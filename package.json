@@ -21,6 +21,7 @@
     "format": "prettier --write .",
     "format-check": "prettier --check .",
     "type-check": "tsc --pretty --noEmit",
+    "gen-types": "supabase gen types typescript --project-id rdqugabfwagikcuttwye > src/database-types.ts",
     "prepare": "husky install",
     "test": "jest",
     "test:ci": "jest --ci",
@@ -46,6 +47,7 @@
     "nextjs-toploader": "^1.6.4",
     "react": "18.2.0",
     "react-dom": "18.2.0",
+    "supabase": "^1.187.10",
     "tailwind-merge": "^2.2.0",
     "undici": "^5.28.2"
   },

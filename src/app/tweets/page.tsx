@@ -2,11 +2,29 @@ import Header from '@/components/Header'
 import ThemeToggle from '@/components/ThemeToggle'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
+import Tweet from '@/components/Tweet'
 
 export default async function Page() {
   const cookieStore = cookies()
   const supabase = createServerClient(cookieStore)
-  const { data: dev_tweets } = await supabase.from('dev_tweets').select()
+  const { data: tweets, error } = await supabase
+    .from('dev_tweets')
+    .select(
+      `
+      *,
+      dev_account:account_id (
+        username,
+        account_display_name
+      )
+    `,
+    )
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  if (error) {
+    console.error('Error fetching tweets:', error)
+    return <div>Error loading tweets</div>
+  }
 
   return (
     <div className="flex w-full flex-1 flex-col items-center gap-20">
@@ -17,8 +35,21 @@ export default async function Page() {
       <div className="flex max-w-4xl flex-1 flex-col gap-20 px-3">
         <Header />
         <main className="flex flex-1 flex-col gap-6">
-          <h2 className="mb-4 text-4xl font-bold">Next steps</h2>
-          <pre>{JSON.stringify(dev_tweets, null, 2)}</pre>
+          <h2 className="mb-4 text-4xl font-bold">Recent Tweets</h2>
+          {tweets.map((tweet) => (
+            <Tweet
+              key={tweet.id}
+              username={tweet.dev_account.username}
+              displayName={tweet.dev_account.account_display_name}
+              // profilePicUrl is omitted for now
+              text={tweet.full_text}
+              favoriteCount={tweet.favorite_count}
+              retweetCount={tweet.retweet_count}
+              date={tweet.created_at}
+              tweetUrl={`https://twitter.com/${tweet.dev_account.username}/status/${tweet.tweet_id}`}
+              replyToUsername={tweet.reply_to_username}
+            />
+          ))}
         </main>
       </div>
 

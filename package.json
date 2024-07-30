@@ -21,7 +21,7 @@
     "format": "prettier --write .",
     "format-check": "prettier --check .",
     "type-check": "tsc --pretty --noEmit",
-    "gen-types": "supabase gen types typescript --project-id rdqugabfwagikcuttwye > src/database-types.ts",
+    "gen-types": "supabase gen types typescript --project-id fabxmporizzqflnftavs  > src/database-types.ts",
     "prepare": "husky install",
     "test": "jest",
     "test:ci": "jest --ci",

@@ -39,14 +39,16 @@ export default async function Page() {
           {tweets.map((tweet) => (
             <Tweet
               key={tweet.id}
-              username={tweet.dev_account.username}
-              displayName={tweet.dev_account.account_display_name}
+              username={tweet.dev_account?.username || 'Unknown'}
+              displayName={tweet.dev_account?.account_display_name || 'Unknown'}
               // profilePicUrl is omitted for now
               text={tweet.full_text}
               favoriteCount={tweet.favorite_count}
               retweetCount={tweet.retweet_count}
               date={tweet.created_at}
-              tweetUrl={`https://twitter.com/${tweet.dev_account.username}/status/${tweet.tweet_id}`}
+              tweetUrl={`https://twitter.com/${
+                tweet.dev_account?.username || 'unknown'
+              }/status/${tweet.tweet_id}`}
               replyToUsername={tweet.reply_to_username}
             />
           ))}

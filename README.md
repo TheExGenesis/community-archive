@@ -1,3 +1,6 @@
+<<<<<<< HEAD
+# open-birdsite-db
+=======
 ![image](https://github.com/michaeltroya/supa-next-starter/assets/38507347/2ea40874-98de-49ec-ab6a-74c816e6ca22)
 
 <h1 align="center">⚡ SupaNext Starter Kit ⚡</h1>
@@ -137,3 +140,4 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 ## Feedback and issues
 
 Please file feedback and issues [here](https://github.com/michaeltroya/supa-next-starter/issues).
+>>>>>>> tweets-display-feature

@@ -30,7 +30,7 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 // Helper function to read and parse mock data
 const readMockData = (filename: string) => {
   const data = fs.readFileSync(
-    path.resolve(__dirname, `../../../data/mock-archive/data/${filename}`),
+    path.resolve(__dirname, `../../data/mock-archive/data/${filename}`),
     'utf8',
   )
   const dataJson = data.slice(data.indexOf('['))

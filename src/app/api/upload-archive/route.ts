@@ -17,12 +17,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Tweets uploaded and processed successfully',
+      message: 'Archive uploaded and processed successfully',
     })
   } catch (error) {
-    console.error('Error processing tweets:', error)
+    console.error('Error processing archive:', error)
     return NextResponse.json(
-      { success: false, message: 'Error processing tweets' },
+      { success: false, message: 'Error processing archive' },
       { status: 500 },
     )
   }

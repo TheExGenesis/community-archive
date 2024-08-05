@@ -15,32 +15,48 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey)
+
+const BATCH_SIZE = 1000
+
+// Helper function to process data in batches
+async function processBatch<T>(
+  items: T[],
+  batchProcessor: (batch: T[]) => Promise<void>,
+) {
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const batch = items.slice(i, i + BATCH_SIZE)
+    await batchProcessor(batch)
+  }
+}
+
 // Insert account data
-export async function insertAccount(accountData: any) {
-  console.log(accountData.account)
-  const { data, error } = await supabase.from('dev_account').upsert(
-    {
+export async function insertAccounts(accountsData: any[]) {
+  await processBatch(accountsData, async (batch) => {
+    const accounts = batch.map((accountData) => ({
       email: accountData.account.email,
       created_via: accountData.account.createdVia,
       username: accountData.account.username,
       account_id: accountData.account.accountId,
       created_at: accountData.account.createdAt,
       account_display_name: accountData.account.accountDisplayName,
-    },
-    {
-      onConflict: 'account_id',
-      ignoreDuplicates: false,
-    },
-  )
+    }))
 
-  if (error) console.error('Error upserting account:', error)
-  else console.log('Account upserted successfully')
+    const { data, error } = await supabase
+      .from('dev_account')
+      .upsert(accounts, {
+        onConflict: 'account_id',
+        ignoreDuplicates: false,
+      })
+
+    if (error) console.error('Error upserting accounts:', error)
+    else console.log(`${accounts.length} accounts upserted successfully`)
+  })
 }
 
 // Insert tweet data
-export async function insertTweet(tweetData: any) {
-  const { data, error } = await supabase.from('dev_tweets').upsert(
-    {
+export async function insertTweets(tweetsData: any[]) {
+  await processBatch(tweetsData, async (batch) => {
+    const tweets = batch.map((tweetData) => ({
       tweet_id: tweetData.tweet.id_str,
       account_id: tweetData.tweet.user_id_str,
       created_at: tweetData.tweet.created_at,
@@ -54,193 +70,179 @@ export async function insertTweet(tweetData: any) {
       is_retweet: tweetData.tweet.retweeted,
       source: tweetData.tweet.source,
       possibly_sensitive: tweetData.tweet.possibly_sensitive || false,
-    },
-    {
-      onConflict: 'tweet_id',
-      ignoreDuplicates: false,
-    },
-  )
+    }))
 
-  if (error) console.error('Error upserting tweet:', error)
-  else {
-    console.log('Tweet upserted successfully')
-    await insertTweetEntities(tweetData.tweet)
-    await insertTweetMedia(tweetData.tweet)
-  }
+    const { data, error } = await supabase
+      .from('dev_tweets')
+      .upsert(tweets, {
+        onConflict: 'tweet_id',
+        ignoreDuplicates: false,
+      })
+      .select()
+
+    if (error) {
+      console.error('Error upserting tweets:', error)
+    } else {
+      console.log(`${tweets.length} tweets upserted successfully`)
+      // Identify the successfully inserted tweets
+      const successfulTweetIds = data ? data.map((tweet) => tweet.tweet_id) : []
+      const confirmedSuccessfulTweets = batch.filter((td) =>
+        successfulTweetIds.includes(td.tweet.id_str),
+      )
+
+      if (confirmedSuccessfulTweets.length > 0) {
+        await insertTweetEntitiesBatch(
+          confirmedSuccessfulTweets.map((td) => td.tweet),
+        )
+        await insertTweetMediaBatch(
+          confirmedSuccessfulTweets.map((td) => td.tweet),
+        )
+      }
+    }
+  })
 }
 
-// Insert tweet entities
-export async function insertTweetEntities(tweet: any) {
-  const { data: existingTweet, error: tweetError } = await supabase
-    .from('dev_tweets')
-    .select('tweet_id')
-    .eq('tweet_id', tweet.id_str)
-    .single()
-
-  if (tweetError || !existingTweet) {
-    console.error('Parent tweet does not exist. Inserting tweet first.')
-    await insertTweet({ tweet })
-  }
-  const entities = [
+// Insert tweet entities in batch
+export async function insertTweetEntitiesBatch(tweets: any[]) {
+  const allEntities = tweets.flatMap((tweet) => [
     ...tweet.entities.hashtags.map((h: any, index: number) => ({
-      type: 'hashtag',
-      value: h.text,
+      tweet_id: tweet.id_str,
+      entity_type: 'hashtag',
+      entity_value: h.text,
       position_index: index,
       start_index: h.indices[0],
       end_index: h.indices[1],
     })),
     ...tweet.entities.user_mentions.map((u: any, index: number) => ({
-      type: 'user_mention',
-      value: u.screen_name,
+      tweet_id: tweet.id_str,
+      entity_type: 'user_mention',
+      entity_value: u.screen_name,
       position_index: index,
       start_index: u.indices[0],
       end_index: u.indices[1],
     })),
     ...tweet.entities.urls.map((u: any, index: number) => ({
-      type: 'url',
-      value: u.expanded_url,
+      tweet_id: tweet.id_str,
+      entity_type: 'url',
+      entity_value: u.expanded_url,
       position_index: index,
       start_index: u.indices[0],
       end_index: u.indices[1],
     })),
-  ]
+  ])
 
-  const { data, error } = await supabase.from('dev_tweet_entities').upsert(
-    entities.map((entity) => ({
-      tweet_id: tweet.id_str,
-      entity_type: entity.type,
-      entity_value: entity.value,
-      position_index: entity.position_index,
-      start_index: entity.start_index,
-      end_index: entity.end_index,
-    })),
-    {
-      onConflict: 'tweet_id,entity_type,position_index',
-      ignoreDuplicates: false,
-    },
-  )
-
-  if (error) console.error('Error upserting tweet entities:', error)
-  else console.log('Tweet entities upserted successfully')
-}
-
-// Insert tweet media
-export async function insertTweetMedia(tweet: any) {
-  if (tweet.extended_entities && tweet.extended_entities.media) {
-    // Check if the parent tweet exists
-    const { data: existingTweet, error: tweetError } = await supabase
-      .from('dev_tweets')
-      .select('tweet_id')
-      .eq('tweet_id', tweet.id_str)
-      .single()
-
-    if (tweetError || !existingTweet) {
-      console.error('Parent tweet does not exist. Inserting tweet first.')
-      await insertTweet({ tweet })
-    }
-
-    const mediaInserts = tweet.extended_entities.media.map((media: any) => ({
-      media_id: media.id_str,
-      tweet_id: tweet.id_str,
-      media_url: media.media_url_https,
-      media_type: media.type,
-      width: media.sizes.large.w,
-      height: media.sizes.large.h,
-    }))
-
+  await processBatch(allEntities, async (batch) => {
     const { data, error } = await supabase
-      .from('dev_tweet_media')
-      .upsert(mediaInserts, {
-        onConflict: 'media_id',
+      .from('dev_tweet_entities')
+      .upsert(batch, {
+        onConflict: 'tweet_id,entity_type,position_index',
         ignoreDuplicates: false,
       })
 
-    if (error) console.error('Error upserting tweet media:', error)
-    else console.log('Tweet media upserted successfully')
+    if (error) console.error('Error upserting tweet entities:', error)
+    else console.log(`${batch.length} tweet entities upserted successfully`)
+  })
+}
+
+// Insert tweet media in batch
+export async function insertTweetMediaBatch(tweets: any[]) {
+  const allMedia = tweets.flatMap((tweet) =>
+    tweet.extended_entities && tweet.extended_entities.media
+      ? tweet.extended_entities.media.map((media: any) => ({
+          media_id: media.id_str,
+          tweet_id: tweet.id_str,
+          media_url: media.media_url_https,
+          media_type: media.type,
+          width: media.sizes.large.w,
+          height: media.sizes.large.h,
+        }))
+      : [],
+  )
+
+  if (allMedia.length > 0) {
+    await processBatch(allMedia, async (batch) => {
+      const { data, error } = await supabase
+        .from('dev_tweet_media')
+        .upsert(batch, {
+          onConflict: 'media_id',
+          ignoreDuplicates: false,
+        })
+
+      if (error) console.error('Error upserting tweet media:', error)
+      else console.log(`${batch.length} tweet media upserted successfully`)
+    })
   }
 }
 
-// Insert follower data
-export async function insertFollower(followerData: any, accountId: any) {
-  const { data, error } = await supabase.from('dev_followers').upsert(
-    {
-      account_id: accountId,
-      follower_account_id: followerData.follower.accountId,
-    },
-    {
+// Insert follower data in batch
+export async function insertFollowers(followersData: any[], accountId: string) {
+  const followers = followersData.map((followerData) => ({
+    account_id: accountId,
+    follower_account_id: followerData.follower.accountId,
+  }))
+
+  await processBatch(followers, async (batch) => {
+    const { data, error } = await supabase.from('dev_followers').upsert(batch, {
       onConflict: 'account_id,follower_account_id',
       ignoreDuplicates: true,
-    },
-  )
+    })
 
-  if (error) console.error('Error upserting follower:', error)
-  else console.log('Follower upserted successfully')
+    if (error) console.error('Error upserting followers:', error)
+    else console.log(`${batch.length} followers upserted successfully`)
+  })
 }
 
-// Insert following data
-export async function insertFollowing(followingData: any, accountId: any) {
-  const { data, error } = await supabase.from('dev_following').upsert(
-    {
-      account_id: accountId,
-      following_account_id: followingData.following.accountId,
-    },
-    {
+// Insert following data in batch
+export async function insertFollowings(
+  followingsData: any[],
+  accountId: string,
+) {
+  const followings = followingsData.map((followingData) => ({
+    account_id: accountId,
+    following_account_id: followingData.following.accountId,
+  }))
+
+  await processBatch(followings, async (batch) => {
+    const { data, error } = await supabase.from('dev_following').upsert(batch, {
       onConflict: 'account_id,following_account_id',
       ignoreDuplicates: true,
-    },
-  )
+    })
 
-  if (error) console.error('Error upserting following:', error)
-  else console.log('Following upserted successfully')
+    if (error) console.error('Error upserting followings:', error)
+    else console.log(`${batch.length} followings upserted successfully`)
+  })
 }
 
 // Main function to process all data
 export async function processTwitterArchive(archiveData: any) {
-  console.log('Archive Data')
-  console.log(archiveData)
-  console.log(archiveData.account)
+  console.log('Processing Twitter Archive')
 
-  const tweets = archiveData.tweets.map((tweet: any) => {
-    tweet.tweet.user_id = archiveData.account[0].account.accountId
-    tweet.tweet.user_id_str = archiveData.account[0].account.accountId
-    return tweet
-  })
-  console.log(tweets)
+  const tweets = archiveData.tweets.map((tweet: any) => ({
+    ...tweet,
+    tweet: {
+      ...tweet.tweet,
+      user_id: archiveData.account[0].account.accountId,
+      user_id_str: archiveData.account[0].account.accountId,
+    },
+  }))
+
   // Insert account data
-  await insertAccount(archiveData.account[0])
+  await insertAccounts(archiveData.account)
 
   // Insert tweets
-  for (const tweet of tweets) {
-    await insertTweet(tweet)
-  }
+  await insertTweets(tweets)
 
   // Insert followers
-  for (const follower of archiveData.follower) {
-    await insertFollower(follower, archiveData.account[0].account.accountId)
-  }
+  await insertFollowers(
+    archiveData.follower,
+    archiveData.account[0].account.accountId,
+  )
 
   // Insert following
-  for (const following of archiveData.following) {
-    await insertFollowing(following, archiveData.account[0].account.accountId)
-  }
+  await insertFollowings(
+    archiveData.following,
+    archiveData.account[0].account.accountId,
+  )
+
+  console.log('Twitter archive processing complete')
 }
-
-// Usage example
-// const archiveData = {
-//   account: [
-//     /* Your account data */
-//   ],
-//   tweets: [
-//     /* Your tweets data */
-//   ],
-//   follower: [
-//     /* Your followers data */
-//   ],
-//   following: [
-//     /* Your following data */
-//   ],
-// }
-
-// processTwitterArchive(archiveData)
-//   .then(() => console.log('Twitter archive processing complete'))
-//   .catch((error) => console.error('Error processing Twitter archive:', error))

@@ -39,7 +39,7 @@ const readMockData = (filename: string) => {
 
 describe('Twitter Archive DB Insert Functions', () => {
   const tweets = readMockData('tweets.js')
-  const followers = readMockData('follower.js')
+  const follower = readMockData('follower.js')
   const following = readMockData('following.js')
   const account = readMockData('account.js')
 
@@ -97,7 +97,7 @@ describe('Twitter Archive DB Insert Functions', () => {
 
   test('insertTweetEntities', async () => {
     const tweetWithEntities = tweets.find(
-      (t) =>
+      (t: any) =>
         t.tweet.entities.user_mentions.length > 0 ||
         t.tweet.entities.hashtags.length > 0 ||
         t.tweet.entities.symbols.length > 0 ||
@@ -156,7 +156,7 @@ describe('Twitter Archive DB Insert Functions', () => {
   })
 
   test('insertFollower', async () => {
-    const mockFollowerData = followers[0]
+    const mockFollowerData = follower[0]
     const accountId = account[0].account.accountId
 
     await insertFollower(mockFollowerData, accountId)
@@ -199,7 +199,7 @@ describe('Twitter Archive DB Insert Functions', () => {
     const mockArchiveData = {
       account: account,
       tweets: tweets.slice(0, 2),
-      followers: followers.slice(0, 2),
+      followers: follower.slice(0, 2),
       following: following.slice(0, 2),
     }
 

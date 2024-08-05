@@ -215,7 +215,7 @@ export async function processTwitterArchive(archiveData: any) {
   }
 
   // Insert followers
-  for (const follower of archiveData.followers) {
+  for (const follower of archiveData.follower) {
     await insertFollower(follower, archiveData.account[0].account.accountId)
   }
 
@@ -233,7 +233,7 @@ export async function processTwitterArchive(archiveData: any) {
 //   tweets: [
 //     /* Your tweets data */
 //   ],
-//   followers: [
+//   follower: [
 //     /* Your followers data */
 //   ],
 //   following: [

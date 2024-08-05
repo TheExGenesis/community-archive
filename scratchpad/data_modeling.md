@@ -11,23 +11,23 @@ Separate tables for follower, following, account, and tweets need to be modelled
 ## Supabase Postgres Table Creation
 
 ```sql
--- Enable UUID extension (if not already enabled)
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create table for account information
-CREATE TABLE dev_account (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE
+  dev_account (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     email TEXT,
     created_via TEXT,
     username TEXT,
     account_id TEXT UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE,
     account_display_name TEXT
-);
+  );
 
 -- Create table for tweets
-CREATE TABLE dev_tweets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE
+  dev_tweets (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     tweet_id TEXT UNIQUE,
     account_id TEXT,
     created_at TIMESTAMP WITH TIME ZONE,
@@ -41,59 +41,54 @@ CREATE TABLE dev_tweets (
     is_retweet BOOLEAN,
     source TEXT,
     possibly_sensitive BOOLEAN,
-    FOREIGN KEY (account_id) REFERENCES dev_account(account_id)
-);
+    FOREIGN KEY (account_id) REFERENCES dev_account (account_id)
+  );
 
 -- Create table for tweet entities
-CREATE TABLE dev_tweet_entities (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE
+  dev_tweet_entities (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     tweet_id TEXT,
     entity_type TEXT,
     entity_value TEXT,
-    FOREIGN KEY (tweet_id) REFERENCES dev_tweets(tweet_id)
-);
+    position_index INTEGER,
+    start_index INTEGER,
+    end_index INTEGER,
+    FOREIGN KEY (tweet_id) REFERENCES dev_tweets (tweet_id),
+    UNIQUE (tweet_id, entity_type, position_index)
+  );
 
 -- Create table for tweet media
-CREATE TABLE dev_tweet_media (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE
+  dev_tweet_media (
+    media_id TEXT PRIMARY KEY,
     tweet_id TEXT,
     media_url TEXT,
     media_type TEXT,
-    width INTEGER,
-    height INTEGER,
-    FOREIGN KEY (tweet_id) REFERENCES dev_tweets(tweet_id)
-);
+    WIDTH INTEGER,
+    HEIGHT INTEGER,
+    FOREIGN KEY (tweet_id) REFERENCES dev_tweets (tweet_id)
+  );
 
 -- Create table for followers
-CREATE TABLE dev_followers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE
+  dev_followers (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     account_id TEXT,
     follower_account_id TEXT,
-    FOREIGN KEY (account_id) REFERENCES dev_account(account_id)
-);
+    UNIQUE (account_id, follower_account_id),
+    FOREIGN KEY (account_id) REFERENCES dev_account (account_id)
+  );
 
 -- Create table for following
-CREATE TABLE dev_following (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE
+  dev_following (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     account_id TEXT,
     following_account_id TEXT,
-    FOREIGN KEY (account_id) REFERENCES dev_account(account_id)
-);
-
--- Enable Row Level Security (RLS) on all tables
-ALTER TABLE dev_account ENABLE ROW LEVEL SECURITY;
-ALTER TABLE dev_tweets ENABLE ROW LEVEL SECURITY;
-ALTER TABLE dev_tweet_entities ENABLE ROW LEVEL SECURITY;
-ALTER TABLE dev_tweet_media ENABLE ROW LEVEL SECURITY;
-ALTER TABLE dev_followers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE dev_following ENABLE ROW LEVEL SECURITY;
-
--- (Optional) Create policies for each table if needed
--- Example policy for the account table:
-CREATE POLICY "Users can view their own account" ON dev_account FOR SELECT
-  USING (auth.uid() = id);
-
--- Remember to create similar policies for other tables as needed
+    UNIQUE (account_id, following_account_id),
+    FOREIGN KEY (account_id) REFERENCES dev_account (account_id)
+  );
 ```
 
 ## Supabase Insert

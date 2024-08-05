@@ -41,9 +41,10 @@ export default function Login({
       email,
       password,
       options: {
-        emailRedirectTo: `${origin}/auth/callback`,
+        emailRedirectTo: `${origin}/api/auth/callback`,
       },
     })
+    console.log(error)
 
     if (error) {
       return redirect('/login?message=Could not authenticate user')

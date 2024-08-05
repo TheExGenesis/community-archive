@@ -1,10 +1,10 @@
 import {
-  insertAccount,
-  insertTweet,
-  insertTweetEntities,
-  insertTweetMedia,
-  insertFollower,
-  insertFollowing,
+  insertAccounts,
+  insertTweets,
+  insertTweetEntitiesBatch,
+  insertTweetMediaBatch,
+  insertFollowers,
+  insertFollowings,
   processTwitterArchive,
 } from './db_insert'
 
@@ -34,6 +34,7 @@ const readMockData = (filename: string) => {
     'utf8',
   )
   const dataJson = data.slice(data.indexOf('['))
+  console.log(dataJson)
   return JSON.parse(dataJson)
 }
 
@@ -53,49 +54,49 @@ describe('Twitter Archive DB Insert Functions', () => {
     await supabase.from('dev_following').delete().neq('account_id', '0')
   })
 
-  test('insertAccount', async () => {
-    const mockAccountData = account[0]
+  test('insertAccounts', async () => {
+    const mockAccountData = [account[0]]
 
-    await insertAccount(mockAccountData)
+    await insertAccounts(mockAccountData)
 
     const { data, error } = await supabase
       .from('dev_account')
       .select()
-      .eq('account_id', mockAccountData.account.accountId)
+      .eq('account_id', mockAccountData[0].account.accountId)
 
     expect(error).toBeNull()
     expect(data).toHaveLength(1)
     expect(data![0]).toMatchObject({
-      email: mockAccountData.account.email,
-      created_via: mockAccountData.account.createdVia,
-      username: mockAccountData.account.username,
-      account_id: mockAccountData.account.accountId,
+      email: mockAccountData[0].account.email,
+      created_via: mockAccountData[0].account.createdVia,
+      username: mockAccountData[0].account.username,
+      account_id: mockAccountData[0].account.accountId,
       created_at: expect.stringMatching(
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?([+-]\d{2}:\d{2}|Z)$/,
       ),
-      account_display_name: mockAccountData.account.accountDisplayName,
+      account_display_name: mockAccountData[0].account.accountDisplayName,
     })
   })
 
-  test('insertTweet', async () => {
-    const tweetData = tweets[0]
-    await insertTweet(tweetData)
+  test('insertTweets', async () => {
+    const tweetData = [tweets[0]]
+    await insertTweets(tweetData)
 
     const { data, error } = await supabase
       .from('dev_tweets')
       .select()
-      .eq('tweet_id', tweetData.tweet.id_str)
+      .eq('tweet_id', tweetData[0].tweet.id_str)
 
     expect(error).toBeNull()
     expect(data).toHaveLength(1)
     expect(data![0]).toMatchObject({
-      tweet_id: tweetData.tweet.id_str,
-      full_text: tweetData.tweet.full_text,
-      lang: tweetData.tweet.lang,
+      tweet_id: tweetData[0].tweet.id_str,
+      full_text: tweetData[0].tweet.full_text,
+      lang: tweetData[0].tweet.lang,
     })
   })
 
-  test('insertTweetEntities', async () => {
+  test('insertTweetEntitiesBatch', async () => {
     const tweetWithEntities = tweets.find(
       (t: any) =>
         t.tweet.entities.user_mentions.length > 0 ||
@@ -110,15 +111,9 @@ describe('Twitter Archive DB Insert Functions', () => {
     }
 
     // Insert the parent tweet first
-    await insertTweet(tweetWithEntities)
+    await insertTweets([tweetWithEntities])
 
-    const entitiesCount =
-      tweetWithEntities.tweet.entities.user_mentions.length +
-      tweetWithEntities.tweet.entities.hashtags.length +
-      tweetWithEntities.tweet.entities.symbols.length +
-      tweetWithEntities.tweet.entities.urls.length
-
-    await insertTweetEntities(tweetWithEntities.tweet)
+    await insertTweetEntitiesBatch([tweetWithEntities.tweet])
 
     const { data, error } = await supabase
       .from('dev_tweet_entities')
@@ -131,15 +126,15 @@ describe('Twitter Archive DB Insert Functions', () => {
     expect(data![0]).toHaveProperty('entity_value')
   })
 
-  test('insertTweetMedia', async () => {
+  test('insertTweetMediaBatch', async () => {
     const tweetWithMedia = tweets.find(
       (t: any) => t.tweet.extended_entities?.media,
     )
     if (tweetWithMedia) {
       // Insert the parent tweet first
-      await insertTweet(tweetWithMedia)
+      await insertTweets([tweetWithMedia])
 
-      await insertTweetMedia(tweetWithMedia.tweet)
+      await insertTweetMediaBatch([tweetWithMedia.tweet])
 
       const { data, error } = await supabase
         .from('dev_tweet_media')
@@ -155,33 +150,33 @@ describe('Twitter Archive DB Insert Functions', () => {
     }
   })
 
-  test('insertFollower', async () => {
-    const mockFollowerData = follower[0]
+  test('insertFollowers', async () => {
+    const mockFollowerData = [follower[0]]
     const accountId = account[0].account.accountId
 
-    await insertFollower(mockFollowerData, accountId)
+    await insertFollowers(mockFollowerData, accountId)
 
     const { data, error } = await supabase
       .from('dev_followers')
       .select()
       .eq('account_id', accountId)
-      .eq('follower_account_id', mockFollowerData.follower.accountId)
+      .eq('follower_account_id', mockFollowerData[0].follower.accountId)
 
     expect(error).toBeNull()
     expect(data).toHaveLength(1)
   })
 
-  test('insertFollowing', async () => {
-    const mockFollowingData = following[0]
+  test('insertFollowings', async () => {
+    const mockFollowingData = [following[0]]
     const accountId = account[0].account.accountId
 
-    await insertFollowing(mockFollowingData, accountId)
+    await insertFollowings(mockFollowingData, accountId)
 
     const { data, error } = await supabase
       .from('dev_following')
       .select()
       .eq('account_id', accountId)
-      .eq('following_account_id', mockFollowingData.following.accountId)
+      .eq('following_account_id', mockFollowingData[0].following.accountId)
 
     expect(error).toBeNull()
     expect(data).toHaveLength(1)
@@ -199,7 +194,7 @@ describe('Twitter Archive DB Insert Functions', () => {
     const mockArchiveData = {
       account: account,
       tweets: tweets.slice(0, 2),
-      followers: follower.slice(0, 2),
+      follower: follower.slice(0, 2),
       following: following.slice(0, 2),
     }
 

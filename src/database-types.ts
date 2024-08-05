@@ -91,6 +91,33 @@ export type Database = {
           },
         ]
       }
+      dev_profile: {
+        Row: {
+          avatar_media_url: string | null
+          bio: string | null
+          header_media_url: string | null
+          id: number
+          location: string | null
+          website: string | null
+        }
+        Insert: {
+          avatar_media_url?: string | null
+          bio?: string | null
+          header_media_url?: string | null
+          id?: never
+          location?: string | null
+          website?: string | null
+        }
+        Update: {
+          avatar_media_url?: string | null
+          bio?: string | null
+          header_media_url?: string | null
+          id?: never
+          location?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
       dev_tweet_entities: {
         Row: {
           end_index: number | null

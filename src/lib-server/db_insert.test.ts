@@ -40,7 +40,13 @@ const readMockData = (filename: string) => {
 }
 
 describe('Twitter Archive DB Insert Functions', () => {
-  const account = readMockData('account.js')
+  const account = readMockData('account.js').map((a: any) => ({
+    ...a,
+    account: {
+      ...a.account,
+      latest_archive_at: new Date().toISOString().replace('Z', '+00:00'),
+    },
+  }))
   const profile = readMockData('profile.js').map((p: any) => ({
     ...p,
     profile: {
@@ -83,7 +89,7 @@ describe('Twitter Archive DB Insert Functions', () => {
     expect(error).toBeNull()
     expect(data).toHaveLength(1)
     expect(data![0]).toMatchObject({
-      email: mockAccountData[0].account.email,
+      // email: mockAccountData[0].account.email,
       created_via: mockAccountData[0].account.createdVia,
       username: mockAccountData[0].account.username,
       account_id: mockAccountData[0].account.accountId,

@@ -1,5 +1,6 @@
 import {
   insertAccounts,
+  insertProfiles,
   insertTweets,
   insertTweetEntitiesBatch,
   insertTweetMediaBatch,
@@ -34,19 +35,34 @@ const readMockData = (filename: string) => {
     'utf8',
   )
   const dataJson = data.slice(data.indexOf('['))
-  console.log(dataJson)
+  // console.log(dataJson)
   return JSON.parse(dataJson)
 }
 
 describe('Twitter Archive DB Insert Functions', () => {
-  const tweets = readMockData('tweets.js')
+  const account = readMockData('account.js')
+  const profile = readMockData('profile.js').map((p: any) => ({
+    ...p,
+    profile: {
+      ...p.profile,
+      account_id: account[0].account.accountId,
+    },
+  }))
+  const tweets = readMockData('tweets.js').map((t: any) => ({
+    ...t,
+    tweet: {
+      ...t.tweet,
+      user_id: account[0].account.accountId,
+      user_id_str: account[0].account.accountId,
+    },
+  }))
   const follower = readMockData('follower.js')
   const following = readMockData('following.js')
-  const account = readMockData('account.js')
 
   beforeAll(async () => {
     // Clear test data before running tests
     await supabase.from('dev_account').delete().neq('account_id', '0')
+    await supabase.from('dev_profile').delete().neq('account_id', '0')
     await supabase.from('dev_tweets').delete().neq('tweet_id', '0')
     await supabase.from('dev_tweet_entities').delete().neq('tweet_id', '0')
     await supabase.from('dev_tweet_media').delete().neq('tweet_id', '0')
@@ -78,7 +94,33 @@ describe('Twitter Archive DB Insert Functions', () => {
     })
   })
 
+  test('insertProfiles', async () => {
+    await insertAccounts(account)
+    const mockProfileData = [profile[0]]
+
+    await insertProfiles(mockProfileData)
+
+    const { data, error } = await supabase
+      .from('dev_profile')
+      .select()
+      .eq('account_id', mockProfileData[0].profile.account_id)
+    console.log(mockProfileData)
+    console.log(data)
+
+    expect(error).toBeNull()
+    expect(data).toHaveLength(1)
+    expect(data![0]).toMatchObject({
+      bio: mockProfileData[0].profile.description.bio,
+      website: mockProfileData[0].profile.description.website,
+      location: mockProfileData[0].profile.description.location,
+      avatar_media_url: mockProfileData[0].profile.avatarMediaUrl,
+      header_media_url: mockProfileData[0].profile.headerMediaUrl,
+    })
+  })
+
   test('insertTweets', async () => {
+    await insertAccounts(account)
+
     const tweetData = [tweets[0]]
     await insertTweets(tweetData)
 
@@ -131,7 +173,6 @@ describe('Twitter Archive DB Insert Functions', () => {
       (t: any) => t.tweet.extended_entities?.media,
     )
     if (tweetWithMedia) {
-      // Insert the parent tweet first
       await insertTweets([tweetWithMedia])
 
       await insertTweetMediaBatch([tweetWithMedia.tweet])
@@ -185,6 +226,7 @@ describe('Twitter Archive DB Insert Functions', () => {
   test('processTwitterArchive', async () => {
     // Clear the database before running this test
     await supabase.from('dev_account').delete().neq('account_id', '0')
+    await supabase.from('dev_profile').delete().neq('account_id', '0')
     await supabase.from('dev_tweets').delete().neq('tweet_id', '0')
     await supabase.from('dev_tweet_entities').delete().neq('tweet_id', '0')
     await supabase.from('dev_tweet_media').delete().neq('tweet_id', '0')
@@ -193,6 +235,7 @@ describe('Twitter Archive DB Insert Functions', () => {
 
     const mockArchiveData = {
       account: account,
+      profile: profile,
       tweets: tweets.slice(0, 2),
       follower: follower.slice(0, 2),
       following: following.slice(0, 2),
@@ -207,6 +250,14 @@ describe('Twitter Archive DB Insert Functions', () => {
       .eq('account_id', account[0].account.accountId)
 
     expect(accountData).toHaveLength(1)
+
+    // Check profile
+    const { data: profileData } = await supabase
+      .from('dev_profile')
+      .select()
+      .eq('account_id', account[0].account.accountId)
+
+    expect(profileData).toHaveLength(1)
 
     // Check tweets
     const { data: tweetsData } = await supabase

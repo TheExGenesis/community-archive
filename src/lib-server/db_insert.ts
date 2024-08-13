@@ -53,6 +53,30 @@ export async function insertAccounts(accountsData: any[]) {
   })
 }
 
+// Insert profile data
+export async function insertProfiles(profilesData: any[]) {
+  await processBatch(profilesData, async (batch) => {
+    const profiles = batch.map((profileData) => ({
+      bio: profileData.profile.description.bio,
+      website: profileData.profile.description.website,
+      location: profileData.profile.description.location,
+      avatar_media_url: profileData.profile.avatarMediaUrl,
+      header_media_url: profileData.profile.headerMediaUrl,
+      account_id: profileData.profile.account_id,
+    }))
+
+    const { data, error } = await supabase
+      .from('dev_profile')
+      .upsert(profiles, {
+        onConflict: 'account_id', // Assuming account_id is the primary key
+        ignoreDuplicates: false,
+      })
+
+    if (error) console.error('Error upserting profiles:', error)
+    else console.log(`${profiles.length} profiles upserted successfully`)
+  })
+}
+
 // Insert tweet data
 export async function insertTweets(tweetsData: any[]) {
   await processBatch(tweetsData, async (batch) => {
@@ -225,6 +249,16 @@ export async function processTwitterArchive(archiveData: any) {
       user_id_str: archiveData.account[0].account.accountId,
     },
   }))
+
+  // Insert profiles with account_id
+  const profilesWithAccountId = archiveData.profile.map((profile: any) => ({
+    ...profile,
+    profile: {
+      ...profile.profile,
+      account_id: archiveData.account[0].account.accountId,
+    },
+  }))
+  await insertProfiles(profilesWithAccountId)
 
   // Insert account data
   await insertAccounts(archiveData.account)

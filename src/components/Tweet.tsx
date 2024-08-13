@@ -27,7 +27,7 @@ export default function Tweet({
   return (
     <div className="mb-4 rounded-lg bg-white p-4 shadow-md dark:bg-gray-800">
       <div className="mb-2 flex items-start">
-        <Image
+        <img
           src={profilePicUrl}
           alt={`${displayName}'s profile picture`}
           width={48}

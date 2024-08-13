@@ -52,7 +52,7 @@ const expectedSchemas = {
   },
   account: {
     account: {
-      email: '',
+      // email: '',
       createdVia: '',
       username: '',
       accountId: '',
@@ -84,9 +84,8 @@ const expectedSchemas = {
 
 export default function UploadTwitterArchive() {
   const [isUploading, setIsUploading] = useState(false)
-  const [progress, setProgress] = useState<'uploading' | 'processing' | null>(
-    null,
-  )
+  const [progress, setProgress] = useState<number>(0)
+  const [status, setStatus] = useState<'uploading' | 'processing' | null>(null)
 
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -96,7 +95,8 @@ export default function UploadTwitterArchive() {
     const file = files[0]
 
     setIsUploading(true)
-    setProgress('uploading')
+    setStatus('uploading')
+    setProgress(0)
 
     const fileContents: { [key: string]: string } = {}
 
@@ -104,6 +104,9 @@ export default function UploadTwitterArchive() {
       try {
         const JSZip = (await import('jszip')).default
         const zip = await JSZip.loadAsync(file)
+
+        const totalFiles = requiredFilePaths.length
+        let processedFiles = 0
 
         for (const fileName of requiredFilePaths) {
           if (!fileName.startsWith('data/') || !fileName.endsWith('.js')) {
@@ -118,11 +121,15 @@ export default function UploadTwitterArchive() {
           const content = await zipFile.async('string')
           const name = fileName.slice(5, -3) // Remove 'data/' prefix and '.js' suffix
           fileContents[name] = content
+
+          processedFiles++
+          setProgress((processedFiles / totalFiles) * 100)
         }
       } catch (error) {
         console.error('Error processing zip file:', error)
         setIsUploading(false)
-        setProgress(null)
+        setStatus(null)
+        setProgress(0)
         return
       }
     } else if (file.webkitRelativePath) {
@@ -133,9 +140,13 @@ export default function UploadTwitterArchive() {
           'Directory upload not supported. Upload a zip file instead.',
         )
         setIsUploading(false)
-        setProgress(null)
+        setStatus(null)
+        setProgress(0)
         return
       }
+
+      const totalFiles = requiredFilePaths.length
+      let processedFiles = 0
 
       for (const fileName of requiredFilePaths) {
         const filePath = `${file.webkitRelativePath.split('/')[0]}/${fileName}`
@@ -149,11 +160,15 @@ export default function UploadTwitterArchive() {
         }
         const name = fileName.slice(5, -3)
         fileContents[name] = await fileEntry.text()
+
+        processedFiles++
+        setProgress((processedFiles / totalFiles) * 100)
       }
     } else {
       console.error('Please upload a zip file or a directory')
       setIsUploading(false)
-      setProgress(null)
+      setStatus(null)
+      setProgress(0)
       return
     }
 
@@ -183,13 +198,13 @@ export default function UploadTwitterArchive() {
     console.log('archive:', archive)
     console.log('archive obj:', JSON.parse(archive))
     try {
-      setProgress('processing')
+      setStatus('processing')
+      setProgress(0)
       const response = await fetch('/api/upload-archive', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        // slice the data from the file contents up to the first array and stringify fileContents
         body: archive,
       })
 
@@ -206,7 +221,8 @@ export default function UploadTwitterArchive() {
     }
 
     setIsUploading(false)
-    setProgress(null)
+    setStatus(null)
+    setProgress(0)
   }
 
   return (
@@ -224,7 +240,7 @@ export default function UploadTwitterArchive() {
       {isUploading && (
         <div>
           <p>
-            {progress === 'uploading' ? 'Uploading...' : 'Processing tweets...'}
+            {status === 'uploading' ? 'Uploading...' : 'Processing tweets...'}
           </p>
           <div
             style={{
@@ -237,13 +253,14 @@ export default function UploadTwitterArchive() {
           >
             <div
               style={{
-                width: `${progress === 'uploading' ? '50%' : '100%'}`,
+                width: `${progress}%`,
                 height: '100%',
                 backgroundColor: '#4CAF50',
                 transition: 'width 0.5s ease-in-out',
               }}
             />
           </div>
+          <p>{Math.round(progress)}%</p>
         </div>
       )}
     </div>

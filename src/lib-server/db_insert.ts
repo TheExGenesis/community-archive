@@ -33,7 +33,7 @@ async function processBatch<T>(
 export async function insertAccounts(accountsData: any[]) {
   await processBatch(accountsData, async (batch) => {
     const accounts = batch.map((accountData) => ({
-      email: accountData.account.email,
+      // email: accountData.account.email,
       created_via: accountData.account.createdVia,
       username: accountData.account.username,
       account_id: accountData.account.accountId,
@@ -184,12 +184,19 @@ export async function insertTweetMediaBatch(tweets: any[]) {
   )
 
   if (allMedia.length > 0) {
-    await processBatch(allMedia, async (batch) => {
+    const uniqueMedia = allMedia.reduce((acc: any[], curr: any) => {
+      if (!acc.find((item: any) => item.media_id === curr.media_id)) {
+        acc.push(curr)
+      }
+      return acc
+    }, [])
+
+    await processBatch(uniqueMedia, async (batch) => {
       const { data, error } = await supabase
         .from('dev_tweet_media')
         .upsert(batch, {
           onConflict: 'media_id',
-          ignoreDuplicates: false,
+          ignoreDuplicates: true,
         })
 
       if (error) console.error('Error upserting tweet media:', error)
@@ -250,6 +257,12 @@ export async function processTwitterArchive(archiveData: any) {
     },
   }))
 
+  // compute the latest tweet date as a proxy for the latest archive date
+  const latestTweetDate = tweets.reduce((latest: any, tweet: any) => {
+    const tweetDate = new Date(tweet.tweet.created_at)
+    return tweetDate > latest ? tweetDate : latest
+  }, new Date(0))
+
   // Insert profiles with account_id
   const profilesWithAccountId = archiveData.profile.map((profile: any) => ({
     ...profile,
@@ -258,10 +271,21 @@ export async function processTwitterArchive(archiveData: any) {
       account_id: archiveData.account[0].account.accountId,
     },
   }))
+
   await insertProfiles(profilesWithAccountId)
 
+  // use the latest tweet date to set the archive_at for each account
+  const accountsWithLatestArchiveAt = archiveData.account.map(
+    (account: any) => ({
+      ...account,
+      account: {
+        ...account.account,
+        archive_at: latestTweetDate.toISOString().replace('Z', '+00:00'),
+      },
+    }),
+  )
   // Insert account data
-  await insertAccounts(archiveData.account)
+  await insertAccounts(accountsWithLatestArchiveAt)
 
   // Insert tweets
   await insertTweets(tweets)

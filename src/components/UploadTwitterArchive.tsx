@@ -7,7 +7,7 @@ type CustomInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   directory?: string
 }
 
-const requiredFiles = ['account', 'tweets', 'follower', 'following']
+const requiredFiles = ['profile', 'account', 'tweets', 'follower', 'following']
 
 const requiredFilePaths = requiredFiles.map((file) => `data/${file}.js`)
 
@@ -38,8 +38,18 @@ const validateContent = (content: string, expectedSchema: any) => {
 }
 
 // ... rest of the code remains the same ...
-
 const expectedSchemas = {
+  profile: {
+    profile: {
+      description: {
+        bio: '',
+        website: '',
+        location: '',
+      },
+      avatarMediaUrl: '',
+      headerMediaUrl: '',
+    },
+  },
   account: {
     account: {
       email: '',

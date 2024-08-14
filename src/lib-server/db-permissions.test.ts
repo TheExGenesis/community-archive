@@ -10,10 +10,11 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE
 
 if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
-  throw new Error('Supabase environment variables are not set')
+  throw new Error(
+    'Supabase URL and key must be provided in environment variables',
+  )
 }
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey)
 
 describe('Database Permissions Tests', () => {

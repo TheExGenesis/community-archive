@@ -7,15 +7,17 @@ dotenv.config({ path: path.resolve(__dirname, '.env') })
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE
+
 const isProduction = process.env.NODE_ENV === 'production'
 
-if (!supabaseUrl || !supabaseKey) {
+if (!supabaseUrl || !supabaseServiceRoleKey || !supabaseKey) {
   throw new Error(
     'Supabase URL and key must be provided in environment variables',
   )
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey)
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey)
 
 const BATCH_SIZE = 1000
 
@@ -45,7 +47,7 @@ export const insertAccounts = async (accountsData: any[]) => {
       account_display_name: accountData.account.accountDisplayName,
     }))
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from(getTableName('account'))
       .upsert(accounts, {
         onConflict: 'account_id',
@@ -69,7 +71,7 @@ export const insertProfiles = async (profilesData: any[]) => {
       account_id: profileData.profile.account_id,
     }))
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from(getTableName('profile'))
       .upsert(profiles, {
         onConflict: 'account_id',
@@ -97,7 +99,7 @@ export const insertTweets = async (tweetsData: any[]) => {
       is_retweet: tweetData.tweet.retweeted,
     }))
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from(getTableName('tweets'))
       .upsert(tweets, {
         onConflict: 'tweet_id',
@@ -156,7 +158,7 @@ export const insertTweetEntitiesBatch = async (tweets: any[]) => {
   ])
 
   await processBatch(allEntities, async (batch) => {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from(getTableName('tweet_entities'))
       .upsert(batch, {
         onConflict: 'tweet_id,entity_type,position_index',
@@ -192,7 +194,7 @@ export const insertTweetMediaBatch = async (tweets: any[]) => {
     }, [])
 
     await processBatch(uniqueMedia, async (batch) => {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from(getTableName('tweet_media'))
         .upsert(batch, {
           onConflict: 'media_id',
@@ -216,7 +218,7 @@ export const insertFollowers = async (
   }))
 
   await processBatch(followers, async (batch) => {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from(getTableName('followers'))
       .upsert(batch, {
         onConflict: 'account_id,follower_account_id',
@@ -239,7 +241,7 @@ export const insertFollowings = async (
   }))
 
   await processBatch(followings, async (batch) => {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from(getTableName('following'))
       .upsert(batch, {
         onConflict: 'account_id,following_account_id',
@@ -252,7 +254,7 @@ export const insertFollowings = async (
 }
 
 const removeExistingFollowers = async (accountId: string) => {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from(getTableName('followers'))
     .delete()
     .eq('account_id', accountId)
@@ -262,7 +264,7 @@ const removeExistingFollowers = async (accountId: string) => {
 }
 
 const removeExistingFollowings = async (accountId: string) => {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from(getTableName('following'))
     .delete()
     .eq('account_id', accountId)
@@ -298,8 +300,6 @@ export const processTwitterArchive = async (archiveData: any) => {
     },
   }))
 
-  await insertProfiles(profilesWithAccountId)
-
   const accountsWithLatestArchiveAt = archiveData.account.map(
     (account: any) => ({
       ...account,
@@ -309,7 +309,10 @@ export const processTwitterArchive = async (archiveData: any) => {
       },
     }),
   )
+
   await insertAccounts(accountsWithLatestArchiveAt)
+
+  await insertProfiles(profilesWithAccountId)
 
   await insertTweets(tweets)
 

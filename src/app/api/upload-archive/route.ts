@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import { createServerClient } from '@/utils/supabase'
 import { processTwitterArchive } from '@/lib-server/db_insert'
 
+export const maxDuration = 60
 export async function POST(request: Request) {
   console.log('POST ARCHIVE RECEIVED')
   const content = await request.json()

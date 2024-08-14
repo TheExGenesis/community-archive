@@ -2,8 +2,8 @@ import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
 import {
-  insertAccount,
-  insertTweet,
+  insertAccounts,
+  insertTweets,
   processTwitterArchive,
 } from '../src/lib-server/db_insert'
 
@@ -58,7 +58,7 @@ async function main() {
   // console.log(tweets.map((tweet: any) => tweet.tweet?.entities))
 
   // console.log(insertAccount(account)) // works
-  console.log(await insertTweet(tweet))
+  console.log(await insertTweets(tweet))
 }
 
 main().catch(console.error)

@@ -89,15 +89,12 @@ export const insertTweets = async (tweetsData: any[]) => {
       account_id: tweetData.tweet.user_id_str,
       created_at: tweetData.tweet.created_at,
       full_text: tweetData.tweet.full_text,
-      lang: tweetData.tweet.lang,
       retweet_count: tweetData.tweet.retweet_count,
       favorite_count: tweetData.tweet.favorite_count,
       reply_to_tweet_id: tweetData.tweet.in_reply_to_status_id_str,
       reply_to_user_id: tweetData.tweet.in_reply_to_user_id_str,
       reply_to_username: tweetData.tweet.in_reply_to_screen_name,
       is_retweet: tweetData.tweet.retweeted,
-      source: tweetData.tweet.source,
-      possibly_sensitive: tweetData.tweet.possibly_sensitive || false,
     }))
 
     const { data, error } = await supabase

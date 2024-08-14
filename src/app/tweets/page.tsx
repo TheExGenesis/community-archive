@@ -3,15 +3,28 @@ import ThemeToggle from '@/components/ThemeToggle'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import Tweet from '@/components/Tweet'
+import dotenv from 'dotenv'
+import path from 'path'
+
+// Load environment variables from .env file in the scratchpad directory
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: path.resolve(__dirname, '../../../.env.local') })
+}
+
+const isProduction = process.env.NODE_ENV === 'production'
+
+// Helper function to get the correct table name based on environment
+const getTableName = (baseName: string) =>
+  isProduction ? baseName : `dev_${baseName}`
 
 const fetchTweets = async (supabase: any) => {
   const { data: tweets, error } = await supabase
-    .from('dev_tweets')
+    .from(getTableName('tweets'))
     .select(
       `
     *,
-    dev_account!inner (
-      dev_profile (
+    ${getTableName('account')}!inner (
+      ${getTableName('profile')} (
         avatar_media_url
       ),
       username,
@@ -52,11 +65,14 @@ export default async function Page() {
           {tweets.map((tweet: any) => (
             <Tweet
               key={tweet.id}
-              username={tweet.dev_account?.username || 'Unknown'}
-              displayName={tweet.dev_account?.account_display_name || 'Unknown'}
-              // profilePicUrl is omitted for now
+              username={tweet[getTableName('account')]?.username || 'Unknown'}
+              displayName={
+                tweet[getTableName('account')]?.account_display_name ||
+                'Unknown'
+              }
               profilePicUrl={
-                tweet.dev_account?.dev_profile?.avatar_media_url ||
+                tweet[getTableName('account')]?.[getTableName('profile')]
+                  ?.avatar_media_url ||
                 'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
               }
               text={tweet.full_text}
@@ -64,7 +80,7 @@ export default async function Page() {
               retweetCount={tweet.retweet_count}
               date={tweet.created_at}
               tweetUrl={`https://twitter.com/${
-                tweet.dev_account?.username || 'unknown'
+                tweet[getTableName('account')]?.username || 'unknown'
               }/status/${tweet.tweet_id}`}
               replyToUsername={tweet.reply_to_username}
             />

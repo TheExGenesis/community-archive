@@ -6,11 +6,16 @@ import path from 'path'
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.resolve(__dirname, '.env') })
 }
+
+const isProduction = process.env.NODE_ENV === 'production'
+
+// Helper function to get the correct table name based on environment
+const getTableName = (baseName: string) =>
+  isProduction ? baseName : `dev_${baseName}`
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE
-
-const isProduction = process.env.NODE_ENV === 'production'
 
 if (!supabaseUrl || !supabaseServiceRoleKey || !supabaseKey) {
   throw new Error(
@@ -32,10 +37,6 @@ const processBatch = async <T>(
     await batchProcessor(batch)
   }
 }
-
-// Helper function to get the correct table name based on environment
-const getTableName = (baseName: string) =>
-  isProduction ? baseName : `dev_${baseName}`
 
 // Insert account data
 export const insertAccounts = async (accountsData: any[]) => {

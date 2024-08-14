@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
   try {
     console.log(content)
-    processTwitterArchive(content)
+    await processTwitterArchive(content)
 
     return NextResponse.json({
       success: true,

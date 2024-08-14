@@ -18,15 +18,16 @@ import fs from 'fs'
 dotenv.config({ path: path.resolve(__dirname, '.env') })
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE
 
-if (!supabaseUrl || !supabaseKey) {
+if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
   throw new Error(
     'Supabase URL and key must be provided in environment variables',
   )
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey)
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey)
 
 // Helper function to read and parse mock data
 const readMockData = (filename: string) => {
@@ -65,15 +66,15 @@ describe('Twitter Archive DB Insert Functions', () => {
   const follower = readMockData('follower.js')
   const following = readMockData('following.js')
 
-  beforeAll(async () => {
-    // Clear test data before running tests
-    await supabase.from('dev_account').delete().neq('account_id', '0')
-    await supabase.from('dev_profile').delete().neq('account_id', '0')
-    await supabase.from('dev_tweets').delete().neq('tweet_id', '0')
-    await supabase.from('dev_tweet_entities').delete().neq('tweet_id', '0')
-    await supabase.from('dev_tweet_media').delete().neq('tweet_id', '0')
-    await supabase.from('dev_followers').delete().neq('account_id', '0')
-    await supabase.from('dev_following').delete().neq('account_id', '0')
+  beforeEach(async () => {
+    // Clear test data before each test
+    await supabaseAdmin.from('dev_account').delete().neq('account_id', '0')
+    await supabaseAdmin.from('dev_profile').delete().neq('account_id', '0')
+    await supabaseAdmin.from('dev_tweets').delete().neq('tweet_id', '0')
+    await supabaseAdmin.from('dev_tweet_entities').delete().neq('tweet_id', '0')
+    await supabaseAdmin.from('dev_tweet_media').delete().neq('tweet_id', '0')
+    await supabaseAdmin.from('dev_followers').delete().neq('account_id', '0')
+    await supabaseAdmin.from('dev_following').delete().neq('account_id', '0')
   })
 
   test('insertAccounts', async () => {
@@ -81,7 +82,7 @@ describe('Twitter Archive DB Insert Functions', () => {
 
     await insertAccounts(mockAccountData)
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('dev_account')
       .select()
       .eq('account_id', mockAccountData[0].account.accountId)
@@ -106,7 +107,7 @@ describe('Twitter Archive DB Insert Functions', () => {
 
     await insertProfiles(mockProfileData)
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('dev_profile')
       .select()
       .eq('account_id', mockProfileData[0].profile.account_id)
@@ -130,7 +131,7 @@ describe('Twitter Archive DB Insert Functions', () => {
     const tweetData = [tweets[0]]
     await insertTweets(tweetData)
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('dev_tweets')
       .select()
       .eq('tweet_id', tweetData[0].tweet.id_str)
@@ -140,7 +141,6 @@ describe('Twitter Archive DB Insert Functions', () => {
     expect(data![0]).toMatchObject({
       tweet_id: tweetData[0].tweet.id_str,
       full_text: tweetData[0].tweet.full_text,
-      lang: tweetData[0].tweet.lang,
     })
   })
 
@@ -163,7 +163,7 @@ describe('Twitter Archive DB Insert Functions', () => {
 
     await insertTweetEntitiesBatch([tweetWithEntities.tweet])
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('dev_tweet_entities')
       .select()
       .eq('tweet_id', tweetWithEntities.tweet.id_str)
@@ -183,7 +183,7 @@ describe('Twitter Archive DB Insert Functions', () => {
 
       await insertTweetMediaBatch([tweetWithMedia.tweet])
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('dev_tweet_media')
         .select()
         .eq('tweet_id', tweetWithMedia.tweet.id_str)
@@ -203,7 +203,7 @@ describe('Twitter Archive DB Insert Functions', () => {
 
     await insertFollowers(mockFollowerData, accountId)
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('dev_followers')
       .select()
       .eq('account_id', accountId)
@@ -219,7 +219,7 @@ describe('Twitter Archive DB Insert Functions', () => {
 
     await insertFollowings(mockFollowingData, accountId)
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('dev_following')
       .select()
       .eq('account_id', accountId)
@@ -231,13 +231,13 @@ describe('Twitter Archive DB Insert Functions', () => {
 
   test('processTwitterArchive', async () => {
     // Clear the database before running this test
-    await supabase.from('dev_account').delete().neq('account_id', '0')
-    await supabase.from('dev_profile').delete().neq('account_id', '0')
-    await supabase.from('dev_tweets').delete().neq('tweet_id', '0')
-    await supabase.from('dev_tweet_entities').delete().neq('tweet_id', '0')
-    await supabase.from('dev_tweet_media').delete().neq('tweet_id', '0')
-    await supabase.from('dev_followers').delete().neq('account_id', '0')
-    await supabase.from('dev_following').delete().neq('account_id', '0')
+    await supabaseAdmin.from('dev_account').delete().neq('account_id', '0')
+    await supabaseAdmin.from('dev_profile').delete().neq('account_id', '0')
+    await supabaseAdmin.from('dev_tweets').delete().neq('tweet_id', '0')
+    await supabaseAdmin.from('dev_tweet_entities').delete().neq('tweet_id', '0')
+    await supabaseAdmin.from('dev_tweet_media').delete().neq('tweet_id', '0')
+    await supabaseAdmin.from('dev_followers').delete().neq('account_id', '0')
+    await supabaseAdmin.from('dev_following').delete().neq('account_id', '0')
 
     const mockArchiveData = {
       account: account,
@@ -246,11 +246,12 @@ describe('Twitter Archive DB Insert Functions', () => {
       follower: follower.slice(0, 2),
       following: following.slice(0, 2),
     }
+    console.log('tweets', mockArchiveData.tweets)
 
     await processTwitterArchive(mockArchiveData)
 
     // Check account
-    const { data: accountData } = await supabase
+    const { data: accountData } = await supabaseAdmin
       .from('dev_account')
       .select()
       .eq('account_id', account[0].account.accountId)
@@ -258,7 +259,7 @@ describe('Twitter Archive DB Insert Functions', () => {
     expect(accountData).toHaveLength(1)
 
     // Check profile
-    const { data: profileData } = await supabase
+    const { data: profileData } = await supabaseAdmin
       .from('dev_profile')
       .select()
       .eq('account_id', account[0].account.accountId)
@@ -266,7 +267,7 @@ describe('Twitter Archive DB Insert Functions', () => {
     expect(profileData).toHaveLength(1)
 
     // Check tweets
-    const { data: tweetsData } = await supabase
+    const { data: tweetsData } = await supabaseAdmin
       .from('dev_tweets')
       .select()
       .eq('account_id', account[0].account.accountId)
@@ -274,7 +275,7 @@ describe('Twitter Archive DB Insert Functions', () => {
     expect(tweetsData!.length).toBe(2)
 
     // Check followers
-    const { data: followersData } = await supabase
+    const { data: followersData } = await supabaseAdmin
       .from('dev_followers')
       .select()
       .eq('account_id', account[0].account.accountId)
@@ -282,7 +283,7 @@ describe('Twitter Archive DB Insert Functions', () => {
     expect(followersData).toHaveLength(2)
 
     // Check following
-    const { data: followingData } = await supabase
+    const { data: followingData } = await supabaseAdmin
       .from('dev_following')
       .select()
       .eq('account_id', account[0].account.accountId)

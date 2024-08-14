@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { processTwitterArchive } from '../lib-server/db_insert'
+import { createBrowserClient } from '@/utils/supabase'
 
 type CustomInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   webkitdirectory?: string
@@ -79,6 +81,7 @@ const expectedSchemas = {
 }
 
 export default function UploadTwitterArchive() {
+  const supabase = createBrowserClient()
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState<number>(0)
   const [status, setStatus] = useState<'uploading' | 'processing' | null>(null)
@@ -196,24 +199,14 @@ export default function UploadTwitterArchive() {
     try {
       setStatus('processing')
       setProgress(0)
-      const response = await fetch('/api/upload-archive', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: archive,
-      })
 
-      if (response.ok) {
-        const result = await response.json()
-        alert(result.message)
-      } else {
-        const error = await response.json()
-        alert(error.message || 'Failed to upload archive')
-      }
+      // Instead of sending a POST request, call processTwitterArchive directly
+      await processTwitterArchive(supabase, JSON.parse(archive))
+
+      alert('Archive processed successfully')
     } catch (error) {
-      console.error('Error uploading archive:', error)
-      alert('An error occurred while uploading archive')
+      console.error('Error processing archive:', error)
+      alert('An error occurred while processing archive')
     }
 
     setIsUploading(false)

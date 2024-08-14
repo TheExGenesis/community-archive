@@ -16,6 +16,7 @@ if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
   )
 }
 
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey)
 
 describe('Database Permissions Tests', () => {

@@ -81,7 +81,7 @@ describe('Twitter Archive DB Insert Functions', () => {
   test('insertAccounts', async () => {
     const mockAccountData = [account[0]]
 
-    await insertAccounts(mockAccountData)
+    await insertAccounts(supabaseAdmin, mockAccountData)
 
     const { data, error } = await supabaseAdmin
       .from('dev_account')
@@ -103,10 +103,10 @@ describe('Twitter Archive DB Insert Functions', () => {
   })
 
   test('insertProfiles', async () => {
-    await insertAccounts(account)
+    await insertAccounts(supabaseAdmin, account)
     const mockProfileData = [profile[0]]
 
-    await insertProfiles(mockProfileData)
+    await insertProfiles(supabaseAdmin, mockProfileData)
 
     const { data, error } = await supabaseAdmin
       .from('dev_profile')
@@ -127,10 +127,10 @@ describe('Twitter Archive DB Insert Functions', () => {
   })
 
   test('insertTweets', async () => {
-    await insertAccounts(account)
+    await insertAccounts(supabaseAdmin, account)
 
     const tweetData = [tweets[0]]
-    await insertTweets(tweetData)
+    await insertTweets(supabaseAdmin, tweetData)
 
     const { data, error } = await supabaseAdmin
       .from('dev_tweets')
@@ -160,9 +160,9 @@ describe('Twitter Archive DB Insert Functions', () => {
     }
 
     // Insert the parent tweet first
-    await insertTweets([tweetWithEntities])
+    await insertTweets(supabaseAdmin, [tweetWithEntities])
 
-    await insertTweetEntitiesBatch([tweetWithEntities.tweet])
+    await insertTweetEntitiesBatch(supabaseAdmin, [tweetWithEntities.tweet])
 
     const { data, error } = await supabaseAdmin
       .from('dev_tweet_entities')
@@ -180,9 +180,9 @@ describe('Twitter Archive DB Insert Functions', () => {
       (t: any) => t.tweet.extended_entities?.media,
     )
     if (tweetWithMedia) {
-      await insertTweets([tweetWithMedia])
+      await insertTweets(supabaseAdmin, [tweetWithMedia])
 
-      await insertTweetMediaBatch([tweetWithMedia.tweet])
+      await insertTweetMediaBatch(supabaseAdmin, [tweetWithMedia.tweet])
 
       const { data, error } = await supabaseAdmin
         .from('dev_tweet_media')
@@ -202,7 +202,7 @@ describe('Twitter Archive DB Insert Functions', () => {
     const mockFollowerData = [follower[0]]
     const accountId = account[0].account.accountId
 
-    await insertFollowers(mockFollowerData, accountId)
+    await insertFollowers(supabaseAdmin, mockFollowerData, accountId)
 
     const { data, error } = await supabaseAdmin
       .from('dev_followers')
@@ -218,7 +218,7 @@ describe('Twitter Archive DB Insert Functions', () => {
     const mockFollowingData = [following[0]]
     const accountId = account[0].account.accountId
 
-    await insertFollowings(mockFollowingData, accountId)
+    await insertFollowings(supabaseAdmin, mockFollowingData, accountId)
 
     const { data, error } = await supabaseAdmin
       .from('dev_following')
@@ -249,7 +249,7 @@ describe('Twitter Archive DB Insert Functions', () => {
     }
     console.log('tweets', mockArchiveData.tweets)
 
-    await processTwitterArchive(mockArchiveData)
+    await processTwitterArchive(supabaseAdmin, mockArchiveData)
 
     // Check account
     const { data: accountData } = await supabaseAdmin

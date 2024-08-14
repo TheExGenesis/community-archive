@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
 
@@ -12,18 +12,6 @@ const isProduction = process.env.NODE_ENV === 'production'
 // Helper function to get the correct table name based on environment
 const getTableName = (baseName: string) =>
   isProduction ? baseName : `dev_${baseName}`
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE
-
-if (!supabaseUrl || !supabaseServiceRoleKey || !supabaseKey) {
-  throw new Error(
-    'Supabase URL and key must be provided in environment variables',
-  )
-}
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey)
 
 const BATCH_SIZE = 1000
 
@@ -39,7 +27,10 @@ const processBatch = async <T>(
 }
 
 // Insert account data
-export const insertAccounts = async (accountsData: any[]) => {
+export const insertAccounts = async (
+  supabase: SupabaseClient,
+  accountsData: any[],
+) => {
   await processBatch(accountsData, async (batch) => {
     const accounts = batch.map((accountData) => ({
       created_via: accountData.account.createdVia,
@@ -49,7 +40,7 @@ export const insertAccounts = async (accountsData: any[]) => {
       account_display_name: accountData.account.accountDisplayName,
     }))
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from(getTableName('account'))
       .upsert(accounts, {
         onConflict: 'account_id',
@@ -62,7 +53,10 @@ export const insertAccounts = async (accountsData: any[]) => {
 }
 
 // Insert profile data
-export const insertProfiles = async (profilesData: any[]) => {
+export const insertProfiles = async (
+  supabase: SupabaseClient,
+  profilesData: any[],
+) => {
   await processBatch(profilesData, async (batch) => {
     const profiles = batch.map((profileData) => ({
       bio: profileData.profile.description.bio,
@@ -73,7 +67,7 @@ export const insertProfiles = async (profilesData: any[]) => {
       account_id: profileData.profile.account_id,
     }))
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from(getTableName('profile'))
       .upsert(profiles, {
         onConflict: 'account_id',
@@ -86,7 +80,10 @@ export const insertProfiles = async (profilesData: any[]) => {
 }
 
 // Insert tweet data
-export const insertTweets = async (tweetsData: any[]) => {
+export const insertTweets = async (
+  supabase: SupabaseClient,
+  tweetsData: any[],
+) => {
   await processBatch(tweetsData, async (batch) => {
     const tweets = batch.map((tweetData) => ({
       tweet_id: tweetData.tweet.id_str,
@@ -101,7 +98,7 @@ export const insertTweets = async (tweetsData: any[]) => {
       is_retweet: tweetData.tweet.retweeted,
     }))
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from(getTableName('tweets'))
       .upsert(tweets, {
         onConflict: 'tweet_id',
@@ -120,9 +117,11 @@ export const insertTweets = async (tweetsData: any[]) => {
 
       if (confirmedSuccessfulTweets.length > 0) {
         await insertTweetEntitiesBatch(
+          supabase,
           confirmedSuccessfulTweets.map((td) => td.tweet),
         )
         await insertTweetMediaBatch(
+          supabase,
           confirmedSuccessfulTweets.map((td) => td.tweet),
         )
       }
@@ -131,7 +130,10 @@ export const insertTweets = async (tweetsData: any[]) => {
 }
 
 // Insert tweet entities in batch
-export const insertTweetEntitiesBatch = async (tweets: any[]) => {
+export const insertTweetEntitiesBatch = async (
+  supabase: SupabaseClient,
+  tweets: any[],
+) => {
   const allEntities = tweets.flatMap((tweet) => [
     ...tweet.entities.hashtags.map((h: any, index: number) => ({
       tweet_id: tweet.id_str,
@@ -160,7 +162,7 @@ export const insertTweetEntitiesBatch = async (tweets: any[]) => {
   ])
 
   await processBatch(allEntities, async (batch) => {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from(getTableName('tweet_entities'))
       .upsert(batch, {
         onConflict: 'tweet_id,entity_type,position_index',
@@ -173,7 +175,10 @@ export const insertTweetEntitiesBatch = async (tweets: any[]) => {
 }
 
 // Insert tweet media in batch
-export const insertTweetMediaBatch = async (tweets: any[]) => {
+export const insertTweetMediaBatch = async (
+  supabase: SupabaseClient,
+  tweets: any[],
+) => {
   const allMedia = tweets.flatMap((tweet) =>
     tweet.extended_entities && tweet.extended_entities.media
       ? tweet.extended_entities.media.map((media: any) => ({
@@ -196,7 +201,7 @@ export const insertTweetMediaBatch = async (tweets: any[]) => {
     }, [])
 
     await processBatch(uniqueMedia, async (batch) => {
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await supabase
         .from(getTableName('tweet_media'))
         .upsert(batch, {
           onConflict: 'media_id',
@@ -211,6 +216,7 @@ export const insertTweetMediaBatch = async (tweets: any[]) => {
 
 // Insert follower data in batch
 export const insertFollowers = async (
+  supabase: SupabaseClient,
   followersData: any[],
   accountId: string,
 ) => {
@@ -220,7 +226,7 @@ export const insertFollowers = async (
   }))
 
   await processBatch(followers, async (batch) => {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from(getTableName('followers'))
       .upsert(batch, {
         onConflict: 'account_id,follower_account_id',
@@ -234,6 +240,7 @@ export const insertFollowers = async (
 
 // Insert following data in batch
 export const insertFollowings = async (
+  supabase: SupabaseClient,
   followingsData: any[],
   accountId: string,
 ) => {
@@ -243,7 +250,7 @@ export const insertFollowings = async (
   }))
 
   await processBatch(followings, async (batch) => {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from(getTableName('following'))
       .upsert(batch, {
         onConflict: 'account_id,following_account_id',
@@ -255,8 +262,11 @@ export const insertFollowings = async (
   })
 }
 
-const removeExistingFollowers = async (accountId: string) => {
-  const { error } = await supabaseAdmin
+const removeExistingFollowers = async (
+  supabase: SupabaseClient,
+  accountId: string,
+) => {
+  const { error } = await supabase
     .from(getTableName('followers'))
     .delete()
     .eq('account_id', accountId)
@@ -265,8 +275,11 @@ const removeExistingFollowers = async (accountId: string) => {
   else console.log(`Existing followers removed for account ${accountId}`)
 }
 
-const removeExistingFollowings = async (accountId: string) => {
-  const { error } = await supabaseAdmin
+const removeExistingFollowings = async (
+  supabase: SupabaseClient,
+  accountId: string,
+) => {
+  const { error } = await supabase
     .from(getTableName('following'))
     .delete()
     .eq('account_id', accountId)
@@ -276,7 +289,10 @@ const removeExistingFollowings = async (accountId: string) => {
 }
 
 // Main function to process all data
-export const processTwitterArchive = async (archiveData: any) => {
+export const processTwitterArchive = async (
+  supabase: SupabaseClient,
+  archiveData: any,
+) => {
   console.log('Processing Twitter Archive')
 
   const tweets = archiveData.tweets.map((tweet: any) => ({
@@ -312,25 +328,20 @@ export const processTwitterArchive = async (archiveData: any) => {
     }),
   )
 
-  await insertAccounts(accountsWithLatestArchiveAt)
+  try {
+    await insertAccounts(supabase, accountsWithLatestArchiveAt)
+    await insertProfiles(supabase, profilesWithAccountId)
+    await insertTweets(supabase, tweets)
 
-  await insertProfiles(profilesWithAccountId)
+    const accountId = archiveData.account[0].account.accountId
+    await removeExistingFollowers(supabase, accountId)
+    await removeExistingFollowings(supabase, accountId)
+    await insertFollowers(supabase, archiveData.follower, accountId)
+    await insertFollowings(supabase, archiveData.following, accountId)
 
-  await insertTweets(tweets)
-
-  const accountId = archiveData.account[0].account.accountId
-  // TODO: keep changes to existing followers and followings across different archive uploads
-  await removeExistingFollowers(accountId)
-  await removeExistingFollowings(accountId)
-  await insertFollowers(
-    archiveData.follower,
-    archiveData.account[0].account.accountId,
-  )
-
-  await insertFollowings(
-    archiveData.following,
-    archiveData.account[0].account.accountId,
-  )
-
-  console.log('Twitter archive processing complete')
+    console.log('Twitter archive processing complete')
+  } catch (error) {
+    console.error('Error processing Twitter archive:', error)
+    throw error
+  }
 }

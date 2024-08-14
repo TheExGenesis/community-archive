@@ -3,8 +3,9 @@ import dotenv from 'dotenv'
 import path from 'path'
 
 // Load environment variables from .env file in the scratchpad directory
-dotenv.config({ path: path.resolve(__dirname, '.env') })
-
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: path.resolve(__dirname, '.env') })
+}
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE

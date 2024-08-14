@@ -7,6 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, '.env') })
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const isProduction = process.env.NODE_ENV === 'production'
 
 if (!supabaseUrl || !supabaseKey) {
   throw new Error(
@@ -19,21 +20,24 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 const BATCH_SIZE = 1000
 
 // Helper function to process data in batches
-async function processBatch<T>(
+const processBatch = async <T>(
   items: T[],
   batchProcessor: (batch: T[]) => Promise<void>,
-) {
+) => {
   for (let i = 0; i < items.length; i += BATCH_SIZE) {
     const batch = items.slice(i, i + BATCH_SIZE)
     await batchProcessor(batch)
   }
 }
 
+// Helper function to get the correct table name based on environment
+const getTableName = (baseName: string) =>
+  isProduction ? baseName : `dev_${baseName}`
+
 // Insert account data
-export async function insertAccounts(accountsData: any[]) {
+export const insertAccounts = async (accountsData: any[]) => {
   await processBatch(accountsData, async (batch) => {
     const accounts = batch.map((accountData) => ({
-      // email: accountData.account.email,
       created_via: accountData.account.createdVia,
       username: accountData.account.username,
       account_id: accountData.account.accountId,
@@ -42,7 +46,7 @@ export async function insertAccounts(accountsData: any[]) {
     }))
 
     const { data, error } = await supabase
-      .from('dev_account')
+      .from(getTableName('account'))
       .upsert(accounts, {
         onConflict: 'account_id',
         ignoreDuplicates: false,
@@ -54,7 +58,7 @@ export async function insertAccounts(accountsData: any[]) {
 }
 
 // Insert profile data
-export async function insertProfiles(profilesData: any[]) {
+export const insertProfiles = async (profilesData: any[]) => {
   await processBatch(profilesData, async (batch) => {
     const profiles = batch.map((profileData) => ({
       bio: profileData.profile.description.bio,
@@ -66,9 +70,9 @@ export async function insertProfiles(profilesData: any[]) {
     }))
 
     const { data, error } = await supabase
-      .from('dev_profile')
+      .from(getTableName('profile'))
       .upsert(profiles, {
-        onConflict: 'account_id', // Assuming account_id is the primary key
+        onConflict: 'account_id',
         ignoreDuplicates: false,
       })
 
@@ -78,7 +82,7 @@ export async function insertProfiles(profilesData: any[]) {
 }
 
 // Insert tweet data
-export async function insertTweets(tweetsData: any[]) {
+export const insertTweets = async (tweetsData: any[]) => {
   await processBatch(tweetsData, async (batch) => {
     const tweets = batch.map((tweetData) => ({
       tweet_id: tweetData.tweet.id_str,
@@ -97,7 +101,7 @@ export async function insertTweets(tweetsData: any[]) {
     }))
 
     const { data, error } = await supabase
-      .from('dev_tweets')
+      .from(getTableName('tweets'))
       .upsert(tweets, {
         onConflict: 'tweet_id',
         ignoreDuplicates: false,
@@ -108,7 +112,6 @@ export async function insertTweets(tweetsData: any[]) {
       console.error('Error upserting tweets:', error)
     } else {
       console.log(`${tweets.length} tweets upserted successfully`)
-      // Identify the successfully inserted tweets
       const successfulTweetIds = data ? data.map((tweet) => tweet.tweet_id) : []
       const confirmedSuccessfulTweets = batch.filter((td) =>
         successfulTweetIds.includes(td.tweet.id_str),
@@ -127,7 +130,7 @@ export async function insertTweets(tweetsData: any[]) {
 }
 
 // Insert tweet entities in batch
-export async function insertTweetEntitiesBatch(tweets: any[]) {
+export const insertTweetEntitiesBatch = async (tweets: any[]) => {
   const allEntities = tweets.flatMap((tweet) => [
     ...tweet.entities.hashtags.map((h: any, index: number) => ({
       tweet_id: tweet.id_str,
@@ -157,7 +160,7 @@ export async function insertTweetEntitiesBatch(tweets: any[]) {
 
   await processBatch(allEntities, async (batch) => {
     const { data, error } = await supabase
-      .from('dev_tweet_entities')
+      .from(getTableName('tweet_entities'))
       .upsert(batch, {
         onConflict: 'tweet_id,entity_type,position_index',
         ignoreDuplicates: false,
@@ -169,7 +172,7 @@ export async function insertTweetEntitiesBatch(tweets: any[]) {
 }
 
 // Insert tweet media in batch
-export async function insertTweetMediaBatch(tweets: any[]) {
+export const insertTweetMediaBatch = async (tweets: any[]) => {
   const allMedia = tweets.flatMap((tweet) =>
     tweet.extended_entities && tweet.extended_entities.media
       ? tweet.extended_entities.media.map((media: any) => ({
@@ -193,7 +196,7 @@ export async function insertTweetMediaBatch(tweets: any[]) {
 
     await processBatch(uniqueMedia, async (batch) => {
       const { data, error } = await supabase
-        .from('dev_tweet_media')
+        .from(getTableName('tweet_media'))
         .upsert(batch, {
           onConflict: 'media_id',
           ignoreDuplicates: true,
@@ -206,17 +209,22 @@ export async function insertTweetMediaBatch(tweets: any[]) {
 }
 
 // Insert follower data in batch
-export async function insertFollowers(followersData: any[], accountId: string) {
+export const insertFollowers = async (
+  followersData: any[],
+  accountId: string,
+) => {
   const followers = followersData.map((followerData) => ({
     account_id: accountId,
     follower_account_id: followerData.follower.accountId,
   }))
 
   await processBatch(followers, async (batch) => {
-    const { data, error } = await supabase.from('dev_followers').upsert(batch, {
-      onConflict: 'account_id,follower_account_id',
-      ignoreDuplicates: true,
-    })
+    const { data, error } = await supabase
+      .from(getTableName('followers'))
+      .upsert(batch, {
+        onConflict: 'account_id,follower_account_id',
+        ignoreDuplicates: true,
+      })
 
     if (error) console.error('Error upserting followers:', error)
     else console.log(`${batch.length} followers upserted successfully`)
@@ -224,28 +232,50 @@ export async function insertFollowers(followersData: any[], accountId: string) {
 }
 
 // Insert following data in batch
-export async function insertFollowings(
+export const insertFollowings = async (
   followingsData: any[],
   accountId: string,
-) {
+) => {
   const followings = followingsData.map((followingData) => ({
     account_id: accountId,
     following_account_id: followingData.following.accountId,
   }))
 
   await processBatch(followings, async (batch) => {
-    const { data, error } = await supabase.from('dev_following').upsert(batch, {
-      onConflict: 'account_id,following_account_id',
-      ignoreDuplicates: true,
-    })
+    const { data, error } = await supabase
+      .from(getTableName('following'))
+      .upsert(batch, {
+        onConflict: 'account_id,following_account_id',
+        ignoreDuplicates: true,
+      })
 
     if (error) console.error('Error upserting followings:', error)
     else console.log(`${batch.length} followings upserted successfully`)
   })
 }
 
+const removeExistingFollowers = async (accountId: string) => {
+  const { error } = await supabase
+    .from(getTableName('followers'))
+    .delete()
+    .eq('account_id', accountId)
+
+  if (error) console.error('Error removing existing followers:', error)
+  else console.log(`Existing followers removed for account ${accountId}`)
+}
+
+const removeExistingFollowings = async (accountId: string) => {
+  const { error } = await supabase
+    .from(getTableName('following'))
+    .delete()
+    .eq('account_id', accountId)
+
+  if (error) console.error('Error removing existing followings:', error)
+  else console.log(`Existing followings removed for account ${accountId}`)
+}
+
 // Main function to process all data
-export async function processTwitterArchive(archiveData: any) {
+export const processTwitterArchive = async (archiveData: any) => {
   console.log('Processing Twitter Archive')
 
   const tweets = archiveData.tweets.map((tweet: any) => ({
@@ -257,24 +287,22 @@ export async function processTwitterArchive(archiveData: any) {
     },
   }))
 
-  // compute the latest tweet date as a proxy for the latest archive date
   const latestTweetDate = tweets.reduce((latest: any, tweet: any) => {
     const tweetDate = new Date(tweet.tweet.created_at)
     return tweetDate > latest ? tweetDate : latest
   }, new Date(0))
 
-  // Insert profiles with account_id
   const profilesWithAccountId = archiveData.profile.map((profile: any) => ({
     ...profile,
     profile: {
       ...profile.profile,
       account_id: archiveData.account[0].account.accountId,
+      archive_at: latestTweetDate.toISOString().replace('Z', '+00:00'),
     },
   }))
 
   await insertProfiles(profilesWithAccountId)
 
-  // use the latest tweet date to set the archive_at for each account
   const accountsWithLatestArchiveAt = archiveData.account.map(
     (account: any) => ({
       ...account,
@@ -284,19 +312,19 @@ export async function processTwitterArchive(archiveData: any) {
       },
     }),
   )
-  // Insert account data
   await insertAccounts(accountsWithLatestArchiveAt)
 
-  // Insert tweets
   await insertTweets(tweets)
 
-  // Insert followers
+  const accountId = archiveData.account[0].account.accountId
+  // TODO: keep changes to existing followers and followings across different archive uploads
+  await removeExistingFollowers(accountId)
+  await removeExistingFollowings(accountId)
   await insertFollowers(
     archiveData.follower,
     archiveData.account[0].account.accountId,
   )
 
-  // Insert following
   await insertFollowings(
     archiveData.following,
     archiveData.account[0].account.accountId,

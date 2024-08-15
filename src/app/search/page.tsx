@@ -6,15 +6,6 @@ import Tweet from '@/components/Tweet'
 import dotenv from 'dotenv'
 import path from 'path'
 import { createBrowserClient } from '@/utils/supabase'
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination'
 import { getTableName } from '@/lib-client/getTableName'
 
 // Load environment variables from .env file in the scratchpad directory

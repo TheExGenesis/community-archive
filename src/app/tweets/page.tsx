@@ -1,10 +1,11 @@
-import Header from '@/components/Header'
+'use client'
+
+import { useState, useEffect } from 'react'
 import ThemeToggle from '@/components/ThemeToggle'
-import { createServerClient } from '@/utils/supabase'
-import { cookies } from 'next/headers'
 import Tweet from '@/components/Tweet'
 import dotenv from 'dotenv'
 import path from 'path'
+import { createBrowserClient } from '@/utils/supabase'
 
 // Load environment variables from .env file in the scratchpad directory
 if (process.env.NODE_ENV !== 'production') {
@@ -33,6 +34,7 @@ const fetchTweets = async (supabase: any) => {
     
   `,
     )
+    // .textSearch('full_text', `'Russian'`)
     .order('created_at', { ascending: false })
     .limit(10)
   console.log('TWEETS')
@@ -45,12 +47,21 @@ const fetchTweets = async (supabase: any) => {
   return tweets
 }
 
-export default async function Page() {
-  const cookieStore = cookies()
-  const supabase = createServerClient(cookieStore)
+export default function Page() {
+  const [tweets, setTweets] = useState([])
 
-  const tweets = await fetchTweets(supabase).catch(() => null)
-  if (!tweets) {
+  useEffect(() => {
+    const fetchData = async () => {
+      const supabase = createBrowserClient()
+      const fetchedTweets = await fetchTweets(supabase).catch(() => null)
+      setTweets(fetchedTweets)
+    }
+    fetchData()
+  }, [])
+
+  if (!tweets || tweets.length === 0) return <div>Loading tweets...</div>
+
+  if (!tweets || tweets.length === 0) {
     return <div>Error loading tweets</div>
   }
   return (

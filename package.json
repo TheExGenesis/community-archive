@@ -14,8 +14,8 @@
     "typescript"
   ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "set NODE_ENV=development & next dev",
+    "build": "set NODE_ENV=production & next build",
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
@@ -45,7 +45,7 @@
     "clsx": "^2.1.0",
     "dotenv": "^16.4.5",
     "fp-ts": "^2.16.9",
-    "geist": "^1.0.0",
+    "geist": "^1.2.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.304.0",
     "next": "^14.1.0",
@@ -73,7 +73,7 @@
     "encoding": "^0.1.13",
     "eslint": "8.56.0",
     "eslint-config-next": "14.0.4",
-    "husky": "^8.0.0",
+    "husky": "^8.0.3",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "lint-staged": "^15.2.0",

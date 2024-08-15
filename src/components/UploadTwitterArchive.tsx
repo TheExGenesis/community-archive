@@ -82,30 +82,28 @@ const expectedSchemas = {
 
 export default function UploadTwitterArchive() {
   const supabase = createBrowserClient()
-  const [isUploading, setIsUploading] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
   const [progress, setProgress] = useState<number>(0)
-  const [status, setStatus] = useState<'uploading' | 'processing' | null>(null)
 
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const files = event.target.files
     if (!files || files.length === 0) return
-    const file = files[0]
 
-    setIsUploading(true)
-    setStatus('uploading')
+    setIsProcessing(true)
     setProgress(0)
 
     const fileContents: { [key: string]: string } = {}
 
-    if (file.type === 'application/zip') {
-      try {
+    try {
+      const file = files[0]
+      const totalFiles = requiredFilePaths.length
+      let processedFiles = 0
+
+      if (file.type === 'application/zip') {
         const JSZip = (await import('jszip')).default
         const zip = await JSZip.loadAsync(file)
-
-        const totalFiles = requiredFilePaths.length
-        let processedFiles = 0
 
         for (const fileName of requiredFilePaths) {
           if (!fileName.startsWith('data/') || !fileName.endsWith('.js')) {
@@ -118,100 +116,69 @@ export default function UploadTwitterArchive() {
             throw new Error(`Required file ${fileName} not found in the zip`)
           }
           const content = await zipFile.async('string')
-          const name = fileName.slice(5, -3) // Remove 'data/' prefix and '.js' suffix
+          const name = fileName.slice(5, -3)
           fileContents[name] = content
 
           processedFiles++
           setProgress((processedFiles / totalFiles) * 100)
         }
-      } catch (error) {
-        console.error('Error processing zip file:', error)
-        setIsUploading(false)
-        setStatus(null)
-        setProgress(0)
-        return
-      }
-    } else if (file.webkitRelativePath) {
-      // Handle directory upload
-      const directoryReader = (event.target as HTMLInputElement).webkitdirectory
-      if (!directoryReader) {
-        console.error(
-          'Directory upload not supported. Upload a zip file instead.',
-        )
-        setIsUploading(false)
-        setStatus(null)
-        setProgress(0)
-        return
-      }
-
-      const totalFiles = requiredFilePaths.length
-      let processedFiles = 0
-
-      for (const fileName of requiredFilePaths) {
-        const filePath = `${file.webkitRelativePath.split('/')[0]}/${fileName}`
-        const fileEntry = Array.from(event.target.files || []).find(
-          (f) => f.webkitRelativePath === filePath,
-        )
-        if (!fileEntry) {
-          throw new Error(
-            `Required file ${fileName} not found in the directory`,
+      } else if (file.webkitRelativePath) {
+        for (const fileName of requiredFilePaths) {
+          const filePath = `${
+            file.webkitRelativePath.split('/')[0]
+          }/${fileName}`
+          const fileEntry = Array.from(event.target.files || []).find(
+            (f) => f.webkitRelativePath === filePath,
           )
+          if (!fileEntry) {
+            throw new Error(
+              `Required file ${fileName} not found in the directory`,
+            )
+          }
+          const name = fileName.slice(5, -3)
+          fileContents[name] = await fileEntry.text()
+
+          processedFiles++
+          setProgress((processedFiles / totalFiles) * 100)
         }
-        const name = fileName.slice(5, -3)
-        fileContents[name] = await fileEntry.text()
-
-        processedFiles++
-        setProgress((processedFiles / totalFiles) * 100)
+      } else {
+        throw new Error('Please upload a zip file or a directory')
       }
-    } else {
-      console.error('Please upload a zip file or a directory')
-      setIsUploading(false)
-      setStatus(null)
-      setProgress(0)
-      return
-    }
 
-    console.log('Extracted files:', Object.keys(fileContents))
+      console.log('Extracted files:', Object.keys(fileContents))
 
-    for (const [fileName, content] of Object.entries(fileContents)) {
-      console.log('Validating file:', fileName)
-      if (
-        !validateContent(
-          content,
-          expectedSchemas[fileName as keyof typeof expectedSchemas],
-        )
-      ) {
-        throw new Error(`Invalid schema for ${fileName}`)
+      for (const [fileName, content] of Object.entries(fileContents)) {
+        console.log('Validating file:', fileName)
+        if (
+          !validateContent(
+            content,
+            expectedSchemas[fileName as keyof typeof expectedSchemas],
+          )
+        ) {
+          throw new Error(`Invalid schema for ${fileName}`)
+        }
       }
-    }
 
-    // Update the content to be sent to the API
-    const archive = JSON.stringify(
-      Object.fromEntries(
-        Object.entries(fileContents).map(([key, content]) => [
-          key,
-          JSON.parse(content.slice(content.indexOf('['))),
-        ]),
-      ),
-    )
-    console.log('archive:', archive)
-    console.log('archive obj:', JSON.parse(archive))
-    try {
-      setStatus('processing')
-      setProgress(0)
+      const archive = JSON.stringify(
+        Object.fromEntries(
+          Object.entries(fileContents).map(([key, content]) => [
+            key,
+            JSON.parse(content.slice(content.indexOf('['))),
+          ]),
+        ),
+      )
+      console.log('archive:', archive)
+      console.log('archive obj:', JSON.parse(archive))
 
-      // Instead of sending a POST request, call processTwitterArchive directly
       await processTwitterArchive(supabase, JSON.parse(archive))
-
       alert('Archive processed successfully')
     } catch (error) {
       console.error('Error processing archive:', error)
       alert('An error occurred while processing archive')
+    } finally {
+      setIsProcessing(false)
+      setProgress(0)
     }
-
-    setIsUploading(false)
-    setStatus(null)
-    setProgress(0)
   }
 
   return (
@@ -220,36 +187,15 @@ export default function UploadTwitterArchive() {
         type="file"
         accept=".js,.zip"
         onChange={handleFileUpload}
-        disabled={isUploading}
+        disabled={isProcessing}
         webkitdirectory=""
         directory=""
         multiple
         {...({} as CustomInputProps)}
       />
-      {isUploading && (
+      {isProcessing && (
         <div>
-          <p>
-            {status === 'uploading' ? 'Uploading...' : 'Processing tweets...'}
-          </p>
-          <div
-            style={{
-              width: '200px',
-              height: '20px',
-              border: '1px solid #ccc',
-              borderRadius: '10px',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                width: `${progress}%`,
-                height: '100%',
-                backgroundColor: '#4CAF50',
-                transition: 'width 0.5s ease-in-out',
-              }}
-            />
-          </div>
-          <p>{Math.round(progress)}%</p>
+          <p>Processing archive...</p>
         </div>
       )}
     </div>

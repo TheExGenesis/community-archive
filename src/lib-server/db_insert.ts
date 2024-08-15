@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
 
@@ -38,6 +38,7 @@ export const insertAccounts = async (
       account_id: accountData.account.accountId,
       created_at: accountData.account.createdAt,
       account_display_name: accountData.account.accountDisplayName,
+      archive_at: accountData.account.archive_at,
     }))
 
     const { data, error } = await supabase
@@ -46,6 +47,7 @@ export const insertAccounts = async (
         onConflict: 'account_id',
         ignoreDuplicates: false,
       })
+      .select()
 
     if (error) console.error('Error upserting accounts:', error)
     else console.log(`${accounts.length} accounts upserted successfully`)
@@ -65,6 +67,7 @@ export const insertProfiles = async (
       avatar_media_url: profileData.profile.avatarMediaUrl,
       header_media_url: profileData.profile.headerMediaUrl,
       account_id: profileData.profile.account_id,
+      archive_at: profileData.profile.archive_at,
     }))
 
     const { data, error } = await supabase
@@ -304,17 +307,20 @@ export const processTwitterArchive = async (
     },
   }))
 
-  const latestTweetDate = tweets.reduce((latest: any, tweet: any) => {
-    const tweetDate = new Date(tweet.tweet.created_at)
-    return tweetDate > latest ? tweetDate : latest
-  }, new Date(0))
+  const latestTweetDate = tweets
+    .map((tweet: any) => new Date(tweet.tweet.created_at))
+    .reduce(
+      (latest: any, current: any) => (current > latest ? current : latest),
+      new Date(0),
+    )
+    .toISOString()
 
   const profilesWithAccountId = archiveData.profile.map((profile: any) => ({
     ...profile,
     profile: {
       ...profile.profile,
       account_id: archiveData.account[0].account.accountId,
-      archive_at: latestTweetDate.toISOString().replace('Z', '+00:00'),
+      archive_at: latestTweetDate,
     },
   }))
 
@@ -323,7 +329,7 @@ export const processTwitterArchive = async (
       ...account,
       account: {
         ...account.account,
-        archive_at: latestTweetDate.toISOString().replace('Z', '+00:00'),
+        archive_at: latestTweetDate,
       },
     }),
   )

@@ -31,43 +31,43 @@ export default function UploadArchivePage() {
       <div className="flex flex-col items-center gap-1">
         <h2 className="mb-4 text-4xl font-bold">Community Archive</h2>
         <p className="text-center text-sm">
-          Welcome to the community archive! We think a lot of value was produced
-          in twitter conversations over the years and it would be amazing to
-          preserve the "canon" somehow.
+          {`Welcome to the community archive! We think a lot of value was
+          produced in twitter conversations over the years and it would be
+          amazing to preserve the "canon" somehow.`}
         </p>
         <br />
         <p className="text-center text-sm">
-          Since twitter is stingy with data, but tweets are technically public,
+          {`Since twitter is stingy with data, but tweets are technically public,
           we're hosting a public database with an API that anyone can query and
-          build on top of.{' '}
+          build on top of.`}
         </p>
         <br />
         <p className="text-center text-sm">
-          If you haven't yet, we ask you to{' '}
+          {"If you haven't yet, we ask you to "}
           <a
             href="https://x.com/settings/download_your_data"
             target="_blank"
             rel="noopener noreferrer"
           >
-            request your twitter archive
+            {'request your twitter archive'}
           </a>
-          . THey'll ask you to login and then email you a code. Then they'll
+          {`. They'll ask you to login and then email you a code. Then they'll
           wait a day or two and email you a download link. Thank you for you
-          persistence :)
+          persistence :)`}
         </p>
       </div>
 
       <div className="flex flex-col items-center gap-1">
         <h2 className="mb-4 text-4xl font-bold">Upload your archive</h2>
         <p className="text-center text-sm">
-          Please upload your Twitter archive (folder or .zip).
+          {`Please upload your Twitter archive (folder or .zip).`}
         </p>
         <UploadTwitterArchive />
       </div>
       <div className="flex flex-col items-center gap-1">
         <h2 className="mb-4 text-4xl font-bold">Community Archive</h2>
         <p className="text-center text-sm">
-          These wonderful people have already uploaded their archives:
+          {`These wonderful people have already uploaded their archives:`}
         </p>
         <div className="flex flex-col gap-4">
           {usernames.map((username: string) => (
@@ -81,8 +81,7 @@ export default function UploadArchivePage() {
       <div className="mt-8 flex flex-col items-center gap-1">
         <h2 className="mb-4 text-4xl font-bold">Search the Archive</h2>
         <p className="text-center text-sm">
-          Ready to explore the community archive? Visit our search page to
-          discover insights and conversations.
+          {`Ready to explore the community archive? Visit our search page!`}
         </p>
         <a
           href="/search"

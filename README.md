@@ -33,6 +33,10 @@
 
 4. If you make changes to the database schema, you'll want to update the types in `src/database-types.ts` with `pnpm gen-types`, you'll need a `SUPABASE_ACCESS_TOKEN` in your environment variables.
 
+## Deployment
+
+Hosted on Vercel.
+
 ## Showcase
 
 Websites started using this template:

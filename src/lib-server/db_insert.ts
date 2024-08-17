@@ -26,6 +26,24 @@ const processBatch = async <T>(
   }
 }
 
+// Insert archive upload data
+export const insertArchiveUpload = async (
+  supabase: SupabaseClient,
+  archiveUploads: { account_id: string; archive_at: string }[],
+) => {
+  await processBatch(archiveUploads, async (batch) => {
+    const { data, error } = await supabase
+      .from(getTableName('archive_upload'))
+      .upsert(batch, {
+        onConflict: 'account_id,archive_at',
+        ignoreDuplicates: false,
+      })
+
+    if (error) console.error('Error upserting archive uploads:', error)
+    else console.log(`${batch.length} archive uploads upserted successfully`)
+  })
+}
+
 // Insert account data
 export const insertAccounts = async (
   supabase: SupabaseClient,
@@ -38,7 +56,6 @@ export const insertAccounts = async (
       account_id: accountData.account.accountId,
       created_at: accountData.account.createdAt,
       account_display_name: accountData.account.accountDisplayName,
-      archive_at: accountData.account.archive_at,
     }))
 
     const { data, error } = await supabase
@@ -67,7 +84,6 @@ export const insertProfiles = async (
       avatar_media_url: profileData.profile.avatarMediaUrl,
       header_media_url: profileData.profile.headerMediaUrl,
       account_id: profileData.profile.account_id,
-      archive_at: profileData.profile.archive_at,
     }))
 
     const { data, error } = await supabase
@@ -320,22 +336,17 @@ export const processTwitterArchive = async (
     profile: {
       ...profile.profile,
       account_id: archiveData.account[0].account.accountId,
-      archive_at: latestTweetDate,
     },
   }))
 
-  const accountsWithLatestArchiveAt = archiveData.account.map(
-    (account: any) => ({
-      ...account,
-      account: {
-        ...account.account,
+  try {
+    await insertAccounts(supabase, archiveData.account)
+    await insertArchiveUpload(supabase, [
+      {
+        account_id: archiveData.account[0].account.accountId,
         archive_at: latestTweetDate,
       },
-    }),
-  )
-
-  try {
-    await insertAccounts(supabase, accountsWithLatestArchiveAt)
+    ])
     await insertProfiles(supabase, profilesWithAccountId)
     await insertTweets(supabase, tweets)
 

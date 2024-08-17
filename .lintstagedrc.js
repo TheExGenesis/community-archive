@@ -1,9 +1,12 @@
 const path = require('path')
-const buildEslintCommand = (filenames) =>
-  `next lint --fix --file ${filenames
+
+const buildEslintCommand = (filenames) => {
+  const files = filenames
     .filter((f) => !f.includes('mock-archive'))
     .map((f) => path.relative(process.cwd(), f))
-    .join(' --file ')}`
+    .join(' --file ')
+  return `next lint --fix ${files.length > 0 ? `--file ${files}` : ''}`
+}
 
 module.exports = {
   '*.{js,jsx,ts,tsx}': [

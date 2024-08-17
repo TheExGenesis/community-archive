@@ -13,11 +13,15 @@ if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.resolve(__dirname, '../../../.env.local') })
 }
 
-const searchTweets = async (supabase: any, query = '') => {
-  const querySafe = query
-    .replace(' ', '+')
-    .replace(/'/g, "''")
-    .replace(/"/g, "''")
+const searchTweets = async (supabase: any, queryText = '') => {
+  // process the postgres text search query text:
+  // - split words by spaces, surrond them with single quotes and join them with ' | '
+  // - escape single quotes with '' and double quotes with ""
+  const querySafe = queryText
+    .split(' ')
+    .map((word) => `'${word.replace(/'/g, "''").replace(/"/g, "''")}'`)
+    .join(' | ')
+
   const { data: tweets, error } = await supabase
     .from(getTableName('tweets'))
     .select(
@@ -33,7 +37,7 @@ const searchTweets = async (supabase: any, query = '') => {
     
   `,
     )
-    .textSearch('full_text', `'${querySafe}'`)
+    .textSearch('full_text', `${querySafe}`)
     .order('created_at', { ascending: false })
   // .limit(10)
   console.log('TWEETS')

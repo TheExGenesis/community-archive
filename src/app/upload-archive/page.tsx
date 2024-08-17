@@ -8,7 +8,7 @@ const getUsernames = async (supabase: any) => {
   const { data: accounts, error } = await supabase
     .from(getTableName('account'))
     .select(`*`)
-    .order('archive_at', { ascending: false })
+    .order('created_at', { ascending: false })
   console.log({ accounts })
   if (error) {
     console.error('Error fetching tweets:', error)
@@ -18,17 +18,86 @@ const getUsernames = async (supabase: any) => {
   return accounts.map((account: any) => account.username)
 }
 
+const signInWithTwitter = async () => {
+  const supabase = createBrowserClient()
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'twitter',
+    options: {
+      redirectTo: `${window.location.origin}/api/auth/callback`,
+    },
+  })
+  console.log({ data, error })
+
+  if (error) {
+    console.error('Error signing in with Twitter:', error)
+  }
+}
+async function signOut() {
+  const supabase = createBrowserClient()
+  const { error } = await supabase.auth.signOut()
+  console.log('sign out', { error })
+  // if (!error) {
+  //   window.location.reload()
+  // }
+}
+
 export default function UploadArchivePage() {
   const [usernames, setUsernames] = useState<string[]>([])
+  const [userMetadata, setUserMetadata] = useState<any>(null)
 
   useEffect(() => {
     const supabase = createBrowserClient()
-    getUsernames(supabase).then((usernames) => setUsernames(usernames))
+    getUsernames(supabase).then(setUsernames)
+
+    // Set up auth state listener
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        setUserMetadata(session.user.user_metadata)
+      } else {
+        setUserMetadata(null)
+      }
+    })
+
+    // Initial check for session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setUserMetadata(session.user.user_metadata)
+      }
+    })
+
+    // Cleanup subscription on component unmount
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   return (
     <div className="flex w-full flex-1 flex-col items-center gap-20">
       <div className="flex flex-col items-center gap-1">
+        {userMetadata ? (
+          <div className="mb-2 text-gray-500">
+            <p>
+              {"You're logged in as"}
+              {userMetadata.full_name || userMetadata.user_name}
+            </p>
+            <form action={signOut}>
+              <button type="submit" className="underline">
+                Sign Out
+              </button>
+            </form>
+          </div>
+        ) : (
+          <>
+            <form action={signInWithTwitter}>
+              <button type="submit" className="underline">
+                {'Log in'}
+              </button>
+            </form>
+            <p className="mb-2 text-gray-500">{'to upload your archive'}</p>
+          </>
+        )}
         <h2 className="mb-4 text-4xl font-bold">Community Archive</h2>
         <p className="text-center text-sm">
           {`Welcome to the community archive! We think a lot of value was
@@ -52,7 +121,7 @@ export default function UploadArchivePage() {
             {'request your twitter archive'}
           </a>
           {`. They'll ask you to login and then email you a code. Then they'll
-          wait a day or two and email you a download link. Thank you for you
+          wait a day or two and email you a download link. ty for your
           persistence :)`}
         </p>
       </div>

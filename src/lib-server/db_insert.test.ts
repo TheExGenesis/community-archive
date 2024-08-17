@@ -7,6 +7,7 @@ import {
   insertFollowers,
   insertFollowings,
   processTwitterArchive,
+  insertArchiveUpload,
 } from './db_insert'
 
 import { createClient } from '@supabase/supabase-js'
@@ -46,9 +47,12 @@ describe('Twitter Archive DB Insert Functions', () => {
     ...a,
     account: {
       ...a.account,
-      latest_archive_at: new Date().toISOString().replace('Z', '+00:00'),
     },
   }))
+  const archiveUpload = {
+    account_id: account[0].account.accountId,
+    archive_at: new Date().toISOString().replace('Z', '+00:00'),
+  }
   const profile = readMockData('profile.js').map((p: any) => ({
     ...p,
     profile: {
@@ -99,6 +103,30 @@ describe('Twitter Archive DB Insert Functions', () => {
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?([+-]\d{2}:\d{2}|Z)$/,
       ),
       account_display_name: mockAccountData[0].account.accountDisplayName,
+    })
+  })
+
+  test('insertArchiveUpload', async () => {
+    const mockArchiveUploadData = [
+      {
+        account_id: account[0].account.accountId,
+        archive_at: '2023-01-01T00:00:00Z',
+      },
+    ]
+
+    await insertArchiveUpload(supabaseAdmin, mockArchiveUploadData)
+
+    const { data, error } = await supabaseAdmin
+      .from('dev_archive_upload')
+      .select()
+      .eq('account_id', mockArchiveUploadData[0].account_id)
+      .eq('archive_at', mockArchiveUploadData[0].archive_at)
+
+    expect(error).toBeNull()
+    expect(data).toHaveLength(1)
+    expect(data![0]).toMatchObject({
+      account_id: mockArchiveUploadData[0].account_id,
+      archive_at: mockArchiveUploadData[0].archive_at,
     })
   })
 

@@ -68,7 +68,7 @@ export default function UploadArchivePage() {
 
       const supabase = createBrowserClient()
       const { data, error } = await supabase
-        .from(getTableName('archive_upload'))
+        .from(getTableName('archive_upload') as 'archive_upload')
         .select('id')
         .eq('account_id', userMetadata.provider_id)
         .limit(1)

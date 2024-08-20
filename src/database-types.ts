@@ -13,7 +13,6 @@ export type Database = {
         Row: {
           account_display_name: string | null
           account_id: string | null
-          archive_at: string | null
           created_at: string | null
           created_via: string | null
           id: number
@@ -22,7 +21,6 @@ export type Database = {
         Insert: {
           account_display_name?: string | null
           account_id?: string | null
-          archive_at?: string | null
           created_at?: string | null
           created_via?: string | null
           id?: never
@@ -31,7 +29,6 @@ export type Database = {
         Update: {
           account_display_name?: string | null
           account_id?: string | null
-          archive_at?: string | null
           created_at?: string | null
           created_via?: string | null
           id?: never
@@ -39,125 +36,28 @@ export type Database = {
         }
         Relationships: []
       }
-      dev_account: {
-        Row: {
-          account_display_name: string | null
-          account_id: string | null
-          archive_at: string | null
-          created_at: string | null
-          created_via: string | null
-          id: number
-          username: string | null
-        }
-        Insert: {
-          account_display_name?: string | null
-          account_id?: string | null
-          archive_at?: string | null
-          created_at?: string | null
-          created_via?: string | null
-          id?: never
-          username?: string | null
-        }
-        Update: {
-          account_display_name?: string | null
-          account_id?: string | null
-          archive_at?: string | null
-          created_at?: string | null
-          created_via?: string | null
-          id?: never
-          username?: string | null
-        }
-        Relationships: []
-      }
-      dev_followers: {
-        Row: {
-          account_id: string | null
-          follower_account_id: string | null
-          id: number
-        }
-        Insert: {
-          account_id?: string | null
-          follower_account_id?: string | null
-          id?: never
-        }
-        Update: {
-          account_id?: string | null
-          follower_account_id?: string | null
-          id?: never
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dev_followers_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "dev_account"
-            referencedColumns: ["account_id"]
-          },
-        ]
-      }
-      dev_following: {
-        Row: {
-          account_id: string | null
-          following_account_id: string | null
-          id: number
-        }
-        Insert: {
-          account_id?: string | null
-          following_account_id?: string | null
-          id?: never
-        }
-        Update: {
-          account_id?: string | null
-          following_account_id?: string | null
-          id?: never
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dev_following_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "dev_account"
-            referencedColumns: ["account_id"]
-          },
-        ]
-      }
-      dev_profile: {
+      archive_upload: {
         Row: {
           account_id: string | null
           archive_at: string | null
-          avatar_media_url: string | null
-          bio: string | null
-          header_media_url: string | null
           id: number
-          location: string | null
-          website: string | null
         }
         Insert: {
           account_id?: string | null
           archive_at?: string | null
-          avatar_media_url?: string | null
-          bio?: string | null
-          header_media_url?: string | null
           id?: never
-          location?: string | null
-          website?: string | null
         }
         Update: {
           account_id?: string | null
           archive_at?: string | null
-          avatar_media_url?: string | null
-          bio?: string | null
-          header_media_url?: string | null
           id?: never
-          location?: string | null
-          website?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "dev_profile_account_id_fkey"
+            foreignKeyName: "archive_upload_account_id_fkey"
             columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "dev_account"
+            isOneToOne: false
+            referencedRelation: "account"
             referencedColumns: ["account_id"]
           },
         ]
@@ -189,142 +89,22 @@ export type Database = {
         }
         Relationships: []
       }
-      dev_tweet_entities: {
-        Row: {
-          end_index: number | null
-          entity_type: string | null
-          entity_value: string | null
-          id: number
-          position_index: number | null
-          start_index: number | null
-          tweet_id: string | null
-        }
-        Insert: {
-          end_index?: number | null
-          entity_type?: string | null
-          entity_value?: string | null
-          id?: never
-          position_index?: number | null
-          start_index?: number | null
-          tweet_id?: string | null
-        }
-        Update: {
-          end_index?: number | null
-          entity_type?: string | null
-          entity_value?: string | null
-          id?: never
-          position_index?: number | null
-          start_index?: number | null
-          tweet_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dev_tweet_entities_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "dev_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-        ]
-      }
-      dev_tweet_media: {
-        Row: {
-          height: number | null
-          media_id: string
-          media_type: string | null
-          media_url: string | null
-          tweet_id: string | null
-          width: number | null
-        }
-        Insert: {
-          height?: number | null
-          media_id: string
-          media_type?: string | null
-          media_url?: string | null
-          tweet_id?: string | null
-          width?: number | null
-        }
-        Update: {
-          height?: number | null
-          media_id?: string
-          media_type?: string | null
-          media_url?: string | null
-          tweet_id?: string | null
-          width?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dev_tweet_media_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "dev_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-        ]
-      }
-      dev_tweets: {
-        Row: {
-          account_id: string | null
-          created_at: string | null
-          favorite_count: number | null
-          full_text: string | null
-          id: number
-          is_retweet: boolean | null
-          reply_to_tweet_id: string | null
-          reply_to_user_id: string | null
-          reply_to_username: string | null
-          retweet_count: number | null
-          tweet_id: string | null
-        }
-        Insert: {
-          account_id?: string | null
-          created_at?: string | null
-          favorite_count?: number | null
-          full_text?: string | null
-          id?: never
-          is_retweet?: boolean | null
-          reply_to_tweet_id?: string | null
-          reply_to_user_id?: string | null
-          reply_to_username?: string | null
-          retweet_count?: number | null
-          tweet_id?: string | null
-        }
-        Update: {
-          account_id?: string | null
-          created_at?: string | null
-          favorite_count?: number | null
-          full_text?: string | null
-          id?: never
-          is_retweet?: boolean | null
-          reply_to_tweet_id?: string | null
-          reply_to_user_id?: string | null
-          reply_to_username?: string | null
-          retweet_count?: number | null
-          tweet_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dev_tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "dev_account"
-            referencedColumns: ["account_id"]
-          },
-        ]
-      }
       followers: {
         Row: {
           account_id: string | null
+          archive_upload_id: number | null
           follower_account_id: string | null
           id: number
         }
         Insert: {
           account_id?: string | null
+          archive_upload_id?: number | null
           follower_account_id?: string | null
           id?: never
         }
         Update: {
           account_id?: string | null
+          archive_upload_id?: number | null
           follower_account_id?: string | null
           id?: never
         }
@@ -336,21 +116,31 @@ export type Database = {
             referencedRelation: "account"
             referencedColumns: ["account_id"]
           },
+          {
+            foreignKeyName: "followers_archive_upload_id_fkey"
+            columns: ["archive_upload_id"]
+            isOneToOne: false
+            referencedRelation: "archive_upload"
+            referencedColumns: ["id"]
+          },
         ]
       }
       following: {
         Row: {
           account_id: string | null
+          archive_upload_id: number | null
           following_account_id: string | null
           id: number
         }
         Insert: {
           account_id?: string | null
+          archive_upload_id?: number | null
           following_account_id?: string | null
           id?: never
         }
         Update: {
           account_id?: string | null
+          archive_upload_id?: number | null
           following_account_id?: string | null
           id?: never
         }
@@ -362,12 +152,19 @@ export type Database = {
             referencedRelation: "account"
             referencedColumns: ["account_id"]
           },
+          {
+            foreignKeyName: "following_archive_upload_id_fkey"
+            columns: ["archive_upload_id"]
+            isOneToOne: false
+            referencedRelation: "archive_upload"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profile: {
         Row: {
           account_id: string | null
-          archive_at: string | null
+          archive_upload_id: number | null
           avatar_media_url: string | null
           bio: string | null
           header_media_url: string | null
@@ -377,7 +174,7 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
-          archive_at?: string | null
+          archive_upload_id?: number | null
           avatar_media_url?: string | null
           bio?: string | null
           header_media_url?: string | null
@@ -387,7 +184,7 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
-          archive_at?: string | null
+          archive_upload_id?: number | null
           avatar_media_url?: string | null
           bio?: string | null
           header_media_url?: string | null
@@ -403,10 +200,18 @@ export type Database = {
             referencedRelation: "account"
             referencedColumns: ["account_id"]
           },
+          {
+            foreignKeyName: "profile_archive_upload_id_fkey"
+            columns: ["archive_upload_id"]
+            isOneToOne: false
+            referencedRelation: "archive_upload"
+            referencedColumns: ["id"]
+          },
         ]
       }
       tweet_entities: {
         Row: {
+          archive_upload_id: number | null
           end_index: number | null
           entity_type: string | null
           entity_value: string | null
@@ -416,6 +221,7 @@ export type Database = {
           tweet_id: string | null
         }
         Insert: {
+          archive_upload_id?: number | null
           end_index?: number | null
           entity_type?: string | null
           entity_value?: string | null
@@ -425,6 +231,7 @@ export type Database = {
           tweet_id?: string | null
         }
         Update: {
+          archive_upload_id?: number | null
           end_index?: number | null
           entity_type?: string | null
           entity_value?: string | null
@@ -434,6 +241,13 @@ export type Database = {
           tweet_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tweet_entities_archive_upload_id_fkey"
+            columns: ["archive_upload_id"]
+            isOneToOne: false
+            referencedRelation: "archive_upload"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tweet_entities_tweet_id_fkey"
             columns: ["tweet_id"]
@@ -445,6 +259,7 @@ export type Database = {
       }
       tweet_media: {
         Row: {
+          archive_upload_id: number | null
           height: number | null
           media_id: string
           media_type: string | null
@@ -453,6 +268,7 @@ export type Database = {
           width: number | null
         }
         Insert: {
+          archive_upload_id?: number | null
           height?: number | null
           media_id: string
           media_type?: string | null
@@ -461,6 +277,7 @@ export type Database = {
           width?: number | null
         }
         Update: {
+          archive_upload_id?: number | null
           height?: number | null
           media_id?: string
           media_type?: string | null
@@ -469,6 +286,13 @@ export type Database = {
           width?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tweet_media_archive_upload_id_fkey"
+            columns: ["archive_upload_id"]
+            isOneToOne: false
+            referencedRelation: "archive_upload"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tweet_media_tweet_id_fkey"
             columns: ["tweet_id"]
@@ -481,11 +305,12 @@ export type Database = {
       tweets: {
         Row: {
           account_id: string | null
+          archive_upload_id: number | null
           created_at: string | null
           favorite_count: number | null
+          fts: unknown | null
           full_text: string | null
           id: number
-          is_retweet: boolean | null
           reply_to_tweet_id: string | null
           reply_to_user_id: string | null
           reply_to_username: string | null
@@ -494,11 +319,12 @@ export type Database = {
         }
         Insert: {
           account_id?: string | null
+          archive_upload_id?: number | null
           created_at?: string | null
           favorite_count?: number | null
+          fts?: unknown | null
           full_text?: string | null
           id?: never
-          is_retweet?: boolean | null
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
@@ -507,11 +333,12 @@ export type Database = {
         }
         Update: {
           account_id?: string | null
+          archive_upload_id?: number | null
           created_at?: string | null
           favorite_count?: number | null
+          fts?: unknown | null
           full_text?: string | null
           id?: never
-          is_retweet?: boolean | null
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
@@ -526,54 +353,26 @@ export type Database = {
             referencedRelation: "account"
             referencedColumns: ["account_id"]
           },
+          {
+            foreignKeyName: "tweets_archive_upload_id_fkey"
+            columns: ["archive_upload_id"]
+            isOneToOne: false
+            referencedRelation: "archive_upload"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Views: {
-      latest_dev_profile: {
-        Row: {
-          account_id: string | null
-          archive_at: string | null
-          avatar_media_url: string | null
-          bio: string | null
-          header_media_url: string | null
-          id: number | null
-          location: string | null
-          website: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dev_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "dev_account"
-            referencedColumns: ["account_id"]
-          },
-        ]
-      }
-      latest_profile: {
-        Row: {
-          account_id: string | null
-          archive_at: string | null
-          avatar_media_url: string | null
-          bio: string | null
-          header_media_url: string | null
-          id: number | null
-          location: string | null
-          website: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
+      apply_dev_entities_rls_policies: {
+        Args: {
+          table_name: string
+        }
+        Returns: undefined
+      }
       apply_dev_rls_policies: {
         Args: {
           table_name: string
@@ -581,6 +380,12 @@ export type Database = {
         Returns: undefined
       }
       apply_dev_table_rls_policies: {
+        Args: {
+          table_name: string
+        }
+        Returns: undefined
+      }
+      apply_entities_rls_policies: {
         Args: {
           table_name: string
         }
@@ -598,11 +403,27 @@ export type Database = {
         }
         Returns: undefined
       }
+      begin_transaction: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      commit_transaction: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      get_provider_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_public_tables: {
         Args: Record<PropertyKey, never>
         Returns: {
           table_name: string
         }[]
+      }
+      rollback_transaction: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
     }
     Enums: {

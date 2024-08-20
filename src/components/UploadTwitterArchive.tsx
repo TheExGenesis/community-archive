@@ -297,14 +297,20 @@ export default function UploadTwitterArchive({
                 )}
               </div>
               <div>
-                <p className="mb-4 text-sm">This will delete all your data</p>
-                <button
-                  onClick={onDeleteArchive}
-                  disabled={isDeleting}
-                  className="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600 disabled:opacity-50"
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete My Archive'}
-                </button>
+                {archiveUpload && (
+                  <>
+                    <p className="mb-4 text-sm">
+                      This will delete all your data
+                    </p>
+                    <button
+                      onClick={onDeleteArchive}
+                      disabled={isDeleting}
+                      className="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600 disabled:opacity-50"
+                    >
+                      {isDeleting ? 'Deleting...' : 'Delete My Archive'}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>

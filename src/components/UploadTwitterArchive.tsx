@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { processTwitterArchive } from '../lib-server/db_insert'
+import { useState, useEffect } from 'react'
+import { processTwitterArchive, deleteArchive } from '../lib-server/db_insert'
 import { createBrowserClient } from '@/utils/supabase'
+import { getTableName } from '@/lib-client/getTableName'
 
 type CustomInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   webkitdirectory?: string
@@ -54,7 +55,6 @@ const expectedSchemas = {
   },
   account: {
     account: {
-      // email: '',
       createdVia: '',
       username: '',
       accountId: '',
@@ -65,7 +65,6 @@ const expectedSchemas = {
   tweets: {
     tweet: {
       id: '',
-      retweeted: false,
       source: '',
       entities: {},
       favorite_count: '',
@@ -80,122 +79,235 @@ const expectedSchemas = {
   following: { following: { accountId: '', userLink: '' } },
 }
 
-export default function UploadTwitterArchive() {
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+const handleFileUpload = async (
+  event: React.ChangeEvent<HTMLInputElement>,
+  setIsProcessing: (isProcessing: boolean) => void,
+  supabase: any,
+) => {
+  const files = event.target.files
+  if (!files || files.length === 0) return
+
+  setIsProcessing(true)
+
+  const fileContents: { [key: string]: string } = {}
+
+  try {
+    const file = files[0]
+
+    if (file.type === 'application/zip') {
+      const JSZip = (await import('jszip')).default
+      const zip = await JSZip.loadAsync(file)
+
+      const rootDir = Object.keys(zip.files)[0].split('/')[0]
+
+      for (const fileName of requiredFilePaths) {
+        const zipFile =
+          zip.file(`${rootDir}/${fileName}`) ||
+          zip.file(`${rootDir}/${fileName}`.replace('tweets.js', 'tweet.js'))
+        if (!zipFile) {
+          throw new Error(
+            `Required file ${`${rootDir}/${fileName}`} not found in the zip`,
+          )
+        }
+        const content = await zipFile.async('string')
+        const name = fileName.slice(5, -3)
+        fileContents[name] = content
+      }
+    } else if (file.webkitRelativePath) {
+      for (const fileName of requiredFilePaths) {
+        const filePath = `${file.webkitRelativePath.split('/')[0]}/${fileName}`
+        const fileEntry = Array.from(event.target.files || []).find(
+          (f) => f.webkitRelativePath === filePath,
+        )
+        if (!fileEntry) {
+          throw new Error(
+            `Required file ${fileName} not found in the directory`,
+          )
+        }
+        const name = fileName.slice(5, -3)
+        fileContents[name] = await fileEntry.text()
+      }
+    } else {
+      throw new Error('Please upload a zip file')
+    }
+
+    console.log('Extracted files:', Object.keys(fileContents))
+
+    for (const [fileName, content] of Object.entries(fileContents)) {
+      console.log('Validating file:', fileName)
+      if (
+        !validateContent(
+          content,
+          expectedSchemas[fileName as keyof typeof expectedSchemas],
+        )
+      ) {
+        throw new Error(`Invalid schema for ${fileName}`)
+      }
+    }
+
+    const archive = JSON.stringify(
+      Object.fromEntries(
+        Object.entries(fileContents).map(([key, content]) => [
+          key,
+          JSON.parse(content.slice(content.indexOf('['))),
+        ]),
+      ),
+    )
+    console.log('archive:', archive)
+    console.log('archive obj:', JSON.parse(archive))
+
+    // Process the archive
+    await processTwitterArchive(supabase, JSON.parse(archive))
+
+    // Clear the archive data from memory
+    Object.keys(fileContents).forEach((key) => delete fileContents[key])
+
+    alert('Archive processed successfully')
+  } catch (error) {
+    console.error('Error processing archive:', error)
+    alert('An error occurred while processing archive')
+  } finally {
+    setIsProcessing(false)
+    // Ensure file input is cleared
+    if (event.target) {
+      event.target.value = ''
+    }
+  }
+}
+
+const fetchArchiveUpload = async (setArchiveUpload: any, userMetadata: any) => {
   const supabase = createBrowserClient()
+  const { data, error } = await supabase
+    .from(getTableName('archive_upload'))
+    .select('archive_at')
+    .eq('account_id', userMetadata.provider_id)
+    .order('archive_at', { ascending: false })
+    .limit(1)
+
+  if (error) {
+    console.error('Error fetching archive upload:', error)
+    return
+  }
+  if (data && data.length > 0) {
+    setArchiveUpload(data[0] as { archive_at: string })
+  }
+}
+
+export default function UploadTwitterArchive({
+  userMetadata,
+}: {
+  userMetadata: any
+}) {
   const [isProcessing, setIsProcessing] = useState(false)
-  const [progress, setProgress] = useState<number>(0)
+  const [archiveUpload, setArchiveUpload] = useState<{
+    archive_at: string
+  } | null>(null)
+  const [showUploadButton, setShowUploadButton] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  const handleFileUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const files = event.target.files
-    if (!files || files.length === 0) return
+  useEffect(() => {
+    fetchArchiveUpload(setArchiveUpload, userMetadata)
+  }, [userMetadata])
 
-    setIsProcessing(true)
-    setProgress(0)
+  const onFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const supabase = createBrowserClient()
+    await handleFileUpload(event, setIsProcessing, supabase)
+  }
 
-    const fileContents: { [key: string]: string } = {}
-
-    try {
-      const file = files[0]
-      const totalFiles = requiredFilePaths.length
-      let processedFiles = 0
-
-      if (file.type === 'application/zip') {
-        const JSZip = (await import('jszip')).default
-        const zip = await JSZip.loadAsync(file)
-
-        for (const fileName of requiredFilePaths) {
-          if (!fileName.startsWith('data/') || !fileName.endsWith('.js')) {
-            throw new Error(`Invalid filename format: ${fileName}`)
-          }
-          const zipFile =
-            zip.file(fileName) ||
-            zip.file(fileName.replace('tweets.js', 'tweet.js'))
-          if (!zipFile) {
-            throw new Error(`Required file ${fileName} not found in the zip`)
-          }
-          const content = await zipFile.async('string')
-          const name = fileName.slice(5, -3)
-          fileContents[name] = content
-
-          processedFiles++
-          setProgress((processedFiles / totalFiles) * 100)
-        }
-      } else if (file.webkitRelativePath) {
-        for (const fileName of requiredFilePaths) {
-          const filePath = `${
-            file.webkitRelativePath.split('/')[0]
-          }/${fileName}`
-          const fileEntry = Array.from(event.target.files || []).find(
-            (f) => f.webkitRelativePath === filePath,
-          )
-          if (!fileEntry) {
-            throw new Error(
-              `Required file ${fileName} not found in the directory`,
-            )
-          }
-          const name = fileName.slice(5, -3)
-          fileContents[name] = await fileEntry.text()
-
-          processedFiles++
-          setProgress((processedFiles / totalFiles) * 100)
-        }
-      } else {
-        throw new Error('Please upload a zip file or a directory')
-      }
-
-      console.log('Extracted files:', Object.keys(fileContents))
-
-      for (const [fileName, content] of Object.entries(fileContents)) {
-        console.log('Validating file:', fileName)
-        if (
-          !validateContent(
-            content,
-            expectedSchemas[fileName as keyof typeof expectedSchemas],
-          )
-        ) {
-          throw new Error(`Invalid schema for ${fileName}`)
-        }
-      }
-
-      const archive = JSON.stringify(
-        Object.fromEntries(
-          Object.entries(fileContents).map(([key, content]) => [
-            key,
-            JSON.parse(content.slice(content.indexOf('['))),
-          ]),
-        ),
+  const onDeleteArchive = async () => {
+    if (
+      window.confirm(
+        'Are you sure you want to delete your archive? This action cannot be undone.',
       )
-      console.log('archive:', archive)
-      console.log('archive obj:', JSON.parse(archive))
-
-      await processTwitterArchive(supabase, JSON.parse(archive))
-      alert('Archive processed successfully')
-    } catch (error) {
-      console.error('Error processing archive:', error)
-      alert('An error occurred while processing archive')
-    } finally {
-      setIsProcessing(false)
-      setProgress(0)
+    ) {
+      setIsDeleting(true)
+      const supabase = createBrowserClient()
+      try {
+        await deleteArchive(supabase, userMetadata.provider_id)
+        setArchiveUpload(null)
+        alert('Archive deleted successfully')
+      } catch (error) {
+        console.error('Error deleting archive:', error)
+        alert('An error occurred while deleting the archive')
+      } finally {
+        setIsDeleting(false)
+      }
     }
   }
 
   return (
     <div>
-      <input
-        type="file"
-        accept=".js,.zip"
-        onChange={handleFileUpload}
-        disabled={isProcessing}
-        webkitdirectory=""
-        directory=""
-        multiple
-        {...({} as CustomInputProps)}
-      />
-      {isProcessing && (
+      {archiveUpload && (
+        <>
+          <p>
+            Your last archive upload was from{' '}
+            {formatDate(archiveUpload.archive_at)}.
+          </p>
+        </>
+      )}
+      {archiveUpload && !showUploadButton ? (
         <div>
-          <p>Processing archive...</p>
+          <button
+            onClick={() => setShowUploadButton(true)}
+            className="cursor-pointer text-blue-500 underline"
+          >
+            Upload a new archive, or delete your data.
+          </button>
+        </div>
+      ) : (
+        <div>
+          {archiveUpload && (
+            <div>
+              <button
+                onClick={() => setShowUploadButton(false)}
+                className="cursor-pointer text-blue-500 underline"
+              >
+                Close
+              </button>
+            </div>
+          )}
+          <div className="flex flex-col">
+            <div className="flex justify-between">
+              <div className="mb-4">
+                <p className="mb-4 text-sm">
+                  Please upload your Twitter archive (as a .zip file).
+                </p>
+                <input
+                  type="file"
+                  accept=".zip,application/zip"
+                  onChange={onFileUpload}
+                  disabled={isProcessing}
+                  // webkitdirectory=""
+                  // directory=""
+                  // {...({} as CustomInputProps)}
+                  multiple
+                />
+                {isProcessing && (
+                  <div>
+                    <p>Processing archive...</p>
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="mb-4 text-sm">This will delete all your data</p>
+                <button
+                  onClick={onDeleteArchive}
+                  disabled={isDeleting}
+                  className="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600 disabled:opacity-50"
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete My Archive'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

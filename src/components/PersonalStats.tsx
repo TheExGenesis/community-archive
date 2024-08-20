@@ -16,15 +16,15 @@ const PersonalStats = ({ userMetadata }: { userMetadata: any }) => {
 
       const [tweetCount, followerCount, followingCount] = await Promise.all([
         supabase
-          .from(getTableName('tweets'))
+          .from(getTableName('tweets') as 'tweets')
           .select('id', { count: 'exact' })
           .eq('account_id', account_id),
         supabase
-          .from(getTableName('followers'))
+          .from(getTableName('followers') as 'followers')
           .select('id', { count: 'exact' })
           .eq('account_id', account_id),
         supabase
-          .from(getTableName('following'))
+          .from(getTableName('following') as 'following')
           .select('id', { count: 'exact' })
           .eq('account_id', account_id),
       ])

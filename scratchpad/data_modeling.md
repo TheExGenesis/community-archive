@@ -13,15 +13,39 @@ Separate tables for follower, following, account, and tweets need to be modelled
 ```sql
 
 -- Create table for account information
+
+-- Create table for account information
 CREATE TABLE
   dev_account (
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    email TEXT,
     created_via TEXT,
     username TEXT,
     account_id TEXT UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE,
     account_display_name TEXT
+  );
+
+-- Create table for archive upload
+CREATE TABLE
+  dev_archive_upload (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    account_id TEXT,
+    archive_at TIMESTAMP WITH TIME ZONE,
+    UNIQUE (account_id, archive_at),
+    FOREIGN KEY (account_id) REFERENCES dev_account (account_id)
+  );
+
+-- Create table for profiles
+CREATE TABLE
+  dev_profile (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    account_id TEXT UNIQUE,
+    bio TEXT,
+    website TEXT,
+    LOCATION TEXT,
+    avatar_media_url TEXT,
+    header_media_url TEXT,
+    FOREIGN KEY (account_id) REFERENCES dev_account (account_id)
   );
 
 -- Create table for tweets
@@ -32,15 +56,14 @@ CREATE TABLE
     account_id TEXT,
     created_at TIMESTAMP WITH TIME ZONE,
     full_text TEXT,
-    lang TEXT,
     retweet_count INTEGER,
     favorite_count INTEGER,
     reply_to_tweet_id TEXT,
     reply_to_user_id TEXT,
     reply_to_username TEXT,
     is_retweet BOOLEAN,
-    source TEXT,
-    possibly_sensitive BOOLEAN,
+    archive_id BIGINT,
+    FOREIGN KEY (archive_id) REFERENCES dev_archive_upload (id);
     FOREIGN KEY (account_id) REFERENCES dev_account (account_id)
   );
 
@@ -76,8 +99,10 @@ CREATE TABLE
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     account_id TEXT,
     follower_account_id TEXT,
+    archive_id BIGINT,
     UNIQUE (account_id, follower_account_id),
     FOREIGN KEY (account_id) REFERENCES dev_account (account_id)
+    FOREIGN KEY (archive_id) REFERENCES dev_archive_upload (id);
   );
 
 -- Create table for following
@@ -86,8 +111,10 @@ CREATE TABLE
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     account_id TEXT,
     following_account_id TEXT,
+    archive_id BIGINT,
     UNIQUE (account_id, following_account_id),
     FOREIGN KEY (account_id) REFERENCES dev_account (account_id)
+    FOREIGN KEY (archive_id) REFERENCES dev_archive_upload (id);
   );
 ```
 
@@ -117,6 +144,26 @@ window.YTD.account.part0 = [
       accountId: '322603863',
       createdAt: '2011-06-23T13:04:14.000Z',
       accountDisplayName: '❤️‍🔥 xiq',
+    },
+  },
+]
+```
+
+### Profile
+
+```js
+window.YTD.profile.part0 = [
+  {
+    profile: {
+      description: {
+        bio: 'negentropy',
+        website: 'https://t.co/n44CGMQVGL',
+        location: 'Porto, Portugal ',
+      },
+      avatarMediaUrl:
+        'https://pbs.twimg.com/profile_images/1562836797494906880/K_O23TKw.jpg',
+      headerMediaUrl:
+        'https://pbs.twimg.com/profile_banners/322603863/1671291348',
     },
   },
 ]

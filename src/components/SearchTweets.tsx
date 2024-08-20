@@ -131,8 +131,7 @@ export default function SearchTweets() {
     <div className="flex h-full flex-col">
       <div className="mb-4 flex flex-col gap-6">
         <p className="text-center text-sm">
-          Simple full text search for tweets. Words separated by spaces will be
-          searched as OR.
+          Very minimal full text search over tweet text.
         </p>
         <div className="flex gap-2">
           <input

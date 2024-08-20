@@ -39,12 +39,14 @@ export default function SignIn({ userMetadata }: { userMetadata: any }) {
     </div>
   ) : (
     <>
-      <form action={signInWithTwitter}>
-        <button type="submit" className="underline">
-          {'Log in'}
-        </button>
-      </form>
-      <p className="mb-2 text-gray-500">{'to upload your archive'}</p>
+      <div className="mb-2 flex items-center">
+        <form action={signInWithTwitter} className="mr-2">
+          <button type="submit" className="underline">
+            {'Sign in with Twitter'}
+          </button>
+        </form>
+        <p className="text-gray-500">{'to upload your archive'}</p>
+      </div>
     </>
   )
 }

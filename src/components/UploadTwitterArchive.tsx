@@ -186,7 +186,7 @@ const handleFileUpload = async (
 const fetchArchiveUpload = async (setArchiveUpload: any, userMetadata: any) => {
   const supabase = createBrowserClient()
   const { data, error } = await supabase
-    .from(getTableName('archive_upload'))
+    .from(getTableName('archive_upload') as 'archive_upload')
     .select('archive_at')
     .eq('account_id', userMetadata.provider_id)
     .order('archive_at', { ascending: false })

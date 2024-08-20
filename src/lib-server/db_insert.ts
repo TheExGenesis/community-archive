@@ -240,7 +240,6 @@ export const insertTweets = async (
     reply_to_tweet_id: tweetData.tweet.in_reply_to_status_id_str,
     reply_to_user_id: tweetData.tweet.in_reply_to_user_id_str,
     reply_to_username: tweetData.tweet.in_reply_to_screen_name,
-    is_retweet: tweetData.tweet.retweeted,
     archive_upload_id: archiveUploadId,
   })
 
@@ -452,5 +451,80 @@ export const processTwitterArchive = async (
     console.error('Error processing Twitter archive:', error)
     await rollback()
     throw error
+  }
+}
+
+export const deleteArchive = async (
+  supabase: SupabaseClient,
+  accountId: string,
+): Promise<void> => {
+  const tables = [
+    'tweet_entities',
+    'tweet_media',
+    'tweets',
+    'followers',
+    'following',
+    'profile',
+  ]
+
+  try {
+    const { data: archiveUploadIds, error } = await supabase
+      .from(getTableName('archive_upload'))
+      .select('id, account_id')
+      .eq('account_id', accountId)
+      .then(({ data, error }) => ({
+        data: data ? data.map((item) => item.id) : [],
+        error,
+      }))
+
+    if (error) throw error
+
+    if (archiveUploadIds.length === 0) {
+      console.log(`No archive found for account ${accountId}`)
+      return
+    }
+
+    for (const archiveUploadId of archiveUploadIds) {
+      // Delete rows from each table
+      for (const table of tables) {
+        const { error } = await supabase
+          .from(getTableName(table))
+          .delete()
+          .eq('archive_upload_id', archiveUploadId)
+        // .eq('account_id', accountId)
+
+        if (error)
+          throw new Error(`Error deleting from ${table}: ${error.message}`)
+      }
+
+      // Delete the archive_upload entry
+      const { error: archiveUploadError } = await supabase
+        .from(getTableName('archive_upload'))
+        .delete()
+        .eq('id', archiveUploadId)
+        .eq('account_id', accountId)
+
+      if (archiveUploadError)
+        throw new Error(
+          `Error deleting archive_upload: ${archiveUploadError.message}`,
+        )
+
+      console.log(
+        `Archive ${archiveUploadId} for account ${accountId} deleted successfully`,
+      )
+    }
+
+    // Delete the account
+    const { error: accountDeletionError } = await supabase
+      .from(getTableName('account'))
+      .delete()
+      .eq('id', accountId)
+
+    if (accountDeletionError)
+      throw new Error(`Error deleting account: ${accountDeletionError.message}`)
+  } catch (error: any) {
+    throw new Error(
+      `Error deleting archives of account ${accountId}: ${error.message}`,
+    )
   }
 }

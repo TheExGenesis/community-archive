@@ -48,15 +48,8 @@ const CommunityStats = () => {
         <strong>{stats.tweetCount}</strong> tweets.
       </p>
       <p className="mb-4 text-sm">
-        These wonderful people have already uploaded their archives:
+        Accounts in the archive: {stats.usernames.join(', ')}
       </p>
-      <div className="mb-8 max-h-40 overflow-y-auto">
-        {stats.usernames.map((username) => (
-          <div key={username} className="mb-2">
-            {username}
-          </div>
-        ))}
-      </div>
     </div>
   )
 }

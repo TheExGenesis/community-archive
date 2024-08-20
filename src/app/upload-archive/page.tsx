@@ -26,6 +26,7 @@ const updateProfile = async (
 
 export default function UploadArchivePage() {
   const [userMetadata, setUserMetadata] = useState<any>(null)
+  const [isArchiveUploaded, setIsArchiveUploaded] = useState(false)
 
   useEffect(() => {
     const supabase = createBrowserClient()
@@ -59,6 +60,28 @@ export default function UploadArchivePage() {
     const supabase = createBrowserClient()
     console.log({ userMetadata })
     updateProfile(supabase, userMetadata.provider_id, userMetadata.picture)
+  }, [userMetadata])
+
+  useEffect(() => {
+    const checkArchiveUpload = async () => {
+      if (!userMetadata?.provider_id) return
+
+      const supabase = createBrowserClient()
+      const { data, error } = await supabase
+        .from(getTableName('archive_upload'))
+        .select('id')
+        .eq('account_id', userMetadata.provider_id)
+        .limit(1)
+
+      if (error) {
+        console.error('Error checking archive upload:', error)
+        return
+      }
+
+      setIsArchiveUploaded(data.length > 0)
+    }
+
+    checkArchiveUpload()
   }, [userMetadata])
 
   return (
@@ -95,19 +118,25 @@ export default function UploadArchivePage() {
           persistence :)`}
           </p>
         </div>
+
+        <br />
         <br />
         <div>
-          <h2 className="mb-4 text-2xl font-bold">Community Stats</h2>
-          <CommunityStats />
-        </div>
-        <div className="flex flex-grow flex-col">
-          <h2 className="mb-4 text-2xl font-bold">Search Tweets</h2>
-          <div
-            className=" flex-grow overflow-hidden rounded-lg border border-gray-300"
-            style={{ height: '48rem' }}
-          >
-            <SearchTweets />
-          </div>
+          <h2 className="mb-4 text-2xl font-bold">Data Policy</h2>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              We do not see direct messages or email addresses or deleted or
+              community tweets.
+            </li>
+            <li>
+              The only things that leave your machine are 1. tweets, 2.
+              followers/following 3. profile information
+            </li>
+            <li>
+              We plan to make a full dump of the db accessible for easier data
+              science use.
+            </li>
+          </ul>
         </div>
       </div>
 
@@ -117,22 +146,32 @@ export default function UploadArchivePage() {
           <SignInComponent userMetadata={userMetadata} />
         </div>
 
-        <div className="mb-8">
-          <h2 className="mb-4 text-2xl font-bold">Upload Your Archive</h2>
-          <p className="mb-4 text-sm">
-            Please upload your Twitter archive (folder or .zip).
-          </p>
-          <UploadTwitterArchive />
-        </div>
+        {userMetadata && (
+          <>
+            <div className="mb-8">
+              <h2 className="mb-4 text-2xl font-bold">Upload Your Archive</h2>
+              <UploadTwitterArchive userMetadata={userMetadata} />
+            </div>
 
-        <div>
-          <h2 className="mb-4 text-2xl font-bold">Your Stats</h2>
-          <p className="text-sm">
-            This space is reserved for displaying your personal statistics.
-          </p>
-          {userMetadata?.user_name && (
-            <PersonalStats userMetadata={userMetadata} />
-          )}
+            {isArchiveUploaded && (
+              <div>
+                <h2 className="mb-4 text-2xl font-bold">Your Stats</h2>
+                <PersonalStats userMetadata={userMetadata} />
+              </div>
+            )}
+          </>
+        )}
+
+        <br />
+        <div className="flex flex-grow flex-col">
+          <h2 className="mb-4 text-2xl font-bold">Search the Archive</h2>
+          <div
+            className=" flex-grow overflow-hidden"
+            style={{ height: '48rem' }}
+          >
+            <CommunityStats />
+            <SearchTweets />
+          </div>
         </div>
       </div>
     </div>

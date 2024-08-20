@@ -1,4 +1,12 @@
+import { Database } from '../database-types'
+
 const isProduction = process.env.NODE_ENV === 'production'
-// Helper function to get the correct table name based on environment
-export const getTableName = (baseName: string) =>
-  isProduction ? baseName : `dev_${baseName}`
+
+type TableName = keyof Database['public']['Tables']
+type DevTableName = `dev_${TableName}`
+type AllTableNames = TableName | DevTableName
+
+export const getTableName = <T extends TableName>(
+  baseName: T,
+): T | `dev_${T}` =>
+  (isProduction ? baseName : `dev_${baseName}`) as T | `dev_${T}`

@@ -688,3 +688,33 @@ window.YTD.follower.part0 = [
   },
 ]
 ```
+
+### Likes
+
+```js
+window.YTD.like.part0 = [
+  {
+    like: {
+      tweetId: '1627038980352147458',
+      fullText:
+        "They're so flat they're almost completely clear, except when the light catches them just right. You can read more in an article I wrote about them here: https://t.co/BhS444jEkF https://t.co/iFeHiZZdUn",
+      expandedUrl: 'https://twitter.com/i/web/status/1627038980352147458',
+    },
+  },
+  {
+    like: {
+      tweetId: '1627038691825950720',
+      fullText:
+        'Sea sapphires are some of the most beautiful animals on Earth.\nTheir bodies contain microscopic crystals that reflect blue light. They use this shine in courtship displays, &amp; in Japan, fishers call this tama-mizu: jeweled water.\n📽️ https://t.co/NI2DioTKA4\nhttps://t.co/Koww4X3sXB',
+      expandedUrl: 'https://twitter.com/i/web/status/1627038691825950720',
+    },
+  },
+  {
+    like: {
+      tweetId: '1627039445253001219',
+      fullText: 'https://t.co/erVoNQELZ2',
+      expandedUrl: 'https://twitter.com/i/web/status/1627039445253001219',
+    },
+  },
+]
+```

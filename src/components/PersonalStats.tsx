@@ -18,7 +18,7 @@ const PersonalStats = ({ userMetadata }: { userMetadata: any }) => {
         supabase
           .schema(getSchemaName())
           .from(getTableName('tweets') as 'tweets')
-          .select('id', { count: 'exact' })
+          .select('tweet_id', { count: 'exact' })
           .eq('account_id', account_id),
         supabase
           .schema(getSchemaName())

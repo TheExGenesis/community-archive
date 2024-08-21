@@ -12,7 +12,7 @@ const getStats = async (supabase: any) => {
   const { count: tweetCount, error: tweetsError } = await supabase
     .schema(getSchemaName())
     .from(getTableName('tweets'))
-    .select('id', { count: 'exact', head: true })
+    .select('tweet_id', { count: 'exact', head: true })
 
   if (accountsError || tweetsError) {
     console.error('Error fetching stats:', accountsError || tweetsError)

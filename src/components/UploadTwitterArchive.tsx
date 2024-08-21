@@ -102,7 +102,12 @@ const handleFileUpload = async (
   try {
     const file = files[0]
 
-    if (file.type === 'application/zip') {
+    if (
+      file.type === 'application/zip' ||
+      file.type === 'application/x-zip-compressed' ||
+      file.type === 'application/octet-stream' ||
+      file.name.toLowerCase().endsWith('.zip')
+    ) {
       const { BlobReader, ZipReader, TextWriter } = await import(
         '@zip.js/zip.js'
       )
@@ -151,7 +156,9 @@ const handleFileUpload = async (
         fileContents[name] = await fileEntry.text()
       }
     } else {
-      throw new Error('Please upload a zip file')
+      throw new Error(
+        `Please upload a zip file, your file type is ${file.type}`,
+      )
     }
 
     console.log('Extracted files:', Object.keys(fileContents))
@@ -176,8 +183,7 @@ const handleFileUpload = async (
         ]),
       ),
     )
-    console.log('archive:', archive)
-    console.log('archive obj:', JSON.parse(archive))
+    // console.log('archive obj:', JSON.parse(archive))
 
     // Process the archive
     await processTwitterArchive(supabase, JSON.parse(archive))

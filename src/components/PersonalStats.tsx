@@ -32,8 +32,6 @@ const PersonalStats = ({ userMetadata }: { userMetadata: any }) => {
           .eq('account_id', account_id),
       ])
 
-      console.log({ tweetCount, followerCount, followingCount })
-
       setStats({
         tweetCount: tweetCount.count ?? 0,
         followerCount: followerCount.count ?? 0,

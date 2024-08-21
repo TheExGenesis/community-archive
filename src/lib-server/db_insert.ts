@@ -5,6 +5,7 @@ import {
 } from '@/lib-client/getTableName'
 import { SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
+import { insert } from 'fp-ts/lib/ReadonlySet'
 import path from 'path'
 
 // Load environment variables from .env file in the scratchpad directory
@@ -119,51 +120,58 @@ export const insertTweetEntitiesBatch = async (
   tweets: any[],
   archiveUploadId: string,
 ) => {
-  const allEntities = tweets.flatMap((tweet) => [
-    ...tweet.entities.hashtags.map((h: any, index: number) => ({
-      tweet_id: tweet.id_str,
-      entity_type: 'hashtag',
-      entity_value: h.text,
-      position_index: index,
-      start_index: h.indices[0],
-      end_index: h.indices[1],
-      archive_upload_id: archiveUploadId,
-    })),
-    ...tweet.entities.user_mentions.map((u: any, index: number) => ({
-      tweet_id: tweet.id_str,
-      entity_type: 'user_mention',
-      entity_value: u.screen_name,
-      position_index: index,
-      start_index: u.indices[0],
-      end_index: u.indices[1],
-      archive_upload_id: archiveUploadId,
-    })),
-    ...tweet.entities.urls.map((url: any, index: number) => ({
-      tweet_id: tweet.id_str,
-      entity_type: 'url',
-      entity_value: url.expanded_url,
-      position_index: index,
-      start_index: url.indices[0],
-      end_index: url.indices[1],
-      archive_upload_id: archiveUploadId,
-    })),
-    ...(tweet.entities.symbols?.map((s: any, index: number) => ({
-      tweet_id: tweet.id_str,
-      entity_type: 'symbol',
-      entity_value: s.text,
-      position_index: index,
-      start_index: s.indices[0],
-      end_index: s.indices[1],
-      archive_upload_id: archiveUploadId,
-    })) ?? []),
-  ])
+  const mentionedUsers = new Map<string, any>()
+  const userMentions: any[] = []
+  const tweetUrls: any[] = []
 
+  tweets.forEach((tweet) => {
+    // Process user mentions
+    tweet.entities.user_mentions.forEach((u: any, index: number) => {
+      mentionedUsers.set(u.id_str, {
+        user_id: u.id_str,
+        name: u.name,
+        screen_name: u.screen_name,
+        updated_at: tweet.created_at,
+      })
+
+      userMentions.push({
+        mentioned_user_id: u.id_str,
+        tweet_id: tweet.id_str,
+      })
+    })
+
+    // Process URLs
+    tweet.entities.urls.forEach((url: any) => {
+      tweetUrls.push({
+        url: url.url,
+        expanded_url: url.expanded_url,
+        display_url: url.display_url,
+        tweet_id: tweet.id_str,
+      })
+    })
+  })
+
+  console.log('inserting entities', { tweetUrls, mentionedUsers, userMentions })
+
+  // Insert mentioned users
   await upsertData(
     supabase,
-    'tweet_entities',
-    allEntities,
-    'tweet_id,entity_type,position_index',
+    'mentioned_users',
+    Array.from(mentionedUsers.values()),
+    'user_id',
   )
+
+  // Insert user mentions
+  await upsertData(
+    supabase,
+    'user_mentions',
+    userMentions,
+    'mentioned_user_id,tweet_id',
+    true,
+  )
+
+  // Insert tweet URLs
+  await upsertData(supabase, 'tweet_urls', tweetUrls, 'tweet_id,url')
 }
 
 export const insertTweetMediaBatch = async (
@@ -226,6 +234,30 @@ export const insertFollowings = (
     'account_id,following_account_id',
     true,
   )
+export const insertLikes = async (
+  supabase: SupabaseClient,
+  likesData: any[],
+  accountId: string,
+  archiveUploadId: string,
+) => {
+  // First, insert liked tweets
+  const likedTweets = likesData.map(({ like }) => ({
+    tweet_id: like.tweetId,
+    full_text: like.fullText,
+  }))
+
+  await upsertData(supabase, 'liked_tweets', likedTweets, 'tweet_id', true)
+
+  // Then, insert likes
+  const likes = likesData.map(({ like }) => ({
+    account_id: accountId,
+    liked_tweet_id: like.tweetId,
+    archive_upload_id: archiveUploadId,
+  }))
+
+  await upsertData(supabase, 'likes', likes, 'account_id,liked_tweet_id', true)
+}
+
 export const insertTweets = async (
   supabase: SupabaseClient,
   tweetsData: any[],
@@ -256,7 +288,9 @@ export const insertTweets = async (
       .select()
 
     if (error) throw new Error(`Error upserting tweets: ${error.message}`)
-    console.log(`${formattedTweets.length} tweets upserted successfully`)
+    console.log(`${formattedTweets.length} tweets upserted successfully`, {
+      data,
+    })
     return data?.map((tweet) => tweet.tweet_id) ?? []
   }
 
@@ -264,9 +298,17 @@ export const insertTweets = async (
     batch: any[],
     successfulIds: string[],
   ) => {
+    const idStrs = successfulIds.map((id) => `${id}`)
     const successfulTweets = batch.filter((td) =>
-      successfulIds.includes(td.tweet.id_str),
+      idStrs.includes(td.tweet.id_str),
     )
+    console.log('successful tweets', {
+      batch,
+      successfulTweets,
+      successfulIds,
+      idStrs,
+      batchIdStrs: batch.map((tweet) => tweet.tweet.id_str),
+    })
     if (successfulTweets.length > 0) {
       await Promise.all([
         insertTweetEntitiesBatch(
@@ -388,12 +430,17 @@ export const processTwitterArchive = async (
   console.log('Processing Twitter Archive', { archiveData })
 
   const accountId = archiveData.account[0].account.accountId
-  const tweets = prepareTweets(archiveData.tweets, accountId)
+  const tweets = prepareTweets(
+    [...archiveData.tweets, ...archiveData['community-tweet']],
+    accountId,
+  )
   const latestTweetDate = getLatestTweetDate(tweets)
   let archiveUploadId: string | null = null
   const insertedData: { [key: string]: any[] } = {}
 
   const rollback = async () => {
+    console.log('Rolling back...', { insertedData })
+
     if (archiveUploadId) {
       for (const tableName of Object.keys(insertedData) as TableName[]) {
         await supabase
@@ -454,88 +501,38 @@ export const processTwitterArchive = async (
     )
     insertedData['following'] = archiveData.following
 
+    console.log('Inserting likes:', {
+      likesCount: archiveData.like.length,
+      accountId,
+      archiveUploadId,
+      sampleLike: archiveData.like[0],
+    })
+    await insertLikes(supabase, archiveData.like, accountId, archiveUploadId)
+    insertedData['likes'] = archiveData.like
+
     await removePastFollowers(supabase, accountId, archiveUploadId)
     await removePastFollowings(supabase, accountId, archiveUploadId)
     console.log('Twitter archive processing complete')
   } catch (error) {
     console.error('Error processing Twitter archive:', error)
-    await rollback()
+    // await rollback()
     throw error
   }
 }
-
 export const deleteArchive = async (
   supabase: SupabaseClient,
   accountId: string,
 ): Promise<void> => {
-  const tables: TableName[] = [
-    'tweet_entities',
-    'tweet_media',
-    'tweets',
-    'followers',
-    'following',
-    'profile',
-  ]
-
   try {
-    const { data: archiveUploadIds, error } = await supabase
+    const { error } = await supabase
       .schema(getSchemaName())
-      .from(getTableName('archive_upload'))
-      .select('id, account_id')
-      .eq('account_id', accountId)
-      .then(({ data, error }) => ({
-        data: data ? data.map((item) => item.id) : [],
-        error,
-      }))
+      .rpc('delete_all_archives', {
+        p_account_id: accountId,
+      })
 
     if (error) throw error
 
-    if (archiveUploadIds.length === 0) {
-      console.log(`No archive found for account ${accountId}`)
-      return
-    }
-
-    for (const archiveUploadId of archiveUploadIds) {
-      // Delete rows from each table
-      for (const table of tables) {
-        const { error } = await supabase
-          .schema(getSchemaName())
-          .from(getTableName(table))
-          .delete()
-          .eq('archive_upload_id', archiveUploadId)
-        // .eq('account_id', accountId)
-
-        if (error)
-          throw new Error(`Error deleting from ${table}: ${error.message}`)
-      }
-
-      // Delete the archive_upload entry
-      const { error: archiveUploadError } = await supabase
-        .schema(getSchemaName())
-        .from(getTableName('archive_upload'))
-        .delete()
-        .eq('id', archiveUploadId)
-        .eq('account_id', accountId)
-
-      if (archiveUploadError)
-        throw new Error(
-          `Error deleting archive_upload: ${archiveUploadError.message}`,
-        )
-
-      console.log(
-        `Archive ${archiveUploadId} for account ${accountId} deleted successfully`,
-      )
-    }
-
-    // Delete the account
-    const { error: accountDeletionError } = await supabase
-      .schema(getSchemaName())
-      .from(getTableName('account'))
-      .delete()
-      .eq('id', accountId)
-
-    if (accountDeletionError)
-      throw new Error(`Error deleting account: ${accountDeletionError.message}`)
+    console.log(`All archives for account ${accountId} deleted successfully`)
   } catch (error: any) {
     throw new Error(
       `Error deleting archives of account ${accountId}: ${error.message}`,

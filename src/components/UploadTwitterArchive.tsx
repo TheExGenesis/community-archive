@@ -10,7 +10,15 @@ type CustomInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   directory?: string
 }
 
-const requiredFiles = ['profile', 'account', 'tweets', 'follower', 'following']
+const requiredFiles = [
+  'profile',
+  'account',
+  'tweets',
+  'community-tweet',
+  'like',
+  'follower',
+  'following',
+]
 
 const requiredFilePaths = requiredFiles.map((file) => `data/${file}.js`)
 
@@ -77,6 +85,20 @@ const expectedSchemas = {
   },
   follower: { follower: { accountId: '', userLink: '' } },
   following: { following: { accountId: '', userLink: '' } },
+  'community-tweet': {
+    tweet: {
+      id: '',
+      source: '',
+      entities: {},
+      favorite_count: '',
+      id_str: '',
+      retweet_count: '',
+      created_at: '',
+      favorited: false,
+      full_text: '',
+    },
+  },
+  like: { like: { tweetId: '', fullText: '' } },
 }
 
 const formatDate = (dateString: string) => {
@@ -125,12 +147,17 @@ const handleFileUpload = async (
           (e) =>
             e.filename === `${rootDir}/${fileName}` ||
             e.filename ===
-              `${rootDir}/${fileName}`.replace('tweets.js', 'tweet.js'),
+              `${rootDir}${rootDir ? '/' : ''}${fileName}`.replace(
+                'tweets.js',
+                'tweet.js',
+              ),
         )
 
         if (!entry) {
           throw new Error(
-            `Required file ${`${rootDir}/${fileName}`} not found in the zip`,
+            `Required file ${`${rootDir}${
+              rootDir ? '/' : ''
+            }${fileName}`} not found in the zip`,
           )
         }
 
@@ -196,7 +223,7 @@ const handleFileUpload = async (
     Object.keys(fileContents).forEach((key) => delete fileContents[key])
 
     alert('Archive processed successfully')
-    window.location.reload() // Reload the page after successful deletion
+    // window.location.reload() // Reload the page after successful insertion
   } catch (error) {
     console.error('Error processing archive:', error)
     alert('An error occurred while processing archive')

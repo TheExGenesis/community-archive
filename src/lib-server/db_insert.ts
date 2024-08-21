@@ -1,17 +1,14 @@
+import { getTableName, TableName } from '@/lib-client/getTableName'
 import { SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
 
 // Load environment variables from .env file in the scratchpad directory
 if (process.env.NODE_ENV !== 'production') {
-  dotenv.config({ path: path.resolve(__dirname, '.env') })
+  dotenv.config({ path: path.resolve(__dirname, '../../.env.local') })
 }
 
 const isProduction = process.env.NODE_ENV === 'production'
-
-// Helper function to get the correct table name based on environment
-const getTableName = (baseName: string) =>
-  isProduction ? baseName : `dev_${baseName}`
 
 const BATCH_SIZE = 1000
 
@@ -36,7 +33,7 @@ const createArchiveUpload = async (
 // Generic upsert function
 const upsertData = async <T>(
   supabase: SupabaseClient,
-  tableName: string,
+  tableName: TableName,
   data: T[],
   conflictTarget: string,
   ignoreDuplicates: boolean = false,
@@ -381,7 +378,7 @@ export const processTwitterArchive = async (
   supabase: SupabaseClient,
   archiveData: any,
 ): Promise<void> => {
-  console.log('Processing Twitter Archive')
+  console.log('Processing Twitter Archive', { archiveData })
 
   const accountId = archiveData.account[0].account.accountId
   const tweets = prepareTweets(archiveData.tweets, accountId)
@@ -391,7 +388,7 @@ export const processTwitterArchive = async (
 
   const rollback = async () => {
     if (archiveUploadId) {
-      for (const tableName of Object.keys(insertedData)) {
+      for (const tableName of Object.keys(insertedData) as TableName[]) {
         await supabase
           .from(getTableName(tableName))
           .delete()
@@ -408,6 +405,7 @@ export const processTwitterArchive = async (
     // Upsert account first
     await insertAccounts(supabase, archiveData.account)
     insertedData['account'] = archiveData.account
+    console.log('Account upserted successfully', { insertedData })
 
     // Create archive upload entry
     archiveUploadId = await createArchiveUpload(
@@ -415,6 +413,7 @@ export const processTwitterArchive = async (
       accountId,
       latestTweetDate,
     )
+    console.log('Archive upload created successfully', { archiveUploadId })
 
     // Process remaining data
     const profilesWithAccountId = prepareProfiles(
@@ -424,6 +423,8 @@ export const processTwitterArchive = async (
 
     await insertProfiles(supabase, profilesWithAccountId, archiveUploadId)
     insertedData['profile'] = profilesWithAccountId
+
+    console.log('Profiles upserted successfully', { insertedData })
 
     await insertTweets(supabase, tweets, archiveUploadId)
     insertedData['tweets'] = tweets
@@ -458,7 +459,7 @@ export const deleteArchive = async (
   supabase: SupabaseClient,
   accountId: string,
 ): Promise<void> => {
-  const tables = [
+  const tables: TableName[] = [
     'tweet_entities',
     'tweet_media',
     'tweets',

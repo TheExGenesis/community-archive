@@ -104,25 +104,25 @@ export default function UploadArchivePage() {
   }, [userMetadata])
 
   return (
-    <div className="flex h-full w-full">
-      {/* Left column - Global content */}
-      <div className="flex h-full w-1/2 flex-col p-4">
+    <div className="flex h-full w-full flex-col md:flex-row">
+      {/* Global content */}
+      <div className="w-full p-4 md:w-1/2">
         <div>
-          <h2 className="mb-4 text-4xl font-bold">
+          <h2 className="mb-4 text-3xl font-bold md:text-4xl">
             Welcome to the community archive!
           </h2>
-          <p className="text-md text-justify">
+          <p className="md:text-md text-justify text-sm">
             {`This is a place to upload your archive and share it with the
           community. We're hosting a public database with an API that anyone can
           query and build on top of.`}
           </p>
           <br />
-          <p className="text-md text-justify">
+          <p className="md:text-md text-justify text-sm">
             {`We think a lot of value was
           produced in twitter conversations over the years and that is worth preserving. Since twitter is stingy with data and tweets are public, we're asking people to upload their archives and serving them back to the public.`}
           </p>
           <br />
-          <p className="text-md text-justify">
+          <p className="md:text-md text-justify text-sm">
             {"If you haven't yet, we strongly encourage you to "}
             <a
               href="https://x.com/settings/download_your_data"
@@ -159,8 +159,8 @@ export default function UploadArchivePage() {
         </div>
       </div>
 
-      {/* Right column - Personal content */}
-      <div className="w-1/2 overflow-y-auto p-4">
+      {/* Personal content */}
+      <div className="w-full overflow-y-auto p-4 md:w-1/2">
         <div className="mb-8">
           <SignInComponent userMetadata={userMetadata} />
         </div>

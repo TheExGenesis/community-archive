@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { processTwitterArchive, deleteArchive } from '../lib-server/db_insert'
 import { createBrowserClient } from '@/utils/supabase'
-import { getTableName } from '@/lib-client/getTableName'
+import { getSchemaName, getTableName } from '@/lib-client/getTableName'
 
 type CustomInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   webkitdirectory?: string
@@ -202,6 +202,7 @@ const handleFileUpload = async (
 const fetchArchiveUpload = async (setArchiveUpload: any, userMetadata: any) => {
   const supabase = createBrowserClient()
   const { data, error } = await supabase
+    .schema(getSchemaName())
     .from(getTableName('archive_upload') as 'archive_upload')
     .select('archive_at')
     .eq('account_id', userMetadata.provider_id)

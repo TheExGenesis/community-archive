@@ -1,4 +1,8 @@
-import { getTableName, TableName } from '@/lib-client/getTableName'
+import {
+  getSchemaName,
+  getTableName,
+  TableName,
+} from '@/lib-client/getTableName'
 import { SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
@@ -8,8 +12,6 @@ if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.resolve(__dirname, '../../.env.local') })
 }
 
-const isProduction = process.env.NODE_ENV === 'production'
-
 const BATCH_SIZE = 1000
 
 const createArchiveUpload = async (
@@ -18,6 +20,7 @@ const createArchiveUpload = async (
   latestTweetDate: string,
 ): Promise<string> => {
   const { data, error } = await supabase
+    .schema(getSchemaName())
     .from(getTableName('archive_upload'))
     .upsert(
       { account_id: accountId, archive_at: latestTweetDate },
@@ -42,6 +45,7 @@ const upsertData = async <T>(
 
   const processBatch = async (batch: T[]) => {
     const { error } = await supabase
+      .schema(getSchemaName())
       .from(getTableName(tableName))
       .upsert(batch, { onConflict: conflictTarget, ignoreDuplicates })
 
@@ -243,6 +247,7 @@ export const insertTweets = async (
   const upsertTweets = async (batch: any[]) => {
     const formattedTweets = batch.map(formatTweet)
     const { data, error } = await supabase
+      .schema(getSchemaName())
       .from(getTableName('tweets'))
       .upsert(formattedTweets, {
         onConflict: 'tweet_id',
@@ -313,6 +318,7 @@ const removePastFollowers = async (
   archiveUploadId: string,
 ) => {
   const { error } = await supabase
+    .schema(getSchemaName())
     .from(getTableName('followers'))
     .delete()
     .eq('account_id', accountId)
@@ -332,6 +338,7 @@ const removePastFollowings = async (
   archiveUploadId: string,
 ) => {
   const { error } = await supabase
+    .schema(getSchemaName())
     .from(getTableName('following'))
     .delete()
     .eq('account_id', accountId)
@@ -390,11 +397,13 @@ export const processTwitterArchive = async (
     if (archiveUploadId) {
       for (const tableName of Object.keys(insertedData) as TableName[]) {
         await supabase
+          .schema(getSchemaName())
           .from(getTableName(tableName))
           .delete()
           .eq('archive_upload_id', archiveUploadId)
       }
       await supabase
+        .schema(getSchemaName())
         .from(getTableName('archive_upload'))
         .delete()
         .eq('id', archiveUploadId)
@@ -470,6 +479,7 @@ export const deleteArchive = async (
 
   try {
     const { data: archiveUploadIds, error } = await supabase
+      .schema(getSchemaName())
       .from(getTableName('archive_upload'))
       .select('id, account_id')
       .eq('account_id', accountId)
@@ -489,6 +499,7 @@ export const deleteArchive = async (
       // Delete rows from each table
       for (const table of tables) {
         const { error } = await supabase
+          .schema(getSchemaName())
           .from(getTableName(table))
           .delete()
           .eq('archive_upload_id', archiveUploadId)
@@ -500,6 +511,7 @@ export const deleteArchive = async (
 
       // Delete the archive_upload entry
       const { error: archiveUploadError } = await supabase
+        .schema(getSchemaName())
         .from(getTableName('archive_upload'))
         .delete()
         .eq('id', archiveUploadId)
@@ -517,6 +529,7 @@ export const deleteArchive = async (
 
     // Delete the account
     const { error: accountDeletionError } = await supabase
+      .schema(getSchemaName())
       .from(getTableName('account'))
       .delete()
       .eq('id', accountId)

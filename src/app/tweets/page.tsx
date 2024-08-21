@@ -6,6 +6,7 @@ import Tweet from '@/components/Tweet'
 import dotenv from 'dotenv'
 import path from 'path'
 import { createBrowserClient } from '@/utils/supabase'
+import { getSchemaName } from '@/lib-client/getTableName'
 
 // Load environment variables from .env file in the scratchpad directory
 if (process.env.NODE_ENV !== 'production') {
@@ -20,6 +21,7 @@ const getTableName = (baseName: string) =>
 
 const fetchTweets = async (supabase: any) => {
   const { data: tweets, error } = await supabase
+    .schema(getSchemaName())
     .from(getTableName('tweets'))
     .select(
       `

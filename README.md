@@ -42,7 +42,7 @@ Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` can be found
 pnpm run dev
 ```
 
-The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+The app should now be running on [localhost:3000](http://localhost:3000/).
 
 > Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
 

@@ -93,7 +93,7 @@ const searchTweets = async (supabase: any, queryText = '') => {
   return Array.from(
     new Map(
       [...tweetsExact, ...tweetsOR, ...tweetsAND].map((tweet) => [
-        tweet.id,
+        tweet.tweet_id,
         tweet,
       ]),
     ).values(),
@@ -161,7 +161,7 @@ export default function SearchTweets() {
           <div className="space-y-4">
             {tweets.map((tweet) => (
               <Tweet
-                key={tweet.id}
+                key={tweet.tweet_id}
                 username={tweet[getTableName('account')]?.username || 'Unknown'}
                 displayName={
                   tweet[getTableName('account')]?.account_display_name ||

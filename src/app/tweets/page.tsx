@@ -77,7 +77,7 @@ export default function Page() {
           <h2 className="mb-4 text-4xl font-bold">Recent Tweets</h2>
           {tweets.map((tweet: any) => (
             <Tweet
-              key={tweet.id}
+              key={tweet.tweet_id}
               username={tweet[getTableName('account')]?.username || 'Unknown'}
               displayName={
                 tweet[getTableName('account')]?.account_display_name ||

@@ -14,28 +14,22 @@ const updateProfile = async (
   avatarUrl: string,
 ) => {
   // Check if the account exists
-  const { data: existingAccount, error: checkError } = await supabase
+  const { data: existingAccount } = await supabase
     .schema(getSchemaName())
     .from(getTableName('profile'))
     .select('account_id')
     .eq('account_id', accountId)
-    .single()
-
-  if (checkError) {
-    console.log('Account does not exist, skipping update')
-    return
-  }
+    .maybeSingle()
 
   // Only upsert if the account exists
   if (existingAccount) {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .schema(getSchemaName())
       .from(getTableName('profile'))
       .upsert(
         { account_id: accountId, avatar_media_url: avatarUrl },
         { onConflict: 'account_id', ignoreDuplicates: false },
       )
-      .select()
 
     if (error) console.error('Error updating profile:', error)
   } else {

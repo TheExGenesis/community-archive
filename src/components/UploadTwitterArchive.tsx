@@ -114,7 +114,11 @@ const handleFileUpload = async (
       const zipReader = new ZipReader(new BlobReader(file))
       const entries = await zipReader.getEntries()
 
-      const rootDir = entries[0].filename.split('/')[0]
+      const rootDir = ['data', 'assets', 'Your archive.html'].includes(
+        entries[0].filename.split('/')[0],
+      )
+        ? ''
+        : entries[0].filename.split('/')[0]
 
       for (const fileName of requiredFilePaths) {
         const entry = entries.find(

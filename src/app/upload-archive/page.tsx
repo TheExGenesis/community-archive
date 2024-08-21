@@ -13,15 +13,32 @@ const updateProfile = async (
   accountId: string,
   avatarUrl: string,
 ) => {
-  const { data, error } = await supabase
+  // Check if the account exists
+  const { data: existingAccount, error: checkError } = await supabase
     .from(getTableName('profile'))
-    .upsert(
-      { account_id: accountId, avatar_media_url: avatarUrl },
-      { onConflict: 'account_id', ignoreDuplicates: false },
-    )
-    .select()
+    .select('account_id')
+    .eq('account_id', accountId)
+    .single()
 
-  if (error) console.error('Error updating profile:', error)
+  if (checkError) {
+    console.log('Account does not exist, skipping update')
+    return
+  }
+
+  // Only upsert if the account exists
+  if (existingAccount) {
+    const { data, error } = await supabase
+      .from(getTableName('profile'))
+      .upsert(
+        { account_id: accountId, avatar_media_url: avatarUrl },
+        { onConflict: 'account_id', ignoreDuplicates: false },
+      )
+      .select()
+
+    if (error) console.error('Error updating profile:', error)
+  } else {
+    console.log('Account does not exist, skipping update')
+  }
 }
 
 export default function UploadArchivePage() {
@@ -37,6 +54,12 @@ export default function UploadArchivePage() {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
         setUserMetadata(session.user.user_metadata)
+        if (!session.user.user_metadata) return
+        updateProfile(
+          supabase,
+          session.user.user_metadata.provider_id,
+          session.user.user_metadata.picture,
+        )
       } else {
         setUserMetadata(null)
       }
@@ -54,13 +77,6 @@ export default function UploadArchivePage() {
       subscription.unsubscribe()
     }
   }, [])
-
-  useEffect(() => {
-    if (!userMetadata) return
-    const supabase = createBrowserClient()
-    console.log({ userMetadata })
-    updateProfile(supabase, userMetadata.provider_id, userMetadata.picture)
-  }, [userMetadata])
 
   useEffect(() => {
     const checkArchiveUpload = async () => {

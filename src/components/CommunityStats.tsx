@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import { createBrowserClient } from '@/utils/supabase'
-import { getTableName } from '@/lib-client/getTableName'
+import { getSchemaName, getTableName } from '@/lib-client/getTableName'
 
 const getStats = async (supabase: any) => {
   const { data: accounts, error: accountsError } = await supabase
+    .schema(getSchemaName())
     .from(getTableName('account'))
     .select(`username`)
     .order('created_at', { ascending: false })
 
   const { count: tweetCount, error: tweetsError } = await supabase
+    .schema(getSchemaName())
     .from(getTableName('tweets'))
     .select('id', { count: 'exact', head: true })
 

@@ -20,9 +20,9 @@ export default function SignIn({ userMetadata }: { userMetadata: any }) {
     const supabase = createBrowserClient()
     const { error } = await supabase.auth.signOut()
     console.log('sign out', { error })
-    // if (!error) {
-    //   window.location.reload()
-    // }
+    if (!error) {
+      window.location.reload()
+    }
   }
 
   return userMetadata ? (

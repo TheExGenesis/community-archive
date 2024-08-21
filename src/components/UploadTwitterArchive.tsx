@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { processTwitterArchive, deleteArchive } from '../lib-server/db_insert'
 import { createBrowserClient } from '@/utils/supabase'
-import { getTableName } from '@/lib-client/getTableName'
+import { getSchemaName, getTableName } from '@/lib-client/getTableName'
 
 type CustomInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   webkitdirectory?: string
@@ -103,24 +103,39 @@ const handleFileUpload = async (
     const file = files[0]
 
     if (file.type === 'application/zip') {
-      const JSZip = (await import('jszip')).default
-      const zip = await JSZip.loadAsync(file)
+      const { BlobReader, ZipReader, TextWriter } = await import(
+        '@zip.js/zip.js'
+      )
+      const zipReader = new ZipReader(new BlobReader(file))
+      const entries = await zipReader.getEntries()
 
-      const rootDir = Object.keys(zip.files)[0].split('/')[0]
+      const rootDir = entries[0].filename.split('/')[0]
 
       for (const fileName of requiredFilePaths) {
-        const zipFile =
-          zip.file(`${rootDir}/${fileName}`) ||
-          zip.file(`${rootDir}/${fileName}`.replace('tweets.js', 'tweet.js'))
-        if (!zipFile) {
+        const entry = entries.find(
+          (e) =>
+            e.filename === `${rootDir}/${fileName}` ||
+            e.filename ===
+              `${rootDir}/${fileName}`.replace('tweets.js', 'tweet.js'),
+        )
+
+        if (!entry) {
           throw new Error(
             `Required file ${`${rootDir}/${fileName}`} not found in the zip`,
           )
         }
-        const content = await zipFile.async('string')
-        const name = fileName.slice(5, -3)
-        fileContents[name] = content
+
+        if (entry && entry.getData) {
+          const writer = new TextWriter()
+          const content = await entry.getData(writer)
+          const name = fileName.slice(5, -3)
+          fileContents[name] = content
+        } else {
+          throw new Error(`Unable to read file: ${fileName}`)
+        }
       }
+
+      await zipReader.close()
     } else if (file.webkitRelativePath) {
       for (const fileName of requiredFilePaths) {
         const filePath = `${file.webkitRelativePath.split('/')[0]}/${fileName}`
@@ -171,6 +186,7 @@ const handleFileUpload = async (
     Object.keys(fileContents).forEach((key) => delete fileContents[key])
 
     alert('Archive processed successfully')
+    window.location.reload() // Reload the page after successful deletion
   } catch (error) {
     console.error('Error processing archive:', error)
     alert('An error occurred while processing archive')
@@ -186,6 +202,7 @@ const handleFileUpload = async (
 const fetchArchiveUpload = async (setArchiveUpload: any, userMetadata: any) => {
   const supabase = createBrowserClient()
   const { data, error } = await supabase
+    .schema(getSchemaName())
     .from(getTableName('archive_upload') as 'archive_upload')
     .select('archive_at')
     .eq('account_id', userMetadata.provider_id)
@@ -234,6 +251,7 @@ export default function UploadTwitterArchive({
         await deleteArchive(supabase, userMetadata.provider_id)
         setArchiveUpload(null)
         alert('Archive deleted successfully')
+        window.location.reload() // Reload the page after successful deletion
       } catch (error) {
         console.error('Error deleting archive:', error)
         alert('An error occurred while deleting the archive')

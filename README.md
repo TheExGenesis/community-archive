@@ -6,24 +6,43 @@
 
 <br/>
 
+## How to use the API
+
+1. Initializing
+   ```js
+   import { createClient } from '@supabase/supabase-js'
+   const supabaseUrl = 'https://fabxmporizzqflnftavs.supabase.co'
+   const supabaseKey = process.env.SUPABASE_KEY
+   const supabase = createClient(supabaseUrl, supabaseKey)
+   ```
+2. Generate API docs: `pnpm gen-api-docs`
+
+3. See API docs here. `https://open-birdsite-db.vercel.app/api/reference`
+
+````
+
+![API schema](image.png)
+
 ## Instructions
 
 1. Rename `.env.example` to `.env.local` and update the following:
 
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=[INSERT SUPABASE PROJECT API ANON KEY]
-   ```
+```
 
-   Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` can be found in [your Supabase project's API settings](https://app.supabase.com/project/_/settings/api)
+NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
+NEXT_PUBLIC_SUPABASE_ANON_KEY=[INSERT SUPABASE PROJECT API ANON KEY]
+
+```
+
+Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` can be found in [your Supabase project's API settings](https://app.supabase.com/project/_/settings/api)
 
 2. You can now run the Next.js local development server:
 
-   ```bash
-   pnpm run dev
-   ```
+```bash
+pnpm run dev
+```
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+The starter kit should now be running on [localhost:3000](http://localhost:3000/).
 
 > Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
 
@@ -36,13 +55,6 @@
 ## Deployment
 
 Hosted on Vercel.
-
-## Showcase
-
-Websites started using this template:
-
-- [mainspring.pro](https://www.mainspring.pro/)
-- [Add yours](https://github.com/michaeltroya/supa-next-starter/edit/main/README.md)
 
 # Documentation
 
@@ -74,3 +86,4 @@ import { Button } from '@/components/ui/Button'
 // To import images or other files from the public folder
 import avatar from '@/public/avatar.png'
 ```
+````

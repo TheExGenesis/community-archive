@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { createBrowserClient } from '@/utils/supabase'
-import { getTableName } from '@/lib-client/getTableName'
+import { getSchemaName, getTableName } from '@/lib-client/getTableName'
 
 const PersonalStats = ({ userMetadata }: { userMetadata: any }) => {
   const [stats, setStats] = useState<{
@@ -16,14 +16,17 @@ const PersonalStats = ({ userMetadata }: { userMetadata: any }) => {
 
       const [tweetCount, followerCount, followingCount] = await Promise.all([
         supabase
+          .schema(getSchemaName())
           .from(getTableName('tweets') as 'tweets')
           .select('id', { count: 'exact' })
           .eq('account_id', account_id),
         supabase
+          .schema(getSchemaName())
           .from(getTableName('followers') as 'followers')
           .select('id', { count: 'exact' })
           .eq('account_id', account_id),
         supabase
+          .schema(getSchemaName())
           .from(getTableName('following') as 'following')
           .select('id', { count: 'exact' })
           .eq('account_id', account_id),

@@ -1,6 +1,6 @@
 'use client'
 import UploadTwitterArchive from '@/components/UploadTwitterArchive'
-import { getTableName } from '@/lib-client/getTableName'
+import { getSchemaName, getTableName } from '@/lib-client/getTableName'
 import { use, useEffect, useState } from 'react'
 import { createBrowserClient } from '@/utils/supabase'
 import SignInComponent from '@/components/SignIn'
@@ -15,6 +15,7 @@ const updateProfile = async (
 ) => {
   // Check if the account exists
   const { data: existingAccount, error: checkError } = await supabase
+    .schema(getSchemaName())
     .from(getTableName('profile'))
     .select('account_id')
     .eq('account_id', accountId)
@@ -28,6 +29,7 @@ const updateProfile = async (
   // Only upsert if the account exists
   if (existingAccount) {
     const { data, error } = await supabase
+      .schema(getSchemaName())
       .from(getTableName('profile'))
       .upsert(
         { account_id: accountId, avatar_media_url: avatarUrl },
@@ -84,6 +86,7 @@ export default function UploadArchivePage() {
 
       const supabase = createBrowserClient()
       const { data, error } = await supabase
+        .schema(getSchemaName())
         .from(getTableName('archive_upload') as 'archive_upload')
         .select('id')
         .eq('account_id', userMetadata.provider_id)

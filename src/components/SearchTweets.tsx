@@ -5,11 +5,12 @@ import Tweet from '@/components/Tweet'
 import dotenv from 'dotenv'
 import path from 'path'
 import { createBrowserClient } from '@/utils/supabase'
-import { getTableName } from '@/lib-client/getTableName'
+import { getSchemaName, getTableName } from '@/lib-client/getTableName'
 import { get } from 'http'
 
 const getLatestTweets = async (supabase: any, count: number) => {
   const { data: tweets, error } = await supabase
+    .schema(getSchemaName())
     .from(getTableName('tweets'))
     .select(
       `
@@ -58,6 +59,7 @@ const searchTweets = async (supabase: any, queryText = '') => {
 
   const pgSearch = async (query: string) => {
     const { data: tweets, error } = await supabase
+      .schema(getSchemaName())
       .from(getTableName('tweets'))
       .select(
         `

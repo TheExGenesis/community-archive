@@ -1,17 +1,16 @@
+import {
+  getSchemaName,
+  getTableName,
+  TableName,
+} from '@/lib-client/getTableName'
 import { SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
 
 // Load environment variables from .env file in the scratchpad directory
 if (process.env.NODE_ENV !== 'production') {
-  dotenv.config({ path: path.resolve(__dirname, '.env') })
+  dotenv.config({ path: path.resolve(__dirname, '../../.env.local') })
 }
-
-const isProduction = process.env.NODE_ENV === 'production'
-
-// Helper function to get the correct table name based on environment
-const getTableName = (baseName: string) =>
-  isProduction ? baseName : `dev_${baseName}`
 
 const BATCH_SIZE = 1000
 
@@ -21,6 +20,7 @@ const createArchiveUpload = async (
   latestTweetDate: string,
 ): Promise<string> => {
   const { data, error } = await supabase
+    .schema(getSchemaName())
     .from(getTableName('archive_upload'))
     .upsert(
       { account_id: accountId, archive_at: latestTweetDate },
@@ -36,7 +36,7 @@ const createArchiveUpload = async (
 // Generic upsert function
 const upsertData = async <T>(
   supabase: SupabaseClient,
-  tableName: string,
+  tableName: TableName,
   data: T[],
   conflictTarget: string,
   ignoreDuplicates: boolean = false,
@@ -45,6 +45,7 @@ const upsertData = async <T>(
 
   const processBatch = async (batch: T[]) => {
     const { error } = await supabase
+      .schema(getSchemaName())
       .from(getTableName(tableName))
       .upsert(batch, { onConflict: conflictTarget, ignoreDuplicates })
 
@@ -246,6 +247,7 @@ export const insertTweets = async (
   const upsertTweets = async (batch: any[]) => {
     const formattedTweets = batch.map(formatTweet)
     const { data, error } = await supabase
+      .schema(getSchemaName())
       .from(getTableName('tweets'))
       .upsert(formattedTweets, {
         onConflict: 'tweet_id',
@@ -316,6 +318,7 @@ const removePastFollowers = async (
   archiveUploadId: string,
 ) => {
   const { error } = await supabase
+    .schema(getSchemaName())
     .from(getTableName('followers'))
     .delete()
     .eq('account_id', accountId)
@@ -335,6 +338,7 @@ const removePastFollowings = async (
   archiveUploadId: string,
 ) => {
   const { error } = await supabase
+    .schema(getSchemaName())
     .from(getTableName('following'))
     .delete()
     .eq('account_id', accountId)
@@ -381,7 +385,7 @@ export const processTwitterArchive = async (
   supabase: SupabaseClient,
   archiveData: any,
 ): Promise<void> => {
-  console.log('Processing Twitter Archive')
+  console.log('Processing Twitter Archive', { archiveData })
 
   const accountId = archiveData.account[0].account.accountId
   const tweets = prepareTweets(archiveData.tweets, accountId)
@@ -391,13 +395,15 @@ export const processTwitterArchive = async (
 
   const rollback = async () => {
     if (archiveUploadId) {
-      for (const tableName of Object.keys(insertedData)) {
+      for (const tableName of Object.keys(insertedData) as TableName[]) {
         await supabase
+          .schema(getSchemaName())
           .from(getTableName(tableName))
           .delete()
           .eq('archive_upload_id', archiveUploadId)
       }
       await supabase
+        .schema(getSchemaName())
         .from(getTableName('archive_upload'))
         .delete()
         .eq('id', archiveUploadId)
@@ -408,6 +414,7 @@ export const processTwitterArchive = async (
     // Upsert account first
     await insertAccounts(supabase, archiveData.account)
     insertedData['account'] = archiveData.account
+    console.log('Account upserted successfully', { insertedData })
 
     // Create archive upload entry
     archiveUploadId = await createArchiveUpload(
@@ -415,6 +422,7 @@ export const processTwitterArchive = async (
       accountId,
       latestTweetDate,
     )
+    console.log('Archive upload created successfully', { archiveUploadId })
 
     // Process remaining data
     const profilesWithAccountId = prepareProfiles(
@@ -424,6 +432,8 @@ export const processTwitterArchive = async (
 
     await insertProfiles(supabase, profilesWithAccountId, archiveUploadId)
     insertedData['profile'] = profilesWithAccountId
+
+    console.log('Profiles upserted successfully', { insertedData })
 
     await insertTweets(supabase, tweets, archiveUploadId)
     insertedData['tweets'] = tweets
@@ -458,7 +468,7 @@ export const deleteArchive = async (
   supabase: SupabaseClient,
   accountId: string,
 ): Promise<void> => {
-  const tables = [
+  const tables: TableName[] = [
     'tweet_entities',
     'tweet_media',
     'tweets',
@@ -469,6 +479,7 @@ export const deleteArchive = async (
 
   try {
     const { data: archiveUploadIds, error } = await supabase
+      .schema(getSchemaName())
       .from(getTableName('archive_upload'))
       .select('id, account_id')
       .eq('account_id', accountId)
@@ -488,6 +499,7 @@ export const deleteArchive = async (
       // Delete rows from each table
       for (const table of tables) {
         const { error } = await supabase
+          .schema(getSchemaName())
           .from(getTableName(table))
           .delete()
           .eq('archive_upload_id', archiveUploadId)
@@ -499,6 +511,7 @@ export const deleteArchive = async (
 
       // Delete the archive_upload entry
       const { error: archiveUploadError } = await supabase
+        .schema(getSchemaName())
         .from(getTableName('archive_upload'))
         .delete()
         .eq('id', archiveUploadId)
@@ -516,6 +529,7 @@ export const deleteArchive = async (
 
     // Delete the account
     const { error: accountDeletionError } = await supabase
+      .schema(getSchemaName())
       .from(getTableName('account'))
       .delete()
       .eq('id', accountId)

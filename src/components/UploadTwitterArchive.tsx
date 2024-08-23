@@ -136,29 +136,17 @@ const handleFileUpload = async (
       const zipReader = new ZipReader(new BlobReader(file))
       const entries = await zipReader.getEntries()
 
-      const rootDir = ['data', 'assets', 'Your archive.html'].includes(
-        entries[0].filename.split('/')[0],
-      )
-        ? ''
-        : entries[0].filename.split('/')[0]
+      console.log('entries', entries)
 
       for (const fileName of requiredFilePaths) {
         const entry = entries.find(
           (e) =>
-            e.filename === `${rootDir}/${fileName}` ||
-            e.filename ===
-              `${rootDir}${rootDir ? '/' : ''}${fileName}`.replace(
-                'tweets.js',
-                'tweet.js',
-              ),
+            e.filename.includes(fileName) ||
+            e.filename.includes(fileName.replace('tweets.js', 'tweet.js')),
         )
 
         if (!entry) {
-          throw new Error(
-            `Required file ${`${rootDir}${
-              rootDir ? '/' : ''
-            }${fileName}`} not found in the zip`,
-          )
+          throw new Error(`Required file ${fileName} not found in the zip`)
         }
 
         if (entry && entry.getData) {

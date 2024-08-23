@@ -151,7 +151,7 @@ export const insertTweetEntitiesBatch = async (
     })
   })
 
-  console.log('inserting entities', { tweetUrls, mentionedUsers, userMentions })
+  console.log('inserting entities')
 
   // Insert mentioned users
   await upsertData(
@@ -302,13 +302,6 @@ export const insertTweets = async (
     const successfulTweets = batch.filter((td) =>
       idStrs.includes(td.tweet.id_str),
     )
-    console.log('successful tweets', {
-      batch,
-      successfulTweets,
-      successfulIds,
-      idStrs,
-      batchIdStrs: batch.map((tweet) => tweet.tweet.id_str),
-    })
     if (successfulTweets.length > 0) {
       await Promise.all([
         insertTweetEntitiesBatch(
@@ -439,7 +432,7 @@ export const processTwitterArchive = async (
   const insertedData: { [key: string]: any[] } = {}
 
   const rollback = async () => {
-    console.log('Rolling back...', { insertedData })
+    console.log('Rolling back...')
 
     if (archiveUploadId) {
       for (const tableName of Object.keys(insertedData) as TableName[]) {
@@ -461,7 +454,7 @@ export const processTwitterArchive = async (
     // Upsert account first
     await insertAccounts(supabase, archiveData.account)
     insertedData['account'] = archiveData.account
-    console.log('Account upserted successfully', { insertedData })
+    console.log('Account upserted successfully')
 
     // Create archive upload entry
     archiveUploadId = await createArchiveUpload(

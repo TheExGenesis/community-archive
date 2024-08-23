@@ -39,8 +39,6 @@ const fetchTweets = async (supabase: any) => {
     // .textSearch('full_text', `'Russian'`)
     .order('created_at', { ascending: false })
     .limit(10)
-  console.log('TWEETS')
-  console.log(tweets)
   if (error) {
     console.error('Error fetching tweets:', error)
     throw error

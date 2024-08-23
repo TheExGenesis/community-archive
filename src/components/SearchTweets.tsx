@@ -88,7 +88,7 @@ const searchTweets = async (supabase: any, queryText = '') => {
   const tweetsOR = await pgSearch(queryOR)
   const tweetsAND = await pgSearch(queryAND)
 
-  console.log('tweets', { tweetsExact, tweetsOR, tweetsAND })
+  // console.log('tweets', { tweetsExact, tweetsOR, tweetsAND })
 
   return Array.from(
     new Map(

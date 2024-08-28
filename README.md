@@ -6,6 +6,8 @@
 
 <br/>
 
+### Deployed at: https://open-birdsite-db.vercel.app/
+
 ## How to use the API
 
 1. Initializing

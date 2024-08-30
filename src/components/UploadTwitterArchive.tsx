@@ -132,6 +132,34 @@ const formatDate = (dateString: string) => {
   })
 }
 
+const uploadArchiveToStorage = async (
+  supabase: any,
+  archiveToUpload: any,
+  accountId: string,
+  archiveId: string,
+): Promise<void> => {
+  const archiveToUploadSize =
+    JSON.stringify(archiveToUpload).length / (1024 * 1024)
+  console.log(`Size of archiveToUpload: ${archiveToUploadSize.toFixed(2)} MB`)
+
+  if (archiveToUploadSize < 50) {
+    const { data, error: uploadError } = await supabase.storage
+      .from('archives')
+      .upload(
+        `${accountId}/${archiveId}.json`,
+        JSON.stringify(archiveToUpload),
+        { upsert: true },
+      )
+    if (uploadError && uploadError.message !== 'The resource already exists') {
+      throw new Error(
+        `Error uploading archive to storage: ${uploadError.message}`,
+      )
+    }
+  } else {
+    console.log('Archive size exceeds 50MB, skipping upload')
+  }
+}
+
 const handleFileUpload = async (
   event: React.ChangeEvent<HTMLInputElement>,
   setIsProcessing: (isProcessing: boolean) => void,
@@ -265,30 +293,13 @@ const handleFileUpload = async (
     const archiveToUpload =
       sizeInMB < 50 ? archiveObjNoEmail : { ...archiveObjNoEmail, like: [] }
 
-    const archiveToUploadSize =
-      JSON.stringify(archiveToUpload).length / (1024 * 1024)
-    console.log(`Size of archiveToUpload: ${archiveToUploadSize.toFixed(2)} MB`)
-
-    if (archiveToUploadSize < 50) {
-      const { error: uploadError } = await supabase.storage
-        .from('archives')
-        .upload(
-          `${archiveObjNoEmail.account[0].account.accountId}/${archiveId}.json`,
-          JSON.stringify(archiveToUpload),
-        )
-      if (uploadError) {
-        throw new Error(
-          `Error uploading archive to storage: ${uploadError.message}`,
-        )
-      }
-      if (uploadError) {
-        throw new Error(
-          `Error uploading archive to storage: ${uploadError.message}`,
-        )
-      }
-    } else {
-      console.log('Archive size exceeds 50MB, skipping upload')
-    }
+    // Use the new function here
+    await uploadArchiveToStorage(
+      supabase,
+      archiveToUpload,
+      archiveObjNoEmail.account[0].account.accountId,
+      archiveId,
+    )
 
     // Process the archive
     await processTwitterArchive(supabase, archiveObjNoEmail, progressCallback)
@@ -413,9 +424,35 @@ export default function UploadTwitterArchive({
       setIsDeleting(true)
       const supabase = createBrowserClient()
       try {
+        // Delete archive from database
         await deleteArchive(supabase, userMetadata.provider_id)
+
+        // Delete everything in the user's directory in storage
+        const { data: fileList, error: listError } = await supabase.storage
+          .from('archives')
+          .list(userMetadata.provider_id)
+
+        if (listError) {
+          console.error('Error listing files in storage:', listError)
+          throw listError
+        }
+
+        if (fileList && fileList.length > 0) {
+          const filesToDelete = fileList.map(
+            (file) => `${userMetadata.provider_id}/${file.name}`,
+          )
+          const { error: deleteError } = await supabase.storage
+            .from('archives')
+            .remove(filesToDelete)
+
+          if (deleteError) {
+            console.error('Error deleting files from storage:', deleteError)
+            throw deleteError
+          }
+        }
+
         setArchiveUpload(null)
-        alert('Archive deleted successfully')
+        alert('Archive deleted successfully from database and storage')
         window.location.reload() // Reload the page after successful deletion
       } catch (error) {
         console.error('Error deleting archive:', error)

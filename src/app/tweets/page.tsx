@@ -15,19 +15,15 @@ if (process.env.NODE_ENV !== 'production') {
 
 const isProduction = process.env.NODE_ENV === 'production'
 
-// Helper function to get the correct table name based on environment
-const getTableName = (baseName: string) =>
-  isProduction ? baseName : `dev_${baseName}`
-
 const fetchTweets = async (supabase: any) => {
   const { data: tweets, error } = await supabase
     .schema(getSchemaName())
-    .from(getTableName('tweets'))
+    .from('tweets')
     .select(
       `
     *,
-    ${getTableName('account')}!inner (
-      ${getTableName('profile')} (
+    ${'account'}!inner (
+      profile (
         avatar_media_url
       ),
       username,
@@ -76,14 +72,10 @@ export default function Page() {
           {tweets.map((tweet: any) => (
             <Tweet
               key={tweet.tweet_id}
-              username={tweet[getTableName('account')]?.username || 'Unknown'}
-              displayName={
-                tweet[getTableName('account')]?.account_display_name ||
-                'Unknown'
-              }
+              username={tweet['account']?.username || 'Unknown'}
+              displayName={tweet['account']?.account_display_name || 'Unknown'}
               profilePicUrl={
-                tweet[getTableName('account')]?.[getTableName('profile')]
-                  ?.avatar_media_url ||
+                tweet['account']?.['profile']?.avatar_media_url ||
                 'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
               }
               text={tweet.full_text}
@@ -91,7 +83,7 @@ export default function Page() {
               retweetCount={tweet.retweet_count}
               date={tweet.created_at}
               tweetUrl={`https://twitter.com/${
-                tweet[getTableName('account')]?.username || 'unknown'
+                tweet['account']?.username || 'unknown'
               }/status/${tweet.tweet_id}`}
               replyToUsername={tweet.reply_to_username}
             />

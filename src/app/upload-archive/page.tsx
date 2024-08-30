@@ -49,13 +49,14 @@ export default function UploadArchivePage() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        setUserMetadata(session.user.user_metadata)
         if (!session.user.user_metadata) return
-        updateProfile(
-          supabase,
-          session.user.user_metadata.provider_id,
-          session.user.user_metadata.picture,
-        )
+        setUserMetadata(session.user.user_metadata)
+        console.log('session.user.user_metadata', session.user.user_metadata)
+        // updateProfile(
+        //   supabase,
+        //   session.user.user_metadata.provider_id,
+        //   session.user.user_metadata.picture,
+        // )
       } else {
         setUserMetadata(null)
       }
@@ -105,18 +106,18 @@ export default function UploadArchivePage() {
           <h2 className="mb-4 text-3xl font-bold md:text-4xl">
             Welcome to the community archive!
           </h2>
-          <p className="md:text-md text-justify text-sm">
+          <p className="md:text-md text-md text-justify">
             {`This is a place to upload your archive and share it with the
           community. We're hosting a public database with an API that anyone can
           query and build on top of.`}
           </p>
           <br />
-          <p className="md:text-md text-justify text-sm">
+          <p className="md:text-md text-md text-justify">
             {`We think a lot of value was
           produced in twitter conversations over the years and that is worth preserving. Since twitter is stingy with data and tweets are public, we're asking people to upload their archives and serving them back to the public.`}
           </p>
           <br />
-          <p className="md:text-md text-justify text-sm">
+          <p className="md:text-md text-md text-justify">
             {"If you haven't yet, we strongly encourage you to "}
             <a
               href="https://x.com/settings/download_your_data"
@@ -135,21 +136,36 @@ export default function UploadArchivePage() {
         <br />
         <br />
         <div>
-          <h2 className="mb-4 text-2xl font-bold">Data Policy</h2>
+          <h2 className="mb-4 text-2xl font-bold">Our Data Policy</h2>
           <ul className="list-disc space-y-2 pl-5">
             <li>
               We do not see direct messages or email addresses or deleted or
               community tweets.
             </li>
             <li>
-              The only things that leave your machine are 1. tweets, 2.
-              followers/following 3. profile information
+              The only things that leave your machine are 1. profile information
+              2. tweets, 3. likes, 4. followers/following
             </li>
             <li>
               We plan to make a full dump of the db accessible for easier data
               science use.
             </li>
           </ul>
+        </div>
+        <br />
+        <br />
+        <div>
+          <h2 className="mb-4 text-2xl font-bold">
+            {"If you want to make absolutely sure we don't see your DMs:"}
+          </h2>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>{`Unzip your archive,`}</li>
+            <li>{`Go into the "data" folder,`}</li>
+            <li>{`Delete "direct-message.js",`}</li>
+            <li>{`and zip the main folder again.`}</li>
+          </ul>
+          <br />
+          {`This way we won't be able to see your DMs but you'll still be able to use the archive to query your tweets, likes, etc.`}
         </div>
       </div>
 

@@ -161,7 +161,7 @@ export default function UploadArchivePage() {
           <ul className="list-disc space-y-2 pl-5">
             <li>{`Unzip your archive,`}</li>
             <li>{`Go into the "data" folder,`}</li>
-            <li>{`Delete "direct-message.js",`}</li>
+            <li>{`Delete "direct-messages.js",`}</li>
             <li>{`and zip the main folder again.`}</li>
           </ul>
           <br />

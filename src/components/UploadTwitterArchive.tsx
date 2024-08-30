@@ -512,7 +512,7 @@ export default function UploadTwitterArchive({
                 />
                 {isProcessing && (
                   <div>
-                    <p>Processing archive...</p>
+                    <p>{`Processing archive (may take up to 10 minutes)...`}</p>
                     {progress && (
                       <div>
                         <p>

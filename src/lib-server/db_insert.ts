@@ -236,8 +236,6 @@ const insertTempLikes = async (
   }))
 
   // Ensure all likes have non-null full_text
-  const invalidLikedTweets = likedTweets.filter((like) => !like.full_text)
-
   const validLikedTweets = likedTweets.map((like) => ({
     ...like,
     full_text: like.full_text || '',
@@ -280,7 +278,7 @@ export const processTwitterArchive = async (
   progressCallback: (progress: { phase: string; percent: number }) => void,
 ): Promise<void> => {
   const startTime = Date.now()
-  console.log('Processing Twitter Archive', { archiveData })
+  // console.log('Processing Twitter Archive', { archiveData })
 
   const accountId = archiveData.account[0].account.accountId
   const suffix = accountId
@@ -352,7 +350,7 @@ export const processTwitterArchive = async (
       archiveData['note-tweet'] || [],
       archiveData.tweets,
     )
-    console.log('patchedTweets', { patchedTweets })
+    // console.log('patchedTweets', { patchedTweets })
     // Process likes
     console.log('Processing likes...')
     const likesStartTime = Date.now()
@@ -474,7 +472,7 @@ export const processTwitterArchivePgFns = async (
   archiveData: any,
 ): Promise<void> => {
   const startTime = Date.now()
-  console.log('Processing Twitter Archive', { archiveData })
+  // console.log('Processing Twitter Archive', { archiveData })
 
   const accountId = archiveData.account[0].account.accountId
   const suffix = accountId

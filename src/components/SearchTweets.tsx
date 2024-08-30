@@ -11,12 +11,12 @@ import { get } from 'http'
 const getLatestTweets = async (supabase: any, count: number) => {
   const { data: tweets, error } = await supabase
     .schema(getSchemaName())
-    .from(getTableName('tweets'))
+    .from('tweets')
     .select(
       `
       *,
-      ${getTableName('account')}!inner (
-        ${getTableName('profile')} (
+      ${'account'}!inner (
+        ${'profile'} (
           avatar_media_url
         ),
         username,
@@ -60,20 +60,21 @@ const searchTweets = async (supabase: any, queryText = '') => {
   const pgSearch = async (query: string) => {
     const { data: tweets, error } = await supabase
       .schema(getSchemaName())
-      .from(getTableName('tweets'))
+      .from('tweets')
       .select(
         `
       *,
-      ${getTableName('account')}!inner (
-        ${getTableName('profile')} (
-          avatar_media_url
-        ),
+      ${'account'}!inner (
         username,
-        account_display_name
+        account_display_name,
+        profile:profile (
+          avatar_media_url
+        )
       )
-      
     `,
       )
+      .order('archive_upload_id', { ascending: false })
+      .limit(1)
       .textSearch('fts', `${query}`)
       .order('created_at', { ascending: false })
 
@@ -121,6 +122,7 @@ export default function SearchTweets() {
     const fetchedTweets: any[] = await searchTweets(supabase, query).catch(
       () => [],
     )
+    console.log('fetchedTweets', fetchedTweets)
     setTweets(fetchedTweets)
     setIsLoading(false)
   }
@@ -153,39 +155,40 @@ export default function SearchTweets() {
           </button>
         </div>
       </div>
-
       <div className="flex-grow overflow-y-auto">
         {isLoading ? (
           <div>Loading tweets...</div>
-        ) : tweets && tweets.length > 0 ? (
-          <div className="space-y-4">
-            {tweets.map((tweet) => (
-              <Tweet
-                key={tweet.tweet_id}
-                username={tweet[getTableName('account')]?.username || 'Unknown'}
-                displayName={
-                  tweet[getTableName('account')]?.account_display_name ||
-                  'Unknown'
-                }
-                profilePicUrl={
-                  tweet[getTableName('account')]?.[getTableName('profile')]
-                    ?.avatar_media_url ||
-                  'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
-                }
-                text={tweet.full_text}
-                favoriteCount={tweet.favorite_count}
-                retweetCount={tweet.retweet_count}
-                date={tweet.created_at}
-                tweetUrl={`https://twitter.com/${
-                  tweet[getTableName('account')]?.username || 'unknown'
-                }/status/${tweet.tweet_id}`}
-                replyToUsername={tweet.reply_to_username}
-              />
-            ))}
-          </div>
-        ) : (
-          <div>No tweets found</div>
-        )}
+        ) : tweets ? (
+          tweets.length > 0 ? (
+            <div className="space-y-4">
+              {tweets.map((tweet) => (
+                <Tweet
+                  key={tweet.tweet_id}
+                  username={tweet['account']?.username || 'Unknown'}
+                  displayName={
+                    tweet['account']?.account_display_name || 'Unknown'
+                  }
+                  profilePicUrl={
+                    tweet['account']?.['profile']?.[
+                      tweet['account']?.['profile'].length - 1
+                    ]?.avatar_media_url ||
+                    'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
+                  }
+                  text={tweet.full_text}
+                  favoriteCount={tweet.favorite_count}
+                  retweetCount={tweet.retweet_count}
+                  date={tweet.created_at}
+                  tweetUrl={`https://twitter.com/${
+                    tweet['account']?.username || 'unknown'
+                  }/status/${tweet.tweet_id}`}
+                  replyToUsername={tweet.reply_to_username}
+                />
+              ))}
+            </div>
+          ) : (
+            <div>No tweets found</div>
+          )
+        ) : null}
       </div>
     </div>
   )

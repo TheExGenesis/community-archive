@@ -122,7 +122,7 @@ export default function SearchTweets() {
     const fetchedTweets: any[] = await searchTweets(supabase, query).catch(
       () => [],
     )
-    console.log('fetchedTweets', fetchedTweets)
+    // console.log('fetchedTweets', fetchedTweets)
     setTweets(fetchedTweets)
     setIsLoading(false)
   }
@@ -169,10 +169,12 @@ export default function SearchTweets() {
                     tweet['account']?.account_display_name || 'Unknown'
                   }
                   profilePicUrl={
-                    tweet['account']?.['profile']?.[
-                      tweet['account']?.['profile'].length - 1
-                    ]?.avatar_media_url ||
-                    'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
+                    Array.isArray(tweet['account']?.['profile'])
+                      ? tweet['account']?.['profile'][
+                          tweet['account']?.['profile'].length - 1
+                        ]?.avatar_media_url
+                      : tweet['account']?.['profile']?.avatar_media_url ||
+                        'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
                   }
                   text={tweet.full_text}
                   favoriteCount={tweet.favorite_count}

@@ -3,26 +3,41 @@ import { createBrowserClient } from '@/utils/supabase'
 import { getSchemaName, getTableName } from '@/lib-client/getTableName'
 
 const getStats = async (supabase: any) => {
-  const { data: accounts, error: accountsError } = await supabase
-    .schema(getSchemaName())
-    .from(getTableName('account'))
-    .select(`username`)
-    .order('created_at', { ascending: false })
+  const [accountsResult, tweetsResult, likedTweetsResult] = await Promise.all([
+    supabase
+      .schema(getSchemaName())
+      .from(getTableName('account'))
+      .select(`username`)
+      .order('created_at', { ascending: false }),
 
-  const { count: tweetCount, error: tweetsError } = await supabase
-    .schema(getSchemaName())
-    .from(getTableName('tweets'))
-    .select('tweet_id', { count: 'exact', head: true })
+    supabase
+      .schema(getSchemaName())
+      .from(getTableName('tweets'))
+      .select('tweet_id', { count: 'exact', head: true }),
 
-  if (accountsError || tweetsError) {
-    console.error('Error fetching stats:', accountsError || tweetsError)
-    throw accountsError || tweetsError
+    supabase
+      .schema(getSchemaName())
+      .from(getTableName('liked_tweets'))
+      .select('tweet_id', { count: 'exact', head: true }),
+  ])
+
+  const { data: accounts, error: accountsError } = accountsResult
+  const { count: tweetCount, error: tweetsError } = tweetsResult
+  const { count: likedTweetCount, error: likedTweetsError } = likedTweetsResult
+
+  if (accountsError || tweetsError || likedTweetsError) {
+    console.error(
+      'Error fetching stats:',
+      accountsError || tweetsError || likedTweetsError,
+    )
+    throw accountsError || tweetsError || likedTweetsError
   }
 
   return {
     usernames: accounts.map((account: any) => account.username),
     accountCount: accounts.length,
     tweetCount,
+    likedTweetCount,
   }
 }
 
@@ -31,6 +46,7 @@ const CommunityStats = () => {
     usernames: [],
     accountCount: null,
     tweetCount: null,
+    likedTweetCount: null,
   })
 
   useEffect(() => {
@@ -46,10 +62,13 @@ const CommunityStats = () => {
   return (
     <div>
       {stats.accountCount !== null && stats.tweetCount !== null && (
-        <p className="mb-4 text-sm">
-          <strong>{stats.accountCount}</strong> accounts have uploaded a total
-          of <strong>{stats.tweetCount}</strong> tweets.
-        </p>
+        <>
+          <p className="mb-4 text-sm">
+            <strong>{stats.accountCount}</strong> accounts have uploaded a total
+            of <strong>{stats.tweetCount}</strong> tweets. We also have{' '}
+            <strong>{stats.likedTweetCount}</strong> liked tweets.
+          </p>
+        </>
       )}
       {stats.usernames.length > 0 && (
         <p className="mb-4 text-sm">

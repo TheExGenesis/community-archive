@@ -65,16 +65,15 @@ const searchTweets = async (supabase: any, queryText = '') => {
         `
       *,
       ${'account'}!inner (
-        username,
-        account_display_name,
-        profile:profile (
+        profile (
           avatar_media_url
-        )
+        ),
+        username,
+        account_display_name
       )
+      
     `,
       )
-      .order('archive_upload_id', { ascending: false })
-      .limit(1)
       .textSearch('fts', `${query}`)
       .order('created_at', { ascending: false })
 
@@ -170,9 +169,7 @@ export default function SearchTweets() {
                   }
                   profilePicUrl={
                     Array.isArray(tweet['account']?.['profile'])
-                      ? tweet['account']?.['profile'][
-                          tweet['account']?.['profile'].length - 1
-                        ]?.avatar_media_url
+                      ? tweet['account']?.['profile'][0]?.avatar_media_url
                       : tweet['account']?.['profile']?.avatar_media_url ||
                         'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
                   }

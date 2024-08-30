@@ -29,8 +29,8 @@ const getStats = async (supabase: any) => {
 const CommunityStats = () => {
   const [stats, setStats] = useState({
     usernames: [],
-    accountCount: 0,
-    tweetCount: 0,
+    accountCount: null,
+    tweetCount: null,
   })
 
   useEffect(() => {
@@ -45,13 +45,17 @@ const CommunityStats = () => {
 
   return (
     <div>
-      <p className="mb-4 text-sm">
-        <strong>{stats.accountCount}</strong> accounts have uploaded a total of{' '}
-        <strong>{stats.tweetCount}</strong> tweets.
-      </p>
-      <p className="mb-4 text-sm">
-        Accounts in the archive: {stats.usernames.join(', ')}
-      </p>
+      {stats.accountCount !== null && stats.tweetCount !== null && (
+        <p className="mb-4 text-sm">
+          <strong>{stats.accountCount}</strong> accounts have uploaded a total
+          of <strong>{stats.tweetCount}</strong> tweets.
+        </p>
+      )}
+      {stats.usernames.length > 0 && (
+        <p className="mb-4 text-sm">
+          Accounts in the archive: {stats.usernames.join(', ')}
+        </p>
+      )}
     </div>
   )
 }

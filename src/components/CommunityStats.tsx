@@ -1,23 +1,23 @@
 import React, { useEffect, useState } from 'react'
 import { createBrowserClient } from '@/utils/supabase'
-import { getSchemaName, getTableName } from '@/lib-client/getTableName'
+import { getSchemaName } from '@/lib-client/getTableName'
 
 const getStats = async (supabase: any) => {
   const [accountsResult, tweetsResult, likedTweetsResult] = await Promise.all([
     supabase
       .schema(getSchemaName())
-      .from(getTableName('account'))
+      .from('account')
       .select(`username`)
       .order('created_at', { ascending: false }),
 
     supabase
       .schema(getSchemaName())
-      .from(getTableName('tweets'))
+      .from('tweets')
       .select('tweet_id', { count: 'exact', head: true }),
 
     supabase
       .schema(getSchemaName())
-      .from(getTableName('liked_tweets'))
+      .from('liked_tweets')
       .select('tweet_id', { count: 'exact', head: true }),
   ])
 
@@ -32,6 +32,8 @@ const getStats = async (supabase: any) => {
     )
     throw accountsError || tweetsError || likedTweetsError
   }
+
+  console.log('accounts', accounts)
 
   return {
     usernames: accounts.map((account: any) => account.username),

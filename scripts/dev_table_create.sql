@@ -245,7 +245,7 @@ BEGIN
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', policy_name, schema_name, table_name);
     END LOOP; 
 
-    -- EXECUTE format('CREATE POLICY "Tweets are publicly visible" ON %I.%I FOR SELECT USING (true)', schema_name, table_name);
+    EXECUTE format('CREATE POLICY "Tweets are publicly visible" ON %I.%I to anon, authenticated FOR SELECT USING (true)', schema_name, table_name);
     EXECUTE format('
         CREATE POLICY "Tweets are modifiable by their users" ON %I.%I to authenticated 
         USING (
@@ -279,7 +279,7 @@ BEGIN
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', policy_name, schema_name, table_name);
     END LOOP;
 
-    -- EXECUTE format('CREATE POLICY "Entities are publicly visible" ON %I.%I FOR SELECT USING (true)', schema_name, table_name);
+    EXECUTE format('CREATE POLICY "Entities are publicly visible" ON %I.%I to anon, authenticated FOR SELECT USING (true)', schema_name, table_name);
     EXECUTE format('
         CREATE POLICY "Entities are modifiable by their users" ON %I.%I to authenticated
         USING (
@@ -323,7 +323,7 @@ BEGIN
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', policy_name, schema_name, table_name);
     END LOOP;
 
-    -- EXECUTE format('CREATE POLICY "Entities are publicly visible" ON %I.%I FOR SELECT USING (true)', schema_name, table_name);
+    EXECUTE format('CREATE POLICY "Entities are publicly visible" ON %I.%I to anon, authenticatedFOR SELECT USING (true)', schema_name, table_name);
     EXECUTE format('CREATE POLICY "Entities are modifiable by their users" ON %I.%I to authenticated  USING (EXISTS (SELECT 1 FROM dev.account dt WHERE dt.account_id = (select auth.jwt()) -> ''app_metadata'' ->> ''provider_id'')) WITH CHECK (EXISTS (SELECT 1 FROM dev.account dt WHERE dt.account_id = (select auth.jwt()) -> ''app_metadata'' ->> ''provider_id''))', schema_name, table_name, schema_name, table_name, schema_name, table_name);
 END;
 $$ LANGUAGE plpgsql;

@@ -1,7 +1,11 @@
-insert into storage.buckets
-  (id, name)
-values
-  ('archives', 'archives');
+SET search_path TO '';
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'archives') THEN
+        INSERT INTO storage.buckets (id, name) VALUES ('archives', 'archives');
+    END IF;
+END $$;
 
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
@@ -183,10 +187,46 @@ CREATE TABLE
     FOREIGN KEY (archive_upload_id) REFERENCES public.archive_upload (id)
   );
 
+-- Indices for public.archive_upload
+CREATE INDEX idx_archive_upload_account_id ON public.archive_upload(account_id);
+
+-- Indices for public.profile
+CREATE INDEX idx_profile_account_id ON public.profile(account_id);
+CREATE INDEX idx_profile_archive_upload_id ON public.profile(archive_upload_id);
+
+-- Indices for public.tweets
+CREATE INDEX idx_tweets_account_id ON public.tweets(account_id);
+CREATE INDEX idx_tweets_archive_upload_id ON public.tweets(archive_upload_id);
+
+-- Indices for public.user_mentions
+CREATE INDEX idx_user_mentions_mentioned_user_id ON public.user_mentions(mentioned_user_id);
+CREATE INDEX idx_user_mentions_tweet_id ON public.user_mentions(tweet_id);
+
+-- Indices for public.tweet_urls
+CREATE INDEX idx_tweet_urls_tweet_id ON public.tweet_urls(tweet_id);
+
+-- Indices for public.tweet_media
+CREATE INDEX idx_tweet_media_tweet_id ON public.tweet_media(tweet_id);
+CREATE INDEX idx_tweet_media_archive_upload_id ON public.tweet_media(archive_upload_id);
+
+-- Indices for public.followers
+CREATE INDEX idx_followers_account_id ON public.followers(account_id);
+CREATE INDEX idx_followers_archive_upload_id ON public.followers(archive_upload_id);
+
+-- Indices for public.following
+CREATE INDEX idx_following_account_id ON public.following(account_id);
+CREATE INDEX idx_following_archive_upload_id ON public.following(archive_upload_id);
+
+-- Indices for public.likes
+CREATE INDEX idx_likes_account_id ON public.likes(account_id);
+CREATE INDEX idx_likes_liked_tweet_id ON public.likes(liked_tweet_id);
+CREATE INDEX idx_likes_archive_upload_id ON public.likes(archive_upload_id);
+
+
 
 --- PERMISSIONS
 -- Function to apply RLS policies for most tables
-CREATE OR REPLACE FUNCTION public.apply_dev_rls_policies(schema_name TEXT, table_name TEXT) RETURNS void AS $$
+CREATE OR REPLACE FUNCTION public.apply_public_rls_policies(schema_name TEXT, table_name TEXT) RETURNS void AS $$
 DECLARE
     policy_name TEXT;
     full_table_name TEXT;
@@ -205,13 +245,22 @@ BEGIN
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', policy_name, schema_name, table_name);
     END LOOP; 
 
-    EXECUTE format('CREATE POLICY "Tweets are publicly visible" ON %I.%I FOR SELECT USING (true)', schema_name, table_name);
-    EXECUTE format('CREATE POLICY "Tweets are modifiable by their users" ON %I.%I FOR ALL USING (account_id = auth.jwt() -> ''app_metadata'' ->> ''provider_id'') WITH CHECK (account_id = auth.jwt() -> ''app_metadata'' ->> ''provider_id'')', schema_name, table_name);
+    -- EXECUTE format('CREATE POLICY "Tweets are publicly visible" ON %I.%I FOR SELECT USING (true)', schema_name, table_name);
+    EXECUTE format('
+        CREATE POLICY "Tweets are modifiable by their users" ON %I.%I to authenticated 
+        USING (
+            account_id = (SELECT auth.jwt()) -> ''app_metadata'' ->> ''provider_id''
+        ) 
+        WITH CHECK (
+            account_id = (SELECT auth.jwt()) -> ''app_metadata'' ->> ''provider_id''
+        )', schema_name, table_name);
 END;
 $$ LANGUAGE plpgsql;
 
 -- Function to apply RLS policies for entity tables
-CREATE OR REPLACE FUNCTION public.apply_dev_entities_rls_policies(schema_name TEXT, table_name TEXT) RETURNS void AS $$
+CREATE OR REPLACE FUNCTION public.apply_public_entities_rls_policies(schema_name TEXT, table_name TEXT) RETURNS void
+set search_path TO ''
+ AS $$
 DECLARE
     policy_name TEXT;
     full_table_name TEXT;
@@ -230,13 +279,32 @@ BEGIN
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', policy_name, schema_name, table_name);
     END LOOP;
 
-    EXECUTE format('CREATE POLICY "Entities are publicly visible" ON %I.%I FOR SELECT USING (true)', schema_name, table_name);
-    EXECUTE format('CREATE POLICY "Entities are modifiable by their users" ON %I.%I FOR ALL USING (EXISTS (SELECT 1 FROM public.tweets dt WHERE dt.account_id = auth.jwt() -> ''app_metadata'' ->> ''provider_id'' AND dt.tweet_id = %I.%I.tweet_id)) WITH CHECK (EXISTS (SELECT 1 FROM public.tweets dt WHERE dt.account_id = auth.jwt() -> ''app_metadata'' ->> ''provider_id'' AND dt.tweet_id = %I.%I.tweet_id))', schema_name, table_name, schema_name, table_name, schema_name, table_name);
+    -- EXECUTE format('CREATE POLICY "Entities are publicly visible" ON %I.%I FOR SELECT USING (true)', schema_name, table_name);
+    EXECUTE format('
+        CREATE POLICY "Entities are modifiable by their users" ON %I.%I to authenticated
+        USING (
+            EXISTS (
+                SELECT 1 
+                FROM public.tweets dt 
+                WHERE dt.tweet_id = %I.tweet_id 
+                AND dt.account_id = (SELECT auth.jwt()) -> ''app_metadata'' ->> ''provider_id''
+            )
+        ) 
+        WITH CHECK (
+            EXISTS (
+                SELECT 1 
+                FROM public.tweets dt 
+                WHERE dt.tweet_id = %I.tweet_id 
+                AND dt.account_id = (SELECT auth.jwt()) -> ''app_metadata'' ->> ''provider_id''
+            )
+        )', schema_name, table_name, table_name, table_name);
 END;
 $$ LANGUAGE plpgsql;
 
 -- Function to apply RLS policies for entity tables
-CREATE OR REPLACE FUNCTION public.apply_dev_liked_tweets_rls_policies(schema_name TEXT, table_name TEXT) RETURNS void AS $$
+CREATE OR REPLACE FUNCTION public.apply_public_liked_tweets_rls_policies(schema_name TEXT, table_name TEXT) RETURNS void
+set search_path TO ''
+ AS $$
 DECLARE
     policy_name TEXT;
     full_table_name TEXT;
@@ -255,8 +323,8 @@ BEGIN
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', policy_name, schema_name, table_name);
     END LOOP;
 
-    EXECUTE format('CREATE POLICY "Entities are publicly visible" ON %I.%I FOR SELECT USING (true)', schema_name, table_name);
-    EXECUTE format('CREATE POLICY "Entities are modifiable by their users" ON %I.%I FOR ALL USING (EXISTS (SELECT 1 FROM public.account dt WHERE dt.account_id = auth.jwt() -> ''app_metadata'' ->> ''provider_id'')) WITH CHECK (EXISTS (SELECT 1 FROM public.account dt WHERE dt.account_id = auth.jwt() -> ''app_metadata'' ->> ''provider_id''))', schema_name, table_name, schema_name, table_name, schema_name, table_name);
+    -- EXECUTE format('CREATE POLICY "Entities are publicly visible" ON %I.%I FOR SELECT USING (true)', schema_name, table_name);
+    EXECUTE format('CREATE POLICY "Entities are modifiable by their users" ON %I.%I to authenticated  USING (EXISTS (SELECT 1 FROM public.account dt WHERE dt.account_id = (select auth.jwt()) -> ''app_metadata'' ->> ''provider_id'')) WITH CHECK (EXISTS (SELECT 1 FROM public.account dt WHERE dt.account_id = (select auth.jwt()) -> ''app_metadata'' ->> ''provider_id''))', schema_name, table_name, schema_name, table_name, schema_name, table_name);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -276,16 +344,16 @@ DECLARE
 BEGIN
     FOREACH t SLICE 1 IN ARRAY tables
     LOOP
-        PERFORM public.apply_dev_rls_policies(t[1], t[2]);
+        PERFORM public.apply_public_rls_policies(t[1], t[2]);
     END LOOP;
 END $$;
 
 -- Apply entity policies
-SELECT public.apply_dev_entities_rls_policies('public', 'tweet_media');
-SELECT public.apply_dev_entities_rls_policies('public', 'tweet_urls');
-SELECT public.apply_dev_entities_rls_policies('public', 'user_mentions');
-SELECT public.apply_dev_liked_tweets_rls_policies('public', 'liked_tweets');
-SELECT public.apply_dev_liked_tweets_rls_policies('public', 'mentioned_users');
+SELECT public.apply_public_entities_rls_policies('public', 'tweet_media');
+SELECT public.apply_public_entities_rls_policies('public', 'tweet_urls');
+SELECT public.apply_public_entities_rls_policies('public', 'user_mentions');
+SELECT public.apply_public_liked_tweets_rls_policies('public', 'liked_tweets');
+SELECT public.apply_public_liked_tweets_rls_policies('public', 'mentioned_users');
 
 -- FTS index
 alter table public.tweets
@@ -299,7 +367,9 @@ create index text_fts on public.tweets using gin (fts);
 
 --DELETE
 CREATE OR REPLACE FUNCTION public.delete_all_archives(p_account_id TEXT)
-RETURNS VOID AS $$
+RETURNS VOID
+set search_path TO ''
+ AS $$
 DECLARE
     v_schema_name TEXT := 'public';
 BEGIN
@@ -327,11 +397,12 @@ BEGIN
         RAISE;
     END;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+set statement_timeout TO '20min';
 
 
 
-SET search_path TO public, public;
+
 
 -- Function to drop functions if they exist
 CREATE OR REPLACE FUNCTION public.drop_function_if_exists(function_name text, function_args text[])
@@ -419,14 +490,15 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
   ALTER DEFAULT PRIVILEGES IN SCHEMA temp GRANT ALL ON TABLES TO authenticated;
 
   CREATE OR REPLACE FUNCTION public.create_temp_tables(p_suffix TEXT)
-  RETURNS VOID AS $$
+  RETURNS VOID
+  set search_path TO '' AS $$
   BEGIN
       -- Check if the user is authenticated or is the postgres role
       IF auth.uid() IS NULL AND current_user != 'postgres' THEN
           RAISE EXCEPTION 'Not authenticated';
       END IF;
 
-      IF p_suffix != (auth.jwt() -> 'app_metadata' ->> 'provider_id') AND current_user != 'postgres' THEN
+      IF p_suffix != ((select (aselect uth.jwt())) -> 'app_metadata' ->> 'provider_id') AND current_user != 'postgres' THEN
           RAISE EXCEPTION 'Not authorized to process this archive';
       END IF;
 
@@ -450,7 +522,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
   CREATE OR REPLACE FUNCTION public.insert_temp_account(p_account JSONB, p_suffix TEXT)
-  RETURNS VOID AS $$
+  RETURNS VOID
+  set search_path TO ''
+   AS $$
   BEGIN
       IF auth.uid() IS NULL AND current_user != 'postgres' THEN
           RAISE EXCEPTION 'Not authenticated';
@@ -472,7 +546,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
 
   -- Function to insert profiles into temporary table
   CREATE OR REPLACE FUNCTION public.insert_temp_profiles(p_profile JSONB, p_account_id TEXT, p_suffix TEXT)
-  RETURNS VOID AS $$
+  RETURNS VOID 
+  set search_path TO ''
+  AS $$
   BEGIN
     IF auth.uid() IS NULL AND current_user != 'postgres' THEN
         RAISE EXCEPTION 'Not authenticated';
@@ -493,10 +569,13 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
   CREATE OR REPLACE FUNCTION public.insert_temp_archive_upload(p_account_id TEXT, p_archive_at TIMESTAMP WITH TIME ZONE, p_suffix TEXT)
-  RETURNS BIGINT AS $$
+  RETURNS BIGINT
+  set search_path TO '' 
+   AS $$
   DECLARE
     v_id BIGINT;
   BEGIN
+    
     IF auth.uid() IS NULL AND current_user != 'postgres' THEN
         RAISE EXCEPTION 'Not authenticated';
     END IF;
@@ -516,15 +595,14 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
 
     -- Modified insert_temp_tweets function
   CREATE OR REPLACE FUNCTION public.insert_temp_tweets(p_tweets JSONB, p_suffix TEXT)
-  RETURNS VOID AS $$
+  RETURNS VOID
+  set search_path TO ''
+   AS $$
   BEGIN
     IF auth.uid() IS NULL AND current_user != 'postgres' THEN
         RAISE EXCEPTION 'Not authenticated';
     END IF;
-    -- raise exception 'debug % ', (
-    --   SELECT jsonb_pretty(jsonb_agg(tweet->'id_str'))
-    --   FROM jsonb_array_elements($1) AS tweet
-    -- );
+
     EXECUTE format('
       INSERT INTO temp.tweets_%s (
         tweet_id, account_id, created_at, full_text, retweet_count, favorite_count,
@@ -548,7 +626,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
 
   -- Modified process_and_insert_tweet_entities function
   CREATE OR REPLACE FUNCTION public.process_and_insert_tweet_entities(p_tweets JSONB, p_suffix TEXT)
-  RETURNS VOID AS $$
+  RETURNS VOID
+  set search_path TO ''
+   AS $$
   BEGIN
       IF auth.uid() IS NULL AND current_user != 'postgres' THEN
           RAISE EXCEPTION 'Not authenticated';
@@ -606,7 +686,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
   CREATE OR REPLACE FUNCTION public.insert_temp_followers(p_followers JSONB, p_account_id TEXT, p_suffix TEXT)
-  RETURNS VOID AS $$
+  RETURNS VOID
+  set search_path TO ''
+   AS $$
   BEGIN
       IF auth.uid() IS NULL AND current_user != 'postgres' THEN
           RAISE EXCEPTION 'Not authenticated';
@@ -625,7 +707,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
   CREATE OR REPLACE FUNCTION public.insert_temp_following(p_following JSONB, p_account_id TEXT, p_suffix TEXT)
-  RETURNS VOID AS $$
+  RETURNS VOID
+  set search_path TO '' AS $$
   BEGIN
       IF auth.uid() IS NULL AND current_user != 'postgres' THEN
           RAISE EXCEPTION 'Not authenticated';
@@ -644,8 +727,11 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
   CREATE OR REPLACE FUNCTION public.insert_temp_likes(p_likes JSONB, p_account_id TEXT, p_suffix TEXT)
-  RETURNS VOID AS $$
+  RETURNS VOID
+  set search_path TO ''
+   AS $$
   BEGIN
+    set search_path TO '';
     IF auth.uid() IS NULL AND current_user != 'postgres' THEN
         RAISE EXCEPTION 'Not authenticated';
     END IF;
@@ -673,7 +759,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
 
   -- New function to drop temporary tables
   CREATE OR REPLACE FUNCTION public.drop_temp_tables(p_suffix TEXT)
-  RETURNS VOID AS $$
+  RETURNS VOID
+  set search_path TO '' AS $$
   BEGIN
       IF auth.uid() IS NULL AND current_user != 'postgres' THEN
           RAISE EXCEPTION 'Not authenticated';
@@ -695,7 +782,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
   $$ LANGUAGE plpgsql SECURITY DEFINER;
 
   CREATE OR REPLACE FUNCTION public.commit_temp_data(p_suffix TEXT)
-  RETURNS VOID AS $$
+  RETURNS VOID
+  set search_path TO ''
+   AS $$
   DECLARE
       v_archive_upload_id BIGINT;
       v_account_id TEXT;
@@ -857,7 +946,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
 
 
   CREATE OR REPLACE FUNCTION public.process_archive(archive_data JSONB)
-  RETURNS VOID AS $$
+  RETURNS VOID
+  set search_path TO ''
+   AS $$
   DECLARE
       v_account_id TEXT;
       v_suffix TEXT;
@@ -876,11 +967,10 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
       v_account_id := (archive_data->'account'->0->'account'->>'accountId')::TEXT;
 
       -- Check if the authenticated user has permission to process this archive
-      IF v_suffix != (auth.jwt() -> 'app_metadata' ->> 'provider_id') AND current_user != 'postgres' THEN
+      IF v_suffix != ((select auth.jwt()) -> 'app_metadata' ->> 'provider_id') AND current_user != 'postgres' THEN
           RAISE EXCEPTION 'Not authorized to process this archive';
       END IF;
 
-      -- v_suffix := (archive_data->'account'->0->'account'->>'username')::TEXT;
       v_suffix := v_account_id;
       
       v_prepared_tweets := (

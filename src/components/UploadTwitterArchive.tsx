@@ -188,7 +188,7 @@ const handleFileUpload = async (
       const zipReader = new ZipReader(new BlobReader(file))
       const entries = await zipReader.getEntries()
 
-      console.log('entries', entries)
+      // console.log('entries', entries)
 
       const allFilePaths = [
         ...requiredFilePaths,

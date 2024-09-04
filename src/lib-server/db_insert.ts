@@ -39,7 +39,6 @@ const retryOperation = async <T>(
 
 const patchTweetsWithNoteTweets = (noteTweets: any[], tweets: any[]): any[] => {
   const startTime = performance.now()
-  let changedTweets: any[] = []
   // console.log('noteTweets', { noteTweets })
 
   const patchedTweets = tweets.map((tweetObj) => {
@@ -56,7 +55,6 @@ const patchTweetsWithNoteTweets = (noteTweets: any[], tweets: any[]): any[] => {
     })
 
     if (matchingNoteTweet) {
-      // changedTweets.push(tweetObj)
       return {
         ...tweetObj,
         tweet: {
@@ -304,8 +302,8 @@ export const processTwitterArchive = async (
   archiveData: any,
   progressCallback: (progress: { phase: string; percent: number }) => void,
 ): Promise<void> => {
-  const startTime = Date.now()
-  // console.log('Processing Twitter Archive', { archiveData })
+  const startTime = performance.now()
+  console.log('Starting Twitter Archive processing...')
 
   const accountId = archiveData.account[0].account.accountId
   const suffix = accountId
@@ -496,8 +494,11 @@ export const processTwitterArchive = async (
       phase: 'Archive Uploaded',
       percent: 100,
     })
-    const endTime = Date.now()
-    console.log(`Total processing time: ${endTime - startTime}ms`)
+    const endTime = performance.now()
+    const totalTimeInSeconds = (endTime - startTime) / 1000
+    console.log(
+      `Total archive upload time: ${totalTimeInSeconds.toFixed(2)} seconds`,
+    )
   } catch (error: any) {
     console.error('Error processing Twitter archive:', error)
 

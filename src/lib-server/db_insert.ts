@@ -250,7 +250,7 @@ const insertTempLikes = async (
     })
 
   if (likedTweetsError) {
-    console.error('Error details:', likedTweetsError)
+    console.error('Error details:', likedTweetsError, { validLikedTweets })
     throw new Error(`Error inserting liked tweets: ${likedTweetsError.message}`)
   }
 
@@ -268,8 +268,10 @@ const insertTempLikes = async (
       ignoreDuplicates: false,
     })
 
-  if (likesError)
+  if (likesError) {
+    console.error('Error details:', likesError, { likeRelations })
     throw new Error(`Error inserting likes: ${likesError.message}`)
+  }
 }
 
 export const processTwitterArchive = async (
@@ -309,6 +311,38 @@ export const processTwitterArchive = async (
     await supabase
       .schema(getSchemaName())
       .rpc('create_temp_tables', { p_suffix: suffix })
+
+    // check if tables are created by selecting from temp.likes, if there's an empty list then it exists, if there's an error, then it doesn't exist
+    const maxRetries = 5
+    let retries = 0
+    let tablesExist = false
+
+    while (retries < maxRetries && !tablesExist) {
+      try {
+        const { data, error: checkTableError } = await supabase
+          .schema('temp')
+          .from(`likes_${suffix}`)
+          .select('*')
+        if (checkTableError) {
+          throw checkTableError
+        }
+        tablesExist = true
+      } catch (checkTableError) {
+        console.log(
+          `Attempt ${retries + 1}: Temporary tables not ready yet. Retrying...`,
+        )
+        retries++
+        if (retries < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, 1000)) // Wait for 1 second before retrying
+        } else {
+          throw new Error(
+            `Failed to verify temporary tables after ${maxRetries} attempts: ${
+              (checkTableError as Error).message
+            }`,
+          )
+        }
+      }
+    }
 
     console.log('Inserting account data...')
     const { error: accountError } = await supabase
@@ -463,6 +497,15 @@ export const processTwitterArchive = async (
 
     // Throw a new error with more context
     throw new Error(`Error processing Twitter archive: ${error.message}`)
+  }
+  try {
+    console.log('Attempting to drop temporary tables...')
+    await supabase
+      .schema(getSchemaName())
+      .rpc('drop_temp_tables', { p_suffix: suffix })
+    console.log('Temporary tables dropped successfully.')
+  } catch (dropError: any) {
+    console.error('Error dropping temporary tables:', dropError)
   }
 }
 

@@ -36,13 +36,23 @@ const updateProfile = async (
     console.log('Account does not exist, skipping update')
   }
 }
-
+declare global {
+  interface Window {
+    supabase: any
+  }
+}
 export default function UploadArchivePage() {
   const [userMetadata, setUserMetadata] = useState<any>(null)
   const [isArchiveUploaded, setIsArchiveUploaded] = useState(false)
 
   useEffect(() => {
     const supabase = createBrowserClient()
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      typeof window !== 'undefined'
+    ) {
+      window.supabase = supabase
+    }
 
     // Set up auth state listener
     const {

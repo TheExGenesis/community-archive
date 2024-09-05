@@ -142,6 +142,7 @@ const uploadArchiveToStorage = async (
     JSON.stringify(archiveToUpload).length / (1024 * 1024)
   console.log(`Size of archiveToUpload: ${archiveToUploadSize.toFixed(2)} MB`)
 
+  console.log('Uploading archive to storage', { accountId, archiveId })
   const { data, error: uploadError } = await supabase.storage
     .from('archives')
     .upload(`${accountId}/${archiveId}.json`, JSON.stringify(archiveToUpload), {
@@ -247,26 +248,26 @@ const handleFileUpload = async (
       }
     }
 
-    let archiveObjNoEmail = Object.fromEntries(
+    let archiveToUpload = Object.fromEntries(
       Object.entries(fileContents).map(([key, content]) => [
         key,
         JSON.parse(content.slice(content.indexOf('['))),
       ]),
     )
-    archiveObjNoEmail = {
-      ...archiveObjNoEmail,
-      account: archiveObjNoEmail.account.map((item: any) => {
+    archiveToUpload = {
+      ...archiveToUpload,
+      account: archiveToUpload.account.map((item: any) => {
         const { email, ...rest } = item.account
         return { account: rest }
       }),
     }
-    const sizeInMB = JSON.stringify(archiveObjNoEmail).length / (1024 * 1024)
+    const sizeInMB = JSON.stringify(archiveToUpload).length / (1024 * 1024)
     console.log(
-      `Size of archiveObjNoEmail: ${sizeInMB.toFixed(2)} MB`,
-      archiveObjNoEmail,
+      `Size of archiveToUpload: ${sizeInMB.toFixed(2)} MB`,
+      archiveToUpload,
     )
 
-    const latestTweetDate = archiveObjNoEmail.tweets.reduce(
+    const latestTweetDate = archiveToUpload.tweets.reduce(
       (latest: string, tweet: any) => {
         const tweetDate = new Date(tweet.tweet.created_at)
         return latest
@@ -279,31 +280,26 @@ const handleFileUpload = async (
     )
 
     // Upload archive objects to storage
-    const username = archiveObjNoEmail.account[0].account.username
+    const username = archiveToUpload.account[0].account.username
     const archiveId = `${username}_${latestTweetDate}`
     console.log('Uploading archive', archiveId)
     progressCallback({ phase: 'Uploading archive', percent: 0 })
-
-    const archiveToUpload =
-      sizeInMB < 50 ? archiveObjNoEmail : { ...archiveObjNoEmail, like: [] }
 
     // Use the new function here
     await uploadArchiveToStorage(
       supabase,
       archiveToUpload,
-      archiveObjNoEmail.account[0].account.accountId,
+      archiveToUpload.account[0].account.accountId,
       archiveId,
     )
 
     // Process the archive
-    await processTwitterArchive(supabase, archiveObjNoEmail, progressCallback)
+    await processTwitterArchive(supabase, archiveToUpload, progressCallback)
 
     // Clear the archive data from memory
     // Clear all archive objects from memory
     Object.keys(fileContents).forEach((key) => delete fileContents[key])
-    Object.keys(archiveObjNoEmail).forEach(
-      (key) => delete archiveObjNoEmail[key],
-    )
+    Object.keys(archiveToUpload).forEach((key) => delete archiveToUpload[key])
     Object.keys(archiveToUpload).forEach((key) => delete archiveToUpload[key])
 
     alert('Archive processed successfully')

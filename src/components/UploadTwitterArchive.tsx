@@ -142,21 +142,15 @@ const uploadArchiveToStorage = async (
     JSON.stringify(archiveToUpload).length / (1024 * 1024)
   console.log(`Size of archiveToUpload: ${archiveToUploadSize.toFixed(2)} MB`)
 
-  if (archiveToUploadSize < 50) {
-    const { data, error: uploadError } = await supabase.storage
-      .from('archives')
-      .upload(
-        `${accountId}/${archiveId}.json`,
-        JSON.stringify(archiveToUpload),
-        { upsert: true },
-      )
-    if (uploadError && uploadError.message !== 'The resource already exists') {
-      throw new Error(
-        `Error uploading archive to storage: ${uploadError.message}`,
-      )
-    }
-  } else {
-    console.log('Archive size exceeds 50MB, skipping upload')
+  const { data, error: uploadError } = await supabase.storage
+    .from('archives')
+    .upload(`${accountId}/${archiveId}.json`, JSON.stringify(archiveToUpload), {
+      upsert: true,
+    })
+  if (uploadError && uploadError.message !== 'The resource already exists') {
+    throw new Error(
+      `Error uploading archive to storage: ${uploadError.message}`,
+    )
   }
 }
 

@@ -149,8 +149,8 @@ export default function UploadArchivePage() {
           <h2 className="mb-4 text-2xl font-bold">Our Data Policy</h2>
           <ul className="list-disc space-y-2 pl-5">
             <li>
-              We do not see direct messages or email addresses or deleted or
-              community tweets.
+              The code never touches direct messages or email addresses or
+              deleted tweets.
             </li>
             <li>
               The only things that leave your machine are 1. profile information
@@ -166,7 +166,9 @@ export default function UploadArchivePage() {
         <br />
         <div>
           <h2 className="mb-4 text-2xl font-bold">
-            {"If you want to make absolutely sure we don't see your DMs:"}
+            {
+              "We promise your DMs won't leave your computer, we never see them. But if you want to be 100% sure:"
+            }
           </h2>
           <ul className="list-disc space-y-2 pl-5">
             <li>{`Unzip your archive,`}</li>
@@ -175,7 +177,7 @@ export default function UploadArchivePage() {
             <li>{`and zip the main folder again.`}</li>
           </ul>
           <br />
-          {`This way we won't be able to see your DMs but you'll still be able to use the archive to query your tweets, likes, etc.`}
+          {`If you trust us, you can skip this step.`}
         </div>
       </div>
 

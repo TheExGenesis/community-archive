@@ -149,13 +149,19 @@ export default function UploadArchivePage() {
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-500 underline"
-            >GitHub repo</a>, contributions welcome! We also have a {` `}
+            >
+              GitHub repo
+            </a>
+            , contributions welcome! We also have a {` `}
             <a
               href="https://discord.gg/AStSQj6ugq"
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-500 underline"
-            >Discord</a> for questions/suggestions/developers chat etc.
+            >
+              Discord
+            </a>{' '}
+            for questions/suggestions/developers chat etc.
           </p>
         </div>
 

@@ -141,6 +141,19 @@ export default function UploadArchivePage() {
           wait a day or two and email you a download link. ty for your
           persistence :)`}
           </p>
+          <br />
+          <p className="md:text-md text-md text-justify">
+            {"If you'd like to "}
+            <a
+              href="https://github.com/open-birdsite-db/open-birdsite-db"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 underline"
+            >
+              {'contribute'}
+            </a>
+            {`, please do.` }
+          </p>
         </div>
 
         <br />

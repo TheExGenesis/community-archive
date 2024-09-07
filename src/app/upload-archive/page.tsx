@@ -143,16 +143,19 @@ export default function UploadArchivePage() {
           </p>
           <br />
           <p className="md:text-md text-md text-justify">
-            {"If you'd like to "}
+            This archive is open source, see{` `}
             <a
               href="https://github.com/open-birdsite-db/open-birdsite-db"
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-500 underline"
-            >
-              {'contribute'}
-            </a>
-            {`, please do.` }
+            >GitHub repo</a>, contributions welcome! We also have a {` `}
+            <a
+              href="https://discord.gg/AStSQj6ugq"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 underline"
+            >Discord</a> for questions/suggestions/developers chat etc.
           </p>
         </div>
 

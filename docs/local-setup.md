@@ -1,4 +1,3 @@
-
 # Development Instructions
 
 1. Rename `.env.example` to `.env.local` and update the following:
@@ -36,7 +35,6 @@ The app should now be running on [localhost:3000](http://localhost:3000/).
    `--selectProjects server` will run tests only for the server-side code in node, and `--selectProjects client` will run tests only for the client-side code in jsdom (see `jest.config.js`)
 
 5. If you make changes to the database schema, you'll want to update the types in `src/database-types.ts` with `pnpm gen-types`, you'll need a `SUPABASE_ACCESS_TOKEN` in your environment variables.
-
 
 ### Requirements
 

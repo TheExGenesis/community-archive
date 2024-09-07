@@ -25,4 +25,4 @@
    console.log(data)
    ```
 
-2. See [API schema here](https://open-birdsite-db.vercel.app/api/reference). Only `GET` requests are relevant, others you don't have permission for. 
+2. See [API schema here](https://open-birdsite-db.vercel.app/api/reference). Only `GET` requests are relevant, others you don't have permission for.

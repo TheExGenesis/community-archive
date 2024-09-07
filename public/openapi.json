@@ -1,1 +1,2526 @@
-{"swagger":"2.0","info":{"description":"","title":"standard public schema","version":"12.2.2 (db9da0b)"},"host":"fabxmporizzqflnftavs.supabase.co:443","basePath":"/","schemes":["https"],"consumes":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json","text/csv"],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json","text/csv"],"paths":{"/":{"get":{"produces":["application/openapi+json","application/json"],"responses":{"200":{"description":"OK"}},"summary":"OpenAPI description (this document)","tags":["Introspection"]}},"/mentioned_users":{"get":{"parameters":[{"$ref":"#/parameters/rowFilter.mentioned_users.user_id"},{"$ref":"#/parameters/rowFilter.mentioned_users.name"},{"$ref":"#/parameters/rowFilter.mentioned_users.screen_name"},{"$ref":"#/parameters/rowFilter.mentioned_users.updated_at"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/order"},{"$ref":"#/parameters/range"},{"$ref":"#/parameters/rangeUnit"},{"$ref":"#/parameters/offset"},{"$ref":"#/parameters/limit"},{"$ref":"#/parameters/preferCount"}],"responses":{"200":{"description":"OK","schema":{"items":{"$ref":"#/definitions/mentioned_users"},"type":"array"}},"206":{"description":"Partial Content"}},"tags":["mentioned_users"]},"post":{"parameters":[{"$ref":"#/parameters/body.mentioned_users"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/preferPost"}],"responses":{"201":{"description":"Created"}},"tags":["mentioned_users"]},"delete":{"parameters":[{"$ref":"#/parameters/rowFilter.mentioned_users.user_id"},{"$ref":"#/parameters/rowFilter.mentioned_users.name"},{"$ref":"#/parameters/rowFilter.mentioned_users.screen_name"},{"$ref":"#/parameters/rowFilter.mentioned_users.updated_at"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["mentioned_users"]},"patch":{"parameters":[{"$ref":"#/parameters/rowFilter.mentioned_users.user_id"},{"$ref":"#/parameters/rowFilter.mentioned_users.name"},{"$ref":"#/parameters/rowFilter.mentioned_users.screen_name"},{"$ref":"#/parameters/rowFilter.mentioned_users.updated_at"},{"$ref":"#/parameters/body.mentioned_users"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["mentioned_users"]}},"/tweet_urls":{"get":{"parameters":[{"$ref":"#/parameters/rowFilter.tweet_urls.id"},{"$ref":"#/parameters/rowFilter.tweet_urls.url"},{"$ref":"#/parameters/rowFilter.tweet_urls.expanded_url"},{"$ref":"#/parameters/rowFilter.tweet_urls.display_url"},{"$ref":"#/parameters/rowFilter.tweet_urls.tweet_id"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/order"},{"$ref":"#/parameters/range"},{"$ref":"#/parameters/rangeUnit"},{"$ref":"#/parameters/offset"},{"$ref":"#/parameters/limit"},{"$ref":"#/parameters/preferCount"}],"responses":{"200":{"description":"OK","schema":{"items":{"$ref":"#/definitions/tweet_urls"},"type":"array"}},"206":{"description":"Partial Content"}},"tags":["tweet_urls"]},"post":{"parameters":[{"$ref":"#/parameters/body.tweet_urls"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/preferPost"}],"responses":{"201":{"description":"Created"}},"tags":["tweet_urls"]},"delete":{"parameters":[{"$ref":"#/parameters/rowFilter.tweet_urls.id"},{"$ref":"#/parameters/rowFilter.tweet_urls.url"},{"$ref":"#/parameters/rowFilter.tweet_urls.expanded_url"},{"$ref":"#/parameters/rowFilter.tweet_urls.display_url"},{"$ref":"#/parameters/rowFilter.tweet_urls.tweet_id"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["tweet_urls"]},"patch":{"parameters":[{"$ref":"#/parameters/rowFilter.tweet_urls.id"},{"$ref":"#/parameters/rowFilter.tweet_urls.url"},{"$ref":"#/parameters/rowFilter.tweet_urls.expanded_url"},{"$ref":"#/parameters/rowFilter.tweet_urls.display_url"},{"$ref":"#/parameters/rowFilter.tweet_urls.tweet_id"},{"$ref":"#/parameters/body.tweet_urls"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["tweet_urls"]}},"/followers":{"get":{"parameters":[{"$ref":"#/parameters/rowFilter.followers.id"},{"$ref":"#/parameters/rowFilter.followers.account_id"},{"$ref":"#/parameters/rowFilter.followers.follower_account_id"},{"$ref":"#/parameters/rowFilter.followers.archive_upload_id"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/order"},{"$ref":"#/parameters/range"},{"$ref":"#/parameters/rangeUnit"},{"$ref":"#/parameters/offset"},{"$ref":"#/parameters/limit"},{"$ref":"#/parameters/preferCount"}],"responses":{"200":{"description":"OK","schema":{"items":{"$ref":"#/definitions/followers"},"type":"array"}},"206":{"description":"Partial Content"}},"tags":["followers"]},"post":{"parameters":[{"$ref":"#/parameters/body.followers"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/preferPost"}],"responses":{"201":{"description":"Created"}},"tags":["followers"]},"delete":{"parameters":[{"$ref":"#/parameters/rowFilter.followers.id"},{"$ref":"#/parameters/rowFilter.followers.account_id"},{"$ref":"#/parameters/rowFilter.followers.follower_account_id"},{"$ref":"#/parameters/rowFilter.followers.archive_upload_id"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["followers"]},"patch":{"parameters":[{"$ref":"#/parameters/rowFilter.followers.id"},{"$ref":"#/parameters/rowFilter.followers.account_id"},{"$ref":"#/parameters/rowFilter.followers.follower_account_id"},{"$ref":"#/parameters/rowFilter.followers.archive_upload_id"},{"$ref":"#/parameters/body.followers"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["followers"]}},"/archive_upload":{"get":{"parameters":[{"$ref":"#/parameters/rowFilter.archive_upload.id"},{"$ref":"#/parameters/rowFilter.archive_upload.account_id"},{"$ref":"#/parameters/rowFilter.archive_upload.archive_at"},{"$ref":"#/parameters/rowFilter.archive_upload.created_at"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/order"},{"$ref":"#/parameters/range"},{"$ref":"#/parameters/rangeUnit"},{"$ref":"#/parameters/offset"},{"$ref":"#/parameters/limit"},{"$ref":"#/parameters/preferCount"}],"responses":{"200":{"description":"OK","schema":{"items":{"$ref":"#/definitions/archive_upload"},"type":"array"}},"206":{"description":"Partial Content"}},"tags":["archive_upload"]},"post":{"parameters":[{"$ref":"#/parameters/body.archive_upload"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/preferPost"}],"responses":{"201":{"description":"Created"}},"tags":["archive_upload"]},"delete":{"parameters":[{"$ref":"#/parameters/rowFilter.archive_upload.id"},{"$ref":"#/parameters/rowFilter.archive_upload.account_id"},{"$ref":"#/parameters/rowFilter.archive_upload.archive_at"},{"$ref":"#/parameters/rowFilter.archive_upload.created_at"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["archive_upload"]},"patch":{"parameters":[{"$ref":"#/parameters/rowFilter.archive_upload.id"},{"$ref":"#/parameters/rowFilter.archive_upload.account_id"},{"$ref":"#/parameters/rowFilter.archive_upload.archive_at"},{"$ref":"#/parameters/rowFilter.archive_upload.created_at"},{"$ref":"#/parameters/body.archive_upload"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["archive_upload"]}},"/liked_tweets":{"get":{"parameters":[{"$ref":"#/parameters/rowFilter.liked_tweets.tweet_id"},{"$ref":"#/parameters/rowFilter.liked_tweets.full_text"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/order"},{"$ref":"#/parameters/range"},{"$ref":"#/parameters/rangeUnit"},{"$ref":"#/parameters/offset"},{"$ref":"#/parameters/limit"},{"$ref":"#/parameters/preferCount"}],"responses":{"200":{"description":"OK","schema":{"items":{"$ref":"#/definitions/liked_tweets"},"type":"array"}},"206":{"description":"Partial Content"}},"tags":["liked_tweets"]},"post":{"parameters":[{"$ref":"#/parameters/body.liked_tweets"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/preferPost"}],"responses":{"201":{"description":"Created"}},"tags":["liked_tweets"]},"delete":{"parameters":[{"$ref":"#/parameters/rowFilter.liked_tweets.tweet_id"},{"$ref":"#/parameters/rowFilter.liked_tweets.full_text"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["liked_tweets"]},"patch":{"parameters":[{"$ref":"#/parameters/rowFilter.liked_tweets.tweet_id"},{"$ref":"#/parameters/rowFilter.liked_tweets.full_text"},{"$ref":"#/parameters/body.liked_tweets"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["liked_tweets"]}},"/following":{"get":{"parameters":[{"$ref":"#/parameters/rowFilter.following.id"},{"$ref":"#/parameters/rowFilter.following.account_id"},{"$ref":"#/parameters/rowFilter.following.following_account_id"},{"$ref":"#/parameters/rowFilter.following.archive_upload_id"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/order"},{"$ref":"#/parameters/range"},{"$ref":"#/parameters/rangeUnit"},{"$ref":"#/parameters/offset"},{"$ref":"#/parameters/limit"},{"$ref":"#/parameters/preferCount"}],"responses":{"200":{"description":"OK","schema":{"items":{"$ref":"#/definitions/following"},"type":"array"}},"206":{"description":"Partial Content"}},"tags":["following"]},"post":{"parameters":[{"$ref":"#/parameters/body.following"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/preferPost"}],"responses":{"201":{"description":"Created"}},"tags":["following"]},"delete":{"parameters":[{"$ref":"#/parameters/rowFilter.following.id"},{"$ref":"#/parameters/rowFilter.following.account_id"},{"$ref":"#/parameters/rowFilter.following.following_account_id"},{"$ref":"#/parameters/rowFilter.following.archive_upload_id"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["following"]},"patch":{"parameters":[{"$ref":"#/parameters/rowFilter.following.id"},{"$ref":"#/parameters/rowFilter.following.account_id"},{"$ref":"#/parameters/rowFilter.following.following_account_id"},{"$ref":"#/parameters/rowFilter.following.archive_upload_id"},{"$ref":"#/parameters/body.following"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["following"]}},"/tweet_media":{"get":{"parameters":[{"$ref":"#/parameters/rowFilter.tweet_media.media_id"},{"$ref":"#/parameters/rowFilter.tweet_media.tweet_id"},{"$ref":"#/parameters/rowFilter.tweet_media.media_url"},{"$ref":"#/parameters/rowFilter.tweet_media.media_type"},{"$ref":"#/parameters/rowFilter.tweet_media.width"},{"$ref":"#/parameters/rowFilter.tweet_media.height"},{"$ref":"#/parameters/rowFilter.tweet_media.archive_upload_id"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/order"},{"$ref":"#/parameters/range"},{"$ref":"#/parameters/rangeUnit"},{"$ref":"#/parameters/offset"},{"$ref":"#/parameters/limit"},{"$ref":"#/parameters/preferCount"}],"responses":{"200":{"description":"OK","schema":{"items":{"$ref":"#/definitions/tweet_media"},"type":"array"}},"206":{"description":"Partial Content"}},"tags":["tweet_media"]},"post":{"parameters":[{"$ref":"#/parameters/body.tweet_media"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/preferPost"}],"responses":{"201":{"description":"Created"}},"tags":["tweet_media"]},"delete":{"parameters":[{"$ref":"#/parameters/rowFilter.tweet_media.media_id"},{"$ref":"#/parameters/rowFilter.tweet_media.tweet_id"},{"$ref":"#/parameters/rowFilter.tweet_media.media_url"},{"$ref":"#/parameters/rowFilter.tweet_media.media_type"},{"$ref":"#/parameters/rowFilter.tweet_media.width"},{"$ref":"#/parameters/rowFilter.tweet_media.height"},{"$ref":"#/parameters/rowFilter.tweet_media.archive_upload_id"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["tweet_media"]},"patch":{"parameters":[{"$ref":"#/parameters/rowFilter.tweet_media.media_id"},{"$ref":"#/parameters/rowFilter.tweet_media.tweet_id"},{"$ref":"#/parameters/rowFilter.tweet_media.media_url"},{"$ref":"#/parameters/rowFilter.tweet_media.media_type"},{"$ref":"#/parameters/rowFilter.tweet_media.width"},{"$ref":"#/parameters/rowFilter.tweet_media.height"},{"$ref":"#/parameters/rowFilter.tweet_media.archive_upload_id"},{"$ref":"#/parameters/body.tweet_media"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["tweet_media"]}},"/account":{"get":{"parameters":[{"$ref":"#/parameters/rowFilter.account.account_id"},{"$ref":"#/parameters/rowFilter.account.created_via"},{"$ref":"#/parameters/rowFilter.account.username"},{"$ref":"#/parameters/rowFilter.account.created_at"},{"$ref":"#/parameters/rowFilter.account.account_display_name"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/order"},{"$ref":"#/parameters/range"},{"$ref":"#/parameters/rangeUnit"},{"$ref":"#/parameters/offset"},{"$ref":"#/parameters/limit"},{"$ref":"#/parameters/preferCount"}],"responses":{"200":{"description":"OK","schema":{"items":{"$ref":"#/definitions/account"},"type":"array"}},"206":{"description":"Partial Content"}},"tags":["account"]},"post":{"parameters":[{"$ref":"#/parameters/body.account"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/preferPost"}],"responses":{"201":{"description":"Created"}},"tags":["account"]},"delete":{"parameters":[{"$ref":"#/parameters/rowFilter.account.account_id"},{"$ref":"#/parameters/rowFilter.account.created_via"},{"$ref":"#/parameters/rowFilter.account.username"},{"$ref":"#/parameters/rowFilter.account.created_at"},{"$ref":"#/parameters/rowFilter.account.account_display_name"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["account"]},"patch":{"parameters":[{"$ref":"#/parameters/rowFilter.account.account_id"},{"$ref":"#/parameters/rowFilter.account.created_via"},{"$ref":"#/parameters/rowFilter.account.username"},{"$ref":"#/parameters/rowFilter.account.created_at"},{"$ref":"#/parameters/rowFilter.account.account_display_name"},{"$ref":"#/parameters/body.account"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["account"]}},"/profile":{"get":{"parameters":[{"$ref":"#/parameters/rowFilter.profile.id"},{"$ref":"#/parameters/rowFilter.profile.account_id"},{"$ref":"#/parameters/rowFilter.profile.bio"},{"$ref":"#/parameters/rowFilter.profile.website"},{"$ref":"#/parameters/rowFilter.profile.location"},{"$ref":"#/parameters/rowFilter.profile.avatar_media_url"},{"$ref":"#/parameters/rowFilter.profile.header_media_url"},{"$ref":"#/parameters/rowFilter.profile.archive_upload_id"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/order"},{"$ref":"#/parameters/range"},{"$ref":"#/parameters/rangeUnit"},{"$ref":"#/parameters/offset"},{"$ref":"#/parameters/limit"},{"$ref":"#/parameters/preferCount"}],"responses":{"200":{"description":"OK","schema":{"items":{"$ref":"#/definitions/profile"},"type":"array"}},"206":{"description":"Partial Content"}},"tags":["profile"]},"post":{"parameters":[{"$ref":"#/parameters/body.profile"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/preferPost"}],"responses":{"201":{"description":"Created"}},"tags":["profile"]},"delete":{"parameters":[{"$ref":"#/parameters/rowFilter.profile.id"},{"$ref":"#/parameters/rowFilter.profile.account_id"},{"$ref":"#/parameters/rowFilter.profile.bio"},{"$ref":"#/parameters/rowFilter.profile.website"},{"$ref":"#/parameters/rowFilter.profile.location"},{"$ref":"#/parameters/rowFilter.profile.avatar_media_url"},{"$ref":"#/parameters/rowFilter.profile.header_media_url"},{"$ref":"#/parameters/rowFilter.profile.archive_upload_id"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["profile"]},"patch":{"parameters":[{"$ref":"#/parameters/rowFilter.profile.id"},{"$ref":"#/parameters/rowFilter.profile.account_id"},{"$ref":"#/parameters/rowFilter.profile.bio"},{"$ref":"#/parameters/rowFilter.profile.website"},{"$ref":"#/parameters/rowFilter.profile.location"},{"$ref":"#/parameters/rowFilter.profile.avatar_media_url"},{"$ref":"#/parameters/rowFilter.profile.header_media_url"},{"$ref":"#/parameters/rowFilter.profile.archive_upload_id"},{"$ref":"#/parameters/body.profile"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["profile"]}},"/tweets":{"get":{"parameters":[{"$ref":"#/parameters/rowFilter.tweets.tweet_id"},{"$ref":"#/parameters/rowFilter.tweets.account_id"},{"$ref":"#/parameters/rowFilter.tweets.created_at"},{"$ref":"#/parameters/rowFilter.tweets.full_text"},{"$ref":"#/parameters/rowFilter.tweets.retweet_count"},{"$ref":"#/parameters/rowFilter.tweets.favorite_count"},{"$ref":"#/parameters/rowFilter.tweets.reply_to_tweet_id"},{"$ref":"#/parameters/rowFilter.tweets.reply_to_user_id"},{"$ref":"#/parameters/rowFilter.tweets.reply_to_username"},{"$ref":"#/parameters/rowFilter.tweets.archive_upload_id"},{"$ref":"#/parameters/rowFilter.tweets.fts"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/order"},{"$ref":"#/parameters/range"},{"$ref":"#/parameters/rangeUnit"},{"$ref":"#/parameters/offset"},{"$ref":"#/parameters/limit"},{"$ref":"#/parameters/preferCount"}],"responses":{"200":{"description":"OK","schema":{"items":{"$ref":"#/definitions/tweets"},"type":"array"}},"206":{"description":"Partial Content"}},"tags":["tweets"]},"post":{"parameters":[{"$ref":"#/parameters/body.tweets"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/preferPost"}],"responses":{"201":{"description":"Created"}},"tags":["tweets"]},"delete":{"parameters":[{"$ref":"#/parameters/rowFilter.tweets.tweet_id"},{"$ref":"#/parameters/rowFilter.tweets.account_id"},{"$ref":"#/parameters/rowFilter.tweets.created_at"},{"$ref":"#/parameters/rowFilter.tweets.full_text"},{"$ref":"#/parameters/rowFilter.tweets.retweet_count"},{"$ref":"#/parameters/rowFilter.tweets.favorite_count"},{"$ref":"#/parameters/rowFilter.tweets.reply_to_tweet_id"},{"$ref":"#/parameters/rowFilter.tweets.reply_to_user_id"},{"$ref":"#/parameters/rowFilter.tweets.reply_to_username"},{"$ref":"#/parameters/rowFilter.tweets.archive_upload_id"},{"$ref":"#/parameters/rowFilter.tweets.fts"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["tweets"]},"patch":{"parameters":[{"$ref":"#/parameters/rowFilter.tweets.tweet_id"},{"$ref":"#/parameters/rowFilter.tweets.account_id"},{"$ref":"#/parameters/rowFilter.tweets.created_at"},{"$ref":"#/parameters/rowFilter.tweets.full_text"},{"$ref":"#/parameters/rowFilter.tweets.retweet_count"},{"$ref":"#/parameters/rowFilter.tweets.favorite_count"},{"$ref":"#/parameters/rowFilter.tweets.reply_to_tweet_id"},{"$ref":"#/parameters/rowFilter.tweets.reply_to_user_id"},{"$ref":"#/parameters/rowFilter.tweets.reply_to_username"},{"$ref":"#/parameters/rowFilter.tweets.archive_upload_id"},{"$ref":"#/parameters/rowFilter.tweets.fts"},{"$ref":"#/parameters/body.tweets"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["tweets"]}},"/likes":{"get":{"parameters":[{"$ref":"#/parameters/rowFilter.likes.id"},{"$ref":"#/parameters/rowFilter.likes.account_id"},{"$ref":"#/parameters/rowFilter.likes.liked_tweet_id"},{"$ref":"#/parameters/rowFilter.likes.archive_upload_id"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/order"},{"$ref":"#/parameters/range"},{"$ref":"#/parameters/rangeUnit"},{"$ref":"#/parameters/offset"},{"$ref":"#/parameters/limit"},{"$ref":"#/parameters/preferCount"}],"responses":{"200":{"description":"OK","schema":{"items":{"$ref":"#/definitions/likes"},"type":"array"}},"206":{"description":"Partial Content"}},"tags":["likes"]},"post":{"parameters":[{"$ref":"#/parameters/body.likes"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/preferPost"}],"responses":{"201":{"description":"Created"}},"tags":["likes"]},"delete":{"parameters":[{"$ref":"#/parameters/rowFilter.likes.id"},{"$ref":"#/parameters/rowFilter.likes.account_id"},{"$ref":"#/parameters/rowFilter.likes.liked_tweet_id"},{"$ref":"#/parameters/rowFilter.likes.archive_upload_id"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["likes"]},"patch":{"parameters":[{"$ref":"#/parameters/rowFilter.likes.id"},{"$ref":"#/parameters/rowFilter.likes.account_id"},{"$ref":"#/parameters/rowFilter.likes.liked_tweet_id"},{"$ref":"#/parameters/rowFilter.likes.archive_upload_id"},{"$ref":"#/parameters/body.likes"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["likes"]}},"/user_mentions":{"get":{"parameters":[{"$ref":"#/parameters/rowFilter.user_mentions.id"},{"$ref":"#/parameters/rowFilter.user_mentions.mentioned_user_id"},{"$ref":"#/parameters/rowFilter.user_mentions.tweet_id"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/order"},{"$ref":"#/parameters/range"},{"$ref":"#/parameters/rangeUnit"},{"$ref":"#/parameters/offset"},{"$ref":"#/parameters/limit"},{"$ref":"#/parameters/preferCount"}],"responses":{"200":{"description":"OK","schema":{"items":{"$ref":"#/definitions/user_mentions"},"type":"array"}},"206":{"description":"Partial Content"}},"tags":["user_mentions"]},"post":{"parameters":[{"$ref":"#/parameters/body.user_mentions"},{"$ref":"#/parameters/select"},{"$ref":"#/parameters/preferPost"}],"responses":{"201":{"description":"Created"}},"tags":["user_mentions"]},"delete":{"parameters":[{"$ref":"#/parameters/rowFilter.user_mentions.id"},{"$ref":"#/parameters/rowFilter.user_mentions.mentioned_user_id"},{"$ref":"#/parameters/rowFilter.user_mentions.tweet_id"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["user_mentions"]},"patch":{"parameters":[{"$ref":"#/parameters/rowFilter.user_mentions.id"},{"$ref":"#/parameters/rowFilter.user_mentions.mentioned_user_id"},{"$ref":"#/parameters/rowFilter.user_mentions.tweet_id"},{"$ref":"#/parameters/body.user_mentions"},{"$ref":"#/parameters/preferReturn"}],"responses":{"204":{"description":"No Content"}},"tags":["user_mentions"]}},"/rpc/create_temp_tables":{"get":{"parameters":[{"format":"text","in":"query","name":"p_suffix","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) create_temp_tables"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"p_suffix":{"format":"text","type":"string"}},"required":["p_suffix"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) create_temp_tables"]}},"/rpc/insert_temp_profiles":{"get":{"parameters":[{"format":"jsonb","in":"query","name":"p_profile","required":true,"type":"string"},{"format":"text","in":"query","name":"p_account_id","required":true,"type":"string"},{"format":"text","in":"query","name":"p_suffix","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_profiles"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"p_account_id":{"format":"text","type":"string"},"p_profile":{"format":"jsonb"},"p_suffix":{"format":"text","type":"string"}},"required":["p_profile","p_account_id","p_suffix"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_profiles"]}},"/rpc/insert_temp_following":{"get":{"parameters":[{"format":"jsonb","in":"query","name":"p_following","required":true,"type":"string"},{"format":"text","in":"query","name":"p_account_id","required":true,"type":"string"},{"format":"text","in":"query","name":"p_suffix","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_following"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"p_account_id":{"format":"text","type":"string"},"p_following":{"format":"jsonb"},"p_suffix":{"format":"text","type":"string"}},"required":["p_following","p_account_id","p_suffix"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_following"]}},"/rpc/insert_temp_followers":{"get":{"parameters":[{"format":"jsonb","in":"query","name":"p_followers","required":true,"type":"string"},{"format":"text","in":"query","name":"p_account_id","required":true,"type":"string"},{"format":"text","in":"query","name":"p_suffix","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_followers"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"p_account_id":{"format":"text","type":"string"},"p_followers":{"format":"jsonb"},"p_suffix":{"format":"text","type":"string"}},"required":["p_followers","p_account_id","p_suffix"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_followers"]}},"/rpc/apply_public_entities_rls_policies":{"get":{"parameters":[{"format":"text","in":"query","name":"schema_name","required":true,"type":"string"},{"format":"text","in":"query","name":"table_name","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) apply_public_entities_rls_policies"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"schema_name":{"format":"text","type":"string"},"table_name":{"format":"text","type":"string"}},"required":["schema_name","table_name"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) apply_public_entities_rls_policies"]}},"/rpc/process_archive":{"get":{"parameters":[{"format":"jsonb","in":"query","name":"archive_data","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) process_archive"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"archive_data":{"format":"jsonb"}},"required":["archive_data"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) process_archive"]}},"/rpc/drop_temp_tables":{"get":{"parameters":[{"format":"text","in":"query","name":"p_suffix","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) drop_temp_tables"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"p_suffix":{"format":"text","type":"string"}},"required":["p_suffix"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) drop_temp_tables"]}},"/rpc/delete_all_archives":{"get":{"parameters":[{"format":"text","in":"query","name":"p_account_id","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) delete_all_archives"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"p_account_id":{"format":"text","type":"string"}},"required":["p_account_id"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) delete_all_archives"]}},"/rpc/insert_temp_account":{"get":{"parameters":[{"format":"jsonb","in":"query","name":"p_account","required":true,"type":"string"},{"format":"text","in":"query","name":"p_suffix","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_account"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"p_account":{"format":"jsonb"},"p_suffix":{"format":"text","type":"string"}},"required":["p_account","p_suffix"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_account"]}},"/rpc/apply_public_liked_tweets_rls_policies":{"get":{"parameters":[{"format":"text","in":"query","name":"schema_name","required":true,"type":"string"},{"format":"text","in":"query","name":"table_name","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) apply_public_liked_tweets_rls_policies"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"schema_name":{"format":"text","type":"string"},"table_name":{"format":"text","type":"string"}},"required":["schema_name","table_name"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) apply_public_liked_tweets_rls_policies"]}},"/rpc/insert_temp_likes":{"get":{"parameters":[{"format":"jsonb","in":"query","name":"p_likes","required":true,"type":"string"},{"format":"text","in":"query","name":"p_account_id","required":true,"type":"string"},{"format":"text","in":"query","name":"p_suffix","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_likes"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"p_account_id":{"format":"text","type":"string"},"p_likes":{"format":"jsonb"},"p_suffix":{"format":"text","type":"string"}},"required":["p_likes","p_account_id","p_suffix"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_likes"]}},"/rpc/insert_temp_tweets":{"get":{"parameters":[{"format":"jsonb","in":"query","name":"p_tweets","required":true,"type":"string"},{"format":"text","in":"query","name":"p_suffix","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_tweets"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"p_suffix":{"format":"text","type":"string"},"p_tweets":{"format":"jsonb"}},"required":["p_tweets","p_suffix"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_tweets"]}},"/rpc/apply_public_rls_policies":{"get":{"parameters":[{"format":"text","in":"query","name":"schema_name","required":true,"type":"string"},{"format":"text","in":"query","name":"table_name","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) apply_public_rls_policies"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"schema_name":{"format":"text","type":"string"},"table_name":{"format":"text","type":"string"}},"required":["schema_name","table_name"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) apply_public_rls_policies"]}},"/rpc/insert_temp_archive_upload":{"get":{"parameters":[{"format":"text","in":"query","name":"p_account_id","required":true,"type":"string"},{"format":"timestamp with time zone","in":"query","name":"p_archive_at","required":true,"type":"string"},{"format":"text","in":"query","name":"p_suffix","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_archive_upload"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"p_account_id":{"format":"text","type":"string"},"p_archive_at":{"format":"timestamp with time zone","type":"string"},"p_suffix":{"format":"text","type":"string"}},"required":["p_account_id","p_archive_at","p_suffix"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) insert_temp_archive_upload"]}},"/rpc/process_and_insert_tweet_entities":{"get":{"parameters":[{"format":"jsonb","in":"query","name":"p_tweets","required":true,"type":"string"},{"format":"text","in":"query","name":"p_suffix","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) process_and_insert_tweet_entities"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"p_suffix":{"format":"text","type":"string"},"p_tweets":{"format":"jsonb"}},"required":["p_tweets","p_suffix"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) process_and_insert_tweet_entities"]}},"/rpc/commit_temp_data":{"get":{"parameters":[{"format":"text","in":"query","name":"p_suffix","required":true,"type":"string"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) commit_temp_data"]},"post":{"parameters":[{"in":"body","name":"args","required":true,"schema":{"properties":{"p_suffix":{"format":"text","type":"string"}},"required":["p_suffix"],"type":"object"}},{"$ref":"#/parameters/preferParams"}],"produces":["application/json","application/vnd.pgrst.object+json;nulls=stripped","application/vnd.pgrst.object+json"],"responses":{"200":{"description":"OK"}},"tags":["(rpc) commit_temp_data"]}}},"definitions":{"mentioned_users":{"required":["user_id","name","screen_name","updated_at"],"properties":{"user_id":{"description":"Note:\nThis is a Primary Key.<pk/>","format":"text","type":"string"},"name":{"format":"text","type":"string"},"screen_name":{"format":"text","type":"string"},"updated_at":{"format":"timestamp with time zone","type":"string"}},"type":"object"},"tweet_urls":{"required":["id","url","expanded_url","display_url","tweet_id"],"properties":{"id":{"description":"Note:\nThis is a Primary Key.<pk/>","format":"bigint","type":"integer"},"url":{"format":"text","type":"string"},"expanded_url":{"format":"text","type":"string"},"display_url":{"format":"text","type":"string"},"tweet_id":{"description":"Note:\nThis is a Foreign Key to `tweets.tweet_id`.<fk table='tweets' column='tweet_id'/>","format":"text","type":"string"}},"type":"object"},"followers":{"required":["id","account_id","follower_account_id","archive_upload_id"],"properties":{"id":{"description":"Note:\nThis is a Primary Key.<pk/>","format":"bigint","type":"integer"},"account_id":{"description":"Note:\nThis is a Foreign Key to `account.account_id`.<fk table='account' column='account_id'/>","format":"text","type":"string"},"follower_account_id":{"format":"text","type":"string"},"archive_upload_id":{"description":"Note:\nThis is a Foreign Key to `archive_upload.id`.<fk table='archive_upload' column='id'/>","format":"bigint","type":"integer"}},"type":"object"},"archive_upload":{"required":["id","account_id","archive_at"],"properties":{"id":{"description":"Note:\nThis is a Primary Key.<pk/>","format":"bigint","type":"integer"},"account_id":{"description":"Note:\nThis is a Foreign Key to `account.account_id`.<fk table='account' column='account_id'/>","format":"text","type":"string"},"archive_at":{"format":"timestamp with time zone","type":"string"},"created_at":{"default":"CURRENT_TIMESTAMP","format":"timestamp with time zone","type":"string"}},"type":"object"},"liked_tweets":{"required":["tweet_id","full_text"],"properties":{"tweet_id":{"description":"Note:\nThis is a Primary Key.<pk/>","format":"text","type":"string"},"full_text":{"format":"text","type":"string"}},"type":"object"},"following":{"required":["id","account_id","following_account_id","archive_upload_id"],"properties":{"id":{"description":"Note:\nThis is a Primary Key.<pk/>","format":"bigint","type":"integer"},"account_id":{"description":"Note:\nThis is a Foreign Key to `account.account_id`.<fk table='account' column='account_id'/>","format":"text","type":"string"},"following_account_id":{"format":"text","type":"string"},"archive_upload_id":{"description":"Note:\nThis is a Foreign Key to `archive_upload.id`.<fk table='archive_upload' column='id'/>","format":"bigint","type":"integer"}},"type":"object"},"tweet_media":{"required":["media_id","tweet_id","media_url","media_type","width","height","archive_upload_id"],"properties":{"media_id":{"description":"Note:\nThis is a Primary Key.<pk/>","format":"bigint","type":"integer"},"tweet_id":{"description":"Note:\nThis is a Foreign Key to `tweets.tweet_id`.<fk table='tweets' column='tweet_id'/>","format":"text","type":"string"},"media_url":{"format":"text","type":"string"},"media_type":{"format":"text","type":"string"},"width":{"format":"integer","type":"integer"},"height":{"format":"integer","type":"integer"},"archive_upload_id":{"description":"Note:\nThis is a Foreign Key to `archive_upload.id`.<fk table='archive_upload' column='id'/>","format":"bigint","type":"integer"}},"type":"object"},"account":{"required":["account_id","created_via","username","created_at","account_display_name"],"properties":{"account_id":{"description":"Note:\nThis is a Primary Key.<pk/>","format":"text","type":"string"},"created_via":{"format":"text","type":"string"},"username":{"format":"text","type":"string"},"created_at":{"format":"timestamp with time zone","type":"string"},"account_display_name":{"format":"text","type":"string"}},"type":"object"},"profile":{"required":["id","account_id","archive_upload_id"],"properties":{"id":{"description":"Note:\nThis is a Primary Key.<pk/>","format":"bigint","type":"integer"},"account_id":{"description":"Note:\nThis is a Foreign Key to `account.account_id`.<fk table='account' column='account_id'/>","format":"text","type":"string"},"bio":{"format":"text","type":"string"},"website":{"format":"text","type":"string"},"location":{"format":"text","type":"string"},"avatar_media_url":{"format":"text","type":"string"},"header_media_url":{"format":"text","type":"string"},"archive_upload_id":{"description":"Note:\nThis is a Foreign Key to `archive_upload.id`.<fk table='archive_upload' column='id'/>","format":"bigint","type":"integer"}},"type":"object"},"tweets":{"required":["tweet_id","account_id","created_at","full_text","retweet_count","favorite_count","archive_upload_id"],"properties":{"tweet_id":{"description":"Note:\nThis is a Primary Key.<pk/>","format":"text","type":"string"},"account_id":{"description":"Note:\nThis is a Foreign Key to `account.account_id`.<fk table='account' column='account_id'/>","format":"text","type":"string"},"created_at":{"format":"timestamp with time zone","type":"string"},"full_text":{"format":"text","type":"string"},"retweet_count":{"format":"integer","type":"integer"},"favorite_count":{"format":"integer","type":"integer"},"reply_to_tweet_id":{"format":"text","type":"string"},"reply_to_user_id":{"format":"text","type":"string"},"reply_to_username":{"format":"text","type":"string"},"archive_upload_id":{"description":"Note:\nThis is a Foreign Key to `archive_upload.id`.<fk table='archive_upload' column='id'/>","format":"bigint","type":"integer"},"fts":{"format":"tsvector","type":"string"}},"type":"object"},"likes":{"required":["id","account_id","liked_tweet_id","archive_upload_id"],"properties":{"id":{"description":"Note:\nThis is a Primary Key.<pk/>","format":"bigint","type":"integer"},"account_id":{"description":"Note:\nThis is a Foreign Key to `account.account_id`.<fk table='account' column='account_id'/>","format":"text","type":"string"},"liked_tweet_id":{"description":"Note:\nThis is a Foreign Key to `liked_tweets.tweet_id`.<fk table='liked_tweets' column='tweet_id'/>","format":"text","type":"string"},"archive_upload_id":{"description":"Note:\nThis is a Foreign Key to `archive_upload.id`.<fk table='archive_upload' column='id'/>","format":"bigint","type":"integer"}},"type":"object"},"user_mentions":{"required":["id","mentioned_user_id","tweet_id"],"properties":{"id":{"description":"Note:\nThis is a Primary Key.<pk/>","format":"bigint","type":"integer"},"mentioned_user_id":{"description":"Note:\nThis is a Foreign Key to `mentioned_users.user_id`.<fk table='mentioned_users' column='user_id'/>","format":"text","type":"string"},"tweet_id":{"description":"Note:\nThis is a Foreign Key to `tweets.tweet_id`.<fk table='tweets' column='tweet_id'/>","format":"text","type":"string"}},"type":"object"}},"parameters":{"preferParams":{"name":"Prefer","description":"Preference","required":false,"enum":["params=single-object"],"in":"header","type":"string"},"preferReturn":{"name":"Prefer","description":"Preference","required":false,"enum":["return=representation","return=minimal","return=none"],"in":"header","type":"string"},"preferCount":{"name":"Prefer","description":"Preference","required":false,"enum":["count=none"],"in":"header","type":"string"},"preferPost":{"name":"Prefer","description":"Preference","required":false,"enum":["return=representation","return=minimal","return=none","resolution=ignore-duplicates","resolution=merge-duplicates"],"in":"header","type":"string"},"select":{"name":"select","description":"Filtering Columns","required":false,"in":"query","type":"string"},"on_conflict":{"name":"on_conflict","description":"On Conflict","required":false,"in":"query","type":"string"},"order":{"name":"order","description":"Ordering","required":false,"in":"query","type":"string"},"range":{"name":"Range","description":"Limiting and Pagination","required":false,"in":"header","type":"string"},"rangeUnit":{"name":"Range-Unit","description":"Limiting and Pagination","required":false,"default":"items","in":"header","type":"string"},"offset":{"name":"offset","description":"Limiting and Pagination","required":false,"in":"query","type":"string"},"limit":{"name":"limit","description":"Limiting and Pagination","required":false,"in":"query","type":"string"},"body.mentioned_users":{"name":"mentioned_users","description":"mentioned_users","required":false,"in":"body","schema":{"$ref":"#/definitions/mentioned_users"}},"rowFilter.mentioned_users.user_id":{"name":"user_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.mentioned_users.name":{"name":"name","required":false,"format":"text","in":"query","type":"string"},"rowFilter.mentioned_users.screen_name":{"name":"screen_name","required":false,"format":"text","in":"query","type":"string"},"rowFilter.mentioned_users.updated_at":{"name":"updated_at","required":false,"format":"timestamp with time zone","in":"query","type":"string"},"body.tweet_urls":{"name":"tweet_urls","description":"tweet_urls","required":false,"in":"body","schema":{"$ref":"#/definitions/tweet_urls"}},"rowFilter.tweet_urls.id":{"name":"id","required":false,"format":"bigint","in":"query","type":"string"},"rowFilter.tweet_urls.url":{"name":"url","required":false,"format":"text","in":"query","type":"string"},"rowFilter.tweet_urls.expanded_url":{"name":"expanded_url","required":false,"format":"text","in":"query","type":"string"},"rowFilter.tweet_urls.display_url":{"name":"display_url","required":false,"format":"text","in":"query","type":"string"},"rowFilter.tweet_urls.tweet_id":{"name":"tweet_id","required":false,"format":"text","in":"query","type":"string"},"body.followers":{"name":"followers","description":"followers","required":false,"in":"body","schema":{"$ref":"#/definitions/followers"}},"rowFilter.followers.id":{"name":"id","required":false,"format":"bigint","in":"query","type":"string"},"rowFilter.followers.account_id":{"name":"account_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.followers.follower_account_id":{"name":"follower_account_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.followers.archive_upload_id":{"name":"archive_upload_id","required":false,"format":"bigint","in":"query","type":"string"},"body.archive_upload":{"name":"archive_upload","description":"archive_upload","required":false,"in":"body","schema":{"$ref":"#/definitions/archive_upload"}},"rowFilter.archive_upload.id":{"name":"id","required":false,"format":"bigint","in":"query","type":"string"},"rowFilter.archive_upload.account_id":{"name":"account_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.archive_upload.archive_at":{"name":"archive_at","required":false,"format":"timestamp with time zone","in":"query","type":"string"},"rowFilter.archive_upload.created_at":{"name":"created_at","required":false,"format":"timestamp with time zone","in":"query","type":"string"},"body.liked_tweets":{"name":"liked_tweets","description":"liked_tweets","required":false,"in":"body","schema":{"$ref":"#/definitions/liked_tweets"}},"rowFilter.liked_tweets.tweet_id":{"name":"tweet_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.liked_tweets.full_text":{"name":"full_text","required":false,"format":"text","in":"query","type":"string"},"body.following":{"name":"following","description":"following","required":false,"in":"body","schema":{"$ref":"#/definitions/following"}},"rowFilter.following.id":{"name":"id","required":false,"format":"bigint","in":"query","type":"string"},"rowFilter.following.account_id":{"name":"account_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.following.following_account_id":{"name":"following_account_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.following.archive_upload_id":{"name":"archive_upload_id","required":false,"format":"bigint","in":"query","type":"string"},"body.tweet_media":{"name":"tweet_media","description":"tweet_media","required":false,"in":"body","schema":{"$ref":"#/definitions/tweet_media"}},"rowFilter.tweet_media.media_id":{"name":"media_id","required":false,"format":"bigint","in":"query","type":"string"},"rowFilter.tweet_media.tweet_id":{"name":"tweet_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.tweet_media.media_url":{"name":"media_url","required":false,"format":"text","in":"query","type":"string"},"rowFilter.tweet_media.media_type":{"name":"media_type","required":false,"format":"text","in":"query","type":"string"},"rowFilter.tweet_media.width":{"name":"width","required":false,"format":"integer","in":"query","type":"string"},"rowFilter.tweet_media.height":{"name":"height","required":false,"format":"integer","in":"query","type":"string"},"rowFilter.tweet_media.archive_upload_id":{"name":"archive_upload_id","required":false,"format":"bigint","in":"query","type":"string"},"body.account":{"name":"account","description":"account","required":false,"in":"body","schema":{"$ref":"#/definitions/account"}},"rowFilter.account.account_id":{"name":"account_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.account.created_via":{"name":"created_via","required":false,"format":"text","in":"query","type":"string"},"rowFilter.account.username":{"name":"username","required":false,"format":"text","in":"query","type":"string"},"rowFilter.account.created_at":{"name":"created_at","required":false,"format":"timestamp with time zone","in":"query","type":"string"},"rowFilter.account.account_display_name":{"name":"account_display_name","required":false,"format":"text","in":"query","type":"string"},"body.profile":{"name":"profile","description":"profile","required":false,"in":"body","schema":{"$ref":"#/definitions/profile"}},"rowFilter.profile.id":{"name":"id","required":false,"format":"bigint","in":"query","type":"string"},"rowFilter.profile.account_id":{"name":"account_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.profile.bio":{"name":"bio","required":false,"format":"text","in":"query","type":"string"},"rowFilter.profile.website":{"name":"website","required":false,"format":"text","in":"query","type":"string"},"rowFilter.profile.location":{"name":"location","required":false,"format":"text","in":"query","type":"string"},"rowFilter.profile.avatar_media_url":{"name":"avatar_media_url","required":false,"format":"text","in":"query","type":"string"},"rowFilter.profile.header_media_url":{"name":"header_media_url","required":false,"format":"text","in":"query","type":"string"},"rowFilter.profile.archive_upload_id":{"name":"archive_upload_id","required":false,"format":"bigint","in":"query","type":"string"},"body.tweets":{"name":"tweets","description":"tweets","required":false,"in":"body","schema":{"$ref":"#/definitions/tweets"}},"rowFilter.tweets.tweet_id":{"name":"tweet_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.tweets.account_id":{"name":"account_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.tweets.created_at":{"name":"created_at","required":false,"format":"timestamp with time zone","in":"query","type":"string"},"rowFilter.tweets.full_text":{"name":"full_text","required":false,"format":"text","in":"query","type":"string"},"rowFilter.tweets.retweet_count":{"name":"retweet_count","required":false,"format":"integer","in":"query","type":"string"},"rowFilter.tweets.favorite_count":{"name":"favorite_count","required":false,"format":"integer","in":"query","type":"string"},"rowFilter.tweets.reply_to_tweet_id":{"name":"reply_to_tweet_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.tweets.reply_to_user_id":{"name":"reply_to_user_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.tweets.reply_to_username":{"name":"reply_to_username","required":false,"format":"text","in":"query","type":"string"},"rowFilter.tweets.archive_upload_id":{"name":"archive_upload_id","required":false,"format":"bigint","in":"query","type":"string"},"rowFilter.tweets.fts":{"name":"fts","required":false,"format":"tsvector","in":"query","type":"string"},"body.likes":{"name":"likes","description":"likes","required":false,"in":"body","schema":{"$ref":"#/definitions/likes"}},"rowFilter.likes.id":{"name":"id","required":false,"format":"bigint","in":"query","type":"string"},"rowFilter.likes.account_id":{"name":"account_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.likes.liked_tweet_id":{"name":"liked_tweet_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.likes.archive_upload_id":{"name":"archive_upload_id","required":false,"format":"bigint","in":"query","type":"string"},"body.user_mentions":{"name":"user_mentions","description":"user_mentions","required":false,"in":"body","schema":{"$ref":"#/definitions/user_mentions"}},"rowFilter.user_mentions.id":{"name":"id","required":false,"format":"bigint","in":"query","type":"string"},"rowFilter.user_mentions.mentioned_user_id":{"name":"mentioned_user_id","required":false,"format":"text","in":"query","type":"string"},"rowFilter.user_mentions.tweet_id":{"name":"tweet_id","required":false,"format":"text","in":"query","type":"string"}},"externalDocs":{"description":"PostgREST Documentation","url":"https://postgrest.org/en/v12/api.html"}}
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "",
+    "title": "standard public schema",
+    "version": "12.2.2 (db9da0b)"
+  },
+  "host": "fabxmporizzqflnftavs.supabase.co:443",
+  "basePath": "/",
+  "schemes": ["https"],
+  "consumes": [
+    "application/json",
+    "application/vnd.pgrst.object+json;nulls=stripped",
+    "application/vnd.pgrst.object+json",
+    "text/csv"
+  ],
+  "produces": [
+    "application/json",
+    "application/vnd.pgrst.object+json;nulls=stripped",
+    "application/vnd.pgrst.object+json",
+    "text/csv"
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "produces": ["application/openapi+json", "application/json"],
+        "responses": { "200": { "description": "OK" } },
+        "summary": "OpenAPI description (this document)",
+        "tags": ["Introspection"]
+      }
+    },
+    "/mentioned_users": {
+      "get": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.mentioned_users.user_id" },
+          { "$ref": "#/parameters/rowFilter.mentioned_users.name" },
+          { "$ref": "#/parameters/rowFilter.mentioned_users.screen_name" },
+          { "$ref": "#/parameters/rowFilter.mentioned_users.updated_at" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/order" },
+          { "$ref": "#/parameters/range" },
+          { "$ref": "#/parameters/rangeUnit" },
+          { "$ref": "#/parameters/offset" },
+          { "$ref": "#/parameters/limit" },
+          { "$ref": "#/parameters/preferCount" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": { "$ref": "#/definitions/mentioned_users" },
+              "type": "array"
+            }
+          },
+          "206": { "description": "Partial Content" }
+        },
+        "tags": ["mentioned_users"]
+      },
+      "post": {
+        "parameters": [
+          { "$ref": "#/parameters/body.mentioned_users" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/preferPost" }
+        ],
+        "responses": { "201": { "description": "Created" } },
+        "tags": ["mentioned_users"]
+      },
+      "delete": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.mentioned_users.user_id" },
+          { "$ref": "#/parameters/rowFilter.mentioned_users.name" },
+          { "$ref": "#/parameters/rowFilter.mentioned_users.screen_name" },
+          { "$ref": "#/parameters/rowFilter.mentioned_users.updated_at" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["mentioned_users"]
+      },
+      "patch": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.mentioned_users.user_id" },
+          { "$ref": "#/parameters/rowFilter.mentioned_users.name" },
+          { "$ref": "#/parameters/rowFilter.mentioned_users.screen_name" },
+          { "$ref": "#/parameters/rowFilter.mentioned_users.updated_at" },
+          { "$ref": "#/parameters/body.mentioned_users" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["mentioned_users"]
+      }
+    },
+    "/tweet_urls": {
+      "get": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.tweet_urls.id" },
+          { "$ref": "#/parameters/rowFilter.tweet_urls.url" },
+          { "$ref": "#/parameters/rowFilter.tweet_urls.expanded_url" },
+          { "$ref": "#/parameters/rowFilter.tweet_urls.display_url" },
+          { "$ref": "#/parameters/rowFilter.tweet_urls.tweet_id" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/order" },
+          { "$ref": "#/parameters/range" },
+          { "$ref": "#/parameters/rangeUnit" },
+          { "$ref": "#/parameters/offset" },
+          { "$ref": "#/parameters/limit" },
+          { "$ref": "#/parameters/preferCount" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": { "$ref": "#/definitions/tweet_urls" },
+              "type": "array"
+            }
+          },
+          "206": { "description": "Partial Content" }
+        },
+        "tags": ["tweet_urls"]
+      },
+      "post": {
+        "parameters": [
+          { "$ref": "#/parameters/body.tweet_urls" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/preferPost" }
+        ],
+        "responses": { "201": { "description": "Created" } },
+        "tags": ["tweet_urls"]
+      },
+      "delete": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.tweet_urls.id" },
+          { "$ref": "#/parameters/rowFilter.tweet_urls.url" },
+          { "$ref": "#/parameters/rowFilter.tweet_urls.expanded_url" },
+          { "$ref": "#/parameters/rowFilter.tweet_urls.display_url" },
+          { "$ref": "#/parameters/rowFilter.tweet_urls.tweet_id" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["tweet_urls"]
+      },
+      "patch": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.tweet_urls.id" },
+          { "$ref": "#/parameters/rowFilter.tweet_urls.url" },
+          { "$ref": "#/parameters/rowFilter.tweet_urls.expanded_url" },
+          { "$ref": "#/parameters/rowFilter.tweet_urls.display_url" },
+          { "$ref": "#/parameters/rowFilter.tweet_urls.tweet_id" },
+          { "$ref": "#/parameters/body.tweet_urls" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["tweet_urls"]
+      }
+    },
+    "/followers": {
+      "get": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.followers.id" },
+          { "$ref": "#/parameters/rowFilter.followers.account_id" },
+          { "$ref": "#/parameters/rowFilter.followers.follower_account_id" },
+          { "$ref": "#/parameters/rowFilter.followers.archive_upload_id" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/order" },
+          { "$ref": "#/parameters/range" },
+          { "$ref": "#/parameters/rangeUnit" },
+          { "$ref": "#/parameters/offset" },
+          { "$ref": "#/parameters/limit" },
+          { "$ref": "#/parameters/preferCount" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": { "$ref": "#/definitions/followers" },
+              "type": "array"
+            }
+          },
+          "206": { "description": "Partial Content" }
+        },
+        "tags": ["followers"]
+      },
+      "post": {
+        "parameters": [
+          { "$ref": "#/parameters/body.followers" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/preferPost" }
+        ],
+        "responses": { "201": { "description": "Created" } },
+        "tags": ["followers"]
+      },
+      "delete": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.followers.id" },
+          { "$ref": "#/parameters/rowFilter.followers.account_id" },
+          { "$ref": "#/parameters/rowFilter.followers.follower_account_id" },
+          { "$ref": "#/parameters/rowFilter.followers.archive_upload_id" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["followers"]
+      },
+      "patch": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.followers.id" },
+          { "$ref": "#/parameters/rowFilter.followers.account_id" },
+          { "$ref": "#/parameters/rowFilter.followers.follower_account_id" },
+          { "$ref": "#/parameters/rowFilter.followers.archive_upload_id" },
+          { "$ref": "#/parameters/body.followers" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["followers"]
+      }
+    },
+    "/archive_upload": {
+      "get": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.archive_upload.id" },
+          { "$ref": "#/parameters/rowFilter.archive_upload.account_id" },
+          { "$ref": "#/parameters/rowFilter.archive_upload.archive_at" },
+          { "$ref": "#/parameters/rowFilter.archive_upload.created_at" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/order" },
+          { "$ref": "#/parameters/range" },
+          { "$ref": "#/parameters/rangeUnit" },
+          { "$ref": "#/parameters/offset" },
+          { "$ref": "#/parameters/limit" },
+          { "$ref": "#/parameters/preferCount" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": { "$ref": "#/definitions/archive_upload" },
+              "type": "array"
+            }
+          },
+          "206": { "description": "Partial Content" }
+        },
+        "tags": ["archive_upload"]
+      },
+      "post": {
+        "parameters": [
+          { "$ref": "#/parameters/body.archive_upload" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/preferPost" }
+        ],
+        "responses": { "201": { "description": "Created" } },
+        "tags": ["archive_upload"]
+      },
+      "delete": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.archive_upload.id" },
+          { "$ref": "#/parameters/rowFilter.archive_upload.account_id" },
+          { "$ref": "#/parameters/rowFilter.archive_upload.archive_at" },
+          { "$ref": "#/parameters/rowFilter.archive_upload.created_at" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["archive_upload"]
+      },
+      "patch": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.archive_upload.id" },
+          { "$ref": "#/parameters/rowFilter.archive_upload.account_id" },
+          { "$ref": "#/parameters/rowFilter.archive_upload.archive_at" },
+          { "$ref": "#/parameters/rowFilter.archive_upload.created_at" },
+          { "$ref": "#/parameters/body.archive_upload" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["archive_upload"]
+      }
+    },
+    "/liked_tweets": {
+      "get": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.liked_tweets.tweet_id" },
+          { "$ref": "#/parameters/rowFilter.liked_tweets.full_text" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/order" },
+          { "$ref": "#/parameters/range" },
+          { "$ref": "#/parameters/rangeUnit" },
+          { "$ref": "#/parameters/offset" },
+          { "$ref": "#/parameters/limit" },
+          { "$ref": "#/parameters/preferCount" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": { "$ref": "#/definitions/liked_tweets" },
+              "type": "array"
+            }
+          },
+          "206": { "description": "Partial Content" }
+        },
+        "tags": ["liked_tweets"]
+      },
+      "post": {
+        "parameters": [
+          { "$ref": "#/parameters/body.liked_tweets" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/preferPost" }
+        ],
+        "responses": { "201": { "description": "Created" } },
+        "tags": ["liked_tweets"]
+      },
+      "delete": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.liked_tweets.tweet_id" },
+          { "$ref": "#/parameters/rowFilter.liked_tweets.full_text" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["liked_tweets"]
+      },
+      "patch": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.liked_tweets.tweet_id" },
+          { "$ref": "#/parameters/rowFilter.liked_tweets.full_text" },
+          { "$ref": "#/parameters/body.liked_tweets" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["liked_tweets"]
+      }
+    },
+    "/following": {
+      "get": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.following.id" },
+          { "$ref": "#/parameters/rowFilter.following.account_id" },
+          { "$ref": "#/parameters/rowFilter.following.following_account_id" },
+          { "$ref": "#/parameters/rowFilter.following.archive_upload_id" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/order" },
+          { "$ref": "#/parameters/range" },
+          { "$ref": "#/parameters/rangeUnit" },
+          { "$ref": "#/parameters/offset" },
+          { "$ref": "#/parameters/limit" },
+          { "$ref": "#/parameters/preferCount" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": { "$ref": "#/definitions/following" },
+              "type": "array"
+            }
+          },
+          "206": { "description": "Partial Content" }
+        },
+        "tags": ["following"]
+      },
+      "post": {
+        "parameters": [
+          { "$ref": "#/parameters/body.following" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/preferPost" }
+        ],
+        "responses": { "201": { "description": "Created" } },
+        "tags": ["following"]
+      },
+      "delete": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.following.id" },
+          { "$ref": "#/parameters/rowFilter.following.account_id" },
+          { "$ref": "#/parameters/rowFilter.following.following_account_id" },
+          { "$ref": "#/parameters/rowFilter.following.archive_upload_id" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["following"]
+      },
+      "patch": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.following.id" },
+          { "$ref": "#/parameters/rowFilter.following.account_id" },
+          { "$ref": "#/parameters/rowFilter.following.following_account_id" },
+          { "$ref": "#/parameters/rowFilter.following.archive_upload_id" },
+          { "$ref": "#/parameters/body.following" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["following"]
+      }
+    },
+    "/tweet_media": {
+      "get": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.tweet_media.media_id" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.tweet_id" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.media_url" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.media_type" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.width" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.height" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.archive_upload_id" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/order" },
+          { "$ref": "#/parameters/range" },
+          { "$ref": "#/parameters/rangeUnit" },
+          { "$ref": "#/parameters/offset" },
+          { "$ref": "#/parameters/limit" },
+          { "$ref": "#/parameters/preferCount" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": { "$ref": "#/definitions/tweet_media" },
+              "type": "array"
+            }
+          },
+          "206": { "description": "Partial Content" }
+        },
+        "tags": ["tweet_media"]
+      },
+      "post": {
+        "parameters": [
+          { "$ref": "#/parameters/body.tweet_media" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/preferPost" }
+        ],
+        "responses": { "201": { "description": "Created" } },
+        "tags": ["tweet_media"]
+      },
+      "delete": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.tweet_media.media_id" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.tweet_id" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.media_url" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.media_type" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.width" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.height" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.archive_upload_id" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["tweet_media"]
+      },
+      "patch": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.tweet_media.media_id" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.tweet_id" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.media_url" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.media_type" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.width" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.height" },
+          { "$ref": "#/parameters/rowFilter.tweet_media.archive_upload_id" },
+          { "$ref": "#/parameters/body.tweet_media" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["tweet_media"]
+      }
+    },
+    "/account": {
+      "get": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.account.account_id" },
+          { "$ref": "#/parameters/rowFilter.account.created_via" },
+          { "$ref": "#/parameters/rowFilter.account.username" },
+          { "$ref": "#/parameters/rowFilter.account.created_at" },
+          { "$ref": "#/parameters/rowFilter.account.account_display_name" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/order" },
+          { "$ref": "#/parameters/range" },
+          { "$ref": "#/parameters/rangeUnit" },
+          { "$ref": "#/parameters/offset" },
+          { "$ref": "#/parameters/limit" },
+          { "$ref": "#/parameters/preferCount" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": { "$ref": "#/definitions/account" },
+              "type": "array"
+            }
+          },
+          "206": { "description": "Partial Content" }
+        },
+        "tags": ["account"]
+      },
+      "post": {
+        "parameters": [
+          { "$ref": "#/parameters/body.account" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/preferPost" }
+        ],
+        "responses": { "201": { "description": "Created" } },
+        "tags": ["account"]
+      },
+      "delete": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.account.account_id" },
+          { "$ref": "#/parameters/rowFilter.account.created_via" },
+          { "$ref": "#/parameters/rowFilter.account.username" },
+          { "$ref": "#/parameters/rowFilter.account.created_at" },
+          { "$ref": "#/parameters/rowFilter.account.account_display_name" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["account"]
+      },
+      "patch": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.account.account_id" },
+          { "$ref": "#/parameters/rowFilter.account.created_via" },
+          { "$ref": "#/parameters/rowFilter.account.username" },
+          { "$ref": "#/parameters/rowFilter.account.created_at" },
+          { "$ref": "#/parameters/rowFilter.account.account_display_name" },
+          { "$ref": "#/parameters/body.account" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["account"]
+      }
+    },
+    "/profile": {
+      "get": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.profile.id" },
+          { "$ref": "#/parameters/rowFilter.profile.account_id" },
+          { "$ref": "#/parameters/rowFilter.profile.bio" },
+          { "$ref": "#/parameters/rowFilter.profile.website" },
+          { "$ref": "#/parameters/rowFilter.profile.location" },
+          { "$ref": "#/parameters/rowFilter.profile.avatar_media_url" },
+          { "$ref": "#/parameters/rowFilter.profile.header_media_url" },
+          { "$ref": "#/parameters/rowFilter.profile.archive_upload_id" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/order" },
+          { "$ref": "#/parameters/range" },
+          { "$ref": "#/parameters/rangeUnit" },
+          { "$ref": "#/parameters/offset" },
+          { "$ref": "#/parameters/limit" },
+          { "$ref": "#/parameters/preferCount" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": { "$ref": "#/definitions/profile" },
+              "type": "array"
+            }
+          },
+          "206": { "description": "Partial Content" }
+        },
+        "tags": ["profile"]
+      },
+      "post": {
+        "parameters": [
+          { "$ref": "#/parameters/body.profile" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/preferPost" }
+        ],
+        "responses": { "201": { "description": "Created" } },
+        "tags": ["profile"]
+      },
+      "delete": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.profile.id" },
+          { "$ref": "#/parameters/rowFilter.profile.account_id" },
+          { "$ref": "#/parameters/rowFilter.profile.bio" },
+          { "$ref": "#/parameters/rowFilter.profile.website" },
+          { "$ref": "#/parameters/rowFilter.profile.location" },
+          { "$ref": "#/parameters/rowFilter.profile.avatar_media_url" },
+          { "$ref": "#/parameters/rowFilter.profile.header_media_url" },
+          { "$ref": "#/parameters/rowFilter.profile.archive_upload_id" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["profile"]
+      },
+      "patch": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.profile.id" },
+          { "$ref": "#/parameters/rowFilter.profile.account_id" },
+          { "$ref": "#/parameters/rowFilter.profile.bio" },
+          { "$ref": "#/parameters/rowFilter.profile.website" },
+          { "$ref": "#/parameters/rowFilter.profile.location" },
+          { "$ref": "#/parameters/rowFilter.profile.avatar_media_url" },
+          { "$ref": "#/parameters/rowFilter.profile.header_media_url" },
+          { "$ref": "#/parameters/rowFilter.profile.archive_upload_id" },
+          { "$ref": "#/parameters/body.profile" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["profile"]
+      }
+    },
+    "/tweets": {
+      "get": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.tweets.tweet_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.account_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.created_at" },
+          { "$ref": "#/parameters/rowFilter.tweets.full_text" },
+          { "$ref": "#/parameters/rowFilter.tweets.retweet_count" },
+          { "$ref": "#/parameters/rowFilter.tweets.favorite_count" },
+          { "$ref": "#/parameters/rowFilter.tweets.reply_to_tweet_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.reply_to_user_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.reply_to_username" },
+          { "$ref": "#/parameters/rowFilter.tweets.archive_upload_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.fts" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/order" },
+          { "$ref": "#/parameters/range" },
+          { "$ref": "#/parameters/rangeUnit" },
+          { "$ref": "#/parameters/offset" },
+          { "$ref": "#/parameters/limit" },
+          { "$ref": "#/parameters/preferCount" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": { "$ref": "#/definitions/tweets" },
+              "type": "array"
+            }
+          },
+          "206": { "description": "Partial Content" }
+        },
+        "tags": ["tweets"]
+      },
+      "post": {
+        "parameters": [
+          { "$ref": "#/parameters/body.tweets" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/preferPost" }
+        ],
+        "responses": { "201": { "description": "Created" } },
+        "tags": ["tweets"]
+      },
+      "delete": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.tweets.tweet_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.account_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.created_at" },
+          { "$ref": "#/parameters/rowFilter.tweets.full_text" },
+          { "$ref": "#/parameters/rowFilter.tweets.retweet_count" },
+          { "$ref": "#/parameters/rowFilter.tweets.favorite_count" },
+          { "$ref": "#/parameters/rowFilter.tweets.reply_to_tweet_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.reply_to_user_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.reply_to_username" },
+          { "$ref": "#/parameters/rowFilter.tweets.archive_upload_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.fts" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["tweets"]
+      },
+      "patch": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.tweets.tweet_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.account_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.created_at" },
+          { "$ref": "#/parameters/rowFilter.tweets.full_text" },
+          { "$ref": "#/parameters/rowFilter.tweets.retweet_count" },
+          { "$ref": "#/parameters/rowFilter.tweets.favorite_count" },
+          { "$ref": "#/parameters/rowFilter.tweets.reply_to_tweet_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.reply_to_user_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.reply_to_username" },
+          { "$ref": "#/parameters/rowFilter.tweets.archive_upload_id" },
+          { "$ref": "#/parameters/rowFilter.tweets.fts" },
+          { "$ref": "#/parameters/body.tweets" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["tweets"]
+      }
+    },
+    "/likes": {
+      "get": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.likes.id" },
+          { "$ref": "#/parameters/rowFilter.likes.account_id" },
+          { "$ref": "#/parameters/rowFilter.likes.liked_tweet_id" },
+          { "$ref": "#/parameters/rowFilter.likes.archive_upload_id" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/order" },
+          { "$ref": "#/parameters/range" },
+          { "$ref": "#/parameters/rangeUnit" },
+          { "$ref": "#/parameters/offset" },
+          { "$ref": "#/parameters/limit" },
+          { "$ref": "#/parameters/preferCount" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": { "$ref": "#/definitions/likes" },
+              "type": "array"
+            }
+          },
+          "206": { "description": "Partial Content" }
+        },
+        "tags": ["likes"]
+      },
+      "post": {
+        "parameters": [
+          { "$ref": "#/parameters/body.likes" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/preferPost" }
+        ],
+        "responses": { "201": { "description": "Created" } },
+        "tags": ["likes"]
+      },
+      "delete": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.likes.id" },
+          { "$ref": "#/parameters/rowFilter.likes.account_id" },
+          { "$ref": "#/parameters/rowFilter.likes.liked_tweet_id" },
+          { "$ref": "#/parameters/rowFilter.likes.archive_upload_id" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["likes"]
+      },
+      "patch": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.likes.id" },
+          { "$ref": "#/parameters/rowFilter.likes.account_id" },
+          { "$ref": "#/parameters/rowFilter.likes.liked_tweet_id" },
+          { "$ref": "#/parameters/rowFilter.likes.archive_upload_id" },
+          { "$ref": "#/parameters/body.likes" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["likes"]
+      }
+    },
+    "/user_mentions": {
+      "get": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.user_mentions.id" },
+          { "$ref": "#/parameters/rowFilter.user_mentions.mentioned_user_id" },
+          { "$ref": "#/parameters/rowFilter.user_mentions.tweet_id" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/order" },
+          { "$ref": "#/parameters/range" },
+          { "$ref": "#/parameters/rangeUnit" },
+          { "$ref": "#/parameters/offset" },
+          { "$ref": "#/parameters/limit" },
+          { "$ref": "#/parameters/preferCount" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": { "$ref": "#/definitions/user_mentions" },
+              "type": "array"
+            }
+          },
+          "206": { "description": "Partial Content" }
+        },
+        "tags": ["user_mentions"]
+      },
+      "post": {
+        "parameters": [
+          { "$ref": "#/parameters/body.user_mentions" },
+          { "$ref": "#/parameters/select" },
+          { "$ref": "#/parameters/preferPost" }
+        ],
+        "responses": { "201": { "description": "Created" } },
+        "tags": ["user_mentions"]
+      },
+      "delete": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.user_mentions.id" },
+          { "$ref": "#/parameters/rowFilter.user_mentions.mentioned_user_id" },
+          { "$ref": "#/parameters/rowFilter.user_mentions.tweet_id" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["user_mentions"]
+      },
+      "patch": {
+        "parameters": [
+          { "$ref": "#/parameters/rowFilter.user_mentions.id" },
+          { "$ref": "#/parameters/rowFilter.user_mentions.mentioned_user_id" },
+          { "$ref": "#/parameters/rowFilter.user_mentions.tweet_id" },
+          { "$ref": "#/parameters/body.user_mentions" },
+          { "$ref": "#/parameters/preferReturn" }
+        ],
+        "responses": { "204": { "description": "No Content" } },
+        "tags": ["user_mentions"]
+      }
+    },
+    "/rpc/create_temp_tables": {
+      "get": {
+        "parameters": [
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_suffix",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) create_temp_tables"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "p_suffix": { "format": "text", "type": "string" }
+              },
+              "required": ["p_suffix"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) create_temp_tables"]
+      }
+    },
+    "/rpc/insert_temp_profiles": {
+      "get": {
+        "parameters": [
+          {
+            "format": "jsonb",
+            "in": "query",
+            "name": "p_profile",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_account_id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_suffix",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_profiles"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "p_account_id": { "format": "text", "type": "string" },
+                "p_profile": { "format": "jsonb" },
+                "p_suffix": { "format": "text", "type": "string" }
+              },
+              "required": ["p_profile", "p_account_id", "p_suffix"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_profiles"]
+      }
+    },
+    "/rpc/insert_temp_following": {
+      "get": {
+        "parameters": [
+          {
+            "format": "jsonb",
+            "in": "query",
+            "name": "p_following",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_account_id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_suffix",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_following"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "p_account_id": { "format": "text", "type": "string" },
+                "p_following": { "format": "jsonb" },
+                "p_suffix": { "format": "text", "type": "string" }
+              },
+              "required": ["p_following", "p_account_id", "p_suffix"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_following"]
+      }
+    },
+    "/rpc/insert_temp_followers": {
+      "get": {
+        "parameters": [
+          {
+            "format": "jsonb",
+            "in": "query",
+            "name": "p_followers",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_account_id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_suffix",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_followers"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "p_account_id": { "format": "text", "type": "string" },
+                "p_followers": { "format": "jsonb" },
+                "p_suffix": { "format": "text", "type": "string" }
+              },
+              "required": ["p_followers", "p_account_id", "p_suffix"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_followers"]
+      }
+    },
+    "/rpc/apply_public_entities_rls_policies": {
+      "get": {
+        "parameters": [
+          {
+            "format": "text",
+            "in": "query",
+            "name": "schema_name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "table_name",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) apply_public_entities_rls_policies"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "schema_name": { "format": "text", "type": "string" },
+                "table_name": { "format": "text", "type": "string" }
+              },
+              "required": ["schema_name", "table_name"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) apply_public_entities_rls_policies"]
+      }
+    },
+    "/rpc/process_archive": {
+      "get": {
+        "parameters": [
+          {
+            "format": "jsonb",
+            "in": "query",
+            "name": "archive_data",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) process_archive"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": { "archive_data": { "format": "jsonb" } },
+              "required": ["archive_data"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) process_archive"]
+      }
+    },
+    "/rpc/drop_temp_tables": {
+      "get": {
+        "parameters": [
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_suffix",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) drop_temp_tables"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "p_suffix": { "format": "text", "type": "string" }
+              },
+              "required": ["p_suffix"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) drop_temp_tables"]
+      }
+    },
+    "/rpc/delete_all_archives": {
+      "get": {
+        "parameters": [
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_account_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) delete_all_archives"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "p_account_id": { "format": "text", "type": "string" }
+              },
+              "required": ["p_account_id"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) delete_all_archives"]
+      }
+    },
+    "/rpc/insert_temp_account": {
+      "get": {
+        "parameters": [
+          {
+            "format": "jsonb",
+            "in": "query",
+            "name": "p_account",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_suffix",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_account"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "p_account": { "format": "jsonb" },
+                "p_suffix": { "format": "text", "type": "string" }
+              },
+              "required": ["p_account", "p_suffix"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_account"]
+      }
+    },
+    "/rpc/apply_public_liked_tweets_rls_policies": {
+      "get": {
+        "parameters": [
+          {
+            "format": "text",
+            "in": "query",
+            "name": "schema_name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "table_name",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) apply_public_liked_tweets_rls_policies"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "schema_name": { "format": "text", "type": "string" },
+                "table_name": { "format": "text", "type": "string" }
+              },
+              "required": ["schema_name", "table_name"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) apply_public_liked_tweets_rls_policies"]
+      }
+    },
+    "/rpc/insert_temp_likes": {
+      "get": {
+        "parameters": [
+          {
+            "format": "jsonb",
+            "in": "query",
+            "name": "p_likes",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_account_id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_suffix",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_likes"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "p_account_id": { "format": "text", "type": "string" },
+                "p_likes": { "format": "jsonb" },
+                "p_suffix": { "format": "text", "type": "string" }
+              },
+              "required": ["p_likes", "p_account_id", "p_suffix"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_likes"]
+      }
+    },
+    "/rpc/insert_temp_tweets": {
+      "get": {
+        "parameters": [
+          {
+            "format": "jsonb",
+            "in": "query",
+            "name": "p_tweets",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_suffix",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_tweets"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "p_suffix": { "format": "text", "type": "string" },
+                "p_tweets": { "format": "jsonb" }
+              },
+              "required": ["p_tweets", "p_suffix"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_tweets"]
+      }
+    },
+    "/rpc/apply_public_rls_policies": {
+      "get": {
+        "parameters": [
+          {
+            "format": "text",
+            "in": "query",
+            "name": "schema_name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "table_name",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) apply_public_rls_policies"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "schema_name": { "format": "text", "type": "string" },
+                "table_name": { "format": "text", "type": "string" }
+              },
+              "required": ["schema_name", "table_name"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) apply_public_rls_policies"]
+      }
+    },
+    "/rpc/insert_temp_archive_upload": {
+      "get": {
+        "parameters": [
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_account_id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "timestamp with time zone",
+            "in": "query",
+            "name": "p_archive_at",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_suffix",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_archive_upload"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "p_account_id": { "format": "text", "type": "string" },
+                "p_archive_at": {
+                  "format": "timestamp with time zone",
+                  "type": "string"
+                },
+                "p_suffix": { "format": "text", "type": "string" }
+              },
+              "required": ["p_account_id", "p_archive_at", "p_suffix"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) insert_temp_archive_upload"]
+      }
+    },
+    "/rpc/process_and_insert_tweet_entities": {
+      "get": {
+        "parameters": [
+          {
+            "format": "jsonb",
+            "in": "query",
+            "name": "p_tweets",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_suffix",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) process_and_insert_tweet_entities"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "p_suffix": { "format": "text", "type": "string" },
+                "p_tweets": { "format": "jsonb" }
+              },
+              "required": ["p_tweets", "p_suffix"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) process_and_insert_tweet_entities"]
+      }
+    },
+    "/rpc/commit_temp_data": {
+      "get": {
+        "parameters": [
+          {
+            "format": "text",
+            "in": "query",
+            "name": "p_suffix",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) commit_temp_data"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "properties": {
+                "p_suffix": { "format": "text", "type": "string" }
+              },
+              "required": ["p_suffix"],
+              "type": "object"
+            }
+          },
+          { "$ref": "#/parameters/preferParams" }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": { "200": { "description": "OK" } },
+        "tags": ["(rpc) commit_temp_data"]
+      }
+    }
+  },
+  "definitions": {
+    "mentioned_users": {
+      "required": ["user_id", "name", "screen_name", "updated_at"],
+      "properties": {
+        "user_id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "text",
+          "type": "string"
+        },
+        "name": { "format": "text", "type": "string" },
+        "screen_name": { "format": "text", "type": "string" },
+        "updated_at": { "format": "timestamp with time zone", "type": "string" }
+      },
+      "type": "object"
+    },
+    "tweet_urls": {
+      "required": ["id", "url", "expanded_url", "display_url", "tweet_id"],
+      "properties": {
+        "id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "bigint",
+          "type": "integer"
+        },
+        "url": { "format": "text", "type": "string" },
+        "expanded_url": { "format": "text", "type": "string" },
+        "display_url": { "format": "text", "type": "string" },
+        "tweet_id": {
+          "description": "Note:\nThis is a Foreign Key to `tweets.tweet_id`.<fk table='tweets' column='tweet_id'/>",
+          "format": "text",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "followers": {
+      "required": [
+        "id",
+        "account_id",
+        "follower_account_id",
+        "archive_upload_id"
+      ],
+      "properties": {
+        "id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "bigint",
+          "type": "integer"
+        },
+        "account_id": {
+          "description": "Note:\nThis is a Foreign Key to `account.account_id`.<fk table='account' column='account_id'/>",
+          "format": "text",
+          "type": "string"
+        },
+        "follower_account_id": { "format": "text", "type": "string" },
+        "archive_upload_id": {
+          "description": "Note:\nThis is a Foreign Key to `archive_upload.id`.<fk table='archive_upload' column='id'/>",
+          "format": "bigint",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "archive_upload": {
+      "required": ["id", "account_id", "archive_at"],
+      "properties": {
+        "id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "bigint",
+          "type": "integer"
+        },
+        "account_id": {
+          "description": "Note:\nThis is a Foreign Key to `account.account_id`.<fk table='account' column='account_id'/>",
+          "format": "text",
+          "type": "string"
+        },
+        "archive_at": {
+          "format": "timestamp with time zone",
+          "type": "string"
+        },
+        "created_at": {
+          "default": "CURRENT_TIMESTAMP",
+          "format": "timestamp with time zone",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "liked_tweets": {
+      "required": ["tweet_id", "full_text"],
+      "properties": {
+        "tweet_id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "text",
+          "type": "string"
+        },
+        "full_text": { "format": "text", "type": "string" }
+      },
+      "type": "object"
+    },
+    "following": {
+      "required": [
+        "id",
+        "account_id",
+        "following_account_id",
+        "archive_upload_id"
+      ],
+      "properties": {
+        "id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "bigint",
+          "type": "integer"
+        },
+        "account_id": {
+          "description": "Note:\nThis is a Foreign Key to `account.account_id`.<fk table='account' column='account_id'/>",
+          "format": "text",
+          "type": "string"
+        },
+        "following_account_id": { "format": "text", "type": "string" },
+        "archive_upload_id": {
+          "description": "Note:\nThis is a Foreign Key to `archive_upload.id`.<fk table='archive_upload' column='id'/>",
+          "format": "bigint",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "tweet_media": {
+      "required": [
+        "media_id",
+        "tweet_id",
+        "media_url",
+        "media_type",
+        "width",
+        "height",
+        "archive_upload_id"
+      ],
+      "properties": {
+        "media_id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "bigint",
+          "type": "integer"
+        },
+        "tweet_id": {
+          "description": "Note:\nThis is a Foreign Key to `tweets.tweet_id`.<fk table='tweets' column='tweet_id'/>",
+          "format": "text",
+          "type": "string"
+        },
+        "media_url": { "format": "text", "type": "string" },
+        "media_type": { "format": "text", "type": "string" },
+        "width": { "format": "integer", "type": "integer" },
+        "height": { "format": "integer", "type": "integer" },
+        "archive_upload_id": {
+          "description": "Note:\nThis is a Foreign Key to `archive_upload.id`.<fk table='archive_upload' column='id'/>",
+          "format": "bigint",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "account": {
+      "required": [
+        "account_id",
+        "created_via",
+        "username",
+        "created_at",
+        "account_display_name"
+      ],
+      "properties": {
+        "account_id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "text",
+          "type": "string"
+        },
+        "created_via": { "format": "text", "type": "string" },
+        "username": { "format": "text", "type": "string" },
+        "created_at": {
+          "format": "timestamp with time zone",
+          "type": "string"
+        },
+        "account_display_name": { "format": "text", "type": "string" }
+      },
+      "type": "object"
+    },
+    "profile": {
+      "required": ["id", "account_id", "archive_upload_id"],
+      "properties": {
+        "id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "bigint",
+          "type": "integer"
+        },
+        "account_id": {
+          "description": "Note:\nThis is a Foreign Key to `account.account_id`.<fk table='account' column='account_id'/>",
+          "format": "text",
+          "type": "string"
+        },
+        "bio": { "format": "text", "type": "string" },
+        "website": { "format": "text", "type": "string" },
+        "location": { "format": "text", "type": "string" },
+        "avatar_media_url": { "format": "text", "type": "string" },
+        "header_media_url": { "format": "text", "type": "string" },
+        "archive_upload_id": {
+          "description": "Note:\nThis is a Foreign Key to `archive_upload.id`.<fk table='archive_upload' column='id'/>",
+          "format": "bigint",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "tweets": {
+      "required": [
+        "tweet_id",
+        "account_id",
+        "created_at",
+        "full_text",
+        "retweet_count",
+        "favorite_count",
+        "archive_upload_id"
+      ],
+      "properties": {
+        "tweet_id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "text",
+          "type": "string"
+        },
+        "account_id": {
+          "description": "Note:\nThis is a Foreign Key to `account.account_id`.<fk table='account' column='account_id'/>",
+          "format": "text",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "timestamp with time zone",
+          "type": "string"
+        },
+        "full_text": { "format": "text", "type": "string" },
+        "retweet_count": { "format": "integer", "type": "integer" },
+        "favorite_count": { "format": "integer", "type": "integer" },
+        "reply_to_tweet_id": { "format": "text", "type": "string" },
+        "reply_to_user_id": { "format": "text", "type": "string" },
+        "reply_to_username": { "format": "text", "type": "string" },
+        "archive_upload_id": {
+          "description": "Note:\nThis is a Foreign Key to `archive_upload.id`.<fk table='archive_upload' column='id'/>",
+          "format": "bigint",
+          "type": "integer"
+        },
+        "fts": { "format": "tsvector", "type": "string" }
+      },
+      "type": "object"
+    },
+    "likes": {
+      "required": ["id", "account_id", "liked_tweet_id", "archive_upload_id"],
+      "properties": {
+        "id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "bigint",
+          "type": "integer"
+        },
+        "account_id": {
+          "description": "Note:\nThis is a Foreign Key to `account.account_id`.<fk table='account' column='account_id'/>",
+          "format": "text",
+          "type": "string"
+        },
+        "liked_tweet_id": {
+          "description": "Note:\nThis is a Foreign Key to `liked_tweets.tweet_id`.<fk table='liked_tweets' column='tweet_id'/>",
+          "format": "text",
+          "type": "string"
+        },
+        "archive_upload_id": {
+          "description": "Note:\nThis is a Foreign Key to `archive_upload.id`.<fk table='archive_upload' column='id'/>",
+          "format": "bigint",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "user_mentions": {
+      "required": ["id", "mentioned_user_id", "tweet_id"],
+      "properties": {
+        "id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "bigint",
+          "type": "integer"
+        },
+        "mentioned_user_id": {
+          "description": "Note:\nThis is a Foreign Key to `mentioned_users.user_id`.<fk table='mentioned_users' column='user_id'/>",
+          "format": "text",
+          "type": "string"
+        },
+        "tweet_id": {
+          "description": "Note:\nThis is a Foreign Key to `tweets.tweet_id`.<fk table='tweets' column='tweet_id'/>",
+          "format": "text",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "parameters": {
+    "preferParams": {
+      "name": "Prefer",
+      "description": "Preference",
+      "required": false,
+      "enum": ["params=single-object"],
+      "in": "header",
+      "type": "string"
+    },
+    "preferReturn": {
+      "name": "Prefer",
+      "description": "Preference",
+      "required": false,
+      "enum": ["return=representation", "return=minimal", "return=none"],
+      "in": "header",
+      "type": "string"
+    },
+    "preferCount": {
+      "name": "Prefer",
+      "description": "Preference",
+      "required": false,
+      "enum": ["count=none"],
+      "in": "header",
+      "type": "string"
+    },
+    "preferPost": {
+      "name": "Prefer",
+      "description": "Preference",
+      "required": false,
+      "enum": [
+        "return=representation",
+        "return=minimal",
+        "return=none",
+        "resolution=ignore-duplicates",
+        "resolution=merge-duplicates"
+      ],
+      "in": "header",
+      "type": "string"
+    },
+    "select": {
+      "name": "select",
+      "description": "Filtering Columns",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "on_conflict": {
+      "name": "on_conflict",
+      "description": "On Conflict",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "order": {
+      "name": "order",
+      "description": "Ordering",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "range": {
+      "name": "Range",
+      "description": "Limiting and Pagination",
+      "required": false,
+      "in": "header",
+      "type": "string"
+    },
+    "rangeUnit": {
+      "name": "Range-Unit",
+      "description": "Limiting and Pagination",
+      "required": false,
+      "default": "items",
+      "in": "header",
+      "type": "string"
+    },
+    "offset": {
+      "name": "offset",
+      "description": "Limiting and Pagination",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "limit": {
+      "name": "limit",
+      "description": "Limiting and Pagination",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "body.mentioned_users": {
+      "name": "mentioned_users",
+      "description": "mentioned_users",
+      "required": false,
+      "in": "body",
+      "schema": { "$ref": "#/definitions/mentioned_users" }
+    },
+    "rowFilter.mentioned_users.user_id": {
+      "name": "user_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.mentioned_users.name": {
+      "name": "name",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.mentioned_users.screen_name": {
+      "name": "screen_name",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.mentioned_users.updated_at": {
+      "name": "updated_at",
+      "required": false,
+      "format": "timestamp with time zone",
+      "in": "query",
+      "type": "string"
+    },
+    "body.tweet_urls": {
+      "name": "tweet_urls",
+      "description": "tweet_urls",
+      "required": false,
+      "in": "body",
+      "schema": { "$ref": "#/definitions/tweet_urls" }
+    },
+    "rowFilter.tweet_urls.id": {
+      "name": "id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweet_urls.url": {
+      "name": "url",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweet_urls.expanded_url": {
+      "name": "expanded_url",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweet_urls.display_url": {
+      "name": "display_url",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweet_urls.tweet_id": {
+      "name": "tweet_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "body.followers": {
+      "name": "followers",
+      "description": "followers",
+      "required": false,
+      "in": "body",
+      "schema": { "$ref": "#/definitions/followers" }
+    },
+    "rowFilter.followers.id": {
+      "name": "id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.followers.account_id": {
+      "name": "account_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.followers.follower_account_id": {
+      "name": "follower_account_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.followers.archive_upload_id": {
+      "name": "archive_upload_id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "body.archive_upload": {
+      "name": "archive_upload",
+      "description": "archive_upload",
+      "required": false,
+      "in": "body",
+      "schema": { "$ref": "#/definitions/archive_upload" }
+    },
+    "rowFilter.archive_upload.id": {
+      "name": "id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.archive_upload.account_id": {
+      "name": "account_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.archive_upload.archive_at": {
+      "name": "archive_at",
+      "required": false,
+      "format": "timestamp with time zone",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.archive_upload.created_at": {
+      "name": "created_at",
+      "required": false,
+      "format": "timestamp with time zone",
+      "in": "query",
+      "type": "string"
+    },
+    "body.liked_tweets": {
+      "name": "liked_tweets",
+      "description": "liked_tweets",
+      "required": false,
+      "in": "body",
+      "schema": { "$ref": "#/definitions/liked_tweets" }
+    },
+    "rowFilter.liked_tweets.tweet_id": {
+      "name": "tweet_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.liked_tweets.full_text": {
+      "name": "full_text",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "body.following": {
+      "name": "following",
+      "description": "following",
+      "required": false,
+      "in": "body",
+      "schema": { "$ref": "#/definitions/following" }
+    },
+    "rowFilter.following.id": {
+      "name": "id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.following.account_id": {
+      "name": "account_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.following.following_account_id": {
+      "name": "following_account_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.following.archive_upload_id": {
+      "name": "archive_upload_id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "body.tweet_media": {
+      "name": "tweet_media",
+      "description": "tweet_media",
+      "required": false,
+      "in": "body",
+      "schema": { "$ref": "#/definitions/tweet_media" }
+    },
+    "rowFilter.tweet_media.media_id": {
+      "name": "media_id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweet_media.tweet_id": {
+      "name": "tweet_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweet_media.media_url": {
+      "name": "media_url",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweet_media.media_type": {
+      "name": "media_type",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweet_media.width": {
+      "name": "width",
+      "required": false,
+      "format": "integer",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweet_media.height": {
+      "name": "height",
+      "required": false,
+      "format": "integer",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweet_media.archive_upload_id": {
+      "name": "archive_upload_id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "body.account": {
+      "name": "account",
+      "description": "account",
+      "required": false,
+      "in": "body",
+      "schema": { "$ref": "#/definitions/account" }
+    },
+    "rowFilter.account.account_id": {
+      "name": "account_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.account.created_via": {
+      "name": "created_via",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.account.username": {
+      "name": "username",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.account.created_at": {
+      "name": "created_at",
+      "required": false,
+      "format": "timestamp with time zone",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.account.account_display_name": {
+      "name": "account_display_name",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "body.profile": {
+      "name": "profile",
+      "description": "profile",
+      "required": false,
+      "in": "body",
+      "schema": { "$ref": "#/definitions/profile" }
+    },
+    "rowFilter.profile.id": {
+      "name": "id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.profile.account_id": {
+      "name": "account_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.profile.bio": {
+      "name": "bio",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.profile.website": {
+      "name": "website",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.profile.location": {
+      "name": "location",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.profile.avatar_media_url": {
+      "name": "avatar_media_url",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.profile.header_media_url": {
+      "name": "header_media_url",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.profile.archive_upload_id": {
+      "name": "archive_upload_id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "body.tweets": {
+      "name": "tweets",
+      "description": "tweets",
+      "required": false,
+      "in": "body",
+      "schema": { "$ref": "#/definitions/tweets" }
+    },
+    "rowFilter.tweets.tweet_id": {
+      "name": "tweet_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweets.account_id": {
+      "name": "account_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweets.created_at": {
+      "name": "created_at",
+      "required": false,
+      "format": "timestamp with time zone",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweets.full_text": {
+      "name": "full_text",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweets.retweet_count": {
+      "name": "retweet_count",
+      "required": false,
+      "format": "integer",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweets.favorite_count": {
+      "name": "favorite_count",
+      "required": false,
+      "format": "integer",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweets.reply_to_tweet_id": {
+      "name": "reply_to_tweet_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweets.reply_to_user_id": {
+      "name": "reply_to_user_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweets.reply_to_username": {
+      "name": "reply_to_username",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweets.archive_upload_id": {
+      "name": "archive_upload_id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.tweets.fts": {
+      "name": "fts",
+      "required": false,
+      "format": "tsvector",
+      "in": "query",
+      "type": "string"
+    },
+    "body.likes": {
+      "name": "likes",
+      "description": "likes",
+      "required": false,
+      "in": "body",
+      "schema": { "$ref": "#/definitions/likes" }
+    },
+    "rowFilter.likes.id": {
+      "name": "id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.likes.account_id": {
+      "name": "account_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.likes.liked_tweet_id": {
+      "name": "liked_tweet_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.likes.archive_upload_id": {
+      "name": "archive_upload_id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "body.user_mentions": {
+      "name": "user_mentions",
+      "description": "user_mentions",
+      "required": false,
+      "in": "body",
+      "schema": { "$ref": "#/definitions/user_mentions" }
+    },
+    "rowFilter.user_mentions.id": {
+      "name": "id",
+      "required": false,
+      "format": "bigint",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.user_mentions.mentioned_user_id": {
+      "name": "mentioned_user_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.user_mentions.tweet_id": {
+      "name": "tweet_id",
+      "required": false,
+      "format": "text",
+      "in": "query",
+      "type": "string"
+    }
+  },
+  "externalDocs": {
+    "description": "PostgREST Documentation",
+    "url": "https://postgrest.org/en/v12/api.html"
+  }
+}

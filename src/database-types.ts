@@ -51,11 +51,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "archive_upload_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: 'archive_upload_account_id_fkey'
+            columns: ['account_id']
             isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
+            referencedRelation: 'account'
+            referencedColumns: ['account_id']
           },
         ]
       }
@@ -80,18 +80,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "followers_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: 'followers_account_id_fkey'
+            columns: ['account_id']
             isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
+            referencedRelation: 'account'
+            referencedColumns: ['account_id']
           },
           {
-            foreignKeyName: "followers_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
+            foreignKeyName: 'followers_archive_upload_id_fkey'
+            columns: ['archive_upload_id']
             isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
+            referencedRelation: 'archive_upload'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -116,18 +116,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "following_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: 'following_account_id_fkey'
+            columns: ['account_id']
             isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
+            referencedRelation: 'account'
+            referencedColumns: ['account_id']
           },
           {
-            foreignKeyName: "following_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
+            foreignKeyName: 'following_archive_upload_id_fkey'
+            columns: ['archive_upload_id']
             isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
+            referencedRelation: 'archive_upload'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -167,25 +167,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "likes_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: 'likes_account_id_fkey'
+            columns: ['account_id']
             isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
+            referencedRelation: 'account'
+            referencedColumns: ['account_id']
           },
           {
-            foreignKeyName: "likes_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
+            foreignKeyName: 'likes_archive_upload_id_fkey'
+            columns: ['archive_upload_id']
             isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
+            referencedRelation: 'archive_upload'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "likes_liked_tweet_id_fkey"
-            columns: ["liked_tweet_id"]
+            foreignKeyName: 'likes_liked_tweet_id_fkey'
+            columns: ['liked_tweet_id']
             isOneToOne: false
-            referencedRelation: "liked_tweets"
-            referencedColumns: ["tweet_id"]
+            referencedRelation: 'liked_tweets'
+            referencedColumns: ['tweet_id']
           },
         ]
       }
@@ -243,18 +243,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "profile_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: 'profile_account_id_fkey'
+            columns: ['account_id']
             isOneToOne: true
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
+            referencedRelation: 'account'
+            referencedColumns: ['account_id']
           },
           {
-            foreignKeyName: "profile_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
+            foreignKeyName: 'profile_archive_upload_id_fkey'
+            columns: ['archive_upload_id']
             isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
+            referencedRelation: 'archive_upload'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -288,18 +288,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "tweet_media_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
+            foreignKeyName: 'tweet_media_archive_upload_id_fkey'
+            columns: ['archive_upload_id']
             isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
+            referencedRelation: 'archive_upload'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "tweet_media_tweet_id_fkey"
-            columns: ["tweet_id"]
+            foreignKeyName: 'tweet_media_tweet_id_fkey'
+            columns: ['tweet_id']
             isOneToOne: false
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
+            referencedRelation: 'tweets'
+            referencedColumns: ['tweet_id']
           },
         ]
       }
@@ -327,11 +327,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "tweet_urls_tweet_id_fkey"
-            columns: ["tweet_id"]
+            foreignKeyName: 'tweet_urls_tweet_id_fkey'
+            columns: ['tweet_id']
             isOneToOne: false
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
+            referencedRelation: 'tweets'
+            referencedColumns: ['tweet_id']
           },
         ]
       }
@@ -377,18 +377,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: 'tweets_account_id_fkey'
+            columns: ['account_id']
             isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
+            referencedRelation: 'account'
+            referencedColumns: ['account_id']
           },
           {
-            foreignKeyName: "tweets_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
+            foreignKeyName: 'tweets_archive_upload_id_fkey'
+            columns: ['archive_upload_id']
             isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
+            referencedRelation: 'archive_upload'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -410,18 +410,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "user_mentions_mentioned_user_id_fkey"
-            columns: ["mentioned_user_id"]
+            foreignKeyName: 'user_mentions_mentioned_user_id_fkey'
+            columns: ['mentioned_user_id']
             isOneToOne: false
-            referencedRelation: "mentioned_users"
-            referencedColumns: ["user_id"]
+            referencedRelation: 'mentioned_users'
+            referencedColumns: ['user_id']
           },
           {
-            foreignKeyName: "user_mentions_tweet_id_fkey"
-            columns: ["tweet_id"]
+            foreignKeyName: 'user_mentions_tweet_id_fkey'
+            columns: ['tweet_id']
             isOneToOne: false
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
+            referencedRelation: 'tweets'
+            referencedColumns: ['tweet_id']
           },
         ]
       }
@@ -509,11 +509,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "archive_upload_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: 'archive_upload_account_id_fkey'
+            columns: ['account_id']
             isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
+            referencedRelation: 'account'
+            referencedColumns: ['account_id']
           },
         ]
       }
@@ -538,18 +538,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "followers_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: 'followers_account_id_fkey'
+            columns: ['account_id']
             isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
+            referencedRelation: 'account'
+            referencedColumns: ['account_id']
           },
           {
-            foreignKeyName: "followers_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
+            foreignKeyName: 'followers_archive_upload_id_fkey'
+            columns: ['archive_upload_id']
             isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
+            referencedRelation: 'archive_upload'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -574,18 +574,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "following_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: 'following_account_id_fkey'
+            columns: ['account_id']
             isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
+            referencedRelation: 'account'
+            referencedColumns: ['account_id']
           },
           {
-            foreignKeyName: "following_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
+            foreignKeyName: 'following_archive_upload_id_fkey'
+            columns: ['archive_upload_id']
             isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
+            referencedRelation: 'archive_upload'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -625,25 +625,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "likes_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: 'likes_account_id_fkey'
+            columns: ['account_id']
             isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
+            referencedRelation: 'account'
+            referencedColumns: ['account_id']
           },
           {
-            foreignKeyName: "likes_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
+            foreignKeyName: 'likes_archive_upload_id_fkey'
+            columns: ['archive_upload_id']
             isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
+            referencedRelation: 'archive_upload'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "likes_liked_tweet_id_fkey"
-            columns: ["liked_tweet_id"]
+            foreignKeyName: 'likes_liked_tweet_id_fkey'
+            columns: ['liked_tweet_id']
             isOneToOne: false
-            referencedRelation: "liked_tweets"
-            referencedColumns: ["tweet_id"]
+            referencedRelation: 'liked_tweets'
+            referencedColumns: ['tweet_id']
           },
         ]
       }
@@ -701,18 +701,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "profile_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: 'profile_account_id_fkey'
+            columns: ['account_id']
             isOneToOne: true
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
+            referencedRelation: 'account'
+            referencedColumns: ['account_id']
           },
           {
-            foreignKeyName: "profile_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
+            foreignKeyName: 'profile_archive_upload_id_fkey'
+            columns: ['archive_upload_id']
             isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
+            referencedRelation: 'archive_upload'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -746,18 +746,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "tweet_media_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
+            foreignKeyName: 'tweet_media_archive_upload_id_fkey'
+            columns: ['archive_upload_id']
             isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
+            referencedRelation: 'archive_upload'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "tweet_media_tweet_id_fkey"
-            columns: ["tweet_id"]
+            foreignKeyName: 'tweet_media_tweet_id_fkey'
+            columns: ['tweet_id']
             isOneToOne: false
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
+            referencedRelation: 'tweets'
+            referencedColumns: ['tweet_id']
           },
         ]
       }
@@ -785,11 +785,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "tweet_urls_tweet_id_fkey"
-            columns: ["tweet_id"]
+            foreignKeyName: 'tweet_urls_tweet_id_fkey'
+            columns: ['tweet_id']
             isOneToOne: false
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
+            referencedRelation: 'tweets'
+            referencedColumns: ['tweet_id']
           },
         ]
       }
@@ -835,18 +835,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: 'tweets_account_id_fkey'
+            columns: ['account_id']
             isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
+            referencedRelation: 'account'
+            referencedColumns: ['account_id']
           },
           {
-            foreignKeyName: "tweets_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
+            foreignKeyName: 'tweets_archive_upload_id_fkey'
+            columns: ['archive_upload_id']
             isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
+            referencedRelation: 'archive_upload'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -868,18 +868,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "user_mentions_mentioned_user_id_fkey"
-            columns: ["mentioned_user_id"]
+            foreignKeyName: 'user_mentions_mentioned_user_id_fkey'
+            columns: ['mentioned_user_id']
             isOneToOne: false
-            referencedRelation: "mentioned_users"
-            referencedColumns: ["user_id"]
+            referencedRelation: 'mentioned_users'
+            referencedColumns: ['user_id']
           },
           {
-            foreignKeyName: "user_mentions_tweet_id_fkey"
-            columns: ["tweet_id"]
+            foreignKeyName: 'user_mentions_tweet_id_fkey'
+            columns: ['tweet_id']
             isOneToOne: false
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
+            referencedRelation: 'tweets'
+            referencedColumns: ['tweet_id']
           },
         ]
       }
@@ -937,27 +937,27 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
+type PublicSchema = Database[Extract<keyof Database, 'public'>]
 
 export type Tables<
   PublicTableNameOrOptions extends
-    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
+    | keyof (PublicSchema['Tables'] & PublicSchema['Views'])
     | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-        Database[PublicTableNameOrOptions["schema"]]["Views"])
+    ? keyof (Database[PublicTableNameOrOptions['schema']]['Tables'] &
+        Database[PublicTableNameOrOptions['schema']]['Views'])
     : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+  ? (Database[PublicTableNameOrOptions['schema']]['Tables'] &
+      Database[PublicTableNameOrOptions['schema']]['Views'])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-        PublicSchema["Views"])
-    ? (PublicSchema["Tables"] &
-        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof (PublicSchema['Tables'] &
+        PublicSchema['Views'])
+    ? (PublicSchema['Tables'] &
+        PublicSchema['Views'])[PublicTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -966,19 +966,19 @@ export type Tables<
 
 export type TablesInsert<
   PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
+    | keyof PublicSchema['Tables']
     | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    ? keyof Database[PublicTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? Database[PublicTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof PublicSchema['Tables']
+    ? PublicSchema['Tables'][PublicTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -987,19 +987,19 @@ export type TablesInsert<
 
 export type TablesUpdate<
   PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
+    | keyof PublicSchema['Tables']
     | { schema: keyof Database },
   TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    ? keyof Database[PublicTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? Database[PublicTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : PublicTableNameOrOptions extends keyof PublicSchema['Tables']
+    ? PublicSchema['Tables'][PublicTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -1008,13 +1008,13 @@ export type TablesUpdate<
 
 export type Enums<
   PublicEnumNameOrOptions extends
-    | keyof PublicSchema["Enums"]
+    | keyof PublicSchema['Enums']
     | { schema: keyof Database },
   EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof Database[PublicEnumNameOrOptions['schema']]['Enums']
     : never = never,
 > = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
+  ? Database[PublicEnumNameOrOptions['schema']]['Enums'][EnumName]
+  : PublicEnumNameOrOptions extends keyof PublicSchema['Enums']
+    ? PublicSchema['Enums'][PublicEnumNameOrOptions]
     : never

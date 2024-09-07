@@ -141,6 +141,28 @@ export default function UploadArchivePage() {
           wait a day or two and email you a download link. ty for your
           persistence :)`}
           </p>
+          <br />
+          <p className="md:text-md text-md text-justify">
+            This archive is open source, see{` `}
+            <a
+              href="https://github.com/open-birdsite-db/open-birdsite-db"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 underline"
+            >
+              GitHub repo
+            </a>
+            , contributions welcome! We also have a {` `}
+            <a
+              href="https://discord.gg/AStSQj6ugq"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 underline"
+            >
+              Discord
+            </a>{' '}
+            for questions/suggestions/developers chat etc.
+          </p>
         </div>
 
         <br />

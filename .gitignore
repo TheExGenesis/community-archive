@@ -40,4 +40,8 @@ yarn-error.log*
 # swc
 .swc
 
+# ignore pnmp lockfile
+pnpm-lock.yaml
+
+# data
 data/**/*

@@ -12,7 +12,16 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 
 Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` can be found in [your Supabase project's API settings](https://app.supabase.com/project/_/settings/api)
 
-2. You can now run the Next.js local development server:
+1. Install [node](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) and optionally [pnpm](https://pnpm.io/installation#using-npm)
+
+2. Install dependencies
+
+```bash
+pnpm install
+
+```
+
+3. You can now run the Next.js local development server:
 
 ```bash
 pnpm run dev

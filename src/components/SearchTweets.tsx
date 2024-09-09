@@ -35,7 +35,6 @@ const getLatestTweets = async (supabase: any, count: number) => {
 
   return tweets
 }
-
 const searchTweets = async (supabase: any, queryText = '') => {
   // process the postgres text search query text:
   // - split words by spaces, surrond them with single quotes and join them with ' | '
@@ -43,19 +42,15 @@ const searchTweets = async (supabase: any, queryText = '') => {
   if (queryText.length === 0) {
     return getLatestTweets(supabase, 50)
   }
-  const queryOR = queryText
-    .replaceAll(/'/g, "''")
-    .replaceAll(/"/g, "''")
-    .split(' ')
-    .map((word) => `'${word}'`)
-    .join(' | ')
 
-  const queryAND = queryOR.replaceAll(' | ', ' & ')
+  const escapedQuery = queryText.replaceAll(/'/g, "''").replaceAll(/"/g, "''")
 
-  const queryExact = queryText
-    .replaceAll(/'/g, "''")
-    .replaceAll(/"/g, "''")
-    .replaceAll(' ', '+')
+  const words = escapedQuery.split(' ')
+  const isSingleWord = words.length === 1
+
+  const queryOR = words.map((word) => `'${word}'`).join(' | ')
+  const queryAND = words.map((word) => `'${word}'`).join(' & ')
+  const queryExact = words.join('+')
 
   const pgSearch = async (query: string) => {
     const { data: tweets, error } = await supabase
@@ -76,12 +71,17 @@ const searchTweets = async (supabase: any, queryText = '') => {
       )
       .textSearch('fts', `${query}`)
       .order('created_at', { ascending: false })
+      .limit(100)
 
     if (error) {
       console.error('Error fetching tweets:', error)
       throw error
     }
     return tweets
+  }
+
+  if (isSingleWord) {
+    return await pgSearch(queryOR)
   }
 
   const tweetsExact = await pgSearch(queryExact)

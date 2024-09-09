@@ -27,6 +27,7 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env
 
 # vercel
 .vercel
@@ -45,3 +46,5 @@ pnpm-lock.yaml
 
 # data
 data/**/*
+dumps/**/*
+supabase/schema.sql

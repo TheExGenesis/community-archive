@@ -1,7 +1,6 @@
 import CommunityStats from '@/components/CommunityStats'
 import SearchTweets from '@/components/SearchTweets'
 import FrontPagePersonalContent from '@/components/FrontPagePersonalContent'
-import ClientCommunityStats from '@/components/ClientCommunityStats'
 
 declare global {
   interface Window {

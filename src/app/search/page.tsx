@@ -1,12 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
 import ThemeToggle from '@/components/ThemeToggle'
-import Tweet from '@/components/Tweet'
-import dotenv from 'dotenv'
-import path from 'path'
-import { createBrowserClient } from '@/utils/supabase'
-import { getTableName } from '@/lib-client/getTableName'
-import { get } from 'http'
 import SearchTweets from '@/components/SearchTweets'
 
 export default function SearchTweetsPage() {

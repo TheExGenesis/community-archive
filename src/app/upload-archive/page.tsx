@@ -1,113 +1,16 @@
-'use client'
-import UploadTwitterArchive from '@/components/UploadTwitterArchive'
-import { getSchemaName, getTableName } from '@/lib-client/getTableName'
-import { use, useEffect, useState } from 'react'
-import { createBrowserClient } from '@/utils/supabase'
-import SignInComponent from '@/components/SignIn'
-import SearchTweets from '@/components/SearchTweets'
 import CommunityStats from '@/components/CommunityStats'
-import PersonalStats from '@/components/PersonalStats'
+import SearchTweets from '@/components/SearchTweets'
+import FrontPagePersonalContent from '@/components/FrontPagePersonalContent'
+import ClientCommunityStats from '@/components/ClientCommunityStats'
 
-const updateProfile = async (
-  supabase: any,
-  accountId: string,
-  avatarUrl: string,
-) => {
-  // Check if the account exists
-  const { data: existingAccount } = await supabase
-    .schema(getSchemaName())
-    .from(getTableName('profile'))
-    .select('account_id')
-    .eq('account_id', accountId)
-    .maybeSingle()
-
-  // Only upsert if the account exists
-  if (existingAccount) {
-    const { error } = await supabase
-      .schema(getSchemaName())
-      .from(getTableName('profile'))
-      .upsert(
-        { account_id: accountId, avatar_media_url: avatarUrl },
-        { onConflict: 'account_id', ignoreDuplicates: false },
-      )
-
-    if (error) console.error('Error updating profile:', error)
-  } else {
-    console.log('Account does not exist, skipping update')
-  }
-}
 declare global {
   interface Window {
     supabase: any
   }
 }
+// personal content
+
 export default function UploadArchivePage() {
-  const [userMetadata, setUserMetadata] = useState<any>(null)
-  const [isArchiveUploaded, setIsArchiveUploaded] = useState(false)
-
-  useEffect(() => {
-    const supabase = createBrowserClient()
-    if (
-      process.env.NODE_ENV !== 'production' &&
-      typeof window !== 'undefined'
-    ) {
-      window.supabase = supabase
-    }
-
-    // Set up auth state listener
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        if (!session.user.user_metadata) return
-        setUserMetadata(session.user.user_metadata)
-        console.log('session.user.user_metadata', session.user.user_metadata)
-        // updateProfile(
-        //   supabase,
-        //   session.user.user_metadata.provider_id,
-        //   session.user.user_metadata.picture,
-        // )
-      } else {
-        setUserMetadata(null)
-      }
-    })
-
-    // Initial check for session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setUserMetadata(session.user.user_metadata)
-      }
-    })
-
-    // Cleanup subscription on component unmount
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
-
-  useEffect(() => {
-    const checkArchiveUpload = async () => {
-      if (!userMetadata?.provider_id) return
-
-      const supabase = createBrowserClient()
-      const { data, error } = await supabase
-        .schema(getSchemaName())
-        .from(getTableName('archive_upload') as 'archive_upload')
-        .select('id')
-        .eq('account_id', userMetadata.provider_id)
-        .limit(1)
-
-      if (error) {
-        console.error('Error checking archive upload:', error)
-        return
-      }
-
-      setIsArchiveUploaded(data.length > 0)
-    }
-
-    checkArchiveUpload()
-  }, [userMetadata])
-
   return (
     <div className="flex h-full w-full flex-col md:flex-row">
       {/* Global content */}
@@ -171,12 +74,12 @@ export default function UploadArchivePage() {
           <h2 className="mb-4 text-2xl font-bold">Our Data Policy</h2>
           <ul className="list-disc space-y-2 pl-5">
             <li>
-              The code never touches direct messages or email addresses or
-              deleted tweets.
-            </li>
-            <li>
               The only things that leave your machine are 1. profile information
               2. tweets, 3. likes, 4. followers/following
+            </li>
+            <li>
+              The code never touches direct messages or email addresses or
+              deleted tweets.
             </li>
             <li>
               We plan to make a full dump of the db accessible for easier data
@@ -205,31 +108,13 @@ export default function UploadArchivePage() {
 
       {/* Personal content */}
       <div className="w-full overflow-y-auto p-4 md:w-1/2">
-        <div className="mb-8">
-          <SignInComponent userMetadata={userMetadata} />
-        </div>
-
-        {userMetadata && (
-          <>
-            <div className="mb-8">
-              <h2 className="mb-4 text-2xl font-bold">Upload Your Archive</h2>
-              <UploadTwitterArchive userMetadata={userMetadata} />
-            </div>
-
-            {isArchiveUploaded && (
-              <div>
-                <h2 className="mb-4 text-2xl font-bold">Your Stats</h2>
-                <PersonalStats userMetadata={userMetadata} />
-              </div>
-            )}
-          </>
-        )}
+        <FrontPagePersonalContent />
 
         <br />
         <div className="flex flex-grow flex-col">
           <h2 className="mb-4 text-2xl font-bold">Search the Archive</h2>
           <div
-            className=" flex-grow overflow-hidden"
+            className="flex-grow overflow-hidden"
             style={{ height: '48rem' }}
           >
             <CommunityStats />

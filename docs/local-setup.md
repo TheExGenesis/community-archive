@@ -1,4 +1,3 @@
-
 # Development Instructions
 
 1. Rename `.env.example` to `.env.local` and update the following:
@@ -37,6 +36,27 @@ The app should now be running on [localhost:3000](http://localhost:3000/).
 
 5. If you make changes to the database schema, you'll want to update the types in `src/database-types.ts` with `pnpm gen-types`, you'll need a `SUPABASE_ACCESS_TOKEN` in your environment variables.
 
+### Supabase local instance
+
+Echoing [supabase's instructions](https://supabase.com/docs/guides/cli/local-development?queryGroups=access-method&access-method=postgres#access-your-projects-services):
+
+- `supabase login`
+- Make sure docker is running:
+  - There are a number of different projects available to download Docker from:
+    - Docker Desktop (macOS, Windows, Linux)
+    - Rancher Desktop (macOS, Windows, Linux)
+    - OrbStack (macOS)
+      colima (macOS)
+- `supabase start`
+
+You can now visit your local Dashboard at `http://localhost:54323`, and access the database directly with any Postgres client via `postgresql://postgres:postgres@localhost:54322/postgres.`
+
+The local Postgres instance can be accessed through psql
+or any other Postgres client, such as pgadmin.
+
+For example:
+
+`psql 'postgresql://postgres:postgres@localhost:54322/postgres'`
 
 ### Requirements
 

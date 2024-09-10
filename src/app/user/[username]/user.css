@@ -1,0 +1,20 @@
+#user-page {
+    width: 100%;
+    height: 100%;
+    padding: 10px;
+    margin: 10px;
+}
+
+.short-tweet-container {
+    max-height: 35vh;
+    overflow-y: scroll;
+    margin-bottom: 50px;
+}
+
+h1 {
+    font-size: 40px;
+}
+
+h2 {
+    font-size:30px;
+}

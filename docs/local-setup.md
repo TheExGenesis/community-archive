@@ -58,6 +58,20 @@ For example:
 
 `psql 'postgresql://postgres:postgres@localhost:54322/postgres'`
 
+### Dumping the database
+
+Dump database into a sql file `supabase/schema.sql`
+
+```bash
+supabase db dump --data-only --db-url <your database URL>
+```
+
+Process the sql dump into a series of csv files, one per table:
+
+```
+python scripts/process_sql_dump.py supabase/schema.sql <OUTPUT_DIR>
+```
+
 ### Requirements
 
 - Node.js >= 18.17.0

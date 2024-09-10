@@ -1,6 +1,7 @@
 import './user.css'
 import { getUserData, getFirstTweets, getTopTweets } from '@/lib-server/user'
 import Tweet from '@/components/TweetRefactor'
+import SearchTweets from '@/components/SearchTweets'
 
 export default async function User({ params, searchParams }:any) {
     const { username } = params
@@ -16,6 +17,8 @@ export default async function User({ params, searchParams }:any) {
     return (
       <div id="user-page">
         <h1>{username} ({new Intl.NumberFormat().format(tweetCount as number)} tweets)</h1>
+
+        <SearchTweets displayText={`Search ${username}'s archive`} account_id={account.account_id} />
         
         <h2>Top 20 tweets</h2>
         <div className="short-tweet-container">

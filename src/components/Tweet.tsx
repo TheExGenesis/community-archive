@@ -25,7 +25,7 @@ export default function Tweet({
   replyToUsername,
 }: TweetProps) {
   return (
-    <div className="mb-4 rounded-lg bg-white p-4 shadow-md dark:bg-gray-800">
+    <div className="mb-4 rounded-lg bg-white p-4 shadow-md dark:bg-black">
       <div className="mb-2 flex items-start">
         <img
           src={profilePicUrl}

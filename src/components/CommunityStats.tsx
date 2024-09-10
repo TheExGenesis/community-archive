@@ -7,6 +7,10 @@ const CommunityStats = async () => {
 
   const stats = await getStats()
 
+  const usernames = stats.usernames!.map(name => {
+    return `<a href="/user/${name}" class="underline">${name}</a>`
+  }).join(', ')
+
   return (
     <div>
       {stats.accountCount !== null &&
@@ -20,7 +24,7 @@ const CommunityStats = async () => {
         )}
       {stats.usernames && stats.usernames.length > 0 && (
         <p className="mb-4 text-sm">
-          Accounts in the archive: {stats.usernames.join(', ')}
+          Accounts in the archive: <span dangerouslySetInnerHTML={{__html: usernames}}></span>
         </p>
       )}
     </div>

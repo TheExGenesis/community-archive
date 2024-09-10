@@ -18,17 +18,17 @@ const PersonalStats = ({ userMetadata }: { userMetadata: any }) => {
         supabase
           .schema(getSchemaName())
           .from(getTableName('tweets') as 'tweets')
-          .select('tweet_id', { count: 'exact' })
+          .select('tweet_id', { count: 'planned' })
           .eq('account_id', account_id),
         supabase
           .schema(getSchemaName())
           .from(getTableName('followers') as 'followers')
-          .select('id', { count: 'exact' })
+          .select('id', { count: 'planned' })
           .eq('account_id', account_id),
         supabase
           .schema(getSchemaName())
           .from(getTableName('following') as 'following')
-          .select('id', { count: 'exact' })
+          .select('id', { count: 'planned' })
           .eq('account_id', account_id),
       ])
 

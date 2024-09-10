@@ -1,6 +1,10 @@
 import CommunityStats from '@/components/CommunityStats'
 import SearchTweets from '@/components/SearchTweets'
 import FrontPagePersonalContent from '@/components/FrontPagePersonalContent'
+import { createServerClient } from '@/utils/supabase'
+import { cookies } from 'next/headers'
+import AvatarList from '@/components/AvatarList'
+import { SupabaseClient } from '@supabase/supabase-js'
 
 declare global {
   interface Window {
@@ -9,7 +13,19 @@ declare global {
 }
 // personal content
 
-export default function UploadArchivePage() {
+const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
+  let { data, error } = await supabase.rpc('get_top_accounts_with_followers', {
+    limit_count: 7,
+  })
+  if (error) console.error(error)
+  else console.log(data)
+  return data
+}
+
+export default async function UploadArchivePage() {
+  const supabase = createServerClient(cookies())
+
+  const mostFollowed = await getMostFollowedAccounts(supabase)
   return (
     <div className="flex h-full w-full flex-col md:flex-row">
       {/* Global content */}
@@ -68,6 +84,19 @@ export default function UploadArchivePage() {
         </div>
 
         <br />
+        <h2 className="mb-4 text-2xl font-bold">
+          Uploaded people you may know:
+        </h2>
+        {mostFollowed ? (
+          <AvatarList
+            initialAvatars={mostFollowed}
+            title="Uploaded people you may know:"
+          />
+        ) : (
+          <p className="text-sm text-red-500">
+            Failed to load most followed accounts.
+          </p>
+        )}
         <br />
         <div>
           <h2 className="mb-4 text-2xl font-bold">Our Data Policy</h2>
@@ -111,12 +140,14 @@ export default function UploadArchivePage() {
 
         <br />
         <div className="flex flex-grow flex-col">
-          <h2 className="mb-4 text-2xl font-bold">Search the Archive</h2>
           <div
             className="flex-grow overflow-hidden"
             style={{ height: '48rem' }}
           >
+            <h2 className="mb-4 text-2xl font-bold">Community Stats</h2>
             <CommunityStats />
+            <br />
+            <h2 className="mb-4 text-2xl font-bold">Search the Archive</h2>
             <SearchTweets />
           </div>
         </div>

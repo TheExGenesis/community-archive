@@ -33,6 +33,12 @@ export default function Tweet({
           width={48}
           height={48}
           className="mr-3 rounded-full"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.onerror = null // Prevent infinite loop
+            target.src =
+              'https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/assets/placeholder.jpg?t=2024-09-09T21%3A51%3A06.677Z'
+          }}
         />
         <div>
           <div className="flex items-center">

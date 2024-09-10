@@ -6,7 +6,7 @@
 }
 
 .short-tweet-container {
-    max-height: 35vh;
+    max-height: 45vh;
     overflow-y: scroll;
     margin-bottom: 50px;
 }

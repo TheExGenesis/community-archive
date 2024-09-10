@@ -35,7 +35,7 @@ const getLatestTweets = async (supabase: any, count: number) => {
 
   return tweets
 }
-const searchTweets = async (supabase: any, queryText = '') => {
+const searchTweets = async (supabase: any, queryText = '', account_id?:string) => {
   // process the postgres text search query text:
   // - split words by spaces, surrond them with single quotes and join them with ' | '
   // - escape single quotes with '' and double quotes with ""
@@ -53,7 +53,7 @@ const searchTweets = async (supabase: any, queryText = '') => {
   const queryExact = words.join('+')
 
   const pgSearch = async (query: string) => {
-    const { data: tweets, error } = await supabase
+    const subaseBaseQuery = supabase
       .schema(getSchemaName())
       .from('tweets')
       .select(
@@ -73,6 +73,11 @@ const searchTweets = async (supabase: any, queryText = '') => {
       .order('created_at', { ascending: false })
       .limit(100)
 
+    if (account_id) {
+      subaseBaseQuery.eq('account_id', account_id)
+    }
+
+    const { data: tweets, error } = await subaseBaseQuery
     if (error) {
       console.error('Error fetching tweets:', error)
       throw error
@@ -100,7 +105,15 @@ const searchTweets = async (supabase: any, queryText = '') => {
   )
 }
 
-export default function SearchTweets() {
+interface SearchProps {
+  displayText?:string
+  account_id?:string
+}
+
+export default function SearchTweets({ 
+  displayText = "Very minimal full text search over tweet text",
+  account_id
+}:SearchProps) {
   const [tweets, setTweets] = useState<any[]>()
   const [query, setQuery] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -118,7 +131,7 @@ export default function SearchTweets() {
   const handleSearch = async () => {
     setIsLoading(true)
     const supabase = createBrowserClient()
-    const fetchedTweets: any[] = await searchTweets(supabase, query).catch(
+    const fetchedTweets: any[] = await searchTweets(supabase, query, account_id).catch(
       () => [],
     )
     // console.log('fetchedTweets', fetchedTweets)
@@ -134,7 +147,7 @@ export default function SearchTweets() {
     <div className="flex h-full flex-col">
       <div className="mb-4 flex flex-col gap-6">
         <p className="text-center text-sm">
-          Very minimal full text search over tweet text.
+          {displayText}
         </p>
         <div className="flex gap-2">
           <input
@@ -154,7 +167,10 @@ export default function SearchTweets() {
           </button>
         </div>
       </div>
-      <div className="flex-grow overflow-y-auto">
+      <div className="flex-grow overflow-y-auto" id="search-results" style={{
+        maxHeight: '400px',
+        overflowY: 'scroll'
+      }}>
         {isLoading ? (
           <div>Loading tweets...</div>
         ) : tweets ? (

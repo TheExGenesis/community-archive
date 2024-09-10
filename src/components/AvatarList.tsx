@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 type Avatar = {
   username: string
   avatar_media_url: string
+  num_tweets?: number
 }
 
 type AvatarListProps = {
@@ -34,7 +35,7 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
               rel="noopener noreferrer"
               className="flex flex-col items-center"
             >
-              <div className="relative h-12 w-12 overflow-hidden rounded-full bg-gray-200 ">
+              <div className="relative h-16 w-16 overflow-hidden rounded-full bg-gray-200 ">
                 <img
                   src={avatar.avatar_media_url}
                   alt={`${avatar.username}'s avatar`}
@@ -54,6 +55,12 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
                 style={{ maxWidth: '40px' }}
               >
                 {avatar.username}
+              </span>
+              <span
+                className="mt-1 overflow-visible whitespace-nowrap text-justify text-xs text-zinc-500 hover:underline"
+                style={{ maxWidth: '40px' }}
+              >
+                {avatar.num_tweets && `${avatar.num_tweets} tweets`}
               </span>
             </a>
           ))}

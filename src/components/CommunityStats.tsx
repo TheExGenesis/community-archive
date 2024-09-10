@@ -2,11 +2,7 @@ import { getStats } from '@/lib-server/stats'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
-import dynamic from 'next/dynamic'
 
-const AvatarList = dynamic(() => import('./AvatarList'), {
-  ssr: false,
-})
 const getRecentUploadedAccounts = async (supabase: SupabaseClient) => {
   const { data, error } = await supabase
     .from('archive_upload')
@@ -27,15 +23,15 @@ const getRecentUploadedAccounts = async (supabase: SupabaseClient) => {
   }
 
   const uniqueAccounts = new Map()
-  data.forEach(({ account }) => {
-    if (!uniqueAccounts.has(account.username)) {
+  data.forEach((item) => {
+    const account = item.account[0]
+    if (account && !uniqueAccounts.has(account.username)) {
       uniqueAccounts.set(account.username, {
         username: account.username,
         avatar_media_url: account.profile?.[0]?.avatar_media_url,
       })
     }
   })
-
   return Array.from(uniqueAccounts.values()).slice(0, 7)
 }
 
@@ -65,20 +61,20 @@ const CommunityStats = async () => {
             <strong>{stats.likedTweetCount}</strong> liked tweets.
           </p>
         )}
-      {stats.usernames && stats.usernames.length > 0 && (
+      {/* {stats.usernames && stats.usernames.length > 0 && (
         <p className="mb-4 text-sm">
           Accounts in the archive: {stats.usernames.join(', ')}
         </p>
-      )}
+      )} */}
 
-      <div className="space-y-8">
+      {/* <div className="space-y-8">
         <h3 className="mb-4 text-xl font-bold">Recent Uploads!</h3>
         {recentUploads ? (
           <AvatarList initialAvatars={recentUploads} title="Recent Uploads!" />
         ) : (
           <p className="text-sm text-red-500">Failed to load recent uploads.</p>
         )}
-      </div>
+      </div> */}
     </div>
   )
 }

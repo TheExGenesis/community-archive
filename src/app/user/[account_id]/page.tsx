@@ -4,8 +4,8 @@ import Tweet from '@/components/TweetRefactor'
 import SearchTweets from '@/components/SearchTweets'
 
 export default async function User({ params, searchParams }:any) {
-    const { username } = params
-    const userData = await getUserData(username.toLowerCase())
+    const { account_id } = params
+    const userData = await getUserData(account_id)
     if (!userData) {
       return (<h1>Not found</h1>)
     }
@@ -16,10 +16,12 @@ export default async function User({ params, searchParams }:any) {
 
     return (
       <div id="user-page">
-        <h1>{username} ({new Intl.NumberFormat().format(tweetCount as number)} tweets)</h1>
+        <h1>{account.username} ({new Intl.NumberFormat().format(tweetCount as number)} tweets)</h1>
 
-        <SearchTweets displayText={`Search ${username}'s archive`} account_id={account.account_id} />
-        
+        <SearchTweets displayText={`Search ${account.username}'s archive`} account_id={account.account_id} />
+        <hr style={{ marginBottom: '50px' }}/>
+
+
         <h2>Top 20 tweets</h2>
         <div className="short-tweet-container">
           {topTweets && topTweets.map((tweet: any) => (

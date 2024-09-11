@@ -11,9 +11,9 @@ interface TweetData {
     tweet_id: string
     reply_to_username?: string
     account: { 
-        profile: {
+        profile: Array<{
             avatar_media_url?:string
-        },
+        }>,
         username?: string, 
         account_display_name?:string 
     }
@@ -26,7 +26,7 @@ interface TweetProps {
 export default function Tweet({ tweet }: TweetProps) {
     const username = tweet['account']?.username || 'Unknown'
     const displayName = tweet['account']?.account_display_name || 'Unknown'
-    const profilePicUrl = tweet['account']?.['profile']?.avatar_media_url || 'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
+    const profilePicUrl = tweet['account']?.['profile'][0]?.avatar_media_url || 'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
     const tweet_url = `https://twitter.com/${tweet['account']?.username || 'unknown'}/status/${tweet.tweet_id}`
     const replyToUsername = tweet.reply_to_username
 

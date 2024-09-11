@@ -8,7 +8,7 @@ export const getStats = async () => {
     supabase
       .schema(getSchemaName())
       .from('account')
-      .select(`username`)
+      .select(`username,account_id`)
       .order('created_at', { ascending: false }),
 
     supabase
@@ -37,9 +37,7 @@ export const getStats = async () => {
   }
 
   return {
-    usernames: accounts
-      ? accounts.map((account: any) => account.username)
-      : null,
+    users: accounts,
     accountCount: accounts ? accounts.length : null,
     tweetCount: tweetCount ?? null,
     likedTweetCount: likedTweetCount ?? null,

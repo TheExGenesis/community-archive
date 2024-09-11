@@ -40,21 +40,19 @@ export const getTopTweets = async(account_id:string, limit:number= 20) => {
   return data
 }
 
-export const getUserData = async (username:string) => {
+export const getUserData = async (account_id:string) => {
   const supabase = createServerClient(cookies())
   const { data } = await 
     supabase
       .schema(getSchemaName())
       .from('account')
       .select('*')
-      .eq('username', username)
+      .eq('account_id', account_id)
 
   if (!data || data.length == 0) {
     return null
   }
 
-
-const account_id = data[0].account_id
 
     const { count } = await supabase
       .schema(getSchemaName())

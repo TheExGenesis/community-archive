@@ -51,7 +51,7 @@ const CommunityStats = async () => {
   ])
 
   return (
-    <div>
+    <div className="dark:text-gray-300">
       {stats.accountCount !== null &&
         stats.tweetCount !== null &&
         stats.likedTweetCount !== null && (

@@ -4,25 +4,23 @@ import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import AvatarList from '@/components/AvatarList'
 import { SupabaseClient } from '@supabase/supabase-js'
-import { FaGithub, FaDiscord } from 'react-icons/fa' // Add this import
+import { FaGithub, FaDiscord } from 'react-icons/fa'
 import { getTweetsCount } from '@/lib-server/db_queries'
 import UploadTwitterArchive from '@/components/UploadTwitterArchive'
 import SignIn from '@/components/SignIn'
-import ThemeToggle from '@/components/ThemeToggle' // Add this import
+import ThemeToggle from '@/components/ThemeToggle'
 
 declare global {
   interface Window {
     supabase: any
   }
 }
-// personal content
 
 const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
   let { data, error } = await supabase.rpc('get_top_accounts_with_followers', {
     limit_count: 7,
   })
   if (error) console.error(error)
-  // else console.log(data)
 
   const account_ids = data.map((account: any) => account.account_id)
   const tweetsCounts = await Promise.all(
@@ -48,41 +46,43 @@ export default async function UploadArchivePage() {
   return (
     <div className="flex min-h-screen justify-center bg-gray-100 dark:bg-gray-900">
       {/* Main content */}
-      <div className="relative w-full max-w-4xl bg-white p-24 dark:bg-gray-800">
+      <div className="relative w-full max-w-3xl bg-white p-24 dark:bg-gray-800">
         <div className="absolute right-4 top-4 flex items-center space-x-4 text-gray-500 dark:text-gray-400">
-          <ThemeToggle side="bottom" /> {/* Add ThemeToggle here */}
-          <SignIn />
+          <ThemeToggle side="bottom" />
+          <p className="text-sm dark:text-gray-300">
+            <SignIn />
+          </p>
         </div>
-        <h1 className="mb-0 text-5xl font-bold text-zinc-400 dark:text-zinc-500 md:text-5xl">
+        <h1 className="mb-0 text-4xl font-bold text-zinc-400 dark:text-zinc-500 md:text-4xl">
           Upload to the
         </h1>
-        <h1 className="mt-0 text-5xl font-bold text-black dark:text-white md:text-5xl">
+        <h1 className="mt-0 text-4xl font-bold text-black dark:text-white md:text-4xl">
           Community Archive!
         </h1>
         <br />
-        <h2 className="mb-4 text-2xl text-zinc-600 dark:text-zinc-300">
+        <h2 className="mb-4 text-xl text-zinc-600 dark:text-zinc-300">
           {`An open database and API anyone can build on.`}
         </h2>
         <br />
-        <h3 className="mb-4 text-xl">Featuring archives uploaded by:</h3>
+        <h3 className="mb-4 text-sm">Featuring archives uploaded by:</h3>
         {mostFollowed ? (
           <AvatarList
             initialAvatars={mostFollowed}
             title="Uploaded people you may know:"
           />
         ) : (
-          <p className="text-sm text-red-500">
+          <p className="text-xs text-red-500">
             Failed to load most followed accounts.
           </p>
         )}
         <br />
         <CommunityStats />
         <br />
-        <div>
-          <p className="mb-4 text-xl leading-relaxed">
+        <div className="text-sm">
+          <p className="mb-4  leading-relaxed">
             {`Powered by your tweet history, the community archive lets anyone build things like:`}
           </p>
-          <ul className="mb-4 list-disc space-y-2 pl-16 text-xl">
+          <ul className="mb-4 list-disc space-y-2 pl-16 ">
             <li>🔎 Search that really knows what you mean;</li>
             <li>✨ AI apps with context on you and your friends;</li>
             <li>📚 Make artifacts like books based on your tweets;</li>
@@ -90,7 +90,7 @@ export default async function UploadArchivePage() {
           </ul>
           <br />
 
-          <p className="text-xl">
+          <p className="text-sm">
             {`If you don't have an archive yet, `}
             <strong>
               <a
@@ -104,15 +104,15 @@ export default async function UploadArchivePage() {
           </p>
         </div>
         <br />
-        <p className="text-xl dark:text-gray-300">
+        <p className="text-sm dark:text-gray-300">
           {`If you do...`} <SignIn />
         </p>
         <UploadTwitterArchive />
         <br />
 
-        <div className="mb-4">
+        <div className="mb-4 text-sm">
           Useful links:
-          <ul className="mb-4 list-disc pl-6 text-xl">
+          <ul className="mb-4 list-disc pl-6">
             <li>
               {`We're an open database and API anyone can build on. Want to know more? `}
               <a
@@ -148,7 +148,6 @@ export default async function UploadArchivePage() {
                 <FaDiscord className="mr-1" /> Discord
               </a>
             </li>
-            {/* TODO: donate links */}
           </ul>
           <br />
           <br />
@@ -160,7 +159,7 @@ export default async function UploadArchivePage() {
             className="flex-grow overflow-hidden"
             style={{ height: '48rem' }}
           >
-            <h2 className="mb-4 text-2xl font-bold">Search the Archive</h2>
+            <h2 className="mb-4 text-xl font-bold">Search the Archive</h2>
             <SearchTweets />
           </div>
         </div>

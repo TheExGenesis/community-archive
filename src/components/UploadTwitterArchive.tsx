@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { processTwitterArchive, deleteArchive } from '../lib-server/db_insert'
 import { createBrowserClient } from '@/utils/supabase'
 import { getSchemaName, getTableName } from '@/lib-client/getTableName'
+import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 
 type CustomInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   webkitdirectory?: string
@@ -320,7 +321,7 @@ const fetchArchiveUpload = async (setArchiveUpload: any, userMetadata: any) => {
   const supabase = createBrowserClient()
   const { data, error } = await supabase
     .schema(getSchemaName())
-    .from(getTableName('archive_upload') as 'archive_upload')
+    .from('archive_upload')
     .select('archive_at')
     .eq('account_id', userMetadata.provider_id)
     .order('archive_at', { ascending: false })
@@ -335,11 +336,8 @@ const fetchArchiveUpload = async (setArchiveUpload: any, userMetadata: any) => {
   }
 }
 
-export default function UploadTwitterArchive({
-  userMetadata,
-}: {
-  userMetadata: any
-}) {
+export default function UploadTwitterArchive() {
+  const { userMetadata, isArchiveUploaded } = useAuthAndArchive()
   const [isProcessing, setIsProcessing] = useState(false)
   const isProcessingRef = useRef(isProcessing)
 
@@ -383,6 +381,7 @@ export default function UploadTwitterArchive({
   )
 
   useEffect(() => {
+    if (!userMetadata) return
     fetchArchiveUpload(setArchiveUpload, userMetadata)
   }, [userMetadata])
 
@@ -454,91 +453,93 @@ export default function UploadTwitterArchive({
   }
 
   return (
-    <div>
-      {archiveUpload && (
-        <>
-          <p>
-            Your last archive upload was from{' '}
-            {formatDate(archiveUpload.archive_at)}.
-          </p>
-        </>
-      )}
-      {archiveUpload && !showUploadButton ? (
-        <div>
-          <button
-            onClick={() => setShowUploadButton(true)}
-            className="cursor-pointer text-blue-500 underline"
-          >
-            Upload a new archive, or delete your data.
-          </button>
-        </div>
-      ) : (
-        <div>
-          {archiveUpload && (
-            <div>
-              <button
-                onClick={() => setShowUploadButton(false)}
-                className="cursor-pointer text-blue-500 underline"
-              >
-                Close
-              </button>
-            </div>
-          )}
-          <div className="flex flex-col">
-            <div className="flex justify-between">
-              <div className="mb-4">
-                <p className="mb-4 text-sm">
-                  Please upload your Twitter archive (as a .zip file).
-                </p>
-                <input
-                  type="file"
-                  accept=".zip,application/zip"
-                  onChange={onFileUpload}
-                  disabled={isProcessing}
-                  // webkitdirectory=""
-                  // directory=""
-                  // {...({} as CustomInputProps)}
-                  multiple
-                />
-                {isProcessing && (
-                  <div>
-                    <p>{`Processing archive (may take up to 10 minutes)...`}</p>
-                    {progress && (
-                      <div>
-                        <p>
-                          {progress.phase}: {progress.percent.toFixed(2)}%
-                        </p>
-                        <div className="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                          <div
-                            className="h-2.5 rounded-full bg-blue-600"
-                            style={{ width: `${progress.percent}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+    userMetadata && (
+      <div className="text-sm dark:text-gray-300">
+        {archiveUpload && (
+          <>
+            <p className="mb-2 text-xs text-zinc-400 dark:text-zinc-500">
+              Your last archive upload was from{' '}
+              {formatDate(archiveUpload.archive_at)}.
+            </p>
+          </>
+        )}
+        {archiveUpload && !showUploadButton ? (
+          <div>
+            <button
+              onClick={() => setShowUploadButton(true)}
+              className="cursor-pointer text-sm text-blue-500 underline dark:text-blue-400"
+            >
+              Upload a new archive, or delete your data.
+            </button>
+          </div>
+        ) : (
+          <div>
+            {archiveUpload && (
               <div>
-                {archiveUpload && (
-                  <>
-                    <p className="mb-4 text-sm">
-                      This will delete all your data
-                    </p>
-                    <button
-                      onClick={onDeleteArchive}
-                      disabled={isDeleting}
-                      className="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600 disabled:opacity-50"
-                    >
-                      {isDeleting ? 'Deleting...' : 'Delete My Archive'}
-                    </button>
-                  </>
-                )}
+                <button
+                  onClick={() => setShowUploadButton(false)}
+                  className="cursor-pointer text-sm text-blue-500 underline dark:text-blue-400"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+            <div className="flex flex-col">
+              <div className="flex justify-between">
+                <div className="mb-4">
+                  <p className="mb-4 text-xs dark:text-gray-300">
+                    Please upload your Twitter archive as a .zip file.
+                  </p>
+                  <input
+                    type="file"
+                    accept=".zip,application/zip"
+                    onChange={onFileUpload}
+                    disabled={isProcessing}
+                    // webkitdirectory=""
+                    // directory=""
+                    // {...({} as CustomInputProps)}
+                    multiple
+                  />
+                  {isProcessing && (
+                    <div>
+                      <p>{`Processing archive (may take up to 10 minutes)...`}</p>
+                      {progress && (
+                        <div>
+                          <p>
+                            {progress.phase}: {progress.percent.toFixed(2)}%
+                          </p>
+                          <div className="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+                            <div
+                              className="h-2.5 rounded-full bg-blue-600"
+                              style={{ width: `${progress.percent}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  {archiveUpload && (
+                    <>
+                      <p className="mb-4 text-xs dark:text-gray-300">
+                        This will delete all your data
+                      </p>
+                      <button
+                        onClick={onDeleteArchive}
+                        disabled={isDeleting}
+                        className="rounded bg-red-500 px-4 py-2 text-sm text-white hover:bg-red-600 disabled:opacity-50 dark:bg-red-600 dark:hover:bg-red-700"
+                      >
+                        {isDeleting ? 'Deleting...' : 'Delete My Archive'}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    )
   )
 }

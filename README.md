@@ -16,7 +16,7 @@ https://discord.gg/AStSQj6ugq
 
 See [API docs](docs/api-doc.md) for how to access the archive's supabase DB.
 
-_TODO: make it possible to download a snapshot of the full archive so people can do offline analysis?_
+We have manual data dumps right now, see:  https://github.com/TheExGenesis/community-archive/releases/tag/dump. Working on automating publishing of snapshots, see: https://github.com/TheExGenesis/community-archive/issues/59
 
 ## Development Instructions
 

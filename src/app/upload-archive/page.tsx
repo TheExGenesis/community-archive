@@ -8,6 +8,7 @@ import { FaGithub, FaDiscord } from 'react-icons/fa' // Add this import
 import { getTweetsCount } from '@/lib-server/db_queries'
 import UploadTwitterArchive from '@/components/UploadTwitterArchive'
 import SignIn from '@/components/SignIn'
+import ThemeToggle from '@/components/ThemeToggle' // Add this import
 
 declare global {
   interface Window {
@@ -45,20 +46,21 @@ export default async function UploadArchivePage() {
   const mostFollowed = await getMostFollowedAccounts(supabase)
 
   return (
-    <div className="flex min-h-screen justify-center bg-gray-100">
+    <div className="flex min-h-screen justify-center bg-gray-100 dark:bg-gray-900">
       {/* Main content */}
-      <div className="relative w-full max-w-4xl bg-white p-24">
-        <div className="absolute right-4 top-4  text-gray-500">
+      <div className="relative w-full max-w-4xl bg-white p-24 dark:bg-gray-800">
+        <div className="absolute right-4 top-4 flex items-center space-x-4 text-gray-500 dark:text-gray-400">
+          <ThemeToggle side="bottom" /> {/* Add ThemeToggle here */}
           <SignIn />
         </div>
-        <h1 className="mb-0 text-5xl font-bold text-zinc-400 md:text-5xl">
+        <h1 className="mb-0 text-5xl font-bold text-zinc-400 dark:text-zinc-500 md:text-5xl">
           Upload to the
         </h1>
-        <h1 className="mt-0 text-5xl font-bold md:text-5xl">
+        <h1 className="mt-0 text-5xl font-bold text-black dark:text-white md:text-5xl">
           Community Archive!
         </h1>
         <br />
-        <h2 className="mb-4 text-2xl text-zinc-600">
+        <h2 className="mb-4 text-2xl text-zinc-600 dark:text-zinc-300">
           {`An open database and API anyone can build on.`}
         </h2>
         <br />
@@ -102,7 +104,7 @@ export default async function UploadArchivePage() {
           </p>
         </div>
         <br />
-        <p className="text-xl">
+        <p className="text-xl dark:text-gray-300">
           {`If you do...`} <SignIn />
         </p>
         <UploadTwitterArchive />

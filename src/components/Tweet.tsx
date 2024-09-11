@@ -71,7 +71,7 @@ export default function Tweet({
         href={tweetUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center text-blue-500 hover:underline"
+        className="flex items-center text-blue-500 hover:underline dark:text-blue-400"
       >
         <FaExternalLinkAlt className="mr-1" /> View on Twitter
       </a>

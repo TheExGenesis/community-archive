@@ -26,7 +26,7 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
   return (
     <div>
       <div className="w-full">
-        <div className="flex justify-around pb-2">
+        <div className="flex justify-between pb-2">
           {avatars.map((avatar) => (
             <a
               key={avatar.username}
@@ -35,7 +35,7 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
               rel="noopener noreferrer"
               className="flex flex-col items-center"
             >
-              <div className="relative h-16 w-16 overflow-hidden rounded-full bg-gray-200 ">
+              <div className="relative h-12 w-12 overflow-hidden rounded-full bg-gray-200 ">
                 <img
                   src={avatar.avatar_media_url}
                   alt={`${avatar.username}'s avatar`}
@@ -51,14 +51,14 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
                 />
               </div>
               <span
-                className="mt-1 overflow-visible whitespace-nowrap text-justify text-xs hover:underline"
-                style={{ maxWidth: '40px' }}
+                className="mt-1 whitespace-nowrap text-justify text-xs hover:underline"
+                style={{ maxWidth: '40px', fontSize: '10px' }}
               >
                 {avatar.username}
               </span>
               <span
-                className="mt-1 overflow-visible whitespace-nowrap text-justify text-xs text-zinc-500 hover:underline"
-                style={{ maxWidth: '40px' }}
+                className="mt-1  whitespace-nowrap text-justify text-xs text-xs text-zinc-500 hover:underline"
+                style={{ maxWidth: '40px', fontSize: '10px' }}
               >
                 {avatar.num_tweets && `${avatar.num_tweets} tweets`}
               </span>

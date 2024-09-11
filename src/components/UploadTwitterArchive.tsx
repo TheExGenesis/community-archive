@@ -454,10 +454,10 @@ export default function UploadTwitterArchive() {
 
   return (
     userMetadata && (
-      <div className="dark:text-gray-300">
+      <div className="text-sm dark:text-gray-300">
         {archiveUpload && (
           <>
-            <p className="mb-2 text-sm text-zinc-400 dark:text-zinc-500">
+            <p className="mb-2 text-xs text-zinc-400 dark:text-zinc-500">
               Your last archive upload was from{' '}
               {formatDate(archiveUpload.archive_at)}.
             </p>
@@ -467,7 +467,7 @@ export default function UploadTwitterArchive() {
           <div>
             <button
               onClick={() => setShowUploadButton(true)}
-              className="cursor-pointer text-blue-500 underline dark:text-blue-400"
+              className="cursor-pointer text-sm text-blue-500 underline dark:text-blue-400"
             >
               Upload a new archive, or delete your data.
             </button>
@@ -478,7 +478,7 @@ export default function UploadTwitterArchive() {
               <div>
                 <button
                   onClick={() => setShowUploadButton(false)}
-                  className="cursor-pointer text-blue-500 underline dark:text-blue-400"
+                  className="cursor-pointer text-sm text-blue-500 underline dark:text-blue-400"
                 >
                   Close
                 </button>
@@ -487,7 +487,7 @@ export default function UploadTwitterArchive() {
             <div className="flex flex-col">
               <div className="flex justify-between">
                 <div className="mb-4">
-                  <p className="mb-4 text-sm dark:text-gray-300">
+                  <p className="mb-4 text-xs dark:text-gray-300">
                     Please upload your Twitter archive as a .zip file.
                   </p>
                   <input
@@ -522,13 +522,13 @@ export default function UploadTwitterArchive() {
                 <div>
                   {archiveUpload && (
                     <>
-                      <p className="mb-4 text-sm dark:text-gray-300">
+                      <p className="mb-4 text-xs dark:text-gray-300">
                         This will delete all your data
                       </p>
                       <button
                         onClick={onDeleteArchive}
                         disabled={isDeleting}
-                        className="rounded bg-red-500 px-4 py-2 text-white hover:bg-red-600 disabled:opacity-50 dark:bg-red-600 dark:hover:bg-red-700"
+                        className="rounded bg-red-500 px-4 py-2 text-sm text-white hover:bg-red-600 disabled:opacity-50 dark:bg-red-600 dark:hover:bg-red-700"
                       >
                         {isDeleting ? 'Deleting...' : 'Delete My Archive'}
                       </button>

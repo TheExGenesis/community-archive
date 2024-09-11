@@ -1,8 +1,15 @@
+'use client'
+import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
+import { getSchemaName } from '@/lib-client/getTableName'
 import { createBrowserClient } from '@/utils/supabase'
+import { useEffect, useState } from 'react'
 
-export default function SignIn({ userMetadata }: { userMetadata: any }) {
+export default function SignIn() {
+  const { userMetadata, isArchiveUploaded } = useAuthAndArchive()
+
   const signInWithTwitter = async () => {
     const supabase = createBrowserClient()
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'twitter',
       options: {
@@ -26,27 +33,31 @@ export default function SignIn({ userMetadata }: { userMetadata: any }) {
   }
 
   return userMetadata ? (
-    <div className="mb-2 text-gray-500">
-      <p>
-        {"You're logged in as"}
-        {userMetadata.full_name || userMetadata.user_name}
-      </p>
-      <form action={handleSignOut}>
-        <button type="submit" className="underline">
-          Sign Out
+    <p className="inline flex items-center dark:text-gray-300">
+      {`You're logged in as 
+      ${userMetadata.full_name || userMetadata.user_name} `}
+      <form action={handleSignOut} className="inline">
+        <button
+          type="submit"
+          className="ml-2 hover:underline dark:text-blue-400"
+        >
+          {'(Sign Out)'}
         </button>
       </form>
-    </div>
+    </p>
   ) : (
     <>
-      <div className="mb-2 flex items-center">
-        <form action={signInWithTwitter} className="mr-2">
-          <button type="submit" className="underline">
-            {'Sign in with Twitter'}
+      <p className="inline  dark:text-gray-300">
+        <form action={signInWithTwitter} className="inline">
+          <button
+            type="submit"
+            className="text-blue-500 hover:underline dark:text-blue-400"
+          >
+            {'Sign in with Twitter '}
           </button>
         </form>
-        <p className="text-gray-500">{'to upload your archive'}</p>
-      </div>
+        {' to upload your archive'}
+      </p>
     </>
   )
 }

@@ -1,9 +1,9 @@
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import { getSchemaName } from '@/lib-client/getTableName'
+import { SupabaseClient } from '@supabase/supabase-js'
 
-export const getStats = async () => {
-  const supabase = createServerClient(cookies())
+export const getStats = async (supabase: SupabaseClient) => {
   const [accountsResult, tweetsResult, likedTweetsResult] = await Promise.all([
     supabase
       .schema(getSchemaName())

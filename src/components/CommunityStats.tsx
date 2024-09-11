@@ -6,9 +6,9 @@ const CommunityStats = async () => {
   // https://nextjs.org/docs/pages/building-your-application/rendering/client-side-rendering
 
   const stats = await getStats()
-
-  const usernames = stats.usernames!.map(name => {
-    return `<a href="/user/${name}" class="underline">${name}</a>`
+  const usernames = stats.users!.map(item => {
+    const { username, account_id } = item
+    return `<a href="/user/${account_id}" class="underline">${username}</a>`
   }).join(', ')
 
   return (

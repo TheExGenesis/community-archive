@@ -63,7 +63,7 @@ const CommunityStats = async () => {
         )}
       {/* {stats.usernames && stats.usernames.length > 0 && (
         <p className="mb-4 text-sm">
-          Accounts in the archive: {stats.usernames.join(', ')}
+          Accounts in the archive: <span dangerouslySetInnerHTML={{__html: usernames}}></span>
         </p>
       )} */}
 

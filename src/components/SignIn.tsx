@@ -1,10 +1,15 @@
 'use client'
+import { FaTwitter } from "react-icons/fa";
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { getSchemaName } from '@/lib-client/getTableName'
 import { createBrowserClient } from '@/utils/supabase'
 import { useEffect, useState } from 'react'
+import { Button } from './ui/button'
 
-export default function SignIn() {
+interface SignInProps {
+  variant: 'button' | 'text'
+}
+export default function SignIn({ variant }: SignInProps) {
   const { userMetadata, isArchiveUploaded } = useAuthAndArchive()
 
   const signInWithTwitter = async () => {
@@ -32,6 +37,35 @@ export default function SignIn() {
     }
   }
 
+  if (variant === "button") {
+
+    return userMetadata ? <p className="inline flex items-center dark:text-gray-300">
+      <form action={handleSignOut} className="inline">
+        {userMetadata.full_name || userMetadata.user_name}
+      </form>
+    </p>
+      : (
+        <>
+          <form action={signInWithTwitter} className="inline">
+            <Button
+              type="submit"
+              variant="default"
+              className="text-blue-500 hover:underline dark:text-blue-400"
+            >
+              <div className="flex items-center space-x-2">
+
+                <FaTwitter />
+                <span>
+                  {'Upload your archive'}
+
+                </span>
+              </div>
+            </Button>
+          </form>
+        </>
+      )
+  }
+
   return userMetadata ? (
     <p className="inline flex items-center dark:text-gray-300">
       {`You're logged in as 
@@ -47,16 +81,15 @@ export default function SignIn() {
     </p>
   ) : (
     <>
-      <p className="inline  dark:text-gray-300">
+      <p className="inline dark:text-gray-300">
         <form action={signInWithTwitter} className="inline">
           <button
             type="submit"
-            className="text-blue-500 hover:underline dark:text-blue-400"
+            className="text-blue-500 hover:underline dark:text-blue-400 underline"
           >
-            {'Sign in with Twitter '}
-          </button>
+            {'Sign in '}
+          </button> {" with Twitter"}
         </form>
-        {' to upload your archive'}
       </p>
     </>
   )

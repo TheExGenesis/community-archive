@@ -1,4 +1,6 @@
 import CommunityStats from '@/components/CommunityStats'
+import { BsFill1CircleFill, BsFill2CircleFill, BsFill3CircleFill } from "react-icons/bs";
+import { FaExternalLinkAlt, FaFileDownload, FaFileUpload, FaSignInAlt } from "react-icons/fa";
 import SearchTweets from '@/components/SearchTweets'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
@@ -9,6 +11,10 @@ import { getTweetsCount } from '@/lib-server/db_queries'
 import UploadTwitterArchive from '@/components/UploadTwitterArchive'
 import SignIn from '@/components/SignIn'
 import ThemeToggle from '@/components/ThemeToggle'
+import { Section } from '@/components/ui/section'
+import IconList from '@/components/IconList'
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 declare global {
   interface Window {
@@ -18,7 +24,7 @@ declare global {
 
 const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
   let { data, error } = await supabase.rpc('get_top_accounts_with_followers', {
-    limit_count: 7,
+    limit_count: 8,
   })
   if (error) console.error(error)
 
@@ -38,98 +44,140 @@ const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
   console.log(data)
   return data
 }
+const exampleApps = [
+  { icon: '🔎', text: ' Search that really knows what you mean' },
+  { icon: '✨', text: 'AI apps with context on you and your friends' },
+  { icon: '📚', text: 'Artifacts like books based on your tweets' },
+  { icon: '🥵', text: 'And more!' }
+];
+
+const howToContribute = [
+  {
+    icon: <BsFill1CircleFill />,
+    text: (
+      <>
+        <a
+          href="https://x.com/settings/download_your_data"
+          className="text-blue-500 underline dark:text-blue-400"
+        >
+          Request your archive
+        </a>
+        {" This takes ~24 hours."}
+      </>
+    ),
+  },
+  {
+    icon: <BsFill2CircleFill />,
+    text: <SignIn variant='text' />,
+  },
+  {
+    icon: <BsFill3CircleFill />,
+    text: <>
+      <a
+        href="/upload-archive"
+        className="text-blue-500 underline dark:text-blue-400">
+        Upload your archive
+      </a> for the greater good!</>
+  },
+]
 
 export default async function UploadArchivePage() {
   const supabase = createServerClient(cookies())
   const mostFollowed = await getMostFollowedAccounts(supabase)
 
+
   return (
     <div className="flex min-h-screen justify-center bg-gray-100 dark:bg-gray-900">
       {/* Main content */}
-      <div className="relative w-full max-w-3xl bg-white p-24 dark:bg-gray-800">
-        <div className="absolute right-4 top-4 flex items-center space-x-4 text-gray-500 dark:text-gray-400">
+      <div className="relative w-full max-w-3xl bg-white dark:bg-gray-800">
+        <Section size="compact">
+          <div className="flex items-center justify-between mb-2 mt-4 text-gray-500 dark:text-gray-400 space-x-2">
+            <CommunityStats showGoal={true} />
+          </div>
+        </Section>
+        <div className="fixed left-4 bottom-4">
           <ThemeToggle side="bottom" />
-          <p className="text-sm dark:text-gray-300">
-            <SignIn />
-          </p>
         </div>
-        <h1 className="mb-0 text-4xl font-bold text-zinc-400 dark:text-zinc-500 md:text-4xl">
-          Upload to the
-        </h1>
-        <h1 className="mt-0 text-4xl font-bold text-black dark:text-white md:text-4xl">
-          Community Archive!
-        </h1>
-        <br />
-        <h2 className="mb-4 text-xl text-zinc-600 dark:text-zinc-300">
-          {`An open database and API anyone can build on.`}
-        </h2>
-        <br />
-        <h3 className="mb-4 text-sm">Featuring archives uploaded by:</h3>
-        {mostFollowed ? (
-          <AvatarList
-            initialAvatars={mostFollowed}
-            title="Uploaded people you may know:"
-          />
-        ) : (
-          <p className="text-xs text-red-500">
-            Failed to load most followed accounts.
-          </p>
-        )}
-        <br />
-        <CommunityStats />
-        <br />
-        <div className="text-sm">
-          <p className="mb-4  leading-relaxed">
-            {`Powered by your tweet history, the community archive lets anyone build things like:`}
-          </p>
-          <ul className="mb-4 list-disc space-y-2 pl-16 ">
-            <li>🔎 Search that really knows what you mean;</li>
-            <li>✨ AI apps with context on you and your friends;</li>
-            <li>📚 Make artifacts like books based on your tweets;</li>
-            <li>And more!</li>
-          </ul>
+        <Section className="pb-4">
+
+          <h1 className="mb-0 text-4xl font-bold text-zinc-400 dark:text-zinc-500 md:text-4xl">
+            Upload to the
+          </h1>
+          <h1 className="mt-0 text-4xl font-bold text-black dark:text-white md:text-4xl">
+            Community Archive!
+          </h1>
           <br />
+          <h2 className="mb-8 text-xl text-zinc-600 dark:text-zinc-300">
+            An open database of tweets anyone can build on.
+          </h2>
+          <div className="flex items-center space-x-2">
 
-          <p className="text-sm">
-            {`If you don't have an archive yet, `}
-            <strong>
-              <a
-                href="https://x.com/settings/download_your_data"
-                className="text-blue-500 hover:underline"
-              >
-                request it here
-              </a>
-            </strong>
-            {` now!`}
+            <SignIn variant="button" />
+            <Link href="https://community-archive.org/api/reference">
+              <Button variant="ghost" >See the API docs</Button>
+            </Link>
+          </div>
+        </Section>
+        <Section size="small">
+          <div className="bg-gray-100 dark:bg-gray-900 p-4 rounded-md">
+
+            <h3 className="mb-4 text-lg">Featuring archives from:</h3>
+            <div className="">
+
+              {mostFollowed ? (
+                <AvatarList
+                  initialAvatars={mostFollowed}
+                  title="Uploaded people you may know:"
+                />
+              ) : (
+                <p className="text-xs text-red-500">
+                  Failed to load most followed accounts.
+                </p>
+              )}
+            </div>
+          </div>
+        </Section>
+        <Section className="text-lg">
+          <div className="mb-4 leading-relaxed text-2xl">
+            {"With your tweets, the Community Archive enables apps like..."}
+          </div>
+          <IconList items={exampleApps} variant="card" />
+        </Section>
+
+        <Section>
+          <div className="mt-0 text-2xl mb-4">
+            {"This is great! How do I add my tweets to the Archive?"}
+          </div>
+          <p className="text-scm text-lg mb-4 italic">
+            {"Thanks for offering! Just follow these steps:"}
           </p>
-        </div>
-        <br />
-        <p className="text-sm dark:text-gray-300">
-          {`If you do...`} <SignIn />
-        </p>
-        <UploadTwitterArchive />
-        <br />
+          <div className="text-lg">
 
-        <div className="mb-4 text-sm">
-          Useful links:
-          <ul className="mb-4 list-disc pl-6">
+            <IconList
+              items={howToContribute}
+              variant="text"
+            />
+          </div>
+          <UploadTwitterArchive />
+          <br />
+        </Section>
+
+        <Section>
+          <div className="text-2xl mb-4">
+            More information
+          </div>
+          <ul className="mb-4 list-disc pl-6 text-lg">
             <li>
-              {`We're an open database and API anyone can build on. Want to know more? `}
-              <a
-                href="https://substack.com/@xiqo/p-148517224"
-                className="text-blue-500 hover:underline"
-              >
-                {`Here's our FAQ`}
-              </a>
+              {"We're an open database and API anyone can build on."}
             </li>
             <li>
-              Worried about privacy? Here is{' '}
+              Here is{' '}
               <a href="/data-policy" className="text-blue-500 hover:underline">
                 our data policy
               </a>{' '}
               and{' '}
               <a href="/remove-dms" className="text-blue-500 hover:underline">
-                how to remove DMs from the archive
+                how to remove sensitive data before uploading
               </a>
             </li>
             <li>
@@ -138,32 +186,43 @@ export default async function UploadArchivePage() {
                 href="https://github.com/TheExGenesis/community-archive"
                 className="mr-2 inline-flex items-center text-blue-500 hover:underline"
               >
-                <FaGithub className="mr-1" /> GitHub repo
+                <FaGithub className="mr-1 leading-3 text-sm" /> GitHub repo
               </a>{' '}
               and{' '}
               <a
                 href="https://discord.gg/AStSQj6ugq"
                 className="inline-flex items-center text-blue-500 hover:underline"
               >
-                <FaDiscord className="mr-1" /> Discord
+                <FaDiscord className="mr-1 leading-3 text-sm" /> Discord
+              </a>
+            </li>
+            <li>
+              {"Want to know more?"}
+              <a
+                href="https://substack.com/@xiqo/p-148517224"
+                className="text-blue-500 hover:underline"
+              >
+                {`Here's our FAQ`}
               </a>
             </li>
           </ul>
           <br />
           <br />
-        </div>
-        <div className="mb-4"></div>
-        <br />
-        <div className="flex flex-grow flex-col">
+        </Section>
+        <Section >
           <div
-            className="flex-grow overflow-hidden"
+            className="flex-grow overflow-hidden flex flex-col"
             style={{ height: '48rem' }}
           >
-            <h2 className="mb-4 text-xl font-bold">Search the Archive</h2>
-            <SearchTweets />
+            <h2 className="mb-4 text-2xl">Try searching the Archive</h2>
+            <div
+              className="bg-gray-300 dark:bg-gray-700 p-2 overflow-hidden flex-grow"
+            >
+              <SearchTweets displayText="" />
+            </div>
           </div>
-        </div>
+        </Section>
       </div>
-    </div>
+    </div >
   )
 }

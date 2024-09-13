@@ -35,7 +35,7 @@ const getLatestTweets = async (supabase: any, count: number) => {
 
   return tweets
 }
-const searchTweets = async (supabase: any, queryText = '', account_id?:string) => {
+const searchTweets = async (supabase: any, queryText = '', account_id?: string) => {
   // process the postgres text search query text:
   // - split words by spaces, surrond them with single quotes and join them with ' | '
   // - escape single quotes with '' and double quotes with ""
@@ -106,14 +106,14 @@ const searchTweets = async (supabase: any, queryText = '', account_id?:string) =
 }
 
 interface SearchProps {
-  displayText?:string
-  account_id?:string
+  displayText?: string
+  account_id?: string
 }
 
-export default function SearchTweets({ 
+export default function SearchTweets({
   displayText = "Very minimal full text search over tweet text",
   account_id
-}:SearchProps) {
+}: SearchProps) {
   const [tweets, setTweets] = useState<any[]>()
   const [query, setQuery] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -146,9 +146,9 @@ export default function SearchTweets({
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4 flex flex-col gap-6">
-        <p className="text-center text-sm">
+        {displayText && <p className="text-center text-sm">
           {displayText}
-        </p>
+        </p>}
         <div className="flex gap-2">
           <input
             type="text"
@@ -187,15 +187,14 @@ export default function SearchTweets({
                     Array.isArray(tweet['account']?.['profile'])
                       ? tweet['account']?.['profile'][0]?.avatar_media_url
                       : tweet['account']?.['profile']?.avatar_media_url ||
-                        'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
+                      'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
                   }
                   text={tweet.full_text}
                   favoriteCount={tweet.favorite_count}
                   retweetCount={tweet.retweet_count}
                   date={tweet.created_at}
-                  tweetUrl={`https://twitter.com/${
-                    tweet['account']?.username || 'unknown'
-                  }/status/${tweet.tweet_id}`}
+                  tweetUrl={`https://twitter.com/${tweet['account']?.username || 'unknown'
+                    }/status/${tweet.tweet_id}`}
                   replyToUsername={tweet.reply_to_username}
                 />
               ))}

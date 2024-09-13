@@ -1,5 +1,5 @@
 import { getStats } from '@/lib-server/stats'
-import { SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 
@@ -23,7 +23,8 @@ const getRecentUploadedAccounts = async (supabase: SupabaseClient) => {
   }
 
   const uniqueAccounts = new Map()
-  data.forEach((item) => {
+
+  for (const item of data) {
     const account = item.account[0]
     if (account && !uniqueAccounts.has(account.username)) {
       uniqueAccounts.set(account.username, {
@@ -31,11 +32,22 @@ const getRecentUploadedAccounts = async (supabase: SupabaseClient) => {
         avatar_media_url: account.profile?.[0]?.avatar_media_url,
       })
     }
-  })
+  }
+
   return Array.from(uniqueAccounts.values()).slice(0, 7)
 }
 
-const CommunityStats = async () => {
+const calculateGoal = (accountCount: number): number => {
+  const goals = [25, 50, 100, 250, 500, 750, 1000];
+  if (accountCount < 25) return 25;
+  return goals.find(goal => goal > accountCount) || goals[goals.length - 1];
+};
+
+interface CommunityStatsProps {
+  showGoal?: boolean
+}
+
+const CommunityStats = async ({ showGoal }: CommunityStatsProps) => {
   const supabase = createServerClient(cookies())
   const [recentUploads, stats] = await Promise.all([
     getRecentUploadedAccounts(supabase),
@@ -50,16 +62,19 @@ const CommunityStats = async () => {
     }),
   ])
 
+  const goal = stats.accountCount !== null ? calculateGoal(stats.accountCount) : null;
+
   return (
-    <div className="text-sm dark:text-gray-300">
+    <div >
       {stats.accountCount !== null &&
         stats.tweetCount !== null &&
         stats.likedTweetCount !== null && (
-          <p className="mb-4 text-xs">
-            <strong>{stats.accountCount}</strong> accounts have uploaded a total
-            of <strong>{stats.tweetCount}</strong> tweets. We also have{' '}
-            <strong>{stats.likedTweetCount}</strong> liked tweets.
-          </p>
+          <>
+            <strong>{stats.tweetCount}</strong> tweets contributed from <strong>{stats.accountCount}</strong> accounts.
+            {showGoal && goal && (
+              <span className="italic"> Next milestone: <strong>{goal}</strong> accounts.</span>
+            )}
+          </>
         )}
       {/* {stats.usernames && stats.usernames.length > 0 && (
         <p className="mb-4 text-sm">

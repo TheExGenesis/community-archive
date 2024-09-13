@@ -47,16 +47,18 @@ export default function SignIn() {
     </p>
   ) : (
     <>
-      <p className="inline  dark:text-gray-300">
+      <p className="inline dark:text-gray-300">
         <form action={signInWithTwitter} className="inline">
           <button
             type="submit"
-            className="text-blue-500 hover:underline dark:text-blue-400"
+            className=" text-blue-500 hover:underline dark:text-blue-400"
           >
             {'Sign in with Twitter '}
           </button>
         </form>
-        {' to upload your archive'}
+        <p className="inline dark:text-gray-300 ">
+          {' to upload your archive'}
+        </p>
       </p>
     </>
   )

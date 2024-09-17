@@ -4,10 +4,14 @@ import Tweet from '@/components/Tweet'
 import { createBrowserClient } from '@/utils/supabase'
 import { getSchemaName, getTableName } from '@/lib-client/getTableName'
 
-const getLatestTweets = async (supabase: any, count: number) => {
+const getLatestTweets = async (
+  supabase: any,
+  count: number,
+  account_id?: string | null,
+) => {
   const { data, error } = await supabase
     .schema('public')
-    .rpc('get_latest_tweets', { count: 50 })
+    .rpc('get_latest_tweets', { count: count, p_account_id: account_id })
 
   if (error) {
     console.error('Error fetching tweets:', error)
@@ -112,12 +116,12 @@ const pgSearch = async (supabase: any, query: string, account_id?: string) => {
 
 interface SearchProps {
   displayText?: string
-  account_id?: string
+  account_id?: string | null
 }
 
 export default function SearchTweets({
   displayText = 'Very minimal full text search over tweet text',
-  account_id,
+  account_id = null,
 }: SearchProps) {
   const [tweetsExact, setTweetsExact] = useState<any[]>([])
   const [tweetsAND, setTweetsAND] = useState<any[]>([])
@@ -128,7 +132,7 @@ export default function SearchTweets({
   useEffect(() => {
     const fetchLatestTweets = async () => {
       const supabase = createBrowserClient()
-      const latestTweets = await getLatestTweets(supabase, 50)
+      const latestTweets = await getLatestTweets(supabase, 50, account_id)
       setTweetsOR(latestTweets)
     }
 
@@ -214,7 +218,7 @@ export default function SearchTweets({
         {isLoading ? (
           <div>Loading tweets...</div>
         ) : allTweets.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-8">
             {allTweets.map((tweet) => (
               <Tweet
                 key={tweet.tweet_id}

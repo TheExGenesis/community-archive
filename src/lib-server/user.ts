@@ -1,6 +1,7 @@
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import { getSchemaName } from '@/lib-client/getTableName'
+import { formatUserData } from '@/lib-client/user-utils'
 
 const tweetSelectString = `
         *,
@@ -59,10 +60,20 @@ export const getUserData = async (account_id: string) => {
   const { data } = await supabase
     .schema('public')
     .from('account')
-    .select('*')
+    .select(
+      `
+      account_id,
+      username,
+      account_display_name,
+      created_at,
+      profile:profile(bio, website, location, avatar_media_url),
+      archive_upload:archive_upload(archive_at)
+    `,
+    )
     .eq('account_id', account_id)
+    .single()
 
-  if (!data || data.length == 0) {
+  if (!data) {
     return null
   }
 
@@ -72,8 +83,10 @@ export const getUserData = async (account_id: string) => {
     .select('tweet_id', { count: 'planned', head: true })
     .eq('account_id', account_id)
 
+  const formattedUser = formatUserData(data)
+
   return {
-    account: data[0],
+    account: formattedUser,
     tweetCount: count,
   }
 }

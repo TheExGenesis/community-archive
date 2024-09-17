@@ -300,7 +300,10 @@ const insertTempLikes = async (
 export const processTwitterArchive = async (
   supabase: SupabaseClient,
   archiveData: any,
-  progressCallback: (progress: { phase: string; percent: number }) => void,
+  progressCallback: (progress: {
+    phase: string
+    percent: number | null
+  }) => void,
 ): Promise<void> => {
   const startTime = performance.now()
   console.log('Starting Twitter Archive processing...')
@@ -474,7 +477,7 @@ export const processTwitterArchive = async (
     console.log('Committing all data...')
     progressCallback({
       phase: 'Finishing up...',
-      percent: 50,
+      percent: null,
     })
     const commitStartTime = Date.now()
     await retryOperation(async () => {
@@ -562,6 +565,16 @@ export const processTwitterArchivePgFns = async (
 
     console.log(`Latest tweet date: ${latestTweetDate}`)
 
+    // Compute counts
+    const tweet_counts = archiveData.tweets.length
+    const following_counts = archiveData.following
+      ? archiveData.following.length
+      : 0
+    const followers_counts = archiveData.followers
+      ? archiveData.followers.length
+      : 0
+    const likes_counts = archiveData.likes ? archiveData.likes.length : 0
+
     // Create temporary tables
     console.log('Creating temporary tables...')
     await supabase
@@ -572,7 +585,13 @@ export const processTwitterArchivePgFns = async (
     const { error: accountError } = await supabase
       .schema(getSchemaName())
       .rpc('insert_temp_account', {
-        p_account: archiveData.account[0].account,
+        p_account: {
+          ...archiveData.account[0].account,
+          tweet_counts,
+          following_counts,
+          followers_counts,
+          likes_counts,
+        },
         p_suffix: suffix,
       })
     if (accountError)

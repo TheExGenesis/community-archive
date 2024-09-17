@@ -15,6 +15,7 @@ import {
 import { ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { formatUserData } from '@/lib-client/user-utils'
 
 type User = {
   account_id: string
@@ -29,8 +30,30 @@ type User = {
 }
 type SortKey = 'username' | 'created_at' | 'account_display_name' | 'archive_at'
 
-type ArchiveUpload = {
-  archive_at: string
+const fetchUsers = async (supabase: ReturnType<typeof createBrowserClient>) => {
+  const { data, error } = await supabase
+    .from('account')
+    .select(
+      `
+      account_id,
+      username,
+      account_display_name,
+      created_at,
+      profile:profile(bio, website, location, avatar_media_url),
+      archive_upload:archive_upload(archive_at)
+    `,
+    )
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+
+  const formattedUsers: User[] = data.map(formatUserData)
+
+  return formattedUsers.sort((a, b) => {
+    if (!a.archive_at) return 1
+    if (!b.archive_at) return -1
+    return new Date(b.archive_at).getTime() - new Date(a.archive_at).getTime()
+  })
 }
 
 export default function UserDirectoryPage() {
@@ -43,53 +66,10 @@ export default function UserDirectoryPage() {
   const supabase = createBrowserClient()
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const loadUsers = async () => {
       try {
-        const { data, error } = await supabase
-          .from('account')
-          .select(
-            `
-            account_id,
-            username,
-            account_display_name,
-            created_at,
-            profile:profile(bio, website, location, avatar_media_url),
-            archive_upload:archive_upload(archive_at)
-          `,
-          )
-          .order('created_at', { ascending: false })
-
-        if (error) throw error
-        const formattedUsers: any = data.map((user) => ({
-          ...user,
-          bio: Array.isArray(user.profile)
-            ? user.profile[user.profile.length - 1]?.bio
-            : user.profile?.bio,
-          website: Array.isArray(user.profile)
-            ? user.profile[user.profile.length - 1]?.website
-            : user.profile?.website,
-          location: Array.isArray(user.profile)
-            ? user.profile[user.profile.length - 1]?.location
-            : user.profile?.website,
-          avatar_media_url: Array.isArray(user.profile)
-            ? user.profile[user.profile.length - 1]?.avatar_media_url
-            : user.profile?.avatar_media_url,
-          archive_at: Array.isArray(user.archive_upload)
-            ? (user.archive_upload as ArchiveUpload[])[
-                user.archive_upload.length - 1
-              ]?.archive_at
-            : (user.archive_upload as ArchiveUpload | null)?.archive_at,
-        }))
-
-        const sortedUsers = formattedUsers.sort((a: User, b: User) => {
-          if (!a.archive_at) return 1
-          if (!b.archive_at) return -1
-          return (
-            new Date(b.archive_at).getTime() - new Date(a.archive_at).getTime()
-          )
-        })
-
-        setUsers(formattedUsers)
+        const sortedUsers = await fetchUsers(supabase)
+        setUsers(sortedUsers)
       } catch (error) {
         setError('Failed to fetch users')
         console.error('Error fetching users:', error)
@@ -98,7 +78,7 @@ export default function UserDirectoryPage() {
       }
     }
 
-    fetchUsers()
+    loadUsers()
   }, [supabase])
 
   if (loading) return <div>Loading...</div>

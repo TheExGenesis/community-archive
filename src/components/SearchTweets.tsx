@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Tweet from '@/components/Tweet'
 import { createBrowserClient } from '@/utils/supabase'
 import { getSchemaName, getTableName } from '@/lib-client/getTableName'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 const getLatestTweets = async (
   supabase: any,
@@ -211,43 +212,38 @@ export default function SearchTweets({
           </button>
         </div>
       </div>
-      <div
-        className="flex-grow overflow-y-auto"
-        id="search-results"
-        style={{
-          maxHeight: '400px',
-          overflowY: 'scroll',
-        }}
-      >
-        {isLoading ? (
-          <div>Loading tweets...</div>
-        ) : allTweets.length > 0 ? (
-          <div className="space-y-8">
-            {allTweets.map((tweet) => (
-              <Tweet
-                key={tweet.tweet_id}
-                tweetId={tweet.tweet_id}
-                username={tweet.username || 'Unknown'}
-                displayName={tweet.account_display_name || 'Unknown'}
-                profilePicUrl={
-                  tweet.avatar_media_url ||
-                  'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
-                }
-                text={tweet.full_text}
-                favoriteCount={tweet.favorite_count}
-                retweetCount={tweet.retweet_count}
-                date={tweet.created_at}
-                tweetUrl={`https://twitter.com/${
-                  tweet['account']?.username || 'unknown'
-                }/status/${tweet.tweet_id}`}
-                replyToUsername={tweet.reply_to_username}
-              />
-            ))}
-          </div>
-        ) : (
-          <div>No tweets found</div>
-        )}
-      </div>
+      <ScrollArea className="flex-grow">
+        <div className="pr-4">
+          {isLoading ? (
+            <div>Loading tweets...</div>
+          ) : allTweets.length > 0 ? (
+            <div className="space-y-8">
+              {allTweets.map((tweet) => (
+                <Tweet
+                  key={tweet.tweet_id}
+                  tweetId={tweet.tweet_id}
+                  username={tweet.username || 'Unknown'}
+                  displayName={tweet.account_display_name || 'Unknown'}
+                  profilePicUrl={
+                    tweet.avatar_media_url ||
+                    'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
+                  }
+                  text={tweet.full_text}
+                  favoriteCount={tweet.favorite_count}
+                  retweetCount={tweet.retweet_count}
+                  date={tweet.created_at}
+                  tweetUrl={`https://twitter.com/${
+                    tweet['account']?.username || 'unknown'
+                  }/status/${tweet.tweet_id}`}
+                  replyToUsername={tweet.reply_to_username}
+                />
+              ))}
+            </div>
+          ) : (
+            <div>No tweets found</div>
+          )}
+        </div>
+      </ScrollArea>
     </div>
   )
 }

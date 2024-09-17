@@ -23,10 +23,30 @@ declare global {
 }
 
 const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
-  let { data, error } = await supabase.rpc('get_top_accounts_with_followers', {
-    limit_count: 7,
-  })
-  if (error) console.error(error)
+  let data, error
+  const maxRetries = 3
+  let retries = 0
+
+  while (retries < maxRetries) {
+    ;({ data, error } = await supabase.rpc('get_top_accounts_with_followers', {
+      limit_count: 7,
+    }))
+
+    if (!error) break
+
+    console.error(`Attempt ${retries + 1} failed:`, error)
+    retries++
+
+    if (retries < maxRetries) {
+      await new Promise((resolve) => setTimeout(resolve, 1000 * retries)) // Exponential backoff
+    }
+  }
+
+  if (error) {
+    console.error('All attempts failed:', error)
+    // Handle the error appropriately, maybe set data to a default value
+    data = []
+  }
 
   const account_ids = data.map((account: any) => account.account_id)
   const tweetsCounts = await Promise.all(
@@ -50,33 +70,9 @@ export default async function UploadArchivePage() {
   const mostFollowed = await getMostFollowedAccounts(supabase)
 
   return (
-    <div className="flex min-h-screen flex-col justify-center bg-gray-100 dark:bg-gray-900">
-      {/* New menu */}
-      <nav className="bg-white p-4 shadow-md dark:bg-gray-800">
-        <div className="mx-auto max-w-3xl">
-          <ul className="flex space-x-4">
-            <li>
-              <Link href="/" className="text-blue-500 hover:underline">
-                Home
-              </Link>
-            </li>
-            <li>
-              <Link href="/user-dir" className="text-blue-500 hover:underline">
-                User Directory
-              </Link>
-            </li>
-          </ul>
-        </div>
-      </nav>
-
+    <div className="relative mx-auto flex min-h-screen w-full max-w-3xl flex-col bg-white p-24 dark:bg-gray-800">
       {/* Main content */}
-      <div className="relative mx-auto w-full max-w-3xl bg-white p-24 dark:bg-gray-800">
-        <div className="absolute right-4 top-4 flex items-center space-x-4 text-gray-500 dark:text-gray-400">
-          <ThemeToggle side="bottom" />
-          <div className="text-sm dark:text-gray-300">
-            <DynamicSignIn />
-          </div>
-        </div>
+      <div className="bg-white dark:bg-gray-800">
         <h1 className="mb-0 text-4xl font-bold text-zinc-400 dark:text-zinc-500 md:text-4xl">
           Upload to the
         </h1>

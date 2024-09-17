@@ -1,5 +1,5 @@
-import Image from 'next/image'
 import { FaHeart, FaRetweet, FaExternalLinkAlt, FaReply } from 'react-icons/fa'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 
 interface TweetProps {
   username: string
@@ -10,6 +10,7 @@ interface TweetProps {
   retweetCount: number
   date: string
   tweetUrl: string
+  tweetId: string // Added for permalink
   replyToUsername?: string
 }
 
@@ -22,24 +23,19 @@ export default function Tweet({
   retweetCount,
   date,
   tweetUrl,
+  tweetId,
   replyToUsername,
 }: TweetProps) {
   return (
     <div className="mb-4 rounded-lg bg-white p-4 shadow-md dark:bg-gray-800">
       <div className="mb-2 flex items-start">
-        <img
-          src={profilePicUrl}
-          alt={`${displayName}'s profile picture`}
-          width={48}
-          height={48}
-          className="mr-3 rounded-full"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.onerror = null // Prevent infinite loop
-            target.src =
-              'https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/assets/placeholder.jpg?t=2024-09-09T21%3A51%3A06.677Z'
-          }}
-        />
+        <Avatar className="mr-3 h-12 w-12">
+          <AvatarImage
+            src={profilePicUrl}
+            alt={`${displayName}'s profile picture`}
+          />
+          <AvatarFallback>{displayName}</AvatarFallback>
+        </Avatar>
         <div>
           <div className="flex items-center">
             <span className="mr-2 font-bold text-gray-900 dark:text-white">
@@ -67,14 +63,22 @@ export default function Tweet({
         </span>
         <span>{new Date(date).toLocaleDateString()}</span>
       </div>
-      <a
-        href={tweetUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center text-blue-500 hover:underline dark:text-blue-400"
-      >
-        <FaExternalLinkAlt className="mr-1" /> View on Twitter
-      </a>
+      <div className="flex items-center space-x-4">
+        <a
+          href={`/tweets/${tweetId}`}
+          className="flex items-center text-blue-500 hover:underline dark:text-blue-400"
+        >
+          <FaExternalLinkAlt className="mr-1" /> Permalink
+        </a>
+        <a
+          href={tweetUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center text-blue-500 hover:underline dark:text-blue-400"
+        >
+          <FaExternalLinkAlt className="mr-1" /> View on Twitter
+        </a>
+      </div>
     </div>
   )
 }

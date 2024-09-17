@@ -72,6 +72,7 @@ export default function Page() {
           {tweets.map((tweet: any) => (
             <Tweet
               key={tweet.tweet_id}
+              tweetId={tweet.tweet_id}
               username={tweet['account']?.username || 'Unknown'}
               displayName={tweet['account']?.account_display_name || 'Unknown'}
               profilePicUrl={

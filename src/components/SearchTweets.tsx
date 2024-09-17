@@ -7,7 +7,7 @@ import { getSchemaName, getTableName } from '@/lib-client/getTableName'
 const getLatestTweets = async (
   supabase: any,
   count: number,
-  account_id?: string | null,
+  account_id?: string,
 ) => {
   const { data, error } = await supabase
     .schema('public')
@@ -132,7 +132,11 @@ export default function SearchTweets({
   useEffect(() => {
     const fetchLatestTweets = async () => {
       const supabase = createBrowserClient()
-      const latestTweets = await getLatestTweets(supabase, 50, account_id)
+      const latestTweets = await getLatestTweets(
+        supabase,
+        50,
+        account_id || undefined,
+      )
       setTweetsOR(latestTweets)
     }
 
@@ -154,16 +158,16 @@ export default function SearchTweets({
       return
     }
 
-    searchTweetsExact(supabase, query, account_id)
+    searchTweetsExact(supabase, query, account_id || undefined)
       .then(setTweetsExact)
       .catch(console.error)
       .finally(() => setIsLoading(false))
 
-    searchTweetsAND(supabase, query, account_id)
+    searchTweetsAND(supabase, query, account_id || undefined)
       .then(setTweetsAND)
       .catch(console.error)
 
-    searchTweetsOR(supabase, query, account_id)
+    searchTweetsOR(supabase, query, account_id || undefined)
       .then(setTweetsOR)
       .catch(console.error)
   }
@@ -222,6 +226,7 @@ export default function SearchTweets({
             {allTweets.map((tweet) => (
               <Tweet
                 key={tweet.tweet_id}
+                tweetId={tweet.tweet_id}
                 username={tweet.username || 'Unknown'}
                 displayName={tweet.account_display_name || 'Unknown'}
                 profilePicUrl={

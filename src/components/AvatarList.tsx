@@ -1,7 +1,7 @@
 'use client'
 
-import Image from 'next/image'
 import { useState, useEffect } from 'react'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 
 type Avatar = {
   username: string
@@ -35,21 +35,15 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
               rel="noopener noreferrer"
               className="flex flex-col items-center"
             >
-              <div className="relative h-12 w-12 overflow-hidden rounded-full bg-gray-200 ">
-                <img
+              <Avatar className="h-12 w-12">
+                <AvatarImage
                   src={avatar.avatar_media_url}
                   alt={`${avatar.username}'s avatar`}
-                  width={96}
-                  height={96}
-                  className="rounded-full"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.onerror = null // Prevent infinite loop
-                    target.src =
-                      'https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/assets/placeholder.jpg?t=2024-09-09T21%3A51%3A06.677Z'
-                  }}
                 />
-              </div>
+                <AvatarFallback>
+                  {avatar.username[0].toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
               <span
                 className="mt-1 whitespace-nowrap text-justify text-xs hover:underline"
                 style={{ maxWidth: '40px', fontSize: '10px' }}
@@ -57,7 +51,7 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
                 {avatar.username}
               </span>
               <span
-                className="mt-1  whitespace-nowrap text-justify text-xs text-xs text-zinc-500 hover:underline"
+                className="mt-1 whitespace-nowrap text-justify text-xs text-zinc-500 hover:underline"
                 style={{ maxWidth: '40px', fontSize: '10px' }}
               >
                 {avatar.num_tweets && `${avatar.num_tweets} tweets`}

@@ -779,7 +779,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
       EXECUTE format('DROP TABLE IF EXISTS temp.liked_tweets_%s', p_suffix);
       EXECUTE format('DROP TABLE IF EXISTS temp.likes_%s', p_suffix);
   END;
-  $$ LANGUAGE plpgsql SECURITY DEFINER;
+  $$ LANGUAGE plpgsql SECURITY DEFINER
+  set statement_timeout TO '30min'; -- set custom timeout
 
   CREATE OR REPLACE FUNCTION public.commit_temp_data(p_suffix TEXT)
   RETURNS VOID
@@ -935,11 +936,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
               archive_upload_id = EXCLUDED.archive_upload_id
       ', p_suffix) USING v_archive_upload_id;
 
-      -- Call the function to drop temporary tables
-      PERFORM public.drop_temp_tables(p_suffix);
   END;
   $$ LANGUAGE plpgsql SECURITY DEFINER
-  set statement_timeout TO '10min'; -- set custom timeout
+  set statement_timeout TO '30min'; -- set custom timeout
 
 
 

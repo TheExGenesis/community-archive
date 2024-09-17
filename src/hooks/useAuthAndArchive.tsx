@@ -8,6 +8,7 @@ export function useAuthAndArchive() {
 
   useEffect(() => {
     const supabase = createBrowserClient()
+    // console.log('supabase', { supabase, node_env: process.env.NODE_ENV })
     if (
       process.env.NODE_ENV !== 'production' &&
       typeof window !== 'undefined'
@@ -20,7 +21,10 @@ export function useAuthAndArchive() {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user.user_metadata) {
         setUserMetadata(session.user.user_metadata)
-        console.log('session.user.user_metadata', session.user.user_metadata)
+        // console.log(
+        //   'supabase.auth.onAuthStateChange session.user.user_metadata',
+        //   session.user.user_metadata,
+        // )
       } else {
         setUserMetadata(null)
       }
@@ -29,6 +33,10 @@ export function useAuthAndArchive() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user.user_metadata) {
         setUserMetadata(session.user.user_metadata)
+        // console.log(
+        //   'supabase.auth.getSession session.user.user_metadata',
+        //   session.user.user_metadata,
+        // )
       }
     })
 

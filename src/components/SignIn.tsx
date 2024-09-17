@@ -1,8 +1,6 @@
 'use client'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
-import { getSchemaName } from '@/lib-client/getTableName'
 import { createBrowserClient } from '@/utils/supabase'
-import { useEffect, useState } from 'react'
 
 export default function SignIn() {
   const { userMetadata, isArchiveUploaded } = useAuthAndArchive()

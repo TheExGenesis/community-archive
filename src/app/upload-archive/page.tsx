@@ -7,8 +7,13 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { FaGithub, FaDiscord } from 'react-icons/fa'
 import { getTweetsCount } from '@/lib-server/db_queries'
 import UploadTwitterArchive from '@/components/UploadTwitterArchive'
-import SignIn from '@/components/SignIn'
+import dynamic from 'next/dynamic'
+
 import ThemeToggle from '@/components/ThemeToggle'
+// Dynamically import SignIn component with ssr disabled
+const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
+  ssr: false,
+})
 
 declare global {
   interface Window {
@@ -35,7 +40,7 @@ const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
   data.forEach((account: any, index: number) => {
     account.num_tweets = tweetsCounts[index].count
   })
-  console.log(data)
+  // console.log(data)
   return data
 }
 
@@ -49,9 +54,9 @@ export default async function UploadArchivePage() {
       <div className="relative w-full max-w-3xl bg-white p-24 dark:bg-gray-800">
         <div className="absolute right-4 top-4 flex items-center space-x-4 text-gray-500 dark:text-gray-400">
           <ThemeToggle side="bottom" />
-          <p className="text-sm dark:text-gray-300">
-            <SignIn />
-          </p>
+          <div className="text-sm dark:text-gray-300">
+            <DynamicSignIn />
+          </div>
         </div>
         <h1 className="mb-0 text-4xl font-bold text-zinc-400 dark:text-zinc-500 md:text-4xl">
           Upload to the
@@ -105,7 +110,8 @@ export default async function UploadArchivePage() {
         </div>
         <br />
         <p className="text-sm dark:text-gray-300">
-          {`If you do...`} <SignIn />
+          {`If you do... `}
+          <DynamicSignIn />
         </p>
         <UploadTwitterArchive />
         <br />

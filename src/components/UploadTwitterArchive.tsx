@@ -134,18 +134,29 @@ const formatDate = (dateString: string) => {
 }
 
 const uploadArchiveToStorage = async (
-  supabase: any,
   archiveToUpload: any,
   accountId: string,
   archiveId: string,
 ): Promise<void> => {
+  const supabase = createBrowserClient()
   const archiveToUploadSize =
     JSON.stringify(archiveToUpload).length / (1024 * 1024)
   console.log(`Size of archiveToUpload: ${archiveToUploadSize.toFixed(2)} MB`)
 
   console.log('Uploading archive to storage', { accountId, archiveId })
+
+  const { data: refreshdata, error: refreshError } =
+    await supabase.auth.refreshSession()
+  if (refreshError) {
+    console.error('Error refreshing session:', refreshError)
+    throw refreshError
+  }
+  console.log('Refreshed session:', refreshdata)
+
+  const bucketName =
+    process.env.NODE_ENV === 'production' ? 'archives' : 'dev_archives'
   const { data, error: uploadError } = await supabase.storage
-    .from('archives')
+    .from(bucketName)
     .upload(`${accountId}/${archiveId}.json`, JSON.stringify(archiveToUpload), {
       upsert: true,
     })
@@ -160,7 +171,10 @@ const handleFileUpload = async (
   event: React.ChangeEvent<HTMLInputElement>,
   setIsProcessing: (isProcessing: boolean) => void,
   supabase: any,
-  progressCallback: (progress: { phase: string; percent: number }) => void,
+  progressCallback: (progress: {
+    phase: string
+    percent: number | null
+  }) => void,
 ) => {
   const files = event.target.files
   if (!files || files.length === 0) return
@@ -288,7 +302,6 @@ const handleFileUpload = async (
 
     // Use the new function here
     await uploadArchiveToStorage(
-      supabase,
       archiveToUpload,
       archiveToUpload.account[0].account.accountId,
       archiveId,
@@ -370,11 +383,11 @@ export default function UploadTwitterArchive() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [progress, setProgress] = useState<{
     phase: string
-    percent: number
+    percent: number | null
   } | null>(null)
 
   const progressCallback = useCallback(
-    (progress: { phase: string; percent: number }) => {
+    (progress: { phase: string; percent: number | null }) => {
       setProgress(progress)
     },
     [],
@@ -506,14 +519,18 @@ export default function UploadTwitterArchive() {
                       {progress && (
                         <div>
                           <p>
-                            {progress.phase}: {progress.percent.toFixed(2)}%
+                            {progress.phase}
+                            {progress.percent !== null &&
+                              `: ${progress.percent.toFixed(2)}%`}
                           </p>
-                          <div className="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                            <div
-                              className="h-2.5 rounded-full bg-blue-600"
-                              style={{ width: `${progress.percent}%` }}
-                            ></div>
-                          </div>
+                          {progress.percent !== null && (
+                            <div className="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+                              <div
+                                className="h-2.5 rounded-full bg-blue-600"
+                                style={{ width: `${progress.percent}%` }}
+                              ></div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

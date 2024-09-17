@@ -936,8 +936,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp GRANT ALL ON SEQUENCES
               archive_upload_id = EXCLUDED.archive_upload_id
       ', p_suffix) USING v_archive_upload_id;
 
-      -- Call the function to drop temporary tables
-      PERFORM public.drop_temp_tables(p_suffix);
   END;
   $$ LANGUAGE plpgsql SECURITY DEFINER
   set statement_timeout TO '30min'; -- set custom timeout

@@ -8,6 +8,7 @@ import { FaGithub, FaDiscord } from 'react-icons/fa'
 import { getTweetsCount } from '@/lib-server/db_queries'
 import UploadTwitterArchive from '@/components/UploadTwitterArchive'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 
 import ThemeToggle from '@/components/ThemeToggle'
 // Dynamically import SignIn component with ssr disabled
@@ -49,9 +50,27 @@ export default async function UploadArchivePage() {
   const mostFollowed = await getMostFollowedAccounts(supabase)
 
   return (
-    <div className="flex min-h-screen justify-center bg-gray-100 dark:bg-gray-900">
+    <div className="flex min-h-screen flex-col justify-center bg-gray-100 dark:bg-gray-900">
+      {/* New menu */}
+      <nav className="bg-white p-4 shadow-md dark:bg-gray-800">
+        <div className="mx-auto max-w-3xl">
+          <ul className="flex space-x-4">
+            <li>
+              <Link href="/" className="text-blue-500 hover:underline">
+                Home
+              </Link>
+            </li>
+            <li>
+              <Link href="/user-dir" className="text-blue-500 hover:underline">
+                User Directory
+              </Link>
+            </li>
+          </ul>
+        </div>
+      </nav>
+
       {/* Main content */}
-      <div className="relative w-full max-w-3xl bg-white p-24 dark:bg-gray-800">
+      <div className="relative mx-auto w-full max-w-3xl bg-white p-24 dark:bg-gray-800">
         <div className="absolute right-4 top-4 flex items-center space-x-4 text-gray-500 dark:text-gray-400">
           <ThemeToggle side="bottom" />
           <div className="text-sm dark:text-gray-300">

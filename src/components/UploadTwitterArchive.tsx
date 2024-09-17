@@ -5,6 +5,7 @@ import { processTwitterArchive, deleteArchive } from '../lib-server/db_insert'
 import { createBrowserClient } from '@/utils/supabase'
 import { getSchemaName, getTableName } from '@/lib-client/getTableName'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
+import { Progress } from '@/components/ui/progress'
 
 type CustomInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   webkitdirectory?: string
@@ -514,22 +515,20 @@ export default function UploadTwitterArchive() {
                     multiple
                   />
                   {isProcessing && (
-                    <div>
-                      <p>{`Processing archive (may take up to 10 minutes)...`}</p>
+                    <div className="mt-4">
+                      <p className="mb-2">{`Processing archive (may take up to 10 minutes)...`}</p>
                       {progress && (
                         <div>
-                          <p>
+                          <p className="mb-1">
                             {progress.phase}
                             {progress.percent !== null &&
                               `: ${progress.percent.toFixed(2)}%`}
                           </p>
                           {progress.percent !== null && (
-                            <div className="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
-                              <div
-                                className="h-2.5 rounded-full bg-blue-600"
-                                style={{ width: `${progress.percent}%` }}
-                              ></div>
-                            </div>
+                            <Progress
+                              value={progress.percent}
+                              className="w-full"
+                            />
                           )}
                         </div>
                       )}

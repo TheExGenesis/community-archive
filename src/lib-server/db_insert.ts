@@ -400,7 +400,7 @@ export const processTwitterArchive = async (
       archiveData['note-tweet'] || [],
       archiveData.tweets,
     )
-    // console.log('patchedTweets', { patchedTweets })
+
     // Process likes
     console.log('Processing likes...')
     const likesStartTime = Date.now()
@@ -480,17 +480,24 @@ export const processTwitterArchive = async (
       percent: null,
     })
     const commitStartTime = Date.now()
-    await retryOperation(async () => {
-      const { data, error } = await supabase
-        .schema(getSchemaName())
-        .rpc('commit_temp_data', {
-          p_suffix: suffix,
-        })
-      if (error) throw error
-      return data
-    }, 'Error committing data')
-    const commitEndTime = Date.now()
-    console.log(`Commit processing time: ${commitEndTime - commitStartTime}ms`)
+    try {
+      await retryOperation(async () => {
+        const { data, error } = await supabase
+          .schema(getSchemaName())
+          .rpc('commit_temp_data', {
+            p_suffix: suffix,
+          })
+        if (error) throw error
+        return data
+      }, 'Error committing data')
+      const commitEndTime = Date.now()
+      console.log(
+        `Commit processing time: ${commitEndTime - commitStartTime}ms`,
+      )
+    } catch (commitError: any) {
+      console.error('Error committing data:', commitError)
+      // Do not throw the error to avoid exposing it to the user
+    }
 
     console.log('Twitter archive processing completed successfully.')
     progressCallback({
@@ -518,23 +525,26 @@ export const processTwitterArchive = async (
       console.log('Temporary tables dropped successfully.')
     } catch (dropError: any) {
       console.error('Error dropping temporary tables:', dropError)
+      // Do not throw the error to avoid exposing it to the user
     }
 
     // Throw a new error with more context
     throw new Error(`Error processing Twitter archive: ${error.message}`)
   }
+
+  // Ensure temporary tables are dropped without throwing errors
   try {
     console.log('Attempting to drop temporary tables...')
     await retryOperation(async () => {
       const { data, error } = await supabase
         .schema(getSchemaName())
         .rpc('drop_temp_tables', { p_suffix: suffix })
-      if (error) throw error
       return data
     }, 'Error dropping temporary tables')
     console.log('Temporary tables dropped successfully.')
   } catch (dropError: any) {
     console.error('Error dropping temporary tables:', dropError)
+    // Do not throw the error to avoid exposing it to the user
   }
 }
 

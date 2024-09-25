@@ -7,7 +7,7 @@ project_id = "canonball"
 port = 54321
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
 # endpoints. public and storage are always included.
-schemas = ["public", "storage", "graphql_public", "dev", "temp"]
+schemas = ["public", "graphql_public", "dev", "temp"]
 # Extra schemas to add to the search_path of every request. public is always included.
 extra_search_path = ["public", "extensions", "dev", "temp"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size

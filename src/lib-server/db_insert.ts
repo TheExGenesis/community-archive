@@ -7,11 +7,6 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
 
-// Load environment variables from .env file in the scratchpad directory
-if (process.env.NODE_ENV !== 'production') {
-  dotenv.config({ path: path.resolve(__dirname, '../../.env.local') })
-}
-
 const BATCH_SIZE = 1000 // Adjust as needed
 
 const MAX_RETRIES = 5

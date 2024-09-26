@@ -48,5 +48,3 @@ BEGIN
         limit_count;
 END; 
 $$;
-
-ALTER FUNCTION "public"."get_top_accounts_with_followers"("limit_count" integer) OWNER TO "postgres";

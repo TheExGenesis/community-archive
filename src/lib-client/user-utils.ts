@@ -8,6 +8,10 @@ export type FormattedUser = {
   location: string | null
   avatar_media_url: string | null
   archive_at: string | null
+  num_tweets: number
+  num_followers: number
+  num_following: number
+  num_likes: number
 }
 
 export function formatUserData(data: any): FormattedUser {
@@ -24,5 +28,9 @@ export function formatUserData(data: any): FormattedUser {
     location: getLatestValue(data.profile, 'location'),
     avatar_media_url: getLatestValue(data.profile, 'avatar_media_url'),
     archive_at: getLatestValue(data.archive_upload, 'archive_at'),
+    num_tweets: data.num_tweets,
+    num_followers: data.num_followers,
+    num_following: data.num_following,
+    num_likes: data.num_likes,
   }
 }

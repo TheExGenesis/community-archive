@@ -571,14 +571,14 @@ export const processTwitterArchivePgFns = async (
     console.log(`Latest tweet date: ${latestTweetDate}`)
 
     // Compute counts
-    const tweet_counts = archiveData.tweets.length
-    const following_counts = archiveData.following
+    const num_tweets = archiveData.tweets.length
+    const num_following = archiveData.following
       ? archiveData.following.length
       : 0
-    const followers_counts = archiveData.followers
+    const num_followers = archiveData.followers
       ? archiveData.followers.length
       : 0
-    const likes_counts = archiveData.likes ? archiveData.likes.length : 0
+    const num_likes = archiveData.likes ? archiveData.likes.length : 0
 
     // Create temporary tables
     console.log('Creating temporary tables...')
@@ -592,10 +592,10 @@ export const processTwitterArchivePgFns = async (
       .rpc('insert_temp_account', {
         p_account: {
           ...archiveData.account[0].account,
-          tweet_counts,
-          following_counts,
-          followers_counts,
-          likes_counts,
+          num_tweets,
+          num_following,
+          num_followers,
+          num_likes,
         },
         p_suffix: suffix,
       })

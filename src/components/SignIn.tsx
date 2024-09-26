@@ -31,33 +31,27 @@ export default function SignIn() {
   }
 
   return userMetadata ? (
-    <p className="inline flex items-center dark:text-gray-300">
-      {`You're logged in as 
-      ${userMetadata.full_name || userMetadata.user_name} `}
-      <form action={handleSignOut} className="inline">
-        <button
-          type="submit"
-          className="ml-2 hover:underline dark:text-blue-400"
-        >
-          {'(Sign Out)'}
+    <div className="inline-flex items-center dark:text-gray-300">
+      <span>{`You're logged in as ${
+        userMetadata.full_name || userMetadata.user_name
+      } `}</span>
+      <form action={handleSignOut} className="ml-2 inline-block">
+        <button type="submit" className="hover:underline dark:text-blue-400">
+          (Sign Out)
         </button>
       </form>
-    </p>
+    </div>
   ) : (
-    <>
-      <p className="inline dark:text-gray-300">
-        <form action={signInWithTwitter} className="inline">
-          <button
-            type="submit"
-            className=" text-blue-500 hover:underline dark:text-blue-400"
-          >
-            {'Sign in with Twitter '}
-          </button>
-        </form>
-        <p className="inline dark:text-gray-300 ">
-          {' to upload your archive'}
-        </p>
-      </p>
-    </>
+    <div className="dark:text-gray-300">
+      <form action={signInWithTwitter} className="inline-block">
+        <button
+          type="submit"
+          className="text-blue-500 hover:underline dark:text-blue-400"
+        >
+          Sign in with Twitter
+        </button>
+      </form>
+      <span className="ml-1">to upload your archive</span>
+    </div>
   )
 }

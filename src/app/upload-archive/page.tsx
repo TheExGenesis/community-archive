@@ -47,21 +47,6 @@ const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
     // Handle the error appropriately, maybe set data to a default value
     data = []
   }
-
-  const account_ids = data.map((account: any) => account.account_id)
-  const tweetsCounts = await Promise.all(
-    account_ids.map(async (account_id: string) => {
-      const result = await getTweetsCount(supabase, account_id)
-      return {
-        account_id,
-        count: result.count,
-      }
-    }),
-  )
-  data.forEach((account: any, index: number) => {
-    account.num_tweets = tweetsCounts[index].count
-  })
-  // console.log(data)
   return data
 }
 

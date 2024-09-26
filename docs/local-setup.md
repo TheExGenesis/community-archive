@@ -60,7 +60,7 @@ For example:
 
 ### Manage remote migrations
 
-We can use Supabase's CLI to manage migrations locally, and then push them to the remote database.
+We can use Supabase's CLI to manage migrations locally, and then push them to the remote database. To do this fully you'll need a db password, so ask admins in the Discord.
 
 Setup:
 

@@ -19,7 +19,12 @@ BEGIN
     INNER JOIN 
         public.account a ON t.account_id = a.account_id
     INNER JOIN 
-        public.profile p ON a.account_id = p.account_id
+        (SELECT DISTINCT ON (p.account_id)
+            p.account_id,
+            p.avatar_media_url
+         FROM public.profile p
+         ORDER BY p.account_id, p.archive_upload_id DESC
+        ) p ON a.account_id = p.account_id
     WHERE 
         t.reply_to_tweet_id IS NULL
         AND (p_account_id IS NULL OR t.account_id = p_account_id)
@@ -30,3 +35,4 @@ END;
 $$;
 
 ALTER FUNCTION "public"."get_latest_tweets"("count" integer, "p_account_id" "text") OWNER TO "postgres";
+

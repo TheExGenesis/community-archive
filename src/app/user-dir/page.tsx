@@ -27,8 +27,18 @@ type User = {
   location: string | null
   avatar_media_url: string | null
   archive_at: string | null
+  num_tweets: number
+  num_followers: number
+  num_following: number
+  num_likes: number
 }
-type SortKey = 'username' | 'created_at' | 'account_display_name' | 'archive_at'
+type SortKey =
+  | 'username'
+  | 'created_at'
+  | 'account_display_name'
+  | 'archive_at'
+  | 'num_tweets'
+  | 'num_followers'
 
 const fetchUsers = async (supabase: ReturnType<typeof createBrowserClient>) => {
   const { data, error } = await supabase
@@ -39,6 +49,10 @@ const fetchUsers = async (supabase: ReturnType<typeof createBrowserClient>) => {
       username,
       account_display_name,
       created_at,
+      num_tweets,
+      num_followers,
+      num_following,
+      num_likes,
       profile:profile(bio, website, location, avatar_media_url),
       archive_upload:archive_upload(archive_at)
     `,
@@ -135,6 +149,19 @@ export default function UserDirectoryPage() {
                 </Button>
               </TableHead>
               <TableHead>
+                <Button variant="ghost" onClick={() => sortData('num_tweets')}>
+                  Tweets {renderSortIcon('num_tweets')}
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => sortData('num_followers')}
+                >
+                  Followers {renderSortIcon('num_followers')}
+                </Button>
+              </TableHead>
+              <TableHead>
                 <Button variant="ghost" onClick={() => sortData('archive_at')}>
                   Archive Date {renderSortIcon('archive_at')}
                 </Button>
@@ -179,6 +206,8 @@ export default function UserDirectoryPage() {
                     {user.username}
                   </Link>
                 </TableCell>
+                <TableCell>{user.num_tweets}</TableCell>
+                <TableCell>{user.num_followers}</TableCell>
                 <TableCell>
                   {user.archive_at
                     ? new Date(user.archive_at).toLocaleDateString()

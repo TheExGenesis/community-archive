@@ -11,7 +11,7 @@ export default async function User({ params, searchParams }: any) {
     return <h1>Not found</h1>
   }
 
-  const { tweetCount, account } = userData
+  const account = userData
   const firstTweets = await getFirstTweets(account.account_id)
   const topTweets = await getTopTweets(account.account_id)
 
@@ -46,9 +46,16 @@ export default async function User({ params, searchParams }: any) {
               Archived: {new Date(account.archive_at).toLocaleDateString()}
             </p>
           )}
-          <p className="mt-2">
-            {new Intl.NumberFormat().format(tweetCount as number)} tweets
-          </p>
+          <div className="mt-4 flex space-x-4 text-sm text-gray-600">
+            <p>{new Intl.NumberFormat().format(account.num_tweets)} Tweets</p>
+            <p>
+              {new Intl.NumberFormat().format(account.num_followers)} Followers
+            </p>
+            <p>
+              {new Intl.NumberFormat().format(account.num_following)} Following
+            </p>
+            <p>{new Intl.NumberFormat().format(account.num_likes)} Likes</p>
+          </div>
         </div>
       </div>
 

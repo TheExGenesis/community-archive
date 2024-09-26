@@ -2,7 +2,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import Tweet from '@/components/Tweet'
 import { createBrowserClient } from '@/utils/supabase'
-import { getSchemaName, getTableName } from '@/lib-client/getTableName'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 const getLatestTweets = async (
@@ -73,7 +72,8 @@ const pgSearch = async (supabase: any, query: string, account_id?: string) => {
       reply_to_tweet_id,
       account:account!inner (
         profile (
-          avatar_media_url
+          avatar_media_url,
+          archive_upload_id
         ),
         username,
         account_display_name
@@ -103,9 +103,13 @@ const pgSearch = async (supabase: any, query: string, account_id?: string) => {
     retweet_count: tweet.retweet_count,
     favorite_count: tweet.favorite_count,
     reply_to_tweet_id: tweet.reply_to_tweet_id,
+    archive_upload_id: tweet.archive_upload_id,
     avatar_media_url: Array.isArray(tweet.account.profile)
-      ? tweet.account.profile[tweet.account.profile.length - 1]
-          ?.avatar_media_url
+      ? tweet.account.profile.reduce((latest: any, profile: any) =>
+          !latest || profile.archive_upload_id > latest.archive_upload_id
+            ? profile
+            : latest,
+        )?.avatar_media_url
       : tweet.account.profile?.avatar_media_url,
     username: tweet.account.username,
     account_display_name: tweet.account.account_display_name,

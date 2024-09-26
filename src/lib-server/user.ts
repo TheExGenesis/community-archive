@@ -1,6 +1,5 @@
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
-import { getSchemaName } from '@/lib-client/getTableName'
 import { formatUserData } from '@/lib-client/user-utils'
 
 const tweetSelectString = `
@@ -18,7 +17,9 @@ const formatTweet = (tweet: any) => {
     tweet_id: tweet.tweet_id,
     username: tweet.account?.username || 'Unknown',
     display_name: tweet.account?.account_display_name || 'Unknown',
-    profile_image_url: tweet.account?.profile[0]?.avatar_media_url || '',
+    profile_image_url:
+      tweet.account?.profile[tweet.account?.profile.length - 1]
+        ?.avatar_media_url || '',
     text: tweet.full_text,
     favorite_count: tweet.favorite_count,
     retweet_count: tweet.retweet_count,
@@ -66,6 +67,10 @@ export const getUserData = async (account_id: string) => {
       username,
       account_display_name,
       created_at,
+      num_tweets,
+      num_followers,
+      num_following,
+      num_likes,
       profile:profile(bio, website, location, avatar_media_url),
       archive_upload:archive_upload(archive_at)
     `,
@@ -77,16 +82,8 @@ export const getUserData = async (account_id: string) => {
     return null
   }
 
-  const { count } = await supabase
-    .schema('public')
-    .from('tweets')
-    .select('tweet_id', { count: 'planned', head: true })
-    .eq('account_id', account_id)
-
   const formattedUser = formatUserData(data)
+  console.log('getUserData', { data, formattedUser })
 
-  return {
-    account: formattedUser,
-    tweetCount: count,
-  }
+  return formattedUser
 }

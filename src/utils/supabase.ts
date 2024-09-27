@@ -9,20 +9,27 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const getSupabaseConfig = (includeServiceRole: boolean = false) => {
   const isDevelopment = process.env.NODE_ENV === 'development'
-  return {
-    url: isDevelopment
+  const useRemoteDevDb = process.env.USE_REMOTE_DEV_DB === 'true'
+  console.log('supabase config', { isDevelopment, useRemoteDevDb })
+  const getUrl = () =>
+    isDevelopment && !useRemoteDevDb
       ? process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL!
-      : process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    anonKey: isDevelopment
+      : process.env.NEXT_PUBLIC_SUPABASE_URL!
+
+  const getAnonKey = () =>
+    isDevelopment && !useRemoteDevDb
       ? process.env.NEXT_PUBLIC_LOCAL_ANON_KEY!
-      : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    ...(includeServiceRole
-      ? {
-          serviceRole: isDevelopment
-            ? process.env.NEXT_PUBLIC_LOCAL_SERVICE_ROLE!
-            : process.env.SUPABASE_SERVICE_ROLE!,
-        }
-      : {}),
+      : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+  const getServiceRole = () =>
+    isDevelopment && !useRemoteDevDb
+      ? process.env.NEXT_PUBLIC_LOCAL_SERVICE_ROLE!
+      : process.env.SUPABASE_SERVICE_ROLE!
+
+  return {
+    url: getUrl(),
+    anonKey: getAnonKey(),
+    ...(includeServiceRole ? { serviceRole: getServiceRole() } : {}),
   }
 }
 

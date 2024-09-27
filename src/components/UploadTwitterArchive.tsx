@@ -1,130 +1,16 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { processTwitterArchive, deleteArchive } from '../lib-server/db_insert'
+import { deleteArchive } from '../lib-server/db_insert'
 import { createBrowserClient } from '@/utils/supabase'
-import { getSchemaName, getTableName } from '@/lib-client/getTableName'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
-import { Progress } from '@/components/ui/progress'
-
-type CustomInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
-  webkitdirectory?: string
-  directory?: string
-}
-
-const requiredFiles = [
-  'profile',
-  'account',
-  'tweets',
-  'community-tweet',
-  'like',
-  'follower',
-  'following',
-]
-
-const optionalFiles = ['note-tweet']
-
-const requiredFilePaths = requiredFiles.map((file) => `data/${file}.js`)
-
-// Validation step
-const validateContent = (content: string, expectedSchema: any) => {
-  console.log('Validating content...', content.split('\n')[0])
-  const dataJson = content.slice(content.indexOf('['))
-  let data
-  try {
-    data = JSON.parse(dataJson)
-  } catch (error) {
-    console.error('Error parsing JSON:', error)
-    return false
-  }
-
-  if (!Array.isArray(data)) {
-    console.error('Data is not an array')
-    return false
-  }
-
-  return data.every((item) => {
-    if (typeof item !== 'object' || item === null) {
-      console.error('Item is not an object:', item)
-      return false
-    }
-    return Object.keys(expectedSchema).every((key) => key in item)
-  })
-}
-
-// ... rest of the code remains the same ...
-const expectedSchemas = {
-  profile: {
-    profile: {
-      description: {
-        bio: '',
-        website: '',
-        location: '',
-      },
-      avatarMediaUrl: '',
-      headerMediaUrl: '',
-    },
-  },
-  account: {
-    account: {
-      createdVia: '',
-      username: '',
-      accountId: '',
-      createdAt: '',
-      accountDisplayName: '',
-    },
-  },
-  tweets: {
-    tweet: {
-      id: '',
-      source: '',
-      entities: {},
-      favorite_count: '',
-      id_str: '',
-      retweet_count: '',
-      created_at: '',
-      favorited: false,
-      full_text: '',
-    },
-  },
-  follower: { follower: { accountId: '', userLink: '' } },
-  following: { following: { accountId: '', userLink: '' } },
-  'community-tweet': {
-    tweet: {
-      id: '',
-      source: '',
-      entities: {},
-      favorite_count: '',
-      id_str: '',
-      retweet_count: '',
-      created_at: '',
-      favorited: false,
-      full_text: '',
-    },
-  },
-  like: { like: { tweetId: '', fullText: '' } },
-  'note-tweet': {
-    noteTweet: {
-      noteTweetId: '',
-      updatedAt: '',
-      lifecycle: {
-        value: '',
-        name: '',
-        originalName: '',
-        annotations: {},
-      },
-      createdAt: '',
-      core: {
-        styletags: [],
-        urls: [],
-        text: '',
-        mentions: [],
-        cashtags: [],
-        hashtags: [],
-      },
-    },
-  },
-}
+import {
+  calculateArchiveStats,
+  fetchArchiveUpload,
+  handleFileUpload,
+} from '@/lib-client/loadArchive'
+import { FileUploadDialog } from './file-upload-dialog' // Import the dialog component
+import { ArchiveStats } from '@/lib-client/types'
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -134,226 +20,14 @@ const formatDate = (dateString: string) => {
   })
 }
 
-const uploadArchiveToStorage = async (
-  archiveToUpload: any,
-  accountId: string,
-  archiveId: string,
-): Promise<void> => {
-  const supabase = createBrowserClient()
-  const archiveToUploadSize =
-    JSON.stringify(archiveToUpload).length / (1024 * 1024)
-  console.log(`Size of archiveToUpload: ${archiveToUploadSize.toFixed(2)} MB`)
-
-  console.log('Uploading archive to storage', { accountId, archiveId })
-
-  const { data: refreshdata, error: refreshError } =
-    await supabase.auth.refreshSession()
-  if (refreshError) {
-    console.error('Error refreshing session:', refreshError)
-    throw refreshError
-  }
-  console.log('Refreshed session:', refreshdata)
-
-  const bucketName =
-    process.env.NODE_ENV === 'production' ? 'archives' : 'dev_archives'
-  const { data, error: uploadError } = await supabase.storage
-    .from(bucketName)
-    .upload(`${accountId}/${archiveId}.json`, JSON.stringify(archiveToUpload), {
-      upsert: true,
-    })
-  if (uploadError && uploadError.message !== 'The resource already exists') {
-    throw new Error(
-      `Error uploading archive to storage: ${uploadError.message}`,
-    )
-  }
-}
-
-const handleFileUpload = async (
-  event: React.ChangeEvent<HTMLInputElement>,
-  setIsProcessing: (isProcessing: boolean) => void,
-  supabase: any,
-  progressCallback: (progress: {
-    phase: string
-    percent: number | null
-  }) => void,
-) => {
-  const files = event.target.files
-  if (!files || files.length === 0) return
-
-  setIsProcessing(true)
-
-  const fileContents: { [key: string]: string } = {}
-
-  try {
-    const file = files[0]
-
-    if (
-      file.type === 'application/zip' ||
-      file.type === 'application/x-zip-compressed' ||
-      file.type === 'application/octet-stream' ||
-      file.name.toLowerCase().endsWith('.zip')
-    ) {
-      const { BlobReader, ZipReader, TextWriter } = await import(
-        '@zip.js/zip.js'
-      )
-      const zipReader = new ZipReader(new BlobReader(file))
-      const entries = await zipReader.getEntries()
-
-      // console.log('entries', entries)
-
-      const allFilePaths = [
-        ...requiredFilePaths,
-        ...optionalFiles.map((file) => `data/${file}.js`),
-      ]
-
-      for (const fileName of allFilePaths) {
-        const entry = entries.find(
-          (e) =>
-            e.filename.includes(fileName) ||
-            e.filename.includes(fileName.replace('tweets.js', 'tweet.js')),
-        )
-
-        if (entry && entry.getData) {
-          const writer = new TextWriter()
-          const content = await entry.getData(writer)
-          const name = fileName.slice(5, -3)
-          fileContents[name] = content
-        } else if (requiredFilePaths.includes(fileName)) {
-          throw new Error(`Required file ${fileName} not found in the zip`)
-        }
-      }
-
-      await zipReader.close()
-    } else if (file.webkitRelativePath) {
-      const allFilePaths = [
-        ...requiredFilePaths,
-        ...optionalFiles.map((file) => `data/${file}.js`),
-      ]
-
-      for (const fileName of allFilePaths) {
-        const filePath = `${file.webkitRelativePath.split('/')[0]}/${fileName}`
-        const fileEntry = Array.from(event.target.files || []).find(
-          (f) => f.webkitRelativePath === filePath,
-        )
-        if (fileEntry) {
-          const name = fileName.slice(5, -3)
-          fileContents[name] = await fileEntry.text()
-        } else if (requiredFilePaths.includes(fileName)) {
-          throw new Error(
-            `Required file ${fileName} not found in the directory`,
-          )
-        }
-      }
-    } else {
-      throw new Error(
-        `Please upload a zip file, your file type is ${file.type}`,
-      )
-    }
-
-    console.log('Extracted files:', Object.keys(fileContents))
-
-    for (const [fileName, content] of Object.entries(fileContents)) {
-      console.log('Validating file:', fileName)
-      if (
-        !validateContent(
-          content,
-          expectedSchemas[fileName as keyof typeof expectedSchemas],
-        )
-      ) {
-        throw new Error(`Invalid schema for ${fileName}`)
-      }
-    }
-
-    let archiveToUpload = Object.fromEntries(
-      Object.entries(fileContents).map(([key, content]) => [
-        key,
-        JSON.parse(content.slice(content.indexOf('['))),
-      ]),
-    )
-    archiveToUpload = {
-      ...archiveToUpload,
-      account: archiveToUpload.account.map((item: any) => {
-        const { email, ...rest } = item.account
-        return { account: rest }
-      }),
-    }
-    const sizeInMB = JSON.stringify(archiveToUpload).length / (1024 * 1024)
-    console.log(
-      `Size of archiveToUpload: ${sizeInMB.toFixed(2)} MB`,
-      archiveToUpload,
-    )
-
-    const latestTweetDate = archiveToUpload.tweets.reduce(
-      (latest: string, tweet: any) => {
-        const tweetDate = new Date(tweet.tweet.created_at)
-        return latest
-          ? tweetDate > new Date(latest)
-            ? tweetDate.toISOString()
-            : latest
-          : tweetDate.toISOString()
-      },
-      '',
-    )
-
-    // Upload archive objects to storage
-    const username = archiveToUpload.account[0].account.username
-    const archiveId = `${username}_${latestTweetDate}`
-    console.log('Uploading archive', archiveId)
-    progressCallback({ phase: 'Uploading archive', percent: 0 })
-
-    // Use the new function here
-    await uploadArchiveToStorage(
-      archiveToUpload,
-      archiveToUpload.account[0].account.accountId,
-      archiveId,
-    )
-
-    // Process the archive
-    await processTwitterArchive(supabase, archiveToUpload, progressCallback)
-
-    // Clear the archive data from memory
-    // Clear all archive objects from memory
-    Object.keys(fileContents).forEach((key) => delete fileContents[key])
-    Object.keys(archiveToUpload).forEach((key) => delete archiveToUpload[key])
-    Object.keys(archiveToUpload).forEach((key) => delete archiveToUpload[key])
-
-    alert('Archive processed successfully')
-    // window.location.reload() // Reload the page after successful insertion
-  } catch (error) {
-    console.error('Error processing archive:', error)
-    alert('An error occurred while processing archive')
-  } finally {
-    setIsProcessing(false)
-    // Ensure file input is cleared
-    if (event.target) {
-      event.target.value = ''
-    }
-  }
-}
-
-const fetchArchiveUpload = async (setArchiveUpload: any, userMetadata: any) => {
-  const supabase = createBrowserClient()
-  const { data, error } = await supabase
-    .schema(getSchemaName())
-    .from('archive_upload')
-    .select('archive_at')
-    .eq('account_id', userMetadata.provider_id)
-    .order('archive_at', { ascending: false })
-    .limit(1)
-
-  if (error) {
-    console.error('Error fetching archive upload:', error)
-    return
-  }
-  if (data && data.length > 0) {
-    setArchiveUpload(data[0] as { archive_at: string })
-  }
-}
-
 export default function UploadTwitterArchive() {
-  const { userMetadata, isArchiveUploaded } = useAuthAndArchive()
+  const { userMetadata } = useAuthAndArchive()
   const [isProcessing, setIsProcessing] = useState(false)
+  const [archive, setArchive] = useState<any>(null)
+  const [archiveStats, setArchiveStats] = useState<ArchiveStats | null>(null)
   const isProcessingRef = useRef(isProcessing)
+  const [isDialogOpen, setIsDialogOpen] = useState(false) // State to control dialog visibility
+  const isDev = process.env.NODE_ENV === 'development'
 
   useEffect(() => {
     isProcessingRef.current = isProcessing
@@ -382,36 +56,33 @@ export default function UploadTwitterArchive() {
   } | null>(null)
   const [showUploadButton, setShowUploadButton] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [progress, setProgress] = useState<{
-    phase: string
-    percent: number | null
-  } | null>(null)
-
-  const progressCallback = useCallback(
-    (progress: { phase: string; percent: number | null }) => {
-      setProgress(progress)
-    },
-    [],
-  )
 
   useEffect(() => {
     if (!userMetadata) return
     fetchArchiveUpload(setArchiveUpload, userMetadata)
   }, [userMetadata])
 
+  useEffect(() => {
+    if (archive) {
+      const stats = calculateArchiveStats(archive)
+      setArchiveStats(stats)
+      setIsDialogOpen(true) // Open the dialog when archive is available
+    }
+  }, [archive])
+
   const onFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const supabase = createBrowserClient()
     setIsProcessing(true)
-    setProgress(null)
 
     try {
-      await handleFileUpload(event, setIsProcessing, supabase, progressCallback)
+      const archive = await handleFileUpload(event, setIsProcessing)
+      console.log('archive', archive)
+      setArchive(archive)
     } catch (error) {
       console.error('Error processing archive:', error)
       alert('An error occurred while processing archive')
     } finally {
       setIsProcessing(false)
-      setProgress(null)
       if (event.target) {
         event.target.value = ''
       }
@@ -467,7 +138,7 @@ export default function UploadTwitterArchive() {
   }
 
   return (
-    userMetadata && (
+    (userMetadata || isDev) && (
       <div className="text-sm dark:text-gray-300">
         {archiveUpload && (
           <>
@@ -509,29 +180,20 @@ export default function UploadTwitterArchive() {
                     accept=".zip,application/zip"
                     onChange={onFileUpload}
                     disabled={isProcessing}
-                    // webkitdirectory=""
-                    // directory=""
-                    // {...({} as CustomInputProps)}
                     multiple
                   />
                   {isProcessing && (
                     <div className="mt-4">
-                      <p className="mb-2">{`Processing archive (may take up to 10 minutes)...`}</p>
-                      {progress && (
-                        <div>
-                          <p className="mb-1">
-                            {progress.phase}
-                            {progress.percent !== null &&
-                              `: ${progress.percent.toFixed(2)}%`}
-                          </p>
-                          {progress.percent !== null && (
-                            <Progress
-                              value={progress.percent}
-                              className="w-full"
-                            />
-                          )}
+                      <p className="mb-2">{`Processing archive...`}</p>
+                      {/* The progress bar has been moved to FileUploadDialog */}
+                      <div className="w-full rounded bg-gray-200">
+                        <div
+                          className="rounded bg-blue-500 py-1 text-center text-xs leading-none text-white"
+                          style={{ width: '0%' }}
+                        >
+                          0%
                         </div>
-                      )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -554,6 +216,16 @@ export default function UploadTwitterArchive() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Include the FileUploadDialog */}
+        {archiveStats && (
+          <FileUploadDialog
+            isOpen={isDialogOpen}
+            onClose={() => setIsDialogOpen(false)}
+            archiveStats={archiveStats}
+            archive={archive}
+          />
         )}
       </div>
     )

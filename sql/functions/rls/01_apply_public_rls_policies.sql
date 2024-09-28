@@ -18,7 +18,18 @@ BEGIN
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', policy_name, schema_name, table_name);
     END LOOP; 
 
-    EXECUTE format('CREATE POLICY "Tweets are publicly visible" ON %I.%I FOR SELECT USING (true)', schema_name, table_name);
+    -- Update the public visibility policy to check for keep_private more efficiently
+    EXECUTE format('
+        CREATE POLICY "Tweets are publicly visible unless marked private" ON %I.%I
+        FOR SELECT
+        USING (
+            (SELECT COALESCE(au.keep_private, false) 
+             FROM archive_upload au 
+             WHERE au.id = %I.archive_upload_id) = false
+            OR account_id = (SELECT auth.jwt() -> ''app_metadata'' ->> ''provider_id'')::UUID
+        )', schema_name, table_name, table_name);
+
+    -- The modification policy remains unchanged
     EXECUTE format('
         CREATE POLICY "Tweets are modifiable by their users" ON %I.%I TO authenticated 
         USING (

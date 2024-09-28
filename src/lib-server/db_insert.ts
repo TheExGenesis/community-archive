@@ -3,9 +3,15 @@ import {
   getTableName,
   TableName,
 } from '@/lib-client/getTableName'
+import { Archive } from '@/lib-client/types'
 import { SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
+
+// Load environment variables from .env file in the scratchpad directory
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: path.resolve(__dirname, '../../.env.local') })
+}
 
 const BATCH_SIZE = 1000 // Adjust as needed
 
@@ -294,14 +300,12 @@ const insertTempLikes = async (
 
 export const processTwitterArchive = async (
   supabase: SupabaseClient,
-  archiveData: any,
-  progressCallback: (progress: {
-    phase: string
-    percent: number | null
-  }) => void,
+  archiveData: Archive,
+  progressCallback: (progress: { phase: string; percent: number }) => void,
 ): Promise<void> => {
   const startTime = performance.now()
   console.log('Starting Twitter Archive processing...')
+  console.log('archiveData', { archiveData })
 
   const accountId = archiveData.account[0].account.accountId
   const suffix = accountId
@@ -365,11 +369,21 @@ export const processTwitterArchive = async (
 
     console.log('Inserting archive upload data...')
     const { data: archiveUploadId } = await retryOperation(async () => {
+      const uploadOptions = archiveData['upload-options'] || {
+        keepPrivate: true,
+        uploadLikes: true,
+        startDate: null,
+        endDate: null,
+      }
       const { data, error } = await supabase
         .schema(getSchemaName())
         .rpc('insert_temp_archive_upload', {
           p_account_id: accountId,
           p_archive_at: latestTweetDate,
+          p_keep_private: uploadOptions.keepPrivate,
+          p_upload_likes: uploadOptions.uploadLikes,
+          p_start_date: uploadOptions.startDate,
+          p_end_date: uploadOptions.endDate,
           p_suffix: suffix,
         })
       if (error) throw error
@@ -395,7 +409,7 @@ export const processTwitterArchive = async (
       archiveData['note-tweet'] || [],
       archiveData.tweets,
     )
-
+    // console.log('patchedTweets', { patchedTweets })
     // Process likes
     console.log('Processing likes...')
     const likesStartTime = Date.now()
@@ -472,27 +486,20 @@ export const processTwitterArchive = async (
     console.log('Committing all data...')
     progressCallback({
       phase: 'Finishing up...',
-      percent: null,
+      percent: 50,
     })
     const commitStartTime = Date.now()
-    try {
-      await retryOperation(async () => {
-        const { data, error } = await supabase
-          .schema(getSchemaName())
-          .rpc('commit_temp_data', {
-            p_suffix: suffix,
-          })
-        if (error) throw error
-        return data
-      }, 'Error committing data')
-      const commitEndTime = Date.now()
-      console.log(
-        `Commit processing time: ${commitEndTime - commitStartTime}ms`,
-      )
-    } catch (commitError: any) {
-      console.error('Error committing data:', commitError)
-      // Do not throw the error to avoid exposing it to the user
-    }
+    await retryOperation(async () => {
+      const { data, error } = await supabase
+        .schema(getSchemaName())
+        .rpc('commit_temp_data', {
+          p_suffix: suffix,
+        })
+      if (error) throw error
+      return data
+    }, 'Error committing data')
+    const commitEndTime = Date.now()
+    console.log(`Commit processing time: ${commitEndTime - commitStartTime}ms`)
 
     console.log('Twitter archive processing completed successfully.')
     progressCallback({
@@ -520,26 +527,23 @@ export const processTwitterArchive = async (
       console.log('Temporary tables dropped successfully.')
     } catch (dropError: any) {
       console.error('Error dropping temporary tables:', dropError)
-      // Do not throw the error to avoid exposing it to the user
     }
 
     // Throw a new error with more context
     throw new Error(`Error processing Twitter archive: ${error.message}`)
   }
-
-  // Ensure temporary tables are dropped without throwing errors
   try {
     console.log('Attempting to drop temporary tables...')
     await retryOperation(async () => {
       const { data, error } = await supabase
         .schema(getSchemaName())
         .rpc('drop_temp_tables', { p_suffix: suffix })
+      if (error) throw error
       return data
     }, 'Error dropping temporary tables')
     console.log('Temporary tables dropped successfully.')
   } catch (dropError: any) {
     console.error('Error dropping temporary tables:', dropError)
-    // Do not throw the error to avoid exposing it to the user
   }
 }
 
@@ -586,7 +590,13 @@ export const processTwitterArchivePgFns = async (
       .schema(getSchemaName())
       .rpc('create_temp_tables', { p_suffix: suffix })
 
-    console.log('Inserting account data...')
+    console.log('Inserting account data...', {
+      ...archiveData.account[0].account,
+      num_tweets,
+      num_following,
+      num_followers,
+      num_likes,
+    })
     const { error: accountError } = await supabase
       .schema(getSchemaName())
       .rpc('insert_temp_account', {

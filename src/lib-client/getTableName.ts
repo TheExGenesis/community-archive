@@ -9,7 +9,7 @@ export type TableName =
 export const getTableName = <T extends TableName>(baseName: T): T => baseName
 
 export const getSchemaName = (): 'public' | 'dev' => {
-  if (isProduction) {
+  if (isProduction || process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'false') {
     return 'public'
   } else {
     return 'dev'

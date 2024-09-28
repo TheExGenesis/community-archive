@@ -371,7 +371,6 @@ export const uploadArchive = async (
     percent: number | null
   }) => void,
   archive: Archive,
-  options: UploadOptions,
 ) => {
   const supabase = createBrowserClient()
   const latestTweetDate = archive.tweets.reduce(

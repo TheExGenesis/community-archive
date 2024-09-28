@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -21,7 +21,11 @@ import { ChevronDown, ChevronUp, Info } from 'lucide-react'
 import Link from 'next/link'
 import { format, parse } from 'date-fns'
 import { Input } from '@/components/ui/input'
-import { FileUploadDialogProps, UploadOptions } from '@/lib-client/types'
+import {
+  ArchiveStats,
+  FileUploadDialogProps,
+  UploadOptions,
+} from '@/lib-client/types'
 import {
   applyOptionsToArchive,
   calculateArchiveStats,
@@ -32,12 +36,14 @@ import { Progress } from '@/components/ui/progress'
 export function FileUploadDialog({
   isOpen,
   onClose,
-  archiveStats,
   archive,
 }: FileUploadDialogProps) {
   const [keepPrivate, setKeepPrivate] = useState(false)
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
   const [uploadLikes, setUploadLikes] = useState(false)
+  const [archiveStats, setArchiveStats] = useState<ArchiveStats>(() =>
+    calculateArchiveStats(archive),
+  )
   const [startDate, setStartDate] = useState<Date>(
     new Date(archiveStats.earliestTweetDate),
   )
@@ -63,6 +69,17 @@ export function FileUploadDialog({
     uploadTime: string
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const newStats = calculateArchiveStats(archive)
+    setArchiveStats(newStats)
+    setStartDate(new Date(newStats.earliestTweetDate))
+    setEndDate(new Date(newStats.latestTweetDate))
+    setStartDateInput(
+      format(new Date(newStats.earliestTweetDate), 'yyyy-MM-dd'),
+    )
+    setEndDateInput(format(new Date(newStats.latestTweetDate), 'yyyy-MM-dd'))
+  }, [archive])
 
   const handleStartDateInputChange = (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -98,13 +115,9 @@ export function FileUploadDialog({
 
     try {
       const filteredStats = calculateArchiveStats(archiveWithOptions)
-      await uploadArchive(
-        (progressUpdate) => {
-          setProgress(progressUpdate)
-        },
-        archive,
-        options,
-      )
+      await uploadArchive((progressUpdate) => {
+        setProgress(progressUpdate)
+      }, archiveWithOptions)
       const stats = {
         uploadedTweets: filteredStats.tweetCount,
         uploadedLikes: uploadLikes ? filteredStats.likesCount : 0,

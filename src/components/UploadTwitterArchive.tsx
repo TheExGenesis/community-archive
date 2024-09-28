@@ -223,7 +223,6 @@ export default function UploadTwitterArchive() {
           <FileUploadDialog
             isOpen={isDialogOpen}
             onClose={() => setIsDialogOpen(false)}
-            archiveStats={archiveStats}
             archive={archive}
           />
         )}

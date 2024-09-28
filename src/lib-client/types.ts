@@ -108,7 +108,6 @@ export type ArchiveStats = {
 export type FileUploadDialogProps = {
   isOpen: boolean
   onClose: () => void
-  archiveStats: ArchiveStats
   archive: Archive
 }
 

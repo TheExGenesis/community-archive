@@ -64,6 +64,8 @@ We can use Supabase's CLI to manage migrations locally, and then push them to th
 
 Setup:
 
+---
+
 1. Associate your project with your remote project using `supabase link --project-ref fabxmporizzqflnftavs`
 2. Pull the latest migrations from the remote database using `supabase migration pull` and if you want to manage auth and storage locally: `supabase db pull --schema auth,storage`,
 
@@ -72,7 +74,7 @@ For each change you make to the db:
 3. Create your migration file: `supabase migration new create_employees_table`
 4. Add the SQL to your migration file
 5. Apply the new migration to your local database `supabase migration up` or `supabase db reset`
-6. Deploy any local database migrations `supabase db push`
+6. CAREFUL: Deploy any local database migrations directly to prod `supabase db push`
 
 ### Dumping the database
 

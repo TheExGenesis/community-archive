@@ -16,6 +16,7 @@ import { ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { formatUserData } from '@/lib-client/user-utils'
+import { getSchemaName } from '@/lib-client/getTableName'
 
 type User = {
   account_id: string
@@ -42,6 +43,7 @@ type SortKey =
 
 const fetchUsers = async (supabase: ReturnType<typeof createBrowserClient>) => {
   const { data, error } = await supabase
+    .schema(getSchemaName())
     .from('account')
     .select(
       `

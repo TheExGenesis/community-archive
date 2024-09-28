@@ -40,7 +40,7 @@ export function FileUploadDialog({
 }: FileUploadDialogProps) {
   const [keepPrivate, setKeepPrivate] = useState(false)
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
-  const [uploadLikes, setUploadLikes] = useState(false)
+  const [uploadLikes, setUploadLikes] = useState(true)
   const [archiveStats, setArchiveStats] = useState<ArchiveStats>(() =>
     calculateArchiveStats(archive),
   )

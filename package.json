@@ -76,7 +76,7 @@
     "react-dom": "18.2.0",
     "react-icons": "^5.2.1",
     "recharts": "^2.12.7",
-    "supabase": "^1.187.10",
+    "supabase": "^1.200.3",
     "tailwind-merge": "^2.2.0",
     "undici": "^5.28.2"
   },

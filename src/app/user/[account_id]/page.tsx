@@ -66,7 +66,7 @@ export default async function User({ params, searchParams }: any) {
         />
       </div>
       <hr style={{ marginBottom: '50px' }} />
-      {topTweets && topTweets.length > 0 && (
+      {/* {topTweets && topTweets.length > 0 && (
         <>
           <h2>Top 20 tweets</h2>
           <div className="short-tweet-container">
@@ -110,7 +110,7 @@ export default async function User({ params, searchParams }: any) {
             ))}
           </div>
         </>
-      )}
+      )} */}
     </div>
   )
 }

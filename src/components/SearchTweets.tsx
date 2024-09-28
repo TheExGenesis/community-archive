@@ -4,6 +4,7 @@ import Tweet from '@/components/Tweet'
 import { createBrowserClient } from '@/utils/supabase'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { getSchemaName } from '@/lib-client/getTableName'
+import { devLog } from '@/lib-client/devLog'
 
 const getLatestTweets = async (
   supabase: any,
@@ -94,7 +95,7 @@ const pgSearch = async (supabase: any, query: string, account_id?: string) => {
     console.error('Error fetching tweets:', error)
     throw error
   }
-  console.log('base search tweets', tweets)
+  devLog('base search tweets', tweets)
 
   const formattedTweets = tweets.map((tweet: any) => ({
     tweet_id: tweet.tweet_id,
@@ -116,7 +117,7 @@ const pgSearch = async (supabase: any, query: string, account_id?: string) => {
     account_display_name: tweet.account.account_display_name,
   }))
 
-  console.log('search tweets', formattedTweets)
+  devLog('search tweets', formattedTweets)
   return formattedTweets
 }
 

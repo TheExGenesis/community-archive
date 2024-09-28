@@ -1,4 +1,5 @@
 import { Database } from '@/database-types'
+import { devLog } from '@/lib-client/devLog'
 import {
   createBrowserClient as browserClient,
   createServerClient as serverClient,
@@ -30,14 +31,14 @@ const getSupabaseConfig = (includeServiceRole: boolean = false) => {
     anonKey: getAnonKey(),
     ...(includeServiceRole ? { serviceRole: getServiceRole() } : {}),
   }
-  console.log('supabase config', { isDevelopment, useRemoteDevDb })
+  devLog('supabase config', { isDevelopment, useRemoteDevDb })
 
   return config
 }
 
 export const createBrowserClient = () => {
   const { url, anonKey } = getSupabaseConfig()
-  console.log('create browser client', { url, anonKey })
+  devLog('create browser client', { url, anonKey })
   return browserClient<Database>(url, anonKey)
 }
 

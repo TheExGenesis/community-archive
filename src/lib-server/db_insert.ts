@@ -1,3 +1,4 @@
+import { devLog } from '@/lib-client/devLog'
 import {
   getSchemaName,
   getTableName,
@@ -308,7 +309,7 @@ export const processTwitterArchive = async (
 ): Promise<void> => {
   const startTime = performance.now()
   console.log('Starting Twitter Archive processing...')
-  console.log('archiveData', { archiveData })
+  devLog('archiveData', { archiveData })
 
   const accountId = archiveData.account[0].account.accountId
   const suffix = accountId

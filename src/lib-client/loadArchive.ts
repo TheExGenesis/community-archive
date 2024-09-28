@@ -3,6 +3,7 @@ import { createBrowserClient } from '@/utils/supabase'
 import { getSchemaName } from './getTableName'
 import { ArchiveStats, Archive, UploadOptions } from './types'
 import { pipe } from 'fp-ts/lib/function'
+import { devLog } from './devLog'
 
 type CustomInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   webkitdirectory?: string
@@ -288,7 +289,7 @@ export const handleFileUpload = async (
       }),
     }
     const sizeInMB = JSON.stringify(archive).length / (1024 * 1024)
-    console.log(`Size of archive: ${sizeInMB.toFixed(2)} MB`, archive)
+    devLog(`Size of archive: ${sizeInMB.toFixed(2)} MB`)
 
     // Clear the archive data from memory
     // Clear all archive objects from memory

@@ -1,0 +1,2 @@
+ALTER TABLE public.account
+ALTER COLUMN keep_private SET DEFAULT FALSE;

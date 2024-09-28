@@ -11,42 +11,45 @@ export type Database = {
     Tables: {
       account: {
         Row: {
-          account_display_name: string | null
+          account_display_name: string
           account_id: string
-          created_at: string | null
-          created_via: string | null
-          username: string | null
+          created_at: string
+          created_via: string
+          username: string
         }
         Insert: {
-          account_display_name?: string | null
+          account_display_name: string
           account_id: string
-          created_at?: string | null
-          created_via?: string | null
-          username?: string | null
+          created_at: string
+          created_via: string
+          username: string
         }
         Update: {
-          account_display_name?: string | null
+          account_display_name?: string
           account_id?: string
-          created_at?: string | null
-          created_via?: string | null
-          username?: string | null
+          created_at?: string
+          created_via?: string
+          username?: string
         }
         Relationships: []
       }
       archive_upload: {
         Row: {
-          account_id: string | null
-          archive_at: string | null
+          account_id: string
+          archive_at: string
+          created_at: string | null
           id: number
         }
         Insert: {
-          account_id?: string | null
-          archive_at?: string | null
+          account_id: string
+          archive_at: string
+          created_at?: string | null
           id?: never
         }
         Update: {
-          account_id?: string | null
-          archive_at?: string | null
+          account_id?: string
+          archive_at?: string
+          created_at?: string | null
           id?: never
         }
         Relationships: [
@@ -61,21 +64,21 @@ export type Database = {
       }
       followers: {
         Row: {
-          account_id: string | null
-          archive_upload_id: number | null
-          follower_account_id: string | null
+          account_id: string
+          archive_upload_id: number
+          follower_account_id: string
           id: number
         }
         Insert: {
-          account_id?: string | null
-          archive_upload_id?: number | null
-          follower_account_id?: string | null
+          account_id: string
+          archive_upload_id: number
+          follower_account_id: string
           id?: never
         }
         Update: {
-          account_id?: string | null
-          archive_upload_id?: number | null
-          follower_account_id?: string | null
+          account_id?: string
+          archive_upload_id?: number
+          follower_account_id?: string
           id?: never
         }
         Relationships: [
@@ -97,21 +100,21 @@ export type Database = {
       }
       following: {
         Row: {
-          account_id: string | null
-          archive_upload_id: number | null
-          following_account_id: string | null
+          account_id: string
+          archive_upload_id: number
+          following_account_id: string
           id: number
         }
         Insert: {
-          account_id?: string | null
-          archive_upload_id?: number | null
-          following_account_id?: string | null
+          account_id: string
+          archive_upload_id: number
+          following_account_id: string
           id?: never
         }
         Update: {
-          account_id?: string | null
-          archive_upload_id?: number | null
-          following_account_id?: string | null
+          account_id?: string
+          archive_upload_id?: number
+          following_account_id?: string
           id?: never
         }
         Relationships: [
@@ -133,37 +136,37 @@ export type Database = {
       }
       liked_tweets: {
         Row: {
-          full_text: string | null
+          full_text: string
           tweet_id: string
         }
         Insert: {
-          full_text?: string | null
+          full_text: string
           tweet_id: string
         }
         Update: {
-          full_text?: string | null
+          full_text?: string
           tweet_id?: string
         }
         Relationships: []
       }
       likes: {
         Row: {
-          account_id: string | null
-          archive_upload_id: number | null
+          account_id: string
+          archive_upload_id: number
           id: number
-          liked_tweet_id: string | null
+          liked_tweet_id: string
         }
         Insert: {
-          account_id?: string | null
-          archive_upload_id?: number | null
+          account_id: string
+          archive_upload_id: number
           id?: never
-          liked_tweet_id?: string | null
+          liked_tweet_id: string
         }
         Update: {
-          account_id?: string | null
-          archive_upload_id?: number | null
+          account_id?: string
+          archive_upload_id?: number
           id?: never
-          liked_tweet_id?: string | null
+          liked_tweet_id?: string
         }
         Relationships: [
           {
@@ -191,29 +194,29 @@ export type Database = {
       }
       mentioned_users: {
         Row: {
-          name: string | null
-          screen_name: string | null
-          updated_at: string | null
+          name: string
+          screen_name: string
+          updated_at: string
           user_id: string
         }
         Insert: {
-          name?: string | null
-          screen_name?: string | null
-          updated_at?: string | null
+          name: string
+          screen_name: string
+          updated_at: string
           user_id: string
         }
         Update: {
-          name?: string | null
-          screen_name?: string | null
-          updated_at?: string | null
+          name?: string
+          screen_name?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
       }
       profile: {
         Row: {
-          account_id: string | null
-          archive_upload_id: number | null
+          account_id: string
+          archive_upload_id: number
           avatar_media_url: string | null
           bio: string | null
           header_media_url: string | null
@@ -222,8 +225,8 @@ export type Database = {
           website: string | null
         }
         Insert: {
-          account_id?: string | null
-          archive_upload_id?: number | null
+          account_id: string
+          archive_upload_id: number
           avatar_media_url?: string | null
           bio?: string | null
           header_media_url?: string | null
@@ -232,8 +235,8 @@ export type Database = {
           website?: string | null
         }
         Update: {
-          account_id?: string | null
-          archive_upload_id?: number | null
+          account_id?: string
+          archive_upload_id?: number
           avatar_media_url?: string | null
           bio?: string | null
           header_media_url?: string | null
@@ -245,7 +248,7 @@ export type Database = {
           {
             foreignKeyName: "profile_account_id_fkey"
             columns: ["account_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "account"
             referencedColumns: ["account_id"]
           },
@@ -260,31 +263,31 @@ export type Database = {
       }
       tweet_media: {
         Row: {
-          archive_upload_id: number | null
-          height: number | null
+          archive_upload_id: number
+          height: number
           media_id: number
-          media_type: string | null
-          media_url: string | null
-          tweet_id: string | null
-          width: number | null
+          media_type: string
+          media_url: string
+          tweet_id: string
+          width: number
         }
         Insert: {
-          archive_upload_id?: number | null
-          height?: number | null
+          archive_upload_id: number
+          height: number
           media_id: number
-          media_type?: string | null
-          media_url?: string | null
-          tweet_id?: string | null
-          width?: number | null
+          media_type: string
+          media_url: string
+          tweet_id: string
+          width: number
         }
         Update: {
-          archive_upload_id?: number | null
-          height?: number | null
+          archive_upload_id?: number
+          height?: number
           media_id?: number
-          media_type?: string | null
-          media_url?: string | null
-          tweet_id?: string | null
-          width?: number | null
+          media_type?: string
+          media_url?: string
+          tweet_id?: string
+          width?: number
         }
         Relationships: [
           {
@@ -305,25 +308,25 @@ export type Database = {
       }
       tweet_urls: {
         Row: {
-          display_url: string | null
-          expanded_url: string | null
+          display_url: string
+          expanded_url: string
           id: number
-          tweet_id: string | null
-          url: string | null
+          tweet_id: string
+          url: string
         }
         Insert: {
-          display_url?: string | null
-          expanded_url?: string | null
+          display_url: string
+          expanded_url: string
           id?: never
-          tweet_id?: string | null
-          url?: string | null
+          tweet_id: string
+          url: string
         }
         Update: {
-          display_url?: string | null
-          expanded_url?: string | null
+          display_url?: string
+          expanded_url?: string
           id?: never
-          tweet_id?: string | null
-          url?: string | null
+          tweet_id?: string
+          url?: string
         }
         Relationships: [
           {
@@ -337,42 +340,42 @@ export type Database = {
       }
       tweets: {
         Row: {
-          account_id: string | null
-          archive_upload_id: number | null
-          created_at: string | null
-          favorite_count: number | null
+          account_id: string
+          archive_upload_id: number
+          created_at: string
+          favorite_count: number
           fts: unknown | null
-          full_text: string | null
+          full_text: string
           reply_to_tweet_id: string | null
           reply_to_user_id: string | null
           reply_to_username: string | null
-          retweet_count: number | null
+          retweet_count: number
           tweet_id: string
         }
         Insert: {
-          account_id?: string | null
-          archive_upload_id?: number | null
-          created_at?: string | null
-          favorite_count?: number | null
+          account_id: string
+          archive_upload_id: number
+          created_at: string
+          favorite_count: number
           fts?: unknown | null
-          full_text?: string | null
+          full_text: string
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
-          retweet_count?: number | null
+          retweet_count: number
           tweet_id: string
         }
         Update: {
-          account_id?: string | null
-          archive_upload_id?: number | null
-          created_at?: string | null
-          favorite_count?: number | null
+          account_id?: string
+          archive_upload_id?: number
+          created_at?: string
+          favorite_count?: number
           fts?: unknown | null
-          full_text?: string | null
+          full_text?: string
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
-          retweet_count?: number | null
+          retweet_count?: number
           tweet_id?: string
         }
         Relationships: [
@@ -395,18 +398,18 @@ export type Database = {
       user_mentions: {
         Row: {
           id: number
-          mentioned_user_id: string | null
-          tweet_id: string | null
+          mentioned_user_id: string
+          tweet_id: string
         }
         Insert: {
           id?: never
-          mentioned_user_id?: string | null
-          tweet_id?: string | null
+          mentioned_user_id: string
+          tweet_id: string
         }
         Update: {
           id?: never
-          mentioned_user_id?: string | null
-          tweet_id?: string | null
+          mentioned_user_id?: string
+          tweet_id?: string
         }
         Relationships: [
           {
@@ -451,9 +454,119 @@ export type Database = {
         }
         Returns: undefined
       }
+      commit_temp_data: {
+        Args: {
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      create_temp_tables: {
+        Args: {
+          p_suffix: string
+        }
+        Returns: undefined
+      }
       delete_all_archives: {
         Args: {
           p_account_id: string
+        }
+        Returns: undefined
+      }
+      drop_function_if_exists: {
+        Args: {
+          function_name: string
+          function_args: string[]
+        }
+        Returns: undefined
+      }
+      drop_temp_tables: {
+        Args: {
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      get_top_accounts_with_followers: {
+        Args: {
+          limit_count: number
+        }
+        Returns: {
+          account_id: string
+          created_via: string
+          username: string
+          created_at: string
+          account_display_name: string
+          avatar_media_url: string
+          bio: string
+          website: string
+          location: string
+          header_media_url: string
+          follower_count: number
+        }[]
+      }
+      insert_temp_account: {
+        Args: {
+          p_account: Json
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      insert_temp_archive_upload: {
+        Args: {
+          p_account_id: string
+          p_archive_at: string
+          p_suffix: string
+        }
+        Returns: number
+      }
+      insert_temp_followers: {
+        Args: {
+          p_followers: Json
+          p_account_id: string
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      insert_temp_following: {
+        Args: {
+          p_following: Json
+          p_account_id: string
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      insert_temp_likes: {
+        Args: {
+          p_likes: Json
+          p_account_id: string
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      insert_temp_profiles: {
+        Args: {
+          p_profile: Json
+          p_account_id: string
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      insert_temp_tweets: {
+        Args: {
+          p_tweets: Json
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      process_and_insert_tweet_entities: {
+        Args: {
+          p_tweets: Json
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      process_archive: {
+        Args: {
+          archive_data: Json
         }
         Returns: undefined
       }
@@ -469,43 +582,70 @@ export type Database = {
     Tables: {
       account: {
         Row: {
-          account_display_name: string | null
+          account_display_name: string
           account_id: string
-          created_at: string | null
-          created_via: string | null
-          username: string | null
+          created_at: string
+          created_via: string
+          num_followers: number | null
+          num_following: number | null
+          num_likes: number | null
+          num_tweets: number | null
+          username: string
         }
         Insert: {
-          account_display_name?: string | null
+          account_display_name: string
           account_id: string
-          created_at?: string | null
-          created_via?: string | null
-          username?: string | null
+          created_at: string
+          created_via: string
+          num_followers?: number | null
+          num_following?: number | null
+          num_likes?: number | null
+          num_tweets?: number | null
+          username: string
         }
         Update: {
-          account_display_name?: string | null
+          account_display_name?: string
           account_id?: string
-          created_at?: string | null
-          created_via?: string | null
-          username?: string | null
+          created_at?: string
+          created_via?: string
+          num_followers?: number | null
+          num_following?: number | null
+          num_likes?: number | null
+          num_tweets?: number | null
+          username?: string
         }
         Relationships: []
       }
       archive_upload: {
         Row: {
-          account_id: string | null
-          archive_at: string | null
+          account_id: string
+          archive_at: string
+          created_at: string | null
+          end_date: string | null
           id: number
+          keep_private: boolean | null
+          start_date: string | null
+          upload_likes: boolean | null
         }
         Insert: {
-          account_id?: string | null
-          archive_at?: string | null
+          account_id: string
+          archive_at: string
+          created_at?: string | null
+          end_date?: string | null
           id?: never
+          keep_private?: boolean | null
+          start_date?: string | null
+          upload_likes?: boolean | null
         }
         Update: {
-          account_id?: string | null
-          archive_at?: string | null
+          account_id?: string
+          archive_at?: string
+          created_at?: string | null
+          end_date?: string | null
           id?: never
+          keep_private?: boolean | null
+          start_date?: string | null
+          upload_likes?: boolean | null
         }
         Relationships: [
           {
@@ -519,21 +659,21 @@ export type Database = {
       }
       followers: {
         Row: {
-          account_id: string | null
-          archive_upload_id: number | null
-          follower_account_id: string | null
+          account_id: string
+          archive_upload_id: number
+          follower_account_id: string
           id: number
         }
         Insert: {
-          account_id?: string | null
-          archive_upload_id?: number | null
-          follower_account_id?: string | null
+          account_id: string
+          archive_upload_id: number
+          follower_account_id: string
           id?: never
         }
         Update: {
-          account_id?: string | null
-          archive_upload_id?: number | null
-          follower_account_id?: string | null
+          account_id?: string
+          archive_upload_id?: number
+          follower_account_id?: string
           id?: never
         }
         Relationships: [
@@ -555,21 +695,21 @@ export type Database = {
       }
       following: {
         Row: {
-          account_id: string | null
-          archive_upload_id: number | null
-          following_account_id: string | null
+          account_id: string
+          archive_upload_id: number
+          following_account_id: string
           id: number
         }
         Insert: {
-          account_id?: string | null
-          archive_upload_id?: number | null
-          following_account_id?: string | null
+          account_id: string
+          archive_upload_id: number
+          following_account_id: string
           id?: never
         }
         Update: {
-          account_id?: string | null
-          archive_upload_id?: number | null
-          following_account_id?: string | null
+          account_id?: string
+          archive_upload_id?: number
+          following_account_id?: string
           id?: never
         }
         Relationships: [
@@ -591,37 +731,37 @@ export type Database = {
       }
       liked_tweets: {
         Row: {
-          full_text: string | null
+          full_text: string
           tweet_id: string
         }
         Insert: {
-          full_text?: string | null
+          full_text: string
           tweet_id: string
         }
         Update: {
-          full_text?: string | null
+          full_text?: string
           tweet_id?: string
         }
         Relationships: []
       }
       likes: {
         Row: {
-          account_id: string | null
-          archive_upload_id: number | null
+          account_id: string
+          archive_upload_id: number
           id: number
-          liked_tweet_id: string | null
+          liked_tweet_id: string
         }
         Insert: {
-          account_id?: string | null
-          archive_upload_id?: number | null
+          account_id: string
+          archive_upload_id: number
           id?: never
-          liked_tweet_id?: string | null
+          liked_tweet_id: string
         }
         Update: {
-          account_id?: string | null
-          archive_upload_id?: number | null
+          account_id?: string
+          archive_upload_id?: number
           id?: never
-          liked_tweet_id?: string | null
+          liked_tweet_id?: string
         }
         Relationships: [
           {
@@ -649,29 +789,29 @@ export type Database = {
       }
       mentioned_users: {
         Row: {
-          name: string | null
-          screen_name: string | null
-          updated_at: string | null
+          name: string
+          screen_name: string
+          updated_at: string
           user_id: string
         }
         Insert: {
-          name?: string | null
-          screen_name?: string | null
-          updated_at?: string | null
+          name: string
+          screen_name: string
+          updated_at: string
           user_id: string
         }
         Update: {
-          name?: string | null
-          screen_name?: string | null
-          updated_at?: string | null
+          name?: string
+          screen_name?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
       }
       profile: {
         Row: {
-          account_id: string | null
-          archive_upload_id: number | null
+          account_id: string
+          archive_upload_id: number
           avatar_media_url: string | null
           bio: string | null
           header_media_url: string | null
@@ -680,8 +820,8 @@ export type Database = {
           website: string | null
         }
         Insert: {
-          account_id?: string | null
-          archive_upload_id?: number | null
+          account_id: string
+          archive_upload_id: number
           avatar_media_url?: string | null
           bio?: string | null
           header_media_url?: string | null
@@ -690,8 +830,8 @@ export type Database = {
           website?: string | null
         }
         Update: {
-          account_id?: string | null
-          archive_upload_id?: number | null
+          account_id?: string
+          archive_upload_id?: number
           avatar_media_url?: string | null
           bio?: string | null
           header_media_url?: string | null
@@ -703,7 +843,7 @@ export type Database = {
           {
             foreignKeyName: "profile_account_id_fkey"
             columns: ["account_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "account"
             referencedColumns: ["account_id"]
           },
@@ -718,31 +858,31 @@ export type Database = {
       }
       tweet_media: {
         Row: {
-          archive_upload_id: number | null
-          height: number | null
+          archive_upload_id: number
+          height: number
           media_id: number
-          media_type: string | null
-          media_url: string | null
-          tweet_id: string | null
-          width: number | null
+          media_type: string
+          media_url: string
+          tweet_id: string
+          width: number
         }
         Insert: {
-          archive_upload_id?: number | null
-          height?: number | null
+          archive_upload_id: number
+          height: number
           media_id: number
-          media_type?: string | null
-          media_url?: string | null
-          tweet_id?: string | null
-          width?: number | null
+          media_type: string
+          media_url: string
+          tweet_id: string
+          width: number
         }
         Update: {
-          archive_upload_id?: number | null
-          height?: number | null
+          archive_upload_id?: number
+          height?: number
           media_id?: number
-          media_type?: string | null
-          media_url?: string | null
-          tweet_id?: string | null
-          width?: number | null
+          media_type?: string
+          media_url?: string
+          tweet_id?: string
+          width?: number
         }
         Relationships: [
           {
@@ -763,25 +903,25 @@ export type Database = {
       }
       tweet_urls: {
         Row: {
-          display_url: string | null
-          expanded_url: string | null
+          display_url: string
+          expanded_url: string
           id: number
-          tweet_id: string | null
-          url: string | null
+          tweet_id: string
+          url: string
         }
         Insert: {
-          display_url?: string | null
-          expanded_url?: string | null
+          display_url: string
+          expanded_url: string
           id?: never
-          tweet_id?: string | null
-          url?: string | null
+          tweet_id: string
+          url: string
         }
         Update: {
-          display_url?: string | null
-          expanded_url?: string | null
+          display_url?: string
+          expanded_url?: string
           id?: never
-          tweet_id?: string | null
-          url?: string | null
+          tweet_id?: string
+          url?: string
         }
         Relationships: [
           {
@@ -795,42 +935,42 @@ export type Database = {
       }
       tweets: {
         Row: {
-          account_id: string | null
-          archive_upload_id: number | null
-          created_at: string | null
-          favorite_count: number | null
+          account_id: string
+          archive_upload_id: number
+          created_at: string
+          favorite_count: number
           fts: unknown | null
-          full_text: string | null
+          full_text: string
           reply_to_tweet_id: string | null
           reply_to_user_id: string | null
           reply_to_username: string | null
-          retweet_count: number | null
+          retweet_count: number
           tweet_id: string
         }
         Insert: {
-          account_id?: string | null
-          archive_upload_id?: number | null
-          created_at?: string | null
-          favorite_count?: number | null
+          account_id: string
+          archive_upload_id: number
+          created_at: string
+          favorite_count: number
           fts?: unknown | null
-          full_text?: string | null
+          full_text: string
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
-          retweet_count?: number | null
+          retweet_count: number
           tweet_id: string
         }
         Update: {
-          account_id?: string | null
-          archive_upload_id?: number | null
-          created_at?: string | null
-          favorite_count?: number | null
+          account_id?: string
+          archive_upload_id?: number
+          created_at?: string
+          favorite_count?: number
           fts?: unknown | null
-          full_text?: string | null
+          full_text?: string
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
-          retweet_count?: number | null
+          retweet_count?: number
           tweet_id?: string
         }
         Relationships: [
@@ -853,18 +993,18 @@ export type Database = {
       user_mentions: {
         Row: {
           id: number
-          mentioned_user_id: string | null
-          tweet_id: string | null
+          mentioned_user_id: string
+          tweet_id: string
         }
         Insert: {
           id?: never
-          mentioned_user_id?: string | null
-          tweet_id?: string | null
+          mentioned_user_id: string
+          tweet_id: string
         }
         Update: {
           id?: never
-          mentioned_user_id?: string | null
-          tweet_id?: string | null
+          mentioned_user_id?: string
+          tweet_id?: string
         }
         Relationships: [
           {
@@ -888,18 +1028,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      apply_dev_entities_rls_policies: {
-        Args: {
-          table_name: string
-        }
-        Returns: undefined
-      }
-      apply_dev_rls_policies: {
-        Args: {
-          table_name: string
-        }
-        Returns: undefined
-      }
       apply_public_entities_rls_policies: {
         Args: {
           schema_name: string
@@ -921,11 +1049,239 @@ export type Database = {
         }
         Returns: undefined
       }
-      get_public_tables: {
-        Args: Record<PropertyKey, never>
+      commit_temp_data: {
+        Args: {
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      create_temp_tables: {
+        Args: {
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      delete_all_archives: {
+        Args: {
+          p_account_id: string
+        }
+        Returns: undefined
+      }
+      drop_temp_tables: {
+        Args: {
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      get_latest_tweets: {
+        Args: {
+          count: number
+          p_account_id?: string
+        }
         Returns: {
-          table_name: string
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          reply_to_tweet_id: string
+          avatar_media_url: string
+          username: string
+          account_display_name: string
         }[]
+      }
+      get_top_accounts_with_followers: {
+        Args: {
+          limit_count: number
+        }
+        Returns: {
+          account_id: string
+          created_via: string
+          username: string
+          created_at: string
+          account_display_name: string
+          avatar_media_url: string
+          bio: string
+          website: string
+          location: string
+          header_media_url: string
+          num_followers: number
+          num_tweets: number
+        }[]
+      }
+      get_tweet_count_by_date:
+        | {
+            Args: {
+              start_date: string
+              end_date: string
+            }
+            Returns: {
+              tweet_date: string
+              tweet_count: number
+            }[]
+          }
+        | {
+            Args: {
+              start_date: string
+              end_date: string
+              granularity: string
+            }
+            Returns: {
+              tweet_date: string
+              tweet_count: number
+            }[]
+          }
+      gtrgm_compress: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      gtrgm_decompress: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      gtrgm_in: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      gtrgm_options: {
+        Args: {
+          "": unknown
+        }
+        Returns: undefined
+      }
+      gtrgm_out: {
+        Args: {
+          "": unknown
+        }
+        Returns: unknown
+      }
+      insert_temp_account: {
+        Args: {
+          p_account: Json
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      insert_temp_archive_upload: {
+        Args: {
+          p_account_id: string
+          p_archive_at: string
+          p_keep_private: boolean
+          p_upload_likes: boolean
+          p_start_date: string
+          p_end_date: string
+          p_suffix: string
+        }
+        Returns: number
+      }
+      insert_temp_followers: {
+        Args: {
+          p_followers: Json
+          p_account_id: string
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      insert_temp_following: {
+        Args: {
+          p_following: Json
+          p_account_id: string
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      insert_temp_likes: {
+        Args: {
+          p_likes: Json
+          p_account_id: string
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      insert_temp_profiles: {
+        Args: {
+          p_profile: Json
+          p_account_id: string
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      insert_temp_tweets: {
+        Args: {
+          p_tweets: Json
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      pg_search_tweets: {
+        Args: {
+          search_query: string
+          p_account_id?: string
+        }
+        Returns: {
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          username: string
+          account_display_name: string
+          avatar_media_url: string
+        }[]
+      }
+      pg_search_tweets_with_trigram: {
+        Args: {
+          search_query: string
+          p_account_id?: string
+        }
+        Returns: {
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          username: string
+          account_display_name: string
+          avatar_media_url: string
+        }[]
+      }
+      process_and_insert_tweet_entities: {
+        Args: {
+          p_tweets: Json
+          p_suffix: string
+        }
+        Returns: undefined
+      }
+      process_archive: {
+        Args: {
+          archive_data: Json
+        }
+        Returns: undefined
+      }
+      set_limit: {
+        Args: {
+          "": number
+        }
+        Returns: number
+      }
+      show_limit: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      show_trgm: {
+        Args: {
+          "": string
+        }
+        Returns: string[]
       }
     }
     Enums: {

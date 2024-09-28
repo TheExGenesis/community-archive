@@ -11,6 +11,7 @@ import {
 } from '@/lib-client/loadArchive'
 import { FileUploadDialog } from './file-upload-dialog' // Import the dialog component
 import { ArchiveStats } from '@/lib-client/types'
+import { devLog } from '@/lib-client/devLog'
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -76,7 +77,7 @@ export default function UploadTwitterArchive() {
 
     try {
       const archive = await handleFileUpload(event, setIsProcessing)
-      console.log('archive', archive)
+      devLog('archive', archive)
       setArchive(archive)
     } catch (error) {
       console.error('Error processing archive:', error)

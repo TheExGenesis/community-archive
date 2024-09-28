@@ -1,3 +1,6 @@
+ALTER TABLE public.archive_upload
+ALTER COLUMN keep_private SET DEFAULT FALSE;
+
 CREATE OR REPLACE FUNCTION public.apply_public_rls_policies_not_private(schema_name TEXT, table_name TEXT) 
 RETURNS void AS $$
 DECLARE

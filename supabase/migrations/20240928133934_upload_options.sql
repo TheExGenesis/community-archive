@@ -1,3 +1,63 @@
+-- Add new columns to the archive_upload table
+ALTER TABLE public.archive_upload
+ADD COLUMN IF NOT EXISTS keep_private BOOLEAN DEFAULT TRUE,
+ADD COLUMN IF NOT EXISTS upload_likes BOOLEAN DEFAULT TRUE,
+ADD COLUMN IF NOT EXISTS start_date DATE,
+ADD COLUMN IF NOT EXISTS end_date DATE;
+
+-- Add a comment to explain the purpose of this migration
+COMMENT ON TABLE public.archive_upload IS 'Stores upload options for each archive upload';
+
+-- Drop existing function if it exists
+DROP FUNCTION IF EXISTS public.insert_temp_archive_upload;
+
+-- Create or replace the insert_temp_archive_upload function
+CREATE OR REPLACE FUNCTION public.insert_temp_archive_upload(
+    p_account_id TEXT,
+    p_archive_at TIMESTAMP WITH TIME ZONE,
+    p_keep_private BOOLEAN,
+    p_upload_likes BOOLEAN,
+    p_start_date DATE,
+    p_end_date DATE,
+    p_suffix TEXT
+)
+RETURNS BIGINT AS $$
+DECLARE
+    v_id BIGINT;
+BEGIN
+    IF auth.uid() IS NULL AND current_user != 'postgres' THEN
+        RAISE EXCEPTION 'Not authenticated';
+    END IF;
+
+    EXECUTE format('
+        INSERT INTO temp.archive_upload_%s (
+            account_id,
+            archive_at,
+            keep_private,
+            upload_likes,
+            start_date,
+            end_date
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id
+    ', p_suffix)
+    USING
+        p_account_id,
+        p_archive_at,
+        p_keep_private,
+        p_upload_likes,
+        p_start_date,
+        p_end_date
+    INTO v_id;
+
+    RETURN v_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Add a comment to explain the purpose of this function
+COMMENT ON FUNCTION public.insert_temp_archive_upload IS 'Inserts upload options into temporary archive_upload table';
+-- Drop existing function if it exists
+DROP FUNCTION IF EXISTS public.commit_temp_data(TEXT);
 
 -- Create or replace the commit_temp_data function
 CREATE OR REPLACE FUNCTION public.commit_temp_data(p_suffix TEXT)
@@ -177,3 +237,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET statement_timeout TO '30min';
+
+-- Add a comment to explain the purpose of this function
+COMMENT ON FUNCTION public.commit_temp_data IS 'Commits temporary data to permanent tables and handles upload options';

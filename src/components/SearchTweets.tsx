@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Tweet from '@/components/Tweet'
 import { createBrowserClient } from '@/utils/supabase'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { getSchemaName } from '@/lib-client/getTableName'
 
 const getLatestTweets = async (
   supabase: any,
@@ -10,7 +11,7 @@ const getLatestTweets = async (
   account_id?: string,
 ) => {
   const { data, error } = await supabase
-    .schema('public')
+    .schema(getSchemaName())
     .rpc('get_latest_tweets', { count: count, p_account_id: account_id })
 
   if (error) {
@@ -59,7 +60,7 @@ const searchTweetsOR = async (
 
 const pgSearch = async (supabase: any, query: string, account_id?: string) => {
   const supabaseBaseQuery = supabase
-    .schema('public')
+    .schema(getSchemaName())
     .from('tweets')
     .select(
       `

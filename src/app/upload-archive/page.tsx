@@ -53,9 +53,10 @@ const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
 export default async function UploadArchivePage() {
   const supabase = createServerClient(cookies())
   const mostFollowed = await getMostFollowedAccounts(supabase)
+  const isDev = process.env.NODE_ENV === 'development'
 
   return (
-    <div className="relative mx-auto flex min-h-screen w-full max-w-3xl flex-col bg-white p-24 dark:bg-gray-800">
+    <div className="relative mx-auto flex min-h-screen w-full max-w-3xl flex-col bg-white px-4 dark:bg-gray-800 sm:px-6 lg:px-24">
       {/* Main content */}
       <div className="bg-white dark:bg-gray-800">
         <h1 className="mb-0 text-4xl font-bold text-zinc-400 dark:text-zinc-500 md:text-4xl">
@@ -84,7 +85,7 @@ export default async function UploadArchivePage() {
         <CommunityStats />
         <br />
         <div className="text-sm">
-          <p className="mb-4  leading-relaxed">
+          <p className="mb-4 leading-relaxed">
             {`Powered by your tweet history, the community archive lets anyone build things like:`}
           </p>
           <ul className="mb-4 list-disc space-y-2 pl-16 ">
@@ -111,9 +112,9 @@ export default async function UploadArchivePage() {
         <br />
         <p className="text-sm dark:text-gray-300">
           {`If you do... `}
-          <DynamicSignIn />
+          {isDev ? <UploadTwitterArchive /> : <DynamicSignIn />}
         </p>
-        <UploadTwitterArchive />
+        {!isDev && <UploadTwitterArchive />}
         <br />
 
         <div className="mb-4 text-sm">

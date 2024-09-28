@@ -58,7 +58,8 @@ export default async function UploadArchivePage() {
   return (
     <div className="relative mx-auto flex min-h-screen w-full max-w-3xl flex-col bg-white px-4 dark:bg-gray-800 sm:px-6 lg:px-24">
       {/* Main content */}
-      <div className="bg-white dark:bg-gray-800">
+      <div className="mt-8 bg-white dark:bg-gray-800">
+        {' '}
         <h1 className="mb-0 text-4xl font-bold text-zinc-400 dark:text-zinc-500 md:text-4xl">
           Upload to the
         </h1>
@@ -110,13 +111,10 @@ export default async function UploadArchivePage() {
           </p>
         </div>
         <br />
-        <p className="text-sm dark:text-gray-300">
-          {`If you do... `}
-          {isDev ? <UploadTwitterArchive /> : <DynamicSignIn />}
-        </p>
+        <p className="text-sm dark:text-gray-300">{`If you do... `}</p>
+        {isDev ? <UploadTwitterArchive /> : <DynamicSignIn />}
         {!isDev && <UploadTwitterArchive />}
         <br />
-
         <div className="mb-4 text-sm">
           Useful links:
           <ul className="mb-4 list-disc pl-6">

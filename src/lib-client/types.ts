@@ -117,3 +117,10 @@ export type UploadOptions = {
   startDate: Date
   endDate: Date
 }
+
+export type AvatarType = {
+  account_id: string
+  username: string
+  avatar_media_url: string
+  num_tweets?: number
+}

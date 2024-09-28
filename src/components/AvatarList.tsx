@@ -2,15 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-
-type Avatar = {
-  username: string
-  avatar_media_url: string
-  num_tweets?: number
-}
+import { AvatarType } from '@/lib-client/types'
 
 type AvatarListProps = {
-  initialAvatars: Avatar[]
+  initialAvatars: AvatarType[]
   title?: string
 }
 const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
@@ -30,9 +25,7 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
           {avatars.map((avatar) => (
             <a
               key={avatar.username}
-              href={`https://x.com/${avatar.username}`}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={`/user/${avatar.account_id}`}
               className="flex flex-col items-center"
             >
               <Avatar className="h-12 w-12">

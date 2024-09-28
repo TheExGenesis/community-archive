@@ -301,7 +301,10 @@ const insertTempLikes = async (
 export const processTwitterArchive = async (
   supabase: SupabaseClient,
   archiveData: Archive,
-  progressCallback: (progress: { phase: string; percent: number }) => void,
+  progressCallback: (progress: {
+    phase: string
+    percent: number | null
+  }) => void,
 ): Promise<void> => {
   const startTime = performance.now()
   console.log('Starting Twitter Archive processing...')
@@ -507,7 +510,7 @@ export const processTwitterArchive = async (
     console.log('Committing all data...')
     progressCallback({
       phase: 'Finishing up...',
-      percent: 50,
+      percent: null,
     })
     const commitStartTime = Date.now()
     await retryOperation(async () => {

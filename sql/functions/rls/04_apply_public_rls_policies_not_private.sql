@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION public.apply_public_rls_policies(schema_name TEXT, table_name TEXT) 
+CREATE OR REPLACE FUNCTION public.apply_public_rls_policies_not_private(schema_name TEXT, table_name TEXT) 
 RETURNS void AS $$
 DECLARE
     policy_name TEXT;
@@ -18,20 +18,9 @@ BEGIN
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', policy_name, schema_name, table_name);
     END LOOP; 
 
-    -- Update the public visibility policy to check for keep_private more efficiently
+    EXECUTE format('CREATE POLICY "Tweets are publicly visible" ON %I.%I FOR SELECT USING (true)', schema_name, table_name);
     EXECUTE format('
-        CREATE POLICY "Data is publicly visible unless marked private" ON %I.%I
-        FOR SELECT
-        USING (
-            (SELECT COALESCE(au.keep_private, false) 
-             FROM archive_upload au 
-             WHERE au.id = %I.id) = false
-            OR account_id = (SELECT auth.jwt() -> ''app_metadata'' ->> ''provider_id'')
-        )', schema_name, table_name, table_name);
-
-    -- The modification policy remains unchanged
-    EXECUTE format('
-        CREATE POLICY "Data is modifiable by their users" ON %I.%I TO authenticated 
+        CREATE POLICY "Tweets are modifiable by their users" ON %I.%I TO authenticated 
         USING (
             account_id = (SELECT auth.jwt()) -> ''app_metadata'' ->> ''provider_id''
         ) 

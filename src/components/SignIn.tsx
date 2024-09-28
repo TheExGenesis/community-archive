@@ -8,6 +8,10 @@ export default function SignIn() {
   const signInWithTwitter = async () => {
     const supabase = createBrowserClient()
 
+    console.log('sign in with twitter', {
+      userMetadata,
+      origin: window.location.origin,
+    })
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'twitter',
       options: {

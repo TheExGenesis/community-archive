@@ -355,12 +355,33 @@ export const processTwitterArchive = async (
       return data
     }, 'Failed to verify temporary tables')
 
-    console.log('Inserting account data...')
+    // Compute counts
+    const num_tweets = archiveData.tweets.length
+    const num_following = archiveData.following
+      ? archiveData.following.length
+      : 0
+    const num_followers = archiveData.follower ? archiveData.follower.length : 0
+    const num_likes = archiveData.like ? archiveData.like.length : 0
+
+    console.log('Inserting account data...', {
+      ...archiveData.account[0].account,
+      num_tweets,
+      num_following,
+      num_followers,
+      num_likes,
+    })
+
     await retryOperation(async () => {
       const { data, error } = await supabase
         .schema(getSchemaName())
         .rpc('insert_temp_account', {
-          p_account: archiveData.account[0].account,
+          p_account: {
+            ...archiveData.account[0].account,
+            num_tweets,
+            num_following,
+            num_followers,
+            num_likes,
+          },
           p_suffix: suffix,
         })
       if (error) throw error
@@ -544,207 +565,6 @@ export const processTwitterArchive = async (
     console.log('Temporary tables dropped successfully.')
   } catch (dropError: any) {
     console.error('Error dropping temporary tables:', dropError)
-  }
-}
-
-// not used, bc slightly slower, but a code example
-export const processTwitterArchivePgFns = async (
-  supabase: SupabaseClient,
-  archiveData: any,
-): Promise<void> => {
-  const startTime = Date.now()
-  // console.log('Processing Twitter Archive', { archiveData })
-
-  const accountId = archiveData.account[0].account.accountId
-  const suffix = accountId
-
-  try {
-    // Calculate latest tweet date
-    const latestTweetDate = archiveData.tweets.reduce(
-      (latest: string, tweet: any) => {
-        const tweetDate = new Date(tweet.tweet.created_at)
-        return latest
-          ? tweetDate > new Date(latest)
-            ? tweetDate.toISOString()
-            : latest
-          : tweetDate.toISOString()
-      },
-      '',
-    )
-
-    console.log(`Latest tweet date: ${latestTweetDate}`)
-
-    // Compute counts
-    const num_tweets = archiveData.tweets.length
-    const num_following = archiveData.following
-      ? archiveData.following.length
-      : 0
-    const num_followers = archiveData.followers
-      ? archiveData.followers.length
-      : 0
-    const num_likes = archiveData.likes ? archiveData.likes.length : 0
-
-    // Create temporary tables
-    console.log('Creating temporary tables...')
-    await supabase
-      .schema(getSchemaName())
-      .rpc('create_temp_tables', { p_suffix: suffix })
-
-    console.log('Inserting account data...', {
-      ...archiveData.account[0].account,
-      num_tweets,
-      num_following,
-      num_followers,
-      num_likes,
-    })
-    const { error: accountError } = await supabase
-      .schema(getSchemaName())
-      .rpc('insert_temp_account', {
-        p_account: {
-          ...archiveData.account[0].account,
-          num_tweets,
-          num_following,
-          num_followers,
-          num_likes,
-        },
-        p_suffix: suffix,
-      })
-    if (accountError)
-      throw new Error(`Error inserting account data: ${accountError.message}`)
-
-    console.log('Inserting profile data...')
-    const { error: profileError } = await supabase
-      .schema(getSchemaName())
-      .rpc('insert_temp_profiles', {
-        p_profile: archiveData.profile[0].profile,
-        p_account_id: accountId,
-        p_suffix: suffix,
-      })
-    if (profileError)
-      throw new Error(`Error inserting profile data: ${profileError.message}`)
-
-    // Batch process tweets
-    console.log('Processing tweets...')
-
-    const tweetsStartTime = Date.now()
-    for (let i = 0; i < archiveData.tweets.length; i += BATCH_SIZE) {
-      const tweetsBatch = archiveData.tweets.slice(i, i + BATCH_SIZE)
-      console.log(`Processing tweets batch ${i / BATCH_SIZE + 1}...`, {
-        tweetsBatch,
-        suffix,
-      })
-      const { error: tweetsError } = await supabase
-        .schema(getSchemaName())
-        .rpc('insert_temp_tweets', {
-          p_tweets: tweetsBatch.map((tweet: any) => {
-            return { ...tweet.tweet, user_id: accountId }
-          }),
-          p_suffix: suffix,
-        })
-      if (tweetsError)
-        throw new Error(`Error inserting tweets: ${tweetsError.message}`)
-
-      const { error: entitiesError } = await supabase
-        .schema(getSchemaName())
-        .rpc('process_and_insert_tweet_entities', {
-          p_tweets: tweetsBatch,
-          p_suffix: suffix,
-        })
-      if (entitiesError)
-        throw new Error(
-          `Error processing tweet entities: ${entitiesError.message}`,
-        )
-    }
-    const tweetsEndTime = Date.now()
-    console.log(`Tweets processing time: ${tweetsEndTime - tweetsStartTime}ms`)
-
-    // Batch process followers and following
-    console.log('Processing followers...')
-    const followsStartTime = Date.now()
-    for (let i = 0; i < archiveData.follower.length; i += BATCH_SIZE) {
-      const followersBatch = archiveData.follower.slice(i, i + BATCH_SIZE)
-      console.log(`Processing followers batch ${i / BATCH_SIZE + 1}...`)
-      const { error: followersError } = await supabase
-        .schema(getSchemaName())
-        .rpc('insert_temp_followers', {
-          p_followers: followersBatch,
-          p_account_id: accountId,
-          p_suffix: suffix,
-        })
-      if (followersError)
-        throw new Error(`Error inserting followers: ${followersError.message}`)
-    }
-    const followsEndTime = Date.now()
-    console.log(
-      `Follows processing time: ${followsEndTime - followsStartTime}ms`,
-    )
-
-    console.log('Processing following...')
-    for (let i = 0; i < archiveData.following.length; i += BATCH_SIZE) {
-      const followingBatch = archiveData.following.slice(i, i + BATCH_SIZE)
-      console.log(`Processing following batch ${i / BATCH_SIZE + 1}...`)
-      const { error: followingError } = await supabase
-        .schema(getSchemaName())
-        .rpc('insert_temp_following', {
-          p_following: followingBatch,
-          p_account_id: accountId,
-          p_suffix: suffix,
-        })
-      if (followingError)
-        throw new Error(`Error inserting following: ${followingError.message}`)
-    }
-
-    // Batch process likes
-    console.log('Processing likes...')
-    const likesStartTime = Date.now()
-    for (let i = 0; i < archiveData.like.length; i += BATCH_SIZE) {
-      const likesBatch = archiveData.like.slice(i, i + BATCH_SIZE)
-      console.log(`Processing likes batch ${i / BATCH_SIZE + 1}...`)
-      const { error: likesError } = await supabase
-        .schema(getSchemaName())
-        .rpc('insert_temp_likes', {
-          p_likes: likesBatch,
-          p_account_id: accountId,
-          p_suffix: suffix,
-        })
-      if (likesError)
-        throw new Error(`Error inserting likes: ${likesError.message}`)
-    }
-    const likesEndTime = Date.now()
-    console.log(`Likes processing time: ${likesEndTime - likesStartTime}ms`)
-
-    // Commit all data
-    console.log('Committing all data...')
-    const commitStartTime = Date.now()
-    const { error: commitError } = await supabase
-      .schema(getSchemaName())
-      .rpc('commit_temp_data', {
-        p_suffix: suffix,
-      })
-    const commitEndTime = Date.now()
-    console.log(`Commit processing time: ${commitEndTime - commitStartTime}ms`)
-    if (commitError)
-      throw new Error(`Error committing data: ${commitError.message}`)
-
-    console.log('Twitter archive processing completed successfully.')
-    const endTime = Date.now()
-    console.log(`Total processing time: ${endTime - startTime}ms`)
-  } catch (error: any) {
-    console.error('Error processing Twitter archive:', error)
-
-    // Attempt to drop temporary tables
-    try {
-      console.log('Attempting to drop temporary tables...')
-      await supabase
-        .schema(getSchemaName())
-        .rpc('drop_temp_tables', { p_suffix: suffix })
-      console.log('Temporary tables dropped successfully.')
-    } catch (dropError: any) {
-      console.error('Error dropping temporary tables:', dropError)
-    }
-
-    // Throw a new error with more context
-    throw new Error(`Error processing Twitter archive: ${error.message}`)
   }
 }
 

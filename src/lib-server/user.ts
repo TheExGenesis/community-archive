@@ -75,7 +75,7 @@ export const getUserData = async (account_id: string) => {
       archive_upload:archive_upload(archive_at)
     `,
     )
-    .eq('account_id', account_id)
+    .or(`account_id.eq.${account_id},username.ilike.${account_id}`)
     .single()
 
   if (!data) {

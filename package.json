@@ -1,9 +1,9 @@
 {
-  "name": "supa-next-starter",
-  "description": "A production ready Next.js/Supabase starter. ",
+  "name": "community-archive",
+  "description": "A Twitter Community Archive",
   "version": "1.0.0",
   "private": true,
-  "author": "Michael Troya <hi@michaeltroya.ca> (@michaeltroya)",
+  "author": "theexgenesis",
   "license": "MIT",
   "keywords": [
     "nextjs",
@@ -14,7 +14,7 @@
     "typescript"
   ],
   "scripts": {
-    "dev": "set NODE_ENV=development & set NEXT_PUBLIC_USE_REMOTE_DEV_DB=false & next dev",
+    "dev": "cross-env NODE_ENV=development NEXT_PUBLIC_USE_REMOTE_DEV_DB=false next dev",
     "dev-as-prod": "set NODE_ENV=production & next dev",
     "dev-remote-db": "set NEXT_PUBLIC_USE_REMOTE_DEV_DB=true & next dev",
     "build": "set NODE_ENV=production & next build",
@@ -30,6 +30,7 @@
     "test:server": "jest --selectProjects server --testPathPattern=src/lib-server",
     "analyze": "ANALYZE=true pnpm build",
     "scratchpad": "ts-node -r tsconfig-paths/register -P ./scratchpad/tsconfig.json",
+    "script": "tsx",
     "gen-api-docs": "curl https://fabxmporizzqflnftavs.supabase.co/rest/v1/ -H \"apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY\" -H \"Accept: application/openapi+json\" > public/openapi.json"
   },
   "dependencies": {
@@ -78,6 +79,7 @@
     "recharts": "^2.12.7",
     "supabase": "^1.200.3",
     "tailwind-merge": "^2.2.0",
+    "tsx": "^4.19.1",
     "undici": "^5.28.2"
   },
   "devDependencies": {

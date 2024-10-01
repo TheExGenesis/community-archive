@@ -17,126 +17,128 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { Progress } from '@/components/ui/progress'
+import { Input } from '@/components/ui/input'
 import { ChevronDown, ChevronUp, Info } from 'lucide-react'
 import Link from 'next/link'
 import { format, parse } from 'date-fns'
-import { Input } from '@/components/ui/input'
 import {
   ArchiveStats,
   FileUploadDialogProps,
   UploadOptions,
 } from '@/lib-client/types'
-import {
-  applyOptionsToArchive,
-  calculateArchiveStats,
-  uploadArchive,
-} from '@/lib-client/loadArchive'
-import { Progress } from '@/components/ui/progress'
+import { uploadArchive } from '@/lib-client/upload-archive/uploadArchive'
+import { calculateArchiveStats } from '@/lib-client/upload-archive/calculateArchiveStats'
+import { applyOptionsToArchive } from '@/lib-client/upload-archive/applyOptionsToArchive'
+
+interface FileUploadDialogState {
+  keepPrivate: boolean
+  showAdvancedOptions: boolean
+  uploadLikes: boolean
+  uploadStatus: 'not_started' | 'uploading' | 'completed'
+  progress: { phase: string; percent: number | null } | null
+  uploadedStats: {
+    uploadedTweets: number
+    uploadedLikes: number
+    uploadTime: string
+  } | null
+  error: string | null
+}
+
+const initialState: FileUploadDialogState = {
+  keepPrivate: false,
+  showAdvancedOptions: false,
+  uploadLikes: true,
+  uploadStatus: 'not_started',
+  progress: null,
+  uploadedStats: null,
+  error: null,
+}
 
 export function FileUploadDialog({
+  supabase,
   isOpen,
   onClose,
   archive,
 }: FileUploadDialogProps) {
-  const [keepPrivate, setKeepPrivate] = useState(false)
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
-  const [uploadLikes, setUploadLikes] = useState(true)
+  const [state, setState] = useState<FileUploadDialogState>(initialState)
   const [archiveStats, setArchiveStats] = useState<ArchiveStats>(() =>
     calculateArchiveStats(archive),
   )
-  const [startDate, setStartDate] = useState<Date>(
-    new Date(archiveStats.earliestTweetDate),
-  )
-  const [endDate, setEndDate] = useState<Date>(
-    new Date(archiveStats.latestTweetDate),
-  )
-  const [startDateInput, setStartDateInput] = useState(
-    format(startDate, 'yyyy-MM-dd'),
-  )
-  const [endDateInput, setEndDateInput] = useState(
-    format(endDate, 'yyyy-MM-dd'),
-  )
-  const [uploadStatus, setUploadStatus] = useState<
-    'not_started' | 'uploading' | 'completed'
-  >('not_started')
-  const [progress, setProgress] = useState<{
-    phase: string
-    percent: number | null
-  } | null>(null)
-  const [uploadedStats, setUploadedStats] = useState<{
-    uploadedTweets: number
-    uploadedLikes: number
-    uploadTime: string
-  } | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [dateRange, setDateRange] = useState({
+    start: new Date(archiveStats.earliestTweetDate),
+    end: new Date(archiveStats.latestTweetDate),
+  })
+  const [dateInputs, setDateInputs] = useState({
+    start: format(dateRange.start, 'yyyy-MM-dd'),
+    end: format(dateRange.end, 'yyyy-MM-dd'),
+  })
 
   useEffect(() => {
     const newStats = calculateArchiveStats(archive)
     setArchiveStats(newStats)
-    setStartDate(new Date(newStats.earliestTweetDate))
-    setEndDate(new Date(newStats.latestTweetDate))
-    setStartDateInput(
-      format(new Date(newStats.earliestTweetDate), 'yyyy-MM-dd'),
-    )
-    setEndDateInput(format(new Date(newStats.latestTweetDate), 'yyyy-MM-dd'))
+    setDateRange({
+      start: new Date(newStats.earliestTweetDate),
+      end: new Date(newStats.latestTweetDate),
+    })
+    setDateInputs({
+      start: format(new Date(newStats.earliestTweetDate), 'yyyy-MM-dd'),
+      end: format(new Date(newStats.latestTweetDate), 'yyyy-MM-dd'),
+    })
   }, [archive])
 
-  const handleStartDateInputChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    setStartDateInput(event.target.value)
-    const parsedDate = parse(event.target.value, 'yyyy-MM-dd', new Date())
-    if (!isNaN(parsedDate.getTime())) {
-      setStartDate(parsedDate)
+  const handleDateInputChange =
+    (type: 'start' | 'end') => (event: React.ChangeEvent<HTMLInputElement>) => {
+      const newValue = event.target.value
+      setDateInputs((prev) => ({ ...prev, [type]: newValue }))
+      const parsedDate = parse(newValue, 'yyyy-MM-dd', new Date())
+      if (!isNaN(parsedDate.getTime())) {
+        setDateRange((prev) => ({ ...prev, [type]: parsedDate }))
+      }
     }
-  }
-
-  const handleEndDateInputChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    setEndDateInput(event.target.value)
-    const parsedDate = parse(event.target.value, 'yyyy-MM-dd', new Date())
-    if (!isNaN(parsedDate.getTime())) {
-      setEndDate(parsedDate)
-    }
-  }
 
   const handleUpload = async () => {
-    setUploadStatus('uploading')
-    setError(null)
+    setState((prev) => ({ ...prev, uploadStatus: 'uploading', error: null }))
     const options: UploadOptions = {
-      keepPrivate,
-      uploadLikes,
-      startDate,
-      endDate,
+      keepPrivate: state.keepPrivate,
+      uploadLikes: state.uploadLikes,
+      startDate: dateRange.start,
+      endDate: dateRange.end,
     }
 
     const archiveWithOptions = applyOptionsToArchive(archive, options)
 
     try {
       const filteredStats = calculateArchiveStats(archiveWithOptions)
-      await uploadArchive((progressUpdate) => {
-        setProgress(progressUpdate)
-      }, archiveWithOptions)
+      await uploadArchive(
+        supabase,
+        (progressUpdate) =>
+          setState((prev) => ({ ...prev, progress: progressUpdate })),
+        archiveWithOptions,
+      )
       const stats = {
         uploadedTweets: filteredStats.tweetCount,
-        uploadedLikes: uploadLikes ? filteredStats.likesCount : 0,
+        uploadedLikes: state.uploadLikes ? filteredStats.likesCount : 0,
         uploadTime: new Date().toLocaleString(),
       }
-      setUploadedStats(stats)
-      setUploadStatus('completed')
+      setState((prev) => ({
+        ...prev,
+        uploadedStats: stats,
+        uploadStatus: 'completed',
+      }))
       console.log('Upload successful')
     } catch (error) {
       console.error('Upload failed:', error)
-      setError(error instanceof Error ? error.message : String(error))
-      setUploadStatus('not_started')
+      setState((prev) => ({
+        ...prev,
+        error: error instanceof Error ? error.message : String(error),
+        uploadStatus: 'not_started',
+      }))
     }
   }
 
   const resetDialog = () => {
-    setUploadStatus('not_started')
-    setProgress(null)
-    setUploadedStats(null)
+    setState(initialState)
     onClose()
   }
 
@@ -145,25 +147,25 @@ export function FileUploadDialog({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
-            {uploadStatus === 'uploading'
+            {state.uploadStatus === 'uploading'
               ? 'Uploading...'
-              : uploadStatus === 'completed'
+              : state.uploadStatus === 'completed'
                 ? 'Upload Successful'
-                : error
+                : state.error
                   ? 'Upload Error'
                   : 'Upload Confirmation'}
           </DialogTitle>
         </DialogHeader>
-        {error ? (
+        {state.error ? (
           <div className="grid gap-4 py-4">
             <p className="mb-2 text-sm text-red-600">
               Sorry, there was an error:
             </p>
             <pre className="whitespace-pre-wrap break-words rounded bg-gray-100 p-2 font-mono text-sm text-gray-900 dark:bg-gray-800 dark:text-gray-100">
-              {error}
+              {state.error}
             </pre>
           </div>
-        ) : uploadStatus === 'not_started' ? (
+        ) : state.uploadStatus === 'not_started' ? (
           <div className="grid gap-4 py-4">
             {/* Display Archive Statistics */}
             <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
@@ -207,8 +209,10 @@ export function FileUploadDialog({
                 </Label>
                 <Switch
                   id="keep-private"
-                  checked={keepPrivate}
-                  onCheckedChange={setKeepPrivate}
+                  checked={state.keepPrivate}
+                  onCheckedChange={(checked: boolean) =>
+                    setState((prev) => ({ ...prev, keepPrivate: checked }))
+                  }
                 />
               </div>
             </TooltipProvider>
@@ -217,17 +221,22 @@ export function FileUploadDialog({
             <div className="mt-6">
               <Button
                 variant="outline"
-                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                onClick={() =>
+                  setState((prev) => ({
+                    ...prev,
+                    showAdvancedOptions: !prev.showAdvancedOptions,
+                  }))
+                }
                 className="w-full justify-between"
               >
                 Advanced Options
-                {showAdvancedOptions ? (
+                {state.showAdvancedOptions ? (
                   <ChevronUp className="ml-2 h-4 w-4" />
                 ) : (
                   <ChevronDown className="ml-2 h-4 w-4" />
                 )}
               </Button>
-              {showAdvancedOptions && (
+              {state.showAdvancedOptions && (
                 <div className="mt-4 space-y-4 border-t pt-4">
                   <TooltipProvider>
                     <div className="flex items-center justify-between">
@@ -247,8 +256,13 @@ export function FileUploadDialog({
                       </Label>
                       <Switch
                         id="upload-likes"
-                        checked={uploadLikes}
-                        onCheckedChange={setUploadLikes}
+                        checked={state.uploadLikes}
+                        onCheckedChange={(checked: boolean) =>
+                          setState((prev) => ({
+                            ...prev,
+                            uploadLikes: checked,
+                          }))
+                        }
                       />
                     </div>
                     <div className="mt-4 flex flex-col space-y-2">
@@ -273,8 +287,8 @@ export function FileUploadDialog({
                           <Input
                             id="start-date"
                             type="date"
-                            value={startDateInput}
-                            onChange={handleStartDateInputChange}
+                            value={dateInputs.start}
+                            onChange={handleDateInputChange('start')}
                             className="w-[150px]"
                           />
                         </div>
@@ -285,8 +299,8 @@ export function FileUploadDialog({
                           <Input
                             id="end-date"
                             type="date"
-                            value={endDateInput}
-                            onChange={handleEndDateInputChange}
+                            value={dateInputs.end}
+                            onChange={handleDateInputChange('end')}
                             className="w-[150px]"
                           />
                         </div>
@@ -307,44 +321,46 @@ export function FileUploadDialog({
               </Link>
             </div>
           </div>
-        ) : uploadStatus === 'uploading' ? (
+        ) : state.uploadStatus === 'uploading' ? (
           <div className="grid gap-4 py-4">
             <p className="mb-2 text-sm">Uploading your archive...</p>
-            {progress && (
+            {state.progress && (
               <div>
                 <p className="mb-1">
-                  {progress.phase}
-                  {progress.percent !== null &&
-                    `: ${progress.percent.toFixed(2)}%`}
+                  {state.progress.phase}
+                  {state.progress.percent !== null &&
+                    `: ${state.progress.percent.toFixed(2)}%`}
                 </p>
-                {progress.percent !== null && (
-                  <Progress value={progress.percent} className="w-full" />
+                {state.progress.percent !== null && (
+                  <Progress value={state.progress.percent} className="w-full" />
                 )}
               </div>
             )}
           </div>
-        ) : uploadStatus === 'completed' && uploadedStats ? (
+        ) : state.uploadStatus === 'completed' && state.uploadedStats ? (
           <div className="grid gap-4 py-4">
             <p className="mb-2 text-sm text-green-600">
               Your archive has been successfully uploaded!
             </p>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="text-muted-foreground">Uploaded Tweets</div>
-              <div>{uploadedStats.uploadedTweets.toLocaleString()}</div>
-              {uploadLikes && (
+              <div>{state.uploadedStats.uploadedTweets.toLocaleString()}</div>
+              {state.uploadLikes && (
                 <>
                   <div className="text-muted-foreground">Uploaded Likes</div>
-                  <div>{uploadedStats.uploadedLikes.toLocaleString()}</div>
+                  <div>
+                    {state.uploadedStats.uploadedLikes.toLocaleString()}
+                  </div>
                 </>
               )}
               <div className="text-muted-foreground">Upload Time</div>
-              <div>{uploadedStats.uploadTime}</div>
+              <div>{state.uploadedStats.uploadTime}</div>
             </div>
           </div>
         ) : null}
 
         <DialogFooter>
-          {uploadStatus === 'not_started' && (
+          {state.uploadStatus === 'not_started' && (
             <>
               <Button variant="outline" onClick={onClose}>
                 Cancel
@@ -352,12 +368,12 @@ export function FileUploadDialog({
               <Button onClick={handleUpload}>Upload</Button>
             </>
           )}
-          {uploadStatus === 'uploading' && (
+          {state.uploadStatus === 'uploading' && (
             <Button variant="outline" onClick={resetDialog}>
               Cancel
             </Button>
           )}
-          {(uploadStatus === 'completed' || error) && (
+          {(state.uploadStatus === 'completed' || state.error) && (
             <Button onClick={resetDialog}>Close</Button>
           )}
         </DialogFooter>

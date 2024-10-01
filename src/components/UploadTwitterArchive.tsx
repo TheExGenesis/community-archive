@@ -1,17 +1,17 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { deleteArchive } from '../lib-server/db_insert'
 import { createBrowserClient } from '@/utils/supabase'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
-import {
-  calculateArchiveStats,
-  fetchArchiveUpload,
-  handleFileUpload,
-} from '@/lib-client/loadArchive'
-import { FileUploadDialog } from './file-upload-dialog' // Import the dialog component
-import { ArchiveStats } from '@/lib-client/types'
+import { FileUploadDialog } from './file-upload-dialog'
+import { ArchiveStats, Archive, ArchiveUpload } from '@/lib-client/types'
 import { devLog } from '@/lib-client/devLog'
+import { fetchArchiveUpload } from '@/lib-client/queries/fetchArchiveUpload'
+import { calculateArchiveStats } from '@/lib-client/upload-archive/calculateArchiveStats'
+import { handleFileUpload } from '@/lib-client/upload-archive/handleFileUpload'
+import { SupabaseClient } from '@supabase/supabase-js'
+import { Database } from '@/database-types'
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -21,18 +21,35 @@ const formatDate = (dateString: string) => {
   })
 }
 
-export default function UploadTwitterArchive() {
+interface UploadTwitterArchiveState {
+  isProcessing: boolean
+  archive: Archive | null
+  archiveStats: ArchiveStats | null
+  isDialogOpen: boolean
+  archiveUpload: ArchiveUpload | null
+  showUploadButton: boolean
+  isDeleting: boolean
+}
+export default function UploadTwitterArchive(props: {
+  supabase: SupabaseClient<Database> | null
+}) {
   const { userMetadata } = useAuthAndArchive()
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [archive, setArchive] = useState<any>(null)
-  const [archiveStats, setArchiveStats] = useState<ArchiveStats | null>(null)
-  const isProcessingRef = useRef(isProcessing)
-  const [isDialogOpen, setIsDialogOpen] = useState(false) // State to control dialog visibility
+  const supabase = props.supabase || createBrowserClient()
+  const [state, setState] = useState<UploadTwitterArchiveState>({
+    isProcessing: false,
+    archive: null,
+    archiveStats: null,
+    isDialogOpen: false,
+    archiveUpload: null,
+    showUploadButton: false,
+    isDeleting: false,
+  })
+  const isProcessingRef = useRef(state.isProcessing)
   const isDev = process.env.NODE_ENV === 'development'
 
   useEffect(() => {
-    isProcessingRef.current = isProcessing
-  }, [isProcessing])
+    isProcessingRef.current = state.isProcessing
+  }, [state.isProcessing])
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -46,44 +63,39 @@ export default function UploadTwitterArchive() {
     }
 
     window.addEventListener('beforeunload', handleBeforeUnload)
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [])
 
-  const [archiveUpload, setArchiveUpload] = useState<{
-    archive_at: string
-  } | null>(null)
-  const [showUploadButton, setShowUploadButton] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-
   useEffect(() => {
-    if (!userMetadata) return
-    fetchArchiveUpload(setArchiveUpload, userMetadata)
+    const fetchArchive = async () => {
+      if (!userMetadata) return
+      const archiveUpload = await fetchArchiveUpload(userMetadata)
+      setState((prev) => ({ ...prev, archiveUpload: archiveUpload || null }))
+    }
+    fetchArchive()
   }, [userMetadata])
 
   useEffect(() => {
-    if (archive) {
-      const stats = calculateArchiveStats(archive)
-      setArchiveStats(stats)
-      setIsDialogOpen(true) // Open the dialog when archive is available
+    if (state.archive) {
+      const stats = calculateArchiveStats(state.archive)
+      setState((prev) => ({ ...prev, archiveStats: stats, isDialogOpen: true }))
     }
-  }, [archive])
+  }, [state.archive])
 
   const onFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const supabase = createBrowserClient()
-    setIsProcessing(true)
+    setState((prev) => ({ ...prev, isProcessing: true }))
 
     try {
-      const archive = await handleFileUpload(event, setIsProcessing)
+      const archive = await handleFileUpload(event, (isProcessing) =>
+        setState((prev) => ({ ...prev, isProcessing })),
+      )
       devLog('archive', archive)
-      setArchive(archive)
+      setState((prev: UploadTwitterArchiveState) => ({ ...prev, archive }))
     } catch (error) {
       console.error('Error processing archive:', error)
       alert('An error occurred while processing archive')
     } finally {
-      setIsProcessing(false)
+      setState((prev) => ({ ...prev, isProcessing: false }))
       if (event.target) {
         event.target.value = ''
       }
@@ -96,44 +108,18 @@ export default function UploadTwitterArchive() {
         'Are you sure you want to delete your archive? This action cannot be undone.',
       )
     ) {
-      setIsDeleting(true)
-      const supabase = createBrowserClient()
+      setState((prev) => ({ ...prev, isDeleting: true }))
       try {
-        // Delete archive from database
         await deleteArchive(supabase, userMetadata.provider_id)
-
-        // Delete everything in the user's directory in storage
-        const { data: fileList, error: listError } = await supabase.storage
-          .from('archives')
-          .list(userMetadata.provider_id)
-
-        if (listError) {
-          console.error('Error listing files in storage:', listError)
-          throw listError
-        }
-
-        if (fileList && fileList.length > 0) {
-          const filesToDelete = fileList.map(
-            (file) => `${userMetadata.provider_id}/${file.name}`,
-          )
-          const { error: deleteError } = await supabase.storage
-            .from('archives')
-            .remove(filesToDelete)
-
-          if (deleteError) {
-            console.error('Error deleting files from storage:', deleteError)
-            throw deleteError
-          }
-        }
-
-        setArchiveUpload(null)
+        await deleteStorageFiles(supabase, userMetadata.provider_id)
+        setState((prev) => ({ ...prev, archiveUpload: null }))
         alert('Archive deleted successfully from database and storage')
-        window.location.reload() // Reload the page after successful deletion
+        window.location.reload()
       } catch (error) {
         console.error('Error deleting archive:', error)
         alert('An error occurred while deleting the archive')
       } finally {
-        setIsDeleting(false)
+        setState((prev) => ({ ...prev, isDeleting: false }))
       }
     }
   }
@@ -141,18 +127,20 @@ export default function UploadTwitterArchive() {
   return (
     (userMetadata || isDev) && (
       <div className="text-sm dark:text-gray-300">
-        {archiveUpload && (
+        {state.archiveUpload && (
           <>
             <p className="mb-2 text-xs text-zinc-400 dark:text-zinc-500">
               Your last archive upload was from{' '}
-              {formatDate(archiveUpload.archive_at)}.
+              {formatDate(state.archiveUpload.archive_at)}.
             </p>
           </>
         )}
-        {archiveUpload && !showUploadButton ? (
+        {state.archiveUpload && !state.showUploadButton ? (
           <div>
             <button
-              onClick={() => setShowUploadButton(true)}
+              onClick={() =>
+                setState((prev) => ({ ...prev, showUploadButton: true }))
+              }
               className="cursor-pointer text-sm text-blue-500 underline dark:text-blue-400"
             >
               Upload a new archive, or delete your data.
@@ -160,10 +148,12 @@ export default function UploadTwitterArchive() {
           </div>
         ) : (
           <div>
-            {archiveUpload && (
+            {state.archiveUpload && (
               <div>
                 <button
-                  onClick={() => setShowUploadButton(false)}
+                  onClick={() =>
+                    setState((prev) => ({ ...prev, showUploadButton: false }))
+                  }
                   className="cursor-pointer text-sm text-blue-500 underline dark:text-blue-400"
                 >
                   Close
@@ -180,13 +170,12 @@ export default function UploadTwitterArchive() {
                     type="file"
                     accept=".zip,application/zip"
                     onChange={onFileUpload}
-                    disabled={isProcessing}
+                    disabled={state.isProcessing}
                     multiple
                   />
-                  {isProcessing && (
+                  {state.isProcessing && (
                     <div className="mt-4">
                       <p className="mb-2">{`Processing archive...`}</p>
-                      {/* The progress bar has been moved to FileUploadDialog */}
                       <div className="w-full rounded bg-gray-200">
                         <div
                           className="rounded bg-blue-500 py-1 text-center text-xs leading-none text-white"
@@ -199,17 +188,17 @@ export default function UploadTwitterArchive() {
                   )}
                 </div>
                 <div>
-                  {archiveUpload && (
+                  {state.archiveUpload && (
                     <>
                       <p className="mb-4 text-xs dark:text-gray-300">
                         This will delete all your data
                       </p>
                       <button
                         onClick={onDeleteArchive}
-                        disabled={isDeleting}
+                        disabled={state.isDeleting}
                         className="rounded bg-red-500 px-4 py-2 text-sm text-white hover:bg-red-600 disabled:opacity-50 dark:bg-red-600 dark:hover:bg-red-700"
                       >
-                        {isDeleting ? 'Deleting...' : 'Delete My Archive'}
+                        {state.isDeleting ? 'Deleting...' : 'Delete My Archive'}
                       </button>
                     </>
                   )}
@@ -219,15 +208,39 @@ export default function UploadTwitterArchive() {
           </div>
         )}
 
-        {/* Include the FileUploadDialog */}
-        {archiveStats && (
+        {state.archiveStats && state.archive && (
           <FileUploadDialog
-            isOpen={isDialogOpen}
-            onClose={() => setIsDialogOpen(false)}
-            archive={archive}
+            supabase={supabase}
+            isOpen={state.isDialogOpen}
+            onClose={() =>
+              setState((prev) => ({ ...prev, isDialogOpen: false }))
+            }
+            archive={state.archive}
           />
         )}
       </div>
     )
   )
+}
+
+const deleteStorageFiles = async (
+  supabase: SupabaseClient<Database>,
+  providerId: string,
+) => {
+  const { data: fileList, error: listError } = await supabase.storage
+    .from('archives')
+    .list(providerId)
+
+  if (listError) throw listError
+
+  if (fileList && fileList.length > 0) {
+    const filesToDelete = fileList.map(
+      (file: { name: string }) => `${providerId}/${file.name}`,
+    )
+    const { error: deleteError } = await supabase.storage
+      .from('archives')
+      .remove(filesToDelete)
+
+    if (deleteError) throw deleteError
+  }
 }

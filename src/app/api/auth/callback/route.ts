@@ -1,18 +1,17 @@
 import { NextResponse } from 'next/server'
 import { createServerAdminClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
+import { devLog } from '@/lib-client/devLog'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/'
 
-  // console.log({ code, next, searchParams, origin, request })
-
   if (code) {
     const supabase = createServerAdminClient(cookies())
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-    console.log({ data, error, next, origin, code })
+    devLog({ data, error, next, origin, code })
 
     if (!error && data.user) {
       // Move provider_id to app_metadata

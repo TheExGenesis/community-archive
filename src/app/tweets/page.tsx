@@ -8,13 +8,6 @@ import path from 'path'
 import { createBrowserClient } from '@/utils/supabase'
 import { getSchemaName } from '@/lib-client/getTableName'
 
-// Load environment variables from .env file in the scratchpad directory
-if (process.env.NODE_ENV !== 'production') {
-  dotenv.config({ path: path.resolve(__dirname, '../../../.env.local') })
-}
-
-const isProduction = process.env.NODE_ENV === 'production'
-
 const fetchTweets = async (supabase: any) => {
   const { data: tweets, error } = await supabase
     .schema(getSchemaName())

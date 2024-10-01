@@ -61,6 +61,7 @@ export default async function User({ params, searchParams }: any) {
 
       <div className="h-screen overflow-y-auto">
         <SearchTweets
+          supabase={supabase}
           displayText={`Search ${account.username}'s archive`}
           account_id={account.account_id}
         />

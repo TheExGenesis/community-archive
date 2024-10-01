@@ -1,9 +1,5 @@
 import { devLog } from '@/lib-client/devLog'
-import {
-  getSchemaName,
-  getTableName,
-  TableName,
-} from '@/lib-client/getTableName'
+import { getSchemaName } from '@/lib-client/getTableName'
 import { Archive } from '@/lib-client/types'
 import { SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'

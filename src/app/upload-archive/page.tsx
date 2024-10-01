@@ -112,8 +112,8 @@ export default async function UploadArchivePage() {
         </div>
         <br />
         <p className="text-sm dark:text-gray-300">{`If you do... `}</p>
-        {isDev ? <UploadTwitterArchive /> : <DynamicSignIn />}
-        {!isDev && <UploadTwitterArchive />}
+        {isDev ? <UploadTwitterArchive supabase={null} /> : <DynamicSignIn />}
+        {!isDev && <UploadTwitterArchive supabase={null} />}
         <br />
         <div className="mb-4 text-sm">
           Useful links:

@@ -5,6 +5,7 @@ import { createBrowserClient } from '@/utils/supabase'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { getSchemaName } from '@/lib-client/getTableName'
 import { devLog } from '@/lib-client/devLog'
+import { SupabaseClient } from '@supabase/supabase-js'
 
 const getLatestTweets = async (
   supabase: any,
@@ -122,11 +123,13 @@ const pgSearch = async (supabase: any, query: string, account_id?: string) => {
 }
 
 interface SearchProps {
+  supabase: SupabaseClient | null
   displayText?: string
   account_id?: string | null
 }
 
 export default function SearchTweets({
+  supabase,
   displayText = 'Very minimal full text search over tweet text',
   account_id = null,
 }: SearchProps) {
@@ -135,10 +138,17 @@ export default function SearchTweets({
   const [tweetsOR, setTweetsOR] = useState<any[]>([])
   const [query, setQuery] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [supabaseClient, setSupabaseClient] = useState(supabase)
+
+  useEffect(() => {
+    if (!supabaseClient) {
+      const newSupabaseClient = createBrowserClient()
+      setSupabaseClient(newSupabaseClient)
+    }
+  }, [supabaseClient])
 
   useEffect(() => {
     const fetchLatestTweets = async () => {
-      const supabase = createBrowserClient()
       const latestTweets = await getLatestTweets(
         supabase,
         50,
@@ -155,8 +165,6 @@ export default function SearchTweets({
     setTweetsExact([])
     setTweetsAND([])
     setTweetsOR([])
-
-    const supabase = createBrowserClient()
 
     if (query.length === 0) {
       const latestTweets = await getLatestTweets(supabase, 50)

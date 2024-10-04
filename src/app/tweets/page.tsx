@@ -6,11 +6,9 @@ import Tweet from '@/components/Tweet'
 import dotenv from 'dotenv'
 import path from 'path'
 import { createBrowserClient } from '@/utils/supabase'
-import { getSchemaName } from '@/lib-client/getTableName'
 
 const fetchTweets = async (supabase: any) => {
   const { data: tweets, error } = await supabase
-    .schema(getSchemaName())
     .from('tweets')
     .select(
       `

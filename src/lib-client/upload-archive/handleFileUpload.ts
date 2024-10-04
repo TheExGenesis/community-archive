@@ -1,9 +1,9 @@
 import { devLog } from '../devLog'
 import { Archive } from '../types'
-import { validateContent } from './validateContent'
+import { validateContent, validateFileContents } from './validateContent'
 import { BlobReader, ZipReader, TextWriter } from '@zip.js/zip.js'
 
-const requiredFiles = [
+export const requiredFiles = [
   'profile',
   'account',
   'tweets',
@@ -13,82 +13,9 @@ const requiredFiles = [
   'following',
 ]
 
-const optionalFiles = ['note-tweet']
+export const optionalFiles = ['note-tweet']
 
-const requiredFilePaths = requiredFiles.map((file) => `data/${file}.js`)
-
-const expectedSchemas = {
-  profile: {
-    profile: {
-      description: {
-        bio: '',
-        website: '',
-        location: '',
-      },
-      avatarMediaUrl: '',
-      headerMediaUrl: '',
-    },
-  },
-  account: {
-    account: {
-      createdVia: '',
-      username: '',
-      accountId: '',
-      createdAt: '',
-      accountDisplayName: '',
-    },
-  },
-  tweets: {
-    tweet: {
-      id: '',
-      source: '',
-      entities: {},
-      favorite_count: '',
-      id_str: '',
-      retweet_count: '',
-      created_at: '',
-      favorited: false,
-      full_text: '',
-    },
-  },
-  follower: { follower: { accountId: '', userLink: '' } },
-  following: { following: { accountId: '', userLink: '' } },
-  'community-tweet': {
-    tweet: {
-      id: '',
-      source: '',
-      entities: {},
-      favorite_count: '',
-      id_str: '',
-      retweet_count: '',
-      created_at: '',
-      favorited: false,
-      full_text: '',
-    },
-  },
-  like: { like: { tweetId: '', fullText: '' } },
-  'note-tweet': {
-    noteTweet: {
-      noteTweetId: '',
-      updatedAt: '',
-      lifecycle: {
-        value: '',
-        name: '',
-        originalName: '',
-        annotations: {},
-      },
-      createdAt: '',
-      core: {
-        styletags: [],
-        urls: [],
-        text: '',
-        mentions: [],
-        cashtags: [],
-        hashtags: [],
-      },
-    },
-  },
-}
+export const requiredFilePaths = requiredFiles.map((file) => `data/${file}.js`)
 
 const isZipFile = (file: File): boolean =>
   file.type === 'application/zip' ||
@@ -143,21 +70,6 @@ const extractZipContents = async (
 
   await zipReader.close()
   return fileContents
-}
-
-const validateFileContents = (fileContents: {
-  [key: string]: string[]
-}): void => {
-  Object.entries(fileContents).forEach(([fileName, contents]) => {
-    devLog('Validating file:', fileName)
-    const schemas = expectedSchemas[fileName as keyof typeof expectedSchemas]
-    const isValid = Array.isArray(contents)
-      ? contents.every((content) => validateContent(content, schemas))
-      : validateContent(contents as any, schemas)
-    if (!isValid) {
-      throw new Error(`Invalid schema for ${fileName}`)
-    }
-  })
 }
 
 const parseFileContents = (fileContents: {

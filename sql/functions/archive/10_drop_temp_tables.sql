@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION public.drop_temp_tables(p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
-IF auth.uid() IS NULL AND current_user != 'postgres' THEN
+IF auth.uid() IS NULL AND current_user NOT IN ('postgres', 'service_role') THEN
 RAISE EXCEPTION 'Not authenticated';
 END IF;
 EXECUTE format('DROP TABLE IF EXISTS temp.account_%s', p_suffix);

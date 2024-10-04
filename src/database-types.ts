@@ -1049,6 +1049,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      apply_public_rls_policies_not_private: {
+        Args: {
+          schema_name: string
+          table_name: string
+        }
+        Returns: undefined
+      }
       commit_temp_data: {
         Args: {
           p_suffix: string
@@ -1064,6 +1071,13 @@ export type Database = {
       delete_all_archives: {
         Args: {
           p_account_id: string
+        }
+        Returns: undefined
+      }
+      drop_all_policies: {
+        Args: {
+          schema_name: string
+          table_name: string
         }
         Returns: undefined
       }

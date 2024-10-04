@@ -20,7 +20,7 @@ export const uploadArchiveToStorage = async (
     '',
   )
   // Upload archive objects to storage
-  const username = archive.account[0].account.username
+  const username = archive.account[0].account.username.toLowerCase()
 
   const archiveSize = JSON.stringify(archive).length / (1024 * 1024)
   console.log(`Size of archive: ${archiveSize.toFixed(2)} MB`)
@@ -29,7 +29,11 @@ export const uploadArchiveToStorage = async (
 
   console.log('Uploading archive to storage', { username, latestTweetDate })
 
-  await refreshSession(supabase)
+  try {
+    await refreshSession(supabase)
+  } catch (error) {
+    console.error('Error refreshing session:', error)
+  }
 
   // const supabaseAdmin = createAdminBrowserClient()
 
@@ -39,8 +43,7 @@ export const uploadArchiveToStorage = async (
     supabase,
   })
 
-  const bucketName =
-    process.env.NODE_ENV === 'production' ? 'archives' : 'dev_archives'
+  const bucketName = 'archives'
   const { data, error: uploadError } = await supabase.storage
     .from(bucketName)
     .upload(`${username}/${latestTweetDate}.json`, JSON.stringify(archive), {

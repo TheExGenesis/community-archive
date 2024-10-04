@@ -25,7 +25,7 @@ const getSupabaseConfig = (includeServiceRole: boolean = false) => {
   const getServiceRole = () =>
     isDevelopment && !useRemoteDevDb
       ? process.env.NEXT_PUBLIC_LOCAL_SERVICE_ROLE!
-      : process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE!
+      : process.env.SUPABASE_SERVICE_ROLE!
 
   const config = {
     url: getUrl(),

@@ -1,4 +1,3 @@
-import { getSchemaName } from '@/lib-client/getTableName'
 import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
@@ -61,7 +60,6 @@ describe('Database Permissions Tests', () => {
     }
 
     const { data, error } = await supabase
-      .schema(getSchemaName())
       .from('dev_account')
       .insert(newAccount)
 

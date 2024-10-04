@@ -21,7 +21,7 @@ const supabaseUrl = isProd
   : process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL
 
 const supabaseServiceRoleKey = isProd
-  ? process.env.SUPABASE_SERVICE_ROLE
+  ? process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE
   : process.env.NEXT_PUBLIC_LOCAL_SERVICE_ROLE
 if (!supabaseUrl || !supabaseServiceRoleKey) {
   console.error('Missing Supabase URL or service role key')

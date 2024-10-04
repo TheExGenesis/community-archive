@@ -29,7 +29,11 @@ export const uploadArchiveToStorage = async (
 
   console.log('Uploading archive to storage', { username, latestTweetDate })
 
-  await refreshSession(supabase)
+  try {
+    await refreshSession(supabase)
+  } catch (error) {
+    console.error('Error refreshing session:', error)
+  }
 
   // const supabaseAdmin = createAdminBrowserClient()
 

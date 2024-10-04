@@ -16,30 +16,11 @@ export const uploadArchive = async (
     dev: process.env.NODE_ENV,
     role: process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE,
   })
-  const latestTweetDate = archive.tweets.reduce(
-    (latest: string, tweet: any) => {
-      const tweetDate = new Date(tweet.tweet.created_at)
-      return latest
-        ? tweetDate > new Date(latest)
-          ? tweetDate.toISOString()
-          : latest
-        : tweetDate.toISOString()
-    },
-    '',
-  )
-  // Upload archive objects to storage
-  const username = archive.account[0].account.username
-  const archiveId = `${username}_${latestTweetDate}`
-  console.log('Uploading archive', archiveId)
+
   progressCallback({ phase: 'Uploading archive', percent: 0 })
 
   // Use the new function here
-  await uploadArchiveToStorage(
-    supabase,
-    archive,
-    archive.account[0].account.accountId,
-    archiveId,
-  )
+  await uploadArchiveToStorage(supabase, archive)
 
   // Process the archive
   await processTwitterArchive(supabase, archive, progressCallback)

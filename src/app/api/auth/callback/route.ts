@@ -12,14 +12,13 @@ export async function GET(request: Request) {
     const supabase = createServerAdminClient(cookies())
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     devLog({ data, error, next, origin, code })
-
     if (!error && data.user) {
-      // Move provider_id to app_metadata
+      // Move provider_id to app_metadata and ensure username is lowercase
       const { data: updateData, error: updateError } =
         await supabase.auth.admin.updateUserById(data.user.id, {
           app_metadata: {
             provider_id: data.user.user_metadata.provider_id,
-            user_name: data.user.user_metadata.user_name,
+            user_name: data.user.user_metadata.user_name.toLowerCase(),
           },
         })
 

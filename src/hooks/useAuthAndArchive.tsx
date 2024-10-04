@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@/utils/supabase'
-import { getSchemaName, getTableName } from '@/lib-client/getTableName'
+import { getTableName } from '@/lib-client/getTableName'
 
 export function useAuthAndArchive() {
   const [userMetadata, setUserMetadata] = useState<any>(null)
@@ -21,10 +21,6 @@ export function useAuthAndArchive() {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user.user_metadata) {
         setUserMetadata(session.user.user_metadata)
-        // console.log(
-        //   'supabase.auth.onAuthStateChange session.user.user_metadata',
-        //   session.user.user_metadata,
-        // )
       } else {
         setUserMetadata(null)
       }
@@ -33,10 +29,6 @@ export function useAuthAndArchive() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user.user_metadata) {
         setUserMetadata(session.user.user_metadata)
-        // console.log(
-        //   'supabase.auth.getSession session.user.user_metadata',
-        //   session.user.user_metadata,
-        // )
       }
     })
 
@@ -51,7 +43,6 @@ export function useAuthAndArchive() {
 
       const supabase = createBrowserClient()
       const { data, error } = await supabase
-        .schema(getSchemaName())
         .from(getTableName('archive_upload') as 'archive_upload')
         .select('id')
         .eq('account_id', userMetadata.provider_id)

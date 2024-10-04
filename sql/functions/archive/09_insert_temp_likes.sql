@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION public.insert_temp_likes(p_likes JSONB, p_account_id TEXT, p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
-IF auth.uid() IS NULL AND current_user != 'postgres' THEN
+IF auth.uid() IS NULL AND current_user NOT IN ('postgres', 'service_role') THEN
 RAISE EXCEPTION 'Not authenticated';
 END IF;
 EXECUTE format('

@@ -20,7 +20,7 @@ export const uploadArchiveToStorage = async (
     '',
   )
   // Upload archive objects to storage
-  const username = archive.account[0].account.username
+  const username = archive.account[0].account.username.toLowerCase()
 
   const archiveSize = JSON.stringify(archive).length / (1024 * 1024)
   console.log(`Size of archive: ${archiveSize.toFixed(2)} MB`)

@@ -14,7 +14,7 @@
     "typescript"
   ],
   "scripts": {
-    "dev": "cross-env NODE_ENV=development NEXT_PUBLIC_USE_REMOTE_DEV_DB=false next dev",
+    "dev": "set NODE_ENV=development & set NEXT_PUBLIC_USE_REMOTE_DEV_DB=false & next dev",
     "dev-as-prod": "set NODE_ENV=production & next dev",
     "dev-remote-db": "set NEXT_PUBLIC_USE_REMOTE_DEV_DB=true & next dev",
     "build": "set NODE_ENV=production & next build",

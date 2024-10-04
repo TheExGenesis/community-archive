@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
 
   const { error } = await supabase.auth.admin.updateUserById(userId, {
     app_metadata: { provider_id: providerId },
+    user_metadata: { provider_id: providerId },
   })
 
   devLog('changeuserid', { error })

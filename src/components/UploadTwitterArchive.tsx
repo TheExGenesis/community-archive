@@ -70,6 +70,7 @@ export default function UploadTwitterArchive(props: {
     const fetchArchive = async () => {
       if (!userMetadata) return
       const archiveUpload = await fetchArchiveUpload(userMetadata)
+      console.log({ archiveUpload, userMetadata })
       setState((prev) => ({ ...prev, archiveUpload: archiveUpload || null }))
     }
     fetchArchive()

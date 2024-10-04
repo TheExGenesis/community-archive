@@ -1,5 +1,4 @@
 import { createBrowserClient } from '@/utils/supabase'
-import { getSchemaName } from '../getTableName'
 import { ArchiveUpload } from '../types'
 
 export const fetchArchiveUpload = async (

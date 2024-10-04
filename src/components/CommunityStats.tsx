@@ -15,17 +15,19 @@ const CommunityStats = async () => {
   })
 
   return (
-    <div className="text-sm dark:text-gray-300">
-      {stats.accountCount !== null &&
-        stats.tweetCount !== null &&
-        stats.likedTweetCount !== null && (
-          <p className="mb-4 text-xs">
-            <strong>{stats.accountCount}</strong> accounts have uploaded a total
-            of <strong>{stats.tweetCount}</strong> tweets. We also have{' '}
-            <strong>{stats.likedTweetCount}</strong> liked tweets.
-          </p>
-        )}
-    </div>
+    stats && (
+      <div className="text-sm dark:text-gray-300">
+        {stats.accountCount !== null &&
+          stats.tweetCount !== null &&
+          stats.likedTweetCount !== null && (
+            <p className="mb-4 text-xs">
+              <strong>{stats.accountCount}</strong> accounts have uploaded a
+              total of <strong>{stats.tweetCount}</strong> tweets. We also have{' '}
+              <strong>{stats.likedTweetCount}</strong> liked tweets.
+            </p>
+          )}
+      </div>
+    )
   )
 }
 

@@ -1,5 +1,3 @@
-import { getSchemaName } from '@/lib-client/getTableName'
-
 export const getTweetsCount = async (supabase: any, account_id: string) => {
   return await supabase
     .from('account')

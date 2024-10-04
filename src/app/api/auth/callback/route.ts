@@ -17,7 +17,10 @@ export async function GET(request: Request) {
       // Move provider_id to app_metadata
       const { data: updateData, error: updateError } =
         await supabase.auth.admin.updateUserById(data.user.id, {
-          app_metadata: { provider_id: data.user.user_metadata.provider_id },
+          app_metadata: {
+            provider_id: data.user.user_metadata.provider_id,
+            user_name: data.user.user_metadata.user_name,
+          },
         })
 
       if (updateError) {

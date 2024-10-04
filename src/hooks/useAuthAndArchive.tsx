@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@/utils/supabase'
-import { getSchemaName, getTableName } from '@/lib-client/getTableName'
+import { getTableName } from '@/lib-client/getTableName'
 
 export function useAuthAndArchive() {
   const [userMetadata, setUserMetadata] = useState<any>(null)

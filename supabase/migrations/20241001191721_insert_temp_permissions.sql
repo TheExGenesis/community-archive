@@ -53,7 +53,7 @@ COALESCE(($1->>''num_likes'')::INTEGER, 0)
 ', p_suffix)
 USING p_account;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION public.insert_temp_profiles(p_profile JSONB, p_account_id TEXT, p_suffix TEXT)
 RETURNS VOID AS $$

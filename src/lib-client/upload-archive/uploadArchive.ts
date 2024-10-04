@@ -11,12 +11,6 @@ export const uploadArchive = async (
   }) => void,
   archive: Archive,
 ) => {
-  console.log('admin supabase?', {
-    supabase,
-    dev: process.env.NODE_ENV,
-    role: process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE,
-  })
-
   progressCallback({ phase: 'Uploading archive', percent: 0 })
 
   // Use the new function here

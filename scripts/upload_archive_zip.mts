@@ -5,10 +5,14 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import unzipper from 'unzipper'
 import { Archive } from '../src/lib-client/types'
+import { v4 as uuidv4 } from 'uuid'
 const { validateFileContents } = await import(
   '../src/lib-client/upload-archive/validateContent'
 )
 const { processTwitterArchive } = await import('../src/lib-server/db_insert')
+const { uploadArchiveToStorage } = await import(
+  '../src/lib-client/upload-archive/uploadArchiveToStorage'
+)
 
 // Initialize paths
 const __filename = fileURLToPath(import.meta.url)
@@ -97,12 +101,16 @@ const extractZip = async (filePath: string): Promise<Archive> => {
 const uploadArchive = async (filePath: string) => {
   try {
     const archive = await extractZip(filePath)
+
+    await uploadArchiveToStorage(supabase, archive)
+    console.log('Archive uploaded to storage successfully')
+
     await processTwitterArchive(supabase, archive, (progress) => {
       console.log(`${progress.phase}: ${progress.percent?.toFixed(2)}%`)
     })
-    console.log('Archive upload completed successfully')
+    console.log('Archive processing completed successfully')
   } catch (error) {
-    console.error('Error uploading archive:', error)
+    console.error('Error uploading and processing archive:', error)
   }
 }
 

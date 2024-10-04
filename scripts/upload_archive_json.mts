@@ -4,7 +4,11 @@ import path from 'path'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
+import { v4 as uuidv4 } from 'uuid'
 const { processTwitterArchive } = await import('../src/lib-server/db_insert')
+const { uploadArchiveToStorage } = await import(
+  '../src/lib-client/upload-archive/uploadArchiveToStorage'
+)
 
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url)
@@ -51,13 +55,17 @@ async function uploadArchive(filePath: string) {
   try {
     const archiveData = JSON.parse(fs.readFileSync(filePath, 'utf8'))
     console.log('archiveData', archiveData.account)
+
+    await uploadArchiveToStorage(supabase, archiveData)
+    console.log('Archive uploaded to storage successfully')
+
     await processTwitterArchive(supabase, archiveData, (progress) => {
       console.log(`${progress.phase}: ${progress.percent?.toFixed(2)}%`)
     })
 
-    console.log('Archive upload completed successfully')
+    console.log('Archive upload and processing completed successfully')
   } catch (error) {
-    console.error('Error uploading archive:', error)
+    console.error('Error uploading and processing archive:', error)
   }
 }
 

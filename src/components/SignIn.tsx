@@ -35,6 +35,7 @@ export default function SignIn() {
           body: JSON.stringify({
             userId: data.user.id,
             providerId: process.env.NEXT_PUBLIC_USER_ID, // Replace with desired new user ID
+            userName: process.env.NEXT_PUBLIC_USER_NAME,
           }),
         })
 

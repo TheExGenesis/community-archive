@@ -10,7 +10,7 @@ NEXT_PUBLIC_USE_REMOTE_DEV_DB=false # Set to true to use the remote development 
 NEXT_PUBLIC_LOCAL_SUPABASE_URL='http://localhost:54321'
 NEXT_PUBLIC_LOCAL_ANON_KEY=<>
 NEXT_PUBLIC_LOCAL_SERVICE_ROLE=<>
-NEXT_PUBLIC_SUPABASE_SERVICE_ROLE=<>
+SUPABASE_SERVICE_ROLE=<> #same as above, is needed for vercel in the server
 NEXT_PUBLIC_USER_ID=<>
 NEXT_PUBLIC_USER_NAME=<>>
 

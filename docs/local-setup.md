@@ -6,6 +6,14 @@
 
 NEXT_PUBLIC_SUPABASE_URL=https://fabxmporizzqflnftavs.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8
+NEXT_PUBLIC_USE_REMOTE_DEV_DB=false # Set to true to use the remote development database, false to use the local development database
+NEXT_PUBLIC_LOCAL_SUPABASE_URL='http://localhost:54321'
+NEXT_PUBLIC_LOCAL_ANON_KEY=<>
+NEXT_PUBLIC_LOCAL_SERVICE_ROLE=<>
+NEXT_PUBLIC_SUPABASE_SERVICE_ROLE=<>
+NEXT_PUBLIC_USER_ID=<>
+NEXT_PUBLIC_USER_NAME=<>>
+
 
 ```
 
@@ -22,7 +30,7 @@ pnpm install
 
 3. You can now run the Next.js local development server:
 
-```bash
+```**bash**
 pnpm run dev
 ```
 
@@ -51,6 +59,8 @@ Echoing [Supabase's Local Development instructions](https://supabase.com/docs/gu
 
 You can now visit your local Dashboard at `http://localhost:54323`, and access the database directly with any Postgres client via `postgresql://postgres:postgres@localhost:54322/postgres.`
 
+`supabase start` will give you the url, anon key, and service role key for your local db.
+
 The local Postgres instance can be accessed through psql
 or any other Postgres client, such as pgadmin.
 
@@ -76,19 +86,25 @@ For each change you make to the db:
 5. Apply the new migration to your local database `supabase migration up` or `supabase db reset`
 6. CAREFUL: Deploy any local database migrations directly to prod `supabase db push`
 
-### Dumping the database
+### Sign-in in dev mode
 
-Dump database into a sql file `supabase/schema.sql`
-
-```bash
-supabase db dump --data-only --db-url <your database URL>
-```
-
-Process the sql dump into a series of csv files, one per table:
+You might to test archive uploads in dev mode. Set these env variables to the user id and name of the user whose archive you want to upload.
 
 ```
-python scripts/process_sql_dump.py supabase/schema.sql <OUTPUT_DIR>
+NEXT_PUBLIC_USER_ID=<>
+NEXT_PUBLIC_USER_NAME=<>>
 ```
+
+Then go to your supabase dashboard and in `Authentication`, press `Add user`:
+
+```
+email: dev@gmail.com
+password: dev
+```
+
+### Dumping the database to file
+
+Use `scripts/download_storage.ts` to download the storage files from the database to a local directory.
 
 ### Requirements
 

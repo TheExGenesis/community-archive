@@ -105,9 +105,25 @@ async function renameObjects(bucket: string, paths: string[]) {
   console.log(`Renaming process completed`)
 }
 
+async function renameObjects2(bucket: string, paths: string[]) {
+  for (const path of paths) {
+    const [username, timestamp] = path.split('/')
+    const newName = `${username.toLowerCase()}/${timestamp}`
+
+    const { error } = await supabase.storage.from(bucket).move(path, newName)
+
+    if (error) {
+      console.error(`Failed to rename ${path} to ${newName}:`, error)
+    } else {
+      console.log(`Renamed ${path} to ${newName}`)
+    }
+  }
+  console.log('Renaming process completed')
+}
+
 const bucket = 'archives'
 listBucketContents(bucket)
-  .then((paths) => renameObjects(bucket, paths))
+  .then((paths) => renameObjects2(bucket, paths))
   .catch((error) => console.error('Error in renaming process:', error))
 
 // supabase.storage

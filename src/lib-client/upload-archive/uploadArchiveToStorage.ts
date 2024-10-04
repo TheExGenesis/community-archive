@@ -43,8 +43,7 @@ export const uploadArchiveToStorage = async (
     supabase,
   })
 
-  const bucketName =
-    process.env.NODE_ENV === 'production' ? 'archives' : 'dev_archives'
+  const bucketName = 'archives'
   const { data, error: uploadError } = await supabase.storage
     .from(bucketName)
     .upload(`${username}/${latestTweetDate}.json`, JSON.stringify(archive), {

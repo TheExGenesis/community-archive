@@ -22,7 +22,7 @@ const supabaseUrl = isProd
   : process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL
 
 const supabaseServiceRoleKey = isProd
-  ? process.env.SUPABASE_SERVICE_ROLE
+  ? process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE
   : process.env.NEXT_PUBLIC_LOCAL_SERVICE_ROLE
 console.log('supabaseUrl', supabaseUrl)
 console.log('supabaseServiceRoleKey', supabaseServiceRoleKey)

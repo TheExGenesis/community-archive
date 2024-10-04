@@ -1,30 +1,12 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import Tweet from '@/components/Tweet'
 import { createBrowserClient } from '@/utils/supabase'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { getSchemaName } from '@/lib-client/getTableName'
 import { devLog } from '@/lib-client/devLog'
 import { SupabaseClient } from '@supabase/supabase-js'
-
-const getLatestTweets = async (
-  supabase: any,
-  count: number,
-  account_id?: string,
-) => {
-  const { data, error } = await supabase
-    .schema(getSchemaName())
-    .rpc('get_latest_tweets', { count: count, p_account_id: account_id })
-
-  if (error) {
-    console.error('Error fetching tweets:', error)
-    throw error
-  }
-
-  console.log('data', data)
-
-  return data
-}
+import { Database } from '@/database-types'
+import getLatestTweets from '@/lib-client/queries/getLatestTweets'
 
 const searchTweetsExact = async (
   supabase: any,
@@ -60,9 +42,14 @@ const searchTweetsOR = async (
   return pgSearch(supabase, queryOR, account_id)
 }
 
-const pgSearch = async (supabase: any, query: string, account_id?: string) => {
+const pgSearch = async (
+  supabase: SupabaseClient<Database>,
+  query: string,
+  account_id?: string,
+) => {
+  console.log('pgSearch', { supabase, query, account_id })
+
   const supabaseBaseQuery = supabase
-    .schema(getSchemaName())
     .from('tweets')
     .select(
       `
@@ -147,42 +134,51 @@ export default function SearchTweets({
     }
   }, [supabaseClient])
 
-  useEffect(() => {
-    const fetchLatestTweets = async () => {
-      const latestTweets = await getLatestTweets(
-        supabase,
-        50,
-        account_id || undefined,
-      )
-      setTweetsOR(latestTweets)
+  const fetchLatestTweets = useCallback(async () => {
+    if (!supabaseClient) {
+      console.warn('Supabase client is not initialized')
+      return
     }
+    const latestTweets = await getLatestTweets(
+      supabaseClient,
+      50,
+      account_id || undefined,
+    )
+    setTweetsOR(latestTweets)
+  }, [supabaseClient, account_id])
 
+  useEffect(() => {
     fetchLatestTweets()
-  }, [])
+  }, [fetchLatestTweets])
 
   const handleSearch = async () => {
+    if (!supabaseClient) {
+      console.warn('Supabase client is not initialized')
+      return
+    }
+    console.log('handleSearch', { supabaseClient })
+
     setIsLoading(true)
     setTweetsExact([])
     setTweetsAND([])
     setTweetsOR([])
 
     if (query.length === 0) {
-      const latestTweets = await getLatestTweets(supabase, 50)
-      setTweetsOR(latestTweets)
+      fetchLatestTweets()
       setIsLoading(false)
       return
     }
 
-    searchTweetsExact(supabase, query, account_id || undefined)
+    searchTweetsExact(supabaseClient, query, account_id || undefined)
       .then(setTweetsExact)
       .catch(console.error)
       .finally(() => setIsLoading(false))
 
-    searchTweetsAND(supabase, query, account_id || undefined)
+    searchTweetsAND(supabaseClient, query, account_id || undefined)
       .then(setTweetsAND)
       .catch(console.error)
 
-    searchTweetsOR(supabase, query, account_id || undefined)
+    searchTweetsOR(supabaseClient, query, account_id || undefined)
       .then(setTweetsOR)
       .catch(console.error)
   }

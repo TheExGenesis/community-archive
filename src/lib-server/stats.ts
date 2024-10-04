@@ -1,23 +1,19 @@
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
-import { getSchemaName } from '@/lib-client/getTableName'
 import { SupabaseClient } from '@supabase/supabase-js'
 
 export const getStats = async (supabase: SupabaseClient) => {
   const [accountsResult, tweetsResult, likedTweetsResult] = await Promise.all([
     supabase
-      .schema(getSchemaName())
       .from('account')
       .select(`username,account_id`)
       .order('created_at', { ascending: false }),
 
     supabase
-      .schema(getSchemaName())
       .from('tweets')
       .select('tweet_id', { count: 'planned', head: true }),
 
     supabase
-      .schema(getSchemaName())
       .from('liked_tweets')
       .select('tweet_id', { count: 'planned', head: true }),
   ])

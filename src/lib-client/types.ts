@@ -1,3 +1,6 @@
+import { Database } from '@/database-types'
+import { SupabaseClient } from '@supabase/supabase-js'
+
 // Define the structure of each part of the archive
 export interface Profile {
   description: {
@@ -106,6 +109,7 @@ export type ArchiveStats = {
 }
 
 export type FileUploadDialogProps = {
+  supabase: SupabaseClient<Database>
   isOpen: boolean
   onClose: () => void
   archive: Archive
@@ -123,4 +127,8 @@ export type AvatarType = {
   username: string
   avatar_media_url: string
   num_tweets?: number
+}
+
+export type ArchiveUpload = {
+  archive_at: string
 }

@@ -4,6 +4,7 @@ import {
   createServerClient as serverClient,
   type CookieOptions,
 } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -131,4 +132,13 @@ export const createServerAdminClient = (
       },
     },
   })
+}
+
+export async function createDbScriptClient() {
+
+  const { url, serviceRole } = getSupabaseConfig(true);
+  return createClient<Database>(
+    url!,
+    serviceRole!
+  );
 }

@@ -123,10 +123,10 @@ export const createServerAdminClient = (
 }
 
 export async function createDbScriptClient() {
-
-  const { url, serviceRole } = getSupabaseConfig(true);
-  return createClient<Database>(
-    url!,
-    serviceRole!
-  );
+  const isDevelopment = process.env.NODE_ENV === 'development'
+  if (!isDevelopment) {
+    throw new Error('createDbScriptClient can only be called in development mode')
+  }
+  const { url, serviceRole } = getSupabaseConfig(true)
+  return createClient<Database>(url!, serviceRole!)
 }

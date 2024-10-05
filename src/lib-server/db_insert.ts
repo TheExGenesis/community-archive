@@ -502,16 +502,22 @@ export const processTwitterArchive = async (
       phase: 'Finishing up...',
       percent: null,
     })
-    const commitStartTime = Date.now()
-    await retryOperation(async () => {
-      const { data, error } = await supabase.rpc('commit_temp_data', {
-        p_suffix: suffix,
-      })
-      if (error) throw error
-      return data
-    }, 'Error committing data')
-    const commitEndTime = Date.now()
-    console.log(`Commit processing time: ${commitEndTime - commitStartTime}ms`)
+    try {
+      const commitStartTime = Date.now()
+      await retryOperation(async () => {
+        const { data, error } = await supabase.rpc('commit_temp_data', {
+          p_suffix: suffix,
+        })
+        if (error) throw error
+        return data
+      }, 'Error committing data')
+      const commitEndTime = Date.now()
+      console.log(
+        `Commit processing time: ${commitEndTime - commitStartTime}ms`,
+      )
+    } catch (error: any) {
+      console.error('Error processing Twitter archive:', error)
+    }
 
     console.log('Twitter archive processing completed successfully.')
     progressCallback({

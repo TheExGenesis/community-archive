@@ -1,7 +1,7 @@
 CREATE OR REPLACE FUNCTION public.process_and_insert_tweet_entities(p_tweets JSONB, p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
-IF auth.uid() IS NULL AND current_user != 'postgres' THEN
+IF auth.uid() IS NULL AND current_user NOT IN ('postgres', 'service_role') THEN
 RAISE EXCEPTION 'Not authenticated';
 END IF;
 -- Insert mentioned users

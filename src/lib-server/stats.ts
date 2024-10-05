@@ -1,45 +1,22 @@
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
-import { getSchemaName } from '@/lib-client/getTableName'
 import { SupabaseClient } from '@supabase/supabase-js'
 
 export const getStats = async (supabase: SupabaseClient) => {
-  const [accountsResult, tweetsResult, likedTweetsResult] = await Promise.all([
-    supabase
-      .schema(getSchemaName())
-      .from('account')
-      .select(`username,account_id`)
-      .order('created_at', { ascending: false }),
+  const { data, error } = await supabase
+    .from('global_activity_summary')
+    .select('total_accounts, total_tweets, total_likes, total_user_mentions')
+    .single()
 
-    supabase
-      .schema(getSchemaName())
-      .from('tweets')
-      .select('tweet_id', { count: 'planned', head: true }),
-
-    supabase
-      .schema(getSchemaName())
-      .from('liked_tweets')
-      .select('tweet_id', { count: 'planned', head: true }),
-  ])
-
-  const { data: accounts, error: accountsError } = accountsResult
-  const { count: tweetCount, error: tweetsError } = tweetsResult
-  const { count: likedTweetCount, error: likedTweetsError } = likedTweetsResult
-
-  if (accountsError) {
-    console.error('Error fetching accounts:', accountsError)
-  }
-  if (tweetsError) {
-    console.error('Error fetching tweets:', tweetsError)
-  }
-  if (likedTweetsError) {
-    console.error('Error fetching liked tweets:', likedTweetsError)
+  if (error) {
+    console.error('Error fetching global activity summary:', error)
+    return null
   }
 
   return {
-    users: accounts,
-    accountCount: accounts ? accounts.length : null,
-    tweetCount: tweetCount ?? null,
-    likedTweetCount: likedTweetCount ?? null,
+    accountCount: data.total_accounts,
+    tweetCount: data.total_tweets,
+    likedTweetCount: data.total_likes,
+    userMentionsCount: data.total_user_mentions,
   }
 }

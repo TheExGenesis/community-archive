@@ -14,6 +14,8 @@ SUPABASE_SERVICE_ROLE=<> #same as above, is needed for vercel in the server
 NEXT_PUBLIC_USER_ID=<>
 NEXT_PUBLIC_USER_NAME=<>>
 
+ARCHIVE_PATH=<path_to_archive_folder>
+
 
 ```
 

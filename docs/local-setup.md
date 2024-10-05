@@ -49,6 +49,12 @@ Echoing [Supabase's Local Development instructions](https://supabase.com/docs/gu
       colima (macOS)
 - `supabase start`
 
+6. Download the last export from [the Github Releases](https://github.com/TheExGenesis/community-archive/releases)
+  6.1 set the `ARCHIVE_PATH` environment variable to the path of the archive folder
+  6.2 run the script `pnpm dev:importdata`
+  6.3 wait a bit and then you should be able to see the data in the local supabase studio at http://localhost:54323/project/default/editor
+
+
 You can now visit your local Dashboard at `http://localhost:54323`, and access the database directly with any Postgres client via `postgresql://postgres:postgres@localhost:54322/postgres.`
 
 The local Postgres instance can be accessed through psql
@@ -108,7 +114,9 @@ python scripts/process_sql_dump.py supabase/schema.sql <OUTPUT_DIR>
 - `pnpm test:ci` — Runs all the jest tests in the project, Jest will assume it is running in a CI environment.
 - `pnpm analyze` — Builds the project and opens the bundle analyzer.
 - `pnpm gen-api-docs` — Generates OpenAPI docs.
-- `pnpm gen-types` — Generates TypeScript types.
+- `pnpm gen-types` — Generates TypeScript types from the remote Supabase instance.
+- `pnpm dev:gen-types` — Generates TypeScript types from the local Supabase instance.
+- `pnpm dev:importdata` — Imports data from the archive folder into the local database.
 
 ### Paths
 

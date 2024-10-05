@@ -34,10 +34,28 @@ const extractZipContents = async (
     .map((e) => e.filename.match(/tweets-part\d+/)?.[0] ?? '')
     .filter(Boolean)
 
+  const likePartFilePaths = entries
+    .filter((e) => e.filename.includes('like-part'))
+    .map((e) => e.filename.match(/like-part\d+/)?.[0] ?? '')
+    .filter(Boolean)
+
+  const followingPartFilePaths = entries
+    .filter((e) => e.filename.includes('following-part'))
+    .map((e) => e.filename.match(/following-part\d+/)?.[0] ?? '')
+    .filter(Boolean)
+
+  const followerPartFilePaths = entries
+    .filter((e) => e.filename.includes('follower-part'))
+    .map((e) => e.filename.match(/follower-part\d+/)?.[0] ?? '')
+    .filter(Boolean)
+
   const allFilePaths = [
     ...requiredFiles,
     ...optionalFiles,
     ...tweetPartFilePaths,
+    ...likePartFilePaths,
+    ...followingPartFilePaths,
+    ...followerPartFilePaths,
   ].map((file) => `data/${file}.js`)
 
   const fileContents: { [key: string]: string[] } = {}
@@ -56,7 +74,13 @@ const extractZipContents = async (
           const content = await entry.getData(writer)
           const name = entry.filename.includes('data/tweets-part')
             ? 'tweets'
-            : fileName.slice(5, -3)
+            : entry.filename.includes('data/like-part')
+              ? 'like'
+              : entry.filename.includes('data/following-part')
+                ? 'following'
+                : entry.filename.includes('data/follower-part')
+                  ? 'follower'
+                  : fileName.slice(5, -3)
           if (!fileContents[name]) {
             fileContents[name] = []
           }
@@ -77,7 +101,7 @@ const parseFileContents = (fileContents: {
 }): Archive => {
   const archive: Archive = Object.fromEntries(
     Object.entries(fileContents).map(([key, contents]) => {
-      if (key === 'tweets') {
+      if (['tweets', 'like', 'follower', 'following'].includes(key)) {
         const allTweets = contents.flatMap((content) =>
           JSON.parse(content.slice(content.indexOf('['))),
         )

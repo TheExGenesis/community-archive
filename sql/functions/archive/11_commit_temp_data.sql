@@ -1,4 +1,3 @@
-
 -- Create or replace the commit_temp_data function
 CREATE OR REPLACE FUNCTION public.commit_temp_data(p_suffix TEXT)
 RETURNS VOID AS $$
@@ -52,7 +51,8 @@ BEGIN
         keep_private, 
         upload_likes, 
         start_date, 
-        end_date
+        end_date,
+        upload_phase
     )
     VALUES (
         v_account_id, 
@@ -61,7 +61,8 @@ BEGIN
         v_keep_private, 
         v_upload_likes, 
         v_start_date, 
-        v_end_date
+        v_end_date,
+        'uploading'
     )
     ON CONFLICT (account_id, archive_at)
     DO UPDATE SET
@@ -70,7 +71,8 @@ BEGIN
         keep_private = EXCLUDED.keep_private,
         upload_likes = EXCLUDED.upload_likes,
         start_date = EXCLUDED.start_date,
-        end_date = EXCLUDED.end_date
+        end_date = EXCLUDED.end_date,
+        upload_phase = 'uploading'
     RETURNING id INTO v_archive_upload_id;
 
     -- Insert profile data
@@ -182,6 +184,19 @@ BEGIN
 
     -- Drop temporary tables after committing
     PERFORM public.drop_temp_tables(p_suffix);
+
+    -- Update upload_phase to 'completed' after successful execution
+    UPDATE public.archive_upload
+    SET upload_phase = 'completed'
+    WHERE id = v_archive_upload_id;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Update upload_phase to 'failed' if an error occurs
+        UPDATE public.archive_upload
+        SET upload_phase = 'failed'
+        WHERE id = v_archive_upload_id;
+        RAISE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET statement_timeout TO '30min';

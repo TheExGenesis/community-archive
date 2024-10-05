@@ -1,6 +1,7 @@
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import { formatUserData } from '@/lib-client/user-utils'
+import { devLog } from '@/lib-client/devLog'
 
 const tweetSelectString = `
         *,
@@ -83,7 +84,7 @@ export const getUserData = async (account_id: string) => {
   }
 
   const formattedUser = formatUserData(data)
-  console.log('getUserData', { data, formattedUser })
+  devLog('getUserData', { data, formattedUser })
 
   return formattedUser
 }

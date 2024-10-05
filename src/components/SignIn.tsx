@@ -1,5 +1,6 @@
 'use client'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
+import { devLog } from '@/lib-client/devLog'
 import { createBrowserClient } from '@/utils/supabase'
 
 export default function SignIn() {
@@ -7,6 +8,10 @@ export default function SignIn() {
 
   const signIn = async () => {
     const supabase = createBrowserClient()
+    devLog('sign in', {
+      userMetadata,
+      useremote: process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB,
+    })
 
     if (
       process.env.NODE_ENV === 'development' &&
@@ -17,7 +22,7 @@ export default function SignIn() {
         email: 'dev@gmail.com',
         password: 'dev',
       })
-
+      devLog('sign in with password', { data, error })
       if (error) {
         console.error('Error signing in:', error)
       } else if (data.user) {
@@ -30,19 +35,20 @@ export default function SignIn() {
           body: JSON.stringify({
             userId: data.user.id,
             providerId: process.env.NEXT_PUBLIC_USER_ID, // Replace with desired new user ID
+            userName: process.env.NEXT_PUBLIC_USER_NAME,
           }),
         })
 
         const result = await response.json()
         if (response.ok) {
-          console.log('User ID updated:', result.data)
+          devLog('User ID updated:', result.data)
         } else {
           console.error('Failed to update user ID:', result.error)
         }
       }
     } else {
       // Existing Twitter OAuth sign-in
-      console.log('sign in with twitter', {
+      devLog('sign in with twitter', {
         userMetadata,
         origin: window.location.origin,
       })
@@ -52,7 +58,7 @@ export default function SignIn() {
           redirectTo: `${window.location.origin}/api/auth/callback`,
         },
       })
-      console.log({ data, error })
+      devLog({ data, error })
 
       if (error) {
         console.error('Error signing in with Twitter:', error)
@@ -63,7 +69,7 @@ export default function SignIn() {
   const handleSignOut = async () => {
     const supabase = createBrowserClient()
     const { error } = await supabase.auth.signOut()
-    console.log('sign out', { error })
+    devLog('sign out', { error })
     if (!error) {
       window.location.reload()
     }

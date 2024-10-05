@@ -1,7 +1,5 @@
 import { Archive, UploadOptions } from '../types'
 
-
-
 export const emptyLikesList = (archive: Archive): Archive => ({
   ...archive,
   like: [],
@@ -31,7 +29,9 @@ export const applyOptionsToArchive = (
   options: UploadOptions,
 ): Archive => {
   let archive = _archive
+  console.log('Applying options to archive', { options })
   if (options.startDate && options.endDate) {
+    console.log('Filtering tweets by date')
     archive = filterArchiveTweetsByDate(
       archive,
       options.startDate.toISOString(),
@@ -39,9 +39,10 @@ export const applyOptionsToArchive = (
     )
   }
   if (options.keepPrivate) {
-    archive = emptyLikesList(archive)
+    console.log('Keeping tweets private')
   }
-  if (options.uploadLikes) {
+  if (!options.uploadLikes) {
+    console.log('Emptying likes list')
     archive = emptyLikesList(archive)
   }
   return { 'upload-options': options, ...archive }

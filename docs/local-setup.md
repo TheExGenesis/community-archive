@@ -59,11 +59,6 @@ Echoing [Supabase's Local Development instructions](https://supabase.com/docs/gu
       colima (macOS)
 - `supabase start`
 
-6. Download the last export from [the Github Releases](https://github.com/TheExGenesis/community-archive/releases)
-  6.1 set the `ARCHIVE_PATH` environment variable to the path of the archive folder
-  6.2 run the script `pnpm dev:importdata`
-  6.3 wait a bit and then you should be able to see the data in the local supabase studio at http://localhost:54323/project/default/editor
-
 
 You can now visit your local Dashboard at `http://localhost:54323`, and access the database directly with any Postgres client via `postgresql://postgres:postgres@localhost:54322/postgres.`
 
@@ -93,6 +88,13 @@ For each change you make to the db:
 4. Add the SQL to your migration file
 5. Apply the new migration to your local database `supabase migration up` or `supabase db reset`
 6. CAREFUL: Deploy any local database migrations directly to prod `supabase db push`
+
+### Seeding the local database
+
+- Download the last export from [the Github Releases](https://github.com/TheExGenesis/community-archive/releases)
+- set the `ARCHIVE_PATH` environment variable to the path of the archive folder
+- run the script `pnpm dev:importdata`
+- wait a bit and then you should be able to see the data in the local supabase studio at http://localhost:54323/project/default/editor
 
 ### Sign-in in dev mode
 

@@ -3,6 +3,10 @@ import { getUserData, getFirstTweets, getTopTweets } from '@/lib-server/user'
 import Tweet from '@/components/Tweet'
 import SearchTweets from '@/components/SearchTweets'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import TopMentionedUsers from '@/components/TopMentionedMissingUsers'
+import { createServerClient } from '@/utils/supabase'
+import { cookies } from 'next/headers'
+import { devLog } from '@/lib-client/devLog'
 
 export default async function User({ params, searchParams }: any) {
   const { account_id } = params
@@ -14,6 +18,10 @@ export default async function User({ params, searchParams }: any) {
   const account = userData
   const firstTweets = await getFirstTweets(account.account_id)
   const topTweets = await getTopTweets(account.account_id)
+
+  const mostMentionedAccounts = await getAccountMostMentionedAccounts(
+    account.username,
+  )
 
   return (
     <div
@@ -58,7 +66,13 @@ export default async function User({ params, searchParams }: any) {
           </div>
         </div>
       </div>
-
+      <h2 className="mb-4 text-xl font-semibold">
+        {'Most Mentioned Accounts'}
+      </h2>
+      <p>{`Top accounts mentioned by @${account.username}`}</p>
+      <div className="h-[25vh] overflow-y-auto">
+        <TopMentionedUsers users={mostMentionedAccounts} />
+      </div>
       <div className="h-screen overflow-y-auto">
         <SearchTweets
           supabase={null}
@@ -67,51 +81,59 @@ export default async function User({ params, searchParams }: any) {
         />
       </div>
       <hr style={{ marginBottom: '50px' }} />
-      {/* {topTweets && topTweets.length > 0 && (
-        <>
-          <h2>Top 20 tweets</h2>
-          <div className="short-tweet-container">
-            {topTweets.map((tweet: any) => (
-              <Tweet
-                key={tweet.tweet_id}
-                username={tweet.username}
-                displayName={tweet.display_name}
-                profilePicUrl={tweet.profile_image_url}
-                text={tweet.text}
-                favoriteCount={tweet.favorite_count}
-                retweetCount={tweet.retweet_count}
-                date={tweet.created_at}
-                tweetUrl={`https://twitter.com/${tweet.username}/status/${tweet.tweet_id}`}
-                tweetId={tweet.tweet_id}
-                replyToUsername={tweet.in_reply_to_screen_name}
-              />
-            ))}
-          </div>
-        </>
-      )}
-
-      {firstTweets && firstTweets.length > 0 && (
-        <>
-          <h2>First 100 tweets</h2>
-          <div className="short-tweet-container">
-            {firstTweets.map((tweet: any) => (
-              <Tweet
-                key={tweet.tweet_id}
-                username={tweet.username}
-                displayName={tweet.display_name}
-                profilePicUrl={tweet.profile_image_url}
-                text={tweet.text}
-                favoriteCount={tweet.favorite_count}
-                retweetCount={tweet.retweet_count}
-                date={tweet.created_at}
-                tweetUrl={`https://twitter.com/${tweet.username}/status/${tweet.tweet_id}`}
-                tweetId={tweet.tweet_id}
-                replyToUsername={tweet.in_reply_to_screen_name}
-              />
-            ))}
-          </div>
-        </>
-      )} */}
     </div>
   )
+}
+
+type MentionedUser = {
+  mentioned_user_id: string
+  mentioned_username: string
+  mention_count: number
+}
+async function getAccountMostMentionedAccounts(
+  username: string,
+): Promise<MentionedUser[]> {
+  const cookieStore = cookies()
+  const supabase = createServerClient(cookieStore)
+
+  const { data: users, error } = await supabase.rpc(
+    'get_account_most_mentioned_accounts',
+    { username_: username, limit_: 10 },
+  )
+
+  if (error) {
+    console.error('Error fetching most mentioned accounts:', error)
+    return []
+  }
+
+  const mentionedUsers = await Promise.all(
+    users
+      .filter((user: any) => user.screen_name !== username)
+      .map(async (user: any) => {
+        const { data: profile } = await supabase
+          .from('profile')
+          .select('*')
+          .eq('account_id', user.user_id)
+          .order('archive_upload_id', { ascending: false })
+          .limit(1)
+          .single()
+
+        const { data: account } = await supabase
+          .from('account')
+          .select('*')
+          .eq('account_id', user.user_id)
+          .single()
+
+        return {
+          mentioned_user_id: user.user_id,
+          screen_name: user.screen_name,
+          mention_count: user.mention_count,
+          account_display_name: user.name,
+          avatar_media_url: profile?.avatar_media_url,
+          uploaded: !!account,
+        }
+      }),
+  )
+  devLog('mentionedUsers', mentionedUsers)
+  return mentionedUsers
 }

@@ -21,8 +21,12 @@
    const supabaseUrl = 'https://fabxmporizzqflnftavs.supabase.co'
    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
    const supabase = createClient(supabaseUrl, supabaseKey)
-   const { data, error } = await supabase.from('profile').select('*').limit(5)
+   const { data, error } = await supabase
+     .schema('public')
+     .from('profile')
+     .select('*')
+     .limit(5)
    console.log(data)
    ```
 
-2. See [API schema here](https://open-birdsite-db.vercel.app/api/reference). Only `GET` requests are relevant, others you don't have permission for. 
+2. See [API schema here](https://open-birdsite-db.vercel.app/api/reference). Only `GET` requests are relevant, others you don't have permission for.

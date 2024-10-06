@@ -1,7 +1,9 @@
+import { pipe } from '@/lib-server/fp'
 import { devLog } from '../devLog'
 import { Archive } from '../types'
 import { validateContent, validateFileContents } from './validateContent'
 import { BlobReader, ZipReader, TextWriter } from '@zip.js/zip.js'
+import { removeProblematicCharacters } from '../removeProblematicChars'
 
 export const requiredFiles = [
   'profile',
@@ -103,11 +105,22 @@ const parseFileContents = (fileContents: {
     Object.entries(fileContents).map(([key, contents]) => {
       if (['tweets', 'like', 'follower', 'following'].includes(key)) {
         const allTweets = contents.flatMap((content) =>
-          JSON.parse(content.slice(content.indexOf('['))),
+          pipe(
+            (content) => content.slice(content.indexOf('[')),
+            removeProblematicCharacters,
+            JSON.parse,
+          )(content),
         )
         return [key, allTweets]
       } else {
-        return [key, JSON.parse(contents[0].slice(contents[0].indexOf('[')))]
+        return [
+          key,
+          pipe(
+            (content) => content.slice(content.indexOf('[')),
+            removeProblematicCharacters,
+            JSON.parse,
+          )(contents[0]),
+        ]
       }
     }),
   ) as Archive

@@ -31,9 +31,11 @@ const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
   let retries = 0
 
   while (retries < maxRetries) {
-    ;({ data, error } = await supabase.rpc('get_top_accounts_with_followers', {
-      limit_count: 8,
-    }))
+    ;({ data, error } = await supabase
+      .schema('public')
+      .rpc('get_top_accounts_with_followers', {
+        limit_count: 8,
+      }))
 
     if (!error) break
 

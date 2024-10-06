@@ -12,23 +12,23 @@ BEGIN
         -- Delete tweets and related data
         EXECUTE format('
             WITH tweets_to_delete AS (
-                SELECT tweet_id FROM %I.tweets WHERE archive_upload_id = ANY($1)
+                SELECT tweet_id FROM %I.tweets WHERE archive_upload_id = ANY($1) OR account_id = $2
             )
             DELETE FROM %I.tweet_media WHERE tweet_id IN (SELECT tweet_id FROM tweets_to_delete);
 
-            WITH tweets_to_delete AS (
-                SELECT tweet_id FROM %I.tweets WHERE archive_upload_id = ANY($1)
-            )
+                WITH tweets_to_delete AS (
+                    SELECT tweet_id FROM %I.tweets WHERE archive_upload_id = ANY($1) 
+                )
             DELETE FROM %I.user_mentions WHERE tweet_id IN (SELECT tweet_id FROM tweets_to_delete);
 
             WITH tweets_to_delete AS (
-                SELECT tweet_id FROM %I.tweets WHERE archive_upload_id = ANY($1)
+                SELECT tweet_id FROM %I.tweets WHERE archive_upload_id = ANY($1) OR account_id = $2
             )
             DELETE FROM %I.tweet_urls WHERE tweet_id IN (SELECT tweet_id FROM tweets_to_delete);
 
             DELETE FROM %I.tweets WHERE archive_upload_id = ANY($1);
         ', v_schema_name, v_schema_name, v_schema_name, v_schema_name, v_schema_name, v_schema_name, v_schema_name)
-        USING v_archive_upload_ids;
+        USING v_archive_upload_ids, p_account_id;
 
         -- Delete other related data
         EXECUTE format('
@@ -46,5 +46,5 @@ BEGIN
         RAISE;
     END;
 END;
-$$ LANGUAGE plpgsql
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 SET statement_timeout TO '20min';

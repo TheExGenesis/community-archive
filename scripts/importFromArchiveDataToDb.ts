@@ -34,6 +34,10 @@ enum FilesToProcess {
   ArchiveUpload = "archive_upload",
 }
 
+function ifStringNullReturnNull(value: string | null): string | null {
+  return value === "NULL" || !value  ? null : value;
+}
+
 (async function execute() {
   var supabase = await createDbScriptClient();
 
@@ -141,7 +145,7 @@ enum FilesToProcess {
       );
       let getItem = (item: any) => {
         const { account_id,bio,website,location,avatar_media_url,header_media_url,archive_upload_id } = item;
-      const newItem: InsertProfile = { account_id,bio,website,location,avatar_media_url,header_media_url,archive_upload_id};
+      const newItem: InsertProfile = { account_id,bio,website,location,avatar_media_url,header_media_url:ifStringNullReturnNull(header_media_url),archive_upload_id};
       return newItem;
       };
       await Upsert_Skeleton(profile, "profile", getItem, 1, []);
@@ -282,7 +286,11 @@ enum FilesToProcess {
     let getItem = (item: any) => {
       const { tweet_id,account_id,created_at,full_text,retweet_count,favorite_count,reply_to_tweet_id,reply_to_user_id,reply_to_username,archive_upload_id } = item;
       const newItem: InsertTweets = {
-        tweet_id,account_id,created_at,full_text,retweet_count,favorite_count,reply_to_tweet_id,reply_to_user_id,reply_to_username,archive_upload_id
+        tweet_id,account_id,created_at,full_text,retweet_count,favorite_count,
+        reply_to_tweet_id:ifStringNullReturnNull(reply_to_tweet_id),
+        reply_to_user_id:ifStringNullReturnNull(reply_to_user_id),
+        reply_to_username:ifStringNullReturnNull(reply_to_username),
+        archive_upload_id
       };
       return newItem;
     };

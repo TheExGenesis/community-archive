@@ -4,6 +4,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 
 export const getStats = async (supabase: SupabaseClient) => {
   const { data, error } = await supabase
+    .schema('public')
     .from('global_activity_summary')
     .select('total_accounts, total_tweets, total_likes, total_user_mentions')
     .single()

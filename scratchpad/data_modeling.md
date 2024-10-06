@@ -124,6 +124,7 @@ Example of inserting data into a table:
 
 ```js
 const { error } = await supabase
+  .schema('public')
   .from('countries')
   .insert({ id: 1, name: 'Denmark' })
 ```

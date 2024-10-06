@@ -24,10 +24,12 @@ async function getTweetCountByDate() {
   const startDate = '2023-01-01'
   const endDate = '2023-12-31'
 
-  const { data, error } = await supabase.rpc('get_tweet_count_by_date', {
-    start_date: startDate,
-    end_date: endDate,
-  })
+  const { data, error } = await supabase
+    .schema('public')
+    .rpc('get_tweet_count_by_date', {
+      start_date: startDate,
+      end_date: endDate,
+    })
 
   if (error) {
     console.error('Error fetching tweet count by date:', error)

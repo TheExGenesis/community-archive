@@ -45,7 +45,10 @@ describe('Database Permissions Tests', () => {
   })
 
   test('Anon user can read from dev_account', async () => {
-    const { data, error } = await supabase.from('dev_account').select('*')
+    const { data, error } = await supabase
+      .schema('public')
+      .from('dev_account')
+      .select('*')
     console.log('data', data)
     expect(error).toBeNull()
     expect(data).toHaveLength(1)
@@ -60,6 +63,7 @@ describe('Database Permissions Tests', () => {
     }
 
     const { data, error } = await supabase
+      .schema('public')
       .from('dev_account')
       .insert(newAccount)
 

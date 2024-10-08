@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { createBrowserClient } from '@/utils/supabase'
 import { devLog } from '@/lib-client/devLog'
+import { Label } from '@/components/ui/label'
 
 export type MentionedUser = {
   mentioned_user_id: string
@@ -28,15 +29,19 @@ export type MentionedUser = {
 type Props = {
   users: MentionedUser[]
   showInviteButton?: boolean
+  showUploadedDefault?: boolean
+  showUploadedSwitch?: boolean
   height?: string // Add this line
 }
 
 export default function TopMentionedUsers({
   users,
   showInviteButton = false,
+  showUploadedDefault = true,
+  showUploadedSwitch = false,
   height = '100%', // Add this line with a default value
 }: Props) {
-  const [showUploaded, setShowUploaded] = useState(true)
+  const [showUploaded, setShowUploaded] = useState(showUploadedDefault)
   const [enrichedUsers, setEnrichedUsers] = useState<MentionedUser[]>([])
   const supabase = createBrowserClient()
 
@@ -101,6 +106,16 @@ export default function TopMentionedUsers({
 
   return (
     <div className="w-full overflow-x-auto">
+      {showUploadedSwitch && (
+        <div className="mb-4 flex items-center space-x-2">
+          <Switch
+            id="show-uploaded"
+            checked={showUploaded}
+            onCheckedChange={setShowUploaded}
+          />
+          <Label htmlFor="show-uploaded">Show uploaded users</Label>
+        </div>
+      )}
       <ScrollArea className={height}>
         <Table>
           <TableHeader>

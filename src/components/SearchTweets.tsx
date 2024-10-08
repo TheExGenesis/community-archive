@@ -3,111 +3,14 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import Tweet from '@/components/Tweet'
 import { createBrowserClient } from '@/utils/supabase'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { devLog } from '@/lib-client/devLog'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/database-types'
 import getLatestTweets from '@/lib-client/queries/getLatestTweets'
-
-const searchTweetsExact = async (
-  supabase: any,
-  queryText: string,
-  account_id?: string,
-) => {
-  const words = queryText.split(' ')
-  const queryExact = words.join('+')
-  return pgSearch(supabase, queryExact, account_id)
-}
-
-const searchTweetsAND = async (
-  supabase: any,
-  queryText: string,
-  account_id?: string,
-) => {
-  const words = queryText
-    .split(' ')
-    .map((word) => `'${word.replaceAll(/'/g, "''")}'`)
-  const queryAND = words.join(' & ')
-  return pgSearch(supabase, queryAND, account_id)
-}
-
-const searchTweetsOR = async (
-  supabase: any,
-  queryText: string,
-  account_id?: string,
-) => {
-  const words = queryText
-    .split(' ')
-    .map((word) => `'${word.replaceAll(/'/g, "''")}'`)
-  const queryOR = words.join(' | ')
-  return pgSearch(supabase, queryOR, account_id)
-}
-
-const pgSearch = async (
-  supabase: SupabaseClient<Database>,
-  query: string,
-  account_id?: string,
-) => {
-  console.log('pgSearch', { supabase, query, account_id })
-
-  const supabaseBaseQuery = supabase
-    .from('tweets')
-    .select(
-      `
-      tweet_id,
-      account_id,
-      created_at,
-      full_text,
-      retweet_count,
-      favorite_count,
-      reply_to_tweet_id,
-      account:account!inner (
-        profile (
-          avatar_media_url,
-          archive_upload_id
-        ),
-        username,
-        account_display_name
-      )
-    `,
-    )
-    .textSearch('fts', query)
-    .order('created_at', { ascending: false })
-    .limit(50)
-
-  if (account_id) {
-    supabaseBaseQuery.eq('account_id', account_id)
-  }
-
-  const { data: tweets, error } = await supabaseBaseQuery
-  if (error) {
-    console.error('Error fetching tweets:', error)
-    throw error
-  }
-  devLog('base search tweets', tweets)
-
-  const formattedTweets = tweets.map((tweet: any) => ({
-    tweet_id: tweet.tweet_id,
-    account_id: tweet.account_id,
-    created_at: tweet.created_at,
-    full_text: tweet.full_text,
-    retweet_count: tweet.retweet_count,
-    favorite_count: tweet.favorite_count,
-    reply_to_tweet_id: tweet.reply_to_tweet_id,
-    archive_upload_id: tweet.archive_upload_id,
-    avatar_media_url: Array.isArray(tweet.account.profile)
-      ? tweet.account.profile.reduce((latest: any, profile: any) =>
-          !latest || profile.archive_upload_id > latest.archive_upload_id
-            ? profile
-            : latest,
-        )?.avatar_media_url
-      : tweet.account.profile?.avatar_media_url,
-    username: tweet.account.username,
-    account_display_name: tweet.account.account_display_name,
-  }))
-
-  devLog('search tweets', formattedTweets)
-  return formattedTweets
-}
+import {
+  searchTweetsExact,
+  searchTweetsAND,
+  searchTweetsOR,
+} from '@/lib-client/pgSearch'
 
 interface SearchProps {
   supabase: SupabaseClient | null

@@ -1,4 +1,3 @@
-
 CREATE OR REPLACE FUNCTION public.get_account_most_liked_tweets_archive_users(
     username_ TEXT,
     limit_ INTEGER DEFAULT NULL
@@ -16,6 +15,8 @@ CREATE OR REPLACE FUNCTION public.get_account_most_liked_tweets_archive_users(
   num_likes BIGINT
 ) AS $$
 BEGIN
+    RAISE NOTICE 'Executing get_account_most_liked_tweets_archive_users with username % and limit %', username_, limit_;
+    
     RETURN QUERY
     SELECT 
         t.tweet_id, 

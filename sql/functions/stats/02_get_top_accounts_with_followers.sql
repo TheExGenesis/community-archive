@@ -18,6 +18,8 @@ RETURNS TABLE(
     LANGUAGE "plpgsql"
     AS $$
 BEGIN
+    RAISE NOTICE 'Executing get_top_accounts_with_followers with limit_count %', limit_count;
+    
     RETURN QUERY
     SELECT 
         a.account_id,

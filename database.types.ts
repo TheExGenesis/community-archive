@@ -1472,6 +1472,29 @@ export type Database = {
         }
         Returns: undefined
       }
+      search_tweets: {
+        Args: {
+          search_query: string
+          from_user?: string
+          to_user?: string
+          since_date?: string
+          until_date?: string
+          limit_?: number
+        }
+        Returns: {
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          reply_to_tweet_id: string
+          avatar_media_url: string
+          archive_upload_id: number
+          username: string
+          account_display_name: string
+        }[]
+      }
       set_limit: {
         Args: {
           "": number

@@ -59,7 +59,6 @@ Echoing [Supabase's Local Development instructions](https://supabase.com/docs/gu
       colima (macOS)
 - `supabase start`
 
-
 You can now visit your local Dashboard at `http://localhost:54323`, and access the database directly with any Postgres client via `postgresql://postgres:postgres@localhost:54322/postgres.`
 
 `supabase start` will give you the url, anon key, and service role key for your local db.
@@ -70,6 +69,10 @@ or any other Postgres client, such as pgadmin.
 For example:
 
 `psql 'postgresql://postgres:postgres@localhost:54322/postgres'`
+
+### Set up storage
+
+- Manually make a bucket in supabase storage called `archive`.
 
 ### Manage remote migrations
 

@@ -28,7 +28,6 @@ export type MentionedUser = {
 
 type Props = {
   users: MentionedUser[]
-  showInviteButton?: boolean
   showUploadedDefault?: boolean
   showUploadedSwitch?: boolean
   height?: string // Add this line
@@ -36,7 +35,6 @@ type Props = {
 
 export default function TopMentionedUsers({
   users,
-  showInviteButton = false,
   showUploadedDefault = true,
   showUploadedSwitch = false,
   height = '100%', // Add this line with a default value
@@ -123,7 +121,6 @@ export default function TopMentionedUsers({
               <TableHead></TableHead>
               <TableHead>Username</TableHead>
               <TableHead>Mention Count</TableHead>
-              {showInviteButton && <TableHead>Action</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -155,34 +152,22 @@ export default function TopMentionedUsers({
                     href={getUserLink(user)}
                     target={user.uploaded ? '_self' : '_blank'}
                     rel={user.uploaded ? '' : 'noopener noreferrer'}
-                    className="text-blue-500 hover:underline"
+                    className=""
                   >
-                    @{user.screen_name}
+                    <span className="hover:underline">
+                      {user.account_display_name || `@${user.screen_name}`}
+                    </span>
+                    {user.account_display_name && (
+                      <div
+                        key={`screen-name-${user.mentioned_user_id}`}
+                        className="text-sm text-gray-500"
+                      >
+                        @{user.screen_name}
+                      </div>
+                    )}
                   </Link>
-                  {user.account_display_name && (
-                    <div
-                      key={`display-name-${user.mentioned_user_id}`}
-                      className="text-sm text-gray-500"
-                    >
-                      {user.account_display_name}
-                    </div>
-                  )}
                 </TableCell>
                 <TableCell>{user.mention_count}</TableCell>
-                {showInviteButton && (
-                  <TableCell>
-                    {!user.uploaded && (
-                      <a
-                        href={`https://twitter.com/intent/tweet?text=@${user.screen_name} I noticed you're mentioned a lot in the community archive and we're missing your tweets!  https://x.com/exgenesis/status/1831686229944885739`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="button-style text-blue-500 hover:text-blue-600 hover:underline"
-                      >
-                        Invite
-                      </a>
-                    )}
-                  </TableCell>
-                )}
               </TableRow>
             ))}
           </TableBody>

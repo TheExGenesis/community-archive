@@ -1,6 +1,6 @@
-
 CREATE
-OR REPLACE FUNCTION public.get_account_most_replied_tweets_by_archive_users (username_ TEXT, limit_ INTEGER) RETURNS TABLE (
+OR REPLACE FUNCTION public.get_account_most_replied_tweets_by_archive_users (username_ TEXT, limit_ INTEGER)
+RETURNS TABLE (
   tweet_id TEXT,
   account_id TEXT,
   created_at TIMESTAMP WITH TIME ZONE,
@@ -14,6 +14,8 @@ OR REPLACE FUNCTION public.get_account_most_replied_tweets_by_archive_users (use
   num_replies BIGINT
 ) AS $$
 BEGIN
+    RAISE NOTICE 'Executing get_account_most_replied_tweets_by_archive_users with username % and limit %', username_, limit_;
+    
     RETURN QUERY
     SELECT 
         t.tweet_id, 

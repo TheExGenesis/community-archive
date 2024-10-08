@@ -1,7 +1,10 @@
-CREATE OR REPLACE FUNCTION "public"."get_tweet_count_by_date"("start_date" timestamp with time zone, "end_date" timestamp with time zone, "granularity" "text") RETURNS TABLE("tweet_date" timestamp without time zone, "tweet_count" bigint)
+CREATE OR REPLACE FUNCTION "public"."get_tweet_count_by_date"("start_date" timestamp with time zone, "end_date" timestamp with time zone, "granularity" "text")
+RETURNS TABLE("tweet_date" timestamp without time zone, "tweet_count" bigint)
     LANGUAGE "plpgsql"
     AS $_$
 BEGIN
+    RAISE NOTICE 'Executing get_tweet_count_by_date with start_date %, end_date %, and granularity %', start_date, end_date, granularity;
+    
     IF granularity NOT IN ('day', 'week', 'month', 'year') THEN
         RAISE EXCEPTION 'Invalid granularity. Must be "day", "week", "month", or "year".';
     END IF;

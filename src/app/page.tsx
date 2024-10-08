@@ -36,7 +36,7 @@ const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
 
 export default async function Homepage() {
   const supabase = createServerClient(cookies())
-  const mostFollowed = await getMostFollowedAccounts(supabase)
+  const mostFollowed = (await getMostFollowedAccounts(supabase)).slice(0, 7)
   const isDev = process.env.NODE_ENV === 'development'
 
   return (

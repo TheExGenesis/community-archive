@@ -20,7 +20,7 @@ const __filename = fileURLToPath(import.meta.url)
 // Load environment variables
 // dotenv.config({ path: path.resolve(__dirname, '../.env.local') })
 // const isProd = process.env.NODE_ENV === 'production'
-const isProd = true
+const isProd = false
 const supabaseUrl = isProd
   ? process.env.NEXT_PUBLIC_SUPABASE_URL
   : process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL

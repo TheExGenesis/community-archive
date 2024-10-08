@@ -1,1 +1,1 @@
-UPDATE public.archive_upload SET upload_phase = 'completed';
+-- UPDATE public.archive_upload SET upload_phase = 'completed';

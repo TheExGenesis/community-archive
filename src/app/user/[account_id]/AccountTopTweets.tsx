@@ -23,10 +23,10 @@ const AccountTopTweets = async ({ userData }: { userData: FormattedUser }) => {
   }
 
   const tweetData = {
-    liked: data.most_liked_tweets_by_archive_users,
-    replied: data.most_replied_tweets_by_archive_users,
-    retweeted: data.most_retweeted_tweets,
+    // liked: data.most_liked_tweets_by_archive_users,
+    // replied: data.most_replied_tweets_by_archive_users,
     favorited: data.most_favorited_tweets,
+    retweeted: data.most_retweeted_tweets,
   }
 
   return (

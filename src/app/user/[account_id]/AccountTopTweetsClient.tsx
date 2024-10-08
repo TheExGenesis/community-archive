@@ -15,10 +15,10 @@ type TabData = {
 }
 
 const tabData: TabData = {
-  liked: { title: 'Top Liked by CA Users' },
-  replied: { title: 'Top Replied to by CA Users' },
-  retweeted: { title: 'Top Retweeted (Global)' },
-  favorited: { title: 'Top Favorited (Global)' },
+  // liked: { title: 'Top Liked by CA Users' },
+  // replied: { title: 'Top Replied to by CA Users' },
+  favorited: { title: 'Top Favorited' },
+  retweeted: { title: 'Top Retweeted' },
 }
 
 type Props = {
@@ -34,12 +34,12 @@ const AccountTopTweetsClient: React.FC<Props> = ({
   displayName,
   profilePicUrl,
 }) => {
-  const [activeTab, setActiveTab] = useState('liked')
+  const [activeTab, setActiveTab] = useState('favorited')
   const [includedTabs, setIncludedTabs] = useState<{ [key: string]: boolean }>({
-    liked: true,
-    replied: true,
-    retweeted: true,
+    // liked: true,
+    // replied: true,
     favorited: true,
+    retweeted: true,
   })
 
   const getTweetsAsText = useCallback(() => {

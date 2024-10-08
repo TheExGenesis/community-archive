@@ -186,37 +186,6 @@ export function FileUploadDialog({
               </div>
             </div>
 
-            {/* Upload Options */}
-            <TooltipProvider>
-              <div className="flex items-center justify-between">
-                <Label
-                  htmlFor="keep-private"
-                  className="flex flex-col space-y-1"
-                >
-                  <span className="flex items-center">
-                    Keep Private
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="ml-1 h-4 w-4 cursor-pointer text-muted-foreground transition-colors hover:text-primary" />
-                      </TooltipTrigger>
-                      <TooltipContent className="bg-gray-800 text-white">
-                        <p>
-                          Data is only visible to you and us. Not the public.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </span>
-                </Label>
-                <Switch
-                  id="keep-private"
-                  checked={state.keepPrivate}
-                  onCheckedChange={(checked: boolean) =>
-                    setState((prev) => ({ ...prev, keepPrivate: checked }))
-                  }
-                />
-              </div>
-            </TooltipProvider>
-
             {/* Advanced Options */}
             <div className="mt-6">
               <Button
@@ -238,6 +207,40 @@ export function FileUploadDialog({
               </Button>
               {state.showAdvancedOptions && (
                 <div className="mt-4 space-y-4 border-t pt-4">
+                  {/* Upload Options */}
+                  <TooltipProvider>
+                    <div className="flex items-center justify-between">
+                      <Label
+                        htmlFor="keep-private"
+                        className="flex flex-col space-y-1"
+                      >
+                        <span className="flex items-center">
+                          Keep Private
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="ml-1 h-4 w-4 cursor-pointer text-muted-foreground transition-colors hover:text-primary" />
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-gray-800 text-white">
+                              <p>
+                                Data is only visible to you and us. Not the
+                                public.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </span>
+                      </Label>
+                      <Switch
+                        id="keep-private"
+                        checked={state.keepPrivate}
+                        onCheckedChange={(checked: boolean) =>
+                          setState((prev) => ({
+                            ...prev,
+                            keepPrivate: checked,
+                          }))
+                        }
+                      />
+                    </div>
+                  </TooltipProvider>
                   <TooltipProvider>
                     <div className="flex items-center justify-between">
                       <Label

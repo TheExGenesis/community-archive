@@ -45,11 +45,13 @@ async function getTweetCountByDate(
 ) {
   const supabase = createBrowserClient()
   console.log('startDate', startDate)
-  const { data, error } = await supabase.rpc('get_tweet_count_by_date', {
-    start_date: startDate,
-    end_date: endDate,
-    granularity: granularity,
-  })
+  const { data, error } = await supabase
+    .schema('public')
+    .rpc('get_tweet_count_by_date', {
+      start_date: startDate,
+      end_date: endDate,
+      granularity: granularity,
+    })
 
   if (error) {
     console.error('Error fetching tweet count by date:', error)

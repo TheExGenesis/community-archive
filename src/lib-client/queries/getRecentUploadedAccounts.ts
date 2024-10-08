@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 
 const getRecentUploadedAccounts = async (supabase: SupabaseClient) => {
   const { data, error } = await supabase
+    .schema('public')
     .from('archive_upload')
     .select(
       `

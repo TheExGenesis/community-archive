@@ -42,6 +42,7 @@ type SortKey =
 
 const fetchUsers = async (supabase: ReturnType<typeof createBrowserClient>) => {
   const { data, error } = await supabase
+    .schema('public')
     .from('account')
     .select(
       `

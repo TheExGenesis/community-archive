@@ -9,6 +9,7 @@ import { createBrowserClient } from '@/utils/supabase'
 
 const fetchTweets = async (supabase: any) => {
   const { data: tweets, error } = await supabase
+    .schema('public')
     .from('tweets')
     .select(
       `

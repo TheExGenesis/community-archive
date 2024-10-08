@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 export const getTweet = async (tweet_id: any) => {
   const supabase = createServerClient(cookies())
   return await supabase
+    .schema('public')
     .from('tweets')
     .select(
       `

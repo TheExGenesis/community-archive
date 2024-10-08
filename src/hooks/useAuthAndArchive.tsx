@@ -43,6 +43,7 @@ export function useAuthAndArchive() {
 
       const supabase = createBrowserClient()
       const { data, error } = await supabase
+        .schema('public')
         .from(getTableName('archive_upload') as 'archive_upload')
         .select('id')
         .eq('account_id', userMetadata.provider_id)

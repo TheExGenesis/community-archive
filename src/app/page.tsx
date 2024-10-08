@@ -7,13 +7,8 @@ import { cookies } from 'next/headers'
 import AvatarList from '@/components/AvatarList'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { FaGithub, FaDiscord } from 'react-icons/fa'
-import { getTweetsCount } from '@/lib-server/db_queries'
 import UploadTwitterArchive from '@/components/UploadTwitterArchive'
 import dynamic from 'next/dynamic'
-import Link from 'next/link'
-
-import ThemeToggle from '@/components/ThemeToggle'
-import { devLog } from '@/lib-client/devLog'
 // Dynamically import SignIn component with ssr disabled
 const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
   ssr: false,
@@ -26,31 +21,17 @@ declare global {
 }
 
 const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
-  let data, error
-  const maxRetries = 3
-  let retries = 0
-
-  while (retries < maxRetries) {
-    ;({ data, error } = await supabase.rpc('get_top_accounts_with_followers', {
-      limit_count: 8,
-    }))
-
-    if (!error) break
-
-    console.error(`Attempt ${retries + 1} failed:`, error)
-    retries++
-
-    if (retries < maxRetries) {
-      await new Promise((resolve) => setTimeout(resolve, 1000 * retries)) // Exponential backoff
-    }
-  }
+  let { data, error } = await supabase
+    .from('global_activity_summary')
+    .select('top_accounts_with_followers')
+    .single()
 
   if (error) {
-    console.error('All attempts failed:', error)
-    // Handle the error appropriately, maybe set data to a default value
-    data = []
+    console.error('Failed to fetch top accounts:', error)
+    return []
   }
-  return data
+
+  return data?.top_accounts_with_followers || []
 }
 
 export default async function Homepage() {

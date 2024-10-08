@@ -5,6 +5,7 @@ import {
   createServerClient as serverClient,
   type CookieOptions,
 } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -119,4 +120,13 @@ export const createServerAdminClient = (
   return serverClient<Database>(url, serviceRole!, {
     cookies: createCookieHandler(cookieStore),
   })
+}
+
+export async function createDbScriptClient() {
+  const isDevelopment = process.env.NODE_ENV === 'development'
+  if (!isDevelopment) {
+    throw new Error('createDbScriptClient can only be called in development mode')
+  }
+  const { url, serviceRole } = getSupabaseConfig(true)
+  return createClient<Database>(url!, serviceRole!)
 }

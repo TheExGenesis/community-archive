@@ -132,3 +132,26 @@ export type AvatarType = {
 export type ArchiveUpload = {
   archive_at: string
 }
+
+export type SearchParams = {
+  search_query: string
+  from_user: string | null
+  to_user: string | null
+  since_date: string | null
+  until_date: string | null
+}
+
+export type PopularTweet = {
+  tweet_id: string
+  account_id: string
+  created_at: string
+  full_text: string
+  retweet_count: number
+  favorite_count: number
+  reply_to_tweet_id: string | null
+  reply_to_user_id: string | null
+  reply_to_username: string | null
+  archive_upload_id: number
+  num_likes?: number
+  num_replies?: number
+}

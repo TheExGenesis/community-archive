@@ -14,7 +14,7 @@ const BATCH_SIZE = 1000 // Adjust as needed
 const MAX_RETRIES = 5
 const RETRY_DELAY = 1000 // 1 second
 
-const retryOperation = async <T>(
+export const retryOperation = async <T>(
   operation: () => Promise<T>,
   errorMessage: string,
 ): Promise<T> => {
@@ -311,9 +311,11 @@ export const processTwitterArchive = async (
 
   console.log('Dropping temporary tables...')
   await retryOperation(async () => {
-    const { data, error } = await supabase.rpc('drop_temp_tables', {
-      p_suffix: suffix,
-    })
+    const { data, error } = await supabase
+      .schema('public')
+      .rpc('drop_temp_tables', {
+        p_suffix: suffix,
+      })
     if (error) throw error
     return data
   }, 'Error dropping temporary tables')
@@ -337,9 +339,11 @@ export const processTwitterArchive = async (
     // Create temporary tables
     console.log('Creating temporary tables...')
     await retryOperation(async () => {
-      const { data, error } = await supabase.rpc('create_temp_tables', {
-        p_suffix: suffix,
-      })
+      const { data, error } = await supabase
+        .schema('public')
+        .rpc('create_temp_tables', {
+          p_suffix: suffix,
+        })
       if (error) throw error
       return data
     }, 'Error creating temporary tables')
@@ -371,16 +375,18 @@ export const processTwitterArchive = async (
     })
 
     await retryOperation(async () => {
-      const { data, error } = await supabase.rpc('insert_temp_account', {
-        p_account: {
-          ...archiveData.account[0].account,
-          num_tweets,
-          num_following,
-          num_followers,
-          num_likes,
-        },
-        p_suffix: suffix,
-      })
+      const { data, error } = await supabase
+        .schema('public')
+        .rpc('insert_temp_account', {
+          p_account: {
+            ...archiveData.account[0].account,
+            num_tweets,
+            num_following,
+            num_followers,
+            num_likes,
+          },
+          p_suffix: suffix,
+        })
       if (error) throw error
       return data
     }, 'Error inserting account data')
@@ -393,26 +399,30 @@ export const processTwitterArchive = async (
         startDate: null,
         endDate: null,
       }
-      const { data, error } = await supabase.rpc('insert_temp_archive_upload', {
-        p_account_id: accountId,
-        p_archive_at: latestTweetDate,
-        p_keep_private: uploadOptions.keepPrivate,
-        p_upload_likes: uploadOptions.uploadLikes,
-        p_start_date: uploadOptions.startDate,
-        p_end_date: uploadOptions.endDate,
-        p_suffix: suffix,
-      })
+      const { data, error } = await supabase
+        .schema('public')
+        .rpc('insert_temp_archive_upload', {
+          p_account_id: accountId,
+          p_archive_at: latestTweetDate,
+          p_keep_private: uploadOptions.keepPrivate,
+          p_upload_likes: uploadOptions.uploadLikes,
+          p_start_date: uploadOptions.startDate,
+          p_end_date: uploadOptions.endDate,
+          p_suffix: suffix,
+        })
       if (error) throw error
       return data
     }, 'Error inserting archive upload data')
 
     console.log('Inserting profile data...')
     await retryOperation(async () => {
-      const { data, error } = await supabase.rpc('insert_temp_profiles', {
-        p_profile: archiveData.profile[0].profile,
-        p_account_id: accountId,
-        p_suffix: suffix,
-      })
+      const { data, error } = await supabase
+        .schema('public')
+        .rpc('insert_temp_profiles', {
+          p_profile: archiveData.profile[0].profile,
+          p_account_id: accountId,
+          p_suffix: suffix,
+        })
       if (error) throw error
       return data
     }, 'Error inserting profile data')
@@ -505,9 +515,11 @@ export const processTwitterArchive = async (
     try {
       const commitStartTime = Date.now()
       await retryOperation(async () => {
-        const { data, error } = await supabase.rpc('commit_temp_data', {
-          p_suffix: suffix,
-        })
+        const { data, error } = await supabase
+          .schema('public')
+          .rpc('commit_temp_data', {
+            p_suffix: suffix,
+          })
         if (error) throw error
         return data
       }, 'Error committing data')
@@ -536,9 +548,11 @@ export const processTwitterArchive = async (
     try {
       console.log('Attempting to drop temporary tables...')
       await retryOperation(async () => {
-        const { data, error } = await supabase.rpc('drop_temp_tables', {
-          p_suffix: suffix,
-        })
+        const { data, error } = await supabase
+          .schema('public')
+          .rpc('drop_temp_tables', {
+            p_suffix: suffix,
+          })
         if (error) throw error
         return data
       }, 'Error dropping temporary tables')
@@ -553,9 +567,11 @@ export const processTwitterArchive = async (
   try {
     console.log('Attempting to drop temporary tables...')
     await retryOperation(async () => {
-      const { data, error } = await supabase.rpc('drop_temp_tables', {
-        p_suffix: suffix,
-      })
+      const { data, error } = await supabase
+        .schema('public')
+        .rpc('drop_temp_tables', {
+          p_suffix: suffix,
+        })
       if (error) throw error
       return data
     }, 'Error dropping temporary tables')
@@ -570,9 +586,11 @@ export const deleteArchive = async (
   accountId: string,
 ): Promise<void> => {
   try {
-    const { error } = await supabase.rpc('delete_all_archives', {
-      p_account_id: accountId,
-    })
+    const { error } = await supabase
+      .schema('public')
+      .rpc('delete_all_archives', {
+        p_account_id: accountId,
+      })
 
     if (error) throw error
 

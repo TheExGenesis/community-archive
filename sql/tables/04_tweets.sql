@@ -12,3 +12,7 @@ CREATE TABLE IF NOT EXISTS public.tweets (
     FOREIGN KEY (archive_upload_id) REFERENCES public.archive_upload (id),
     FOREIGN KEY (account_id) REFERENCES public.account (account_id)
 );
+
+ALTER TABLE public.tweets DROP COLUMN IF EXISTS fts;
+ALTER TABLE public.tweets ADD COLUMN fts tsvector GENERATED ALWAYS AS (to_tsvector('english', full_text)) STORED;
+CREATE INDEX IF NOT EXISTS text_fts ON public.tweets USING gin (fts);

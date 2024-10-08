@@ -4,10 +4,14 @@ import path from 'path'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
-import { v4 as uuidv4 } from 'uuid'
+import { Archive } from '../src/lib-client/types'
 const { processTwitterArchive } = await import('../src/lib-server/db_insert')
+const { pipe } = await import('../src/lib-server/fp')
 const { uploadArchiveToStorage } = await import(
   '../src/lib-client/upload-archive/uploadArchiveToStorage'
+)
+const { removeProblematicCharacters } = await import(
+  '../src/lib-client/removeProblematicChars'
 )
 
 // Get the directory name of the current module
@@ -15,8 +19,8 @@ const __filename = fileURLToPath(import.meta.url)
 
 // Load environment variables
 // dotenv.config({ path: path.resolve(__dirname, '../.env.local') })
-const isProd = process.env.NODE_ENV === 'production'
-
+// const isProd = process.env.NODE_ENV === 'production'
+const isProd = true
 const supabaseUrl = isProd
   ? process.env.NEXT_PUBLIC_SUPABASE_URL
   : process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL
@@ -53,13 +57,18 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
 
 async function uploadArchive(filePath: string) {
   try {
-    const archiveData = JSON.parse(fs.readFileSync(filePath, 'utf8'))
-    console.log('archiveData', archiveData.account)
+    const archive: any = pipe(
+      (filePath: string) => fs.readFileSync(filePath, 'utf8'),
+      removeProblematicCharacters,
+      JSON.parse,
+    )(filePath)
 
-    await uploadArchiveToStorage(supabase, archiveData)
+    console.log('archive', archive.account)
+
+    await uploadArchiveToStorage(supabase, archive)
     console.log('Archive uploaded to storage successfully')
 
-    await processTwitterArchive(supabase, archiveData, (progress) => {
+    await processTwitterArchive(supabase, archive, (progress) => {
       console.log(`${progress.phase}: ${progress.percent?.toFixed(2)}%`)
     })
 

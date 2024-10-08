@@ -14,3 +14,5 @@ CREATE TABLE IF NOT EXISTS public.archive_upload (
     UNIQUE (account_id, archive_at),
     FOREIGN KEY (account_id) REFERENCES public.account (account_id)
 );
+
+ALTER TABLE public.archive_upload ADD COLUMN upload_phase upload_phase_enum DEFAULT 'uploading';

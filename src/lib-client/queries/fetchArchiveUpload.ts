@@ -6,6 +6,7 @@ export const fetchArchiveUpload = async (
 ): Promise<ArchiveUpload | undefined> => {
   const supabase = createBrowserClient()
   const { data, error } = await supabase
+    .schema('public')
     .from('archive_upload')
     .select('archive_at')
     .eq('account_id', userMetadata.provider_id)

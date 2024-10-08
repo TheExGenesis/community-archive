@@ -29,7 +29,7 @@ BEGIN
   IF from_user IS NOT NULL THEN
     SELECT a.account_id INTO from_account_id
     FROM account as a
-    WHERE a.username = from_user;
+    WHERE LOWER(a.username) = LOWER(from_user);
     
     -- Return empty if from_user not found
     IF from_account_id IS NULL THEN
@@ -41,7 +41,7 @@ BEGIN
   IF to_user IS NOT NULL THEN
     SELECT a.account_id INTO to_account_id
     FROM account as a
-    WHERE a.username = to_user;
+    WHERE LOWER(a.username) = LOWER(to_user);
     
     -- Return empty if to_user not found
     IF to_account_id IS NULL THEN

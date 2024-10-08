@@ -1,6 +1,6 @@
-
 CREATE
-OR REPLACE FUNCTION get_account_most_mentioned_accounts (username_ TEXT, limit_ INTEGER) RETURNS TABLE (
+OR REPLACE FUNCTION get_account_most_mentioned_accounts (username_ TEXT, limit_ INTEGER)
+RETURNS TABLE (
   user_id TEXT,
   name TEXT,
   screen_name TEXT,
@@ -9,6 +9,8 @@ OR REPLACE FUNCTION get_account_most_mentioned_accounts (username_ TEXT, limit_ 
 DECLARE
     user_id text;
 BEGIN
+    RAISE NOTICE 'Executing get_account_most_mentioned_accounts with username % and limit %', username_, limit_;
+    
     -- Get the user_id based on the provided username
     SELECT account_id INTO user_id
     FROM public.account

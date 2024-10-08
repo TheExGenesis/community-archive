@@ -19,6 +19,8 @@ v_account_id := (archive_data->'account'->0->'account'->>'accountId')::TEXT;
 IF v_suffix != ((SELECT auth.jwt()) -> 'app_metadata' ->> 'provider_id') AND current_user != 'postgres' THEN
 RAISE EXCEPTION 'Not authorized to process this archive';
 END IF;
+RAISE NOTICE 'process_archive called with account_id: %', v_account_id;
+
 v_suffix := v_account_id;
 v_prepared_tweets := (
 SELECT jsonb_agg(

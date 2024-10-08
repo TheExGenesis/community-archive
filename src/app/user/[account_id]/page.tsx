@@ -1,7 +1,9 @@
 import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import TopMentionedUsers from '@/components/TopMentionedMissingUsers'
+import TopMentionedUsers, {
+  MentionedUser,
+} from '@/components/TopMentionedMissingUsers'
 import AccountTopTweets from './AccountTopTweets'
 import { createServerClient } from '@/utils/supabase'
 import { FormattedUser } from '@/lib-client/user-utils'
@@ -60,7 +62,7 @@ export default async function User({ params }: any) {
   const userData = await getUserData(account_id)
 
   const { data: summaryData, error: summaryError } = await supabase
-    .from('account_activity_summary')
+    .from('account_activity_summary' as any)
     .select('mentioned_accounts')
     .eq('account_id', account_id)
     .single()

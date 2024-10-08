@@ -81,33 +81,32 @@ export async function getArchiveMostMentionedAccounts(): Promise<
   }, [])
 
   devLog('users', users)
+  const userIds = users.map((user) => user.user_id)
 
-  const mentionedUsers = await Promise.all(
-    users.map(async (user: any) => {
-      const { data: profile } = await supabase
-        .from('profile')
-        .select('*')
-        .eq('account_id', user.user_id)
-        .order('archive_upload_id', { ascending: false })
-        .limit(1)
-        .single()
+  const { data: profiles } = await supabase
+    .from('profile')
+    .select('*')
+    .in('account_id', userIds)
+    .order('archive_upload_id', { ascending: false })
 
-      const { data: account } = await supabase
-        .from('account')
-        .select('*')
-        .eq('account_id', user.user_id)
-        .single()
+  const { data: accounts } = await supabase
+    .from('account')
+    .select('*')
+    .in('account_id', userIds)
 
-      return {
-        mentioned_user_id: user.user_id,
-        screen_name: user.screen_name,
-        mention_count: user.mention_count,
-        account_display_name: user.name,
-        avatar_media_url: profile?.avatar_media_url,
-        uploaded: !!account,
-      }
-    }),
-  )
+  const mentionedUsers = users.map((user: any) => {
+    const profile = profiles?.find((p) => p.account_id === user.user_id)
+    const account = accounts?.find((a) => a.account_id === user.user_id)
+    return {
+      mentioned_user_id: user.user_id,
+      screen_name: user.screen_name,
+      mention_count: user.mention_count,
+      account_display_name: user.name,
+      avatar_media_url: profile?.avatar_media_url,
+      uploaded: !!account,
+    }
+  })
+
   devLog('mentionedUsers', mentionedUsers)
   return mentionedUsers
 }

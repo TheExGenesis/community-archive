@@ -1,6 +1,6 @@
 
 CREATE
-OR REPLACE FUNCTION public.get_account_most_replied_tweets_by_archive_users (username_ TEXT, limit_ INTEGER) RETURNS TABLE (
+OR REPLACE FUNCTION public.get_account_top_favorite_count_tweets (username_ TEXT, limit_ INTEGER) RETURNS TABLE (
   tweet_id TEXT,
   account_id TEXT,
   created_at TIMESTAMP WITH TIME ZONE,
@@ -10,8 +10,7 @@ OR REPLACE FUNCTION public.get_account_most_replied_tweets_by_archive_users (use
   reply_to_tweet_id TEXT,
   reply_to_user_id TEXT,
   reply_to_username TEXT,
-  archive_upload_id BIGINT,
-  num_replies BIGINT
+  archive_upload_id BIGINT
 ) AS $$
 BEGIN
     RETURN QUERY
@@ -25,22 +24,17 @@ BEGIN
         t.reply_to_tweet_id, 
         t.reply_to_user_id, 
         t.reply_to_username, 
-        t.archive_upload_id , 
-        COUNT(r.reply_to_tweet_id) AS num_replies 
+        t.archive_upload_id 
     FROM 
         public.tweets t 
     JOIN 
         public.account a ON t.account_id = a.account_id 
-    LEFT JOIN 
-        public.tweets r ON t.tweet_id = r.reply_to_tweet_id 
     WHERE 
         a.username = username_
-    GROUP BY 
-        t.tweet_id, 
-        t.full_text 
     ORDER BY 
-        num_replies DESC 
+        t.favorite_count DESC 
     LIMIT 
         limit_;
 END;
 $$ LANGUAGE plpgsql;
+

@@ -1,4 +1,3 @@
-
 CREATE OR REPLACE FUNCTION public.get_top_mentioned_users(limit_ INT)
 RETURNS TABLE (
     mentioned_user_id TEXT,
@@ -7,6 +6,8 @@ RETURNS TABLE (
     mention_count BIGINT
 ) AS $$
 BEGIN
+    RAISE NOTICE 'Executing get_top_mentioned_users with limit %', limit_;
+    
     RETURN QUERY
     WITH TopMentionedUsers AS (
         SELECT

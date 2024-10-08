@@ -1,6 +1,6 @@
-
 CREATE
-OR REPLACE FUNCTION public.get_account_top_retweet_count_tweets (username_ TEXT, limit_ INTEGER) RETURNS TABLE (
+OR REPLACE FUNCTION public.get_account_top_retweet_count_tweets (username_ TEXT, limit_ INTEGER)
+RETURNS TABLE (
   tweet_id TEXT,
   account_id TEXT,
   created_at TIMESTAMP WITH TIME ZONE,
@@ -13,6 +13,8 @@ OR REPLACE FUNCTION public.get_account_top_retweet_count_tweets (username_ TEXT,
   archive_upload_id BIGINT
 ) AS $$
 BEGIN
+    RAISE NOTICE 'Executing get_account_top_retweet_count_tweets with username % and limit %', username_, limit_;
+    
     RETURN QUERY
     SELECT 
         t.tweet_id, 

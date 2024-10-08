@@ -104,6 +104,40 @@ const pgSearch = async (
   return formattedTweets
 }
 
+export const parseSearchOptions = (query: string) => {
+  // detect instances of from:{username}, to:{username}, since:{date}, until:{date} and put the following strings in an object
+  let searchOptions: SearchParams = {
+    search_query: query,
+    from_user: null,
+    to_user: null,
+    since_date: null,
+    until_date: null,
+  }
+  const words = query.split(' ')
+  words.forEach((word) => {
+    if (word.startsWith('from:')) {
+      searchOptions.from_user = word.slice(5)
+    }
+    if (word.startsWith('to:')) {
+      searchOptions.to_user = word.slice(3)
+    }
+    if (word.startsWith('since:')) {
+      searchOptions.since_date = word.slice(5)
+    }
+    if (word.startsWith('until:')) {
+      searchOptions.until_date = word.slice(5)
+    }
+  })
+  const queryMinusOptions = words.filter(
+    (word) =>
+      !word.startsWith('from:') &&
+      !word.startsWith('to:') &&
+      !word.startsWith('since:') &&
+      !word.startsWith('until:'),
+  )
+  searchOptions.search_query = queryMinusOptions.join(' ')
+  return searchOptions
+}
 export async function searchTweets(
   supabase: SupabaseClient<Database>,
   searchParams: SearchParams,
@@ -112,7 +146,7 @@ export async function searchTweets(
   const { search_query, from_user, to_user, since_date, until_date } =
     searchParams
 
-  const { data, error } = await supabase.rpc('search_tweets', {
+  const { data, error } = await supabase.rpc('search_tweets' as any, {
     search_query,
     from_user,
     to_user,

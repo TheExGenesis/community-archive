@@ -626,6 +626,7 @@ export type Database = {
           keep_private: boolean | null
           start_date: string | null
           upload_likes: boolean | null
+          upload_phase: Database["public"]["Enums"]["upload_phase_enum"] | null
         }
         Insert: {
           account_id: string
@@ -636,6 +637,7 @@ export type Database = {
           keep_private?: boolean | null
           start_date?: string | null
           upload_likes?: boolean | null
+          upload_phase?: Database["public"]["Enums"]["upload_phase_enum"] | null
         }
         Update: {
           account_id?: string
@@ -646,6 +648,7 @@ export type Database = {
           keep_private?: boolean | null
           start_date?: string | null
           upload_likes?: boolean | null
+          upload_phase?: Database["public"]["Enums"]["upload_phase_enum"] | null
         }
         Relationships: [
           {
@@ -653,6 +656,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "account"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "archive_upload_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_activity_summary"
             referencedColumns: ["account_id"]
           },
         ]
@@ -682,6 +692,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "account"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "followers_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_activity_summary"
             referencedColumns: ["account_id"]
           },
           {
@@ -718,6 +735,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "account"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "following_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_activity_summary"
             referencedColumns: ["account_id"]
           },
           {
@@ -769,6 +793,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "account"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "likes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_activity_summary"
             referencedColumns: ["account_id"]
           },
           {
@@ -845,6 +876,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "account"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "profile_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_activity_summary"
             referencedColumns: ["account_id"]
           },
           {
@@ -982,6 +1020,13 @@ export type Database = {
             referencedColumns: ["account_id"]
           },
           {
+            foreignKeyName: "tweets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_activity_summary"
+            referencedColumns: ["account_id"]
+          },
+          {
             foreignKeyName: "tweets_archive_upload_id_fkey"
             columns: ["archive_upload_id"]
             isOneToOne: false
@@ -1025,7 +1070,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      account_activity_summary: {
+        Row: {
+          account_id: string | null
+          mentioned_accounts: Json | null
+          most_favorited_tweets: Json | null
+          most_liked_tweets_by_archive_users: Json | null
+          most_replied_tweets_by_archive_users: Json | null
+          most_retweeted_tweets: Json | null
+          num_followers: number | null
+          num_tweets: number | null
+          total_likes: number | null
+          total_mentions: number | null
+          username: string | null
+        }
+        Relationships: []
+      }
+      global_activity_summary: {
+        Row: {
+          top_accounts_with_followers: Json | null
+          top_mentioned_users: Json | null
+          total_accounts: number | null
+          total_likes: number | null
+          total_tweets: number | null
+          total_user_mentions: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       apply_public_entities_rls_policies: {
@@ -1087,6 +1158,92 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_account_most_liked_tweets_archive_users: {
+        Args: {
+          username_: string
+          limit_?: number
+        }
+        Returns: {
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          reply_to_tweet_id: string
+          reply_to_user_id: string
+          reply_to_username: string
+          archive_upload_id: number
+          num_likes: number
+        }[]
+      }
+      get_account_most_mentioned_accounts: {
+        Args: {
+          username_: string
+          limit_: number
+        }
+        Returns: {
+          user_id: string
+          name: string
+          screen_name: string
+          mention_count: number
+        }[]
+      }
+      get_account_most_replied_tweets_by_archive_users: {
+        Args: {
+          username_: string
+          limit_: number
+        }
+        Returns: {
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          reply_to_tweet_id: string
+          reply_to_user_id: string
+          reply_to_username: string
+          archive_upload_id: number
+          num_replies: number
+        }[]
+      }
+      get_account_top_favorite_count_tweets: {
+        Args: {
+          username_: string
+          limit_: number
+        }
+        Returns: {
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          reply_to_tweet_id: string
+          reply_to_user_id: string
+          reply_to_username: string
+          archive_upload_id: number
+        }[]
+      }
+      get_account_top_retweet_count_tweets: {
+        Args: {
+          username_: string
+          limit_: number
+        }
+        Returns: {
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          reply_to_tweet_id: string
+          reply_to_user_id: string
+          reply_to_username: string
+          archive_upload_id: number
+        }[]
+      }
       get_latest_tweets: {
         Args: {
           count: number
@@ -1122,6 +1279,17 @@ export type Database = {
           header_media_url: string
           num_followers: number
           num_tweets: number
+        }[]
+      }
+      get_top_mentioned_users: {
+        Args: {
+          limit_: number
+        }
+        Returns: {
+          user_id: string
+          name: string
+          screen_name: string
+          mention_count: number
         }[]
       }
       get_tweet_count_by_date:
@@ -1281,6 +1449,29 @@ export type Database = {
         }
         Returns: undefined
       }
+      search_tweets: {
+        Args: {
+          search_query: string
+          from_user?: string
+          to_user?: string
+          since_date?: string
+          until_date?: string
+          limit_?: number
+        }
+        Returns: {
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          reply_to_tweet_id: string
+          avatar_media_url: string
+          archive_upload_id: number
+          username: string
+          account_display_name: string
+        }[]
+      }
       set_limit: {
         Args: {
           "": number
@@ -1299,7 +1490,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      upload_phase_enum: "uploading" | "completed" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1388,3 +1579,4 @@ export type Enums<
   : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
     ? PublicSchema["Enums"][PublicEnumNameOrOptions]
     : never
+

@@ -151,3 +151,5 @@ import { Button } from '@/components/ui/Button'
 // To import images or other files from the public folder
 import avatar from '@/public/avatar.png'
 ```
+
+.

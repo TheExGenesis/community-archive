@@ -4,6 +4,8 @@ BEGIN
 IF auth.uid() IS NULL AND current_user NOT IN ('postgres', 'service_role') THEN
 RAISE EXCEPTION 'Not authenticated';
 END IF;
+RAISE NOTICE 'process_and_insert_tweet_entities called with suffix: %', p_suffix;
+
 -- Insert mentioned users
 EXECUTE format('
 INSERT INTO temp.mentioned_users_%s (user_id, name, screen_name, updated_at)

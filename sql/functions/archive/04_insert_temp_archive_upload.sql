@@ -37,5 +37,7 @@ BEGIN
     INTO v_id;
 
     RETURN v_id;
+    RAISE NOTICE 'insert_temp_archive_upload called with account_id: %, archive_at: %, suffix: %', p_account_id, p_archive_at, p_suffix;
+
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

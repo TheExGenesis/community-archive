@@ -4,6 +4,8 @@ BEGIN
 IF auth.uid() IS NULL AND current_user NOT IN ('postgres', 'service_role') THEN
 RAISE EXCEPTION 'Not authenticated';
 END IF;
+RAISE NOTICE 'drop_temp_tables called with suffix: %', p_suffix;
+
 EXECUTE format('DROP TABLE IF EXISTS temp.account_%s', p_suffix);
 EXECUTE format('DROP TABLE IF EXISTS temp.archive_upload_%s', p_suffix);
 EXECUTE format('DROP TABLE IF EXISTS temp.profile_%s', p_suffix);

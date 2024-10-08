@@ -1,6 +1,7 @@
 CREATE OR REPLACE FUNCTION public.create_temp_tables(p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
+RAISE NOTICE 'create_temp_tables called with suffix: %', p_suffix;
 -- Check if the user is authenticated or is the postgres role
 IF auth.uid() IS NULL AND current_user != 'postgres' THEN
 RAISE EXCEPTION 'Not authenticated';

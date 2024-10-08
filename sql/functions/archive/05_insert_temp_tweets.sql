@@ -22,5 +22,7 @@ SELECT
 -1
 FROM jsonb_array_elements($1) AS tweet
 ', p_suffix) USING p_tweets;
+RAISE NOTICE 'insert_temp_tweets called with suffix: %', p_suffix;
+
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -4,6 +4,8 @@ BEGIN
 IF auth.uid() IS NULL AND current_user NOT IN ('postgres', 'service_role') THEN
 RAISE EXCEPTION 'Not authenticated';
 END IF;
+RAISE NOTICE 'insert_temp_following called with account_id: %, suffix: %', p_account_id, p_suffix;
+
 EXECUTE format('
 INSERT INTO temp.following_%s (account_id, following_account_id, archive_upload_id)
 SELECT
@@ -13,5 +15,6 @@ $2,
 FROM jsonb_array_elements($1) AS following
 ', p_suffix)
 USING p_following, p_account_id;
+
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

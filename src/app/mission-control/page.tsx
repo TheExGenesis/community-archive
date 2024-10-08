@@ -15,7 +15,6 @@ export default async function StatsPage() {
         <p className="mb-4">Top mentioned users who are not in the archive</p>
         <TopMentionedUsers
           users={topMentionedMissingUsers}
-          showInviteButton={true}
           showUploadedDefault={false}
           showUploadedSwitch={true}
         />

@@ -81,7 +81,7 @@ export async function getArchiveMostMentionedAccounts(): Promise<
   }, [])
 
   devLog('users', users)
-  const userIds = users.map((user) => user.user_id)
+  const userIds = users.map((user: any) => user.user_id)
 
   const { data: profiles } = await supabase
     .from('profile')

@@ -11,9 +11,7 @@ const AccountTopTweets = async ({ userData }: { userData: FormattedUser }) => {
 
   const { data, error } = await supabase
     .from('account_activity_summary' as any)
-    .select(
-      'most_liked_tweets_by_archive_users, most_replied_tweets_by_archive_users, most_retweeted_tweets, most_favorited_tweets',
-    )
+    .select('most_retweeted_tweets, most_favorited_tweets')
     .eq('username', userData.username)
     .single()
   // devLog('account_activity_summary', data)

@@ -4,6 +4,9 @@ BEGIN
 IF auth.uid() IS NULL AND current_user NOT IN ('postgres', 'service_role') THEN
 RAISE EXCEPTION 'Not authenticated';
 END IF;
+
+RAISE NOTICE 'insert_temp_followers called with account_id: %, suffix: %', p_account_id, p_suffix;
+
 EXECUTE format('
 INSERT INTO temp.followers_%s (account_id, follower_account_id, archive_upload_id)
 SELECT

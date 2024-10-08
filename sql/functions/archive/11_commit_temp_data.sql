@@ -13,6 +13,7 @@ BEGIN
     IF auth.uid() IS NULL AND current_user != 'postgres' THEN
         RAISE EXCEPTION 'Not authenticated';
     END IF;
+    RAISE NOTICE 'commit_temp_data called with suffix: %', p_suffix;
     -- 1. Insert account data first
     EXECUTE format('
         INSERT INTO public.account (

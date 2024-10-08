@@ -1,6 +1,7 @@
 CREATE OR REPLACE FUNCTION public.insert_temp_account(p_account JSONB, p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
+RAISE NOTICE 'insert_temp_account called with suffix: %', p_suffix;
 IF auth.uid() IS NULL AND current_user NOT IN ('postgres', 'service_role') THEN
 RAISE EXCEPTION 'Not authenticated';
 END IF;

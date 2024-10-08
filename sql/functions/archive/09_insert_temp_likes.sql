@@ -4,6 +4,8 @@ BEGIN
 IF auth.uid() IS NULL AND current_user NOT IN ('postgres', 'service_role') THEN
 RAISE EXCEPTION 'Not authenticated';
 END IF;
+RAISE NOTICE 'insert_temp_likes called with account_id: %, suffix: %', p_account_id, p_suffix;
+
 EXECUTE format('
 INSERT INTO temp.liked_tweets_%s (tweet_id, full_text)
 SELECT

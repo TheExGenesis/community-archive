@@ -14,7 +14,7 @@ const BATCH_SIZE = 1000 // Adjust as needed
 const MAX_RETRIES = 5
 const RETRY_DELAY = 1000 // 1 second
 
-const retryOperation = async <T>(
+export const retryOperation = async <T>(
   operation: () => Promise<T>,
   errorMessage: string,
 ): Promise<T> => {

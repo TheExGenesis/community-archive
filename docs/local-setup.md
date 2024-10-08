@@ -14,6 +14,8 @@ SUPABASE_SERVICE_ROLE=<> #same as above, is needed for vercel in the server
 NEXT_PUBLIC_USER_ID=<>
 NEXT_PUBLIC_USER_NAME=<>>
 
+ARCHIVE_PATH=<path_to_archive_folder>
+
 
 ```
 
@@ -57,6 +59,7 @@ Echoing [Supabase's Local Development instructions](https://supabase.com/docs/gu
       colima (macOS)
 - `supabase start`
 
+
 You can now visit your local Dashboard at `http://localhost:54323`, and access the database directly with any Postgres client via `postgresql://postgres:postgres@localhost:54322/postgres.`
 
 `supabase start` will give you the url, anon key, and service role key for your local db.
@@ -85,6 +88,13 @@ For each change you make to the db:
 4. Add the SQL to your migration file
 5. Apply the new migration to your local database `supabase migration up` or `supabase db reset`
 6. CAREFUL: Deploy any local database migrations directly to prod `supabase db push`
+
+### Seeding the local database
+
+- Download the last export from [the Github Releases](https://github.com/TheExGenesis/community-archive/releases)
+- set the `ARCHIVE_PATH` environment variable to the path of the archive folder
+- run the script `pnpm dev:importdata`
+- wait a bit and then you should be able to see the data in the local supabase studio at http://localhost:54323/project/default/editor
 
 ### Sign-in in dev mode
 
@@ -124,7 +134,9 @@ Use `scripts/download_storage.ts` to download the storage files from the databas
 - `pnpm test:ci` — Runs all the jest tests in the project, Jest will assume it is running in a CI environment.
 - `pnpm analyze` — Builds the project and opens the bundle analyzer.
 - `pnpm gen-api-docs` — Generates OpenAPI docs.
-- `pnpm gen-types` — Generates TypeScript types.
+- `pnpm gen-types` — Generates TypeScript types from the remote Supabase instance.
+- `pnpm dev:gen-types` — Generates TypeScript types from the local Supabase instance.
+- `pnpm dev:importdata` — Imports data from the archive folder into the local database.
 
 ### Paths
 

@@ -975,6 +975,7 @@ export type Database = {
         Row: {
           account_id: string
           archive_upload_id: number
+          conversation_id: string | null
           created_at: string
           favorite_count: number
           fts: unknown | null
@@ -988,6 +989,7 @@ export type Database = {
         Insert: {
           account_id: string
           archive_upload_id: number
+          conversation_id?: string | null
           created_at: string
           favorite_count: number
           fts?: unknown | null
@@ -1001,6 +1003,7 @@ export type Database = {
         Update: {
           account_id?: string
           archive_upload_id?: number
+          conversation_id?: string | null
           created_at?: string
           favorite_count?: number
           fts?: unknown | null
@@ -1314,6 +1317,21 @@ export type Database = {
               tweet_count: number
             }[]
           }
+      get_user_threads: {
+        Args: {
+          p_account_id: string
+        }
+        Returns: {
+          tweet_id: string
+          conversation_id: string
+          reply_to_tweet_id: string
+          depth: number
+          tweet_count: number
+          max_depth: number
+          total_favorite_count: number
+          total_retweet_count: number
+        }[]
+      }
       gtrgm_compress: {
         Args: {
           "": unknown
@@ -1487,6 +1505,10 @@ export type Database = {
           "": string
         }
         Returns: string[]
+      }
+      update_conversation_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
     }
     Enums: {

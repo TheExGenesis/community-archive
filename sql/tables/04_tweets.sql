@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS public.tweets (
     reply_to_user_id TEXT,
     reply_to_username TEXT,
     archive_upload_id BIGINT NOT NULL,
+    conversation_id TEXT,
     FOREIGN KEY (archive_upload_id) REFERENCES public.archive_upload (id),
     FOREIGN KEY (account_id) REFERENCES public.account (account_id)
 );

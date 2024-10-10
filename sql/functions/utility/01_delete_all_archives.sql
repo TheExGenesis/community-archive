@@ -46,5 +46,5 @@ BEGIN
         RAISE;
     END;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
 SET statement_timeout TO '20min';

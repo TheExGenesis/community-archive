@@ -143,15 +143,6 @@ export default async function Homepage() {
         </div>
         <div className="mb-4"></div>
         <br />
-        <div className="flex flex-grow flex-col">
-          <div
-            className="flex-grow overflow-hidden"
-            style={{ height: '48rem' }}
-          >
-            <h2 className="mb-4 text-xl font-bold">Search the Archive</h2>
-            <SearchTweets supabase={null} />
-          </div>
-        </div>
       </div>
     </div>
   )

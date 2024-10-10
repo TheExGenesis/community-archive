@@ -1100,6 +1100,19 @@ export type Database = {
         }
         Relationships: []
       }
+      main_thread_view: {
+        Row: {
+          account_id: string | null
+          conversation_id: string | null
+          depth: number | null
+          favorite_count: number | null
+          max_depth: number | null
+          reply_to_tweet_id: string | null
+          retweet_count: number | null
+          tweet_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       apply_public_entities_rls_policies: {
@@ -1317,21 +1330,6 @@ export type Database = {
               tweet_count: number
             }[]
           }
-      get_user_threads: {
-        Args: {
-          p_account_id: string
-        }
-        Returns: {
-          tweet_id: string
-          conversation_id: string
-          reply_to_tweet_id: string
-          depth: number
-          tweet_count: number
-          max_depth: number
-          total_favorite_count: number
-          total_retweet_count: number
-        }[]
-      }
       gtrgm_compress: {
         Args: {
           "": unknown
@@ -1454,6 +1452,10 @@ export type Database = {
           avatar_media_url: string
         }[]
       }
+      post_upload_update_conversation_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       process_and_insert_tweet_entities: {
         Args: {
           p_tweets: Json
@@ -1508,7 +1510,7 @@ export type Database = {
       }
       update_conversation_ids: {
         Args: Record<PropertyKey, never>
-        Returns: string
+        Returns: number
       }
     }
     Enums: {

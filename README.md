@@ -25,3 +25,22 @@ See [local setup](docs/local-setup.md).
 ## Contributing
 
 We welcome all contributions! Contribute to the code, or upload your archive, clone it & try it locally, join our discord & give us feedback or ideas.
+
+## Roadmap
+
+See our detailed [Roadmap](docs/roadmap.md) for planned features and improvements.
+
+**Key focus areas:**
+
+Infra
+
+- [ ] Browser extension for DB updates via Twitter client API scraping
+- [ ] Storing and making embeddings for semantic search
+- [ ] more ...
+
+Apps
+
+- [ ] Websim-style app for exploring the data with dynamic UI and analysis
+- [ ] User summary pages (interests, projects, relationships)
+- [ ] Discourse mapping
+- [ ] much more ...

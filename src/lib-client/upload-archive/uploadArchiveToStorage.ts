@@ -46,7 +46,7 @@ export const uploadArchiveToStorage = async (
   const bucketName = 'archives'
   const { data, error: uploadError } = await supabase.storage
     .from(bucketName)
-    .upload(`${username}/${latestTweetDate}.json`, JSON.stringify(archive), {
+    .upload(`${username}/archive.json`, JSON.stringify(archive), {
       upsert: true,
     })
   if (uploadError && uploadError.message !== 'The resource already exists') {

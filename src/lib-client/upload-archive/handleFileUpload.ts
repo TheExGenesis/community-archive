@@ -10,12 +10,11 @@ export const requiredFiles = [
   'account',
   'tweets',
   'community-tweet',
-  'like',
   'follower',
   'following',
 ]
 
-export const optionalFiles = ['note-tweet']
+export const optionalFiles = ['note-tweet', 'like']
 
 export const requiredFilePaths = requiredFiles.map((file) => `data/${file}.js`)
 
@@ -127,6 +126,7 @@ const parseFileContents = (fileContents: {
 
   return {
     ...archive,
+    like: archive.like || [],
     account: archive.account.map(({ account }: any) => {
       const { email, ...rest } = account
       return { account: rest }
@@ -171,9 +171,12 @@ export const handleFileUpload = async (
     if (event.target) {
       event.target.value = ''
     }
-    error = error as Error
     console.error('Error loading the archive:', error)
-    alert('An error occurred while processing archive')
+    alert(
+      `An error occurred while processing archive\n ${
+        (error as Error).message
+      }`,
+    )
     throw error
   }
 }

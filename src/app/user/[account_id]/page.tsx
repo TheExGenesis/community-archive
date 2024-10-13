@@ -10,6 +10,7 @@ import { FormattedUser } from '@/lib-client/user-utils'
 import { devLog } from '@/lib-client/devLog'
 import { cookies } from 'next/headers'
 import { getUserData } from '@/lib-server/user'
+import { formatNumber } from '@/lib-client/formatNumber'
 
 const UserProfile = ({ userData }: { userData: FormattedUser }) => {
   const account = userData
@@ -40,14 +41,10 @@ const UserProfile = ({ userData }: { userData: FormattedUser }) => {
           </p>
         )}
         <div className="mt-4 flex space-x-4 text-sm text-gray-600">
-          <p>{new Intl.NumberFormat().format(account.num_tweets)} Tweets</p>
-          <p>
-            {new Intl.NumberFormat().format(account.num_followers)} Followers
-          </p>
-          <p>
-            {new Intl.NumberFormat().format(account.num_following)} Following
-          </p>
-          <p>{new Intl.NumberFormat().format(account.num_likes)} Likes</p>
+          <p>{formatNumber(account.num_tweets)} Tweets</p>
+          <p>{formatNumber(account.num_followers)} Followers</p>
+          <p>{formatNumber(account.num_following)} Following</p>
+          <p>{formatNumber(account.num_likes)} Likes</p>
         </div>
       </div>
     </div>

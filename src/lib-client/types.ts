@@ -127,6 +127,7 @@ export type AvatarType = {
   username: string
   avatar_media_url: string
   num_tweets?: number
+  num_followers?: number
 }
 
 export type ArchiveUpload = {

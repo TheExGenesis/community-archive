@@ -1,8 +1,8 @@
 # What data from the archive do we use?
 
-We only use and store the following files from the archive.
+Your archive gets processed locally and only the following data ever leaves your machine.
 
-If you want to be 100% sure abot your privacy, you can remvove everything else from the data folder.
+If you want to be 100% sure about your privacy, you can remove everything else from the data folder.
 
 | File               | Contains                                               | Why We Need                                        |
 | ------------------ | ------------------------------------------------------ | -------------------------------------------------- |

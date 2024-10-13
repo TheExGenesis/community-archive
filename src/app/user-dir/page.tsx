@@ -16,6 +16,7 @@ import { ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { formatUserData } from '@/lib-client/user-utils'
+import { formatNumber } from '@/lib-client/formatNumber'
 
 type User = {
   account_id: string
@@ -207,8 +208,8 @@ export default function UserDirectoryPage() {
                     {user.username}
                   </Link>
                 </TableCell>
-                <TableCell>{user.num_tweets}</TableCell>
-                <TableCell>{user.num_followers}</TableCell>
+                <TableCell>{formatNumber(user.num_tweets)}</TableCell>
+                <TableCell>{formatNumber(user.num_followers)}</TableCell>
                 <TableCell>
                   {user.archive_at
                     ? new Date(user.archive_at).toLocaleDateString()

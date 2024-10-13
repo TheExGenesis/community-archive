@@ -1,5 +1,6 @@
 import { FaHeart, FaRetweet, FaExternalLinkAlt, FaReply } from 'react-icons/fa'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { formatNumber } from '@/lib-client/formatNumber'
 
 interface TweetProps {
   username: string
@@ -56,10 +57,10 @@ export default function Tweet({
       <p className="mb-2 text-gray-700 dark:text-gray-300">{text}</p>
       <div className="mb-2 flex items-center text-sm text-gray-500 dark:text-gray-400">
         <span className="mr-4 flex items-center">
-          <FaHeart className="mr-1" /> {favoriteCount}
+          <FaHeart className="mr-1" /> {formatNumber(favoriteCount)}
         </span>
         <span className="mr-4 flex items-center">
-          <FaRetweet className="mr-1" /> {retweetCount}
+          <FaRetweet className="mr-1" /> {formatNumber(retweetCount)}
         </span>
         <span>{new Date(date).toLocaleDateString()}</span>
       </div>

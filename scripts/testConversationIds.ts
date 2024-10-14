@@ -1,15 +1,10 @@
-import { parse } from "csv-parse";
 import * as dotenv from 'dotenv';
 dotenv.config({path: '../.env'});
-import { createReadStream } from "fs";
-import { finished } from "stream/promises";
-import { InsertAccount, InsertArchiveUpload, InsertFollowers, InsertFollowing, InsertLikedTweets, InsertLikes, InsertMentionedUsers, InsertNotebookLMPodcasts, InsertProfile, InsertTweetMedia, InsertTweets, InsertTweetURLs, 
-    InsertUserMentions, 
-    //InsertUserFollowing, InsertUserMention, InsertUserTweetLikes, InsertUsers 
-} from "../src/database-explicit-types";
 
-import { createDbScriptClient, createServerAdminClient } from "../src/utils/supabase";
-import { Database } from "../src/database-types";
+
+
+import { createDbScriptClient } from "../src/utils/supabase";
+
 
 (async function execute() {
   var supabase = await createDbScriptClient();

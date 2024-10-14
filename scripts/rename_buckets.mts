@@ -108,7 +108,7 @@ async function renameObjects(bucket: string, paths: string[]) {
 async function renameObjects2(bucket: string, paths: string[]) {
   for (const path of paths) {
     const [username, timestamp] = path.split('/')
-    const newName = `${username.toLowerCase()}/${timestamp}`
+    const newName = `${username.toLowerCase()}/archive.json`
 
     const { error } = await supabase.storage.from(bucket).move(path, newName)
 

@@ -71,9 +71,14 @@ WHERE key = v_job.key;
 
 -- Do the job
 IF v_job.key = 'refresh_activity_summary' THEN
-    RAISE NOTICE 'Refreshing materialized views';
+    RAISE NOTICE 'Refreshing materialized views concurrently';
     REFRESH MATERIALIZED VIEW CONCURRENTLY public.global_activity_summary;
     REFRESH MATERIALIZED VIEW CONCURRENTLY public.account_activity_summary;
+END IF;
+
+IF v_job.key = 'update_conversation_ids' THEN
+    RAISE NOTICE 'Updating conversation ids';
+    PERFORM public.post_upload_update_conversation_ids();
 END IF;
 
 -- Delete the job
@@ -84,6 +89,21 @@ $$ LANGUAGE plpgsql;
 
 -- Enable pg_cron extension if not already enabled
 CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+
+DO $$
+DECLARE
+    job_id bigint;
+BEGIN
+    FOR job_id IN 
+        SELECT jobid 
+        FROM cron.job 
+        WHERE command LIKE '%SELECT private.process_jobs();%'
+    LOOP
+        PERFORM cron.unschedule(job_id);
+        RAISE NOTICE 'Unscheduled job with ID: %', job_id;
+    END LOOP;
+END $$;
 
 -- Schedule job to run every minute
 SELECT cron.schedule('* * * * *', $$

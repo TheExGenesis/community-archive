@@ -101,7 +101,7 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 // Usage
-const outputDir = '../../data/downloads/archives_'
+const outputDir = path.join(__dirname, '../../data/downloads/archives')
 const paths = (await fetchObjects()).map((obj) => obj.name)
 // console.log(paths)
 downloadBucketContents('archives', outputDir, paths)

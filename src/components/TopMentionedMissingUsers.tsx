@@ -16,6 +16,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { createBrowserClient } from '@/utils/supabase'
 import { devLog } from '@/lib-client/devLog'
 import { Label } from '@/components/ui/label'
+import { formatNumber } from '@/lib-client/formatNumber'
 
 export type MentionedUser = {
   mentioned_user_id: string
@@ -167,7 +168,7 @@ export default function TopMentionedUsers({
                     )}
                   </Link>
                 </TableCell>
-                <TableCell>{user.mention_count}</TableCell>
+                <TableCell>{formatNumber(user.mention_count)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

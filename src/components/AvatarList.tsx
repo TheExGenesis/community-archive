@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { AvatarType } from '@/lib-client/types'
+import { formatNumber } from '@/lib-client/formatNumber'
 
 type AvatarListProps = {
   initialAvatars: AvatarType[]
@@ -47,7 +48,15 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
                 className="mt-1 whitespace-nowrap text-justify text-xs text-zinc-500 hover:underline"
                 style={{ maxWidth: '40px', fontSize: '10px' }}
               >
-                {avatar.num_tweets && `${avatar.num_tweets} tweets`}
+                {avatar.num_followers &&
+                  `${formatNumber(avatar.num_followers)} followers`}
+              </span>
+              <span
+                className="mt-1 whitespace-nowrap text-justify text-xs text-zinc-500 hover:underline"
+                style={{ maxWidth: '40px', fontSize: '10px' }}
+              >
+                {avatar.num_tweets &&
+                  `${formatNumber(avatar.num_tweets)} tweets`}
               </span>
             </a>
           ))}

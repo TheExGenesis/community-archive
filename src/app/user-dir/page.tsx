@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
-import ThemeToggle from '@/components/ThemeToggle'
-import { createBrowserClient } from '@/utils/supabase'
+import { User, SortKey } from '@/lib-client/types'
+import { fetchUsers } from '@/lib-server/queries/fetchUsers'
 import Link from 'next/link'
 
 import {
@@ -15,62 +15,8 @@ import {
 import { ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { formatUserData } from '@/lib-client/user-utils'
 import { formatNumber } from '@/lib-client/formatNumber'
-
-type User = {
-  account_id: string
-  username: string
-  account_display_name: string
-  created_at: string
-  bio: string | null
-  website: string | null
-  location: string | null
-  avatar_media_url: string | null
-  archive_at: string | null
-  num_tweets: number
-  num_followers: number
-  num_following: number
-  num_likes: number
-}
-type SortKey =
-  | 'username'
-  | 'created_at'
-  | 'account_display_name'
-  | 'archive_at'
-  | 'num_tweets'
-  | 'num_followers'
-
-const fetchUsers = async (supabase: ReturnType<typeof createBrowserClient>) => {
-  const { data, error } = await supabase
-    .schema('public')
-    .from('account')
-    .select(
-      `
-      account_id,
-      username,
-      account_display_name,
-      created_at,
-      num_tweets,
-      num_followers,
-      num_following,
-      num_likes,
-      profile:profile(bio, website, location, avatar_media_url),
-      archive_upload:archive_upload(archive_at)
-    `,
-    )
-    .order('created_at', { ascending: false })
-
-  if (error) throw error
-
-  const formattedUsers: User[] = data.map(formatUserData)
-
-  return formattedUsers.sort((a, b) => {
-    if (!a.archive_at) return 1
-    if (!b.archive_at) return -1
-    return new Date(b.archive_at).getTime() - new Date(a.archive_at).getTime()
-  })
-}
+import { createBrowserClient } from '@/utils/supabase'
 
 export default function UserDirectoryPage() {
   const [users, setUsers] = useState<User[]>([])
@@ -79,11 +25,10 @@ export default function UserDirectoryPage() {
   const [sortKey, setSortKey] = useState<SortKey>('archive_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  const supabase = createBrowserClient()
-
   useEffect(() => {
     const loadUsers = async () => {
       try {
+        const supabase = createBrowserClient()
         const sortedUsers = await fetchUsers(supabase)
         setUsers(sortedUsers)
       } catch (error) {
@@ -95,7 +40,7 @@ export default function UserDirectoryPage() {
     }
 
     loadUsers()
-  }, [supabase])
+  }, [])
 
   if (loading) return <div>Loading...</div>
   if (error) return <div>Error: {error}</div>
@@ -156,6 +101,11 @@ export default function UserDirectoryPage() {
                 </Button>
               </TableHead>
               <TableHead>
+                <Button variant="ghost" onClick={() => sortData('num_likes')}>
+                  Likes {renderSortIcon('num_likes')}
+                </Button>
+              </TableHead>
+              <TableHead>
                 <Button
                   variant="ghost"
                   onClick={() => sortData('num_followers')}
@@ -170,7 +120,15 @@ export default function UserDirectoryPage() {
               </TableHead>
               <TableHead>
                 <Button variant="ghost" onClick={() => sortData('created_at')}>
-                  Created At {renderSortIcon('created_at')}
+                  Account Created At {renderSortIcon('created_at')}
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => sortData('archive_uploaded_at')}
+                >
+                  Archive Uploaded At {renderSortIcon('archive_uploaded_at')}
                 </Button>
               </TableHead>
             </TableRow>
@@ -209,6 +167,7 @@ export default function UserDirectoryPage() {
                   </Link>
                 </TableCell>
                 <TableCell>{formatNumber(user.num_tweets)}</TableCell>
+                <TableCell>{formatNumber(user.num_likes)}</TableCell>
                 <TableCell>{formatNumber(user.num_followers)}</TableCell>
                 <TableCell>
                   {user.archive_at
@@ -217,6 +176,11 @@ export default function UserDirectoryPage() {
                 </TableCell>
                 <TableCell>
                   {new Date(user.created_at).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  {user.archive_uploaded_at
+                    ? new Date(user.archive_uploaded_at).toLocaleDateString()
+                    : '-'}
                 </TableCell>
               </TableRow>
             ))}

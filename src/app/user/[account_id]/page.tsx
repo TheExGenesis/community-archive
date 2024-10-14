@@ -6,10 +6,10 @@ import TopMentionedUsers, {
 } from '@/components/TopMentionedMissingUsers'
 import AccountTopTweets from './AccountTopTweets'
 import { createServerClient } from '@/utils/supabase'
-import { FormattedUser } from '@/lib-client/user-utils'
+import { FormattedUser } from '@/lib-client/types'
 import { devLog } from '@/lib-client/devLog'
 import { cookies } from 'next/headers'
-import { getUserData } from '@/lib-server/user'
+import { getUserData } from '@/lib-server/queries/fetchUsers'
 import { formatNumber } from '@/lib-client/formatNumber'
 
 const UserProfile = ({ userData }: { userData: FormattedUser }) => {
@@ -56,7 +56,7 @@ export default async function User({ params }: any) {
   const cookieStore = cookies()
   const supabase = createServerClient(cookieStore)
 
-  const userData = await getUserData(account_id)
+  const userData = await getUserData(supabase, account_id)
 
   const { data: summaryData, error: summaryError } = await supabase
     .from('account_activity_summary' as any)

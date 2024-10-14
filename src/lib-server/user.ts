@@ -56,35 +56,3 @@ export const getTopTweets = async (account_id: string, limit: number = 20) => {
     .limit(limit)
   return data ? data.map(formatTweet) : []
 }
-
-export const getUserData = async (account_id: string) => {
-  const supabase = createServerClient(cookies())
-  const { data } = await supabase
-    .schema('public')
-    .from('account')
-    .select(
-      `
-      account_id,
-      username,
-      account_display_name,
-      created_at,
-      num_tweets,
-      num_followers,
-      num_following,
-      num_likes,
-      profile:profile(bio, website, location, avatar_media_url),
-      archive_upload:archive_upload(archive_at)
-    `,
-    )
-    .or(`account_id.eq.${account_id},username.ilike.${account_id}`)
-    .single()
-
-  if (!data) {
-    return null
-  }
-
-  const formattedUser = formatUserData(data)
-  devLog('getUserData', { data, formattedUser })
-
-  return formattedUser
-}

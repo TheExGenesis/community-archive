@@ -6,10 +6,11 @@ import TopMentionedUsers, {
 } from '@/components/TopMentionedMissingUsers'
 import AccountTopTweets from './AccountTopTweets'
 import { createServerClient } from '@/utils/supabase'
-import { FormattedUser } from '@/lib-client/user-utils'
+import { FormattedUser } from '@/lib-client/types'
 import { devLog } from '@/lib-client/devLog'
 import { cookies } from 'next/headers'
-import { getUserData } from '@/lib-server/user'
+import { getUserData } from '@/lib-server/queries/fetchUsers'
+import { formatNumber } from '@/lib-client/formatNumber'
 
 const UserProfile = ({ userData }: { userData: FormattedUser }) => {
   const account = userData
@@ -40,14 +41,10 @@ const UserProfile = ({ userData }: { userData: FormattedUser }) => {
           </p>
         )}
         <div className="mt-4 flex space-x-4 text-sm text-gray-600">
-          <p>{new Intl.NumberFormat().format(account.num_tweets)} Tweets</p>
-          <p>
-            {new Intl.NumberFormat().format(account.num_followers)} Followers
-          </p>
-          <p>
-            {new Intl.NumberFormat().format(account.num_following)} Following
-          </p>
-          <p>{new Intl.NumberFormat().format(account.num_likes)} Likes</p>
+          <p>{formatNumber(account.num_tweets)} Tweets</p>
+          <p>{formatNumber(account.num_followers)} Followers</p>
+          <p>{formatNumber(account.num_following)} Following</p>
+          <p>{formatNumber(account.num_likes)} Likes</p>
         </div>
       </div>
     </div>
@@ -59,7 +56,7 @@ export default async function User({ params }: any) {
   const cookieStore = cookies()
   const supabase = createServerClient(cookieStore)
 
-  const userData = await getUserData(account_id)
+  const userData = await getUserData(supabase, account_id)
 
   const { data: summaryData, error: summaryError } = await supabase
     .from('account_activity_summary' as any)

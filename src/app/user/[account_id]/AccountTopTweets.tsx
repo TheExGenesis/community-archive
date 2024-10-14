@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import AccountTopTweetsClient from './AccountTopTweetsClient'
-import { FormattedUser } from '@/lib-client/user-utils'
+import { FormattedUser } from '@/lib-client/types'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import { devLog } from '@/lib-client/devLog'

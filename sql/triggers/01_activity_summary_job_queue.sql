@@ -79,7 +79,7 @@ END IF;
 
 IF v_job.key = 'update_conversation_ids' THEN
     RAISE NOTICE 'Updating conversation ids';
-    PERFORM public.post_upload_update_conversation_ids();
+    PERFORM private.post_upload_update_conversation_ids();
 END IF;
 
 -- Delete the job

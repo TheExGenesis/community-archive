@@ -37,3 +37,4 @@ JOIN thread_summary ts ON mt.conversation_id = ts.conversation_id AND mt.account
 
 CREATE INDEX idx_main_thread_view_account_id ON main_thread_view (account_id);
 CREATE INDEX idx_main_thread_view_conversation_id ON main_thread_view (conversation_id);
+CREATE INDEX idx_main_thread_view_tweet_id ON main_thread_view (tweet_id);

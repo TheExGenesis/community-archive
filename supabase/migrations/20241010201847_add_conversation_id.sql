@@ -2,7 +2,7 @@ ALTER TABLE "public"."tweets"
 ADD COLUMN "conversation_id" text;
 
 
-CREATE OR REPLACE FUNCTION public.update_conversation_ids()
+CREATE OR REPLACE FUNCTION private.update_conversation_ids()
 RETURNS INTEGER AS $$
 DECLARE
     affected_rows INTEGER := 0;
@@ -76,7 +76,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Add a comment to explain the purpose of this function
-COMMENT ON FUNCTION public.update_conversation_ids() IS 'Updates conversation_ids for tweets';
+COMMENT ON FUNCTION private.update_conversation_ids() IS 'Updates conversation_ids for tweets';
 
 
 
@@ -119,6 +119,7 @@ JOIN thread_summary ts ON mt.conversation_id = ts.conversation_id AND mt.account
 
 CREATE INDEX idx_main_thread_view_account_id ON main_thread_view (account_id);
 CREATE INDEX idx_main_thread_view_conversation_id ON main_thread_view (conversation_id);
+CREATE INDEX idx_main_thread_view_tweet_id ON main_thread_view (tweet_id);
 
 --ALTER MATERIALIZED VIEW main_thread_view OWNER TO authenticated,service_role,postgres;
 
@@ -181,23 +182,23 @@ CREATE INDEX idx_main_thread_view_conversation_id ON main_thread_view (conversat
 
 
 
-CREATE OR REPLACE FUNCTION public.post_upload_update_conversation_ids()
+CREATE OR REPLACE FUNCTION private.post_upload_update_conversation_ids()
 RETURNS void AS $$
 BEGIN
     
     RAISE NOTICE 'Updating conversation ids';
-    PERFORM public.update_conversation_ids();
+    PERFORM private.update_conversation_ids();
    
    
    RAISE NOTICE 'Refreshing materialized view: main_thread_view';
-    REFRESH MATERIALIZED VIEW main_thread_view;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY main_thread_view;
 END;
 $$ LANGUAGE plpgsql;
 
 
 
 -- Run the function to update the conversation_ids and main_thread_view when the migration is applied
-SELECT public.post_upload_update_conversation_ids();
+SELECT private.post_upload_update_conversation_ids();
 
 
 CREATE OR REPLACE FUNCTION private.queue_update_conversation_ids()
@@ -264,7 +265,7 @@ END IF;
 
 IF v_job.key = 'update_conversation_ids' THEN
     RAISE NOTICE 'Updating conversation ids';
-    PERFORM public.post_upload_update_conversation_ids();
+    PERFORM private.post_upload_update_conversation_ids();
 END IF;
 
 -- Delete the job

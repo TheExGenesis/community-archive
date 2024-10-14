@@ -1,5 +1,5 @@
 
-CREATE OR REPLACE FUNCTION public.update_conversation_ids()
+CREATE OR REPLACE FUNCTION private.update_conversation_ids()
 RETURNS INTEGER AS $$
 DECLARE
     affected_rows INTEGER := 0;
@@ -73,4 +73,4 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Add a comment to explain the purpose of this function
-COMMENT ON FUNCTION public.update_conversation_ids() IS 'Updates conversation_ids for tweets';
+COMMENT ON FUNCTION private.update_conversation_ids() IS 'Updates conversation_ids for tweets';

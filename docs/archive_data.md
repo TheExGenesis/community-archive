@@ -1,8 +1,8 @@
 # What data from the archive do we use?
 
-We only use and store the following files from the archive.
+Your archive gets processed locally and only the following data ever leaves your machine.
 
-If you want to be 100% sure abot your privacy, you can remvove everything else from the data folder.
+If you want to be 100% sure about your privacy, you can remove everything else from the data folder.
 
 | File               | Contains                                               | Why We Need                                        |
 | ------------------ | ------------------------------------------------------ | -------------------------------------------------- |
@@ -12,6 +12,7 @@ If you want to be 100% sure abot your privacy, you can remvove everything else f
 | account.js         | Basic account info like email, username, creation date | Identify user, show account age                    |
 | profile.js         | User's profile data like bio, location, avatar         | Display user info in UI                            |
 | note-tweet.js      | Full text of long tweets                               | Complete content for tweets truncated in tweets.js |
+| community-tweet.js | Tweets from twitter communities, which are all public  | Same reason as we need other tweets                |
 | like.js (optional) | Tweets user has liked                                  | Show user's interests, engagement                  |
 
 ## Examples
@@ -207,3 +208,39 @@ window.YTD.like.part1 = [
   }
 ]
 ```
+
+community-tweet.json
+
+```json
+window.YTD.community_tweet.part0 = [
+  {
+    "tweet" : {
+      "retweeted" : false,
+      "source" : "<a href=\"http://twitter.com/download/android\" rel=\"nofollow\">Twitter for Android</a>",
+      "entities" : {
+        "hashtags" : [ ],
+        "symbols" : [ ],
+        "user_mentions" : [ ],
+        "urls" : [ ]
+      },
+      "display_text_range" : [
+        "0",
+        "25"
+      ],
+      "favorite_count" : "10",
+      "id_str" : "1611701861727313922",
+      "scopes" : {
+        "followers" : false
+      },
+      "truncated" : false,
+      "retweet_count" : "0",
+      "id" : "1611701861727313922",
+      "community_id" : "1611684946967412736",
+      "community_id_str" : "1611684946967412736",
+      "created_at" : "Sat Jan 07 12:30:42 +0000 2023",
+      "favorited" : false,
+      "full_text" : "Hey friends miss u dearly",
+      "lang" : "en"
+    }
+  }
+]```

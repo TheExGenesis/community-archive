@@ -8,17 +8,6 @@ export const uploadArchiveToStorage = async (
   supabase: SupabaseClient,
   archive: Archive,
 ): Promise<void> => {
-  const latestTweetDate = archive.tweets.reduce(
-    (latest: string, tweet: any) => {
-      const tweetDate = new Date(tweet.tweet.created_at)
-      return latest
-        ? tweetDate > new Date(latest)
-          ? tweetDate.toISOString()
-          : latest
-        : tweetDate.toISOString()
-    },
-    '',
-  )
   // Upload archive objects to storage
   const username = archive.account[0].account.username.toLowerCase()
 
@@ -27,7 +16,7 @@ export const uploadArchiveToStorage = async (
   const isDevelopment = process.env.NODE_ENV === 'development'
   const useRemoteDevDb = process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true'
 
-  console.log('Uploading archive to storage', { username, latestTweetDate })
+  console.log('Uploading archive to storage', { username })
 
   try {
     await refreshSession(supabase)
@@ -46,7 +35,7 @@ export const uploadArchiveToStorage = async (
   const bucketName = 'archives'
   const { data, error: uploadError } = await supabase.storage
     .from(bucketName)
-    .upload(`${username}/${latestTweetDate}.json`, JSON.stringify(archive), {
+    .upload(`${username}/archive.json`, JSON.stringify(archive), {
       upsert: true,
     })
   if (uploadError && uploadError.message !== 'The resource already exists') {

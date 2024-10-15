@@ -35,7 +35,14 @@ pop3_port = 54326
 
 [storage]
 # The maximum file size allowed (e.g. "5MB", "500KB").
-file_size_limit = "500MiB"
+file_size_limit = "1000MiB"
+
+[storage.buckets.archives]
+public = false
+file_size_limit = "1000MiB"
+allowed_mime_types = ["application/json", "text/plain"]
+objects_path = "../../data/local_seed/archives"
+
 
 [auth]
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used

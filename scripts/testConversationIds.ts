@@ -21,7 +21,7 @@ import { createDbScriptClient } from "../src/utils/supabase";
 
   async function fetchTweets() {
     const query = supabase
-      .from('tweets')
+      .from('tweets_w_conversation_id')
       .select('tweet_id, conversation_id, reply_to_tweet_id')
       .order('tweet_id', { ascending: true })
       .limit(batchSize);
@@ -49,7 +49,7 @@ import { createDbScriptClient } from "../src/utils/supabase";
       let currentTweetId = tweet.reply_to_tweet_id;
       while (currentTweetId) {
         const { data: parentTweet, error: parentError } = await supabase
-          .from('tweets')
+          .from('tweets_w_conversation_id')
           .select('tweet_id, conversation_id, reply_to_tweet_id')
           .eq('tweet_id', currentTweetId)
           .single();

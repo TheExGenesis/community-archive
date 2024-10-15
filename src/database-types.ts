@@ -1591,7 +1591,6 @@ export type Database = {
         }
         Returns: string[]
       }
-      }
     }
     Enums: {
       upload_phase_enum: "uploading" | "completed" | "failed"

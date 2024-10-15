@@ -6,7 +6,7 @@ BEGIN
     PERFORM private.update_conversation_ids();
    
    
-   RAISE NOTICE 'Refreshing materialized view: main_thread_view';
-    REFRESH MATERIALIZED VIEW CONCURRENTLY main_thread_view;
+   --RAISE NOTICE 'Refreshing materialized view: main_thread_view';
+   -- REFRESH MATERIALIZED VIEW CONCURRENTLY main_thread_view;
 END;
 $$ LANGUAGE plpgsql;

@@ -667,6 +667,36 @@ export type Database = {
           },
         ]
       }
+      conversations: {
+        Row: {
+          conversation_id: string | null
+          tweet_id: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          tweet_id: string
+        }
+        Update: {
+          conversation_id?: string | null
+          tweet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_tweet_id_fkey"
+            columns: ["tweet_id"]
+            isOneToOne: true
+            referencedRelation: "tweets"
+            referencedColumns: ["tweet_id"]
+          },
+          {
+            foreignKeyName: "conversations_tweet_id_fkey"
+            columns: ["tweet_id"]
+            isOneToOne: true
+            referencedRelation: "tweets_w_conversation_id"
+            referencedColumns: ["tweet_id"]
+          },
+        ]
+      }
       followers: {
         Row: {
           account_id: string
@@ -937,6 +967,13 @@ export type Database = {
             referencedRelation: "tweets"
             referencedColumns: ["tweet_id"]
           },
+          {
+            foreignKeyName: "tweet_media_tweet_id_fkey"
+            columns: ["tweet_id"]
+            isOneToOne: false
+            referencedRelation: "tweets_w_conversation_id"
+            referencedColumns: ["tweet_id"]
+          },
         ]
       }
       tweet_urls: {
@@ -969,13 +1006,19 @@ export type Database = {
             referencedRelation: "tweets"
             referencedColumns: ["tweet_id"]
           },
+          {
+            foreignKeyName: "tweet_urls_tweet_id_fkey"
+            columns: ["tweet_id"]
+            isOneToOne: false
+            referencedRelation: "tweets_w_conversation_id"
+            referencedColumns: ["tweet_id"]
+          },
         ]
       }
       tweets: {
         Row: {
           account_id: string
           archive_upload_id: number
-          conversation_id: string | null
           created_at: string
           favorite_count: number
           fts: unknown | null
@@ -989,7 +1032,6 @@ export type Database = {
         Insert: {
           account_id: string
           archive_upload_id: number
-          conversation_id?: string | null
           created_at: string
           favorite_count: number
           fts?: unknown | null
@@ -1003,7 +1045,6 @@ export type Database = {
         Update: {
           account_id?: string
           archive_upload_id?: number
-          conversation_id?: string | null
           created_at?: string
           favorite_count?: number
           fts?: unknown | null
@@ -1069,6 +1110,13 @@ export type Database = {
             referencedRelation: "tweets"
             referencedColumns: ["tweet_id"]
           },
+          {
+            foreignKeyName: "user_mentions_tweet_id_fkey"
+            columns: ["tweet_id"]
+            isOneToOne: false
+            referencedRelation: "tweets_w_conversation_id"
+            referencedColumns: ["tweet_id"]
+          },
         ]
       }
     }
@@ -1078,8 +1126,6 @@ export type Database = {
           account_id: string | null
           mentioned_accounts: Json | null
           most_favorited_tweets: Json | null
-          most_liked_tweets_by_archive_users: Json | null
-          most_replied_tweets_by_archive_users: Json | null
           most_retweeted_tweets: Json | null
           num_followers: number | null
           num_tweets: number | null
@@ -1100,18 +1146,44 @@ export type Database = {
         }
         Relationships: []
       }
-      main_thread_view: {
+      tweets_w_conversation_id: {
         Row: {
           account_id: string | null
+          archive_upload_id: number | null
           conversation_id: string | null
-          depth: number | null
+          created_at: string | null
           favorite_count: number | null
-          max_depth: number | null
+          fts: unknown | null
+          full_text: string | null
           reply_to_tweet_id: string | null
+          reply_to_user_id: string | null
+          reply_to_username: string | null
           retweet_count: number | null
           tweet_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tweets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "tweets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_activity_summary"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "tweets_archive_upload_id_fkey"
+            columns: ["archive_upload_id"]
+            isOneToOne: false
+            referencedRelation: "archive_upload"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -1276,6 +1348,21 @@ export type Database = {
           avatar_media_url: string
           username: string
           account_display_name: string
+        }[]
+      }
+      get_main_thread: {
+        Args: {
+          p_conversation_id: string
+        }
+        Returns: {
+          tweet_id: string
+          conversation_id: string
+          reply_to_tweet_id: string
+          account_id: string
+          depth: number
+          max_depth: number
+          favorite_count: number
+          retweet_count: number
         }[]
       }
       get_top_accounts_with_followers: {
@@ -1452,10 +1539,6 @@ export type Database = {
           avatar_media_url: string
         }[]
       }
-      post_upload_update_conversation_ids: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       process_and_insert_tweet_entities: {
         Args: {
           p_tweets: Json
@@ -1508,9 +1591,6 @@ export type Database = {
         }
         Returns: string[]
       }
-      update_conversation_ids: {
-        Args: Record<PropertyKey, never>
-        Returns: number
       }
     }
     Enums: {

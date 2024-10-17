@@ -76,6 +76,12 @@ IF v_job.key = 'refresh_activity_summary' THEN
     REFRESH MATERIALIZED VIEW CONCURRENTLY public.account_activity_summary;
 END IF;
 
+
+IF v_job.key = 'update_conversation_ids' THEN
+    RAISE NOTICE 'Updating conversation ids';
+    PERFORM private.post_upload_update_conversation_ids();
+END IF;
+
 -- Delete the job
 DELETE FROM private.job_queue WHERE key = v_job.key;
 RAISE NOTICE 'Job completed and removed from queue: %', v_job.key;

@@ -18,6 +18,7 @@
     "dev-as-prod": "set NODE_ENV=production & next dev",
     "dev-remote-db": "set NEXT_PUBLIC_USE_REMOTE_DEV_DB=true & next dev",
     "dev:importdata": "tsx --env-file=.env scripts/importFromArchiveDataToDb.ts",
+    "dev:testconversationids": "tsx --env-file=.env scripts/testConversationIds.ts",
     "build": "set NODE_ENV=production & next build",
     "start": "next start",
     "lint": "next lint",

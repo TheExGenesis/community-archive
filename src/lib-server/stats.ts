@@ -11,7 +11,7 @@ export const getStats = async (supabase: SupabaseClient) => {
 
   if (error) {
     console.error('Error fetching global activity summary:', error)
-    return null
+    throw error
   }
 
   return {

@@ -14,6 +14,9 @@ const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
   ssr: false,
 })
 
+// Add this import
+import Footer from '@/components/Footer'
+
 declare global {
   interface Window {
     supabase: any
@@ -73,15 +76,17 @@ export default async function Homepage() {
           <p className="mb-4 leading-relaxed">
             {`Powered by your tweet history, the community archive lets anyone build things like:`}
           </p>
-          <ul className="mb-4 list-disc space-y-2 pl-16 ">
-            <li>🔎 Search that really knows what you mean;</li>
-            <li>✨ AI apps with context on you and your friends;</li>
-            <li>📚 Make artifacts like books based on your tweets;</li>
-            <li>And more!</li>
-          </ul>
+          <div className="mb-4 space-y-2 pl-4">
+            <p>🔎 Search that really knows what you mean</p>
+            <p>✨ AI apps with context on you and your friends</p>
+            <p>📚 Make artifacts like books based on your tweets</p>
+            <p>And more!</p>
+          </div>
           <br />
-
-          <p className="text-sm">
+        </div>
+        <p className="mb-4 text-sm font-bold">{`How can I contribute?`}</p>
+        <ul className="mb-4 list-disc space-y-2 pl-6 text-sm">
+          <li>
             {`If you don't have an archive yet, `}
             <strong>
               <a
@@ -92,10 +97,9 @@ export default async function Homepage() {
               </a>
             </strong>
             {` now!`}
-          </p>
-        </div>
-        <br />
-        <p className="text-sm dark:text-gray-300">{`If you do... `}</p>
+          </li>
+          <li className="dark:text-gray-300">{`If you do have an archive... `}</li>
+        </ul>
         {isDev ? <UploadTwitterArchive supabase={null} /> : <DynamicSignIn />}
         {!isDev && <UploadTwitterArchive supabase={null} />}
         <br />
@@ -103,22 +107,11 @@ export default async function Homepage() {
           Useful links:
           <ul className="mb-4 list-disc pl-6">
             <li>
-              {`We're an open database and API anyone can build on. Want to know more? `}
               <a
-                href="https://substack.com/@xiqo/p-148517224"
+                href="https://github.com/TheExGenesis/community-archive/blob/main/docs/archive_data.md"
                 className="text-blue-500 hover:underline"
               >
-                {`Here's our FAQ`}
-              </a>
-            </li>
-            <li>
-              Worried about privacy? Here is{' '}
-              <a href="/data-policy" className="text-blue-500 hover:underline">
-                our data policy
-              </a>{' '}
-              and{' '}
-              <a href="/remove-dms" className="text-blue-500 hover:underline">
-                how to remove DMs from the archive
+                {`What data from the archive do we use, and why?`}
               </a>
             </li>
             <li>
@@ -137,6 +130,15 @@ export default async function Homepage() {
                 <FaDiscord className="mr-1" /> Discord
               </a>
             </li>
+            <li>
+              {`Want to know more? `}
+              <a
+                href="https://substack.com/@xiqo/p-148517224"
+                className="text-blue-500 hover:underline"
+              >
+                {`Here's our FAQ`}
+              </a>
+            </li>
           </ul>
           <br />
           <br />
@@ -144,6 +146,9 @@ export default async function Homepage() {
         <div className="mb-4"></div>
         <br />
       </div>
+
+      {/* Add Footer component */}
+      <Footer />
     </div>
   )
 }

@@ -37,8 +37,10 @@ const CommunityStats = async ({ showGoal }: CommunityStatsProps) => {
         stats.tweetCount !== null &&
         stats.likedTweetCount !== null && (
           <p className="mb-4 text-xs">
-            <strong>{formatNumber(stats.tweetCount)}</strong> tweets contributed
-            from <strong>{formatNumber(stats.accountCount)}</strong> accounts.
+            <strong>{formatNumber(stats.tweetCount)}</strong> tweets and{' '}
+            <strong>{formatNumber(stats.likedTweetCount)}</strong> liked tweets
+            contributed from <strong>{formatNumber(stats.accountCount)}</strong>{' '}
+            accounts.
             {showGoal && goal && (
               <span className="italic">
                 {' '}

@@ -119,6 +119,19 @@ export default function DataPolicyPage() {
       </p>
 
       <p>
+        You can reach out to us on Twitter at{' '}
+        <a
+          href="https://x.com/exgenesis"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:underline"
+        >
+          @exgenesis
+        </a>
+        .
+      </p>
+
+      <p>
         By using the Community Archive, you acknowledge that you understand and
         agree to this privacy policy.
       </p>

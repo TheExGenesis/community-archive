@@ -14,7 +14,7 @@ OR REPLACE FUNCTION public.word_occurrences (
   start_date TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   end_date TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   user_ids TEXT[] DEFAULT NULL
-) RETURNS TABLE (MONTH TEXT, word_count bigint) AS $$
+) RETURNS TABLE (MONTH TEXT, word_count BIGINT) AS $$
 BEGIN
     RETURN QUERY
     SELECT
@@ -23,12 +23,14 @@ BEGIN
     FROM
         public.tweets t
     WHERE
-        t.full_text ILIKE '%' || search_word || '%'  -- Search for the specified word
-        AND (t.created_at BETWEEN start_date AND end_date OR start_date IS NULL OR end_date IS NULL)  -- Date range filtering
-        AND (t.account_id = ANY(user_ids) OR user_ids IS NULL)  -- User filtering
+        t.fts @@ to_tsquery(replace(search_word, ' ', '+'))  -- Full-text search
+        AND (start_date IS NULL OR end_date IS NULL OR t.created_at BETWEEN start_date AND end_date)  -- Date range filtering
+        AND (user_ids IS NULL OR t.account_id = ANY(user_ids))  -- User filtering
     GROUP BY
         month
     ORDER BY
         month;
-END;
-$$ LANGUAGE plpgsql;
+END; $$ LANGUAGE plpgsql SECURITY DEFINER
+SET statement_timeout TO '5min';
+
+

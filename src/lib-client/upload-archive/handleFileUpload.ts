@@ -102,24 +102,28 @@ const parseFileContents = (fileContents: {
 }): Archive => {
   const archive: Archive = Object.fromEntries(
     Object.entries(fileContents).map(([key, contents]) => {
-      if (['tweets', 'like', 'follower', 'following'].includes(key)) {
-        const allTweets = contents.flatMap((content) =>
-          pipe(
-            (content) => content.slice(content.indexOf('[')),
-            removeProblematicCharacters,
-            JSON.parse,
-          )(content),
-        )
-        return [key, allTweets]
-      } else {
-        return [
-          key,
-          pipe(
-            (content) => content.slice(content.indexOf('[')),
-            removeProblematicCharacters,
-            JSON.parse,
-          )(contents[0]),
-        ]
+      try {
+        if (['tweets', 'like', 'follower', 'following'].includes(key)) {
+          const allTweets = contents.flatMap((content, index) =>
+            pipe(
+              (content) => content.slice(content.indexOf('[')),
+              removeProblematicCharacters,
+              JSON.parse,
+            )(content),
+          )
+          return [key, allTweets]
+        } else {
+          return [
+            key,
+            pipe(
+              (content) => content.slice(content.indexOf('[')),
+              removeProblematicCharacters,
+              JSON.parse,
+            )(contents[0]),
+          ]
+        }
+      } catch (error) {
+        throw new Error(`Error parsing ${key}.js: ${(error as Error).message}`)
       }
     }),
   ) as Archive
@@ -172,11 +176,7 @@ export const handleFileUpload = async (
       event.target.value = ''
     }
     console.error('Error loading the archive:', error)
-    alert(
-      `An error occurred while processing archive\n ${
-        (error as Error).message
-      }`,
-    )
+
     throw error
   }
 }

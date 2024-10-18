@@ -76,7 +76,7 @@ export default function SignIn() {
   }
 
   return userMetadata ? (
-    <div className="inline-flex items-center dark:text-gray-300">
+    <div className="inline-flex items-center text-sm dark:text-gray-300">
       <span>{`You're logged in as ${
         userMetadata.full_name || userMetadata.user_name || 'Unknown User'
       } `}</span>

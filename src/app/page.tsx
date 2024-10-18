@@ -100,8 +100,8 @@ export default async function Homepage() {
           </li>
           <li className="dark:text-gray-300">{`If you do have an archive... `}</li>
         </ul>
-        {isDev ? <UploadTwitterArchive supabase={null} /> : <DynamicSignIn />}
-        {!isDev && <UploadTwitterArchive supabase={null} />}
+        <DynamicSignIn />
+        <UploadTwitterArchive supabase={null} />
         <br />
         <div className="mb-4 text-sm">
           Useful links:

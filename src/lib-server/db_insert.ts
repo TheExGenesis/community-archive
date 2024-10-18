@@ -28,6 +28,7 @@ export const retryOperation = async <T>(
         throw new Error(`${errorMessage}: ${(error as Error).message}`)
       }
       console.log(`Attempt ${retries} failed. Retrying in ${RETRY_DELAY}ms...`)
+      console.info(`${errorMessage}: ${(error as Error).message}`)
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY))
     }
   }

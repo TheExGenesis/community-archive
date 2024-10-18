@@ -94,7 +94,11 @@ export default function UploadTwitterArchive(props: {
       setState((prev: UploadTwitterArchiveState) => ({ ...prev, archive }))
     } catch (error) {
       console.error('Error processing archive:', error)
-      alert('An error occurred while processing archive')
+      alert(
+        `An error occurred while processing archive: ${
+          (error as Error).message
+        }`,
+      )
     } finally {
       setState((prev) => ({ ...prev, isProcessing: false }))
       if (event.target) {
@@ -126,7 +130,7 @@ export default function UploadTwitterArchive(props: {
   }
 
   return (
-    (userMetadata || isDev) && (
+    userMetadata && (
       <div className="text-sm dark:text-gray-300">
         {state.archiveUpload && (
           <>
@@ -137,18 +141,18 @@ export default function UploadTwitterArchive(props: {
           </>
         )}
         {state.archiveUpload && !state.showUploadButton ? (
-          <div>
-            <button
-              onClick={() =>
-                setState((prev) => ({ ...prev, showUploadButton: true }))
-              }
-              className="cursor-pointer text-sm text-blue-500 underline dark:text-blue-400"
-            >
+          <div
+            className="transition-colsors rounded-md bg-zinc-100 p-4 duration-200 hover:bg-zinc-50 dark:bg-gray-900 dark:hover:bg-gray-800"
+            onClick={() =>
+              setState((prev) => ({ ...prev, showUploadButton: true }))
+            }
+          >
+            <button className="cursor-pointer text-sm font-bold text-blue-500 hover:underline dark:text-blue-400">
               Upload a new archive, or delete your data.
             </button>
           </div>
         ) : (
-          <div>
+          <div className="transition-colsors rounded-md bg-zinc-100 p-4 duration-200 hover:bg-zinc-50 dark:bg-gray-900 dark:hover:bg-gray-800">
             {state.archiveUpload && (
               <div>
                 <button
@@ -164,16 +168,20 @@ export default function UploadTwitterArchive(props: {
             <div className="flex flex-col">
               <div className="flex justify-between">
                 <div className="mb-4">
-                  <p className="mb-4 text-xs dark:text-gray-300">
+                  <p className="mb-6 text-xs dark:text-gray-300">
                     Please upload your Twitter archive as a .zip file.
                   </p>
-                  <input
-                    type="file"
-                    accept=".zip,application/zip"
-                    onChange={onFileUpload}
-                    disabled={state.isProcessing}
-                    multiple
-                  />
+                  <label className="mb-4 cursor-pointer rounded bg-zinc-500 px-4 py-3 text-sm text-white hover:bg-zinc-600 disabled:opacity-50 dark:bg-zinc-600 dark:hover:bg-zinc-700">
+                    Choose Files
+                    <input
+                      type="file"
+                      accept=".zip,application/zip"
+                      onChange={onFileUpload}
+                      disabled={state.isProcessing}
+                      multiple
+                      className="hidden"
+                    />
+                  </label>
                   {state.isProcessing && (
                     <div className="mt-4">
                       <p className="mb-2">{`Processing archive...`}</p>
@@ -197,7 +205,7 @@ export default function UploadTwitterArchive(props: {
                       <button
                         onClick={onDeleteArchive}
                         disabled={state.isDeleting}
-                        className="rounded bg-red-500 px-4 py-2 text-sm text-white hover:bg-red-600 disabled:opacity-50 dark:bg-red-600 dark:hover:bg-red-700"
+                        className="rounded bg-red-700 px-4 py-2 text-sm text-white hover:bg-red-600 disabled:opacity-50 dark:bg-red-800 dark:hover:bg-red-700"
                       >
                         {state.isDeleting ? 'Deleting...' : 'Delete My Archive'}
                       </button>

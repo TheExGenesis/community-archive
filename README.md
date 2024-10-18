@@ -10,7 +10,14 @@ The goals of this project are (1) create a public domain dataset so that we can 
 
 ## Join our Discord
 
-https://discord.gg/AStSQj6ugq
+https://discord.gg/5mbWEfVrqw
+
+## App showcase
+
+|  | | |
+| ------------- | ------------- | ------------- |
+| <a href="https://labs-community-archive.streamlit.app/"><img src="https://github.com/user-attachments/assets/39269a8e-e675-4040-9b71-f04c811ca304" width="350" /></a>  | - [app](https://labs-community-archive.streamlit.app/) <br/> - [source code](https://github.com/TheExGenesis/community-archive-apps/tree/main) | "google trends" like app but for twitter data
+
 
 ## How to use the API (from your own app)
 
@@ -44,3 +51,13 @@ Apps
 - [ ] User summary pages (interests, projects, relationships)
 - [ ] Discourse mapping
 - [ ] much more ...
+
+## Privacy
+
+We take your privacy seriously. When you upload your Twitter archive:
+
+- Data is processed locally on your device
+- Only essential information is sent to our servers
+- No personal messages or sensitive data are uploaded
+
+For a detailed list of what data we use and why, see [archive_data.md](docs/archive_data.md).

@@ -208,7 +208,7 @@ export function FileUploadDialog({
               {state.showAdvancedOptions && (
                 <div className="mt-4 space-y-4 border-t pt-4">
                   {/* Upload Options */}
-                  <TooltipProvider>
+                  {/* <TooltipProvider>
                     <div className="flex items-center justify-between">
                       <Label
                         htmlFor="keep-private"
@@ -240,7 +240,7 @@ export function FileUploadDialog({
                         }
                       />
                     </div>
-                  </TooltipProvider>
+                  </TooltipProvider> */}
                   <TooltipProvider>
                     <div className="flex items-center justify-between">
                       <Label

@@ -1542,70 +1542,6 @@ CREATE OR REPLACE FUNCTION "public"."insert_temp_tweets"("p_tweets" "jsonb", "p_
 
 ALTER FUNCTION "public"."insert_temp_tweets"("p_tweets" "jsonb", "p_suffix" "text") OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION "public"."pg_search_tweets"("search_query" "text", "p_account_id" "text" DEFAULT NULL::"text") RETURNS TABLE("tweet_id" "text", "account_id" "text", "created_at" timestamp with time zone, "full_text" "text", "retweet_count" integer, "favorite_count" integer, "username" "text", "account_display_name" "text", "avatar_media_url" "text")
-    LANGUAGE "plpgsql"
-    AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        t.tweet_id, 
-        t.account_id, 
-        t.created_at, 
-        t.full_text, 
-        t.retweet_count, 
-        t.favorite_count, 
-        a.username, 
-        a.account_display_name, 
-        p.avatar_media_url
-    FROM 
-        public.tweets t
-    INNER JOIN 
-        public.account a ON t.account_id = a.account_id
-    LEFT JOIN 
-        public.profile p ON a.account_id = p.account_id
-    WHERE 
-        to_tsvector('english', t.full_text) @@ to_tsquery('english', '''' || replace(search_query, '''', '''''') || '''')
-        OR t.full_text ILIKE '%' || search_query || '%'
-    ORDER BY 
-        t.created_at DESC
-    LIMIT 100;
-END; 
-$$;
-
-ALTER FUNCTION "public"."pg_search_tweets"("search_query" "text", "p_account_id" "text") OWNER TO "postgres";
-
-CREATE OR REPLACE FUNCTION "public"."pg_search_tweets_with_trigram"("search_query" "text", "p_account_id" "text" DEFAULT NULL::"text") RETURNS TABLE("tweet_id" "text", "account_id" "text", "created_at" timestamp with time zone, "full_text" "text", "retweet_count" integer, "favorite_count" integer, "username" "text", "account_display_name" "text", "avatar_media_url" "text")
-    LANGUAGE "plpgsql"
-    AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        t.tweet_id, 
-        t.account_id, 
-        t.created_at, 
-        t.full_text, 
-        t.retweet_count, 
-        t.favorite_count, 
-        a.username, 
-        a.account_display_name, 
-        p.avatar_media_url
-    FROM 
-        public.tweets t
-    INNER JOIN 
-        public.account a ON t.account_id = a.account_id
-    LEFT JOIN 
-        public.profile p ON a.account_id = p.account_id
-    WHERE 
-        t.full_text % search_query
-    ORDER BY 
-        similarity(t.full_text, search_query) DESC,
-        t.created_at DESC
-    LIMIT 100;
-END; 
-$$;
-
-ALTER FUNCTION "public"."pg_search_tweets_with_trigram"("search_query" "text", "p_account_id" "text") OWNER TO "postgres";
-
 CREATE OR REPLACE FUNCTION "public"."process_and_insert_tweet_entities"("p_tweets" "jsonb", "p_suffix" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $_$
@@ -1664,7 +1600,7 @@ CREATE OR REPLACE FUNCTION "public"."process_and_insert_tweet_entities"("p_tweet
       ', p_suffix) USING p_tweets;
   END;
   $_$;
-
+  
 ALTER FUNCTION "public"."process_and_insert_tweet_entities"("p_tweets" "jsonb", "p_suffix" "text") OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."process_archive"("archive_data" "jsonb") RETURNS "void"
@@ -2849,14 +2785,6 @@ GRANT ALL ON FUNCTION "public"."insert_temp_profiles"("p_profile" "jsonb", "p_ac
 GRANT ALL ON FUNCTION "public"."insert_temp_tweets"("p_tweets" "jsonb", "p_suffix" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."insert_temp_tweets"("p_tweets" "jsonb", "p_suffix" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."insert_temp_tweets"("p_tweets" "jsonb", "p_suffix" "text") TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."pg_search_tweets"("search_query" "text", "p_account_id" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."pg_search_tweets"("search_query" "text", "p_account_id" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."pg_search_tweets"("search_query" "text", "p_account_id" "text") TO "service_role";
-
-GRANT ALL ON FUNCTION "public"."pg_search_tweets_with_trigram"("search_query" "text", "p_account_id" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."pg_search_tweets_with_trigram"("search_query" "text", "p_account_id" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."pg_search_tweets_with_trigram"("search_query" "text", "p_account_id" "text") TO "service_role";
 
 GRANT ALL ON FUNCTION "public"."process_and_insert_tweet_entities"("p_tweets" "jsonb", "p_suffix" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."process_and_insert_tweet_entities"("p_tweets" "jsonb", "p_suffix" "text") TO "authenticated";

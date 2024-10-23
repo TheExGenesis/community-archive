@@ -24,13 +24,27 @@ function isValidRedirectUrl(url: string): boolean {
 }
 
 export async function GET(request: Request) {
-  console.log('request', request)
-  const { searchParams, origin } = new URL(request.url)
+  const requestUrl = new URL(request.url)
+  const { searchParams, origin } = requestUrl
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/'
   const forwardedHost = request.headers.get('x-forwarded-host')
 
-  console.log('request.url', { url: request.url, code, next, origin })
+  console.log('request.url', {
+    request,
+    url: request.url,
+    allParams: Object.fromEntries(requestUrl.searchParams),
+    headers: Object.fromEntries(request.headers),
+    state: requestUrl.searchParams.get('state'),
+    error: requestUrl.searchParams.get('error'),
+    errorDescription: requestUrl.searchParams.get('error_description'),
+    code,
+    next,
+    origin,
+    forwardedHost,
+    searchParams,
+    customUrlParam: searchParams.get('customUrlParam'),
+  })
 
   if (code) {
     const supabase = createServerAdminClient(cookies())
@@ -51,14 +65,15 @@ export async function GET(request: Request) {
       }
 
       // Determine base URL
-      const baseUrl = forwardedHost ? `https://${forwardedHost}` : origin
+      // const baseUrl = forwardedHost ? `https://${forwardedHost}` : origin
+      const baseUrl = origin ? origin : `https://${forwardedHost}`
 
       // Determine redirect URL
       let redirectUrl = `${baseUrl}${next}`
       if (isValidRedirectUrl(next)) {
         redirectUrl = next
       }
-      console.log('redirectUrl', redirectUrl)
+      console.log('redirectUrl', { redirectUrl, next, origin, forwardedHost })
 
       return NextResponse.redirect(redirectUrl)
     }

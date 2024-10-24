@@ -395,7 +395,7 @@ export const processTwitterArchive = async (
     console.log('Inserting archive upload data...')
     const { data: archiveUploadId } = await retryOperation(async () => {
       const uploadOptions = archiveData['upload-options'] || {
-        keepPrivate: true,
+        keepPrivate: false,
         uploadLikes: true,
         startDate: null,
         endDate: null,

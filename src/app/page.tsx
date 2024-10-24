@@ -124,7 +124,7 @@ export default async function Homepage() {
               </a>{' '}
               and{' '}
               <a
-                href="https://discord.gg/AStSQj6ugq"
+                href="https://discord.gg/5mbWEfVrqw"
                 className="inline-flex items-center text-blue-500 hover:underline"
               >
                 <FaDiscord className="mr-1" /> Discord

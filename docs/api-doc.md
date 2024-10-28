@@ -1,32 +1,85 @@
 # How to use the API (from your own app)
 
-1. You can interact with the DB via `curl` or using any of [supabase's client libraries](https://github.com/supabase/supabase#client-libraries). See `NEXT_PUBLIC_SUPABASE_ANON_KEY` below, just copy paste it.
+There are two ways to access the Community Archive's data: (1) Download a JSON file with an individual user's data from blob storage (2) query the DB through the Supabase API
 
-   ```
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8
-   ```
+### Raw user data from blob storage
 
-   Curl example:
+Given a username (lowercase), the URL format is: `/storage/v1/object/public/archives/<username>/archive.json`. 
 
-   ```bash
-   curl 'https://fabxmporizzqflnftavs.supabase.co/rest/v1/profile?limit=5' \
-   -H "apikey: <NEXT_PUBLIC_SUPABASE_ANON_KEY>" \
-   -H "Authorization: Bearer <NEXT_PUBLIC_SUPABASE_ANON_KEY>"
-   ```
+For example, the URL for the user `DefenderOfBasic` is:
 
-   Supabase javascript client (instructions [here](https://supabase.com/docs/reference/javascript/introduction)):
+https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/defenderofbasic/archive.json
 
-   ```js
-   import { createClient } from '@supabase/supabase-js'
-   const supabaseUrl = 'https://fabxmporizzqflnftavs.supabase.co'
-   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-   const supabase = createClient(supabaseUrl, supabaseKey)
-   const { data, error } = await supabase
-     .schema('public')
-     .from('profile')
-     .select('*')
-     .limit(5)
-   console.log(data)
-   ```
+The structure of this JSON is:
 
-2. See [API schema here](https://open-birdsite-db.vercel.app/api/reference). Only `GET` requests are relevant, others you don't have permission for.
+```js
+{
+  "account": {},// username, accountId, display name, etc..
+  "follower": {}, // list of accountId's of followers
+  "following": {}, // list of accountId's they follow
+  "profile": {}, // bio & URL to profile picture
+  "like": {}, // list of full text of each liked tweet
+  "tweets": {}, // list of tweets
+}
+```
+
+### Query the DB 
+
+- API URL: `https://fabxmporizzqflnftavs.supabase.co`
+- [API reference docs](https://open-birdsite-db.vercel.app/api/reference)
+- Authorization token (gives you access to all GET routes): `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8`
+
+Curl example, fetch the profile info of 5 users:
+
+```bash
+export NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8
+
+curl 'https://fabxmporizzqflnftavs.supabase.co/rest/v1/profile?limit=5' \
+-H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+-H "Authorization: Bearer $NEXT_PUBLIC_SUPABASE_ANON_KEY"
+```
+
+Supabase has [client libraries](https://github.com/supabase/supabase#client-libraries) for various languages. JavaScript example:
+
+```js
+import { createClient } from '@supabase/supabase-js'
+const supabaseUrl = 'https://fabxmporizzqflnftavs.supabase.co'
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabase = createClient(supabaseUrl, supabaseKey)
+const { data, error } = await supabase
+  .schema('public')
+  .from('profile')
+  .select('*')
+  .limit(5)
+console.log(data)
+```
+
+#### Get all tweets from a specific user
+
+This example uses accountId for user `DefenderOfBasic`. 
+
+With Curl:
+
+```
+curl 'https://fabxmporizzqflnftavs.supabase.co/rest/v1/tweets?account_id=eq.1680757426889342977&limit=1' \
+-H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+-H "Authorization: Bearer $NEXT_PUBLIC_SUPABASE_ANON_KEY"
+```
+
+With JavaScript:
+
+```js
+const { data, error } = await supabase
+        .schema('public')
+        .from('tweets')
+        .select('*')
+        .eq('account_id', '1680757426889342977') 
+        .limit(1)
+console.log(data)
+```
+
+See [scripts/get_all_tweets_paginated.mts](scripts/get_all_tweets_paginated.mts) for an example of fetching all tweets with pagination. You can run it from the root directory with:
+
+```
+pnpm script scripts/get_all_tweets_paginated.mts
+```

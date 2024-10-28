@@ -2,8 +2,9 @@ import { fileURLToPath } from 'url'
 import path from 'path'
 import * as dotenv from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
-import fs from 'fs/promises'
+import fs from 'fs'
 import { Archive } from '../src/lib-client/types'
+import os from 'os'
 const { processTwitterArchive } = await import('../src/lib-server/db_insert')
 const { pipe } = await import('../src/lib-server/fp')
 const { uploadArchiveToStorage } = await import(
@@ -20,7 +21,7 @@ const __dirname = path.dirname(__filename)
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') })
 
-const isProd = true
+const isProd = false
 
 const supabaseUrl = isProd
   ? process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -68,110 +69,102 @@ async function fetchAccountUsernames() {
   return data?.map((account) => account.username.toLowerCase()) || []
 }
 
-async function downloadUserArchives(usernames: string[]) {
-  const outputDir = path.join(__dirname, '../../data', 'downloads', 'archives')
-  await fs.mkdir(outputDir, { recursive: true })
+async function downloadAndProcessArchive(
+  username: string,
+  archivePath: string,
+): Promise<void> {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'archive-'))
+  const filePath = path.join(tempDir, 'archive.json')
 
-  const storageObjects = await fetchStoragePaths()
-  console.log('storageObjects', storageObjects)
-  const paths = []
-
-  for (const username of usernames) {
-    const archivePath = storageObjects.find((path) =>
-      path.startsWith(`${username}/`),
-    )
-    if (!archivePath) {
-      console.error(`No archive found for ${username}`)
-      continue
-    }
-
-    const filePath = path.join(outputDir, archivePath)
-
-    console.log('downloading')
+  try {
+    console.log(`Downloading archive for ${username}`)
     const { data, error } = await supabase.storage
       .from('archives')
       .download(archivePath)
 
     if (error) {
       console.error(`Error downloading ${username}:`, error)
-      continue
+      return
     }
 
     if (!(data instanceof Blob)) {
       console.error(`Unexpected data type for ${username}`)
-      continue
+      return
     }
 
-    await fs.writeFile(filePath, Buffer.from(await data.arrayBuffer()))
+    const buffer = Buffer.from(await data.arrayBuffer())
+    fs.writeFileSync(filePath, buffer)
     console.log(`Downloaded: ${username}`)
-    paths.push(filePath)
-  }
 
-  return paths
+    await uploadArchive(filePath)
+  } finally {
+    // Clean up temporary directory
+    fs.rmSync(tempDir, { recursive: true, force: true })
+  }
 }
 
 async function uploadArchive(filePath: string) {
   try {
-    const fileContents = await fs.readFile(filePath, 'utf8')
+    const fileContents = fs.readFileSync(filePath, 'utf8')
     const archive: any = pipe(
       removeProblematicCharacters,
       JSON.parse,
     )(fileContents)
 
-    console.log('archive', archive.account)
-
-    // await uploadArchiveToStorage(supabase, archive)
-    // console.log('Archive uploaded to storage successfully')
+    console.log('Processing archive for', archive.account)
 
     await processTwitterArchive(supabase, archive, (progress) => {
       console.log(`${progress.phase}: ${progress.percent?.toFixed(2)}%`)
     })
 
-    console.log('Archive upload and processing completed successfully')
+    console.log('Archive processing completed successfully')
   } catch (error) {
-    console.error('Error uploading and processing archive:', error)
+    console.error('Error processing archive:', error)
   }
 }
 
 async function processArchives(usernames: string[]) {
-  await downloadUserArchives(usernames)
+  const storageObjects = await fetchStoragePaths()
 
-  const outputDir = path.join(__dirname, '../../data', 'downloads', 'archives')
-  for (const archiveName of usernames) {
-    const filePath = path.join(outputDir, `${archiveName}.json`)
-    await uploadArchive(filePath)
+  for (const username of usernames) {
+    const archivePath = storageObjects.find((path) =>
+      path.toLowerCase().startsWith(`${username.toLowerCase()}/archive.json`),
+    )
+    if (!archivePath) {
+      console.error(`No archive found for ${username}`)
+      continue
+    }
+
+    await downloadAndProcessArchive(username, archivePath)
   }
 }
 
-async function checkArchives() {
-  const storageObjects =
-    (await fetchStoragePaths())
-      ?.map((path) => path.split('/')[0])
-      .map((obj) => obj.toLowerCase()) || []
-  const accountUsernames = (await fetchAccountUsernames()).map((username) =>
-    username.toLowerCase(),
+async function checkAndProcessArchives() {
+  const storageObjects = await fetchStoragePaths()
+  const accountUsernames = await fetchAccountUsernames()
+
+  const archivesInStorage = new Set(
+    storageObjects.map((path) => path.split('/')[0].toLowerCase()),
+  )
+  const accountsInDb = new Set(
+    accountUsernames.map((username) => username.toLowerCase()),
   )
 
-  const missingArchives = storageObjects
-    .filter((obj) => !accountUsernames.includes(obj))
-    .filter((obj) => !obj.includes('ceeeeeres'))
-  const extraAccounts = accountUsernames.filter(
-    (username) => !storageObjects.includes(username),
+  const archivesToProcess = [...archivesInStorage].filter(
+    (archive) => !accountsInDb.has(archive),
   )
 
   console.log('Archives in storage but not in public.account:')
-  missingArchives.forEach((archive) => console.log(archive))
+  archivesToProcess.forEach((archive) => console.log(archive))
 
-  console.log('\nUsernames in public.account but not in storage:')
-  extraAccounts.forEach((username) => console.log(username))
+  console.log(`\nTotal archives to process: ${archivesToProcess.length}`)
 
-  console.log(`\nTotal missing archives: ${missingArchives.length}`)
-  console.log(`Total extra accounts: ${extraAccounts.length}`)
-  // if (missingArchives.length > 0) {
-  //   console.log('\nProcessing missing archives...')
-  //   await processArchives(missingArchives)
-  // }
+  if (archivesToProcess.length > 0) {
+    console.log('\nProcessing archives...')
+    await processArchives(archivesToProcess)
+  } else {
+    console.log('No archives to process.')
+  }
 }
 
-// Run the check
-checkArchives()
+checkAndProcessArchives()

@@ -70,3 +70,6 @@ EXCEPTION
         RAISE EXCEPTION 'An error occurred in update_conversation_ids: %', error_message;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Add a comment to explain the purpose of this function
+COMMENT ON FUNCTION private.update_conversation_ids() IS 'Updates conversation_ids for tweets';

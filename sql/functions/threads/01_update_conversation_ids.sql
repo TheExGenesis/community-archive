@@ -5,7 +5,13 @@ DECLARE
     current_tweet RECORD;
     current_conversation_id BIGINT;
     error_message TEXT;
+    lock_key BIGINT;
 BEGIN
+
+    lock_key := hashtext('private' || '.' || 'update_conversation_ids')::BIGINT;
+    
+    -- Obtain an advisory lock using the calculated key
+    PERFORM pg_advisory_lock(lock_key);
     -- Create a temporary table to store processed tweets
     CREATE TEMPORARY TABLE temp_processed_tweets (
         tweet_id text PRIMARY KEY,
@@ -48,16 +54,19 @@ BEGIN
 
     -- Clean up
     DROP TABLE temp_processed_tweets;
+    -- Release the advisory lock
+    PERFORM pg_advisory_unlock(lock_key);
 
     RETURN affected_rows;
 EXCEPTION
     WHEN OTHERS THEN
         -- Clean up the temporary table if it exists
         DROP TABLE IF EXISTS temp_processed_tweets;
+
+        -- Release the advisory lock
+        PERFORM pg_advisory_unlock(lock_key);
+
         GET STACKED DIAGNOSTICS error_message = MESSAGE_TEXT;
         RAISE EXCEPTION 'An error occurred in update_conversation_ids: %', error_message;
 END;
 $$ LANGUAGE plpgsql;
-
--- Add a comment to explain the purpose of this function
-COMMENT ON FUNCTION private.update_conversation_ids() IS 'Updates conversation_ids for tweets';

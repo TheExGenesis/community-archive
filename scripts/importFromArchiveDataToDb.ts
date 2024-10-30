@@ -4,6 +4,7 @@ import * as dotenv from 'dotenv'
 dotenv.config({ path: '../.env' })
 import { createReadStream } from 'fs'
 import { finished } from 'stream/promises'
+import path from 'path'
 import {
   InsertAccount,
   InsertArchiveUpload,
@@ -397,10 +398,10 @@ function ifStringNullReturnNull(value: string | null): string | null {
     ])
   }
 
-  async function getDataFromUnprocessedFile(path: string, file: string) {
+  async function getDataFromUnprocessedFile(dirPath: string, file: string) {
     let processedData: any[] = {} as any
 
-    const filePath = `${path}${file}.csv`
+    const filePath = path.join(dirPath, `${file}.csv`)
     try {
       const records: any[] = []
       const csvParser = parse({

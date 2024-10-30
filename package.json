@@ -17,7 +17,9 @@
     "dev": "set NODE_ENV=development & set NEXT_PUBLIC_USE_REMOTE_DEV_DB=false & next dev",
     "dev-as-prod": "set NODE_ENV=production & next dev",
     "dev-remote-db": "set NEXT_PUBLIC_USE_REMOTE_DEV_DB=true & next dev",
-    "dev:importdata": "tsx --env-file=.env scripts/importFromArchiveDataToDb.ts",
+    "dev:importfiles": "tsx --env-file=.env scripts/importFromFilesToDb.ts",
+    "dev:validateimport": "tsx --env-file=.env scripts/validateDbImport.ts",
+    "dev:downloadarchive": "tsx --env-file=.env scripts/download_storage_anon.mts",
     "dev:testconversationids": "tsx --env-file=.env scripts/testConversationIds.ts",
     "build": "set NODE_ENV=production & next build",
     "start": "next start",
@@ -123,5 +125,13 @@
     "workerDirectory": [
       "public"
     ]
-  }
+  },
+  "contributors": [
+    "ri72miieop <Ri72miIEop@tuta.io>",
+    "DefenderOfBasic <defenderofbasic@proton.me>",
+    "Nathaniel Astudillo <nathanielastudillo@gmail.com>",
+    "Tangrenin <quentindidier@msn.com>",
+    "Brent Baumgartner <brent@brentbaum.com>",
+    "Omar Shehata <omar.sameh.shehata@gmail.com>"
+  ]
 }

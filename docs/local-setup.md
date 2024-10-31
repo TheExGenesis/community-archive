@@ -96,13 +96,15 @@ For each change you make to the db:
 
 ### Seeding the local database
 
-- make sure your .env file is pointing to the Community Archive db
+- make sure your `.env` file has `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` setup to the Community Archive db
 - run the script `pnpm dev:downloadarchive`
-- change the `.env` file to use the local supabase db
+- make sure your `.env` file has `*_LOCAL_*` env vars setup to your local db
 - set the `ARCHIVE_PATH` environment variable to the path of the archive folder
 - run the script `pnpm dev:importfiles`
 - wait a bit and then you should be able to see the data in the local supabase studio at http://localhost:54323/project/default/editor
-- (OPTIONAL)run the script `pnpm dev:validateimport` to validate the data. afaict there's a few edge cases where the data might not import correctly. For now it's not a priority, PR is welcome!
+- (OPTIONAL)run the script `pnpm dev:validateimport` to validate the data. afaict there's a few edge cases where the data might not import correctly. For now fixing this is not a priority, PR is welcome!
+
+Note: this process takes a bit of time because there's 100+ archives to import. Feel free to delete some of the archives from the `ARCHIVE_PATH` folder if you want to speed up the process. Another option is finding the optimal `BATCH_SIZE` value in `scripts/importFromFilesToDb.ts` for your machine.
 
 ### Sign-in in dev mode
 

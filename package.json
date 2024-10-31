@@ -125,13 +125,5 @@
     "workerDirectory": [
       "public"
     ]
-  },
-  "contributors": [
-    "ri72miieop <Ri72miIEop@tuta.io>",
-    "DefenderOfBasic <defenderofbasic@proton.me>",
-    "Nathaniel Astudillo <nathanielastudillo@gmail.com>",
-    "Tangrenin <quentindidier@msn.com>",
-    "Brent Baumgartner <brent@brentbaum.com>",
-    "Omar Shehata <omar.sameh.shehata@gmail.com>"
-  ]
+  }
 }

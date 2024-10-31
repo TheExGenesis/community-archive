@@ -74,6 +74,7 @@ enable_confirmations = false
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin`, `notion`, `twitch`,
 # `twitter`, `slack`, `spotify`, `workos`, `zoom`.
 [auth.external.twitter]
+enabled = true
 client_id = "env(SUPABASE_AUTH_TWITTER_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_TWITTER_SECRET)"
 redirect_uri = "http://localhost:54321/auth/v1/callback"

@@ -8,70 +8,72 @@ CREATE OR REPLACE FUNCTION private.update_conversation_ids()
 RETURNS INTEGER AS $$
 DECLARE
     affected_rows INTEGER := 0;
+    current_tweet RECORD;
+    current_conversation_id BIGINT;
     error_message TEXT;
+    lock_key BIGINT;
 BEGIN
-    -- Create a temporary table to store the results
-    CREATE TEMPORARY TABLE temp_conversation_ids AS
-    SELECT t.tweet_id, c.conversation_id, t.reply_to_tweet_id
-    FROM tweets t
-    LEFT JOIN conversations c ON t.tweet_id = c.tweet_id;
 
-    -- Create indexes to speed up joins and lookups
-    CREATE INDEX idx_temp_in_reply_to ON temp_conversation_ids(reply_to_tweet_id);
-    CREATE INDEX idx_temp_tweet_id ON temp_conversation_ids(tweet_id);
+    lock_key := hashtext('private' || '.' || 'update_conversation_ids')::BIGINT;
+    
+    -- Obtain an advisory lock using the calculated key
+    PERFORM pg_advisory_lock(lock_key);
+    -- Create a temporary table to store processed tweets
+    CREATE TEMPORARY TABLE temp_processed_tweets (
+        tweet_id text PRIMARY KEY,
+        conversation_id text
+    );
 
-    -- Update conversation_ids
-    WITH RECURSIVE conversation_chain AS (
-        -- Base case: tweets that are start of conversations or already have conversation_ids
-        SELECT tweet_id, COALESCE(conversation_id, tweet_id) AS conversation_id, reply_to_tweet_id
-        FROM temp_conversation_ids
-        WHERE reply_to_tweet_id IS NULL OR conversation_id IS NOT NULL
-        UNION ALL
-        -- Recursive case: tweets that are replies
-        SELECT t.tweet_id, cc.conversation_id, t.reply_to_tweet_id
-        FROM temp_conversation_ids t
-        JOIN conversation_chain cc ON t.reply_to_tweet_id = cc.tweet_id
-        WHERE t.conversation_id IS NULL
-    )
-    UPDATE temp_conversation_ids t
-    SET conversation_id = cc.conversation_id
-    FROM conversation_chain cc
-    WHERE t.tweet_id = cc.tweet_id;
+    -- Create an index on the temporary table
+    CREATE INDEX idx_temp_conversation_id ON temp_processed_tweets(conversation_id);
 
-    -- Handle tweets replying to non-existent tweets (keep conversation_id as NULL)
-    UPDATE temp_conversation_ids t
-    SET conversation_id = NULL
-    WHERE conversation_id IS NOT NULL
-      AND reply_to_tweet_id IS NOT NULL
-      AND NOT EXISTS (
-          SELECT 1
-          FROM temp_conversation_ids
-          WHERE tweet_id = t.reply_to_tweet_id
-      );
+    -- Process tweets in order
+    FOR current_tweet IN (SELECT tweet_id, reply_to_tweet_id FROM tweets ORDER BY tweet_id) LOOP
+        IF current_tweet.reply_to_tweet_id IS NULL THEN
+            -- This tweet is not a reply, so it starts its own conversation
+            current_conversation_id := current_tweet.tweet_id;
+        ELSE
+            -- Check if the tweet this is replying to has been processed
+            SELECT conversation_id INTO current_conversation_id
+            FROM temp_processed_tweets
+            WHERE tweet_id = current_tweet.reply_to_tweet_id;
 
-    -- Update the conversations table with the calculated conversation_ids
-    WITH updated_rows AS (
+            IF current_conversation_id IS NULL THEN
+                -- The tweet this is replying to hasn't been processed yet, so skip this tweet
+                CONTINUE;
+            END IF;
+        END IF;
+
+        -- Insert or update the conversation record
         INSERT INTO conversations (tweet_id, conversation_id)
-        SELECT tci.tweet_id, tci.conversation_id
-        FROM temp_conversation_ids tci
-        WHERE tci.conversation_id is not null
+        VALUES (current_tweet.tweet_id, current_conversation_id)
         ON CONFLICT (tweet_id) DO UPDATE
         SET conversation_id = EXCLUDED.conversation_id
-        WHERE conversations.conversation_id IS DISTINCT FROM EXCLUDED.conversation_id
-        RETURNING 1
-    )
-    SELECT COUNT(*)
-    INTO affected_rows
-    FROM updated_rows;
+        WHERE conversations.conversation_id IS DISTINCT FROM EXCLUDED.conversation_id;
+
+        -- Insert into the temporary table
+        INSERT INTO temp_processed_tweets (tweet_id, conversation_id)
+        VALUES (current_tweet.tweet_id, current_conversation_id);
+
+        affected_rows := affected_rows + 1;
+    END LOOP;
 
     -- Clean up
-    DROP TABLE temp_conversation_ids;
+    DROP TABLE temp_processed_tweets;
+    -- Release the advisory lock
+    PERFORM pg_advisory_unlock(lock_key);
 
     RETURN affected_rows;
 EXCEPTION
     WHEN OTHERS THEN
+        -- Clean up the temporary table if it exists
+        DROP TABLE IF EXISTS temp_processed_tweets;
+
+        -- Release the advisory lock
+        PERFORM pg_advisory_unlock(lock_key);
+
         GET STACKED DIAGNOSTICS error_message = MESSAGE_TEXT;
-        RAISE EXCEPTION 'An error occurred: %', error_message;
+        RAISE EXCEPTION 'An error occurred in update_conversation_ids: %', error_message;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -139,9 +141,6 @@ BEGIN
     RAISE NOTICE 'Updating conversation ids';
     PERFORM private.update_conversation_ids();
    
-   
-   --RAISE NOTICE 'Refreshing materialized view: main_thread_view';
-   --REFRESH MATERIALIZED VIEW CONCURRENTLY main_thread_view;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -161,8 +160,6 @@ BEGIN
     SET timestamp = CURRENT_TIMESTAMP,
         status = 'QUEUED';
 
-    -- Call process_jobs directly
-    PERFORM private.process_jobs();
     
     RETURN NEW;
 END;

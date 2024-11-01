@@ -8,8 +8,6 @@ BEGIN
     SET timestamp = CURRENT_TIMESTAMP,
         status = 'QUEUED';
 
-    -- Call process_jobs directly
-    PERFORM private.process_jobs();
     
     RETURN NEW;
 END;

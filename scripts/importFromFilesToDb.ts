@@ -1,9 +1,6 @@
-import { parse } from 'csv-parse'
-
 import * as dotenv from 'dotenv'
 dotenv.config({ path: '../.env' })
-import { createReadStream } from 'fs'
-import { finished } from 'stream/promises'
+
 import {
   InsertAccount,
   InsertArchiveUpload,
@@ -22,7 +19,6 @@ import {
 
 import {
   createDbScriptClient,
-  createServerAdminClient,
 } from '../src/utils/supabase'
 import { Database } from '../src/database-types'
 
@@ -33,20 +29,7 @@ type Tables = Database['public']['Tables']
 type TableNames = keyof Tables
 type ColumnsFor<T extends TableNames> = keyof Tables[T]['Row']
 
-enum FilesToProcess {
-  Account = 'account',
-  Profile = 'profile',
-  UserMentions = 'user_mentions',
-  Followers = 'followers',
-  Following = 'following',
-  Tweets = 'tweets',
-  TweetUrls = 'tweet_urls',
-  TweetMedia = 'tweet_media',
-  Likes = 'likes',
-  LikedTweets = 'liked_tweets',
-  MentionedUsers = 'mentioned_users',
-  ArchiveUpload = 'archive_upload',
-}
+
 
 function ifStringNullReturnNull(value: string | null): string | null {
   return value === 'NULL' || !value ? null : value

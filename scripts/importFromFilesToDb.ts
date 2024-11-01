@@ -60,6 +60,12 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
 ;(async function execute() {
   var supabase = await createDbScriptClient()
 
+  const { data: healthCheck, error: healthError } = await supabase.from('account').select('*').limit(1)
+  if (healthError) {
+    console.error('Supabase connection error:', healthError)
+    throw new Error('Failed to connect to Supabase')
+  }
+
 
 
   async function Upsert_SkeletonItem<T extends TableNames>(
@@ -138,7 +144,7 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
           `Error inserting batch into ${table}:`,
           JSON.stringify(data),
         )
-        throw new Error(fileRoot + ' ' + error.message);
+        //throw new Error(fileRoot + ' ' + error.message);
       } else if (data.length > 0) {
         cont += data.length
         //console.log('processed batch', table, i, data.length)
@@ -150,6 +156,10 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
 
   async function Upsert_Account(data: any , fileRoot:string) {
     const account = data.account;
+    const num_followers = data.follower.length || 0;
+    const num_following = data.following.length || 0;
+    const num_likes = data.like.length || 0;
+    const num_tweets = data.tweets.length || 0;
 
     let getItem = (item: any) => {
       const {
@@ -158,6 +168,7 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
         username,
         createdAt,
         accountDisplayName,
+
       } = item.account
       const newAccount: InsertAccount = {
         account_id: accountId,
@@ -165,6 +176,10 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
         account_display_name:accountDisplayName,
         created_at: createdAt,
         created_via: createdVia,
+        num_followers,
+        num_following,
+        num_likes,
+        num_tweets,
       }
       return newAccount
     }
@@ -360,8 +375,16 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
   }
   async function Upsert_Archive_Upload(data: any, fileRoot:string) {
     const accountId = data.account[0].account.accountId;
+    const tweetsDate=data.tweets.map(t=>new Date(t.tweet.created_at)).sort((a, b) => a - b);;
+    const start_date = tweetsDate[0];
+    const end_date = tweetsDate[tweetsDate.length-1];
 
-    const archive_upload : InsertArchiveUpload ={account_id:accountId, archive_at:new Date().toISOString(),keep_private:false}
+    const archive_upload : InsertArchiveUpload ={
+      account_id:accountId, 
+      start_date:start_date.toISOString(),
+      end_date:end_date.toISOString(),
+      archive_at:new Date().toISOString(),
+      keep_private:false}
 
      let getItem = (item: any) => {
        return item as InsertArchiveUpload;
@@ -472,6 +495,18 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
     Upsert_Tweet_Media
     ]
 
+  
+    async function processData(data: any,fileRoot:string): Promise<void> {
+      for (const operation of Operations) {
+        try {
+          await operation(data,fileRoot);
+        } catch (error) {
+          console.error('Operation failed:', error);
+          throw error;
+        }
+      }
+    }
+
   const filesRoot = getFoldersInPath(GLOBAL_ARCHIVE_PATH);
 
 
@@ -492,24 +527,19 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
       }
     });
 
+    console.log("waiting for batch to finish")
     await Promise.all(batchPromises);
     
     // Add a small delay between batches to allow GC
     await new Promise(resolve => setTimeout(resolve, 500));
   }
 
-    await supabase.from("archive_upload").update({upload_phase:"completed"});
+  const {data, error} = await supabase.schema("public").from("archive_upload").update({upload_phase:"completed"}).eq("upload_phase","uploading");
+  if(error){
+    console.error("Error updating archive_upload table:", error);
+    console.error("Please update manually the upload_phase to completed")
+  }
 
-    async function processData(data: any,fileRoot:string): Promise<void> {
-      for (const operation of Operations) {
-        try {
-          await operation(data,fileRoot);
-        } catch (error) {
-          console.error('Operation failed:', error);
-          throw error;
-        }
-      }
-    }
 
   
 })()

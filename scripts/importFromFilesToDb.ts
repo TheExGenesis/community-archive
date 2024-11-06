@@ -519,8 +519,8 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
 
   const {data, error} = await supabase.schema("public").from("archive_upload").update({upload_phase:"completed"}).eq("upload_phase","uploading");
   if(error){
-    console.error("Error updating archive_upload table:", error);
-    console.error("Please update manually the upload_phase to completed")
+    console.error("Error updating archive_upload table:",error);
+    console.error("Please run the query manually: update \"archive_upload\" set \"upload_phase\" = 'completed' where \"upload_phase\" = 'uploading';")
   }
 
 

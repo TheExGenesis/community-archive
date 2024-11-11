@@ -66,7 +66,7 @@ async function validateTweets(data: any, supabase: any): Promise<ValidationResul
     }
   }
 
-  const missingTweets = tweetIds.filter(id => !dbTweetIds.has(id))
+  const missingTweets = tweetIds.filter((id:any) => !dbTweetIds.has(id))
 
   return {
     table: 'tweets',
@@ -103,7 +103,7 @@ async function validateLikes(data: any, supabase: any): Promise<ValidationResult
     }
   }
 
-  const missingLikes = likedTweetIds.filter(id => !dbLikeIds.has(id))
+  const missingLikes = likedTweetIds.filter((id:any) => !dbLikeIds.has(id))
 
   return {
     table: 'likes',
@@ -148,7 +148,7 @@ async function validateTweetMedia(data: any, supabase: any): Promise<ValidationR
     dbMedia?.forEach((m: any) => dbMediaUrls.add(m.media_url))
   }
 
-  const missingMedia = mediaItems.filter(url => !dbMediaUrls.has(url))
+  const missingMedia = mediaItems.filter((url:any) => !dbMediaUrls.has(url))
 
   return {
     table: 'tweet_media',
@@ -171,12 +171,12 @@ async function validateTweetUrls(data: any, supabase: any): Promise<ValidationRe
     const { data: dbUrlData } = await supabase
       .from('tweet_urls')
       .select('tweet_id, url')
-      .in('tweet_id', batchItems.map(item => item.tweet_id))
+      .in('tweet_id', batchItems.map((item:any) => item.tweet_id))
 
     dbUrlData?.forEach((u: any) => dbUrls.add(`${u.tweet_id}-${u.url}`))
   }
 
-  const missingUrls = urlItems.filter(item => !dbUrls.has(`${item.tweet_id}-${item.url}`))
+  const missingUrls = urlItems.filter((item:any) => !dbUrls.has(`${item.tweet_id}-${item.url}`))
 
   return {
     table: 'tweet_urls',
@@ -204,7 +204,7 @@ async function validateFollowers(data: any, supabase: any): Promise<ValidationRe
     dbFollowers?.forEach((f: any) => dbFollowerIds.add(f.follower_account_id))
   }
 
-  const missingFollowers = followerIds.filter(id => !dbFollowerIds.has(id))
+  const missingFollowers = followerIds.filter((id:any) => !dbFollowerIds.has(id))
 
   return {
     table: 'followers',
@@ -232,7 +232,7 @@ async function validateFollowing(data: any, supabase: any): Promise<ValidationRe
     dbFollowing?.forEach((f: any) => dbFollowingIds.add(f.following_account_id))
   }
 
-  const missingFollowing = followingIds.filter(id => !dbFollowingIds.has(id))
+  const missingFollowing = followingIds.filter((id:any) => !dbFollowingIds.has(id))
 
   return {
     table: 'following',
@@ -258,12 +258,12 @@ async function validateUserMentions(data: any, supabase: any): Promise<Validatio
     const { data: dbMentionData } = await supabase
       .from('user_mentions')
       .select('tweet_id, mentioned_user_id')
-      .in('tweet_id', batchMentions.map(m => m.tweet_id))
+      .in('tweet_id', batchMentions.map((m:any) => m.tweet_id))
 
     dbMentionData?.forEach((m: any) => dbMentions.add(`${m.tweet_id}-${m.mentioned_user_id}`))
   }
 
-  const missingMentions = mentions.filter(m => !dbMentions.has(`${m.tweet_id}-${m.user_id}`))
+  const missingMentions = mentions.filter((m:any) => !dbMentions.has(`${m.tweet_id}-${m.user_id}`))
 
   return {
     table: 'user_mentions',

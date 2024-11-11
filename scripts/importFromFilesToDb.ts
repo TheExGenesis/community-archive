@@ -171,7 +171,7 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
   }
 
   async function Upsert_Tweet_Media(data: any, fileRoot:string) {
-    const tweets = data.tweets.map(i=>i.tweet);
+    const tweets = data.tweets.map((i:any) => i.tweet);
     const allmedia = [];
 
     for(const tweet of tweets){
@@ -253,7 +253,7 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
   }
   async function Upsert_User_Mentions(data: any, fileRoot:string) {
     
-    const tweets = data.tweets.map(i=>i.tweet);
+    const tweets = data.tweets.map((i:any) =>i.tweet);
     const mentions = [];
 
     for(const tweet of tweets){
@@ -300,7 +300,7 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
     ])
   }
   async function Upsert_Likes(data: any, fileRoot:string) {
-    const likes = data.like.map(i => i.like);
+    const likes = data.like.map((i:any) => i.like);
     const accountId = data.account[0].account.accountId;
     
 
@@ -358,7 +358,7 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
   }
   async function Upsert_Archive_Upload(data: any, fileRoot:string) {
     const accountId = data.account[0].account.accountId;
-    const tweetsDate=data.tweets.map(t=>new Date(t.tweet.created_at)).sort((a, b) => a - b);;
+    const tweetsDate=data.tweets.map((t:any)=>new Date(t.tweet.created_at)).sort((a:any, b:any) => a - b);;
     const start_date = tweetsDate[0];
     const end_date = tweetsDate[tweetsDate.length-1];
 
@@ -373,12 +373,12 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
        return item as InsertArchiveUpload;
      };
     const res = await Upsert_SkeletonItem(archive_upload, fileRoot, "archive_upload", getItem, ["id"]);
-    
+    if(!res) throw new Error("Error inserting archive_upload");
     const archiveId = res[0].id;
     data.archive_upload_id = archiveId;
   }
   async function Upsert_Tweet_Urls(data: any, fileRoot:string) {
-    const tweets = data.tweets.map(i=>i.tweet);
+    const tweets = data.tweets.map((i:any) =>i.tweet);
     const urls = [];
 
     for(const tweet of tweets){

@@ -23,8 +23,6 @@ https://discord.gg/5mbWEfVrqw
 
 See [API docs](docs/api-doc.md) for how to access the archive's supabase DB.
 
-We have manual data dumps right now, see: https://github.com/TheExGenesis/community-archive/releases/tag/dump. Working on automating publishing of snapshots, see: https://github.com/TheExGenesis/community-archive/issues/59
-
 ## Development Instructions
 
 See [local setup](docs/local-setup.md).

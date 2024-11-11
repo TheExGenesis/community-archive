@@ -16,6 +16,7 @@
     - [ ] using people's openai api key or letting them pay us to do it
   - [ ] Develop economics model for user charging
 - [ ] Browser extension for DB updates via Twitter client API scraping
+- [ ] Own your social graph: prompt users for contact info (email is included in archive), and display it in profile only to their mutuals.
 
 ## Apps Using the Data
 

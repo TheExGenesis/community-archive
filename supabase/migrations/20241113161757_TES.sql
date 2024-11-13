@@ -238,7 +238,7 @@ BEGIN
   ) p ON true
   ORDER BY t.created_at DESC;
 END;
-$$ LANGUAGE plpgsql
+$$ LANGUAGE plpgsql;
 
 
 CREATE OR REPLACE FUNCTION tes_search_tweets(
@@ -334,5 +334,5 @@ BEGIN
   ) p ON true
   ORDER BY t.created_at DESC;
 END;
-$$ LANGUAGE plpgsql
+$$ LANGUAGE plpgsql;
 

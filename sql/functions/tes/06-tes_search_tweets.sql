@@ -93,4 +93,4 @@ BEGIN
   ) p ON true
   ORDER BY t.created_at DESC;
 END;
-$$ LANGUAGE plpgsql
+$$ LANGUAGE plpgsql;

@@ -23,6 +23,8 @@ https://discord.gg/5mbWEfVrqw
 
 See [API docs](docs/api-doc.md) for how to access the archive's supabase DB.
 
+See also this [Google colab notebook](https://colab.research.google.com/drive/109XOgTWj-sajpAYhDCNPfts5zvdkpi_s) for an example you can run in your browser that fetches tweets from the archive for a specific user and runs some basic analysis.
+
 ## Development Instructions
 
 See [local setup](docs/local-setup.md).

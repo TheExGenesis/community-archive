@@ -283,7 +283,7 @@ export function FileUploadDialog({
             {/* Privacy Policy Link */}
             <div className="mt-4 text-center text-sm">
               <Link
-                href="/privacy-policy"
+                href="/data-policy"
                 className="text-primary hover:underline"
               >
                 Read our Privacy Policy

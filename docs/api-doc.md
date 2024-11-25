@@ -1,4 +1,4 @@
-# How to use the API (from your own app)
+# API doc
 
 There are two ways to access the Community Archive's data: (1) Download a JSON file with an individual user's data from blob storage (2) query the DB through the Supabase API
 

@@ -9,12 +9,11 @@ export const requiredFiles = [
   'profile',
   'account',
   'tweets',
-  'community-tweet',
   'follower',
   'following',
 ]
 
-export const optionalFiles = ['note-tweet', 'like']
+export const optionalFiles = ['note-tweet', 'like', 'community-tweet']
 
 export const requiredFilePaths = requiredFiles.map((file) => `data/${file}.js`)
 
@@ -103,15 +102,23 @@ const parseFileContents = (fileContents: {
   const archive: Archive = Object.fromEntries(
     Object.entries(fileContents).map(([key, contents]) => {
       try {
-        if (['tweets', 'like', 'follower', 'following'].includes(key)) {
-          const allTweets = contents.flatMap((content, index) =>
+        if (
+          [
+            'tweets',
+            'like',
+            'follower',
+            'following',
+            'community-tweet',
+          ].includes(key)
+        ) {
+          const allItems = contents.flatMap((content, index) =>
             pipe(
               (content) => content.slice(content.indexOf('[')),
               removeProblematicCharacters,
               JSON.parse,
             )(content),
           )
-          return [key, allTweets]
+          return [key, allItems]
         } else {
           return [
             key,

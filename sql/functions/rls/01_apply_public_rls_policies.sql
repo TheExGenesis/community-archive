@@ -22,12 +22,7 @@ BEGIN
     EXECUTE format('
         CREATE POLICY "Data is publicly visible unless marked private" ON %I.%I
         FOR SELECT
-        USING (
-            (SELECT COALESCE(au.keep_private, false) 
-             FROM archive_upload au 
-             WHERE au.id = %I.id) = false
-            OR account_id = (SELECT auth.jwt() -> ''app_metadata'' ->> ''provider_id'')
-        )', schema_name, table_name, table_name);
+        USING (true)', schema_name, table_name);
 
     -- The modification policy remains unchanged
     EXECUTE format('

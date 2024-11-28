@@ -1,4 +1,3 @@
-
 -- Drop all policies and apply new ones for each table
 DO $$
 DECLARE

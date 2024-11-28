@@ -1,5 +1,4 @@
 DROP FUNCTION IF EXISTS "public"."get_top_accounts_with_followers"(integer);
-
 CREATE OR REPLACE FUNCTION "public"."get_top_accounts_with_followers"("limit_count" integer) 
 RETURNS TABLE(
     "account_id" "text", 
@@ -48,9 +47,7 @@ BEGIN
         limit_count;
 END; 
 $$;
-
 ALTER FUNCTION "public"."get_top_accounts_with_followers"("limit_count" integer) OWNER TO "postgres";
-
 CREATE OR REPLACE FUNCTION "public"."get_latest_tweets"("count" integer, "p_account_id" "text" DEFAULT NULL::"text") RETURNS TABLE("tweet_id" "text", "account_id" "text", "created_at" timestamp with time zone, "full_text" "text", "retweet_count" integer, "favorite_count" integer, "reply_to_tweet_id" "text", "avatar_media_url" "text", "username" "text", "account_display_name" "text")
     LANGUAGE "plpgsql"
     AS $$
@@ -86,6 +83,4 @@ BEGIN
     LIMIT COUNT;
 END;
 $$;
-
 ALTER FUNCTION "public"."get_latest_tweets"("count" integer, "p_account_id" "text") OWNER TO "postgres";
-

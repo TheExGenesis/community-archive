@@ -1,4 +1,3 @@
-
 CREATE OR REPLACE FUNCTION public.drop_all_policies(schema_name TEXT, table_name TEXT) RETURNS VOID AS $$
 DECLARE
     policy_name TEXT;
@@ -12,12 +11,10 @@ BEGIN
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
-
 DO $$
 BEGIN
 PERFORM public.drop_all_policies('storage', 'objects');
 END $$;
-
 create policy "Allow authenticated uploads"
 on storage.objects
 for insert
@@ -29,8 +26,6 @@ with check ((bucket_id = 'dev_archives'::text) AND (
     AND username = (storage.foldername(name))[1]
   )
 ));
-
-
 create policy "Allow authenticated archive deletes"
 on storage.objects
 for insert
@@ -42,8 +37,6 @@ with check ((bucket_id = 'dev_archives'::text) AND (
     AND username = (storage.foldername(name))[1]
   )
 ));
-
-
 create policy "Allow authenticated archive updates"
 on storage.objects
 for update
@@ -55,7 +48,6 @@ with check ((bucket_id = 'dev_archives'::text) AND (
     AND username = (storage.foldername(name))[1]
   )
 ));
-
 create policy "Allow archive access based on privacy setting"
 on storage.objects
 for select
@@ -78,4 +70,3 @@ using (
     )
   )
 );
-

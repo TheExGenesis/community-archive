@@ -7,3 +7,5 @@ CREATE TABLE IF NOT EXISTS public.tweet_urls (
     FOREIGN KEY (tweet_id) REFERENCES public.tweets (tweet_id),
     UNIQUE(tweet_id, url)
 );
+
+CREATE INDEX "idx_tweet_urls_tweet_id" ON "public"."tweet_urls" USING "btree" ("tweet_id");

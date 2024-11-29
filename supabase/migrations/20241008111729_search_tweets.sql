@@ -1,5 +1,4 @@
 DROP FUNCTION IF EXISTS search_tweets;
-
 CREATE OR REPLACE FUNCTION search_tweets(
   search_query TEXT,
   from_user TEXT DEFAULT NULL,

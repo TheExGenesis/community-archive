@@ -6,16 +6,12 @@ DROP TRIGGER IF EXISTS queue_job_on_upload_complete ON public.archive_upload;
 DROP TRIGGER IF EXISTS queue_job_on_upload_delete ON public.archive_upload;
 DROP FUNCTION IF EXISTS private.queue_refresh_activity_summary_on_upload_complete() CASCADE;
 DROP FUNCTION IF EXISTS private.process_jobs() CASCADE;
-
-
 CREATE TABLE IF NOT EXISTS private.job_queue (
 key TEXT PRIMARY KEY,
 timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 status TEXT CHECK (status IN ('QUEUED', 'PROCESSING', 'DONE'))
 );
-
 CREATE INDEX IF NOT EXISTS idx_job_queue_status_timestamp ON private.job_queue (status, timestamp);
-
 CREATE OR REPLACE FUNCTION private.queue_refresh_activity_summary()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -29,18 +25,15 @@ SET timestamp = CURRENT_TIMESTAMP,
 RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 CREATE TRIGGER queue_job_on_upload_complete
 AFTER UPDATE OF upload_phase ON public.archive_upload
 FOR EACH ROW
 WHEN (NEW.upload_phase = 'completed')
 EXECUTE FUNCTION private.queue_refresh_activity_summary();
-
 CREATE TRIGGER queue_job_on_upload_delete
 AFTER DELETE ON public.archive_upload
 FOR EACH ROW
 EXECUTE FUNCTION private.queue_refresh_activity_summary();
-
 CREATE OR REPLACE FUNCTION private.process_jobs()
 RETURNS void AS $$
 DECLARE
@@ -78,7 +71,7 @@ END IF;
 
 IF v_job.key = 'update_conversation_ids' THEN
     RAISE NOTICE 'Updating conversation ids';
-    PERFORM private.post_upload_update_conversation_ids();
+    PERFORM public.post_upload_update_conversation_ids();
 END IF;
 
 -- Delete the job
@@ -86,11 +79,8 @@ DELETE FROM private.job_queue WHERE key = v_job.key;
 RAISE NOTICE 'Job completed and removed from queue: %', v_job.key;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Enable pg_cron extension if not already enabled
 CREATE EXTENSION IF NOT EXISTS pg_cron;
-
-
 DO $$
 DECLARE
     job_id bigint;
@@ -104,7 +94,6 @@ BEGIN
         RAISE NOTICE 'Unscheduled job with ID: %', job_id;
     END LOOP;
 END $$;
-
 -- Schedule job to run every minute
 SELECT cron.schedule('* * * * *', $$
 SELECT private.process_jobs();

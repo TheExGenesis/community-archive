@@ -1,5 +1,4 @@
 DROP MATERIALIZED VIEW IF EXISTS public.account_activity_summary;
-
 CREATE MATERIALIZED VIEW public.account_activity_summary AS
 SELECT
   a.account_id,
@@ -24,7 +23,6 @@ SELECT
     SELECT * FROM get_account_top_favorite_count_tweets(a.username, 20)
   ) f) AS most_favorited_tweets
 FROM public.account a;
-
 -- DROP FUNCTION IF EXISTS refresh_account_activity_summary() CASCADE;
 
 -- CREATE OR REPLACE FUNCTION refresh_account_activity_summary()
@@ -41,4 +39,4 @@ FROM public.account a;
 -- AFTER UPDATE OF upload_phase ON public.archive_upload
 -- FOR EACH ROW
 -- WHEN (NEW.upload_phase = 'completed')
--- EXECUTE FUNCTION refresh_account_activity_summary();
+-- EXECUTE FUNCTION refresh_account_activity_summary();;

@@ -1,4 +1,3 @@
-
 CREATE OR REPLACE FUNCTION public.create_temp_tables(p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
@@ -26,8 +25,6 @@ EXECUTE format('CREATE TABLE temp.liked_tweets_%s (LIKE public.liked_tweets INCL
 EXECUTE format('CREATE TABLE temp.likes_%s (LIKE public.likes INCLUDING ALL)', p_suffix);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
 CREATE OR REPLACE FUNCTION public.insert_temp_account(p_account JSONB, p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
@@ -53,8 +50,7 @@ COALESCE(($1->>''num_likes'')::INTEGER, 0)
 ', p_suffix)
 USING p_account;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
+$$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION public.insert_temp_profiles(p_profile JSONB, p_account_id TEXT, p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
@@ -74,8 +70,6 @@ $2,
 ', p_suffix) USING p_profile, p_account_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
 CREATE OR REPLACE FUNCTION public.insert_temp_archive_upload(
     p_account_id TEXT,
     p_archive_at TIMESTAMP WITH TIME ZONE,
@@ -117,8 +111,6 @@ BEGIN
     RETURN v_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
 CREATE OR REPLACE FUNCTION public.insert_temp_tweets(p_tweets JSONB, p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
@@ -145,8 +137,6 @@ FROM jsonb_array_elements($1) AS tweet
 ', p_suffix) USING p_tweets;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
 CREATE OR REPLACE FUNCTION public.process_and_insert_tweet_entities(p_tweets JSONB, p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
@@ -200,7 +190,6 @@ jsonb_array_elements(tweet->''entities''->''urls'') AS url
 ', p_suffix) USING p_tweets;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
 CREATE OR REPLACE FUNCTION public.insert_temp_followers(p_followers JSONB, p_account_id TEXT, p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
@@ -218,8 +207,6 @@ FROM jsonb_array_elements($1) AS follower
 USING p_followers, p_account_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
 CREATE OR REPLACE FUNCTION public.insert_temp_following(p_following JSONB, p_account_id TEXT, p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
@@ -237,9 +224,6 @@ FROM jsonb_array_elements($1) AS following
 USING p_following, p_account_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
-
 CREATE OR REPLACE FUNCTION public.insert_temp_likes(p_likes JSONB, p_account_id TEXT, p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
@@ -265,8 +249,6 @@ ON CONFLICT (account_id, liked_tweet_id) DO NOTHING
 ', p_suffix) USING p_likes, p_account_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
 CREATE OR REPLACE FUNCTION public.drop_temp_tables(p_suffix TEXT)
 RETURNS VOID AS $$
 BEGIN
@@ -287,9 +269,6 @@ EXECUTE format('DROP TABLE IF EXISTS temp.liked_tweets_%s', p_suffix);
 EXECUTE format('DROP TABLE IF EXISTS temp.likes_%s', p_suffix);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
-
 -- Create or replace the commit_temp_data function
 CREATE OR REPLACE FUNCTION public.commit_temp_data(p_suffix TEXT)
 RETURNS VOID AS $$

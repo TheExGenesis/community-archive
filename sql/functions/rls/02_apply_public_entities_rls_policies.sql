@@ -21,18 +21,7 @@ BEGIN
     EXECUTE format('
         CREATE POLICY "Entities are publicly visible unless marked private" ON %I.%I
         FOR SELECT
-        USING (
-            (SELECT COALESCE(au.keep_private, false) 
-             FROM archive_upload au 
-             JOIN public.tweets t ON t.archive_upload_id = au.id
-             WHERE t.tweet_id = %I.tweet_id) = false
-            OR EXISTS (
-                SELECT 1
-                FROM public.tweets t
-                WHERE t.tweet_id = %I.tweet_id
-                AND t.account_id = (SELECT auth.jwt() -> ''app_metadata'' ->> ''provider_id'')
-            )
-        )', schema_name, table_name, table_name, table_name);
+        USING (true)', schema_name, table_name, table_name);
 
     EXECUTE format('
         CREATE POLICY "Entities are modifiable by their users" ON %I.%I TO authenticated

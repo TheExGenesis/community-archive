@@ -1,9 +1,6 @@
 drop policy "Data is publicly visible" on "public"."profile";
-
 drop function if exists "public"."get_top_mentioned_users_not_uploaded"();
-
 set check_function_bodies = off;
-
 CREATE OR REPLACE FUNCTION public.get_most_liked_tweets_by_username(username_ text)
  RETURNS TABLE(tweet_id text, full_text text, num_likes bigint)
  LANGUAGE plpgsql
@@ -28,9 +25,7 @@ BEGIN
     ORDER BY 
         num_likes DESC;
 END;
-$function$
-;
-
+$function$;
 CREATE OR REPLACE FUNCTION public.get_most_mentioned_accounts_by_username(username_ text)
  RETURNS TABLE(mentioned_user_id text, mentioned_username text, mention_count bigint)
  LANGUAGE plpgsql
@@ -76,9 +71,7 @@ BEGIN
     ORDER BY
         t.mention_count DESC;
 END;
-$function$
-;
-
+$function$;
 CREATE OR REPLACE FUNCTION public.get_top_liked_users()
  RETURNS TABLE(tweet_id text, full_text text, like_count bigint, reply_to_tweet_id text, reply_to_user_id text, reply_to_username text)
  LANGUAGE plpgsql
@@ -120,9 +113,7 @@ BEGIN
     ORDER BY
         tl.like_count DESC;
 END;
-$function$
-;
-
+$function$;
 CREATE OR REPLACE FUNCTION public.get_top_retweeted_tweets_by_username(username_ text, limit_ integer)
  RETURNS TABLE(tweet_id text, account_id text, created_at timestamp with time zone, full_text text, retweet_count integer, favorite_count integer, reply_to_tweet_id text, reply_to_user_id text, reply_to_username text, archive_upload_id bigint)
  LANGUAGE plpgsql
@@ -151,9 +142,7 @@ BEGIN
     LIMIT 
         limit_;
 END;
-$function$
-;
-
+$function$;
 create policy "Data is publicly visible unless marked private"
 on "public"."profile"
 as permissive
@@ -162,6 +151,3 @@ to public
 using (((( SELECT COALESCE(au.keep_private, false) AS "coalesce"
    FROM archive_upload au
   WHERE (au.id = profile.archive_upload_id)) = false) OR (account_id = ( SELECT ((auth.jwt() -> 'app_metadata'::text) ->> 'provider_id'::text)))));
-
-
-

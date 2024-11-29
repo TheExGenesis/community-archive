@@ -1,5 +1,4 @@
 DROP FUNCTION IF EXISTS public.get_account_most_replied_tweets_by_archive_users (TEXT, INTEGER);
-
 CREATE
 OR REPLACE FUNCTION public.get_account_most_replied_tweets_by_archive_users (username_ TEXT, limit_ INTEGER) RETURNS TABLE (
   tweet_id TEXT,

@@ -1,5 +1,4 @@
 set check_function_bodies = off;
-
 CREATE OR REPLACE FUNCTION dev.commit_temp_data(p_suffix text)
  RETURNS void
  LANGUAGE plpgsql
@@ -160,12 +159,8 @@ AS $function$
       -- Call the function to drop temporary tables
       PERFORM dev.drop_temp_tables(p_suffix);
   END;
-  $function$
-;
-
-
+  $function$;
 set check_function_bodies = off;
-
 CREATE OR REPLACE FUNCTION public.insert_temp_account(p_account jsonb, p_suffix text)
  RETURNS void
  LANGUAGE plpgsql
@@ -187,7 +182,4 @@ AS $function$
       ', p_suffix)
       USING p_account;
   END;
-  $function$
-;
-
-
+  $function$;

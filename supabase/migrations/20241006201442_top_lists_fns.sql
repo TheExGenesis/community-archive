@@ -1,5 +1,4 @@
 DROP FUNCTION IF EXISTS get_account_most_mentioned_accounts(TEXT, INTEGER);
-
 CREATE
 OR REPLACE FUNCTION get_account_most_mentioned_accounts (username_ TEXT, limit_ INTEGER) RETURNS TABLE (
   user_id TEXT,

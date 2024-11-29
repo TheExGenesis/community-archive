@@ -11,8 +11,7 @@ BEGIN
     VALUES (
       'archives',     -- Generate a unique UUID for the bucket
       'archives',    -- Replace with your desired bucket name
-      true,                  -- Set to 'true' for a public bucket, 'false' for private
-
+      true           -- Set to 'true' for a public bucket, 'false' for private
     );
   END IF;
 END $$;

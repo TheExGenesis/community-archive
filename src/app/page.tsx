@@ -89,7 +89,7 @@ export default async function Homepage() {
         </h1>
 
         <p>
-          You can download any individual user's data (includes all tweets, followers, following, etc) as one big JSON file, or query our API, <a href='https://github.com/TheExGenesis/community-archive/tree/main/docs#docs' className='text-blue-500 underline'>see documentation here</a>.
+          You can download any individual user's data (includes all tweets, followers, following, etc) as one big JSON file, or query our API, <a href='https://github.com/TheExGenesis/community-archive/tree/main/docs#docs' className='text-blue-500 hover:underline'>see documentation here</a>.
         </p>
 
         <br/>
@@ -97,7 +97,7 @@ export default async function Homepage() {
           <li>
           <a
             href="https://github.com/TheExGenesis/community-archive"
-            className="mr-2 inline-flex items-center text-blue-500 underline"
+            className="mr-2 inline-flex items-center text-blue-500 hover:underline"
           >
             <FaGithub className="mr-1" /> GitHub repo
           </a>
@@ -105,7 +105,7 @@ export default async function Homepage() {
           <li>
           <a
                 href="https://discord.gg/5mbWEfVrqw"
-                className="inline-flex items-center text-blue-500 underline"
+                className="inline-flex items-center text-blue-500 hover:underline"
               >
                 <FaDiscord className="mr-1" /> Discord
               </a>
@@ -113,7 +113,7 @@ export default async function Homepage() {
           <li>
           <a
                 href="https://github.com/TheExGenesis/community-archive/tree/main/docs"
-                className="inline-flex items-center text-blue-500 underline"
+                className="inline-flex items-center text-blue-500 hover:underline"
               >
                 Docs & code examples
               </a>

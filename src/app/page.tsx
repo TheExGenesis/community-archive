@@ -89,7 +89,7 @@ export default async function Homepage() {
         </h1>
 
         <p>
-          You can download any individual user's data (includes all tweets, followers, following, etc) as one big JSON file, or query our API, <a href='https://github.com/TheExGenesis/community-archive/tree/main/docs#docs' className='text-blue-500 hover:underline'>see documentation here</a>.
+          You can download any individual user&apos;s data (includes all tweets, followers, following, etc) as one big JSON file, or query our API, <a href='https://github.com/TheExGenesis/community-archive/tree/main/docs#docs' className='text-blue-500 hover:underline'>see documentation here</a>.
         </p>
 
         <br/>
@@ -125,7 +125,7 @@ export default async function Homepage() {
         </h1>
  
         <p>
-          We believe there is immense cultural, historical, and economic value in our data. We're building open source public infrastructure to collect, host, and serve this data for whatever purpose communities choose to use it for.
+          We believe there is immense cultural, historical, and economic value in our data. We&apos;re building open source public infrastructure to collect, host, and serve this data for whatever purpose communities choose to use it for.
         </p>
 
         <br/>

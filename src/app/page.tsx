@@ -66,9 +66,9 @@ export default async function Homepage() {
         )}
 
         <br/>
-        <h1 className="mb-4 text-2xl">
+        <h2 className="mb-4 text-xl">
           📤 Upload your data
-        </h1>
+        </h2>
 
         <p>
           Export your data from twitter:{' '}
@@ -84,9 +84,9 @@ export default async function Homepage() {
         <UploadTwitterArchive supabase={null} />
         <br />
 
-        <h1 className="mb-4 text-2xl my-10">
+        <h2 className="mb-4 text-xl my-10">
           💻 Data & source code
-        </h1>
+        </h2>
 
         <p>
           You can download any individual user&apos;s data (includes all tweets, followers, following, etc) as one big JSON file, or query our API, <a href='https://github.com/TheExGenesis/community-archive/tree/main/docs#docs' className='text-blue-500 hover:underline'>see documentation here</a>.
@@ -120,18 +120,23 @@ export default async function Homepage() {
           </li>
         </ul>
 
-        <h1 className="mb-4 text-2xl my-10">
+        <h2 className="mb-4 text-xl my-10">
           📖 About this project
-        </h1>
+        </h2>
  
         <p>
           We believe there is immense cultural, historical, and economic value in our data. We&apos;re building open source public infrastructure to collect, host, and serve this data for whatever purpose communities choose to use it for.
         </p>
 
         <br/>
-        <a href="https://opencollective.com/community-archive/donate" target="_blank">
-          <img src="https://opencollective.com/community-archive/donate/button@2x.png?color=blue" width="300" />
+        <ul className='list-disc pl-4'>
+          <li>
+          <a href="https://opencollective.com/community-archive/donate" className='text-blue-500 hover:underline' target="_blank">
+          Donate to our Open Collective
         </a>
+          </li>
+        </ul>
+        
         <br/>
         <p>
           Maintained & developed by <a href="@https://x.com/exgenesis" className='hover:underline'>Xiq (@exgeneis)</a> & contributors.

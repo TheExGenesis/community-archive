@@ -45,19 +45,14 @@ export default async function Homepage() {
   return (
     <div className="relative mx-auto flex min-h-screen w-full max-w-3xl flex-col bg-white px-4 dark:bg-gray-800 sm:px-6 lg:px-24">
       {/* Main content */}
-      <div className="mt-8 bg-white dark:bg-gray-800">
-        {' '}
-        <h1 className="mb-0 text-4xl font-bold text-zinc-400 dark:text-zinc-500 md:text-4xl">
-          Upload to the
-        </h1>
+      <div className="mt-8 bg-white dark:bg-gray-800 pb-16">
         <h1 className="mt-0 text-4xl font-bold text-black dark:text-white md:text-4xl">
-          Community Archive!
+          Community Archive
         </h1>
-        <br />
         <h2 className="mb-4 text-xl text-zinc-600 dark:text-zinc-300">
-          {`An open database and API anyone can build on.`}
+          {`An open database and API anyone can build on`}
         </h2>
-        <br />
+        <CommunityStats />
         <h3 className="mb-4 text-sm">Featuring archives uploaded by:</h3>
         {mostFollowed ? (
           <AvatarList
@@ -69,82 +64,84 @@ export default async function Homepage() {
             Failed to load most followed accounts.
           </p>
         )}
-        <br />
-        <CommunityStats />
-        <br />
-        <div className="text-sm">
-          <p className="mb-4 leading-relaxed">
-            {`Powered by your tweet history, the community archive lets anyone build things like:`}
-          </p>
-          <div className="mb-4 space-y-2 pl-4">
-            <p>🔎 Search that really knows what you mean</p>
-            <p>✨ AI apps with context on you and your friends</p>
-            <p>📚 Make artifacts like books based on your tweets</p>
-            <p>And more!</p>
-          </div>
-          <br />
-        </div>
-        <p className="mb-4 text-sm font-bold">{`How can I contribute?`}</p>
-        <ul className="mb-4 list-disc space-y-2 pl-6 text-sm">
-          <li>
-            {`If you don't have an archive yet, `}
-            <strong>
-              <a
-                href="https://x.com/settings/download_your_data"
-                className="text-blue-500 hover:underline"
-              >
-                request it here
-              </a>
-            </strong>
-            {` now!`}
-          </li>
-          <li className="dark:text-gray-300">{`If you do have an archive... `}</li>
-        </ul>
+
+        <br/>
+        <h2 className="mb-4 text-xl">
+          📤 Upload your data
+        </h2>
+
+        <p>
+          Export your data from twitter:{' '}
+            <a
+              href="https://x.com/settings/download_your_data"
+              className="text-blue-500 hover:underline"
+            >
+              https://x.com/settings/download_your_data
+            </a>
+        </p>
+        <br/>
         <DynamicSignIn />
         <UploadTwitterArchive supabase={null} />
         <br />
-        <div className="mb-4 text-sm">
-          Useful links:
-          <ul className="mb-4 list-disc pl-6">
-            <li>
-              <a
-                href="https://github.com/TheExGenesis/community-archive/blob/main/docs/archive_data.md"
-                className="text-blue-500 hover:underline"
-              >
-                {`What data from the archive do we use, and why?`}
-              </a>
-            </li>
-            <li>
-              Want to build on the project? Check out our{' '}
-              <a
-                href="https://github.com/TheExGenesis/community-archive"
-                className="mr-2 inline-flex items-center text-blue-500 hover:underline"
-              >
-                <FaGithub className="mr-1" /> GitHub repo
-              </a>{' '}
-              and{' '}
-              <a
+
+        <h2 className="mb-4 text-xl my-10">
+          💻 Data & source code
+        </h2>
+
+        <p>
+          You can download any individual user&apos;s data (includes all tweets, followers, following, etc) as one big JSON file, or query our API, <a href='https://github.com/TheExGenesis/community-archive/tree/main/docs#docs' className='text-blue-500 hover:underline'>see documentation here</a>.
+        </p>
+
+        <br/>
+        <ul className='list-disc pl-4'>
+          <li>
+          <a
+            href="https://github.com/TheExGenesis/community-archive"
+            className="mr-2 inline-flex items-center text-blue-500 hover:underline"
+          >
+            <FaGithub className="mr-1" /> GitHub repo
+          </a>
+          </li>
+          <li>
+          <a
                 href="https://discord.gg/5mbWEfVrqw"
                 className="inline-flex items-center text-blue-500 hover:underline"
               >
                 <FaDiscord className="mr-1" /> Discord
               </a>
-            </li>
-            <li>
-              {`Want to know more? `}
-              <a
-                href="https://substack.com/@xiqo/p-148517224"
-                className="text-blue-500 hover:underline"
+          </li>
+          <li>
+          <a
+                href="https://github.com/TheExGenesis/community-archive/tree/main/docs"
+                className="inline-flex items-center text-blue-500 hover:underline"
               >
-                {`Here's our FAQ`}
+                Docs & code examples
               </a>
-            </li>
-          </ul>
-          <br />
-          <br />
-        </div>
-        <div className="mb-4"></div>
-        <br />
+          </li>
+        </ul>
+
+        <h2 className="mb-4 text-xl my-10">
+          📖 About this project
+        </h2>
+ 
+        <p>
+          We believe there is immense cultural, historical, and economic value in our data. We&apos;re building open source public infrastructure to collect, host, and serve this data for whatever purpose communities choose to use it for.
+        </p>
+
+        <br/>
+        <ul className='list-disc pl-4'>
+          <li>
+          <a href="https://opencollective.com/community-archive/donate" className='text-blue-500 hover:underline' target="_blank">
+          Donate to our Open Collective
+        </a>
+          </li>
+        </ul>
+        
+        <br/>
+        <p>
+          Maintained & developed by <a href="@https://x.com/exgenesis" className='hover:underline'>Xiq (@exgeneis)</a> & contributors.
+        </p>
+
       </div>
 
       {/* Add Footer component */}

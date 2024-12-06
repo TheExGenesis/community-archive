@@ -8,7 +8,7 @@ export default function DataPolicyPage() {
       </h1>
 
       <p>
-        At the Community Archive, we are committed to preserving the public
+        We are committed to preserving the public
         history of Twitter conversations while respecting your privacy. This
         policy outlines how we handle your data and the options available to
         you.
@@ -51,6 +51,10 @@ export default function DataPolicyPage() {
           anthropology research and fine-tuning language models.
         </li>
       </ul>
+      <br/>
+      <p>
+        API docs & instructions for downloading the data <a href='https://github.com/TheExGenesis/community-archive/tree/main/docs#docs' className='text-blue-500 hover:underline'>are in the GitHub repo.</a>
+      </p>
 
       <h2 className="mt-6 text-2xl font-semibold">Important Considerations</h2>
 
@@ -73,22 +77,6 @@ export default function DataPolicyPage() {
 
       <ol className="list-inside list-decimal space-y-2">
         <li>
-          <strong>Private Archive</strong>: You can choose to make your archive
-          private. In this case:
-          <ul className="ml-5 mt-2 list-inside list-disc space-y-1">
-            <li>
-              Only you and Community Archive stewards will have access to your
-              full data.
-            </li>
-            <li>
-              Your tweets may still appear in search results or aggregated data.
-            </li>
-            <li>
-              We may use your data for research and to improve our services.
-            </li>
-          </ul>
-        </li>
-        <li>
           <strong>Exclude Likes</strong>: You can opt to leave out your likes
           when uploading your archive.
         </li>
@@ -103,14 +91,6 @@ export default function DataPolicyPage() {
         </li>
       </ol>
 
-      <h2 className="mt-6 text-2xl font-semibold">Data Access</h2>
-
-      <p>
-        We provide a full dump of the public database for easier data science
-        use. This allows researchers and developers to work with the collective
-        data more efficiently.
-      </p>
-
       <h2 className="mt-6 text-2xl font-semibold">Contact Us</h2>
 
       <p>
@@ -124,11 +104,11 @@ export default function DataPolicyPage() {
           href="https://x.com/exgenesis"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 hover:underline"
+          className="text-blue-500 hover:underline"
         >
           @exgenesis
         </a>
-        .
+        . Or find us on <a href="https://discord.gg/5mbWEfVrqw" className="text-blue-500 hover:underline">Discord</a> or <a href="https://github.com/TheExGenesis/community-archive" className="text-blue-500 hover:underline">GitHub</a>  
       </p>
 
       <p>

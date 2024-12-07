@@ -27,7 +27,7 @@
 - [ ] Website improvements:
   - [x] Restyle front page
   - [ ] Render threads
-- [ ] User clones via tweet distillation and LLM simulation
+- [ ] Train the tpot LLM and give it a twitter account
 - [ ] Semantic search
 - [ ] User summary pages (interests, projects, relationships)
 - [ ] Discourse mapping

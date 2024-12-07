@@ -27,6 +27,7 @@
 - [ ] Website improvements:
   - [x] Restyle front page
   - [ ] Render threads
+- [ ] Birdseye: personal archive insights (topic clustering app)
 - [ ] Train the tpot LLM and give it a twitter account
 - [ ] Semantic search
 - [ ] User summary pages (interests, projects, relationships)

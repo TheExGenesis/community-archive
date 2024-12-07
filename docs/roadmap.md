@@ -23,14 +23,14 @@
 - [x] Website
   - [x] Twitter-like advanced full text search
   - [x] User pages with top tweets and a button to copy as text (to put in LLM context)
+- [x] Keyword and concept trends analysis
 - [ ] Website improvements:
-  - [ ] Restyle front page
+  - [x] Restyle front page
   - [ ] Render threads
 - [ ] User clones via tweet distillation and LLM simulation
-- [ ] Keyword and concept trends analysis
 - [ ] Semantic search
 - [ ] User summary pages (interests, projects, relationships)
 - [ ] Discourse mapping
 - [ ] Discussion reranking with bridging algorithms
-- [ ] WebSim with DB access for on-the-fly data analysis and UI
+- [ ] GraphRAG on whole db
 - [ ] Interactions network visualization and temporal analysis

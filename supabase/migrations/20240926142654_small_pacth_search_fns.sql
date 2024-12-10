@@ -1,5 +1,4 @@
 DROP FUNCTION IF EXISTS "public"."get_top_accounts_with_followers"(integer);
-
 CREATE OR REPLACE FUNCTION "public"."get_top_accounts_with_followers"("limit_count" integer) 
 RETURNS TABLE(
     "account_id" "text", 

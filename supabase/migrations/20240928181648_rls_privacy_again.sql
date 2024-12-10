@@ -1,6 +1,5 @@
 ALTER TABLE public.archive_upload
 ALTER COLUMN keep_private SET DEFAULT FALSE;
-
 CREATE OR REPLACE FUNCTION public.apply_public_rls_policies_not_private(schema_name TEXT, table_name TEXT) 
 RETURNS void AS $$
 DECLARE
@@ -32,7 +31,6 @@ BEGIN
         )', schema_name, table_name);
 END;
 $$ LANGUAGE plpgsql;
-
 CREATE OR REPLACE FUNCTION public.apply_public_rls_policies(schema_name TEXT, table_name TEXT) 
 RETURNS void AS $$
 DECLARE
@@ -75,7 +73,6 @@ BEGIN
         )', schema_name, table_name);
 END;
 $$ LANGUAGE plpgsql;
-
 CREATE OR REPLACE FUNCTION public.apply_public_entities_rls_policies(schema_name TEXT, table_name TEXT) 
 RETURNS void AS $$
 DECLARE
@@ -132,7 +129,6 @@ BEGIN
         )', schema_name, table_name, table_name, table_name);
 END;
 $$ LANGUAGE plpgsql;
-
 -- Function to drop all policies on a table
 CREATE OR REPLACE FUNCTION public.drop_all_policies(schema_name TEXT, table_name TEXT)
 RETURNS void AS $$
@@ -148,7 +144,6 @@ BEGIN
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Drop all policies and apply new ones for each table
 DO $$
 DECLARE

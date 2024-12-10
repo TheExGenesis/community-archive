@@ -1,5 +1,4 @@
 DROP MATERIALIZED VIEW IF EXISTS public.global_activity_summary;
-
 CREATE MATERIALIZED VIEW
   public.global_activity_summary AS
 SELECT
@@ -28,14 +27,10 @@ SELECT
     ) t
   ) AS top_accounts_with_followers,
   CURRENT_TIMESTAMP AS last_updated;
-
 -- Add a unique index on the last_updated column
 CREATE UNIQUE INDEX idx_global_activity_summary_last_updated 
 ON public.global_activity_summary (last_updated);
-
-
 DROP MATERIALIZED VIEW IF EXISTS public.account_activity_summary;
-
 CREATE MATERIALIZED VIEW public.account_activity_summary AS
 SELECT
   a.account_id,
@@ -55,6 +50,5 @@ SELECT
   ) f) AS most_favorited_tweets,
   CURRENT_TIMESTAMP AS last_updated
 FROM public.account a;
-
 CREATE UNIQUE INDEX idx_account_activity_summary_account_id
 ON public.account_activity_summary (account_id);

@@ -7,7 +7,7 @@ project_id = "canonball"
 port = 54321
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
 # endpoints. public and storage are always included.
-schemas = ["public", "graphql_public", "dev", "temp"]
+schemas = ["public", "graphql_public", "dev", "temp", "storage"]
 # Extra schemas to add to the search_path of every request. public is always included.
 extra_search_path = ["public", "extensions", "dev", "temp"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size
@@ -40,16 +40,21 @@ file_size_limit = "1000MiB"
 [storage.buckets.archives]
 public = false
 file_size_limit = "1000MiB"
-allowed_mime_types = ["application/json", "text/plain"]
-objects_path = "../../data/local_seed/archives"
+objects_path = "../data/local_seed/archives"
 
 
 [auth]
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
 site_url = "http://localhost:3000"
+
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://localhost:3000"]
+additional_redirect_urls = [
+    "http://127.0.0.1:3000", 
+    "http://127.0.0.1:3000/api/auth/callback",
+    "http://localhost:3000", 
+    "http://localhost:3000/api/auth/callback",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 seconds (one
 # week).
 jwt_expiry = 3600
@@ -73,6 +78,7 @@ enabled = true
 client_id = "env(SUPABASE_AUTH_TWITTER_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_TWITTER_SECRET)"
 redirect_uri = "http://localhost:54321/auth/v1/callback"
+
 
 [analytics]
 enabled = false

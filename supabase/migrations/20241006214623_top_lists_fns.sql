@@ -1,6 +1,5 @@
 DROP FUNCTION IF EXISTS "public"."get_top_mentioned_users"();
 DROP FUNCTION IF EXISTS "public"."get_top_mentioned_users"(INT);
-
 CREATE OR REPLACE FUNCTION public.get_top_mentioned_users(limit_ INT)
 RETURNS TABLE (
     user_id TEXT,

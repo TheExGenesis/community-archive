@@ -7,7 +7,6 @@ DROP FUNCTION IF EXISTS public.word_occurrences (
   TIMESTAMP WITH TIME ZONE,
   TEXT[]
 );
-
 CREATE
 OR REPLACE FUNCTION public.word_occurrences (
   search_word TEXT,

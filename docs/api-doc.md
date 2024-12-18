@@ -78,6 +78,17 @@ const { data, error } = await supabase
 console.log(data)
 ```
 
+You likely have their twitter handle, and not their accountId, so here is how you get a user's accountId from a twitter handle:
+```js
+const { data, error } = await supabase
+    .from('account')
+    .select('account_id')
+    .eq('username', username)
+    .single()
+const accountId = data
+console.log(accountId)
+```
+
 See [scripts/get_all_tweets_paginated.mts](scripts/get_all_tweets_paginated.mts) for an example of fetching all tweets with pagination. You can run it from the root directory with:
 
 ```

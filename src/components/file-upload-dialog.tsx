@@ -285,8 +285,9 @@ export function FileUploadDialog({
               <Link
                 href="/data-policy"
                 className="text-primary hover:underline"
+                target='_blank'
               >
-                Read our Privacy Policy
+                Read our Data Policy
               </Link>
             </div>
           </div>

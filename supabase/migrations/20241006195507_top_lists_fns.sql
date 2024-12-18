@@ -37,7 +37,6 @@ BEGIN
         t.mention_count DESC;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Function 5: get_account_most_liked_tweets_archive_users
 DROP FUNCTION IF EXISTS public.get_account_most_liked_tweets_archive_users(TEXT, INTEGER);
 CREATE OR REPLACE FUNCTION public.get_account_most_liked_tweets_archive_users(
@@ -86,7 +85,6 @@ BEGIN
     LIMIT limit_;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Function 6: get_account_most_replied_tweets_by_archive_users
 DROP FUNCTION IF EXISTS public.get_account_most_replied_tweets_by_archive_users(TEXT, INTEGER);
 CREATE OR REPLACE FUNCTION public.get_account_most_replied_tweets_by_archive_users (
@@ -136,7 +134,6 @@ BEGIN
         limit_count;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Function 7: get_account_top_retweet_count_tweets
 DROP FUNCTION IF EXISTS public.get_account_top_retweet_count_tweets(TEXT, INTEGER);
 CREATE OR REPLACE FUNCTION public.get_account_top_retweet_count_tweets (
@@ -177,5 +174,58 @@ BEGIN
         t.retweet_count DESC 
     LIMIT 
         limit_;
+END;
+$$ LANGUAGE plpgsql;
+-- Function 8: get_account_most_mentioned_accounts
+DROP FUNCTION IF EXISTS public.get_account_most_mentioned_accounts(TEXT, INTEGER);
+CREATE OR REPLACE FUNCTION public.get_account_most_mentioned_accounts (
+    username_ TEXT, 
+    limit_ INTEGER
+) RETURNS TABLE (
+  mentioned_user_id TEXT,
+  mentioned_username TEXT,
+  mention_count BIGINT
+) AS $$
+DECLARE
+    user_id text;
+BEGIN
+    -- Get the user_id based on the provided username
+    SELECT account_id INTO user_id
+    FROM public.account
+    WHERE username = username_;
+
+    -- If the user_id is not found, return an empty result
+    IF user_id IS NULL THEN
+        RETURN;
+    END IF;
+
+    RETURN QUERY
+    WITH TopMentionedUsers AS (
+        SELECT
+            um.mentioned_user_id,
+            COUNT(*) AS mention_count
+        FROM
+            public.user_mentions um
+        JOIN
+            public.tweets t ON um.tweet_id = t.tweet_id
+        WHERE
+            t.account_id = user_id
+            AND um.mentioned_user_id <> '-1'
+        GROUP BY
+            um.mentioned_user_id
+        ORDER BY
+            mention_count DESC
+        LIMIT limit_
+    )
+    SELECT
+        t.mentioned_user_id,
+        mu.screen_name AS mentioned_username,
+        t.mention_count
+    FROM
+        TopMentionedUsers t
+    LEFT JOIN
+        public.mentioned_users mu ON t.mentioned_user_id = mu.user_id
+    ORDER BY
+        t.mention_count DESC;
 END;
 $$ LANGUAGE plpgsql;

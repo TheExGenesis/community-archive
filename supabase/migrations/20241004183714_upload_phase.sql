@@ -1,6 +1,4 @@
 CREATE TYPE upload_phase_enum AS ENUM ('uploading', 'completed', 'failed');
-
-
 CREATE TABLE IF NOT EXISTS public.archive_upload (
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     account_id TEXT NOT NULL,
@@ -14,7 +12,6 @@ CREATE TABLE IF NOT EXISTS public.archive_upload (
     UNIQUE (account_id, archive_at),
     FOREIGN KEY (account_id) REFERENCES public.account (account_id)
 );
-
 -- Create or replace the commit_temp_data function
 CREATE OR REPLACE FUNCTION public.commit_temp_data(p_suffix TEXT)
 RETURNS VOID AS $$

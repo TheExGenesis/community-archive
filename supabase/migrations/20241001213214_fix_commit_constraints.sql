@@ -1,4 +1,3 @@
-
 -- Create or replace the commit_temp_data function
 CREATE OR REPLACE FUNCTION public.commit_temp_data(p_suffix TEXT)
 RETURNS VOID AS $$

@@ -21,9 +21,10 @@ const __dirname = path.dirname(__filename)
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') })
 
-const isProd = process.argv[3]
-  ? process.argv[3] === 'true'
-  : process.env.NODE_ENV === 'production'
+// const isProd = process.argv[3]
+//   ? process.argv[3] === 'true'
+//   : process.env.NODE_ENV === 'production'
+const isProd = true
 
 const supabaseUrl = isProd
   ? process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -48,13 +49,12 @@ const requiredFiles = [
   'profile',
   'account',
   'tweets',
-  'community-tweet',
   'like',
   'follower',
   'following',
 ]
 
-const optionalFiles = ['note-tweet']
+const optionalFiles = ['note-tweet', 'community-tweet']
 
 const extractZip = async (filePath: string): Promise<Archive> => {
   const directory = await unzipper.Open.file(filePath)

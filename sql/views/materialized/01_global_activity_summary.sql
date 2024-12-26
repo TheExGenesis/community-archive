@@ -4,16 +4,32 @@ CREATE MATERIALIZED VIEW
   public.global_activity_summary AS
 SELECT
   (
-    SELECT COUNT(DISTINCT account_id) FROM public.account
+    SELECT c.reltuples::bigint AS estimate
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relname = 'account' 
+    AND n.nspname = 'public'
   ) AS total_accounts,
   (
-    SELECT COUNT(DISTINCT tweet_id) FROM public.tweets
+    SELECT c.reltuples::bigint AS estimate
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relname = 'tweets'
+    AND n.nspname = 'public'
   ) AS total_tweets,
   (
-    SELECT COUNT(DISTINCT liked_tweet_id) FROM public.likes
+    SELECT c.reltuples::bigint AS estimate
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relname = 'liked_tweets'
+    AND n.nspname = 'public'
   ) AS total_likes,
   (
-    SELECT COUNT(DISTINCT tweet_id) FROM public.user_mentions
+    SELECT c.reltuples::bigint AS estimate
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relname = 'user_mentions'
+    AND n.nspname = 'public'
   ) AS total_user_mentions,
   (
     SELECT json_agg(row_to_json(t))

@@ -1,43 +1,23 @@
 drop policy "Data is modifiable by their users" on "public"."account";
-
 drop policy "Data is publicly visible" on "public"."account";
-
 drop policy "Data is modifiable by their users" on "public"."archive_upload";
-
 drop policy "Data is publicly visible" on "public"."archive_upload";
-
 drop policy "Data is modifiable by their users" on "public"."followers";
-
 drop policy "Data is publicly visible unless marked private" on "public"."followers";
-
 drop policy "Data is modifiable by their users" on "public"."following";
-
 drop policy "Data is publicly visible unless marked private" on "public"."following";
-
 drop policy "Data is modifiable by their users" on "public"."likes";
-
 drop policy "Data is publicly visible unless marked private" on "public"."likes";
-
 drop policy "Data is modifiable by their users" on "public"."profile";
-
 drop policy "Data is publicly visible unless marked private" on "public"."profile";
-
 drop policy "Entities are publicly visible unless marked private" on "public"."tweet_media";
-
 drop policy "Entities are publicly visible unless marked private" on "public"."tweet_urls";
-
 drop policy "Data is modifiable by their users" on "public"."tweets";
-
 drop policy "Data is publicly visible unless marked private" on "public"."tweets";
-
 drop policy "Entities are publicly visible unless marked private" on "public"."user_mentions";
-
 drop function if exists "public"."apply_public_rls_policies_not_private"(schema_name text, table_name text);
-
 drop function if exists "public"."drop_all_policies"(schema_name text, table_name text);
-
 set check_function_bodies = off;
-
 CREATE OR REPLACE FUNCTION public.apply_public_entities_rls_policies(schema_name text, table_name text)
  RETURNS void
  LANGUAGE plpgsql
@@ -81,9 +61,7 @@ BEGIN
             )
         )', schema_name, table_name, table_name, table_name);
 END;
-$function$
-;
-
+$function$;
 CREATE OR REPLACE FUNCTION public.apply_public_rls_policies(schema_name text, table_name text)
  RETURNS void
  LANGUAGE plpgsql
@@ -116,9 +94,7 @@ BEGIN
             account_id = (SELECT auth.jwt()) -> ''app_metadata'' ->> ''provider_id''
         )', schema_name, table_name);
 END;
-$function$
-;
-
+$function$;
 create policy "Tweets are modifiable by their users"
 on "public"."account"
 as permissive
@@ -126,16 +102,12 @@ for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-
-
 create policy "Tweets are publicly visible"
 on "public"."account"
 as permissive
 for select
 to public
 using (true);
-
-
 create policy "Tweets are modifiable by their users"
 on "public"."archive_upload"
 as permissive
@@ -143,16 +115,12 @@ for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-
-
 create policy "Tweets are publicly visible"
 on "public"."archive_upload"
 as permissive
 for select
 to public
 using (true);
-
-
 create policy "Tweets are modifiable by their users"
 on "public"."followers"
 as permissive
@@ -160,16 +128,12 @@ for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-
-
 create policy "Tweets are publicly visible"
 on "public"."followers"
 as permissive
 for select
 to public
 using (true);
-
-
 create policy "Tweets are modifiable by their users"
 on "public"."following"
 as permissive
@@ -177,16 +141,12 @@ for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-
-
 create policy "Tweets are publicly visible"
 on "public"."following"
 as permissive
 for select
 to public
 using (true);
-
-
 create policy "Tweets are modifiable by their users"
 on "public"."likes"
 as permissive
@@ -194,16 +154,12 @@ for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-
-
 create policy "Tweets are publicly visible"
 on "public"."likes"
 as permissive
 for select
 to public
 using (true);
-
-
 create policy "Tweets are modifiable by their users"
 on "public"."profile"
 as permissive
@@ -211,32 +167,24 @@ for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-
-
 create policy "Tweets are publicly visible"
 on "public"."profile"
 as permissive
 for select
 to public
 using (true);
-
-
 create policy "Entities are publicly visible"
 on "public"."tweet_media"
 as permissive
 for select
 to public
 using (true);
-
-
 create policy "Entities are publicly visible"
 on "public"."tweet_urls"
 as permissive
 for select
 to public
 using (true);
-
-
 create policy "Tweets are modifiable by their users"
 on "public"."tweets"
 as permissive
@@ -244,22 +192,15 @@ for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-
-
 create policy "Tweets are publicly visible"
 on "public"."tweets"
 as permissive
 for select
 to public
 using (true);
-
-
 create policy "Entities are publicly visible"
 on "public"."user_mentions"
 as permissive
 for select
 to public
 using (true);
-
-
-

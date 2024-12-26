@@ -16,3 +16,7 @@ CREATE TABLE IF NOT EXISTS public.archive_upload (
 );
 
 ALTER TABLE public.archive_upload ADD COLUMN upload_phase upload_phase_enum DEFAULT 'uploading';
+
+
+CREATE INDEX "idx_archive_upload_account_id" ON "public"."archive_upload" USING "btree" ("account_id");
+

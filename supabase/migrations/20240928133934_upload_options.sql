@@ -4,13 +4,10 @@ ADD COLUMN IF NOT EXISTS keep_private BOOLEAN DEFAULT TRUE,
 ADD COLUMN IF NOT EXISTS upload_likes BOOLEAN DEFAULT TRUE,
 ADD COLUMN IF NOT EXISTS start_date DATE,
 ADD COLUMN IF NOT EXISTS end_date DATE;
-
 -- Add a comment to explain the purpose of this migration
 COMMENT ON TABLE public.archive_upload IS 'Stores upload options for each archive upload';
-
 -- Drop existing function if it exists
 DROP FUNCTION IF EXISTS public.insert_temp_archive_upload;
-
 -- Create or replace the insert_temp_archive_upload function
 CREATE OR REPLACE FUNCTION public.insert_temp_archive_upload(
     p_account_id TEXT,
@@ -53,12 +50,10 @@ BEGIN
     RETURN v_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- Add a comment to explain the purpose of this function
 COMMENT ON FUNCTION public.insert_temp_archive_upload IS 'Inserts upload options into temporary archive_upload table';
 -- Drop existing function if it exists
 DROP FUNCTION IF EXISTS public.commit_temp_data(TEXT);
-
 -- Create or replace the commit_temp_data function
 CREATE OR REPLACE FUNCTION public.commit_temp_data(p_suffix TEXT)
 RETURNS VOID AS $$
@@ -237,6 +232,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET statement_timeout TO '30min';
-
 -- Add a comment to explain the purpose of this function
 COMMENT ON FUNCTION public.commit_temp_data IS 'Commits temporary data to permanent tables and handles upload options';

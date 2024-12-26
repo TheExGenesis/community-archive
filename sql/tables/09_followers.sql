@@ -7,3 +7,7 @@ CREATE TABLE IF NOT EXISTS public.followers (
     FOREIGN KEY (account_id) REFERENCES public.account (account_id),
     FOREIGN KEY (archive_upload_id) REFERENCES public.archive_upload (id)
 );
+
+CREATE INDEX "idx_followers_account_id" ON "public"."followers" USING "btree" ("account_id");
+
+CREATE INDEX "idx_followers_archive_upload_id" ON "public"."followers" USING "btree" ("archive_upload_id");

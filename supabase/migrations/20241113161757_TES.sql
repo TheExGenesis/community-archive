@@ -1,9 +1,6 @@
 ALTER TABLE public.liked_tweets DROP COLUMN IF EXISTS fts;
 ALTER TABLE public.liked_tweets ADD COLUMN fts tsvector GENERATED ALWAYS AS (to_tsvector('english', full_text)) STORED;
 CREATE INDEX IF NOT EXISTS text_fts ON public.liked_tweets USING gin (fts);
-
-
-
 CREATE OR REPLACE FUNCTION tes_get_tweets_on_this_day(
     p_limit INTEGER DEFAULT NULL,
     p_account_id TEXT DEFAULT NULL
@@ -49,7 +46,6 @@ BEGIN
     LIMIT p_limit;
 END;
 $$ LANGUAGE plpgsql;
-
 CREATE OR REPLACE FUNCTION tes_get_tweet_counts_by_date(p_account_id TEXT)
 RETURNS TABLE (tweet_date DATE, tweet_count BIGINT) AS $$
 BEGIN
@@ -83,12 +79,9 @@ BEGIN
         ON f1.account_id = f2.account_id 
         AND f1.follower_account_id = f2.following_account_id
 	left join mentioned_users mu on mu.user_id = f1.follower_account_id
-    where f1.account_id = $1;
+    where f1.account_id = get_moots.user_id;
 END;
 $$ LANGUAGE plpgsql;
-
-
-
 CREATE OR REPLACE FUNCTION tes_get_followers(user_id TEXT)
 RETURNS TABLE (
     account_id TEXT,
@@ -101,10 +94,9 @@ BEGIN
         mu.screen_name AS username
     FROM public.followers f1
     LEFT JOIN mentioned_users mu ON mu.user_id = f1.follower_account_id
-    WHERE f1.account_id = $1 and mu.screen_name is not null;
+    WHERE f1.account_id = get_followers.user_id and mu.screen_name is not null;
 END;
 $$ LANGUAGE plpgsql;
-
 CREATE OR REPLACE FUNCTION tes_get_followings(user_id TEXT)
 RETURNS TABLE (
     account_id TEXT,
@@ -117,13 +109,10 @@ BEGIN
         mu.screen_name AS username
     FROM public.following f2
     LEFT JOIN mentioned_users mu ON mu.user_id = f2.following_account_id
-    WHERE f2.account_id = $1 and mu.screen_name is not null; 
+    WHERE f2.account_id = get_followings.user_id and mu.screen_name is not null; 
 END;
+
 $$ LANGUAGE plpgsql;
-
-
-
-
 CREATE OR REPLACE FUNCTION tes_search_liked_tweets(
   search_query TEXT,
   from_user TEXT DEFAULT NULL,
@@ -239,8 +228,6 @@ BEGIN
   ORDER BY t.created_at DESC;
 END;
 $$ LANGUAGE plpgsql;
-
-
 CREATE OR REPLACE FUNCTION tes_search_tweets(
   search_query TEXT,
   from_user TEXT DEFAULT NULL,
@@ -335,4 +322,3 @@ BEGIN
   ORDER BY t.created_at DESC;
 END;
 $$ LANGUAGE plpgsql;
-

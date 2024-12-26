@@ -8,3 +8,10 @@ CREATE TABLE IF NOT EXISTS public.likes (
     FOREIGN KEY (liked_tweet_id) REFERENCES public.liked_tweets (tweet_id),
     FOREIGN KEY (archive_upload_id) REFERENCES public.archive_upload (id)
 );
+
+
+CREATE INDEX "idx_likes_account_id" ON "public"."likes" USING "btree" ("account_id");
+
+CREATE INDEX "idx_likes_archive_upload_id" ON "public"."likes" USING "btree" ("archive_upload_id");
+
+CREATE INDEX "idx_likes_liked_tweet_id" ON "public"."likes" USING "btree" ("liked_tweet_id");

@@ -1,4 +1,3 @@
-
 CREATE
 OR REPLACE FUNCTION public.get_account_top_favorite_count_tweets (username_ TEXT, limit_ INTEGER) RETURNS TABLE (
   tweet_id TEXT,
@@ -37,4 +36,3 @@ BEGIN
         limit_;
 END;
 $$ LANGUAGE plpgsql;
-

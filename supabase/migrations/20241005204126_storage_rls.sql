@@ -2,7 +2,6 @@ DO $$
 BEGIN
 PERFORM public.drop_all_policies('storage', 'objects');
 END $$;
-
 create policy "Allow authenticated uploads"
 on storage.objects
 for insert
@@ -11,7 +10,6 @@ with check (
   bucket_id = 'archives'::text AND
   ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'user_name'::text) = (storage.foldername(name))[1]
 );
-
 create policy "Allow authenticated archive deletes"
 on storage.objects
 for delete
@@ -20,7 +18,6 @@ using (
   bucket_id = 'archives'::text AND
   ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'user_name'::text) = (storage.foldername(name))[1]
 );
-
 create policy "Allow authenticated archive updates"
 on storage.objects
 for update
@@ -29,7 +26,6 @@ with check (
   bucket_id = 'archives'::text AND
   ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'user_name'::text) = (storage.foldername(name))[1]
 );
-
 create policy "Allow archive access based on privacy setting"
 on storage.objects
 for select

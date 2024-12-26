@@ -26,7 +26,6 @@ SELECT
     FROM
       public.user_mentions
   ) AS total_user_mentions;
-  
 CREATE
 OR REPLACE FUNCTION refresh_global_activity_summary () RETURNS TRIGGER AS $$
 BEGIN
@@ -36,7 +35,6 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 CREATE TRIGGER update_global_activity_summary
 AFTER
 UPDATE OF upload_phase ON public.archive_upload FOR EACH ROW

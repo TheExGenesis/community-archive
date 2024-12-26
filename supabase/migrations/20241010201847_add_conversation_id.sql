@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS "public"."conversations" (
     "conversation_id" text,
     FOREIGN KEY (tweet_id) REFERENCES public.tweets(tweet_id)
 );
-
 CREATE OR REPLACE FUNCTION private.update_conversation_ids()
 RETURNS INTEGER AS $$
 DECLARE
@@ -76,14 +75,11 @@ EXCEPTION
         RAISE EXCEPTION 'An error occurred in update_conversation_ids: %', error_message;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Add a comment to explain the purpose of this function
 COMMENT ON FUNCTION private.update_conversation_ids() IS 'Updates conversation_ids for tweets';
-
 CREATE OR REPLACE VIEW public.tweets_w_conversation_id AS
 SELECT tweets.*, c.conversation_id
 FROM tweets LEFT JOIN conversations c ON tweets.tweet_id = c.tweet_id;
-
 CREATE OR REPLACE FUNCTION public.get_main_thread(p_conversation_id TEXT)
 RETURNS TABLE (
     tweet_id TEXT,
@@ -131,9 +127,6 @@ BEGIN
     JOIN thread_summary ts ON mt.conversation_id = ts.conversation_id AND mt.account_id = ts.account_id;
 END;
 $$ LANGUAGE plpgsql;
-
-
-
 CREATE OR REPLACE FUNCTION private.post_upload_update_conversation_ids()
 RETURNS void AS $$
 BEGIN
@@ -143,13 +136,8 @@ BEGIN
    
 END;
 $$ LANGUAGE plpgsql;
-
-
-
 -- Run the function to update the conversation_ids and main_thread_view when the migration is applied
 SELECT private.post_upload_update_conversation_ids();
-
-
 CREATE OR REPLACE FUNCTION private.queue_update_conversation_ids()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -164,16 +152,11 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
-
 CREATE TRIGGER queue_update_conversation_ids_on_upload_complete
 AFTER UPDATE OF upload_phase ON public.archive_upload
 FOR EACH ROW
 WHEN (NEW.upload_phase = 'completed')
 EXECUTE FUNCTION private.queue_update_conversation_ids();
-
-
-
 CREATE OR REPLACE FUNCTION private.process_jobs()
 RETURNS void AS $$
 DECLARE

@@ -1,5 +1,23 @@
 DO $$
 BEGIN
+  -- Check if the bucket already exists
+  IF NOT EXISTS (
+    SELECT 1
+    FROM storage.buckets
+    WHERE name = 'archives'
+  ) THEN
+    -- Insert a new bucket if it doesn't exist
+    INSERT INTO storage.buckets (id, name, public)
+    VALUES (
+      'archives',     -- Generate a unique UUID for the bucket
+      'archives',    -- Replace with your desired bucket name
+      true           -- Set to 'true' for a public bucket, 'false' for private
+    );
+  END IF;
+END $$;
+
+DO $$
+BEGIN
 PERFORM public.drop_all_policies('storage', 'objects');
 END $$;
 create policy "Allow authenticated uploads"
@@ -20,20 +38,4 @@ with check ((bucket_id = 'archives'::text) AND (LOWER(((( SELECT auth.jwt() AS j
 create policy "Allow archive access based on privacy setting"
 on storage.objects
 for select
-using (
-  bucket_id = 'archives'::text AND (
-    LOWER(((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'user_name'::text)) = LOWER((storage.foldername(name))[1])
-    OR
-    EXISTS (
-      SELECT 1 FROM public.archive_upload au
-      JOIN public.account acc ON au.account_id = acc.account_id
-      WHERE LOWER(acc.username) = LOWER((storage.foldername(name))[1])
-      AND au.keep_private = false
-      AND au.archive_at = (
-        SELECT MAX(archive_at)
-        FROM public.archive_upload
-        WHERE account_id = au.account_id
-      )
-    )
-  )
-);
+using (bucket_id = 'archives'::text);

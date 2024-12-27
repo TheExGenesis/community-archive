@@ -89,7 +89,7 @@ const accountId = data
 console.log(accountId)
 ```
 
-See [scripts/get_all_tweets_paginated.mts](scripts/get_all_tweets_paginated.mts) for an example of fetching all tweets with pagination. You can run it from the root directory with:
+See [scripts/get_all_tweets_paginated.mts](../scripts/get_all_tweets_paginated.mts) for an example of fetching all tweets with pagination. You can run it from the root directory with:
 
 ```
 pnpm script scripts/get_all_tweets_paginated.mts

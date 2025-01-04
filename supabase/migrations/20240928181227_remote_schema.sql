@@ -41,9 +41,9 @@ BEGIN
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', policy_name, schema_name, table_name);
     END LOOP;
 
-    EXECUTE format('CREATE POLICY "Entities are publicly visible" ON %I.%I FOR SELECT USING (true)', schema_name, table_name);
+    EXECUTE format('create policy if not exists "Entities %I are publicly visible" ON %I.%I FOR SELECT USING (true)', table_name, schema_name, table_name);
     EXECUTE format('
-        CREATE POLICY "Entities are modifiable by their users" ON %I.%I to authenticated
+        create policy if not exists "Entities %I are modifiable by their users" ON %I.%I to authenticated
         USING (
             EXISTS (
                 SELECT 1 
@@ -59,7 +59,7 @@ BEGIN
                 WHERE dt.tweet_id = %I.tweet_id 
                 AND dt.account_id = (SELECT auth.jwt()) -> ''app_metadata'' ->> ''provider_id''
             )
-        )', schema_name, table_name, table_name, table_name);
+        )', table_name, schema_name, table_name, table_name, table_name);
 END;
 $function$;
 CREATE OR REPLACE FUNCTION public.apply_public_rls_policies(schema_name text, table_name text)
@@ -84,121 +84,121 @@ BEGIN
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', policy_name, schema_name, table_name);
     END LOOP; 
 
-    EXECUTE format('CREATE POLICY "Tweets are publicly visible" ON %I.%I FOR SELECT USING (true)', schema_name, table_name);
+    EXECUTE format('create policy if not exists "%I are publicly visible" ON %I.%I FOR SELECT USING (true)', table_name, schema_name, table_name);
     EXECUTE format('
-        CREATE POLICY "Tweets are modifiable by their users" ON %I.%I to authenticated 
+        create policy if not exists "%I are modifiable by their users" ON %I.%I to authenticated 
         USING (
             account_id = (SELECT auth.jwt()) -> ''app_metadata'' ->> ''provider_id''
         ) 
         WITH CHECK (
             account_id = (SELECT auth.jwt()) -> ''app_metadata'' ->> ''provider_id''
-        )', schema_name, table_name);
+        )', table_name, schema_name, table_name);
 END;
 $function$;
-create policy "Account are modifiable by their users"
+create policy if not exists "Account are modifiable by their users"
 on "public"."account"
 as permissive
 for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-create policy "Account are publicly visible"
+create policy if not exists "Account are publicly visible"
 on "public"."account"
 as permissive
 for select
 to public
 using (true);
-create policy "Archive Upload are modifiable by their users"
+create policy if not exists "Archive Upload are modifiable by their users"
 on "public"."archive_upload"
 as permissive
 for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-create policy "Archive Upload are publicly visible"
+create policy if not exists "Archive Upload are publicly visible"
 on "public"."archive_upload"
 as permissive
 for select
 to public
 using (true);
-create policy "Followers are modifiable by their users"
+create policy if not exists "Followers are modifiable by their users"
 on "public"."followers"
 as permissive
 for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-create policy "Followers are publicly visible"
+create policy if not exists "Followers are publicly visible"
 on "public"."followers"
 as permissive
 for select
 to public
 using (true);
-create policy "Following are modifiable by their users"
+create policy if not exists "Following are modifiable by their users"
 on "public"."following"
 as permissive
 for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-create policy "Following are publicly visible"
+create policy if not exists "Following are publicly visible"
 on "public"."following"
 as permissive
 for select
 to public
 using (true);
-create policy "Likes are modifiable by their users"
+create policy if not exists "Likes are modifiable by their users"
 on "public"."likes"
 as permissive
 for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-create policy "Likes are publicly visible"
+create policy if not exists "Likes are publicly visible"
 on "public"."likes"
 as permissive
 for select
 to public
 using (true);
-create policy "Profile are modifiable by their users"
+create policy if not exists "Profile are modifiable by their users"
 on "public"."profile"
 as permissive
 for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-create policy "Profile are publicly visible"
+create policy if not exists "Profile are publicly visible"
 on "public"."profile"
 as permissive
 for select
 to public
 using (true);
-create policy "Media are publicly visible"
+create policy if not exists "Media are publicly visible"
 on "public"."tweet_media"
 as permissive
 for select
 to public
 using (true);
-create policy "Urls are publicly visible"
+create policy if not exists "Urls are publicly visible"
 on "public"."tweet_urls"
 as permissive
 for select
 to public
 using (true);
-create policy "Tweets are modifiable by their users"
+create policy if not exists "Tweets are modifiable by their users"
 on "public"."tweets"
 as permissive
 for all
 to authenticated
 using ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)))
 with check ((account_id = ((( SELECT auth.jwt() AS jwt) -> 'app_metadata'::text) ->> 'provider_id'::text)));
-create policy "Tweets are publicly visible"
+create policy if not exists "Tweets are publicly visible"
 on "public"."tweets"
 as permissive
 for select
 to public
 using (true);
-create policy "User Mentions are publicly visible"
+create policy if not exists "User Mentions are publicly visible"
 on "public"."user_mentions"
 as permissive
 for select

@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     }
 
     const bucketName = "twitter_api_files";
-    const res = await processTemporaryData(supabaseAdminClient, bucketName);
+    const res = await move_twitter_apiresponses_to_storage(supabaseAdminClient, bucketName);
 
     return new Response(
       JSON.stringify(res),
@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
   } 
 });
 
-export async function processTemporaryData(
+export async function move_twitter_apiresponses_to_storage(
   supabase: ReturnType<typeof createClient>,
   bucketName: string,
   batchSize: number = 150

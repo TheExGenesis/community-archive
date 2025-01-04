@@ -134,22 +134,11 @@ CREATE TABLE IF NOT EXISTS public.tes_blocked_scraping_users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create an index on updated_at for faster queries if you need to find recently blocked users
-CREATE INDEX IF NOT EXISTS idx_tes_blocked_scraping_updated_at ON public.tes_blocked_scraping_users(updated_at);
-
--- Create a trigger to automatically update the updated_at timestamp
-CREATE OR REPLACE FUNCTION update_tes_blocked_scraping_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER update_tes_blocked_scraping_timestamp
     BEFORE UPDATE ON public.tes_blocked_scraping_users
     FOR EACH ROW
-    EXECUTE FUNCTION update_tes_blocked_scraping_timestamp();
+    EXECUTE FUNCTION update_updated_at_column();
 
 
 -- Enable RLS
@@ -737,7 +726,7 @@ DECLARE
     url_result RECORD;
     mention_result RECORD;
 BEGIN
-    RAISE NOTICE 'Starting process_temporary_data';
+    RAISE NOTICE 'Starting tes_import_temporary_data_into_tables';
 
     -- Process accounts and capture results
     SELECT * INTO account_result FROM private.tes_process_account_records();
@@ -775,7 +764,7 @@ $$ LANGUAGE plpgsql;
 
 
 
-CREATE OR REPLACE FUNCTION private.tes_invoke_edge_function_process_temporary_data()
+CREATE OR REPLACE FUNCTION private.tes_invoke_edge_function_move_data_to_storage()
 RETURNS void AS $$
 DECLARE
     request_id TEXT;
@@ -799,7 +788,7 @@ select
     'tes-invoke-edge-function-scheduler',
     '* * * * *', 
     $$
-    select private.tes_invoke_edge_function_process_temporary_data()
+    select private.tes_invoke_edge_function_move_data_to_storage()
     $$
   );
 

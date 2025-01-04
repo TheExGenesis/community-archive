@@ -19,7 +19,7 @@ Deno.serve(async (req: Request) => {
     supabaseAdminClient = createClient(supabaseUrl, supabaseKey);
 
     const invokeFunction = async () => {
-      const { data, error } = await supabaseAdminClient.functions.invoke('process_temporary_data', {
+      const { data, error } = await supabaseAdminClient.functions.invoke('move_twitter_apiresponses_to_storage', {
         method: 'POST'
       });
       
@@ -34,6 +34,7 @@ Deno.serve(async (req: Request) => {
         let res = await invokeFunction();
         if(!res.success){
           console.log(`invocation ${i+1} failed. ${JSON.stringify(res)}`); 
+          throw new Error(`invocation ${i+1} failed. ${JSON.stringify(res)}`);
           break;
         }
         else if (res.processedCount == 0) {

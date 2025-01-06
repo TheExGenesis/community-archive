@@ -40,7 +40,7 @@ file_size_limit = "1000MiB"
 [storage.buckets.archives]
 public = false
 file_size_limit = "1000MiB"
-objects_path = "../data/local_seed/archives"
+# objects_path = "../data/local_seed/archives"
 
 
 [auth]

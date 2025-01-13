@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS public.profile (
+CREATE TABLE IF NOT EXISTS public.all_profile (
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     account_id TEXT NOT NULL, 
     bio TEXT,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS public.profile (
     archive_upload_id BIGINT NOT NULL,
     UNIQUE (account_id, archive_upload_id),
     FOREIGN KEY (archive_upload_id) REFERENCES public.archive_upload (id),
-    FOREIGN KEY (account_id) REFERENCES public.account (account_id)
+    FOREIGN KEY (account_id) REFERENCES public.all_account (account_id)
 );
 
 

@@ -12,7 +12,9 @@
      FOREIGN KEY (account_id) REFERENCES public.all_account (account_id)
  );
 
+CREATE INDEX "idx_all_profile_account_id" ON "public"."all_profile" USING "btree" ("account_id");
 
+CREATE INDEX "idx_all_profile_archive_upload_id" ON "public"."all_profile" USING "btree" ("archive_upload_id");
 
     SELECT public.apply_public_rls_policies_not_private('public', 'all_account');
     SELECT public.apply_public_rls_policies_not_private('public', 'all_profile');

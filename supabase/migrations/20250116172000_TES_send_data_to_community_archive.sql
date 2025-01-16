@@ -1310,4 +1310,3 @@ CREATE POLICY temporary_data_no_delete_policy
  -- Schedule job to run every 5 minutes
  SELECT cron.schedule('tes-insert-temporary-data-into-tables', 
      '* * * * *', $$SELECT private.tes_import_temporary_data_into_tables();$$);
-

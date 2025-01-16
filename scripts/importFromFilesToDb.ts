@@ -43,7 +43,7 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
 ;(async function execute() {
   var supabase = await createDbScriptClient()
 
-  const { data: healthCheck, error: healthError } = await supabase.from('account').select('*').limit(1)
+  const { data: healthCheck, error: healthError } = await supabase.from('archive_upload').select('*').limit(1)
   if (healthError) {
     console.error('Supabase connection error:', healthError)
     throw new Error('Failed to connect to Supabase')
@@ -167,7 +167,7 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
       return newAccount
     }
 
-    await Upsert_Skeleton(account, fileRoot, 'account', getItem, 1, ['account_id'])
+    await Upsert_Skeleton(account, fileRoot, 'all_account', getItem, 1, ['account_id'])
   }
 
   async function Upsert_Tweet_Media(data: any, fileRoot:string) {
@@ -177,15 +177,22 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
     for(const tweet of tweets){
       if(tweet.entities.media){
         for(const media of tweet.entities.media){
-          allmedia.push({
-          tweet_id: tweet.id,
-          url: media.url,
-          expanded_url: media.expanded_url,
-          display_url: media.display_url ,
-          media_type : media.type,
-          media_url: media.media_url,
-          media_url_https: media.media_url_https,         
-        })
+          const isDuplicate = allmedia.some(m => 
+            m.tweet_id === tweet.id && 
+            m.media_url_https === media.media_url_https
+          );
+          
+          if (!isDuplicate) {
+            allmedia.push({
+              tweet_id: tweet.id,
+              url: media.url,
+              expanded_url: media.expanded_url,
+              display_url: media.display_url,
+              media_type: media.type,
+              media_url: media.media_url,
+              media_url_https: media.media_url_https,
+            });
+          }
         }
       }
     }
@@ -249,7 +256,7 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
       }
       return newItem
     }
-    await Upsert_Skeleton(profile, fileRoot, 'profile', getItem, 1, [])
+    await Upsert_Skeleton(profile, fileRoot, 'all_profile', getItem, 1, [])
   }
   async function Upsert_User_Mentions(data: any, fileRoot:string) {
     

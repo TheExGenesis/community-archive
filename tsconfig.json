@@ -48,6 +48,7 @@
     "node_modules",
     ".next",
     "out",
-    "scratchpad/**"
+    "scratchpad/**",
+    "supabase/functions/**"
   ]
 }

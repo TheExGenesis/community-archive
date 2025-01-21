@@ -76,12 +76,11 @@ export default function TopMentionedUsers({
         if (!accountData) {
           return { ...user, uploaded: false }
         }
+        const media_url = (accountData.profile?.avatar_media_url)? accountData.profile?.avatar_media_url : undefined;
         return {
           ...user,
-          account_display_name: accountData.account_display_name,
-          avatar_media_url: accountData.profile?.sort(
-            (a, b) => b.archive_upload_id - a.archive_upload_id,
-          )[0]?.avatar_media_url,
+          account_display_name: accountData.account_display_name!,
+          avatar_media_url: media_url,
           uploaded: true,
         }
       })

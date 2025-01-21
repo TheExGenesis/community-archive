@@ -172,7 +172,7 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
 
   async function Upsert_Tweet_Media(data: any, fileRoot:string) {
     const tweets = data.tweets.map((i:any) => i.tweet);
-    const allmedia = [];
+    const allmedia:any[] = [];
 
     for(const tweet of tweets){
       if(tweet.entities.media){

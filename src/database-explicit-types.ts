@@ -2,9 +2,9 @@
 import { Tables, TablesInsert, TablesUpdate } from './database-types'
 
 // Account
-export type Account = Tables<'account'>
-export type InsertAccount = TablesInsert<'account'>
-export type UpdateAccount = TablesUpdate<'account'>
+export type Account = Tables<'all_account'>
+export type InsertAccount = TablesInsert<'all_account'>
+export type UpdateAccount = TablesUpdate<'all_account'>
 
 // Archive Upload
 export type ArchiveUpload = Tables<'archive_upload'>
@@ -37,9 +37,9 @@ export type InsertMentionedUsers = TablesInsert<'mentioned_users'>
 export type UpdateMentionedUsers = TablesUpdate<'mentioned_users'>
 
 // Profile
-export type Profile = Tables<'profile'>
-export type InsertProfile = TablesInsert<'profile'>
-export type UpdateProfile = TablesUpdate<'profile'>
+export type Profile = Tables<'all_profile'>
+export type InsertProfile = TablesInsert<'all_profile'>
+export type UpdateProfile = TablesUpdate<'all_profile'>
 
 // Tweet Media
 export type TweetMedia = Tables<'tweet_media'>

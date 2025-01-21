@@ -1,6 +1,5 @@
 CREATE TABLE IF NOT EXISTS public.all_profile (
-    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    account_id TEXT NOT NULL, 
+    account_id TEXT PRIMARY KEY,  
     bio TEXT,
     website TEXT,
     location TEXT,
@@ -12,7 +11,5 @@ CREATE TABLE IF NOT EXISTS public.all_profile (
     FOREIGN KEY (account_id) REFERENCES public.all_account (account_id)
 );
 
-
-CREATE INDEX "idx_profile_account_id" ON "public"."profile" USING "btree" ("account_id");
 
 CREATE INDEX "idx_profile_archive_upload_id" ON "public"."profile" USING "btree" ("archive_upload_id");

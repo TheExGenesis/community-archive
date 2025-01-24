@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.tweets (
     archive_upload_id BIGINT NOT NULL,
 
     FOREIGN KEY (archive_upload_id) REFERENCES public.archive_upload (id),
-    FOREIGN KEY (account_id) REFERENCES public.account (account_id)
+    FOREIGN KEY (account_id) REFERENCES public.all_account (account_id)
 );
 
 ALTER TABLE public.tweets DROP COLUMN IF EXISTS fts;

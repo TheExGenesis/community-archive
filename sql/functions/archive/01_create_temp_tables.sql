@@ -13,8 +13,8 @@ END IF;
 PERFORM public.drop_temp_tables(p_suffix);
 -- Create new tables
 EXECUTE format('CREATE TABLE temp.archive_upload_%s (LIKE public.archive_upload INCLUDING ALL)', p_suffix);
-EXECUTE format('CREATE TABLE temp.account_%s (LIKE public.account INCLUDING ALL)', p_suffix);
-EXECUTE format('CREATE TABLE temp.profile_%s (LIKE public.profile INCLUDING ALL)', p_suffix);
+EXECUTE format('CREATE TABLE temp.account_%s (LIKE public.all_account INCLUDING ALL)', p_suffix);
+EXECUTE format('CREATE TABLE temp.profile_%s (LIKE public.all_profile INCLUDING ALL)', p_suffix);
 EXECUTE format('CREATE TABLE temp.tweets_%s (LIKE public.tweets INCLUDING ALL)', p_suffix);
 EXECUTE format('CREATE TABLE temp.mentioned_users_%s (LIKE public.mentioned_users INCLUDING ALL)', p_suffix);
 EXECUTE format('CREATE TABLE temp.user_mentions_%s (LIKE public.user_mentions INCLUDING ALL)', p_suffix);

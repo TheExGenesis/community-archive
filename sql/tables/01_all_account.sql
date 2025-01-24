@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS public.account (
+CREATE TABLE IF NOT EXISTS public.all_account (
     account_id TEXT PRIMARY KEY,
     created_via TEXT NOT NULL,
     username TEXT NOT NULL,

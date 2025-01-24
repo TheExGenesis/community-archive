@@ -16,7 +16,7 @@ BEGIN
     RAISE NOTICE 'commit_temp_data called with suffix: %', p_suffix;
     -- 1. Insert account data first
     EXECUTE format('
-        INSERT INTO public.account (
+        INSERT INTO public.all_account (
             created_via, username, account_id, created_at, account_display_name,
             num_tweets, num_following, num_followers, num_likes
         )

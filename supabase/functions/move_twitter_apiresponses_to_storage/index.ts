@@ -18,16 +18,6 @@ Deno.serve(async (req) => {
 
     supabaseAdminClient = createClient(supabaseUrl, supabaseKey);
     
-    // Test the connection
-    const { data: testData, error: testError } = await supabaseAdminClient.from("temporary_data").select("count").limit(1);
-    if (testError) {
-      throw new Error(`Database connection test failed: ${testError.message}`);
-    }
-
-    const { data, error } = await supabaseAdminClient.storage.from("twitter_api_files").list();
-    if (error) {
-      throw new Error(`Storage error: ${error.message}`);
-    }
 
     const bucketName = "twitter_api_files";
     const res = await move_twitter_apiresponses_to_storage(supabaseAdminClient, bucketName);

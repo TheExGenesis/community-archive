@@ -1316,8 +1316,7 @@ DECLARE
     start_time TIMESTAMP;
     elapsed_seconds NUMERIC;
 BEGIN
-    -- First execution
-    SELECT status, clock_timestamp() INTO response_status, start_time FROM net.http_post(
+    PERFORM net.http_post(
         url:='https://fabxmporizzqflnftavs.supabase.co/functions/v1/schedule_data_moving'
     );
 END;

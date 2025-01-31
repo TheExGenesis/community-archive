@@ -21,7 +21,7 @@ const __dirname = path.dirname(__filename)
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') })
 
-const isProd = false
+const isProd = true
 
 const supabaseUrl = isProd
   ? process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -139,6 +139,13 @@ async function processArchives(usernames: string[]) {
   }
 }
 
+const EXCLUDED_USERNAMES = [
+  'exgenesis_',
+  'nido_kween',
+  'ceeeeeres',
+  '_ceeeeeeee_',
+]
+
 async function checkAndProcessArchives() {
   const storageObjects = await fetchStoragePaths()
   const accountUsernames = await fetchAccountUsernames()
@@ -150,9 +157,9 @@ async function checkAndProcessArchives() {
     accountUsernames.map((username) => username.toLowerCase()),
   )
 
-  const archivesToProcess = [...archivesInStorage].filter(
-    (archive) => !accountsInDb.has(archive),
-  )
+  const archivesToProcess = [...archivesInStorage]
+    .filter((archive) => !accountsInDb.has(archive))
+    .filter((archive) => !EXCLUDED_USERNAMES.includes(archive))
 
   console.log('Archives in storage but not in public.account:')
   archivesToProcess.forEach((archive) => console.log(archive))

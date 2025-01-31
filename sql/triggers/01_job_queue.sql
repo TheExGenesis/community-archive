@@ -74,8 +74,8 @@ IF v_job.key = 'archive_changes' THEN
     RAISE NOTICE 'Refreshing materialized views concurrently';
     REFRESH MATERIALIZED VIEW CONCURRENTLY public.global_activity_summary;
     REFRESH MATERIALIZED VIEW CONCURRENTLY public.account_activity_summary;
-    REFRESH MATERIALIZED VIEW CONCURRENTLY public.quote_tweets_view;
-    PERFORM public.post_upload_update_conversation_ids();
+    REFRESH MATERIALIZED VIEW CONCURRENTLY public.quote_tweets;
+    PERFORM private.post_upload_update_conversation_ids();
 END IF;
 
 IF v_job.key = 'update_conversation_ids' THEN
@@ -107,3 +107,4 @@ END $$;
 SELECT cron.schedule('* * * * *', $$
 SELECT private.process_jobs();
 $$);
+

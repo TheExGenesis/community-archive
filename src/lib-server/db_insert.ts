@@ -3,6 +3,8 @@ import { Archive } from '@/lib-client/types'
 import { SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
+import { removeProblematicCharacters } from '@/lib-client/removeProblematicChars'
+import { uniqBy } from 'lodash/fp'
 
 // Load environment variables from .env file in the scratchpad directory
 if (process.env.NODE_ENV !== 'production') {
@@ -57,7 +59,9 @@ const patchTweetsWithNoteTweets = (noteTweets: any[], tweets: any[]): any[] => {
         ...tweetObj,
         tweet: {
           ...tweet,
-          full_text: matchingNoteTweet.noteTweet.core.text,
+          full_text: removeProblematicCharacters(
+            matchingNoteTweet.noteTweet.core.text,
+          ),
         },
       }
     }
@@ -82,12 +86,14 @@ const insertTempTweets = async (
     tweet_id: tweet.id_str,
     account_id: tweet.user_id,
     created_at: tweet.created_at,
-    full_text: tweet.full_text,
+    full_text: removeProblematicCharacters(tweet.full_text),
     retweet_count: tweet.retweet_count,
     favorite_count: tweet.favorite_count,
     reply_to_tweet_id: tweet.in_reply_to_status_id_str,
     reply_to_user_id: tweet.in_reply_to_user_id_str,
-    reply_to_username: tweet.in_reply_to_screen_name,
+    reply_to_username: tweet.in_reply_to_screen_name
+      ? removeProblematicCharacters(tweet.in_reply_to_screen_name)
+      : undefined,
     archive_upload_id: -1, // Placeholder value
   }))
 
@@ -115,8 +121,8 @@ const processAndInsertTweetEntities = async (
         tweet.entities.user_mentions.reduce((acc: any, user: any) => {
           acc[user.id_str] = {
             user_id: user.id_str,
-            name: user.name,
-            screen_name: user.screen_name,
+            name: removeProblematicCharacters(user.name),
+            screen_name: removeProblematicCharacters(user.screen_name),
             updated_at: new Date().toISOString(),
           }
           return acc
@@ -255,20 +261,17 @@ const insertTempLikes = async (
 ) => {
   const likedTweets = likes.map((like) => ({
     tweet_id: like.like.tweetId,
-    full_text: like.like.fullText,
+    full_text: removeProblematicCharacters(like.like.fullText || ''),
   }))
 
-  // Ensure all likes have non-null full_text
-  const validLikedTweets = likedTweets.map((like) => ({
-    ...like,
-    full_text: like.full_text || '',
-  }))
+  // Ensure unique tweet_id entries
+  const uniqueLikedTweets = uniqBy((like: any) => like.tweet_id, likedTweets)
 
   await retryOperation(async () => {
     const { data, error } = await supabase
       .schema('temp')
       .from(`liked_tweets_${suffix}`)
-      .upsert(validLikedTweets, {
+      .upsert(uniqueLikedTweets, {
         onConflict: 'tweet_id',
         ignoreDuplicates: false,
       })
@@ -282,11 +285,16 @@ const insertTempLikes = async (
     archive_upload_id: -1, // Placeholder value
   }))
 
+  const uniqueLikeRelations = uniqBy(
+    (like: any) => like.account_id + like.liked_tweet_id,
+    likeRelations,
+  )
+
   await retryOperation(async () => {
     const { data, error } = await supabase
       .schema('temp')
       .from(`likes_${suffix}`)
-      .upsert(likeRelations, {
+      .upsert(uniqueLikeRelations, {
         onConflict: 'account_id,liked_tweet_id',
         ignoreDuplicates: false,
       })
@@ -515,21 +523,18 @@ export const processTwitterArchive = async (
     })
     try {
       const commitStartTime = Date.now()
-      await retryOperation(async () => {
-        const { data, error } = await supabase
-          .schema('public')
-          .rpc('commit_temp_data', {
-            p_suffix: suffix,
-          })
-        if (error) throw error
-        return data
-      }, 'Error committing data')
+      const { data, error } = await supabase
+        .schema('public')
+        .rpc('commit_temp_data', {
+          p_suffix: suffix,
+        })
+      if (error) throw error
       const commitEndTime = Date.now()
       console.log(
         `Commit processing time: ${commitEndTime - commitStartTime}ms`,
       )
     } catch (error: any) {
-      console.error('Error processing Twitter archive:', error)
+      // console.error('Error processing Twitter archive:', error)
     }
 
     console.log('Twitter archive processing completed successfully.')
@@ -564,21 +569,6 @@ export const processTwitterArchive = async (
 
     // Throw a new error with more context
     throw new Error(`Error processing Twitter archive: ${error.message}`)
-  }
-  try {
-    console.log('Attempting to drop temporary tables...')
-    await retryOperation(async () => {
-      const { data, error } = await supabase
-        .schema('public')
-        .rpc('drop_temp_tables', {
-          p_suffix: suffix,
-        })
-      if (error) throw error
-      return data
-    }, 'Error dropping temporary tables')
-    console.log('Temporary tables dropped successfully.')
-  } catch (dropError: any) {
-    console.error('Error dropping temporary tables:', dropError)
   }
 }
 

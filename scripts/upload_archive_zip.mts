@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 import unzipper from 'unzipper'
 import { Archive } from '../src/lib-client/types'
 import { v4 as uuidv4 } from 'uuid'
+import { removeProblematicCharacters } from '../src/lib-client/removeProblematicChars'
 const { validateFileContents } = await import(
   '../src/lib-client/upload-archive/validateContent'
 )
@@ -74,7 +75,9 @@ const extractZip = async (filePath: string): Promise<Archive> => {
       const key = file.path.includes('data/tweets-part')
         ? 'tweets'
         : file.path.match(/.*data\/(.+?)\.js/)?.[1] || ''
-      const text = (await file.buffer()).toString('utf8')
+      const text = removeProblematicCharacters(
+        (await file.buffer()).toString('utf8'),
+      )
       console.log({ text })
       fileContents[key] = [...(fileContents[key] || []), text]
     }

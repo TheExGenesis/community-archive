@@ -59,7 +59,7 @@ export default async function User({ params }: any) {
   const userData = await getUserData(supabase, account_id)
 
   const { data: summaryData, error: summaryError } = await supabase
-    .from('account_activity_summary' as any)
+    .from('account_activity_summary')
     .select('mentioned_accounts')
     .or(`account_id.eq.${account_id},username.ilike.${account_id}`)
     .single()

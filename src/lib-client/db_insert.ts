@@ -3,6 +3,7 @@ import { Archive } from '@/lib-client/types'
 import { SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
+import { removeProblematicCharacters } from '@/lib-client/removeProblematicChars'
 
 // Load environment variables from .env file in the scratchpad directory
 if (process.env.NODE_ENV !== 'production') {
@@ -57,7 +58,9 @@ const patchTweetsWithNoteTweets = (noteTweets: any[], tweets: any[]): any[] => {
         ...tweetObj,
         tweet: {
           ...tweet,
-          full_text: matchingNoteTweet.noteTweet.core.text,
+          full_text: removeProblematicCharacters(
+            matchingNoteTweet.noteTweet.core.text,
+          ),
         },
       }
     }
@@ -82,12 +85,14 @@ const insertTempTweets = async (
     tweet_id: tweet.id_str,
     account_id: tweet.user_id,
     created_at: tweet.created_at,
-    full_text: tweet.full_text,
+    full_text: removeProblematicCharacters(tweet.full_text),
     retweet_count: tweet.retweet_count,
     favorite_count: tweet.favorite_count,
     reply_to_tweet_id: tweet.in_reply_to_status_id_str,
     reply_to_user_id: tweet.in_reply_to_user_id_str,
-    reply_to_username: tweet.in_reply_to_screen_name,
+    reply_to_username: tweet.in_reply_to_screen_name
+      ? removeProblematicCharacters(tweet.in_reply_to_screen_name)
+      : undefined,
     archive_upload_id: -1, // Placeholder value
   }))
 
@@ -115,8 +120,8 @@ const processAndInsertTweetEntities = async (
         tweet.entities.user_mentions.reduce((acc: any, user: any) => {
           acc[user.id_str] = {
             user_id: user.id_str,
-            name: user.name,
-            screen_name: user.screen_name,
+            name: removeProblematicCharacters(user.name),
+            screen_name: removeProblematicCharacters(user.screen_name),
             updated_at: new Date().toISOString(),
           }
           return acc
@@ -255,20 +260,17 @@ const insertTempLikes = async (
 ) => {
   const likedTweets = likes.map((like) => ({
     tweet_id: like.like.tweetId,
-    full_text: like.like.fullText,
+    full_text: removeProblematicCharacters(like.like.fullText || ''),
   }))
 
-  // Ensure all likes have non-null full_text
-  const validLikedTweets = likedTweets.map((like) => ({
-    ...like,
-    full_text: like.full_text || '',
-  }))
+  // Ensure unique tweet_id entries
+  const uniqueLikedTweets = uniqBy((like: any) => like.tweet_id, likedTweets)
 
   await retryOperation(async () => {
     const { data, error } = await supabase
       .schema('temp')
       .from(`liked_tweets_${suffix}`)
-      .upsert(validLikedTweets, {
+      .upsert(uniqueLikedTweets, {
         onConflict: 'tweet_id',
         ignoreDuplicates: false,
       })
@@ -282,17 +284,32 @@ const insertTempLikes = async (
     archive_upload_id: -1, // Placeholder value
   }))
 
+  const uniqueLikeRelations = uniqBy(
+    (like: any) => like.account_id + like.liked_tweet_id,
+    likeRelations,
+  )
+
   await retryOperation(async () => {
     const { data, error } = await supabase
       .schema('temp')
       .from(`likes_${suffix}`)
-      .upsert(likeRelations, {
+      .upsert(uniqueLikeRelations, {
         onConflict: 'account_id,liked_tweet_id',
         ignoreDuplicates: false,
       })
     if (error) throw error
     return data
   }, 'Error inserting likes')
+}
+
+const uniqBy = <T>(fn: (item: T) => string | number, items: T[]): T[] => {
+  const seen = new Set<string | number>()
+  return items.filter((item) => {
+    const key = fn(item)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 export const processTwitterArchive = async (
@@ -322,7 +339,7 @@ export const processTwitterArchive = async (
   }, 'Error dropping temporary tables')
 
   try {
-    // Calculate latest tweet date
+    // Calculate latest tweet date first since we need it for the archive_upload
     const latestTweetDate = archiveData.tweets.reduce(
       (latest: string, tweet: any) => {
         const tweetDate = new Date(tweet.tweet.created_at)
@@ -335,6 +352,56 @@ export const processTwitterArchive = async (
       '',
     )
 
+    // Compute counts
+    const num_tweets = archiveData.tweets.length
+    const num_following = archiveData.following
+      ? archiveData.following.length
+      : 0
+    const num_followers = archiveData.follower ? archiveData.follower.length : 0
+    const num_likes = archiveData.like ? archiveData.like.length : 0
+
+    // Insert into all_account first
+    console.log('Inserting account data...')
+    await retryOperation(async () => {
+      const { error } = await supabase.from('all_account').upsert({
+        account_id: accountId,
+        created_via: 'twitter_archive',
+        username: archiveData.account[0].account.username,
+        created_at: archiveData.account[0].account.createdAt,
+        account_display_name: archiveData.account[0].account.accountDisplayName,
+        num_tweets,
+        num_following,
+        num_followers,
+        num_likes,
+      })
+      if (error) throw error
+    }, 'Error inserting all_account data')
+
+    // Create initial archive_upload record
+    console.log('Creating archive upload record...')
+    const uploadOptions = archiveData['upload-options'] || {
+      keepPrivate: false,
+      uploadLikes: true,
+      startDate: null,
+      endDate: null,
+    }
+    const { data: archiveUploadId, error: uploadError } = await supabase
+      .from('archive_upload')
+      .insert({
+        account_id: accountId,
+        archive_at: latestTweetDate,
+        keep_private: uploadOptions.keepPrivate,
+        upload_likes: uploadOptions.uploadLikes,
+        start_date: uploadOptions.startDate,
+        end_date: uploadOptions.endDate,
+        upload_phase: 'uploading',
+      })
+      .select('id')
+      .single()
+
+    if (uploadError) throw uploadError
+
+    // Calculate latest tweet date
     console.log(`Latest tweet date: ${latestTweetDate}`)
 
     // Create temporary tables
@@ -358,62 +425,6 @@ export const processTwitterArchive = async (
       if (error) throw error
       return data
     }, 'Failed to verify temporary tables')
-
-    // Compute counts
-    const num_tweets = archiveData.tweets.length
-    const num_following = archiveData.following
-      ? archiveData.following.length
-      : 0
-    const num_followers = archiveData.follower ? archiveData.follower.length : 0
-    const num_likes = archiveData.like ? archiveData.like.length : 0
-
-    console.log('Inserting account data...', {
-      ...archiveData.account[0].account,
-      num_tweets,
-      num_following,
-      num_followers,
-      num_likes,
-    })
-
-    await retryOperation(async () => {
-      const { data, error } = await supabase
-        .schema('public')
-        .rpc('insert_temp_account', {
-          p_account: {
-            ...archiveData.account[0].account,
-            num_tweets,
-            num_following,
-            num_followers,
-            num_likes,
-          },
-          p_suffix: suffix,
-        })
-      if (error) throw error
-      return data
-    }, 'Error inserting account data')
-
-    console.log('Inserting archive upload data...')
-    const { data: archiveUploadId } = await retryOperation(async () => {
-      const uploadOptions = archiveData['upload-options'] || {
-        keepPrivate: false,
-        uploadLikes: true,
-        startDate: null,
-        endDate: null,
-      }
-      const { data, error } = await supabase
-        .schema('public')
-        .rpc('insert_temp_archive_upload', {
-          p_account_id: accountId,
-          p_archive_at: latestTweetDate,
-          p_keep_private: uploadOptions.keepPrivate,
-          p_upload_likes: uploadOptions.uploadLikes,
-          p_start_date: uploadOptions.startDate,
-          p_end_date: uploadOptions.endDate,
-          p_suffix: suffix,
-        })
-      if (error) throw error
-      return data
-    }, 'Error inserting archive upload data')
 
     console.log('Inserting profile data...')
     await retryOperation(async () => {
@@ -513,24 +524,31 @@ export const processTwitterArchive = async (
       phase: 'Finishing up...',
       percent: null,
     })
-    try {
-      const commitStartTime = Date.now()
-      await retryOperation(async () => {
-        const { data, error } = await supabase
-          .schema('public')
-          .rpc('commit_temp_data', {
-            p_suffix: suffix,
-          })
-        if (error) throw error
-        return data
-      }, 'Error committing data')
-      const commitEndTime = Date.now()
-      console.log(
-        `Commit processing time: ${commitEndTime - commitStartTime}ms`,
-      )
-    } catch (error: any) {
-      console.error('Error processing Twitter archive:', error)
-    }
+
+    // Update upload_phase to ready_for_commit
+    await retryOperation(async () => {
+      const { error } = await supabase
+        .from('archive_upload')
+        .update({ upload_phase: 'ready_for_commit' })
+        .eq('id', archiveUploadId.id)
+      if (error) throw error
+    }, 'Error updating archive upload phase')
+
+    // try {
+    //   const commitStartTime = Date.now()
+    //   const { data, error } = await supabase
+    //     .schema('public')
+    //     .rpc('commit_temp_data', {
+    //       p_suffix: suffix,
+    //     })
+    //   if (error) throw error
+    //   const commitEndTime = Date.now()
+    //   console.log(
+    //     `Commit processing time: ${commitEndTime - commitStartTime}ms`,
+    //   )
+    // } catch (error: any) {
+    //   // console.error('Error processing Twitter archive:', error)
+    // }
 
     console.log('Twitter archive processing completed successfully.')
     progressCallback({
@@ -565,21 +583,6 @@ export const processTwitterArchive = async (
     // Throw a new error with more context
     throw new Error(`Error processing Twitter archive: ${error.message}`)
   }
-  try {
-    console.log('Attempting to drop temporary tables...')
-    await retryOperation(async () => {
-      const { data, error } = await supabase
-        .schema('public')
-        .rpc('drop_temp_tables', {
-          p_suffix: suffix,
-        })
-      if (error) throw error
-      return data
-    }, 'Error dropping temporary tables')
-    console.log('Temporary tables dropped successfully.')
-  } catch (dropError: any) {
-    console.error('Error dropping temporary tables:', dropError)
-  }
 }
 
 export const deleteArchive = async (
@@ -589,7 +592,7 @@ export const deleteArchive = async (
   try {
     const { error } = await supabase
       .schema('public')
-      .rpc('delete_all_archives', {
+      .rpc('delete_user_archive', {
         p_account_id: accountId,
       })
 

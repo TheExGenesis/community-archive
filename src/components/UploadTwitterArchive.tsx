@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { deleteArchive } from '../lib-server/db_insert'
+import { deleteArchive } from '../lib-client/db_insert'
 import { createBrowserClient } from '@/utils/supabase'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { FileUploadDialog } from './file-upload-dialog'

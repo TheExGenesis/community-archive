@@ -1,3 +1,77 @@
+CREATE OR REPLACE FUNCTION public.create_temp_tables(p_suffix TEXT)
+RETURNS VOID AS $$
+DECLARE
+    v_provider_id TEXT;
+BEGIN
+    RAISE NOTICE 'create_temp_tables called with suffix: %', p_suffix;
+
+    -- Get provider_id from JWT
+    SELECT ((auth.jwt()->'app_metadata'->>'provider_id')::text) INTO v_provider_id;
+    
+    -- Basic auth check
+    IF auth.uid() IS NULL AND current_user != 'postgres' THEN
+        RAISE EXCEPTION 'Not authenticated';
+    END IF;
+
+    -- Verify the JWT provider_id matches the suffix
+    IF v_provider_id IS NULL OR v_provider_id != p_suffix THEN
+        RAISE EXCEPTION 'Unauthorized: provider_id % does not match account_id %', v_provider_id, p_suffix;
+    END IF;
+
+    -- Drop the temporary tables if they exist
+    PERFORM public.drop_temp_tables(p_suffix);
+    -- Create new tables
+    EXECUTE format('CREATE TABLE temp.archive_upload_%s (LIKE public.archive_upload INCLUDING ALL)', p_suffix);
+    EXECUTE format('CREATE TABLE temp.account_%s (LIKE public.all_account INCLUDING ALL)', p_suffix);
+    EXECUTE format('CREATE TABLE temp.profile_%s (LIKE public.all_profile INCLUDING ALL)', p_suffix);
+    EXECUTE format('CREATE TABLE temp.tweets_%s (LIKE public.tweets INCLUDING ALL)', p_suffix);
+    EXECUTE format('CREATE TABLE temp.mentioned_users_%s (LIKE public.mentioned_users INCLUDING ALL)', p_suffix);
+    EXECUTE format('CREATE TABLE temp.user_mentions_%s (LIKE public.user_mentions INCLUDING ALL)', p_suffix);
+    EXECUTE format('CREATE TABLE temp.tweet_urls_%s (LIKE public.tweet_urls INCLUDING ALL)', p_suffix);
+    EXECUTE format('CREATE TABLE temp.tweet_media_%s (LIKE public.tweet_media INCLUDING ALL)', p_suffix);
+    EXECUTE format('CREATE TABLE temp.followers_%s (LIKE public.followers INCLUDING ALL)', p_suffix);
+    EXECUTE format('CREATE TABLE temp.following_%s (LIKE public.following INCLUDING ALL)', p_suffix);
+    EXECUTE format('CREATE TABLE temp.liked_tweets_%s (LIKE public.liked_tweets INCLUDING ALL)', p_suffix);
+    EXECUTE format('CREATE TABLE temp.likes_%s (LIKE public.likes INCLUDING ALL)', p_suffix);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.drop_temp_tables(p_suffix TEXT)
+RETURNS VOID AS $$
+DECLARE
+    v_provider_id TEXT;
+BEGIN
+    -- Get provider_id from JWT
+    SELECT ((auth.jwt()->'app_metadata'->>'provider_id')::text) INTO v_provider_id;
+    
+    -- Basic auth check
+    IF auth.uid() IS NULL AND current_user NOT IN ('postgres', 'service_role') THEN
+        RAISE EXCEPTION 'Not authenticated';
+    END IF;
+
+    -- Verify the JWT provider_id matches the suffix
+    IF current_user NOT IN ('postgres', 'service_role') AND (v_provider_id IS NULL OR v_provider_id != p_suffix) THEN
+        RAISE EXCEPTION 'Unauthorized: provider_id % does not match account_id %', v_provider_id, p_suffix;
+    END IF;
+
+    RAISE NOTICE 'drop_temp_tables called with suffix: %', p_suffix;
+
+    EXECUTE format('DROP TABLE IF EXISTS temp.account_%s', p_suffix);
+    EXECUTE format('DROP TABLE IF EXISTS temp.archive_upload_%s', p_suffix);
+    EXECUTE format('DROP TABLE IF EXISTS temp.profile_%s', p_suffix);
+    EXECUTE format('DROP TABLE IF EXISTS temp.tweets_%s', p_suffix);
+    EXECUTE format('DROP TABLE IF EXISTS temp.mentioned_users_%s', p_suffix);
+    EXECUTE format('DROP TABLE IF EXISTS temp.user_mentions_%s', p_suffix);
+    EXECUTE format('DROP TABLE IF EXISTS temp.tweet_urls_%s', p_suffix);
+    EXECUTE format('DROP TABLE IF EXISTS temp.tweet_media_%s', p_suffix);
+    EXECUTE format('DROP TABLE IF EXISTS temp.followers_%s', p_suffix);
+    EXECUTE format('DROP TABLE IF EXISTS temp.following_%s', p_suffix);
+    EXECUTE format('DROP TABLE IF EXISTS temp.liked_tweets_%s', p_suffix);
+    EXECUTE format('DROP TABLE IF EXISTS temp.likes_%s', p_suffix);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
 -- Create or replace the commit_temp_data function
 CREATE OR REPLACE FUNCTION public.commit_temp_data(p_suffix TEXT)
 RETURNS VOID AS $$
@@ -216,3 +290,72 @@ SET statement_timeout TO '30min';
 
 
 -- select public.commit_temp_data('322603863');
+
+CREATE OR REPLACE FUNCTION public.delete_user_archive(p_account_id TEXT)
+RETURNS VOID AS $$
+DECLARE
+    v_schema_name TEXT := 'public';
+    v_archive_upload_ids BIGINT[];
+    v_provider_id TEXT;
+BEGIN
+    -- Get provider_id from JWT
+    SELECT ((auth.jwt()->'app_metadata'->>'provider_id')::text) INTO v_provider_id;
+    
+    -- Verify the JWT provider_id matches the account_id being deleted
+    IF v_provider_id IS NULL OR v_provider_id != p_account_id THEN
+        RAISE EXCEPTION 'Unauthorized: provider_id % does not match account_id %', v_provider_id, v_account_id;
+    END IF;
+
+    SELECT ARRAY_AGG(id) INTO v_archive_upload_ids
+    FROM public.archive_upload
+    WHERE account_id = p_account_id;
+
+    BEGIN
+        -- Delete tweets and related data in correct order to handle foreign key constraints
+        EXECUTE format('
+            -- First delete from conversations since it references tweets
+            WITH tweets_to_delete AS (
+                SELECT tweet_id FROM %I.tweets WHERE archive_upload_id = ANY($1) OR account_id = $2
+            )
+            DELETE FROM %I.conversations WHERE tweet_id IN (SELECT tweet_id FROM tweets_to_delete);
+
+            -- Then delete other tweet-related data
+            WITH tweets_to_delete AS (
+                SELECT tweet_id FROM %I.tweets WHERE archive_upload_id = ANY($1) OR account_id = $2
+            )
+            DELETE FROM %I.tweet_media WHERE tweet_id IN (SELECT tweet_id FROM tweets_to_delete);
+
+            WITH tweets_to_delete AS (
+                SELECT tweet_id FROM %I.tweets WHERE archive_upload_id = ANY($1) OR account_id = $2
+            )
+            DELETE FROM %I.user_mentions WHERE tweet_id IN (SELECT tweet_id FROM tweets_to_delete);
+
+            WITH tweets_to_delete AS (
+                SELECT tweet_id FROM %I.tweets WHERE archive_upload_id = ANY($1) OR account_id = $2
+            )
+            DELETE FROM %I.tweet_urls WHERE tweet_id IN (SELECT tweet_id FROM tweets_to_delete);
+
+            -- Now we can safely delete the tweets
+            DELETE FROM %I.tweets WHERE archive_upload_id = ANY($1);
+
+            -- Delete other related data
+            DELETE FROM %I.likes WHERE archive_upload_id = ANY($1);
+            DELETE FROM %I.followers WHERE archive_upload_id = ANY($1);
+            DELETE FROM %I.following WHERE archive_upload_id = ANY($1);
+            DELETE FROM %I.all_profile WHERE archive_upload_id = ANY($1);
+            DELETE FROM %I.tweet_media WHERE archive_upload_id = ANY($1);
+            DELETE FROM %I.archive_upload WHERE id = ANY($1);
+            DELETE FROM %I.all_account WHERE account_id = $2;
+        ', 
+        v_schema_name, v_schema_name, v_schema_name, v_schema_name, 
+        v_schema_name, v_schema_name, v_schema_name, v_schema_name, 
+        v_schema_name, v_schema_name, v_schema_name, v_schema_name,
+        v_schema_name, v_schema_name, v_schema_name, v_schema_name)
+        USING v_archive_upload_ids, p_account_id;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Error deleting archives for account %: %', p_account_id, SQLERRM;
+        RAISE;
+    END;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET statement_timeout TO '20min';

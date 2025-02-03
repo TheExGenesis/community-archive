@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { Archive } from '../src/lib-client/types'
-const { processTwitterArchive } = await import('../src/lib-server/db_insert')
+const { processTwitterArchive } = await import('../src/lib-client/db_insert')
 const { pipe } = await import('../src/lib-server/fp')
 const { uploadArchiveToStorage } = await import(
   '../src/lib-client/upload-archive/uploadArchiveToStorage'

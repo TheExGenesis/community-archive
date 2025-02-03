@@ -12,8 +12,7 @@ CREATE OR REPLACE FUNCTION tes.search_liked_tweets(
   min_retweets INTEGER DEFAULT 0,
   max_likes INTEGER DEFAULT 100000000,
   max_retweets INTEGER DEFAULT 100000000,
-  limit_ INTEGER DEFAULT 50,
-  auth_account_id TEXT DEFAULT NULL 
+  limit_ INTEGER DEFAULT 50
 )
 RETURNS TABLE (
   tweet_id TEXT,
@@ -31,7 +30,11 @@ RETURNS TABLE (
 DECLARE
   from_account_id TEXT;
   to_account_id TEXT;
+  v_account_id TEXT;
 BEGIN
+  -- Get the current user's account_id
+  v_account_id := tes.get_current_account_id();
+
   -- Get account_id for from_user
   IF from_user IS NOT NULL THEN
     SELECT a.account_id INTO from_account_id
@@ -72,11 +75,9 @@ BEGIN
       SELECT lt.tweet_id, lt.full_text, lt.fts
       FROM liked_tweets lt
       left JOIN likes l ON lt.tweet_id = l.liked_tweet_id 
-      WHERE l.account_id = auth_account_id 
-
+      WHERE l.account_id = v_account_id
     ) lt
     LEFT JOIN tweets t ON lt.tweet_id = t.tweet_id
-
   ),
   matching_tweets AS (
     SELECT ct.tweet_id,ct.full_text
@@ -117,4 +118,4 @@ BEGIN
   ) p ON true
   ORDER BY t.created_at DESC;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

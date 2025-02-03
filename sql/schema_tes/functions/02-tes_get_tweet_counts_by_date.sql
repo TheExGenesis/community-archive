@@ -1,6 +1,6 @@
-DROP FUNCTION IF EXISTS tes_get_tweet_counts_by_date;
+DROP FUNCTION IF EXISTS tes.get_tweet_counts_by_date;
 
-CREATE OR REPLACE FUNCTION tes_get_tweet_counts_by_date(p_account_id TEXT)
+CREATE OR REPLACE FUNCTION tes.get_tweet_counts_by_date(p_account_id TEXT)
 RETURNS TABLE (tweet_date DATE, tweet_count BIGINT) AS $$
 BEGIN
     RETURN QUERY

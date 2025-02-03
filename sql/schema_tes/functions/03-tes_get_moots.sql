@@ -1,6 +1,6 @@
-DROP FUNCTION IF EXISTS tes_get_moots;
+DROP FUNCTION IF EXISTS tes.get_moots;
 
-CREATE OR REPLACE FUNCTION tes_get_moots(user_id TEXT)
+CREATE OR REPLACE FUNCTION tes.get_moots(user_id TEXT)
 RETURNS TABLE (
     account_id TEXT,
     username TEXT
@@ -15,6 +15,6 @@ BEGIN
         ON f1.account_id = f2.account_id 
         AND f1.follower_account_id = f2.following_account_id
 	left join mentioned_users mu on mu.user_id = f1.follower_account_id
-    where f1.account_id = $1;
+    where f1.account_id = get_moots.user_id;
 END;
 $$ LANGUAGE plpgsql;

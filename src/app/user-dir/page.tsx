@@ -22,7 +22,7 @@ export default function UserDirectoryPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [sortKey, setSortKey] = useState<SortKey>('archive_at')
+  const [sortKey, setSortKey] = useState<SortKey>('archive_uploaded_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {

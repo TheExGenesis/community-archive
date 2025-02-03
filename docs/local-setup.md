@@ -126,6 +126,10 @@ password: dev
 
 Use `scripts/download_storage.ts` to download the storage files from the database to a local directory.
 
+### Observability
+
+- `supabase inspect db` has good tools
+
 ### Requirements
 
 - Node.js >= 18.17.0

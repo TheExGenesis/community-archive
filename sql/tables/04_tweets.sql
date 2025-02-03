@@ -29,3 +29,4 @@ CREATE INDEX "idx_tweets_created_at" ON "public"."tweets" USING "btree" ("create
 CREATE INDEX IF NOT EXISTS idx_tweets_reply_to_user_id ON public.tweets USING btree (reply_to_user_id) TABLESPACE pg_default;
 
 CREATE INDEX idx_favorite_count ON tweets (favorite_count);
+CREATE INDEX idx_tweets_updated_at ON tweets (updated_at);

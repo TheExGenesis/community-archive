@@ -10,7 +10,7 @@ import { removeProblematicCharacters } from '../src/lib-client/removeProblematic
 const { validateFileContents } = await import(
   '../src/lib-client/upload-archive/validateContent'
 )
-const { processTwitterArchive } = await import('../src/lib-server/db_insert')
+const { processTwitterArchive } = await import('../src/lib-client/db_insert')
 const { uploadArchiveToStorage } = await import(
   '../src/lib-client/upload-archive/uploadArchiveToStorage'
 )

@@ -4,7 +4,6 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
 import { removeProblematicCharacters } from '@/lib-client/removeProblematicChars'
-import { uniqBy } from 'lodash/fp'
 
 // Load environment variables from .env file in the scratchpad directory
 if (process.env.NODE_ENV !== 'production') {
@@ -301,6 +300,16 @@ const insertTempLikes = async (
     if (error) throw error
     return data
   }, 'Error inserting likes')
+}
+
+const uniqBy = <T>(fn: (item: T) => string | number, items: T[]): T[] => {
+  const seen = new Set<string | number>()
+  return items.filter((item) => {
+    const key = fn(item)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 export const processTwitterArchive = async (

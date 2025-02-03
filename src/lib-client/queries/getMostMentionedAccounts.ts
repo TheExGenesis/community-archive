@@ -64,21 +64,24 @@ export async function getArchiveMostMentionedAccounts(): Promise<
 
   const { data: rawUsers, error } = await supabase
     .schema('public')
-    .from('global_activity_summary' as any)
+    .from('global_activity_summary')
     .select('top_mentioned_users')
     .single()
 
-  if (error) {
+  if (error || !rawUsers?.top_mentioned_users) {
     console.error('Error fetching most mentioned accounts:', error)
     return []
   }
 
-  const users = rawUsers.top_mentioned_users.reduce((acc: any, user: any) => {
-    if (!acc.some((u: any) => u.user_id === user.user_id)) {
-      acc.push(user)
-    }
-    return acc
-  }, [])
+  const users = (rawUsers.top_mentioned_users as any[]).reduce(
+    (acc: any, user: any) => {
+      if (!acc.some((u: any) => u.user_id === user.user_id)) {
+        acc.push(user)
+      }
+      return acc
+    },
+    [],
+  )
 
   devLog('users', users)
   const userIds = users.map((user: any) => user.user_id)

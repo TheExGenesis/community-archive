@@ -9,56 +9,77 @@ DECLARE
     v_upload_likes BOOLEAN;
     v_start_date DATE;
     v_end_date DATE;
-    v_phase_start TIMESTAMP;
-    v_total_start TIMESTAMP;
-    v_provider_id TEXT;
 BEGIN
-    v_total_start := clock_timestamp();
-    
-    -- Get provider_id from JWT
-    SELECT ((auth.jwt()->'app_metadata'->>'provider_id')::text) INTO v_provider_id;
-    
-    -- Use p_suffix as account_id
-    v_account_id := p_suffix;
-    
-    -- Verify the JWT provider_id matches the account_id
-    IF v_provider_id IS NULL OR v_provider_id != v_account_id THEN
-        RAISE EXCEPTION 'Unauthorized: provider_id % does not match account_id %', v_provider_id, v_account_id;
-    END IF;
-
     IF auth.uid() IS NULL AND current_user != 'postgres' THEN
         RAISE EXCEPTION 'Not authenticated';
     END IF;
     RAISE NOTICE 'commit_temp_data called with suffix: %', p_suffix;
     
-    v_phase_start := clock_timestamp();
-    RAISE NOTICE 'Phase 1: Getting account and archive data';
-    -- Remove the account_id query since we already have it
-    RAISE NOTICE 'Phase 1 completed in %', clock_timestamp() - v_phase_start;
+    RAISE NOTICE 'Phase 1: Inserting account data';
+    -- 1. Insert account data first
+    EXECUTE format('
+        INSERT INTO public.all_account (
+            created_via, username, account_id, created_at, account_display_name,
+            num_tweets, num_following, num_followers, num_likes
+        )
+        SELECT 
+            created_via, username, account_id, created_at, account_display_name,
+            num_tweets, num_following, num_followers, num_likes
+        FROM temp.account_%s
+        ON CONFLICT (account_id) DO UPDATE SET
+            username = EXCLUDED.username,
+            account_display_name = EXCLUDED.account_display_name,
+            created_via = EXCLUDED.created_via,
+            created_at = EXCLUDED.created_at,
+            num_tweets = EXCLUDED.num_tweets,
+            num_following = EXCLUDED.num_following,
+            num_followers = EXCLUDED.num_followers,
+            num_likes = EXCLUDED.num_likes
+        RETURNING account_id
+    ', p_suffix) INTO v_account_id;
 
-    v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 2: Getting archive upload data';
-    -- Get the archive upload that's ready for commit
-    SELECT id, archive_at, keep_private, upload_likes, start_date, end_date
-    INTO v_archive_upload_id, v_archive_at, v_keep_private, v_upload_likes, v_start_date, v_end_date
-    FROM public.archive_upload
-    WHERE account_id = v_account_id
-    AND upload_phase = 'ready_for_commit'
-    ORDER BY created_at DESC
-    LIMIT 1;
+    -- 2. Get the latest archive upload data from temp.archive_upload
+    EXECUTE format('
+        SELECT archive_at, keep_private, upload_likes, start_date, end_date
+        FROM temp.archive_upload_%s
+        ORDER BY archive_at DESC
+        LIMIT 1
+    ', p_suffix) INTO v_archive_at, v_keep_private, v_upload_likes, v_start_date, v_end_date;
 
-    IF v_archive_upload_id IS NULL THEN
-        RAISE EXCEPTION 'No archive_upload found in ready_for_commit state for account %', v_account_id ;
-    END IF;
+    RAISE NOTICE 'Phase 3: Inserting archive upload data';
+    -- 3. Insert or update archive_upload and get the ID
+    INSERT INTO public.archive_upload (
+        account_id, 
+        archive_at, 
+        created_at, 
+        keep_private, 
+        upload_likes, 
+        start_date, 
+        end_date,
+        upload_phase
+    )
+    VALUES (
+        v_account_id, 
+        v_archive_at, 
+        CURRENT_TIMESTAMP, 
+        v_keep_private, 
+        v_upload_likes, 
+        v_start_date, 
+        v_end_date,
+        'uploading'
+    )
+    ON CONFLICT (account_id, archive_at)
+    DO UPDATE SET
+        account_id = EXCLUDED.account_id,
+        created_at = CURRENT_TIMESTAMP,
+        keep_private = EXCLUDED.keep_private,
+        upload_likes = EXCLUDED.upload_likes,
+        start_date = EXCLUDED.start_date,
+        end_date = EXCLUDED.end_date,
+        upload_phase = 'uploading'
+    RETURNING id INTO v_archive_upload_id;
 
-    -- Update the upload phase to committing
-    UPDATE public.archive_upload
-    SET upload_phase = 'committing'
-    WHERE id = v_archive_upload_id;
-
-    RAISE NOTICE 'Phase 2 completed in %', clock_timestamp() - v_phase_start;
-
-    v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 4: Inserting profile data';
     -- Insert profile data
     EXECUTE format('
@@ -73,9 +94,7 @@ BEGIN
             header_media_url = EXCLUDED.header_media_url,
             archive_upload_id = EXCLUDED.archive_upload_id
     ', p_suffix) USING v_archive_upload_id;
-    RAISE NOTICE 'Phase 4 completed in %', clock_timestamp() - v_phase_start;
 
-    v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 5: Inserting tweets data';
     -- Insert tweets data
     EXECUTE format('
@@ -91,9 +110,7 @@ BEGIN
             reply_to_username = EXCLUDED.reply_to_username,
             archive_upload_id = EXCLUDED.archive_upload_id
     ', p_suffix) USING v_archive_upload_id;
-    RAISE NOTICE 'Phase 5 completed in %', clock_timestamp() - v_phase_start;
 
-    v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 6: Inserting tweet media data';
     -- Insert tweet_media data
     EXECUTE format('
@@ -107,9 +124,7 @@ BEGIN
             height = EXCLUDED.height,
             archive_upload_id = EXCLUDED.archive_upload_id
     ', p_suffix) USING v_archive_upload_id;
-    RAISE NOTICE 'Phase 6 completed in %', clock_timestamp() - v_phase_start;
 
-    v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 7: Inserting mentioned users data';
     -- Insert mentioned_users data
     EXECUTE format('
@@ -121,9 +136,7 @@ BEGIN
             screen_name = EXCLUDED.screen_name,
             updated_at = EXCLUDED.updated_at
     ', p_suffix);
-    RAISE NOTICE 'Phase 7 completed in %', clock_timestamp() - v_phase_start;
 
-    v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 8: Inserting user mentions data';
     -- Insert user_mentions data
     EXECUTE format('
@@ -134,9 +147,7 @@ BEGIN
         JOIN public.tweets t ON um.tweet_id = t.tweet_id
         ON CONFLICT (mentioned_user_id, tweet_id) DO NOTHING
     ', p_suffix);
-    RAISE NOTICE 'Phase 8 completed in %', clock_timestamp() - v_phase_start;
 
-    v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 9: Inserting tweet URLs data';
     -- Insert tweet_urls data
     EXECUTE format('
@@ -146,9 +157,7 @@ BEGIN
         JOIN public.tweets t ON tu.tweet_id = t.tweet_id
         ON CONFLICT (tweet_id, url) DO NOTHING
     ', p_suffix);
-    RAISE NOTICE 'Phase 9 completed in %', clock_timestamp() - v_phase_start;
 
-    v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 10: Inserting followers data';
     -- Insert followers data
     EXECUTE format('
@@ -158,9 +167,7 @@ BEGIN
         ON CONFLICT (account_id, follower_account_id) DO UPDATE SET
             archive_upload_id = EXCLUDED.archive_upload_id
     ', p_suffix) USING v_archive_upload_id;
-    RAISE NOTICE 'Phase 10 completed in %', clock_timestamp() - v_phase_start;
 
-    v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 11: Inserting following data';
     -- Insert following data
     EXECUTE format('
@@ -170,9 +177,7 @@ BEGIN
         ON CONFLICT (account_id, following_account_id) DO UPDATE SET
             archive_upload_id = EXCLUDED.archive_upload_id
     ', p_suffix) USING v_archive_upload_id;
-    RAISE NOTICE 'Phase 11 completed in %', clock_timestamp() - v_phase_start;
 
-    v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 12: Inserting liked tweets data';
     -- Insert liked_tweets data
     EXECUTE format('
@@ -181,9 +186,7 @@ BEGIN
         FROM temp.liked_tweets_%s lt
         ON CONFLICT (tweet_id) DO NOTHING
     ', p_suffix);
-    RAISE NOTICE 'Phase 12 completed in %', clock_timestamp() - v_phase_start;
 
-    v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 13: Inserting likes data';
     -- Insert likes data
     EXECUTE format('
@@ -193,26 +196,24 @@ BEGIN
         ON CONFLICT (account_id, liked_tweet_id) DO UPDATE SET
             archive_upload_id = EXCLUDED.archive_upload_id
     ', p_suffix) USING v_archive_upload_id;
-    RAISE NOTICE 'Phase 13 completed in %', clock_timestamp() - v_phase_start;
 
-    v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 14: Dropping temporary tables';
     -- Drop temporary tables after committing
     PERFORM public.drop_temp_tables(p_suffix);
-    RAISE NOTICE 'Phase 14 completed in %', clock_timestamp() - v_phase_start;
 
-    v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 15: Updating upload phase to completed';
     -- Update upload_phase to 'completed' after successful execution
     UPDATE public.archive_upload
     SET upload_phase = 'completed'
     WHERE id = v_archive_upload_id;
-    RAISE NOTICE 'Phase 15 completed in %', clock_timestamp() - v_phase_start;
 
-    RAISE NOTICE 'Total execution time: %', clock_timestamp() - v_total_start;
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Update upload_phase to 'failed' if an error occurs
+        UPDATE public.archive_upload
+        SET upload_phase = 'failed'
+        WHERE id = v_archive_upload_id;
+        RAISE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET statement_timeout TO '30min';
-
-
--- select public.commit_temp_data('322603863');

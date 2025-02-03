@@ -130,7 +130,6 @@ CREATE OR REPLACE FUNCTION tes.search_liked_tweets(
   since_date DATE DEFAULT NULL,
   until_date DATE DEFAULT NULL,
   min_likes INTEGER DEFAULT 0,
-
   min_retweets INTEGER DEFAULT 0,
   max_likes INTEGER DEFAULT 100000000,
   max_retweets INTEGER DEFAULT 100000000,
@@ -247,7 +246,6 @@ CREATE OR REPLACE FUNCTION tes.search_tweets(
   since_date DATE DEFAULT NULL,
   until_date DATE DEFAULT NULL,
   min_likes INTEGER DEFAULT 0,
-
   min_retweets INTEGER DEFAULT 0,
   max_likes INTEGER DEFAULT 100000000,
   max_retweets INTEGER DEFAULT 100000000,

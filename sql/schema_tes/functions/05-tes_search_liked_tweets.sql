@@ -1,7 +1,8 @@
 
-DROP FUNCTION IF EXISTS tes_search_liked_tweets;
+DROP FUNCTION IF EXISTS tes.search_liked_tweets;
 
-CREATE OR REPLACE FUNCTION tes_search_liked_tweets(
+
+CREATE OR REPLACE FUNCTION tes.search_liked_tweets(
   search_query TEXT,
   from_user TEXT DEFAULT NULL,
   to_user TEXT DEFAULT NULL,
@@ -65,9 +66,10 @@ BEGIN
       t.retweet_count,
       t.favorite_count,
       t.reply_to_user_id,
-      t.reply_to_tweet_id
+      t.reply_to_tweet_id,
+      COALESCE(t.fts, lt.fts) as fts
     FROM (
-      SELECT lt.tweet_id, lt.full_text 
+      SELECT lt.tweet_id, lt.full_text, lt.fts
       FROM liked_tweets lt
       left JOIN likes l ON lt.tweet_id = l.liked_tweet_id 
       WHERE l.account_id = auth_account_id 
@@ -79,7 +81,7 @@ BEGIN
   matching_tweets AS (
     SELECT ct.tweet_id,ct.full_text
     FROM combined_tweets ct
-    WHERE (search_query = '' OR to_tsvector('english', ct.full_text) @@ websearch_to_tsquery('english', search_query))
+    WHERE (search_query = '' OR ct.fts @@ websearch_to_tsquery('english', search_query))
       AND (from_account_id IS NULL OR ct.account_id = from_account_id)
       AND (to_account_id IS NULL OR ct.reply_to_user_id = to_account_id)
       AND (since_date IS NULL OR ct.created_at >= since_date OR ct.created_at IS NULL)

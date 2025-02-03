@@ -1,6 +1,6 @@
-DROP FUNCTION IF EXISTS tes_get_tweets_on_this_day;
+DROP FUNCTION IF EXISTS tes.get_tweets_on_this_day;
 
-CREATE OR REPLACE FUNCTION tes_get_tweets_on_this_day(
+CREATE OR REPLACE FUNCTION tes.get_tweets_on_this_day(
     p_limit INTEGER DEFAULT NULL,
     p_account_id TEXT DEFAULT NULL
 )

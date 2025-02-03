@@ -1,18 +1,13 @@
+-- Drop the old function
+DROP FUNCTION IF EXISTS public.delete_all_archives(TEXT);
+
+-- Create the new function with the new name
 CREATE OR REPLACE FUNCTION public.delete_user_archive(p_account_id TEXT)
 RETURNS VOID AS $$
 DECLARE
     v_schema_name TEXT := 'public';
     v_archive_upload_ids BIGINT[];
-    v_provider_id TEXT;
 BEGIN
-    -- Get provider_id from JWT
-    SELECT ((auth.jwt()->'app_metadata'->>'provider_id')::text) INTO v_provider_id;
-    
-    -- Verify the JWT provider_id matches the account_id being deleted
-    IF v_provider_id IS NULL OR v_provider_id != p_account_id THEN
-        RAISE EXCEPTION 'Unauthorized: provider_id % does not match account_id %', v_provider_id, v_account_id;
-    END IF;
-
     SELECT ARRAY_AGG(id) INTO v_archive_upload_ids
     FROM public.archive_upload
     WHERE account_id = p_account_id;
@@ -49,10 +44,10 @@ BEGIN
             DELETE FROM %I.likes WHERE archive_upload_id = ANY($1);
             DELETE FROM %I.followers WHERE archive_upload_id = ANY($1);
             DELETE FROM %I.following WHERE archive_upload_id = ANY($1);
-            DELETE FROM %I.all_profile WHERE archive_upload_id = ANY($1);
+            DELETE FROM %I.profile WHERE archive_upload_id = ANY($1);
             DELETE FROM %I.tweet_media WHERE archive_upload_id = ANY($1);
             DELETE FROM %I.archive_upload WHERE id = ANY($1);
-            DELETE FROM %I.all_account WHERE account_id = $2;
+            DELETE FROM %I.account WHERE account_id = $2;
         ', 
         v_schema_name, v_schema_name, v_schema_name, v_schema_name, 
         v_schema_name, v_schema_name, v_schema_name, v_schema_name, 
@@ -65,4 +60,4 @@ BEGIN
     END;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
-SET statement_timeout TO '20min';
+SET statement_timeout TO '20min'; 

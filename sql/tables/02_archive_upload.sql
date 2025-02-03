@@ -1,4 +1,4 @@
-CREATE TYPE upload_phase_enum AS ENUM ('uploading', 'completed', 'failed');
+CREATE TYPE upload_phase_enum AS ENUM ('uploading', 'ready_for_commit', 'committing', 'completed', 'failed');
 
 
 CREATE TABLE IF NOT EXISTS public.archive_upload (

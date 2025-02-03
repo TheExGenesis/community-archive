@@ -1,5 +1,5 @@
 import { Archive } from '../types'
-import { processTwitterArchive } from '@/lib-server/db_insert'
+import { processTwitterArchive } from '@/lib-client/db_insert'
 import { uploadArchiveToStorage } from '@/lib-client/upload-archive/uploadArchiveToStorage'
 import { SupabaseClient } from '@supabase/supabase-js'
 

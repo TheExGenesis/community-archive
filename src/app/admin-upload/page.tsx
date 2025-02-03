@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminBrowserClient } from '@/utils/supabase'
 import { refreshSession } from '@/lib-client/refreshSession'
-import { processTwitterArchive } from '@/lib-server/db_insert'
+import { processTwitterArchive } from '@/lib-client/db_insert'
 import UploadTwitterArchive from '@/components/UploadTwitterArchive'
 import { devLog } from '@/lib-client/devLog'
 

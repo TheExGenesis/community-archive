@@ -122,6 +122,7 @@ BEGIN
     WHERE f2.account_id = get_followings.user_id and mu.screen_name is not null; 
 END;
 $$ LANGUAGE plpgsql;
+
 CREATE OR REPLACE FUNCTION tes.search_liked_tweets(
   search_query TEXT,
   from_user TEXT DEFAULT NULL,
@@ -188,7 +189,7 @@ BEGIN
       t.favorite_count,
       t.reply_to_user_id,
       t.reply_to_tweet_id,
-      COALESCE(t.fts, lt.fts) as fts,
+      COALESCE(t.fts, lt.fts) as fts
     FROM (
       SELECT lt.tweet_id, lt.full_text, lt.fts
       FROM liked_tweets lt

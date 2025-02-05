@@ -86,6 +86,5 @@ FROM public.account a
 LEFT JOIN mentioned_accounts ma ON ma.account_id = a.account_id
 LEFT JOIN top_tweets tt ON tt.account_id = a.account_id;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_account_activity_summary_account_id
-ON public.account_activity_summary (account_id);
+
 

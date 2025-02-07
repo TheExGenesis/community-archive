@@ -5,7 +5,9 @@ import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { Archive } from '../src/lib-client/types'
-const { processTwitterArchive } = await import('../src/lib-client/db_insert')
+const { insertArchiveInTempTables } = await import(
+  '../src/lib-client/db_insert'
+)
 const { pipe } = await import('../src/lib-server/fp')
 const { uploadArchiveToStorage } = await import(
   '../src/lib-client/upload-archive/uploadArchiveToStorage'
@@ -68,7 +70,7 @@ async function uploadArchive(filePath: string) {
     await uploadArchiveToStorage(supabase, archive)
     console.log('Archive uploaded to storage successfully')
 
-    await processTwitterArchive(supabase, archive, (progress) => {
+    await insertArchiveInTempTables(supabase, archive, (progress) => {
       console.log(`${progress.phase}: ${progress.percent?.toFixed(2)}%`)
     })
 

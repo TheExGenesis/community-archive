@@ -43,7 +43,7 @@ BEGIN
             DELETE FROM %I.tweet_urls WHERE tweet_id IN (SELECT tweet_id FROM tweets_to_delete);
 
             -- Now we can safely delete the tweets
-            DELETE FROM %I.tweets WHERE archive_upload_id = ANY($1);
+            DELETE FROM %I.tweets WHERE archive_upload_id = ANY($1) OR account_id = $2;
 
             -- Delete other related data
             DELETE FROM %I.likes WHERE archive_upload_id = ANY($1);

@@ -15,22 +15,31 @@ const BATCH_SIZE = 1000 // Adjust as needed
 const MAX_RETRIES = 5
 const RETRY_DELAY = 1000 // 1 second
 
+type RetryOptions = {
+  maxRetries?: number
+  retryDelay?: number
+}
+
 export const retryOperation = async <T>(
   operation: () => Promise<T>,
   errorMessage: string,
+  options: RetryOptions = {},
 ): Promise<T> => {
+  const maxRetries = options.maxRetries ?? MAX_RETRIES
+  const retryDelay = options.retryDelay ?? RETRY_DELAY
+
   let retries = 0
-  while (retries < MAX_RETRIES) {
+  while (retries < maxRetries) {
     try {
       return await operation()
     } catch (error) {
       retries++
-      if (retries >= MAX_RETRIES) {
+      if (retries >= maxRetries) {
         throw new Error(`${errorMessage}: ${(error as Error).message}`)
       }
-      console.log(`Attempt ${retries} failed. Retrying in ${RETRY_DELAY}ms...`)
+      console.log(`Attempt ${retries} failed. Retrying in ${retryDelay}ms...`)
       console.info(`${errorMessage}: ${(error as Error).message}`)
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY))
+      await new Promise((resolve) => setTimeout(resolve, retryDelay))
     }
   }
   throw new Error(`Max retries reached for operation: ${errorMessage}`)
@@ -575,7 +584,7 @@ export const insertArchiveInTempTables = async (
     // Update upload_phase to ready_for_commit with longer timeout
     await setUploadPhase(supabase, archiveUploadId, 'ready_for_commit')
 
-    console.log('Insertion into temp tablescompleted successfully.')
+    console.log('Insertion into temp tables completed successfully.')
     progressCallback({
       phase: 'Insertion into temp tables completed successfully.',
       percent: 100,
@@ -614,6 +623,48 @@ export const insertArchiveInTempTables = async (
 
     // Throw a new error with more context
     throw new Error(`Error processing Twitter archive: ${error.message}`)
+  }
+}
+
+export const commitTempTables = async (
+  supabase: SupabaseClient,
+  account_id: number,
+): Promise<void> => {
+  try {
+    // Start the commit process
+    await retryOperation(async () => {
+      const { error } = await supabase
+        .schema('public')
+        .rpc('commit_temp_data', {
+          p_suffix: account_id,
+        })
+      if (error) throw error
+    }, 'Error starting commit process')
+
+    // Wait a bit before checking status
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    // Check final status
+    const { data, error } = await supabase
+      .from('archive_upload')
+      .select('upload_phase')
+      .eq('account_id', account_id)
+      .single()
+
+    if (error) throw error
+
+    if (data?.upload_phase !== 'completed') {
+      throw new Error(`Archive commit failed: ${data?.upload_phase}`)
+    }
+
+    console.log('Archive commit completed successfully')
+  } catch (error) {
+    // Set failed status and rethrow
+    await supabase
+      .from('archive_upload')
+      .update({ upload_phase: 'failed' })
+      .eq('account_id', account_id)
+    throw error
   }
 }
 

@@ -1,7 +1,6 @@
 export const revalidate = 0
 
 import CommunityStats from '@/components/CommunityStats'
-import SearchTweets from '@/components/SearchTweets'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import AvatarList from '@/components/AvatarList'
@@ -150,7 +149,7 @@ export default async function Homepage() {
         <p>
           Maintained & developed by{' '}
           <a href="@https://x.com/exgenesis" className="hover:underline">
-            Xiq (@exgeneis)
+            Xiq (@exgenesis)
           </a>{' '}
           & contributors.
         </p>

@@ -1,6 +1,5 @@
 'use client'
 import ThemeToggle from '@/components/ThemeToggle'
-import SearchTweets from '@/components/SearchTweets'
 import AdvancedSearchForm from '@/components/AdvancedSearchForm'
 
 export default function SearchTweetsPage() {
@@ -14,7 +13,6 @@ export default function SearchTweetsPage() {
         <main className="flex flex-1 flex-col gap-6">
           <h2 className="mb-4 text-4xl font-bold">Advanced Search</h2>
           <AdvancedSearchForm />
-          {/* <SearchTweets supabase={null} /> */}
         </main>
       </div>
       <footer className="w-full justify-center border-t border-t-foreground/10 p-8 text-center text-xs">

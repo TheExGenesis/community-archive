@@ -52,6 +52,7 @@ export default function UploadHomepageSection(props: {
   }, [state.isProcessing])
 
   useEffect(() => {
+    console.log('hey UploadHomepageSection')
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isProcessingRef.current) {
         const message =
@@ -148,7 +149,7 @@ export default function UploadHomepageSection(props: {
             }
           >
             <button className="cursor-pointer text-sm font-bold text-blue-500 hover:underline dark:text-blue-400">
-              Upload a new archive, or delete your data.
+              Upload a new archive, or delete your data. :)
             </button>
           </div>
         ) : (

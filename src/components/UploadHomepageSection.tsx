@@ -21,7 +21,7 @@ const formatDate = (dateString: string) => {
   })
 }
 
-interface UploadTwitterArchiveState {
+interface UploadArchiveState {
   isProcessing: boolean
   archive: Archive | null
   archiveStats: ArchiveStats | null
@@ -30,12 +30,12 @@ interface UploadTwitterArchiveState {
   showUploadButton: boolean
   isDeleting: boolean
 }
-export default function UploadTwitterArchive(props: {
+export default function UploadHomepageSection(props: {
   supabase: SupabaseClient<Database> | null
 }) {
   const { userMetadata } = useAuthAndArchive()
   const supabase = props.supabase || createBrowserClient()
-  const [state, setState] = useState<UploadTwitterArchiveState>({
+  const [state, setState] = useState<UploadArchiveState>({
     isProcessing: false,
     archive: null,
     archiveStats: null,
@@ -91,7 +91,7 @@ export default function UploadTwitterArchive(props: {
         setState((prev) => ({ ...prev, isProcessing })),
       )
       devLog('archive', archive)
-      setState((prev: UploadTwitterArchiveState) => ({ ...prev, archive }))
+      setState((prev: UploadArchiveState) => ({ ...prev, archive }))
     } catch (error) {
       console.error('Error processing archive:', error)
       alert(

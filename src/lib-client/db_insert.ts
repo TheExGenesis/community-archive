@@ -312,7 +312,107 @@ const uniqBy = <T>(fn: (item: T) => string | number, items: T[]): T[] => {
   })
 }
 
-export const processTwitterArchive = async (
+type UploadPhase = 'uploading' | 'ready_for_commit' | 'committed' | 'failed'
+
+const setUploadPhase = async (
+  supabase: SupabaseClient,
+  archiveUploadId: number,
+  phase: UploadPhase,
+): Promise<void> => {
+  await retryOperation(async () => {
+    const { error } = await supabase
+      .from('archive_upload')
+      .update({ upload_phase: phase })
+      .eq('id', archiveUploadId)
+  }, `Error updating archive upload phase to ${phase}`)
+}
+
+const waitForCommit = async (
+  supabase: SupabaseClient,
+  archiveUploadId: number,
+): Promise<void> => {
+  await retryOperation(async () => {
+    const { data, error } = await supabase
+      .from('archive_upload')
+      .select('upload_phase')
+      .eq('id', archiveUploadId)
+      .single()
+  }, 'Error verifying archive commit')
+}
+
+const insertAccountAndUploadRow = async (
+  supabase: SupabaseClient,
+  accountId: string,
+  archiveData: Archive,
+  latestTweetDate: string,
+): Promise<number> => {
+  // Compute counts
+  const num_tweets = archiveData.tweets.length
+  const num_following = archiveData.following?.length ?? 0
+  const num_followers = archiveData.follower?.length ?? 0
+  const num_likes = archiveData.like?.length ?? 0
+
+  // Insert into all_account first
+  console.log('Inserting account data...')
+  await retryOperation(async () => {
+    const { error } = await supabase.from('all_account').upsert({
+      account_id: accountId,
+      created_via: 'twitter_archive',
+      username: archiveData.account[0].account.username,
+      created_at: archiveData.account[0].account.createdAt,
+      account_display_name: archiveData.account[0].account.accountDisplayName,
+      num_tweets,
+      num_following,
+      num_followers,
+      num_likes,
+    })
+    if (error) throw error
+  }, 'Error inserting all_account data')
+
+  // Create initial archive_upload record
+  console.log('Creating/updating archive upload record...')
+  const uploadOptions = archiveData['upload-options'] || {
+    keepPrivate: false,
+    uploadLikes: true,
+    startDate: null,
+    endDate: null,
+  }
+
+  // First try to update existing row
+  const { data: existingUpload, error: existingError } = await supabase
+    .from('archive_upload')
+    .update({ upload_phase: 'uploading' })
+    .eq('account_id', accountId)
+    .select('id')
+    .maybeSingle()
+
+  // If no existing row, create new one
+  const { data: archiveUploadIdData, error: uploadError } = existingUpload
+    ? { data: existingUpload, error: existingError }
+    : await supabase
+        .from('archive_upload')
+        .insert({
+          account_id: accountId,
+          archive_at: latestTweetDate,
+          keep_private: uploadOptions.keepPrivate,
+          upload_likes: uploadOptions.uploadLikes,
+          start_date: uploadOptions.startDate,
+          end_date: uploadOptions.endDate,
+          upload_phase: 'uploading',
+        })
+        .select('id')
+        .single()
+
+  console.log('archiveUploadIdData', { archiveUploadIdData })
+  const archiveUploadId = archiveUploadIdData?.id
+
+  if (!archiveUploadId) throw new Error('Archive upload ID not found')
+  if (uploadError) throw uploadError
+
+  return archiveUploadId
+}
+
+export const insertArchiveInTempTables = async (
   supabase: SupabaseClient,
   archiveData: Archive,
   progressCallback: (progress: {
@@ -338,79 +438,26 @@ export const processTwitterArchive = async (
     return data
   }, 'Error dropping temporary tables')
 
+  // Calculate latest tweet date first since we need it for the archive_upload
+  const latestTweetDate = archiveData.tweets.reduce(
+    (latest: string, tweet: any) => {
+      const tweetDate = new Date(tweet.tweet.created_at)
+      return latest
+        ? tweetDate > new Date(latest)
+          ? tweetDate.toISOString()
+          : latest
+        : tweetDate.toISOString()
+    },
+    '',
+  )
+  const archiveUploadId = await insertAccountAndUploadRow(
+    supabase,
+    accountId,
+    archiveData,
+    latestTweetDate,
+  )
+
   try {
-    // Calculate latest tweet date first since we need it for the archive_upload
-    const latestTweetDate = archiveData.tweets.reduce(
-      (latest: string, tweet: any) => {
-        const tweetDate = new Date(tweet.tweet.created_at)
-        return latest
-          ? tweetDate > new Date(latest)
-            ? tweetDate.toISOString()
-            : latest
-          : tweetDate.toISOString()
-      },
-      '',
-    )
-
-    // Compute counts
-    const num_tweets = archiveData.tweets.length
-    const num_following = archiveData.following
-      ? archiveData.following.length
-      : 0
-    const num_followers = archiveData.follower ? archiveData.follower.length : 0
-    const num_likes = archiveData.like ? archiveData.like.length : 0
-
-    // Insert into all_account first
-    console.log('Inserting account data...')
-    await retryOperation(async () => {
-      const { error } = await supabase.from('all_account').upsert({
-        account_id: accountId,
-        created_via: 'twitter_archive',
-        username: archiveData.account[0].account.username,
-        created_at: archiveData.account[0].account.createdAt,
-        account_display_name: archiveData.account[0].account.accountDisplayName,
-        num_tweets,
-        num_following,
-        num_followers,
-        num_likes,
-      })
-      if (error) throw error
-    }, 'Error inserting all_account data')
-
-    // Create initial archive_upload record
-    console.log('Creating/updating archive upload record...')
-    const uploadOptions = archiveData['upload-options'] || {
-      keepPrivate: false,
-      uploadLikes: true,
-      startDate: null,
-      endDate: null,
-    }
-
-    const { data: archiveUploadId, error: uploadError } = await supabase
-      .from('archive_upload')
-      .upsert(
-        {
-          account_id: accountId,
-          archive_at: latestTweetDate,
-          keep_private: uploadOptions.keepPrivate,
-          upload_likes: uploadOptions.uploadLikes,
-          start_date: uploadOptions.startDate,
-          end_date: uploadOptions.endDate,
-          upload_phase: 'uploading',
-        },
-        {
-          onConflict: 'account_id',
-          ignoreDuplicates: false,
-        },
-      )
-      .select('id')
-      .single()
-
-    if (uploadError) throw uploadError
-
-    // Calculate latest tweet date
-    console.log(`Latest tweet date: ${latestTweetDate}`)
-
     // Create temporary tables
     console.log('Creating temporary tables...')
     await retryOperation(async () => {
@@ -525,25 +572,12 @@ export const processTwitterArchive = async (
       `Follows processing time: ${followsEndTime - followsStartTime}ms`,
     )
 
-    // Commit all data
-    console.log('Committing all data...')
-    progressCallback({
-      phase: 'Finishing up...',
-      percent: null,
-    })
+    // Update upload_phase to ready_for_commit with longer timeout
+    await setUploadPhase(supabase, archiveUploadId, 'ready_for_commit')
 
-    // Update upload_phase to ready_for_commit
-    await retryOperation(async () => {
-      const { error } = await supabase
-        .from('archive_upload')
-        .update({ upload_phase: 'ready_for_commit' })
-        .eq('id', archiveUploadId.id)
-      if (error) throw error
-    }, 'Error updating archive upload phase')
-
-    console.log('Twitter archive processing completed successfully.')
+    console.log('Insertion into temp tablescompleted successfully.')
     progressCallback({
-      phase: 'Archive Uploaded',
+      phase: 'Insertion into temp tables completed successfully.',
       percent: 100,
     })
     const endTime = performance.now()
@@ -556,13 +590,7 @@ export const processTwitterArchive = async (
 
     // Update upload_phase to failed
     try {
-      await retryOperation(async () => {
-        const { error: phaseError } = await supabase
-          .from('archive_upload')
-          .update({ upload_phase: 'failed' })
-          .eq('account_id', accountId)
-        if (phaseError) throw phaseError
-      }, 'Error updating archive upload phase to failed')
+      await setUploadPhase(supabase, archiveUploadId, 'failed')
     } catch (updateError: any) {
       console.error('Error updating upload phase to failed:', updateError)
     }

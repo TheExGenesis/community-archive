@@ -285,7 +285,7 @@ export function FileUploadDialog({
               <Link
                 href="/data-policy"
                 className="text-primary hover:underline"
-                target='_blank'
+                target="_blank"
               >
                 Read our Data Policy
               </Link>
@@ -309,9 +309,13 @@ export function FileUploadDialog({
           </div>
         ) : state.uploadStatus === 'completed' && state.uploadedStats ? (
           <div className="grid gap-4 py-4">
-            <p className="mb-2 text-sm text-green-600">
-              Your archive has been successfully uploaded!
-            </p>
+            <div className="space-y-2">
+              <p className="text-sm text-green-600">We got your archive!</p>
+              <p className="text-sm text-muted-foreground">
+                Your account should show up in the database in the next 20 mins
+                or so
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="text-muted-foreground">Uploaded Tweets</div>
               <div>{state.uploadedStats.uploadedTweets.toLocaleString()}</div>

@@ -58,15 +58,15 @@ export default async function User({ params }: any) {
 
   const userData = await getUserData(supabase, account_id)
 
+  if (!userData) {
+    return <div>Error fetching user data</div>
+  }
+
   const { data: summaryData, error: summaryError } = await supabase
     .from('account_activity_summary')
     .select('mentioned_accounts')
     .or(`account_id.eq.${account_id},username.ilike.${account_id}`)
     .single()
-
-  if (!userData) {
-    return <div>Error fetching user data</div>
-  }
 
   const showingSummaryData = !summaryError && summaryData?.mentioned_accounts
 
@@ -79,7 +79,7 @@ export default async function User({ params }: any) {
         <UserProfile userData={userData} />
       </Suspense>
 
-      {showingSummaryData ? (
+      {showingSummaryData && (
         <>
           <h2 className="text-xl font-semibold">{'Most Mentioned Accounts'}</h2>
           <Suspense fallback={<Skeleton className="h-[20vh] w-full" />}>
@@ -88,21 +88,15 @@ export default async function User({ params }: any) {
               height="h-[20vh]"
             />
           </Suspense>
-        </>
-      ) : (
-        <div className="my-8 rounded-lg bg-blue-50 p-4 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
-          Archive statistics are being computed and should be available in about
-          5 minutes. Please check back soon to see interaction data and top
-          mentions.
-        </div>
-      )}
 
-      <div className="my-16">
-        <h2 className="text-xl font-semibold">{'Top Tweets'}</h2>
-        <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-          <AccountTopTweets userData={userData} />
-        </Suspense>
-      </div>
+          <div className="my-16">
+            <h2 className="text-xl font-semibold">{'Top Tweets'}</h2>
+            <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+              <AccountTopTweets userData={userData} />
+            </Suspense>
+          </div>
+        </>
+      )}
     </div>
   )
 }

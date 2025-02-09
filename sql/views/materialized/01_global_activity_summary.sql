@@ -4,11 +4,8 @@ CREATE MATERIALIZED VIEW
   public.global_activity_summary AS
 SELECT
   (
-    SELECT c.reltuples::bigint AS estimate
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE c.relname = 'account' 
-    AND n.nspname = 'public'
+    SELECT COUNT(*)
+    FROM public.account
   ) AS total_accounts,
   (
     SELECT c.reltuples::bigint AS estimate
@@ -48,3 +45,5 @@ SELECT
 -- Add a unique index on the last_updated column
 CREATE UNIQUE INDEX idx_global_activity_summary_last_updated 
 ON public.global_activity_summary (last_updated);
+
+

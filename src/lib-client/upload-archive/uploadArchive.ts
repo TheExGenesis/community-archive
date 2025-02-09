@@ -22,5 +22,5 @@ export const uploadArchive = async (
   console.log(
     'Uploaded to storage, insertion into db will be handled by our worker.',
   )
-  // await insertArchiveInTempTables(supabase, archive, progressCallback)
+  await insertArchiveInTempTables(supabase, archive, progressCallback)
 }

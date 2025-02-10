@@ -3,17 +3,13 @@ import path from 'path'
 import * as dotenv from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
-import { Archive } from '../src/lib-client/types'
 import os from 'os'
-const { insertArchiveInTempTables } = await import(
-  '../src/lib-client/db_insert'
-)
 const { pipe } = await import('../src/lib-server/fp')
-const { uploadArchiveToStorage } = await import(
-  '../src/lib-client/upload-archive/uploadArchiveToStorage'
-)
 const { removeProblematicCharacters } = await import(
   '../src/lib-client/removeProblematicChars'
+)
+const { commitTempTables, insertArchiveInTempTables } = await import(
+  '../src/lib-client/db_insert'
 )
 
 // Initialize paths
@@ -118,6 +114,12 @@ async function uploadArchive(filePath: string) {
     await insertArchiveInTempTables(supabase, archive, (progress) => {
       console.log(`${progress.phase}: ${progress.percent?.toFixed(2)}%`)
     })
+
+    const accountId = archive.account[0].account.accountId
+
+    console.log('accountId', accountId)
+    console.log('Committing temp tables...')
+    await commitTempTables(supabase, accountId)
 
     console.log('Archive processing completed successfully')
   } catch (error) {

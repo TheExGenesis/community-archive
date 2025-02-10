@@ -6,12 +6,12 @@ DROP TRIGGER IF EXISTS queue_job_on_upload_complete ON public.archive_upload;
 DROP TRIGGER IF EXISTS queue_job_on_upload_delete ON public.archive_upload;
 DROP FUNCTION IF EXISTS private.queue_archive_changes_on_upload_complete() CASCADE;
 DROP FUNCTION IF EXISTS private.process_jobs() CASCADE;
+DROP TABLE IF EXISTS private.job_queue CASCADE;
 
-
-CREATE TABLE IF NOT EXISTS private.job_queue (
-key TEXT PRIMARY KEY,
-timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-status TEXT CHECK (status IN ('QUEUED', 'PROCESSING', 'DONE', 'FAILED'))
+CREATE TABLE private.job_queue (
+    key TEXT PRIMARY KEY,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    status TEXT CHECK (status IN ('QUEUED', 'PROCESSING', 'DONE', 'FAILED'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_job_queue_status_timestamp ON private.job_queue (status, timestamp);
@@ -41,10 +41,12 @@ AFTER DELETE ON public.archive_upload
 FOR EACH ROW
 EXECUTE FUNCTION private.queue_archive_changes();
 
+
 CREATE OR REPLACE FUNCTION private.process_jobs()
 RETURNS void AS $$
 DECLARE
 v_job RECORD;
+v_start_time TIMESTAMP;
 BEGIN
 RAISE NOTICE 'Starting process_jobs';
 
@@ -70,18 +72,26 @@ SET status = 'PROCESSING'
 WHERE key = v_job.key;
 
 BEGIN  -- Start exception block
+    -- Set 30 minute timeout for this job's execution
+    SET LOCAL statement_timeout TO '1800000';  -- 30 minutes in milliseconds
+
     -- Do the job
     IF v_job.key = 'archive_changes' THEN
         RAISE NOTICE 'Refreshing materialized views concurrently';
+        v_start_time := clock_timestamp();
         REFRESH MATERIALIZED VIEW CONCURRENTLY public.global_activity_summary;
-        REFRESH MATERIALIZED VIEW CONCURRENTLY public.account_activity_summary;
-        REFRESH MATERIALIZED VIEW CONCURRENTLY public.quote_tweets_mv;
+        RAISE NOTICE 'Refreshing materialized view took: %', clock_timestamp() - v_start_time;
+        
+        v_start_time := clock_timestamp();
         PERFORM private.post_upload_update_conversation_ids();
+        RAISE NOTICE 'Updating conversation IDs took: %', clock_timestamp() - v_start_time;
     END IF;
 
     IF v_job.key = 'update_conversation_ids' THEN
         RAISE NOTICE 'Updating conversation ids';
+        v_start_time := clock_timestamp();
         
+        RAISE NOTICE 'Updating conversation IDs took: %', clock_timestamp() - v_start_time;
     END IF;
 
     -- Delete the job only if successful
@@ -99,6 +109,8 @@ END;
 
 END;
 $$ LANGUAGE plpgsql;
+
+
 -- Enable pg_cron extension if not already enabled
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 DO $$

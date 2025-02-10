@@ -29,7 +29,13 @@ export default function UserDirectoryPage() {
     const loadUsers = async () => {
       try {
         const supabase = createBrowserClient()
-        const sortedUsers = await fetchUsers(supabase)
+        const users = await fetchUsers(supabase)
+        // Sort users by archive_uploaded_at by default
+        const sortedUsers = [...users].sort((a, b) => {
+          const aValue = a.archive_uploaded_at ?? ''
+          const bValue = b.archive_uploaded_at ?? ''
+          return bValue < aValue ? -1 : bValue > aValue ? 1 : 0
+        })
         setUsers(sortedUsers)
       } catch (error) {
         setError('Failed to fetch users')

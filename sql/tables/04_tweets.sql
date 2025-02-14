@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS public.tweets (
     reply_to_tweet_id TEXT,
     reply_to_user_id TEXT,
     reply_to_username TEXT,
-    archive_upload_id BIGINT NOT NULL,
+    archive_upload_id BIGINT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (archive_upload_id) REFERENCES public.archive_upload (id),
     FOREIGN KEY (account_id) REFERENCES public.all_account (account_id)

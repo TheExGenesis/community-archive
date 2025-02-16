@@ -148,7 +148,7 @@ export default async function Homepage() {
         <br />
         <p>
           Maintained & developed by{' '}
-          <a href="@https://x.com/exgenesis" className="hover:underline">
+          <a href="https://x.com/exgenesis" className="hover:underline">
             Xiq (@exgenesis)
           </a>{' '}
           & contributors.

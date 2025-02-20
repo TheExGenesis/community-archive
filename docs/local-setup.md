@@ -1,20 +1,21 @@
 # Development Instructions
 
-1. Rename `.env.example` to `.env.local` and update the following:
+1. Rename `.env.example` to `.env` and update the following:
 
 ```
 
 NEXT_PUBLIC_SUPABASE_URL=https://fabxmporizzqflnftavs.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8
 NEXT_PUBLIC_USE_REMOTE_DEV_DB=false # Set to true to use the remote development database, false to use the local development database
-NEXT_PUBLIC_LOCAL_SUPABASE_URL='http://localhost:54321'
-NEXT_PUBLIC_LOCAL_ANON_KEY=<>
-NEXT_PUBLIC_LOCAL_SERVICE_ROLE=<>
-SUPABASE_SERVICE_ROLE=<> #same as above, is needed for vercel in the server
+NEXT_PUBLIC_LOCAL_SUPABASE_URL=http://localhost:54321
+NEXT_PUBLIC_LOCAL_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+NEXT_PUBLIC_LOCAL_SERVICE_ROLE=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+SUPABASE_SERVICE_ROLE=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
 SUPABASE_AUTH_TWITTER_CLIENT_ID=<>
 SUPABASE_AUTH_TWITTER_SECRET=<>
 NEXT_PUBLIC_USER_ID=<>
 NEXT_PUBLIC_USER_NAME=<>>
+NODE_ENV=development
 
 ARCHIVE_PATH=<path_to_archive_folder>
 
@@ -72,10 +73,6 @@ For example:
 
 `psql 'postgresql://postgres:postgres@localhost:54322/postgres'`
 
-### Set up storage
-
-- Manually make a bucket in supabase storage called `archive`.
-
 ### Manage remote migrations
 
 We can use Supabase's CLI to manage migrations locally, and then push them to the remote database. To do this fully you'll need a db password, so ask admins in the Discord.
@@ -99,7 +96,7 @@ For each change you make to the db:
 - make sure your `.env` file has `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` setup to the Community Archive db
 - run the script `pnpm dev:downloadarchive`
 - make sure your `.env` file has `*_LOCAL_*` env vars setup to your local db
-- set the `ARCHIVE_PATH` environment variable to the path of the archive folder
+- set the `ARCHIVE_PATH` environment variable to the path of the archive folder (which will be "../data/downloads/archives" from the root of the repo)
 - run the script `pnpm dev:importfiles`
 - wait a bit and then you should be able to see the data in the local supabase studio at http://localhost:54323/project/default/editor
 - (OPTIONAL)run the script `pnpm dev:validateimport` to validate the data. afaict there's a few edge cases where the data might not import correctly. For now fixing this is not a priority, PR is welcome!

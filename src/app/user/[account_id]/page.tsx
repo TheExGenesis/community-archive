@@ -11,6 +11,7 @@ import { devLog } from '@/lib-client/devLog'
 import { cookies } from 'next/headers'
 import { getUserData } from '@/lib-server/queries/fetchUsers'
 import { formatNumber } from '@/lib-client/formatNumber'
+import { DownloadArchiveButton } from './DownloadArchiveButton'
 
 const UserProfile = ({ userData }: { userData: FormattedUser }) => {
   const account = userData
@@ -46,6 +47,7 @@ const UserProfile = ({ userData }: { userData: FormattedUser }) => {
           <p>{formatNumber(account.num_following)} Following</p>
           <p>{formatNumber(account.num_likes)} Likes</p>
         </div>
+        <DownloadArchiveButton username={account.username} />
       </div>
     </div>
   )

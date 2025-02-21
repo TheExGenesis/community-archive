@@ -7,5 +7,6 @@ CREATE TABLE IF NOT EXISTS public.all_account (
     num_tweets INTEGER DEFAULT 0,
     num_following INTEGER DEFAULT 0,
     num_followers INTEGER DEFAULT 0,
-    num_likes INTEGER DEFAULT 0
+    num_likes INTEGER DEFAULT 0,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

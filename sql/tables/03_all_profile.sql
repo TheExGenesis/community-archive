@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS public.all_profile (
     location TEXT,
     avatar_media_url TEXT,
     header_media_url TEXT,
-    archive_upload_id BIGINT NOT NULL,
+    archive_upload_id BIGINT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (account_id, archive_upload_id),
     FOREIGN KEY (archive_upload_id) REFERENCES public.archive_upload (id),
     FOREIGN KEY (account_id) REFERENCES public.all_account (account_id)

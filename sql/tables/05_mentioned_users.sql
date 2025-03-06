@@ -4,3 +4,5 @@ CREATE TABLE IF NOT EXISTS public.mentioned_users (
     screen_name TEXT NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
+
+CREATE INDEX "idx_mentioned_users_user_id" ON "public"."mentioned_users" USING "btree" ("user_id");

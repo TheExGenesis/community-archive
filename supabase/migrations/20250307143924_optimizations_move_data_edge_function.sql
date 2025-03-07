@@ -1,6 +1,6 @@
 
 
-CREATE INDEX IF NOT EXISTSidx_temp_data_api_types ON temporary_data (inserted, stored) 
+CREATE INDEX IF NOT EXISTS idx_temp_data_api_types ON temporary_data (inserted, stored) 
 WHERE inserted IS NOT NULL AND stored = 'false' AND type LIKE 'api_%';
 
 ALTER TABLE temporary_data

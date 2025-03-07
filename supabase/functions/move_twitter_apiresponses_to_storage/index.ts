@@ -18,7 +18,6 @@ Deno.serve(async (req) => {
 
     supabaseAdminClient = createClient(supabaseUrl, supabaseKey);
     
-
     const bucketName = "twitter_api_files";
     const res = await move_twitter_apiresponses_to_storage(supabaseAdminClient, bucketName);
 
@@ -55,12 +54,12 @@ export async function move_twitter_apiresponses_to_storage(
   supabase: ReturnType<typeof createClient>,
   bucketName: string,
   batchSize: number = 150
-): Promise<{ success: boolean; processedCount?: number; error?: any }> {
+): Promise<{ success: boolean; processedCount?: number; error?: any; failed?: any }> {
   try {
     const { data: tempRecords, error: fetchError } = await supabase
       .from('temporary_data')
       .select('*')
-      .not('inserted','is', null)
+      .not('inserted', 'is', null)
       .eq('stored', false)
       .like('type', 'api_%')
       .limit(batchSize);
@@ -70,42 +69,53 @@ export async function move_twitter_apiresponses_to_storage(
       return { success: true, processedCount: 0 };
     }
 
-    let processedCount = 0;
+    // Replace the sequential processing with parallel uploads
+    const uploadRecord = async (record: any) => {
+      const filename = `${record.originator_id}/${record.timestamp}__${record.type}.json`;
+      const { error } = await supabase.storage
+        .from(bucketName)
+        .upload(filename, JSON.stringify(record.data), {
+          contentType: 'application/json',
+          upsert: true,
+        });
+      
+      return { record, error };
+    };
 
-    for (const record of tempRecords) {
-      try {
-        const filename = `${record.originator_id}/${record.timestamp}__${record.type}.json`;
-        
-        // Upload file with explicit error handling
-        const { error: uploadError } = await supabase.storage
-          .from(bucketName)
-          .upload(filename, JSON.stringify(record.data), {
-            contentType: 'application/json',
-            upsert: true
-          });
+    const uploadResults = await Promise.all(tempRecords.map(uploadRecord));
 
-        if (uploadError) throw uploadError;
+    // Log any upload errors
+    const failedUploads = uploadResults.filter(({ error }) => error);
+    if (failedUploads.length > 0) {
+      console.error(`Failed to upload ${failedUploads.length} records:`);
+      failedUploads.forEach(({ record, error }) => {
+        console.error(`Error uploading record ${record.id} (${record.type}):`, error);
+      });
+    }
 
-        // Update record status with explicit error handling
-        const { error: updateError } = await supabase
-          .from('temporary_data')
-          .update({ stored: true })
-          .eq('type', record.type)
-          .eq('originator_id', record.originator_id)
-          .eq('item_id', record.item_id)
-          .eq('timestamp', record.timestamp);
+    // Filter successful uploads
+    const successfulUploads = uploadResults.filter(({ error }) => !error).map(({ record }) => record);
 
-        if (updateError) throw updateError;
-
-        processedCount++;
-      } catch (recordError) {
-        console.error(`Error processing record ${record.id}:`, recordError);
-        // Continue with next record instead of failing completely
-        continue;
+    // Batch update all successfully uploaded records
+    if (successfulUploads.length > 0) {
+      const { error: batchUpdateError } = await supabase
+        .from('temporary_data')
+        .update({ stored: true })
+        .in('id', successfulUploads.map(r => r.id));
+      
+      if (batchUpdateError) {
+        console.error('Batch update error:', batchUpdateError);
+        throw batchUpdateError;
       }
     }
-    console.log("processedCount",processedCount)
-    return { success: true, processedCount };
+
+    const processedCount = successfulUploads.length;
+    console.log("processedCount", processedCount);
+    return { 
+      success: true, 
+      processedCount,
+      failed: JSON.stringify(failedUploads)
+    };
     
   } catch (error) {
     console.error('Error in processTemporaryData:', error);

@@ -1,3 +1,12 @@
+CREATE TABLE IF NOT EXISTS private.import_errors (
+    id SERIAL PRIMARY KEY,
+    type TEXT NOT NULL,
+    originator_id TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    error_message TEXT NOT NULL,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 
 CREATE OR REPLACE FUNCTION private.tes_process_mention_records() RETURNS TABLE (
     processed INTEGER,
@@ -136,3 +145,8 @@ BEGIN
     END;
 END;
 $$ LANGUAGE plpgsql;
+
+
+
+
+

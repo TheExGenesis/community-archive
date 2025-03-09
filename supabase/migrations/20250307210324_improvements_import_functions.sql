@@ -148,7 +148,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
+DROP FUNCTION IF EXISTS private.tes_complete_group_insertions();
 CREATE OR REPLACE FUNCTION private.tes_complete_group_insertions()
 RETURNS TABLE (
     completed INTEGER

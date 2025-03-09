@@ -1,4 +1,3 @@
-
 CREATE OR REPLACE FUNCTION private.tes_process_mention_records() RETURNS TABLE (
     processed INTEGER,
     errors TEXT[]
@@ -20,13 +19,11 @@ BEGIN
             WHERE td.type = 'import_mention'
             AND (td.data->>'mentioned_user_id')::text IS NOT NULL
             AND td.inserted IS NULL
-            AND NOT EXISTS (
-                SELECT 1 
-                FROM private.import_errors ie
-                WHERE ie.type = 'import_mention'
+            LEFT JOIN private.import_errors ie ON 
+                ie.type = 'import_mention'
                 AND ie.originator_id = td.originator_id
                 AND ie.item_id = td.item_id
-			)
+            WHERE ie.id IS NULL
         ),
         user_insertions AS (
             INSERT INTO public.mentioned_users (
@@ -98,7 +95,7 @@ BEGIN
     
             FROM temporary_data td 
             LEFT JOIN private.import_errors ie ON 
-                ie.type = 'import_mention' AND
+                ie.type = td.type AND
                 ie.originator_id = td.originator_id AND 
                 ie.item_id = td.item_id
             WHERE td.type = 'import_mention'

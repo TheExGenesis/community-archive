@@ -60,7 +60,7 @@ BEGIN
         SET inserted = CURRENT_TIMESTAMP
         FROM processed_ids_table pit
         WHERE td.type = 'import_account' 
-        AND (td.data->>'account_id')::text = pit.account_id;
+        AND (td.data->>'account_id')::text = pit.account_id
         AND td.timestamp < process_cutoff_time;
         
         -- Get error records
@@ -234,7 +234,6 @@ BEGIN
         SELECT COUNT(*) INTO processed_count
         FROM unnest(processed_ids);
 
-
         WITH processed_ids_table AS (
             SELECT unnest(processed_ids) as tweet_id
         )
@@ -244,8 +243,6 @@ BEGIN
         WHERE td.type = 'import_tweet' 
         AND (td.data->>'tweet_id')::text = pit.tweet_id
         AND td.timestamp < process_cutoff_time;
-
-        
 
         WITH error_scan AS (
             SELECT (data->>'tweet_id')::text as error_id,
@@ -260,7 +257,6 @@ BEGIN
         INTO error_records
         FROM error_scan;
         
-
         RETURN QUERY SELECT processed_count, error_records;
   
     EXCEPTION WHEN OTHERS THEN
@@ -411,15 +407,11 @@ BEGIN
         SELECT COUNT(*) INTO processed_count
         FROM unnest(processed_ids);
 
-
         UPDATE temporary_data td
         SET inserted = CURRENT_TIMESTAMP
         WHERE td.type = 'import_url'
         AND (td.data->>'tweet_id')::text = ANY(processed_ids)
         AND td.timestamp < process_cutoff_time;
-
-        SELECT COUNT(*) INTO processed_count FROM update_result;
-
 
         WITH error_scan AS (
             SELECT 

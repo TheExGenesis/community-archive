@@ -59,7 +59,7 @@ BEGIN
         SET inserted = CURRENT_TIMESTAMP
         FROM processed_ids_table pit
         WHERE td.type = 'import_account' 
-        AND (td.data->>'account_id')::text = pit.account_id;
+        AND (td.data->>'account_id')::text = pit.account_id
         AND td.timestamp < process_cutoff_time;
         
         -- Get error records

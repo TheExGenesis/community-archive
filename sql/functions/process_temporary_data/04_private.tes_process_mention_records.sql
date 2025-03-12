@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION private.tes_process_mention_records() RETURNS TABLE (
+CREATE OR REPLACE FUNCTION private.tes_process_mention_records(process_cutoff_time TIMESTAMP) RETURNS TABLE (
     processed INTEGER,
     errors TEXT[]
 ) AS $$
@@ -10,20 +10,21 @@ BEGIN
     BEGIN
         -- First, insert or update the mentioned users
         WITH latest_records AS (
-            SELECT *,
+            SELECT td.*,
                 ROW_NUMBER() OVER (
                     PARTITION BY (data->>'mentioned_user_id')::text 
-                    ORDER BY timestamp DESC
+                    ORDER BY td.timestamp DESC
                 ) as rn
             FROM temporary_data td
+            LEFT JOIN private.import_errors ie ON 
+                ie.type = 'import_mention' and ie.type = td.type
+                AND ie.originator_id = td.originator_id
+                AND ie.item_id = td.item_id
             WHERE td.type = 'import_mention'
             AND (td.data->>'mentioned_user_id')::text IS NOT NULL
             AND td.inserted IS NULL
-            LEFT JOIN private.import_errors ie ON 
-                ie.type = 'import_mention'
-                AND ie.originator_id = td.originator_id
-                AND ie.item_id = td.item_id
-            WHERE ie.id IS NULL
+            AND td.timestamp < process_cutoff_time
+            AND ie.id IS NULL
         ),
         user_insertions AS (
             INSERT INTO public.mentioned_users (
@@ -73,7 +74,8 @@ BEGIN
         SET inserted = CURRENT_TIMESTAMP
         FROM processed_ids_table pit
         WHERE td.type = 'import_mention' 
-        AND (td.data->>'mentioned_user_id')::text = pit.mentioned_user_id;
+        AND (td.data->>'mentioned_user_id')::text = pit.mentioned_user_id
+        AND td.timestamp < process_cutoff_time;
         
         -- Get error records
         SELECT array_agg((data->>'mentioned_user_id')::text || ':' || (data->>'tweet_id')::text)
@@ -81,7 +83,8 @@ BEGIN
         FROM temporary_data
         WHERE type = 'import_mention'
         AND (data->>'mentioned_user_id')::text IS NOT NULL
-        AND inserted IS NULL;
+        AND inserted IS NULL
+        AND timestamp < process_cutoff_time;
         
         RETURN QUERY SELECT processed_count, error_records;
     
@@ -95,12 +98,13 @@ BEGIN
     
             FROM temporary_data td 
             LEFT JOIN private.import_errors ie ON 
-                ie.type = td.type AND
+                ie.type = 'import_mention' AND
                 ie.originator_id = td.originator_id AND 
                 ie.item_id = td.item_id
             WHERE td.type = 'import_mention'
             AND td.data->>'mentioned_user_id' IS NOT NULL
             AND td.inserted IS NULL
+            AND td.timestamp < process_cutoff_time
             AND ie.id IS NULL
         ),
         validation_checks AS (

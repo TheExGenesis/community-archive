@@ -1,4 +1,5 @@
-CREATE OR REPLACE FUNCTION private.tes_complete_group_insertions()
+
+CREATE OR REPLACE FUNCTION private.tes_complete_group_insertions(process_cutoff_time TIMESTAMP)
 RETURNS TABLE (
     completed INTEGER
 ) AS $$
@@ -11,6 +12,7 @@ BEGIN
             SELECT originator_id
             FROM temporary_data
             WHERE inserted IS NULL
+            AND timestamp < process_cutoff_time
             GROUP BY originator_id
             HAVING COUNT(*) FILTER (WHERE type NOT LIKE 'api%') = 0
         ),
@@ -21,6 +23,7 @@ BEGIN
             WHERE td.originator_id = eg.originator_id
             AND td.type LIKE 'api%'
             AND td.inserted IS NULL
+            AND td.timestamp < process_cutoff_time
             RETURNING td.originator_id
         )
         SELECT COUNT(DISTINCT u.originator_id), 

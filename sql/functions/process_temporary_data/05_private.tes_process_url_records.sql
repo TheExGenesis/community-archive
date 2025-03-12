@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION private.tes_process_url_records()
+CREATE OR REPLACE FUNCTION private.tes_process_url_records(process_cutoff_time TIMESTAMP)
 RETURNS TABLE (
     processed INTEGER,
     errors TEXT[]
@@ -24,6 +24,7 @@ BEGIN
             WHERE td.type = 'import_url'
                 AND (td.data->>'tweet_id')::text IS NOT NULL
                 AND td.inserted IS NULL
+                AND td.timestamp < process_cutoff_time
                 AND ie.id IS NULL
             ORDER BY (data->>'tweet_id')::text, (data->>'url')::text, td.timestamp DESC
         ),
@@ -57,6 +58,7 @@ BEGIN
             SET inserted = CURRENT_TIMESTAMP
             WHERE td.type = 'import_url'
             AND (td.data->>'tweet_id')::text = ANY(processed_ids)
+            AND td.timestamp < process_cutoff_time
             RETURNING td.*
         )
         SELECT COUNT(*) INTO processed_count FROM update_result;
@@ -69,6 +71,7 @@ BEGIN
             WHERE type = 'import_url'
             AND (data->>'tweet_id')::text IS NOT NULL
             AND inserted IS NULL
+            AND timestamp < process_cutoff_time
         )
         SELECT array_agg(error_id)
         INTO error_records
@@ -93,6 +96,7 @@ BEGIN
             WHERE td.type = 'import_url'
             AND td.data->>'tweet_id' IS NOT NULL
             AND td.inserted IS NULL
+            AND td.timestamp < process_cutoff_time
             AND ie.id IS NULL
         ),
         validation_checks AS (

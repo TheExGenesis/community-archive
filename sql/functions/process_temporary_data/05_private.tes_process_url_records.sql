@@ -52,17 +52,11 @@ BEGIN
         SELECT COUNT(*) INTO processed_count
         FROM unnest(processed_ids);
 
-
-        WITH update_result AS (
-            UPDATE temporary_data td
-            SET inserted = CURRENT_TIMESTAMP
-            WHERE td.type = 'import_url'
-            AND (td.data->>'tweet_id')::text = ANY(processed_ids)
-            AND td.timestamp < process_cutoff_time
-            RETURNING td.*
-        )
-        SELECT COUNT(*) INTO processed_count FROM update_result;
-
+        UPDATE temporary_data td
+        SET inserted = CURRENT_TIMESTAMP
+        WHERE td.type = 'import_url'
+        AND (td.data->>'tweet_id')::text = ANY(processed_ids)
+        AND td.timestamp < process_cutoff_time;
 
         WITH error_scan AS (
             SELECT 

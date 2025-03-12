@@ -8,21 +8,15 @@ DECLARE
     processed_count INTEGER := 0;
     error_records TEXT[];
     processed_ids TEXT[];
-    start_time TIMESTAMP;
-    query_time INTERVAL;
-    rows_read BIGINT;
 BEGIN
     BEGIN
-        RAISE NOTICE 'Starting account processing at %', clock_timestamp();
-        
-        start_time := clock_timestamp();
+
         WITH latest_records AS (
             SELECT *,
                 ROW_NUMBER() OVER (
                     PARTITION BY (data->>'account_id')::text 
                     ORDER BY (data->>'created_at')::timestamp with time zone DESC
-                ) as rn,
-                count(*) OVER () as total_rows
+                )
             FROM temporary_data 
             WHERE type = 'import_account' 
             AND (data->>'account_id')::text IS NOT NULL
@@ -52,52 +46,31 @@ BEGIN
                 num_following = EXCLUDED.num_following,
                 num_followers = EXCLUDED.num_followers,
                 num_likes = EXCLUDED.num_likes
-            RETURNING account_id, (SELECT total_rows FROM latest_records LIMIT 1) as rows_scanned
+            RETURNING account_id
         )
-        SELECT array_agg(account_id), MAX(rows_scanned) INTO processed_ids, rows_read FROM insertions;
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Account insertion completed in %. Scanned % rows from temporary_data', query_time, rows_read;
+        SELECT array_agg(account_id) INTO processed_ids FROM insertions;
 
-        start_time := clock_timestamp();
         SELECT COUNT(*) INTO processed_count
         FROM unnest(processed_ids);
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Count processed in %. Processed % records', query_time, processed_count;
 
-        -- Update inserted timestamp
-        start_time := clock_timestamp();
         WITH processed_ids_table AS (
             SELECT unnest(processed_ids) as account_id
-        ),
-        update_result AS (
-            UPDATE temporary_data td
-            SET inserted = CURRENT_TIMESTAMP
-            FROM processed_ids_table pit
-            WHERE td.type = 'import_account' 
-            AND (td.data->>'account_id')::text = pit.account_id
-            AND td.timestamp < process_cutoff_time
-            RETURNING td.*
         )
-        SELECT COUNT(*) INTO rows_read FROM update_result;
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Updated inserted timestamps in %. Updated % rows', query_time, rows_read;
-
+        UPDATE temporary_data td
+        SET inserted = CURRENT_TIMESTAMP
+        FROM processed_ids_table pit
+        WHERE td.type = 'import_account' 
+        AND (td.data->>'account_id')::text = pit.account_id;
+        AND td.timestamp < process_cutoff_time;
+        
         -- Get error records
-        start_time := clock_timestamp();
-        WITH error_scan AS (
-            SELECT (data->>'account_id')::text as error_id,
-                   count(*) OVER () as total_scanned
-            FROM temporary_data
-            WHERE type = 'import_account'
-            AND (data->>'account_id')::text IS NOT NULL
-            AND inserted IS NULL
-            AND timestamp < process_cutoff_time
-        )
-        SELECT array_agg(error_id), MAX(total_scanned)
-        INTO error_records, rows_read
-        FROM error_scan;
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Error records collected in %. Scanned % rows', query_time, rows_read;
+        SELECT array_agg((data->>'account_id')::text)
+        INTO error_records
+        FROM temporary_data
+        WHERE type = 'import_account'
+        AND (data->>'account_id')::text IS NOT NULL
+        AND inserted IS NULL
+        AND timestamp < process_cutoff_time;
 
         RETURN QUERY SELECT processed_count, error_records;
   
@@ -117,21 +90,15 @@ DECLARE
     processed_count INTEGER := 0;
     error_records TEXT[];
     processed_ids TEXT[];
-    start_time TIMESTAMP;
-    query_time INTERVAL;
-    rows_read BIGINT;
 BEGIN
     BEGIN
-        RAISE NOTICE 'Starting profile processing at %', clock_timestamp();
 
-        start_time := clock_timestamp();
         WITH latest_records AS (
             SELECT *,
                 ROW_NUMBER() OVER (
                     PARTITION BY (data->>'account_id')::text 
                     ORDER BY (data->>'created_at')::timestamp with time zone DESC
-                ) as rn,
-                count(*) OVER () as total_rows
+                ) as rn
             FROM temporary_data 
             WHERE type = 'import_profile' 
             AND (data->>'account_id')::text IS NOT NULL
@@ -163,50 +130,35 @@ BEGIN
                 location = EXCLUDED.location,
                 avatar_media_url = EXCLUDED.avatar_media_url,
                 header_media_url = EXCLUDED.header_media_url
-            RETURNING account_id, (SELECT total_rows FROM latest_records LIMIT 1) as rows_scanned
+            RETURNING account_id
         )
-        SELECT array_agg(account_id), MAX(rows_scanned) INTO processed_ids, rows_read FROM insertions;
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Profile insertion completed in %. Scanned % rows from temporary_data', query_time, rows_read;
+        SELECT array_agg(account_id) INTO processed_ids FROM insertions;
 
-        start_time := clock_timestamp();
         SELECT COUNT(*) INTO processed_count
         FROM unnest(processed_ids);
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Count processed in %. Processed % records', query_time, processed_count;
 
-        start_time := clock_timestamp();
         WITH processed_ids_table AS (
             SELECT unnest(processed_ids) as account_id
-        ),
-        update_result AS (
-            UPDATE temporary_data td
-            SET inserted = CURRENT_TIMESTAMP
-            FROM processed_ids_table pit
-            WHERE td.type = 'import_profile' 
-            AND (td.data->>'account_id')::text = pit.account_id
-            AND td.timestamp < process_cutoff_time
-            RETURNING td.*
         )
-        SELECT COUNT(*) INTO rows_read FROM update_result;
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Updated inserted timestamps in %. Updated % rows', query_time, rows_read;
+        UPDATE temporary_data td
+        SET inserted = CURRENT_TIMESTAMP
+        FROM processed_ids_table pit
+        WHERE td.type = 'import_profile' 
+        AND (td.data->>'account_id')::text = pit.account_id
+        AND td.timestamp < process_cutoff_time;
 
-        start_time := clock_timestamp();
         WITH error_scan AS (
-            SELECT (data->>'account_id')::text as error_id,
-                   count(*) OVER () as total_scanned
+            SELECT (data->>'account_id')::text as error_id
             FROM temporary_data
             WHERE type = 'import_profile'
             AND (data->>'account_id')::text IS NOT NULL
             AND inserted IS NULL
             AND timestamp < process_cutoff_time
         )
-        SELECT array_agg(error_id), MAX(total_scanned)
-        INTO error_records, rows_read
+        SELECT array_agg(error_id)
+        INTO error_records
         FROM error_scan;
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Error records collected in %. Scanned % rows', query_time, rows_read;
+
 
         RETURN QUERY SELECT processed_count, error_records;
   
@@ -226,21 +178,15 @@ DECLARE
     processed_count INTEGER := 0;
     error_records TEXT[];
     processed_ids TEXT[];
-    start_time TIMESTAMP;
-    query_time INTERVAL;
-    rows_read BIGINT;
 BEGIN
     BEGIN
-        RAISE NOTICE 'Starting tweet processing at %', clock_timestamp();
-
-        start_time := clock_timestamp();
+       
         WITH latest_records AS (
             SELECT *,
                 ROW_NUMBER() OVER (
                     PARTITION BY (data->>'tweet_id')::text 
                     ORDER BY (data->>'created_at')::timestamp with time zone DESC
-                ) as rn,
-                count(*) OVER () as total_rows
+                ) as rn
             FROM temporary_data 
             WHERE type = 'import_tweet' 
             AND (data->>'tweet_id')::text IS NOT NULL
@@ -281,36 +227,26 @@ BEGIN
                 reply_to_tweet_id = EXCLUDED.reply_to_tweet_id,
                 reply_to_user_id = EXCLUDED.reply_to_user_id,
                 reply_to_username = EXCLUDED.reply_to_username
-            RETURNING tweet_id, (SELECT total_rows FROM latest_records LIMIT 1) as rows_scanned
+            RETURNING tweet_id
         )
-        SELECT array_agg(tweet_id), MAX(rows_scanned) INTO processed_ids, rows_read FROM insertions;
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Tweet insertion completed in %. Scanned % rows from temporary_data', query_time, rows_read;
+        SELECT array_agg(tweet_id) INTO processed_ids FROM insertions;
 
-        start_time := clock_timestamp();
         SELECT COUNT(*) INTO processed_count
         FROM unnest(processed_ids);
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Count processed in %. Processed % records', query_time, processed_count;
 
-        start_time := clock_timestamp();
+
         WITH processed_ids_table AS (
             SELECT unnest(processed_ids) as tweet_id
-        ),
-        update_result AS (
-            UPDATE temporary_data td
-            SET inserted = CURRENT_TIMESTAMP
-            FROM processed_ids_table pit
-            WHERE td.type = 'import_tweet' 
-            AND (td.data->>'tweet_id')::text = pit.tweet_id
-            AND td.timestamp < process_cutoff_time
-            RETURNING td.*
         )
-        SELECT COUNT(*) INTO rows_read FROM update_result;
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Updated inserted timestamps in %. Updated % rows', query_time, rows_read;
+        UPDATE temporary_data td
+        SET inserted = CURRENT_TIMESTAMP
+        FROM processed_ids_table pit
+        WHERE td.type = 'import_tweet' 
+        AND (td.data->>'tweet_id')::text = pit.tweet_id
+        AND td.timestamp < process_cutoff_time;
 
-        start_time := clock_timestamp();
+        
+
         WITH error_scan AS (
             SELECT (data->>'tweet_id')::text as error_id,
                    count(*) OVER () as total_scanned
@@ -320,11 +256,10 @@ BEGIN
             AND inserted IS NULL
             AND timestamp < process_cutoff_time
         )
-        SELECT array_agg(error_id), MAX(total_scanned)
-        INTO error_records, rows_read
+        SELECT array_agg(error_id)
+        INTO error_records
         FROM error_scan;
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Error records collected in %. Scanned % rows', query_time, rows_read;
+        
 
         RETURN QUERY SELECT processed_count, error_records;
   
@@ -344,33 +279,22 @@ DECLARE
     processed_count INTEGER := 0;
     error_records TEXT[];
     processed_ids TEXT[];
-    start_time TIMESTAMP;
-    query_time INTERVAL;
-    rows_read BIGINT;
 BEGIN
     BEGIN
-        RAISE NOTICE 'Starting media processing at %', clock_timestamp();
 
-        start_time := clock_timestamp();
-        WITH scan_records AS (
-            SELECT *,
-                   count(*) OVER () as total_scanned
-            FROM temporary_data 
-            WHERE type = 'import_media'
-            AND (data->>'media_id')::text IS NOT NULL
-            AND inserted IS NULL
-            AND timestamp < process_cutoff_time
-        ),
-        latest_records AS (
+        WITH latest_records AS (
             SELECT DISTINCT ON ((data->>'media_id')::text)
                 (data->>'media_id')::bigint as media_id,
                 (data->>'tweet_id')::text as tweet_id,
                 (data->>'media_url')::text as media_url,
                 (data->>'media_type')::text as media_type,
                 (data->>'width')::integer as width,
-                (data->>'height')::integer as height,
-                total_scanned
-            FROM scan_records
+                (data->>'height')::integer as height
+            FROM temporary_data 
+            WHERE type = 'import_media'
+            AND (data->>'media_id')::text IS NOT NULL
+            AND inserted IS NULL
+            AND timestamp < process_cutoff_time
             ORDER BY (data->>'media_id')::text, timestamp DESC
         ),
         insertions AS (
@@ -397,46 +321,32 @@ BEGIN
                 media_type = EXCLUDED.media_type,
                 width = EXCLUDED.width,
                 height = EXCLUDED.height
-            RETURNING media_id::text, (SELECT MAX(total_scanned) FROM latest_records) as rows_scanned
+            RETURNING media_id::text
         )
-        SELECT array_agg(media_id), MAX(rows_scanned) INTO processed_ids, rows_read FROM insertions;
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Media insertion completed in %. Scanned % rows from temporary_data', query_time, rows_read;
-
-        start_time := clock_timestamp();
+        SELECT array_agg(media_id) INTO processed_ids FROM insertions;
+        
         SELECT COUNT(*) INTO processed_count
         FROM unnest(processed_ids);
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Count processed in %. Processed % records', query_time, processed_count;
 
-        start_time := clock_timestamp();
-        WITH update_result AS (
-            UPDATE temporary_data td
-            SET inserted = CURRENT_TIMESTAMP
-            WHERE td.type = 'import_media'
-            AND (td.data->>'media_id')::text = ANY(processed_ids)
-            AND td.timestamp < process_cutoff_time
-            RETURNING td.*
-        )
-        SELECT COUNT(*) INTO rows_read FROM update_result;
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Updated inserted timestamps in %. Updated % rows', query_time, rows_read;
+       
+        UPDATE temporary_data td
+        SET inserted = CURRENT_TIMESTAMP
+        WHERE td.type = 'import_media'
+        AND (td.data->>'media_id')::text = ANY(processed_ids)
+        AND td.timestamp < process_cutoff_time;
 
-        start_time := clock_timestamp();
         WITH error_scan AS (
-            SELECT (data->>'media_id')::text as error_id,
-                   count(*) OVER () as total_scanned
+            SELECT (data->>'media_id')::text as error_id
             FROM temporary_data
             WHERE type = 'import_media'
             AND (data->>'media_id')::text IS NOT NULL
             AND inserted IS NULL
             AND timestamp < process_cutoff_time
         )
-        SELECT array_agg(error_id), MAX(total_scanned)
-        INTO error_records, rows_read
+        SELECT array_agg(error_id)
+        INTO error_records
         FROM error_scan;
-        query_time := clock_timestamp() - start_time;
-        RAISE NOTICE 'Error records collected in %. Scanned % rows', query_time, rows_read;
+        
 
         RETURN QUERY SELECT processed_count, error_records;
   
@@ -502,14 +412,12 @@ BEGIN
         FROM unnest(processed_ids);
 
 
-        WITH update_result AS (
-            UPDATE temporary_data td
-            SET inserted = CURRENT_TIMESTAMP
-            WHERE td.type = 'import_url'
-            AND (td.data->>'tweet_id')::text = ANY(processed_ids)
-            AND td.timestamp < process_cutoff_time
-            RETURNING td.*
-        )
+        UPDATE temporary_data td
+        SET inserted = CURRENT_TIMESTAMP
+        WHERE td.type = 'import_url'
+        AND (td.data->>'tweet_id')::text = ANY(processed_ids)
+        AND td.timestamp < process_cutoff_time;
+
         SELECT COUNT(*) INTO processed_count FROM update_result;
 
 

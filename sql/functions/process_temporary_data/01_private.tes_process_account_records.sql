@@ -15,7 +15,7 @@ BEGIN
                 ROW_NUMBER() OVER (
                     PARTITION BY (data->>'account_id')::text 
                     ORDER BY (data->>'created_at')::timestamp with time zone DESC
-                )
+                ) as rn
             FROM temporary_data 
             WHERE type = 'import_account' 
             AND (data->>'account_id')::text IS NOT NULL

@@ -35,3 +35,8 @@ BEGIN
         )', schema_name, table_name);
 END;
 $$ LANGUAGE plpgsql;
+
+PERFORM public.apply_public_rls_policies('public', 'tweets');
+PERFORM public.apply_public_rls_policies('public', 'likes');
+PERFORM public.apply_public_rls_policies('public', 'followers');
+PERFORM public.apply_public_rls_policies('public', 'following');

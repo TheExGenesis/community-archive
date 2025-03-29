@@ -27,6 +27,4 @@ LEFT JOIN LATERAL (
     LIMIT 1
 ) p ON true;
 
-CREATE INDEX IF NOT EXISTS idx_profile_account_id_archive_upload_id ON profile(account_id, archive_upload_id DESC);
 CREATE INDEX IF NOT EXISTS idx_conversations_tweet_id ON conversations(tweet_id);
-CREATE INDEX IF NOT EXISTS idx_quote_tweets_tweet_id ON quote_tweets(tweet_id);

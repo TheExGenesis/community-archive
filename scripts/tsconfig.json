@@ -12,6 +12,7 @@
     },
     "include": [
         "**/*.mts",
-        "**/*.ts"
+        "**/*.ts",
+        "fix_circles.js"
     ]
 }

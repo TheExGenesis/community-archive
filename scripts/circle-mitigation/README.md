@@ -23,5 +23,3 @@ We identify circle tweets by querying the syndication api and seeing if it retur
 ### Eliminate Circle Tweets
 
 We eliminate circle tweets from the database by deleting those tweets and any tweets downstream of those from the database.
-
-## Data

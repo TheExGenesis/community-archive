@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION private.tes_process_media_records()
+CREATE OR REPLACE FUNCTION private.tes_process_media_records(process_cutoff_time TIMESTAMP)
 RETURNS TABLE (
     processed INTEGER,
     errors TEXT[]
@@ -21,6 +21,7 @@ BEGIN
             WHERE type = 'import_media'
             AND (data->>'media_id')::text IS NOT NULL
             AND inserted IS NULL
+            AND timestamp < process_cutoff_time
             ORDER BY (data->>'media_id')::text, timestamp DESC
         ),
         insertions AS (
@@ -50,20 +51,30 @@ BEGIN
             RETURNING media_id::text
         )
         SELECT array_agg(media_id) INTO processed_ids FROM insertions;
+        
         SELECT COUNT(*) INTO processed_count
         FROM unnest(processed_ids);
-        -- Update inserted timestamp for ALL related records
+
+       
         UPDATE temporary_data td
         SET inserted = CURRENT_TIMESTAMP
         WHERE td.type = 'import_media'
-        AND (td.data->>'media_id')::text = ANY(processed_ids);
-        -- Get error records
-        SELECT array_agg((data->>'media_id')::text)
+        AND (td.data->>'media_id')::text = ANY(processed_ids)
+        AND td.timestamp < process_cutoff_time;
+
+        WITH error_scan AS (
+            SELECT (data->>'media_id')::text as error_id
+            FROM temporary_data
+            WHERE type = 'import_media'
+            AND (data->>'media_id')::text IS NOT NULL
+            AND inserted IS NULL
+            AND timestamp < process_cutoff_time
+        )
+        SELECT array_agg(error_id)
         INTO error_records
-        FROM temporary_data
-        WHERE type = 'import_media'
-        AND (data->>'media_id')::text IS NOT NULL
-        AND inserted IS NULL;
+        FROM error_scan;
+        
+
         RETURN QUERY SELECT processed_count, error_records;
   
     EXCEPTION WHEN OTHERS THEN

@@ -1,41 +1,38 @@
-CREATE OR REPLACE FUNCTION private.tes_complete_group_insertions()
+
+CREATE OR REPLACE FUNCTION private.tes_complete_group_insertions(process_cutoff_time TIMESTAMP)
 RETURNS TABLE (
-    completed INTEGER,
-    errors TEXT[]
+    completed INTEGER
 ) AS $$
 DECLARE
     completed_count INTEGER := 0;
-    error_records TEXT[];
 BEGIN
     BEGIN
-        WITH api_groups AS (
-            SELECT DISTINCT originator_id
-            FROM temporary_data td1
-            WHERE 
-                -- Find groups where all records are API-type
-                type LIKE 'api%'
-                AND NOT EXISTS (
-                    SELECT 1 
-                    FROM temporary_data td2 
-                    WHERE td2.originator_id = td1.originator_id 
-                    AND td2.type NOT LIKE 'api%'
-                    AND td2.inserted IS NULL
-                )
+        -- Identify originator_ids with only api% rows and inserted IS NULL
+        WITH eligible_groups AS (
+            SELECT originator_id
+            FROM temporary_data
+            WHERE inserted IS NULL
+            AND timestamp < process_cutoff_time
+            GROUP BY originator_id
+            HAVING COUNT(*) FILTER (WHERE type NOT LIKE 'api%') = 0
         ),
         updates AS (
             UPDATE temporary_data td
             SET inserted = CURRENT_TIMESTAMP
-            FROM api_groups ag
-            WHERE td.originator_id = ag.originator_id
+            FROM eligible_groups eg
+            WHERE td.originator_id = eg.originator_id
             AND td.type LIKE 'api%'
             AND td.inserted IS NULL
+            AND td.timestamp < process_cutoff_time
             RETURNING td.originator_id
         )
-        SELECT COUNT(DISTINCT originator_id), array_agg(DISTINCT originator_id)
-        INTO completed_count, error_records
-        FROM updates;
-        RETURN QUERY SELECT completed_count, error_records;
-  
+        SELECT COUNT(DISTINCT u.originator_id), 
+               ARRAY_AGG(DISTINCT u.originator_id)
+        INTO completed_count
+        FROM updates u;
+
+        RETURN QUERY SELECT completed_count;
+
     EXCEPTION WHEN OTHERS THEN
         RETURN QUERY SELECT -1, ARRAY[SQLERRM];
     END;

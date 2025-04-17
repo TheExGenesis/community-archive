@@ -1,5 +1,4 @@
-
-CREATE OR REPLACE FUNCTION private.tes_process_profile_records()
+CREATE OR REPLACE FUNCTION private.tes_process_profile_records(process_cutoff_time TIMESTAMP)
 RETURNS TABLE (
     processed INTEGER,
     errors TEXT[]
@@ -20,6 +19,7 @@ BEGIN
             WHERE type = 'import_profile' 
             AND (data->>'account_id')::text IS NOT NULL
             AND inserted IS NULL
+            AND timestamp < process_cutoff_time
         ),
         insertions AS (
             INSERT INTO public.all_profile (
@@ -49,8 +49,10 @@ BEGIN
             RETURNING account_id
         )
         SELECT array_agg(account_id) INTO processed_ids FROM insertions;
+
         SELECT COUNT(*) INTO processed_count
         FROM unnest(processed_ids);
+
         WITH processed_ids_table AS (
             SELECT unnest(processed_ids) as account_id
         )
@@ -58,13 +60,22 @@ BEGIN
         SET inserted = CURRENT_TIMESTAMP
         FROM processed_ids_table pit
         WHERE td.type = 'import_profile' 
-        AND (td.data->>'account_id')::text = pit.account_id;
-        SELECT array_agg((data->>'account_id')::text)
+        AND (td.data->>'account_id')::text = pit.account_id
+        AND td.timestamp < process_cutoff_time;
+
+        WITH error_scan AS (
+            SELECT (data->>'account_id')::text as error_id
+            FROM temporary_data
+            WHERE type = 'import_profile'
+            AND (data->>'account_id')::text IS NOT NULL
+            AND inserted IS NULL
+            AND timestamp < process_cutoff_time
+        )
+        SELECT array_agg(error_id)
         INTO error_records
-        FROM temporary_data
-        WHERE type = 'import_profile'
-        AND (data->>'account_id')::text IS NOT NULL
-        AND inserted IS NULL;
+        FROM error_scan;
+
+
         RETURN QUERY SELECT processed_count, error_records;
   
     EXCEPTION WHEN OTHERS THEN

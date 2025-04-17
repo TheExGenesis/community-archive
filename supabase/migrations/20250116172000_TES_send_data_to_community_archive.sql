@@ -109,7 +109,7 @@ BEGIN
     SELECT COUNT(*) INTO account_count FROM public.account;
     SELECT COUNT(*) INTO all_account_count FROM public.all_account;
     IF account_count = all_account_count THEN
-        DROP TABLE public.account;
+        DROP TABLE IF EXISTS public.account;
         CREATE OR REPLACE VIEW public.account AS
         SELECT a.*
         FROM all_account a
@@ -133,7 +133,7 @@ BEGIN
            AND p.archive_upload_id = latest.latest_archive_id;
     SELECT COUNT(*) INTO all_profile_count FROM public.all_profile;
     IF profile_count = all_profile_count THEN
-        DROP TABLE public.profile;
+        DROP TABLE IF EXISTS public.profile;
         CREATE OR REPLACE VIEW public.profile AS
         SELECT  
             p.*

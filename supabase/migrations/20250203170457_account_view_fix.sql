@@ -1,4 +1,6 @@
-create or replace view public.account as
+drop view if exists public.account;
+
+create view public.account as
 select
   a.account_id,
   a.created_via,
@@ -8,7 +10,8 @@ select
   a.num_tweets,
   a.num_following,
   a.num_followers,
-  a.num_likes
+  a.num_likes,
+  a.updated_at
 from
   all_account a
   join archive_upload au on a.account_id = au.account_id

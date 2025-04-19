@@ -30,11 +30,9 @@ interface UploadArchiveState {
   showUploadButton: boolean
   isDeleting: boolean
 }
-export default function UploadHomepageSection(props: {
-  supabase: SupabaseClient<Database> | null
-}) {
+export default function UploadHomepageSection() {
   const { userMetadata } = useAuthAndArchive()
-  const supabase = props.supabase || createBrowserClient()
+  const supabase = createBrowserClient()
   const [state, setState] = useState<UploadArchiveState>({
     isProcessing: false,
     archive: null,

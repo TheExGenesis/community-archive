@@ -78,7 +78,7 @@ export default async function Homepage() {
         </p>
         <br />
         <DynamicSignIn />
-        <UploadHomepageSection supabase={null} />
+        <UploadHomepageSection supabase={supabase} />
         <br />
 
         <h2 className="my-10 mb-4 text-xl">💻 Data & source code</h2>

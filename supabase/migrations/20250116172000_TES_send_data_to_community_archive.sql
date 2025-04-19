@@ -763,8 +763,11 @@ FOR SELECT
 TO public
 USING (true);
 --create bucket
-insert into storage.buckets (id, name,public) values  
-('twitter_api_files', 'twitter_api_files',false);
+INSERT INTO storage.buckets (id, name, public)
+SELECT 'twitter_api_files', 'twitter_api_files', false
+WHERE NOT EXISTS (
+    SELECT 1 FROM storage.buckets WHERE id = 'twitter_api_files'
+);
 CREATE TABLE IF NOT EXISTS public.temporary_data (
     type VARCHAR(255) NOT NULL,
     item_id VARCHAR(255) NOT NULL,

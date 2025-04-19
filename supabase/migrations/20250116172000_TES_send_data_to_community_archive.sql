@@ -105,11 +105,24 @@ DO $$
 DECLARE
     account_count INTEGER;
     all_account_count INTEGER;
+    table_exists BOOLEAN;
 BEGIN
     SELECT COUNT(*) INTO account_count FROM public.account;
     SELECT COUNT(*) INTO all_account_count FROM public.all_account;
+    
+    -- Check if table exists without using nested DO block
+    SELECT EXISTS (
+        SELECT 1 FROM pg_tables 
+        WHERE schemaname = 'public' AND tablename = 'account'
+    ) INTO table_exists;
+    
     IF account_count = all_account_count THEN
-        DROP TABLE IF EXISTS public.account;
+        -- Drop table if it exists
+        IF table_exists THEN
+            EXECUTE 'DROP TABLE public.account';
+        END IF;
+        
+        -- Create view
         CREATE OR REPLACE VIEW public.account AS
         SELECT a.*
         FROM all_account a
@@ -133,7 +146,12 @@ BEGIN
            AND p.archive_upload_id = latest.latest_archive_id;
     SELECT COUNT(*) INTO all_profile_count FROM public.all_profile;
     IF profile_count = all_profile_count THEN
-        DROP TABLE IF EXISTS public.profile;
+        IF EXISTS (
+            SELECT 1 FROM pg_tables 
+            WHERE schemaname = 'public' AND tablename = 'profile'
+        ) THEN
+            DROP TABLE public.profile;
+        END IF;
         CREATE OR REPLACE VIEW public.profile AS
         SELECT  
             p.*

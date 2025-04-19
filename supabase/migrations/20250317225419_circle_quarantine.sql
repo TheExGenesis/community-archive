@@ -21,7 +21,7 @@ $$;
 DO $$
 BEGIN
   -- Remove existing policies
-  PERFORM public.apply_public_rls_policies('public', 'tweet_media');
+  PERFORM public.apply_public_entities_rls_policies('public', 'tweet_media');
   
   -- Add quarantine policy for tweet media based on tweet creation date
   CREATE POLICY "Quarantine media from tweets between Aug 2022 and Nov 2023" ON public.tweet_media

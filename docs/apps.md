@@ -10,4 +10,4 @@ Applications running on top of the community archive.
 - 💥 [Banger Bot](https://theexgenesis--text-rag-ui-run.modal.run/) - Write tweets based on RAG from the most liked tweets in the archive
 - 🐦 [Birdseye](https://theexgenesis--community-archive-birdseye-run.modal.run/?username=romeostevens76) - Gives you a top down view of your tweets by topic and over time, with a bit of LLM analysis.
 - 🪡 [Thread of community builds](https://x.com/exgenesis/status/1835411943735140798) - mostly smaller builds and demos from the community
-
+- 📝 [Historical highlights bot](https://www.val.town/v/exgenesis/ca_highlights) - running on twitter [@ca_highlights]([url](https://x.com/ca_highlights)), posts highlights from the current day from past years.

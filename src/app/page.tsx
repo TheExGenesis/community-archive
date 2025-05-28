@@ -98,7 +98,7 @@ export default async function Homepage() {
           To understand exactly what data from your Twitter archive is processed
           and stored, please see our{' '}
           <a
-            href="https://github.com/TheExGenesis/open-birdsite-db/blob/main/open-birdsite-db/open-birdsite-db/docs/archive_data.md"
+            href="https://github.com/TheExGenesis/community-archive/blob/main/community-archive/community-archive/docs/archive_data.md"
             className="text-blue-500 hover:underline"
             target="_blank"
             rel="noopener noreferrer"

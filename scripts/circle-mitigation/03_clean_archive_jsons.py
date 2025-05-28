@@ -8,7 +8,8 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv("/Users/frsc/Documents/Projects/open-birdsite-db/open-birdsite-db/.env")
+PROJECT_ROOT = "/Users/frsc/Documents/Projects/open-birdsite-db"
+load_dotenv(f"{PROJECT_ROOT}/open-birdsite-db/.env")
 
 # Initialize Supabase client
 supabase: Client = create_client(
@@ -16,7 +17,7 @@ supabase: Client = create_client(
     os.getenv("NEXT_PUBLIC_SUPABASE_SERVICE_ROLE"),
 )
 
-SUSPECTED_CIRCLE_TWEET_IDS_PATH = "/Users/frsc/Documents/Projects/open-birdsite-db/data/circle-mitigation/isCircleTweet"
+SUSPECTED_CIRCLE_TWEET_IDS_PATH = f"{PROJECT_ROOT}/data/circle-mitigation/isCircleTweet"
 # these have dirs whose names are user_ids, and then have files named like socialdata_1558616329686601729.json and syndication_1558616329686601729.json
 # we want to get all these ids into a dataframe
 
@@ -32,8 +33,8 @@ for user_id in os.listdir(SUSPECTED_CIRCLE_TWEET_IDS_PATH):
 suspected_circle_tweet_ids = pd.DataFrame(suspected_circle_tweet_ids)
 suspected_circle_tweet_ids.set_index("tweet_id", inplace=True)
 # %%
-INPUT_DIR = "/Users/frsc/Documents/Projects/open-birdsite-db/data/downloads/archives"  # <USERNAME>/archive.json
-OUTPUT_DIR = "/Users/frsc/Documents/Projects/open-birdsite-db/data/circle-mitigation/archives-no-circle-tweets"
+INPUT_DIR = f"{PROJECT_ROOT}/data/downloads/archives"  # <USERNAME>/archive.json
+OUTPUT_DIR = f"{PROJECT_ROOT}/data/circle-mitigation/archives-no-circle-tweets"
 
 users_to_check = ["myceliummage", "__drewface"]
 import json
@@ -114,7 +115,7 @@ print(f"Found {len(all_conversations)} conversations in supabase db")
 # in rerequest_circles, we requested all of the tweets above to distinguish circle tweets from tweets coming threads started by deleted accounts - visible tweets will have more than 1KB and so can be discarded
 import os
 
-REREQUEST_PATH = "/Users/frsc/Documents/Projects/open-birdsite-db/data/circle-mitigation/rerequest_circles"  # contains files <TWEETID>.json
+REREQUEST_PATH = f"{PROJECT_ROOT}/data/circle-mitigation/rerequest_circles"  # contains files <TWEETID>.json
 rerequest_ids = [f.split(".")[0] for f in os.listdir(REREQUEST_PATH)]
 rerequest_circle_tweet_ids = [
     f.split(".")[0]
@@ -141,12 +142,12 @@ suspected_circle_tweets_and_conversations_ids_df = pd.DataFrame(
     suspected_circle_tweets_and_conversations_ids, columns=["tweet_id"]
 )
 suspected_circle_tweets_and_conversations_ids_df.to_csv(
-    "/Users/frsc/Documents/Projects/open-birdsite-db/data/circle-mitigation/circle_and_conversation_tweet_ids.csv",
+    f"{PROJECT_ROOT}/data/circle-mitigation/circle_and_conversation_tweet_ids.csv",
     index=False,
 )
 # %%
 suspected_circle_tweets_and_conversations_ids_df = pd.read_csv(
-    "/Users/frsc/Documents/Projects/open-birdsite-db/data/circle-mitigation/circle_and_conversation_tweet_ids.csv",
+    f"{PROJECT_ROOT}/data/circle-mitigation/circle_and_conversation_tweet_ids.csv",
     dtype={"tweet_id": str},
 )
 suspected_circle_tweets_and_conversations_ids = set(

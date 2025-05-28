@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { AvatarType } from '@/lib-client/types'
-import { formatNumber } from '@/lib-client/formatNumber'
+import { AvatarType } from '@/lib/types'
+import { formatNumber } from '@/lib/formatNumber'
 
 type AvatarListProps = {
   initialAvatars: AvatarType[]

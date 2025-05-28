@@ -1,7 +1,7 @@
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
-import { formatUserData } from '@/lib-client/user-utils'
-import { devLog } from '@/lib-client/devLog'
+import { formatUserData } from '@/lib/user-utils'
+import { devLog } from '@/lib/devLog'
 
 const tweetSelectString = `
         *,

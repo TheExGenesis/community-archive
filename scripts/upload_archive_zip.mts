@@ -4,17 +4,15 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import unzipper from 'unzipper'
-import { Archive } from '../src/lib-client/types'
+import { Archive } from '../src/lib/types'
 import { v4 as uuidv4 } from 'uuid'
-import { removeProblematicCharacters } from '../src/lib-client/removeProblematicChars'
+import { removeProblematicCharacters } from '../src/lib/removeProblematicChars'
 const { validateFileContents } = await import(
-  '../src/lib-client/upload-archive/validateContent'
+  '../src/lib/upload-archive/validateContent'
 )
-const { insertArchiveInTempTables } = await import(
-  '../src/lib-client/db_insert'
-)
+const { insertArchiveInTempTables } = await import('../src/lib/db_insert')
 const { uploadArchiveToStorage } = await import(
-  '../src/lib-client/upload-archive/uploadArchiveToStorage'
+  '../src/lib/upload-archive/uploadArchiveToStorage'
 )
 
 // Initialize paths

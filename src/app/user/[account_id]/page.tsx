@@ -6,11 +6,11 @@ import TopMentionedUsers, {
 } from '@/components/TopMentionedMissingUsers'
 import AccountTopTweets from './AccountTopTweets'
 import { createServerClient } from '@/utils/supabase'
-import { FormattedUser } from '@/lib-client/types'
-import { devLog } from '@/lib-client/devLog'
+import { FormattedUser } from '@/lib/types'
+import { devLog } from '@/lib/devLog'
 import { cookies } from 'next/headers'
-import { getUserData } from '@/lib-server/queries/fetchUsers'
-import { formatNumber } from '@/lib-client/formatNumber'
+import { getUserData } from '@/lib/queries/fetchUsers'
+import { formatNumber } from '@/lib/formatNumber'
 import { DownloadArchiveButton } from './DownloadArchiveButton'
 
 const UserProfile = ({ userData }: { userData: FormattedUser }) => {
@@ -81,7 +81,7 @@ export default async function User({ params }: any) {
         <UserProfile userData={userData} />
       </Suspense>
 
-      {showingSummaryData && (
+      {showingSummaryData ? (
         <>
           <h2 className="text-xl font-semibold">{'Most Mentioned Accounts'}</h2>
           <Suspense fallback={<Skeleton className="h-[20vh] w-full" />}>
@@ -98,6 +98,17 @@ export default async function User({ params }: any) {
             </Suspense>
           </div>
         </>
+      ) : (
+        <div className="my-16 rounded-md border border-dashed border-gray-300 bg-gray-50 p-8 text-center dark:border-gray-700 dark:bg-gray-700/30">
+          <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+            Activity summary not yet available.
+          </h3>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            Detailed activity data like top tweets and mentions is currently
+            being processed or is not available for this user. Basic profile
+            information is still shown above.
+          </p>
+        </div>
       )}
     </div>
   )

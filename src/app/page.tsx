@@ -94,6 +94,19 @@ export default async function Homepage() {
           </a>
           .
         </p>
+        <p className="mt-2">
+          To understand exactly what data from your Twitter archive is processed
+          and stored, please see our{' '}
+          <a
+            href="https://github.com/TheExGenesis/open-birdsite-db/blob/main/open-birdsite-db/open-birdsite-db/docs/archive_data.md"
+            className="text-blue-500 hover:underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Data Usage Details
+          </a>
+          .
+        </p>
 
         <br />
         <ul className="list-disc pl-4">

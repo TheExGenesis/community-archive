@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { PopularTweet } from '@/lib-client/types'
+import { PopularTweet } from '@/lib/types'
 import Tweet from '@/components/Tweet'
 import { CopyButton } from '@/components/copy-button'
 import { ScrollArea } from '@/components/ui/scroll-area'

@@ -1,5 +1,5 @@
 import { Database } from '@/database-types'
-import { devLog } from '@/lib-client/devLog'
+import { devLog } from '@/lib/devLog'
 import {
   createBrowserClient as browserClient,
   createServerClient as serverClient,
@@ -125,7 +125,9 @@ export const createServerAdminClient = (
 export async function createDbScriptClient() {
   const isDevelopment = process.env.NODE_ENV === 'development'
   if (!isDevelopment) {
-    throw new Error('createDbScriptClient can only be called in development mode')
+    throw new Error(
+      'createDbScriptClient can only be called in development mode',
+    )
   }
   const { url, serviceRole } = getSupabaseConfig(true)
   return createClient<Database>(url!, serviceRole!)

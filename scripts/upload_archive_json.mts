@@ -4,16 +4,14 @@ import path from 'path'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
-import { Archive } from '../src/lib-client/types'
-const { insertArchiveInTempTables } = await import(
-  '../src/lib-client/db_insert'
-)
-const { pipe } = await import('../src/lib-server/fp')
+import { Archive } from '../src/lib/types'
+const { insertArchiveInTempTables } = await import('../src/lib/db_insert')
+const { pipe } = await import('../src/lib/fp')
 const { uploadArchiveToStorage } = await import(
-  '../src/lib-client/upload-archive/uploadArchiveToStorage'
+  '../src/lib/upload-archive/uploadArchiveToStorage'
 )
 const { removeProblematicCharacters } = await import(
-  '../src/lib-client/removeProblematicChars'
+  '../src/lib/removeProblematicChars'
 )
 
 // Get the directory name of the current module

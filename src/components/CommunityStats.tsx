@@ -1,7 +1,7 @@
-import { getStats } from '@/lib-server/stats'
+import { getStats } from '@/lib/stats'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
-import { formatNumber } from '@/lib-client/formatNumber'
+import { formatNumber } from '@/lib/formatNumber'
 
 const calculateGoal = (accountCount: number): number => {
   const goals = [25, 50, 100, 250, 500, 750, 1000]

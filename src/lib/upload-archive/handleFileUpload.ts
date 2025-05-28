@@ -1,4 +1,4 @@
-import { pipe } from '@/lib-server/fp'
+import { pipe } from '@/lib/fp'
 import { devLog } from '../devLog'
 import { Archive } from '../types'
 import { validateContent, validateFileContents } from './validateContent'

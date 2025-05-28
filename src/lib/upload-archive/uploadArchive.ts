@@ -1,6 +1,6 @@
 import { Archive } from '../types'
-import { insertArchiveInTempTables } from '@/lib-client/db_insert'
-import { uploadArchiveToStorage } from '@/lib-client/upload-archive/uploadArchiveToStorage'
+import { insertArchiveInTempTables } from '@/lib/db_insert'
+import { uploadArchiveToStorage } from '@/lib/upload-archive/uploadArchiveToStorage'
 import { SupabaseClient } from '@supabase/supabase-js'
 
 export const uploadArchive = async (

@@ -1,15 +1,15 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { deleteArchive } from '../lib-client/db_insert'
+import { deleteArchive } from '../lib/db_insert'
 import { createBrowserClient } from '@/utils/supabase'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { FileUploadDialog } from './file-upload-dialog'
-import { ArchiveStats, Archive, ArchiveUpload } from '@/lib-client/types'
-import { devLog } from '@/lib-client/devLog'
-import { fetchArchiveUpload } from '@/lib-client/queries/fetchArchiveUpload'
-import { calculateArchiveStats } from '@/lib-client/upload-archive/calculateArchiveStats'
-import { handleFileUpload } from '@/lib-client/upload-archive/handleFileUpload'
+import { ArchiveStats, Archive, ArchiveUpload } from '@/lib/types'
+import { devLog } from '@/lib/devLog'
+import { fetchArchiveUpload } from '@/lib/queries/fetchArchiveUpload'
+import { calculateArchiveStats } from '@/lib/upload-archive/calculateArchiveStats'
+import { handleFileUpload } from '@/lib/upload-archive/handleFileUpload'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/database-types'
 
@@ -233,17 +233,17 @@ export default function UploadHomepageSection() {
 
 const deleteStorageFiles = async (
   supabase: SupabaseClient<Database>,
-  providerId: string,
+  username: string,
 ) => {
   const { data: fileList, error: listError } = await supabase.storage
     .from('archives')
-    .list(providerId)
+    .list(username)
 
   if (listError) throw listError
 
   if (fileList && fileList.length > 0) {
     const filesToDelete = fileList.map(
-      (file: { name: string }) => `${providerId}/${file.name}`,
+      (file: { name: string }) => `${username}/${file.name}`,
     )
     const { error: deleteError } = await supabase.storage
       .from('archives')

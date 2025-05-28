@@ -1,6 +1,6 @@
 import { FaHeart, FaRetweet, FaExternalLinkAlt, FaReply } from 'react-icons/fa'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { formatNumber } from '@/lib-client/formatNumber'
+import { formatNumber } from '@/lib/formatNumber'
 
 interface TweetProps {
   username: string

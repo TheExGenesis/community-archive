@@ -22,14 +22,10 @@ import { Input } from '@/components/ui/input'
 import { ChevronDown, ChevronUp, Info } from 'lucide-react'
 import Link from 'next/link'
 import { format, parse } from 'date-fns'
-import {
-  ArchiveStats,
-  FileUploadDialogProps,
-  UploadOptions,
-} from '@/lib-client/types'
-import { uploadArchive } from '@/lib-client/upload-archive/uploadArchive'
-import { calculateArchiveStats } from '@/lib-client/upload-archive/calculateArchiveStats'
-import { applyOptionsToArchive } from '@/lib-client/upload-archive/applyOptionsToArchive'
+import { ArchiveStats, FileUploadDialogProps, UploadOptions } from '@/lib/types'
+import { uploadArchive } from '@/lib/upload-archive/uploadArchive'
+import { calculateArchiveStats } from '@/lib/upload-archive/calculateArchiveStats'
+import { applyOptionsToArchive } from '@/lib/upload-archive/applyOptionsToArchive'
 
 interface FileUploadDialogState {
   keepPrivate: boolean

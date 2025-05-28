@@ -1,9 +1,9 @@
-import { devLog } from '@/lib-client/devLog'
-import { Archive } from '@/lib-client/types'
+import { devLog } from '@/lib/devLog'
+import { Archive } from '@/lib/types'
 import { SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
-import { removeProblematicCharacters } from '@/lib-client/removeProblematicChars'
+import { removeProblematicCharacters } from '@/lib/removeProblematicChars'
 
 // Load environment variables from .env file in the scratchpad directory
 if (process.env.NODE_ENV !== 'production') {

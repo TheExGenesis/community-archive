@@ -1,8 +1,8 @@
 import { createBrowserClient } from '@/utils/supabase'
-import { User } from '@/lib-client/types'
-import { formatUserData } from '@/lib-client/user-utils'
+import { User } from '@/lib/types'
+import { formatUserData } from '@/lib/user-utils'
 import { SupabaseClient } from '@supabase/supabase-js'
-import { devLog } from '@/lib-client/devLog'
+import { devLog } from '@/lib/devLog'
 
 export const fetchUsers = async (supabase: SupabaseClient): Promise<User[]> => {
   const { data, error } = await supabase

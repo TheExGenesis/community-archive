@@ -1,6 +1,6 @@
 'use client'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
-import { devLog } from '@/lib-client/devLog'
+import { devLog } from '@/lib/devLog'
 import { createBrowserClient } from '@/utils/supabase'
 
 export default function SignIn() {

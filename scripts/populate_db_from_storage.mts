@@ -4,12 +4,12 @@ import * as dotenv from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import os from 'os'
-const { pipe } = await import('../src/lib-server/fp')
+const { pipe } = await import('../src/lib/fp')
 const { removeProblematicCharacters } = await import(
-  '../src/lib-client/removeProblematicChars'
+  '../src/lib/removeProblematicChars'
 )
 const { commitTempTables, insertArchiveInTempTables } = await import(
-  '../src/lib-client/db_insert'
+  '../src/lib/db_insert'
 )
 
 // Initialize paths

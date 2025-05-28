@@ -14,7 +14,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(script_dir, "../../.."))
 
 # Load environment variables from the project root .env file
-dotenv_path = os.path.join(project_root, "open-birdsite-db", ".env")
+dotenv_path = os.path.join(project_root, "community-archive", ".env")
 load_dotenv(dotenv_path)
 
 # Initialize Supabase client

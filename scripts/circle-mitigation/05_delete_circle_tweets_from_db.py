@@ -14,7 +14,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(script_dir, "../../.."))
 
 # Load environment variables from the project root .env file
-dotenv_path = os.path.join(project_root, "open-birdsite-db", ".env")
+dotenv_path = os.path.join(project_root, "community-archive", ".env")
 load_dotenv(dotenv_path)
 # Upload the modified archives to Supabase Storage
 BATCH_SIZE = 100
@@ -31,11 +31,12 @@ supabase: Client = create_client(supabase_url, supabase_key)
 # %%
 # Delete the suspected circle tweets and their related data from the database
 
+PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "../..")
 # Ensure the set of IDs is loaded
 if "suspected_circle_tweets_and_conversations_ids" not in locals():
     print("Loading suspected circle tweet IDs from CSV...")
     suspected_circle_tweets_and_conversations_ids_df = pd.read_csv(
-        "/Users/frsc/Documents/Projects/open-birdsite-db/data/circle-mitigation/circle_and_conversation_tweet_ids.csv",
+        f"{PROJECT_ROOT}/data/circle-mitigation/circle_and_conversation_tweet_ids.csv",
         dtype={"tweet_id": str},
     )
     suspected_circle_tweets_and_conversations_ids = set(

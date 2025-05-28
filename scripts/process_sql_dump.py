@@ -136,11 +136,11 @@ def process_dump(input_file, output_dir):
         gc.collect()
 
 
-input_file = "/Users/frsc/Documents/Projects/open-birdsite-db/open-birdsite-db/supabase/schema.sql"
-# input_file = "/Users/frsc/Documents/Projects/open-birdsite-db/open-birdsite-db/supabase/mock-dump.sql"
-output_dir = (
-    "/Users/frsc/Documents/Projects/open-birdsite-db/open-birdsite-db/dumps/big1"
-)
+import os
+
+PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "../..")
+input_file = f"{PROJECT_ROOT}/supabase/schema.sql"
+output_dir = f"{PROJECT_ROOT}/dumps/big1"
 # %%
 # Usage
 

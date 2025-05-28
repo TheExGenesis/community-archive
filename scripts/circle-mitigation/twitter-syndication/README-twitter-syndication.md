@@ -173,7 +173,7 @@ The client provides comprehensive TypeScript types for all API responses:
 
 ## License
 
-This client is part of the open-birdsite-db project and is subject to its license terms.
+This client is part of the community-archive project and is subject to its license terms.
 
 ## Credits
 

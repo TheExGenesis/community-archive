@@ -51,6 +51,7 @@ BEGIN
             DELETE FROM %I.followers WHERE archive_upload_id = ANY($1);
             DELETE FROM %I.following WHERE archive_upload_id = ANY($1);
             DELETE FROM %I.all_profile WHERE archive_upload_id = ANY($1);
+            DELETE FROM %I.tweet_media WHERE archive_upload_id = ANY($1);
             DELETE FROM %I.archive_upload WHERE id = ANY($1);
             DELETE FROM %I.all_account WHERE account_id = $2;
         ', 

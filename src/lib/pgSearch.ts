@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/database-types'
-import { devLog } from '@/lib-client/devLog'
+import { devLog } from '@/lib/devLog'
 import { SearchParams } from './types'
 
 export const searchTweetsExact = async (

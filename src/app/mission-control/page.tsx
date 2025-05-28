@@ -1,6 +1,6 @@
 import CommunityStats from '@/components/CommunityStats'
 import TopMentionedUsers from '@/components/TopMentionedMissingUsers'
-import { getArchiveMostMentionedAccounts } from '@/lib-client/queries/getMostMentionedAccounts'
+import { getArchiveMostMentionedAccounts } from '@/lib/queries/getMostMentionedAccounts'
 
 export default async function StatsPage() {
   const topMentionedMissingUsers = await getArchiveMostMentionedAccounts()

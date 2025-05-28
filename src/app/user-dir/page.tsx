@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { User, SortKey } from '@/lib-client/types'
-import { fetchUsers } from '@/lib-server/queries/fetchUsers'
+import { User, SortKey } from '@/lib/types'
+import { fetchUsers } from '@/lib/queries/fetchUsers'
 import Link from 'next/link'
 
 import {
@@ -15,7 +15,7 @@ import {
 import { ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { formatNumber } from '@/lib-client/formatNumber'
+import { formatNumber } from '@/lib/formatNumber'
 import { createBrowserClient } from '@/utils/supabase'
 
 export default function UserDirectoryPage() {

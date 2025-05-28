@@ -1,10 +1,10 @@
 import { Suspense } from 'react'
 import AccountTopTweetsClient from './AccountTopTweetsClient'
-import { FormattedUser } from '@/lib-client/types'
+import { FormattedUser } from '@/lib/types'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
-import { devLog } from '@/lib-client/devLog'
-import { PopularTweet } from '@/lib-client/types'
+import { devLog } from '@/lib/devLog'
+import { PopularTweet } from '@/lib/types'
 
 const AccountTopTweets = async ({ userData }: { userData: FormattedUser }) => {
   const cookieStore = cookies()

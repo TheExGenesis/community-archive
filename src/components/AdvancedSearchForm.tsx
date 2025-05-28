@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react'
 import { createBrowserClient } from '@/utils/supabase'
 import Tweet from '@/components/Tweet'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { searchTweets } from '@/lib-client/pgSearch'
+import { searchTweets } from '@/lib/pgSearch'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 

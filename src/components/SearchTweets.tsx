@@ -5,12 +5,12 @@ import { createBrowserClient } from '@/utils/supabase'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/database-types'
-import getLatestTweets from '@/lib-client/queries/getLatestTweets'
+import getLatestTweets from '@/lib/queries/getLatestTweets'
 import {
   searchTweetsExact,
   searchTweetsAND,
   searchTweetsOR,
-} from '@/lib-client/pgSearch'
+} from '@/lib/pgSearch'
 
 interface SearchProps {
   supabase: SupabaseClient | null

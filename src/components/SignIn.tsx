@@ -93,7 +93,7 @@ export default function SignIn() {
           type="submit"
           className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-gray-800 transition-colors duration-300"
         >
-          Sign in to Upload
+          Sign in with Twitter
         </button>
       </form>
       {process.env.NODE_ENV === 'development' &&

@@ -13,6 +13,7 @@ export function formatUserData(data: any): FormattedUser {
     website: getLatestValue(data.profile, 'website'),
     location: getLatestValue(data.profile, 'location'),
     avatar_media_url: getLatestValue(data.profile, 'avatar_media_url'),
+    header_media_url: getLatestValue(data.profile, 'header_media_url'),
     archive_at: getLatestValue(data.archive_upload, 'archive_at'),
     num_tweets: data.num_tweets,
     num_followers: data.num_followers,

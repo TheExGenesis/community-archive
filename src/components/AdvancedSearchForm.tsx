@@ -65,12 +65,10 @@ export default function AdvancedSearchForm() {
     searchTweets(supabase, { ...baseParams, search_query: queryExact }, 50)
       .then(setTweetsExact)
       .catch(console.error)
-      .finally(() => setIsLoading(false))
 
     searchTweets(supabase, { ...baseParams, search_query: queryAND }, 50)
       .then(setTweetsAND)
       .catch(console.error)
-      .finally(() => setIsLoading(false))
 
     searchTweets(supabase, { ...baseParams, search_query: queryOR }, 50)
       .then(setTweetsOR)
@@ -79,7 +77,8 @@ export default function AdvancedSearchForm() {
   }
 
   const allTweets = useMemo(() => {
-    return Array.from(
+    // Combine results from different search strategies and remove duplicates
+    const combinedTweets = Array.from(
       new Map(
         [...tweetsExact, ...tweetsAND, ...tweetsOR].map((tweet) => [
           tweet.tweet_id,
@@ -87,26 +86,46 @@ export default function AdvancedSearchForm() {
         ]),
       ).values(),
     )
+
+    // Transform tweets to the nested structure expected by the consolidated Tweet component
+    return combinedTweets.map((tweet: any) => ({
+      ...tweet, // Keep all original tweet fields like full_text, favorite_count, etc.
+      account: {
+        username: tweet.username, // Assuming username is top-level from searchTweets RPC
+        account_display_name: tweet.account_display_name, // Assuming account_display_name is top-level
+        profile: {
+          avatar_media_url: tweet.avatar_media_url // Assuming avatar_media_url is top-level
+        }
+      }
+    }));
   }, [tweetsExact, tweetsAND, tweetsOR])
 
+  const inputClasses = "w-full rounded border p-2 dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:placeholder-slate-400 focus:ring-blue-500 focus:border-blue-500";
+  const labelClasses = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
+
   return (
-    <div className="flex h-full flex-col">
-      <form onSubmit={handleSubmit} className="mb-4 space-y-4">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search tweets (use from:, to:, since:, until: for advanced search)"
-          className="w-full rounded border p-2"
-        />
+    <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-lg shadow-xl flex h-full flex-col">
+      <form onSubmit={handleSubmit} className="mb-6 space-y-4">
+        <div>
+          <label htmlFor="main-search" className={labelClasses}>Search terms</label>
+          <input
+            id="main-search"
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Keywords (e.g., concert OR live from:myUser)"
+            className={inputClasses}
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">You can use from:, to:, since: YYYY-MM-DD, until: YYYY-MM-DD.</p>
+        </div>
 
         <Button
           type="button"
           variant="outline"
           onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-          className="w-full justify-between"
+          className="w-full justify-between dark:text-white dark:border-slate-600 dark:hover:bg-slate-700"
         >
-          Advanced Options
+          Filter by User / Date Range
           {showAdvancedOptions ? (
             <ChevronUp className="ml-2 h-4 w-4" />
           ) : (
@@ -115,25 +134,33 @@ export default function AdvancedSearchForm() {
         </Button>
 
         {showAdvancedOptions && (
-          <div className="space-y-4 border-t pt-4">
-            <input
-              type="text"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              placeholder="From user"
-              className="w-full rounded border p-2"
-            />
-            <input
-              type="text"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="To user"
-              className="w-full rounded border p-2"
-            />
+          <div className="space-y-4 border-t dark:border-slate-700 pt-4">
+            <div>
+              <label htmlFor="from-user" className={labelClasses}>From user</label>
+              <input
+                id="from-user"
+                type="text"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                placeholder="twitter_handle (without @)"
+                className={inputClasses}
+              />
+            </div>
+            <div>
+              <label htmlFor="to-user" className={labelClasses}>To user (in reply to)</label>
+              <input
+                id="to-user"
+                type="text"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                placeholder="twitter_handle (without @)"
+                className={inputClasses}
+              />
+            </div>
             <div>
               <label
                 htmlFor="since-date"
-                className="block text-sm font-medium text-gray-700"
+                className={labelClasses}
               >
                 From date:
               </label>
@@ -142,13 +169,13 @@ export default function AdvancedSearchForm() {
                 type="date"
                 value={since}
                 onChange={(e) => setSince(e.target.value)}
-                className="mt-1 w-full rounded border p-2"
+                className={`${inputClasses} mt-1`}
               />
             </div>
             <div>
               <label
                 htmlFor="until-date"
-                className="block text-sm font-medium text-gray-700"
+                className={labelClasses}
               >
                 To date:
               </label>
@@ -157,50 +184,41 @@ export default function AdvancedSearchForm() {
                 type="date"
                 value={until}
                 onChange={(e) => setUntil(e.target.value)}
-                className="mt-1 w-full rounded border p-2"
+                className={`${inputClasses} mt-1`}
               />
             </div>
           </div>
         )}
 
-        <button
+        <Button
           type="submit"
-          className="w-full rounded bg-blue-500 p-2 text-white"
+          className="w-full rounded bg-blue-600 p-3 text-lg text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors duration-300 shadow-md hover:shadow-lg"
+          disabled={isLoading}
         >
-          Search
-        </button>
+          {isLoading ? 'Searching...' : 'Search'}
+        </Button>
       </form>
-      <ScrollArea className="flex-grow">
+      <ScrollArea className="flex-grow mt-4 border-t dark:border-slate-700 pt-4">
         <div className="pr-4">
-          {isLoading ? (
-            <div>Loading tweets...</div>
+          {isLoading && !hasSearched ? (
+            <div className="text-center py-4 text-gray-600 dark:text-gray-300">Loading tweets...</div>
           ) : hasSearched ? (
             allTweets.length > 0 ? (
               <div className="space-y-8">
+                <p className="text-sm text-gray-600 dark:text-gray-300">Found {allTweets.length} tweet(s).</p>
                 {allTweets.map((tweet) => (
                   <Tweet
                     key={tweet.tweet_id}
-                    tweetId={tweet.tweet_id}
-                    username={tweet.username || 'Unknown'}
-                    displayName={tweet.account_display_name || 'Unknown'}
-                    profilePicUrl={
-                      tweet.avatar_media_url ||
-                      'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
-                    }
-                    text={tweet.full_text}
-                    favoriteCount={tweet.favorite_count}
-                    retweetCount={tweet.retweet_count}
-                    date={tweet.created_at}
-                    tweetUrl={`https://twitter.com/${
-                      tweet.username || 'unknown'
-                    }/status/${tweet.tweet_id}`}
+                    tweet={tweet}
                   />
                 ))}
               </div>
             ) : (
-              <div>No tweets found</div>
+              <div className="text-center py-4 text-gray-600 dark:text-gray-300">No tweets found matching your criteria.</div>
             )
-          ) : null}
+          ) : (
+             <div className="text-center py-4 text-gray-500 dark:text-gray-400">Enter your search terms above and click Search.</div>
+          )}
         </div>
       </ScrollArea>
     </div>

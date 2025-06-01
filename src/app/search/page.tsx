@@ -1,23 +1,29 @@
 'use client'
-import ThemeToggle from '@/components/ThemeToggle'
 import AdvancedSearchForm from '@/components/AdvancedSearchForm'
 
 export default function SearchTweetsPage() {
-  return (
-    <div className="flex w-full flex-1 flex-col items-center gap-20">
-      <nav className="flex h-16 w-full justify-center border-b border-b-foreground/10">
-        <div className="flex w-full max-w-4xl items-center justify-between p-3 text-sm"></div>
-      </nav>
+  // Style definitions copied from homepage
+  const unifiedDeepBlueBase = "bg-slate-200 dark:bg-slate-900";
+  const sectionPaddingClasses = "py-16 md:py-20"
+  // Using max-w-3xl for search page
+  const contentWrapperClasses = "w-full max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10"
+  const glowBaseColor = "hsla(200, 100%, 60%,"
+  const glowStyleStrong = {
+    backgroundImage: `radial-gradient(ellipse at 50% 0%, ${glowBaseColor}0.2) 0%, transparent 50%)`,
+    backgroundRepeat: 'no-repeat',
+  }
 
-      <div className="flex max-w-4xl flex-1 flex-col gap-20 px-3">
-        <main className="flex flex-1 flex-col gap-6">
-          <h2 className="mb-4 text-4xl font-bold">Advanced Search</h2>
+  return (
+    <main> 
+      <section 
+        className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} overflow-hidden min-h-screen`}
+        style={glowStyleStrong}
+      >
+        <div className={`${contentWrapperClasses}`}> 
+          <h2 className="mb-8 text-4xl font-bold text-center text-gray-900 dark:text-white">🔬 Advanced Search</h2>
           <AdvancedSearchForm />
-        </main>
-      </div>
-      <footer className="w-full justify-center border-t border-t-foreground/10 p-8 text-center text-xs">
-        <ThemeToggle />
-      </footer>
-    </div>
+        </div>
+      </section>
+    </main>
   )
 }

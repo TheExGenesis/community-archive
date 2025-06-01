@@ -1,0 +1,62 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useState } from 'react'
+import { Menu as MenuIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
+
+// Same nav items as in HeaderNavigation.tsx
+const navItems = [
+  { href: '/', label: 'Home' },
+  { href: '/user-dir', label: 'User Directory' },
+  { href: '/search', label: 'Advanced Search' },
+  { href: 'https://github.com/TheExGenesis/community-archive/blob/main/docs/apps.md', label: 'Apps', isExternal: true },
+]
+
+export default function MobileMenu() {
+  const pathname = usePathname()
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      <SheetTrigger asChild>
+        <Button variant="ghost" size="icon" className="md:hidden">
+          <MenuIcon className="h-6 w-6" />
+          <span className="sr-only">Open menu</span>
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" className="w-full max-w-xs sm:max-w-sm">
+        <SheetHeader className="mb-6">
+          <SheetTitle className="text-left text-lg font-semibold">Navigation</SheetTitle>
+        </SheetHeader>
+        <nav className="flex flex-col space-y-2">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              target={item.isExternal ? '_blank' : undefined}
+              rel={item.isExternal ? 'noopener noreferrer' : undefined}
+              className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-150
+                ${
+                  !item.isExternal && pathname === item.href
+                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
+              onClick={() => setIsOpen(false)} // Close sheet on link click
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      </SheetContent>
+    </Sheet>
+  )
+} 

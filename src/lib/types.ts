@@ -194,6 +194,7 @@ export type FormattedUser = {
   website: string | null
   location: string | null
   avatar_media_url: string | null
+  header_media_url?: string | null
   archive_at: string | null
   num_tweets: number
   num_followers: number

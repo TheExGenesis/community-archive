@@ -27,6 +27,7 @@ export default async function TweetPage({ params }: any) {
   }
 
   const tweet: any = tweetResult.data[0]
+  console.log("Raw tweet data for permalink:", JSON.stringify(tweet, null, 2));
 
   return (
     <main>

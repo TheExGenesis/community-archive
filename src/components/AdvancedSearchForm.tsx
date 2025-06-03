@@ -104,18 +104,18 @@ export default function AdvancedSearchForm() {
   const labelClasses = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
 
   return (
-    <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-lg shadow-xl flex h-full flex-col">
+    <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-lg flex h-full flex-col">
       <form onSubmit={handleSubmit} className="mb-6 space-y-4">
         <div>
           <label htmlFor="main-search" className={labelClasses}>Search terms</label>
-          <input
+        <input
             id="main-search"
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
             placeholder="Keywords (e.g., concert OR live from:myUser)"
             className={inputClasses}
-          />
+        />
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">You can use from:, to:, since: YYYY-MM-DD, until: YYYY-MM-DD.</p>
         </div>
 
@@ -137,25 +137,25 @@ export default function AdvancedSearchForm() {
           <div className="space-y-4 border-t dark:border-slate-700 pt-4">
             <div>
               <label htmlFor="from-user" className={labelClasses}>From user</label>
-              <input
+            <input
                 id="from-user"
-                type="text"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
+              type="text"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
                 placeholder="twitter_handle (without @)"
                 className={inputClasses}
-              />
+            />
             </div>
             <div>
               <label htmlFor="to-user" className={labelClasses}>To user (in reply to)</label>
-              <input
+            <input
                 id="to-user"
-                type="text"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
+              type="text"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
                 placeholder="twitter_handle (without @)"
                 className={inputClasses}
-              />
+            />
             </div>
             <div>
               <label
@@ -192,7 +192,7 @@ export default function AdvancedSearchForm() {
 
         <Button
           type="submit"
-          className="w-full rounded bg-blue-600 p-3 text-lg text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors duration-300 shadow-md hover:shadow-lg"
+          className="w-full rounded bg-blue-600 p-3 text-lg text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors duration-300"
           disabled={isLoading}
         >
           {isLoading ? 'Searching...' : 'Search'}

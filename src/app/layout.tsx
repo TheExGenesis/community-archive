@@ -35,6 +35,7 @@ export default function RootLayout({
       lang="en"
       className={`${GeistSans.className} antialiased`}
       style={{ colorScheme: 'dark' }}
+      suppressHydrationWarning={true}
     >
       <body className="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300">
         <NextTopLoader showSpinner={false} height={3} color="#2acf80" />

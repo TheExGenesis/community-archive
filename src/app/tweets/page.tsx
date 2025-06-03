@@ -39,11 +39,6 @@ export default function TweetsPage() {
   const unifiedDeepBlueBase = "bg-slate-200 dark:bg-slate-900"
   const sectionPaddingClasses = "py-16 md:py-20"
   const contentWrapperClasses = "w-full max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10"
-  const glowBaseColor = "hsla(200, 100%, 60%,"
-  const glowStyleStrong = {
-    backgroundImage: `radial-gradient(ellipse at 50% 0%, ${glowBaseColor}0.2) 0%, transparent 50%)`,
-    backgroundRepeat: 'no-repeat',
-  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -65,7 +60,7 @@ export default function TweetsPage() {
 
   if (loading) {
     return (
-      <main className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} overflow-hidden min-h-screen flex items-center justify-center`} style={glowStyleStrong}>
+      <main className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} overflow-hidden min-h-screen flex items-center justify-center`}>
         <p className="text-xl text-gray-700 dark:text-gray-300">Loading recent tweets...</p>
       </main>
     )
@@ -73,7 +68,7 @@ export default function TweetsPage() {
   
   if (error) {
     return (
-      <main className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} overflow-hidden min-h-screen flex items-center justify-center`} style={glowStyleStrong}>
+      <main className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} overflow-hidden min-h-screen flex items-center justify-center`}>
         <p className="text-xl text-red-500">Error: {error}</p>
       </main>
     )
@@ -83,11 +78,10 @@ export default function TweetsPage() {
     <main> 
       <section 
         className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} overflow-hidden min-h-screen`}
-        style={glowStyleStrong}
       >
         <div className={`${contentWrapperClasses}`}> 
           <h2 className="mb-8 text-4xl font-bold text-center text-gray-900 dark:text-white">📜 Recent Tweets</h2>
-          <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-lg shadow-xl space-y-8">
+          <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-lg space-y-8">
             {tweets.length > 0 ? (
               tweets.map((tweet: any) => (
                 <Tweet

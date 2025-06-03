@@ -12,6 +12,8 @@ import { getUserData } from '@/lib/queries/fetchUsers'
 import { formatNumber } from '@/lib/formatNumber'
 import { DownloadArchiveButton } from './DownloadArchiveButton'
 import Image from 'next/image'
+import TweetList from '@/components/TweetList'
+import { FilterCriteria } from '@/lib/queries/tweetQueries'
 
 // Style constants (glows removed)
 const unifiedDeepBlueBase = "bg-slate-200 dark:bg-slate-900"
@@ -150,6 +152,16 @@ export default async function User({ params }: any) {
             </p>
           </div>
         )}
+
+        {/* New Section for User's Recent Tweets - MOVED BELOW ACTIVITY SUMMARY */}
+        <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-lg">
+          <h2 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-white">Recent Tweets</h2>
+          <TweetList 
+            filterCriteria={{ userId: account_id } satisfies FilterCriteria}
+            itemsPerPage={20} // Example: can be adjusted or made a prop
+          />
+        </div>
+
       </div>
     </section>
   )

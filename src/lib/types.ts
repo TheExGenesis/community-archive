@@ -202,3 +202,52 @@ export type FormattedUser = {
   num_likes: number
   archive_uploaded_at: string | null
 }
+
+// Interfaces for fetching and displaying tweets via Supabase queries
+export interface RawSupabaseProfile {
+  avatar_media_url: string | null;
+}
+
+export interface RawSupabaseAccount {
+  username: string;
+  account_display_name: string;
+  profile: RawSupabaseProfile | null;
+}
+
+export interface RawSupabaseTweet {
+  tweet_id: string;
+  created_at: string;
+  full_text: string;
+  favorite_count: number;
+  retweet_count: number;
+  reply_to_tweet_id: string | null;
+  account: RawSupabaseAccount; 
+  media?: Array<{
+    media_url: string;
+    media_type: string;
+    width?: number;
+    height?: number;
+  }>;
+}
+
+export interface TimelineTweet {
+  tweet_id: string;
+  created_at: string;
+  full_text: string;
+  favorite_count: number;
+  retweet_count: number;
+  reply_to_tweet_id: string | null;
+  account: { 
+    username: string;
+    account_display_name: string;
+    profile?: { 
+      avatar_media_url?: string;
+    };
+  };
+  media?: Array<{
+    media_url: string;
+    media_type: string;
+    width?: number;
+    height?: number;
+  }>;
+}

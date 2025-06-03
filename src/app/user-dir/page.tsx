@@ -30,11 +30,6 @@ export default function UserDirectoryPage() {
   const sectionPaddingClasses = "py-16 md:py-20"
   // Using max-w-6xl for user directory to accommodate table width
   const contentWrapperClasses = "w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10"
-  const glowBaseColor = "hsla(200, 100%, 60%,"
-  const glowStyleStrong = {
-    backgroundImage: `radial-gradient(ellipse at 50% 0%, ${glowBaseColor}0.2) 0%, transparent 50%)`,
-    backgroundRepeat: 'no-repeat',
-  }
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -94,143 +89,142 @@ export default function UserDirectoryPage() {
     <main>
       <section 
         className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} overflow-hidden min-h-screen`}
-        style={glowStyleStrong}
       >
         <div className={`${contentWrapperClasses}`}>
           <h2 className="mb-8 text-4xl font-bold text-center text-gray-900 dark:text-white">User Directory</h2>
-          <div className="w-full overflow-x-scroll bg-white dark:bg-slate-800 p-6 rounded-lg shadow-xl">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Avatar</TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => sortData('account_display_name')}
+          <div className="w-full overflow-x-scroll bg-white dark:bg-slate-800 p-6 rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Avatar</TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => sortData('account_display_name')}
                       className="hover:bg-slate-200 dark:hover:bg-slate-700"
-                    >
-                      Display Name {renderSortIcon('account_display_name')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
+                >
+                  Display Name {renderSortIcon('account_display_name')}
+                </Button>
+              </TableHead>
+              <TableHead>
                     <Button 
                       variant="ghost" 
                       onClick={() => sortData('username')} 
                       className="hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
-                      Username {renderSortIcon('username')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
+                  Username {renderSortIcon('username')}
+                </Button>
+              </TableHead>
+              <TableHead>
                     <Button 
                       variant="ghost" 
                       onClick={() => sortData('num_tweets')} 
                       className="hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
-                      Tweets {renderSortIcon('num_tweets')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
+                  Tweets {renderSortIcon('num_tweets')}
+                </Button>
+              </TableHead>
+              <TableHead>
                     <Button 
                       variant="ghost" 
                       onClick={() => sortData('num_likes')} 
                       className="hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
-                      Likes {renderSortIcon('num_likes')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => sortData('num_followers')}
+                  Likes {renderSortIcon('num_likes')}
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => sortData('num_followers')}
                       className="hover:bg-slate-200 dark:hover:bg-slate-700"
-                    >
-                      Followers {renderSortIcon('num_followers')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
+                >
+                  Followers {renderSortIcon('num_followers')}
+                </Button>
+              </TableHead>
+              <TableHead>
                     <Button 
                       variant="ghost" 
                       onClick={() => sortData('archive_at')} 
                       className="hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
-                      Archive Date {renderSortIcon('archive_at')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
+                  Archive Date {renderSortIcon('archive_at')}
+                </Button>
+              </TableHead>
+              <TableHead>
                     <Button 
                       variant="ghost" 
                       onClick={() => sortData('created_at')} 
                       className="hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
-                      Account Created At {renderSortIcon('created_at')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => sortData('archive_uploaded_at')}
+                  Account Created At {renderSortIcon('created_at')}
+                </Button>
+              </TableHead>
+              <TableHead>
+                <Button
+                  variant="ghost"
+                  onClick={() => sortData('archive_uploaded_at')}
                       className="hover:bg-slate-200 dark:hover:bg-slate-700"
-                    >
-                      Archive Uploaded At {renderSortIcon('archive_uploaded_at')}
-                    </Button>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
+                >
+                  Archive Uploaded At {renderSortIcon('archive_uploaded_at')}
+                </Button>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map((user) => (
                   <TableRow key={user.account_id} className="dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                    <TableCell>
-                      <Link href={`/user/${user.account_id}`}>
-                        <Avatar>
-                          <AvatarImage
-                            src={user.avatar_media_url || '/placeholder.jpg'}
-                            alt={`${user.account_display_name}'s avatar`}
-                          />
-                          <AvatarFallback>
-                            {user.account_display_name.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      </Link>
-                    </TableCell>
+                <TableCell>
+                  <Link href={`/user/${user.account_id}`}>
+                    <Avatar>
+                      <AvatarImage
+                        src={user.avatar_media_url || '/placeholder.jpg'}
+                        alt={`${user.account_display_name}'s avatar`}
+                      />
+                      <AvatarFallback>
+                        {user.account_display_name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Link>
+                </TableCell>
                     <TableCell className="font-medium">
-                      <Link
-                        href={`/user/${user.account_id}`}
-                        className="hover:underline"
-                      >
-                        {user.account_display_name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/user/${user.account_id}`}
-                        className="hover:underline"
-                      >
+                  <Link
+                    href={`/user/${user.account_id}`}
+                    className="hover:underline"
+                  >
+                    {user.account_display_name}
+                  </Link>
+                </TableCell>
+                <TableCell>
+                  <Link
+                    href={`/user/${user.account_id}`}
+                    className="hover:underline"
+                  >
                         @{user.username}
-                      </Link>
-                    </TableCell>
+                  </Link>
+                </TableCell>
                     <TableCell className="text-right">{formatNumber(user.num_tweets)}</TableCell>
                     <TableCell className="text-right">{formatNumber(user.num_likes)}</TableCell>
                     <TableCell className="text-right">{formatNumber(user.num_followers)}</TableCell>
-                    <TableCell>
-                      {user.archive_at
-                        ? new Date(user.archive_at).toLocaleDateString()
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      {user.archive_uploaded_at
-                        ? new Date(user.archive_uploaded_at).toLocaleDateString()
-                        : '-'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
+                <TableCell>
+                  {user.archive_at
+                    ? new Date(user.archive_at).toLocaleDateString()
+                    : '-'}
+                </TableCell>
+                <TableCell>
+                  {new Date(user.created_at).toLocaleDateString()}
+                </TableCell>
+                <TableCell>
+                  {user.archive_uploaded_at
+                    ? new Date(user.archive_uploaded_at).toLocaleDateString()
+                    : '-'}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
       </section>
     </main>
   )

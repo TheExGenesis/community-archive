@@ -13,12 +13,7 @@ import { formatNumber } from '@/lib/formatNumber'
 import { DownloadArchiveButton } from './DownloadArchiveButton'
 import Image from 'next/image'
 
-// Consistent glow and background from homepage
-const glowBaseColor = "hsla(200, 100%, 60%,"
-const glowStyleStrong = {
-  backgroundImage: `radial-gradient(ellipse at 50% 0%, ${glowBaseColor}0.2) 0%, transparent 50%)`,
-  backgroundRepeat: 'no-repeat',
-}
+// Style constants (glows removed)
 const unifiedDeepBlueBase = "bg-slate-200 dark:bg-slate-900"
 const sectionPaddingClasses = "py-12 md:py-16"
 const contentWrapperClasses = "w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10"
@@ -26,8 +21,8 @@ const contentWrapperClasses = "w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 rel
 const UserProfile = ({ userData }: { userData: FormattedUser }) => {
   const account = userData
   return (
-    // Profile info wrapped in a card
-    <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-lg shadow-xl mb-8">
+    // Profile info card - Removed shadow
+    <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-lg mb-8">
       <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6">
         <Avatar className="h-24 w-24 sm:h-28 sm:w-28 ring-2 ring-offset-2 ring-blue-500 dark:ring-offset-slate-800">
           <AvatarImage
@@ -67,46 +62,45 @@ const UserProfile = ({ userData }: { userData: FormattedUser }) => {
 }
 
 export default async function User({ params }: any) {
-  const { account_id } = params
-  const cookieStore = cookies()
-  const supabase = createServerClient(cookieStore)
+  const { account_id } = params;
+  const cookieStore = cookies();
+  const supabase = createServerClient(cookieStore);
 
-  const userData = await getUserData(supabase, account_id)
+  const userData = await getUserData(supabase, account_id);
 
   if (!userData) {
-    // Styled error message for consistency
+    // Styled error message for consistency - Removed glow and shadow
     return (
       <section 
         className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} flex-grow flex items-center justify-center overflow-hidden`}
-        style={glowStyleStrong}
       >
         <div className={`${contentWrapperClasses} text-center`}>
-            <div className="bg-white dark:bg-slate-800 p-8 rounded-lg shadow-xl">
+            {/* Error card - Removed shadow */}
+            <div className="bg-white dark:bg-slate-800 p-8 rounded-lg">
                 <h1 className="text-2xl font-bold text-red-600 dark:text-red-400">Error Fetching User Data</h1>
                 <p className="mt-2 text-gray-600 dark:text-gray-300">Could not retrieve information for this user. Please try again later.</p>
             </div>
         </div>
       </section>
-    )
+    );
   }
 
   const { data: summaryData, error: summaryError } = await supabase
     .from('account_activity_summary')
     .select('mentioned_accounts')
     .or(`account_id.eq.${account_id},username.ilike.${account_id}`)
-    .single()
+    .single();
 
-  const showingSummaryData = !summaryError && summaryData?.mentioned_accounts
+  const showingSummaryData = !summaryError && summaryData?.mentioned_accounts;
 
   return (
     <section 
       className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} flex-grow overflow-hidden`}
-      style={glowStyleStrong}
     >
       <div className={`${contentWrapperClasses} space-y-8`}>
-        {/* Banner Image */}
+        {/* Banner Image - Removed shadow */}
         {userData?.header_media_url && (
-          <div className="relative w-full h-48 md:h-64 rounded-xl overflow-hidden shadow-lg mb-8">
+          <div className="relative w-full h-48 md:h-64 rounded-xl overflow-hidden mb-8">
             <Image 
               src={userData.header_media_url}
               alt={`${userData.account_display_name}'s cover photo`}
@@ -117,13 +111,15 @@ export default async function User({ params }: any) {
           </div>
         )}
 
-        <Suspense fallback={<Skeleton className="bg-white dark:bg-slate-800 p-8 rounded-lg shadow-xl h-60 w-full" />}>
+        {/* UserProfile Suspense - Removed shadow from Skeleton */}
+        <Suspense fallback={<Skeleton className="bg-white dark:bg-slate-800 p-8 rounded-lg h-60 w-full" />}>
           <UserProfile userData={userData} />
         </Suspense>
 
         {showingSummaryData ? (
           <>
-            <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-lg shadow-xl">
+            {/* Most Mentioned Accounts card - Removed shadow */}
+            <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-lg">
               <h2 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-white">Most Mentioned Accounts</h2>
               <Suspense fallback={<Skeleton className="h-[20vh] w-full bg-slate-200 dark:bg-slate-700 rounded" />}>
                 <TopMentionedUsers
@@ -133,7 +129,8 @@ export default async function User({ params }: any) {
               </Suspense>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-lg shadow-xl">
+            {/* Top Tweets card - Removed shadow */}
+            <div className="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-lg">
               <h2 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-white">Top Tweets</h2>
               <Suspense fallback={<Skeleton className="h-96 w-full bg-slate-200 dark:bg-slate-700 rounded" />}>
                 <AccountTopTweets userData={userData} />
@@ -141,7 +138,8 @@ export default async function User({ params }: any) {
             </div>
           </>
         ) : (
-          <div className="bg-white dark:bg-slate-800 p-8 rounded-lg shadow-xl text-center">
+          <div className="bg-white dark:bg-slate-800 p-8 rounded-lg text-center">
+            {/* Activity summary placeholder card - Removed shadow */}
             <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
               Activity summary not yet available.
             </h3>

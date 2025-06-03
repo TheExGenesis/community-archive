@@ -74,7 +74,7 @@ const appsData: AppItem[] = [
 
 const AppCard: React.FC<AppItem> = ({ icon, name, description, link }) => (
   <Link href={link} passHref legacyBehavior>
-    <a target="_blank" rel="noopener noreferrer" className="flex flex-col items-center p-6 bg-slate-100 dark:bg-slate-800 bg-gradient-to-br from-slate-50 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 h-full cursor-pointer">
+    <a target="_blank" rel="noopener noreferrer" className="flex flex-col items-center p-6 bg-slate-100 dark:bg-slate-700 rounded-xl transition-shadow duration-300 h-full cursor-pointer">
       <div className="text-4xl mb-4 text-blue-500 dark:text-blue-400">{icon}</div>
       <h3 className="text-xl font-semibold mb-2 text-center text-gray-800 dark:text-gray-200">{name}</h3>
       <p className="text-sm text-gray-600 dark:text-gray-400 text-center flex-grow">{description}</p>
@@ -100,14 +100,14 @@ export default function ShowcasedApps() {
       </div>
       <Carousel
         opts={{
-          align: "start",
+          align: "center",
           loop: true,
         }}
         className="w-full max-w-xs sm:max-w-xl md:max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto"
       >
         <CarouselContent className="-ml-1">
           {appsData.map((app, index) => (
-            <CarouselItem key={index} className="pl-1 basis-full md:basis-1/2 lg:basis-1/3">
+            <CarouselItem key={index} className="pl-1 basis-4/5 md:basis-2/5 lg:basis-[26.66%]">
               <div className="p-1 h-full">
                 <AppCard {...app} />
               </div>

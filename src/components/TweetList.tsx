@@ -30,6 +30,7 @@ export default function TweetList({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
+  const [lastFetchCount, setLastFetchCount] = useState<number>(0);
 
   useEffect(() => {
     setSupabase(createBrowserClient());
@@ -55,6 +56,7 @@ export default function TweetList({
       }
 
       setTweets(prevTweets => pageToLoad === 1 ? fetchedTweets : [...prevTweets, ...fetchedTweets]);
+      setLastFetchCount(fetchedTweets.length);
       if (fetchedTotalCount !== null) {
         setTotalCount(fetchedTotalCount);
       }
@@ -74,6 +76,8 @@ export default function TweetList({
   useEffect(() => {
     if (supabase) {
       setCurrentPage(1); 
+      setTotalCount(null);
+      setLastFetchCount(0);
       loadTweets(1, filterCriteria);
     }
   }, [supabase, filterCriteria, loadTweets]);
@@ -117,7 +121,9 @@ export default function TweetList({
     }
   };
 
-  const hasMoreTweets = totalCount !== null ? (currentPage * itemsPerPage) < totalCount : false;
+  const hasMoreTweets = totalCount !== null 
+    ? (currentPage * itemsPerPage) < totalCount 
+    : lastFetchCount === itemsPerPage;
 
   if (isLoading) {
     return <p className="text-xl text-gray-700 dark:text-gray-300 text-center py-10">Loading tweets...</p>;

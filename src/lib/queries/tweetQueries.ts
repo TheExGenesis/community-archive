@@ -80,18 +80,19 @@ export async function fetchTweets(
     const searchParams: SearchParams = {
       search_query: criteria.searchQuery,
       from_user: criteria.fromUsername || null,
-      to_user: criteria.replyToUsername || null, 
+      to_user: criteria.replyToUsername || null,
       since_date: criteria.startDate || null,
       until_date: criteria.endDate || null,
     };
 
     try {
-      const rpcData = await rpcSearchTweets(supabase, searchParams, pageSize);
-      if (!rpcData) {
+      const offset = (page - 1) * pageSize;
+      const rpcData = await rpcSearchTweets(supabase, searchParams, pageSize, offset);
+      if (!rpcData || rpcData.length === 0) {
         return { tweets: [], totalCount: 0, error: null };
       }
-      const transformedTweets = transformRawTweetsToTimelineTweets(rpcData, true); // Mark as RPC result
-      return { tweets: transformedTweets, totalCount: transformedTweets.length, error: null };
+      const transformedTweets = transformRawTweetsToTimelineTweets(rpcData, true);
+      return { tweets: transformedTweets, totalCount: null, error: null };
     } catch (error: any) {
       console.error('Error fetching tweets via RPC:', error);
       if (error.message && error.message.includes('statement timeout')) {

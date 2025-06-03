@@ -251,3 +251,10 @@ export interface TimelineTweet {
     height?: number;
   }>;
 }
+
+export interface TweetMediaItem {
+  media_url: string;
+  media_type: string;
+  width?: number;
+  height?: number;
+}

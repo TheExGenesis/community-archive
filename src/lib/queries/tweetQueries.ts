@@ -76,9 +76,16 @@ export async function fetchTweets(
   page: number,
   pageSize: number = DEFAULT_PAGE_SIZE
 ): Promise<{ tweets: TimelineTweet[]; totalCount: number | null; error: any }> {
-  if (criteria.searchQuery) {
+  // Use RPC if a text search query is provided OR if any filters supported by the RPC are used.
+  if (
+    criteria.searchQuery || // Main keyword search
+    criteria.fromUsername || // Filter by author username
+    criteria.replyToUsername || // Filter by replied-to username
+    criteria.startDate || // Filter by start date
+    criteria.endDate // Filter by end date
+  ) {
     const searchParams: SearchParams = {
-      search_query: criteria.searchQuery,
+      search_query: criteria.searchQuery || '', // Pass empty string if not provided
       from_user: criteria.fromUsername || null,
       to_user: criteria.replyToUsername || null,
       since_date: criteria.startDate || null,
@@ -87,12 +94,22 @@ export async function fetchTweets(
 
     try {
       const offset = (page - 1) * pageSize;
+      // Assuming rpcSearchTweets is an alias for the searchTweets function from pgSearch.ts
       const rpcData = await rpcSearchTweets(supabase, searchParams, pageSize, offset);
+      
       if (!rpcData || rpcData.length === 0) {
-        return { tweets: [], totalCount: 0, error: null };
+        return { tweets: [], totalCount: rpcData?.length === 0 ? 0 : null, error: null };
       }
+      // The RPC result now includes 'total_count' if the SQL function is modified to return it.
+      // For now, totalCount from RPC is an estimate or based on limited results.
+      // The SQL function `search_tweets` currently doesn't return a total count for pagination.
+      // We might need to adjust this or the SQL if accurate pagination for RPC results is critical.
       const transformedTweets = transformRawTweetsToTimelineTweets(rpcData, true);
-      return { tweets: transformedTweets, totalCount: null, error: null };
+      // If rpcData has a total_count field from a modified SQL function:
+      // const totalCountFromRpc = rpcData[0]?.total_count_estimate || null; 
+      // For now, we don't get a separate total count from the current search_tweets RPC for pagination.
+      // It just returns a limited set.
+      return { tweets: transformedTweets, totalCount: null, error: null }; 
     } catch (error: any) {
       console.error('Error fetching tweets via RPC:', error);
       if (error.message && error.message.includes('statement timeout')) {
@@ -101,6 +118,8 @@ export async function fetchTweets(
       return { tweets: [], totalCount: 0, error };
     }
   } else {
+    // Fallback to direct Supabase query for filters not supported by the main search_tweets RPC
+    // (e.g., specific userId, isRootTweet, mentionedUser, hashtags without other search terms)
     let query = supabase
       .from('tweets')
       .select(
@@ -123,7 +142,8 @@ export async function fetchTweets(
           media_url,
           media_type,
           width,
-          height
+          height,
+          alt_text
         )
       `,
         { count: 'exact' }
@@ -133,16 +153,15 @@ export async function fetchTweets(
       query = query.eq('account_id', criteria.userId);
     }
 
-    if (criteria.fromUsername) {
-      query = query.eq('account.username', criteria.fromUsername);
-    }
+    // Note: fromUsername is handled by RPC path. If it reaches here, it means no other RPC criteria were met.
+    // However, if we wanted to support fromUsername directly here (e.g. if RPC path was removed),
+    // it would need to be: query = query.eq('all_account.username', criteria.fromUsername);
+    // Same for replyToUsername: query = query.eq('reply_to_username', criteria.replyToUsername);
     
     if (criteria.mentionedUser) {
-      query = query.ilike('full_text', `%@${criteria.mentionedUser}%`); // Corrected string literal
-    }
-
-    if (criteria.replyToUsername) {
-      query = query.eq('reply_to_username', criteria.replyToUsername);
+      // Ensure 'all_account' is the correct alias if filtering on joined table.
+      // Here, mentionedUser is likely in 'full_text' of the 'tweets' table.
+      query = query.ilike('full_text', `%@${criteria.mentionedUser}%`);
     }
 
     if (criteria.isRootTweet) {
@@ -151,17 +170,18 @@ export async function fetchTweets(
 
     if (criteria.hashtags && criteria.hashtags.length > 0) {
       criteria.hashtags.forEach(tag => {
-        query = query.ilike('full_text', `%#${tag}%`); // Corrected string literal
+        query = query.ilike('full_text', `%#${tag}%`);
       });
     }
 
-    if (criteria.startDate) {
-      query = query.gte('created_at', criteria.startDate);
-    }
-
-    if (criteria.endDate) {
-      query = query.lte('created_at', criteria.endDate);
-    }
+    // Date filters are handled by RPC path if present.
+    // If they were to be handled here, they would be:
+    // if (criteria.startDate) {
+    //   query = query.gte('created_at', criteria.startDate);
+    // }
+    // if (criteria.endDate) {
+    //   query = query.lte('created_at', criteria.endDate);
+    // }
     
     query = query.order('created_at', { ascending: false });
     query = query.range((page - 1) * pageSize, page * pageSize - 1);
@@ -169,7 +189,7 @@ export async function fetchTweets(
     const { data: rawData, error, count } = await query;
 
     if (error) {
-      console.error('Error fetching tweets:', error);
+      console.error('Error fetching tweets directly:', error); // Clarified error source
       if (error.message && error.message.includes('statement timeout')) {
         return { tweets: [], totalCount: 0, error: { message: 'Query timed out. Please try a more specific query.', details: error } };
       }
@@ -179,7 +199,7 @@ export async function fetchTweets(
       return { tweets: [], totalCount: 0, error: null };
     }
     
-    const transformedTweets = transformRawTweetsToTimelineTweets(rawData, false); // Mark as non-RPC result
+    const transformedTweets = transformRawTweetsToTimelineTweets(rawData, false);
     return { tweets: transformedTweets, totalCount: count, error: null };
   }
 } 

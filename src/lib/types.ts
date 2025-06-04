@@ -252,5 +252,4 @@ export interface TweetMediaItem {
   media_type: string;
   width?: number;
   height?: number;
-  alt_text?: string;
 }

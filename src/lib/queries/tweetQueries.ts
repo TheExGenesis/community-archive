@@ -145,7 +145,7 @@ export async function fetchTweets(
           height
         )
       `,
-        { count: 'exact' }
+        { count: 'estimated' }
       );
 
     if (criteria.userId) {

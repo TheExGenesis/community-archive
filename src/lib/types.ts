@@ -244,12 +244,7 @@ export interface TimelineTweet {
       avatar_media_url?: string;
     };
   };
-  media?: Array<{
-    media_url: string;
-    media_type: string;
-    width?: number;
-    height?: number;
-  }>;
+  media?: Array<TweetMediaItem>;
 }
 
 export interface TweetMediaItem {
@@ -257,4 +252,5 @@ export interface TweetMediaItem {
   media_type: string;
   width?: number;
   height?: number;
+  alt_text?: string;
 }

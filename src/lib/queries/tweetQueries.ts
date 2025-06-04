@@ -142,8 +142,7 @@ export async function fetchTweets(
           media_url,
           media_type,
           width,
-          height,
-          alt_text
+          height
         )
       `,
         { count: 'exact' }

@@ -8,7 +8,6 @@ interface TweetMediaItem {
   media_type: string
   width?: number
   height?: number
-  alt_text?: string
 }
 
 interface TweetData {
@@ -76,7 +75,7 @@ export default function Tweet({ tweet }: TweetProps) {
               <div key={index} className="relative overflow-hidden rounded-lg border dark:border-gray-700">
                 <NextImage 
                   src={mediaItem.media_url} 
-                  alt={mediaItem.alt_text || `Tweet image ${index + 1}`}
+                  alt={`Tweet image ${index + 1}`}
                   width={mediaItem.width || 600}
                   height={mediaItem.height || 400}
                   className="object-contain w-full h-auto"

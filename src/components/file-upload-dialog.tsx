@@ -140,7 +140,15 @@ export function FileUploadDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={resetDialog}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent 
+        className="sm:max-w-[425px]"
+        onInteractOutside={(event) => {
+          event.preventDefault();
+        }}
+        onEscapeKeyDown={(event) => {
+          event.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>
             {state.uploadStatus === 'uploading'

@@ -6,9 +6,9 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
 // Style definitions
-const unifiedDeepBlueBase = "bg-slate-200 dark:bg-slate-900";
-const sectionPaddingClasses = "py-16 md:py-20";
-const contentWrapperClasses = "w-full max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10";
+const unifiedDeepBlueBase = "bg-white dark:bg-background";
+const sectionPaddingClasses = "py-12 md:py-16 lg:py-20";
+const contentWrapperClasses = "w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8";
 
 // This wrapper is needed because useSearchParams can only be used in Client Components,
 // and Suspense is recommended for pages that use it.
@@ -40,15 +40,17 @@ function SearchPageContent() {
           <AdvancedSearchForm /> {/* This will pre-fill itself from URL params */}
           
           <div className="mt-12">
-            <h3 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-white">Search Results</h3>
             {/* Render TweetList only if there are actual search parameters present */} 
             {searchParams.toString().length > 0 ? (
-              <TweetList 
-                key={tweetListKey} // Force re-mount on new search
-                filterCriteria={filterCriteria} 
-              />
+              <div className="bg-slate-100 dark:bg-card p-6 md:p-8 rounded-lg">
+                <h3 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-white">Search Results</h3>
+                <TweetList 
+                  key={tweetListKey} // Force re-mount on new search
+                  filterCriteria={filterCriteria} 
+                />
+              </div>
             ) : (
-              <p className="text-center text-gray-500 dark:text-gray-400">Please enter your search criteria above.</p>
+              <p className="text-center text-gray-500 dark:text-gray-400 mt-12">Please enter your search criteria above.</p>
             )}
           </div>
         </div>

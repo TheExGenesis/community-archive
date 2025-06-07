@@ -133,7 +133,7 @@ export default async function Homepage() {
     }
   })
 
-  const unifiedDeepBlueBase = "bg-white dark:bg-background";
+  const unifiedDeepBlueBase = "bg-white dark:bg-slate-900";
   
   const sectionPaddingClasses = "py-12 md:py-16 lg:py-20"
   const contentWrapperClasses = "w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10"

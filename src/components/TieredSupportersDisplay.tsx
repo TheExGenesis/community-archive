@@ -125,10 +125,10 @@ const TieredSupportersDisplay: React.FC<TieredSupportersDisplayProps> = ({
       <div className="w-full max-w-2xl text-center">
         {topTenNames.length > 0 && (
           <p className="text-gray-700 dark:text-gray-300 text-lg">
-            A special thank you to <span className="font-semibold">{topTenNames.join(', ')}</span>
+            <span className="font-semibold">{topTenNames.join(', ')}</span>
             {additionalSupportersCount > 0 && (
               <span>, and {additionalSupportersCount} more wonderful supporter{additionalSupportersCount > 1 ? 's' : ''}</span>
-            )} for their contributions!
+            )}
           </p>
         )}
         {(imageStack.length === 0 && topTenNames.length === 0 && totalSupportersCount > 0) && (

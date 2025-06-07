@@ -18,7 +18,6 @@ const navItems = [
   { href: '/', label: 'Home' },
   { href: '/user-dir', label: 'User Directory' },
   { href: '/search', label: 'Advanced Search' },
-  { href: 'https://github.com/TheExGenesis/community-archive/blob/main/docs/apps.md', label: 'Apps', isExternal: true },
 ]
 
 export default function MobileMenu() {
@@ -42,11 +41,9 @@ export default function MobileMenu() {
             <Link
               key={item.href}
               href={item.href}
-              target={item.isExternal ? '_blank' : undefined}
-              rel={item.isExternal ? 'noopener noreferrer' : undefined}
               className={`block px-3 py-2 rounded-md text-base font-medium transition-colors duration-150
                 ${
-                  !item.isExternal && pathname === item.href
+                  pathname === item.href
                     ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                 }`}

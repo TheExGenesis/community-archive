@@ -45,7 +45,7 @@ export default function AdvancedSearchForm() {
   const labelClasses = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
 
   return (
-    <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-lg">
+    <div className="bg-slate-100 dark:bg-card p-6 md:p-8 rounded-lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="main-search" className={labelClasses}>Search terms</label>

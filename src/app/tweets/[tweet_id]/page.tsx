@@ -6,10 +6,10 @@ export default async function TweetPage({ params }: any) {
   const tweetResult = await getTweet(tweet_id)
 
   // Style definitions copied from homepage
-  const unifiedDeepBlueBase = "bg-slate-200 dark:bg-slate-900";
-  const sectionPaddingClasses = "py-16 md:py-20"
+  const unifiedDeepBlueBase = "bg-white dark:bg-background";
+  const sectionPaddingClasses = "py-12 md:py-16 lg:py-20"
   // Using max-w-2xl for a single tweet display
-  const contentWrapperClasses = "w-full max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10"
+  const contentWrapperClasses = "w-full max-w-2xl mx-auto px-4 sm:px-6 lg:px-8"
 
   if (!tweetResult.data || tweetResult.data.length === 0) {
     return (
@@ -35,10 +35,11 @@ export default async function TweetPage({ params }: any) {
         className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} overflow-hidden min-h-screen`}
       >
         <div className={`${contentWrapperClasses}`}> 
-          <h2 className="mb-8 text-4xl font-bold text-center text-gray-900 dark:text-white">🔎 View Tweet</h2>
-          <div className="bg-white dark:bg-slate-800 p-4 md:p-6 rounded-lg">
-            {/* Ensure TweetRefactor component handles its own internal styling well within this card */}
-            <Tweet key={tweet.tweet_id} tweet={tweet} />
+          <div className="bg-slate-100 dark:bg-card p-6 md:p-8 rounded-lg">
+            <h2 className="mb-8 text-4xl font-bold text-center text-gray-900 dark:text-white">🔎 View Tweet</h2>
+            <div className="bg-background dark:bg-secondary p-4 rounded-lg">
+              <Tweet key={tweet.tweet_id} tweet={tweet} />
+            </div>
           </div>
         </div>
       </section>

@@ -143,11 +143,13 @@ export default function TweetList({
       {tweets.length === 0 && !isLoading && !error && (
         <p className="text-lg text-gray-600 dark:text-gray-400 text-center py-10">No tweets to display for the current filters.</p>
       )}
-      {tweets.map(tweet => (
-        <div key={tweet.tweet_id} className="bg-white dark:bg-slate-800 p-4 md:p-6 rounded-lg shadow">
-          <Tweet tweet={tweet} />
-        </div>
-      ))}
+      <div className="space-y-4">
+        {tweets.map(tweet => (
+          <div key={tweet.tweet_id} className="bg-background dark:bg-secondary p-4 rounded-lg">
+            <Tweet tweet={tweet} />
+          </div>
+        ))}
+      </div>
       {error && tweets.length > 0 && (
         <p className="text-red-500 text-center mt-6">Error loading more tweets: {error}</p>
       )}

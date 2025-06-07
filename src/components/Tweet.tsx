@@ -39,7 +39,7 @@ export default function Tweet({ tweet }: TweetProps) {
     const replyToUsername = tweet.reply_to_username
 
   return (
-    <div className="mb-4 rounded-lg bg-white p-4 shadow-md dark:bg-gray-800">
+    <div>
       <div className="mb-2 flex items-start">
         <Avatar className="mr-3 h-12 w-12">
           <AvatarImage

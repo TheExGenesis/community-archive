@@ -133,9 +133,9 @@ export default async function Homepage() {
     }
   })
 
-  const unifiedDeepBlueBase = "bg-slate-200 dark:bg-slate-900";
+  const unifiedDeepBlueBase = "bg-white dark:bg-background";
   
-  const sectionPaddingClasses = "py-16 md:py-20"
+  const sectionPaddingClasses = "py-12 md:py-16 lg:py-20"
   const contentWrapperClasses = "w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10"
 
   return (
@@ -257,13 +257,46 @@ export default async function Homepage() {
         </div>
       </section>
 
-      {/* Section 7: Our Supporters - Removed glow */}
+      {/* Section 7: Our Supporters - Unified and Re-ordered */}
       <section 
         className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} overflow-hidden`}
       >
-        <div className={`${contentWrapperClasses} text-center space-y-6`}>
+        <div className={`${contentWrapperClasses} text-center space-y-12`}>
           <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">💖 Our Supporters</h2>
 
+          {/* Major Backers Section */}
+          <div className="w-full max-w-3xl mx-auto">
+            <h3 className="text-2xl font-semibold leading-8 text-gray-900 dark:text-white mb-8">
+              Special thanks to our major backers
+            </h3>
+            <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-6">
+              <Link href="https://survivalandflourishing.fund/" target="_blank" rel="noopener noreferrer" className="text-xl font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                Survival and Flourishing Fund
+              </Link>
+              <span className="text-gray-400 dark:text-gray-500 text-xl">•</span>
+              <span className="text-xl font-medium text-gray-700 dark:text-gray-300">
+                <Link href="https://x.com/VitalikButerin" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Vitalik Buterin
+                </Link>
+                {' '}(via{' '}
+                <Link href="https://kanro.fi/" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Kanro
+                </Link>)
+              </span>
+              <span className="text-gray-400 dark:text-gray-500 text-xl">•</span>
+              <Link href="https://x.com/pwang" target="_blank" rel="noopener noreferrer" className="text-xl font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                Peter Wang
+              </Link>
+            </div>
+          </div>
+          
+          {/* Divider */}
+          <div className="w-full max-w-2xl mx-auto border-t border-gray-200 dark:border-gray-700"></div>
+
+          {/* Community Supporters Section */}
+          <h3 className="text-2xl font-semibold leading-8 text-gray-900 dark:text-white -mb-4">
+            And to our community backers
+          </h3>
           <TieredSupportersDisplay 
             highestDonorWithImage={highestDonorWithImage}
             otherDonorsForStack={otherDonorsForStack}
@@ -275,26 +308,13 @@ export default async function Homepage() {
 
           <div className="pt-8">
             <Link href="https://opencollective.com/community-archive/donate" passHref>
-               {/* Removed shadow-md, hover:shadow-lg from Donate button */}
                <div className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-lg font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 transition-colors duration-300 cursor-pointer">
                  <FaHeart className="mr-2" /> Donate to our Open Collective
                </div>
             </Link>
           </div>
-        </div>
-      </section>
 
-      {/* Maintained by text */}
-      <section className={`bg-slate-100 dark:bg-slate-800 py-8 overflow-hidden`}>
-        <div className={`${contentWrapperClasses} text-center`}>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-          Maintained & developed by{' '}
-            <a href="https://x.com/exgenesis" className="font-medium text-blue-600 hover:underline dark:text-blue-400">
-            Xiq (@exgenesis)
-          </a>{' '}
-          & contributors.
-        </p>
-      </div>
+        </div>
       </section>
 
       <Footer />

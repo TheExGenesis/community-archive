@@ -52,7 +52,7 @@ export const getUserData = async (
       num_followers,
       num_following,
       num_likes,
-      profile:profile(bio, website, location, avatar_media_url),
+      profile:profile(bio, website, location, avatar_media_url, header_media_url),
       archive_upload:archive_upload(archive_at, created_at)
     `,
     )

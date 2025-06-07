@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import * as AvatarPrimitive from '@radix-ui/react-avatar'
+import Image from 'next/image'
 
 import { cn } from '@/utils/tailwind'
 
@@ -43,15 +44,16 @@ const AvatarFallback = React.forwardRef<
   <AvatarPrimitive.Fallback
     ref={ref}
     className={cn(
-      'flex h-full w-full items-center justify-center rounded-full bg-muted',
+      'relative flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-muted',
       className,
     )}
     {...props}
   >
-    <img
+    <Image
       src="/placeholder.jpg"
       alt="Placeholder"
-      className="h-full w-full object-cover"
+      layout="fill"
+      objectFit="cover"
     />
   </AvatarPrimitive.Fallback>
 ))

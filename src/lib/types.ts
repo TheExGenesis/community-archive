@@ -194,10 +194,62 @@ export type FormattedUser = {
   website: string | null
   location: string | null
   avatar_media_url: string | null
+  header_media_url?: string | null
   archive_at: string | null
   num_tweets: number
   num_followers: number
   num_following: number
   num_likes: number
   archive_uploaded_at: string | null
+}
+
+// Interfaces for fetching and displaying tweets via Supabase queries
+export interface RawSupabaseProfile {
+  avatar_media_url: string | null;
+}
+
+export interface RawSupabaseAccount {
+  username: string;
+  account_display_name: string;
+  profile: RawSupabaseProfile | null;
+}
+
+export interface RawSupabaseTweet {
+  tweet_id: string;
+  created_at: string;
+  full_text: string;
+  favorite_count: number;
+  retweet_count: number;
+  reply_to_tweet_id: string | null;
+  account: RawSupabaseAccount; 
+  media?: Array<{
+    media_url: string;
+    media_type: string;
+    width?: number;
+    height?: number;
+  }>;
+}
+
+export interface TimelineTweet {
+  tweet_id: string;
+  created_at: string;
+  full_text: string;
+  favorite_count: number;
+  retweet_count: number;
+  reply_to_tweet_id: string | null;
+  account: { 
+    username: string;
+    account_display_name: string;
+    profile?: { 
+      avatar_media_url?: string;
+    };
+  };
+  media?: Array<TweetMediaItem>;
+}
+
+export interface TweetMediaItem {
+  media_url: string;
+  media_type: string;
+  width?: number;
+  height?: number;
 }

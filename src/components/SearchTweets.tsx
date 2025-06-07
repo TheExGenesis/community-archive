@@ -131,26 +131,31 @@ export default function SearchTweets({
             <div>Loading tweets...</div>
           ) : allTweets.length > 0 ? (
             <div className="space-y-8">
-              {allTweets.map((tweet) => (
-                <Tweet
-                  key={tweet.tweet_id}
-                  tweetId={tweet.tweet_id}
-                  username={tweet.username || 'Unknown'}
-                  displayName={tweet.account_display_name || 'Unknown'}
-                  profilePicUrl={
-                    tweet.avatar_media_url ||
-                    'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
-                  }
-                  text={tweet.full_text}
-                  favoriteCount={tweet.favorite_count}
-                  retweetCount={tweet.retweet_count}
-                  date={tweet.created_at}
-                  tweetUrl={`https://twitter.com/${
-                    tweet['account']?.username || 'unknown'
-                  }/status/${tweet.tweet_id}`}
-                  replyToUsername={tweet.reply_to_username}
-                />
-              ))}
+              {allTweets.map((individualTweet) => {
+                // Construct the tweet object expected by the Tweet component
+                const tweetForTweetComponent = {
+                  tweet_id: individualTweet.tweet_id,
+                  full_text: individualTweet.full_text,
+                  favorite_count: individualTweet.favorite_count,
+                  retweet_count: individualTweet.retweet_count,
+                  created_at: individualTweet.created_at,
+                  reply_to_username: individualTweet.reply_to_username || undefined,
+                  account: {
+                    username: individualTweet.username || 'Unknown',
+                    account_display_name: individualTweet.account_display_name || 'Unknown',
+                    profile: {
+                      avatar_media_url: individualTweet.avatar_media_url || undefined, // Let Tweet.tsx handle placeholder
+                    },
+                  },
+                  // media is not available here and is optional in TweetData
+                };
+                return (
+                  <Tweet
+                    key={individualTweet.tweet_id}
+                    tweet={tweetForTweetComponent}
+                  />
+                )
+              })}
             </div>
           ) : (
             <div>No tweets found</div>

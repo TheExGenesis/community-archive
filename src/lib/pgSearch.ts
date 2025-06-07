@@ -1,7 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/database-types'
 import { devLog } from '@/lib/devLog'
-import { SearchParams } from './types'
+import { SearchParams, TweetMediaItem } from './types'
 
 export const searchTweetsExact = async (
   supabase: SupabaseClient<Database>,
@@ -138,27 +138,48 @@ export const parseSearchOptions = (query: string) => {
   searchOptions.search_query = queryMinusOptions.join(' ')
   return searchOptions
 }
+
+export interface SearchTweetRpcResponseItem {
+  tweet_id: string;
+  account_id: string;
+  created_at: string;
+  full_text: string;
+  retweet_count: number;
+  favorite_count: number;
+  reply_to_tweet_id: string | null;
+  avatar_media_url: string | null;
+  archive_upload_id: number;
+  username: string;
+  account_display_name: string;
+  media: TweetMediaItem[] | null;
+}
+
 export async function searchTweets(
   supabase: SupabaseClient<Database>,
   searchParams: SearchParams,
   limit: number = 50,
-) {
-  const { search_query, from_user, to_user, since_date, until_date } =
-    searchParams
-
-  const { data, error } = await supabase.rpc('search_tweets' as any, {
-    search_query,
-    from_user,
-    to_user,
-    since_date,
-    until_date,
+  offset: number = 0
+): Promise<SearchTweetRpcResponseItem[] | null> {
+  const params = {
+    search_query: searchParams.search_query,
+    from_user: searchParams.from_user || undefined,
+    to_user: searchParams.to_user || undefined,
+    since_date: searchParams.since_date || undefined,
+    until_date: searchParams.until_date || undefined,
     limit_: limit,
-  })
+    offset_: offset
+  };
+
+  const { data, error } = await supabase.rpc('search_tweets', params);
 
   if (error) {
-    console.error('Error fetching tweets:', error)
-    throw error
+    console.error('Error calling search_tweets RPC:', error);
+    throw error;
   }
 
-  return data
+  if (!data) {
+    return [];
+  }
+
+  return data as SearchTweetRpcResponseItem[];
 }

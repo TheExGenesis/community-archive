@@ -140,7 +140,15 @@ export function FileUploadDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={resetDialog}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent 
+        className="sm:max-w-[425px]"
+        onInteractOutside={(event) => {
+          event.preventDefault();
+        }}
+        onEscapeKeyDown={(event) => {
+          event.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>
             {state.uploadStatus === 'uploading'
@@ -181,6 +189,18 @@ export function FileUploadDialog({
                 - {new Date(archiveStats.latestTweetDate).toLocaleDateString()}
               </div>
             </div>
+
+            {/* Circle Tweet Warning */}
+            {new Date(archiveStats.earliestTweetDate) < new Date('2023-10-31') && (
+              <div className="my-2 p-3 bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 dark:border-yellow-700 text-yellow-700 dark:text-yellow-200 rounded">
+                <p className="font-bold">Important Notice Regarding Twitter Circle Tweets:</p>
+                <p className="text-sm">
+                  Your archive may contain tweets from before October 31, 2023. 
+                  Any Twitter Circle tweets from this period will be treated as public tweets and will be visible to everyone in this archive. 
+                  By proceeding, you acknowledge this.
+                </p>
+              </div>
+            )}
 
             {/* Advanced Options */}
             <div className="mt-6">

@@ -9,12 +9,18 @@ export const getTweet = async (tweet_id: any) => {
     .select(
       `
         *,
-        ${'account'}!inner (
-          profile (
-            avatar_media_url
-          ),
+        account:all_account!inner (
           username,
-          account_display_name
+          account_display_name,
+          profile:profile!left (
+            avatar_media_url
+          )
+        ),
+        media:tweet_media (
+          media_url,
+          media_type,
+          width,
+          height
         )
       `,
     )

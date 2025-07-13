@@ -15,9 +15,24 @@ const contentWrapperClasses = "w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8";
 function SearchPageContent() {
   const searchParams = useSearchParams();
 
+  const rawQuery = searchParams.get('q');
+  let formattedQuery: string | undefined;
+
+  if (rawQuery) {
+    const trimmedQuery = rawQuery.trim();
+    if (trimmedQuery.startsWith('"') && trimmedQuery.endsWith('"')) {
+      // Exact phrase search: "cool project" -> cool <-> project
+      const phrase = trimmedQuery.substring(1, trimmedQuery.length - 1);
+      formattedQuery = phrase.trim().split(/\s+/).join(' <-> ');
+    } else {
+      // All words search: cool project -> cool & project
+      formattedQuery = trimmedQuery.split(/\s+/).join(' & ');
+    }
+  }
+
   // Construct FilterCriteria from URL search parameters
   const filterCriteria: FilterCriteria = {
-    searchQuery: searchParams.get('q') || undefined,
+    searchQuery: formattedQuery,
     fromUsername: searchParams.get('fromUser') || undefined,
     replyToUsername: searchParams.get('replyToUser') || undefined,
     startDate: searchParams.get('sinceDate') || undefined,

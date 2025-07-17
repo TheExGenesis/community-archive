@@ -1,42 +1,99 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
+
+const parseQuery = (q: string) => {
+  const parts = q.split(' ');
+  const options: { [key: string]: string } = {};
+  const words: string[] = [];
+  const validFilters = ['from', 'to', 'since', 'until'];
+
+  parts.forEach((part) => {
+    const separatorIndex = part.indexOf(':');
+    if (separatorIndex > 0) { // must not start with ':' and must contain ':'
+      const key = part.substring(0, separatorIndex);
+      const value = part.substring(separatorIndex + 1);
+      if (validFilters.includes(key) && value) {
+        options[key] = value;
+        return; // Go to next part
+      }
+    }
+    words.push(part); // Not a valid filter, so it's a keyword
+  });
+
+  return { options, words };
+};
 
 export default function AdvancedSearchForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Initialize state from URL params or defaults
-  const [query, setQuery] = useState(searchParams.get('q') || '');
-  const [from, setFrom] = useState(searchParams.get('fromUser') || '');
-  const [to, setTo] = useState(searchParams.get('replyToUser') || ''); // Renamed URL param for clarity
-  const [since, setSince] = useState(searchParams.get('sinceDate') || '');
-  const [until, setUntil] = useState(searchParams.get('untilDate') || '');
+  const [query, setQuery] = useState('');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
-  // Effect to update form fields if URL search params change (e.g., browser back/forward)
+  // Effect to set initial query from URL params
   useEffect(() => {
-    setQuery(searchParams.get('q') || '');
-    setFrom(searchParams.get('fromUser') || '');
-    setTo(searchParams.get('replyToUser') || '');
-    setSince(searchParams.get('sinceDate') || '');
-    setUntil(searchParams.get('untilDate') || '');
-    // Determine if advanced options should be shown based on if any advanced fields have values
-    if (searchParams.get('fromUser') || searchParams.get('replyToUser') || searchParams.get('sinceDate') || searchParams.get('untilDate')) {
-      setShowAdvancedOptions(true);
-    }
+    const q = searchParams.get('q') || '';
+    const fromUser = searchParams.get('fromUser') || '';
+    const replyToUser = searchParams.get('replyToUser') || '';
+    const sinceDate = searchParams.get('sinceDate') || '';
+    const untilDate = searchParams.get('untilDate') || '';
+    
+    const parts = [q];
+    if (fromUser) parts.push(`from:${fromUser}`);
+    if (replyToUser) parts.push(`to:${replyToUser}`);
+    if (sinceDate) parts.push(`since:${sinceDate}`);
+    if (untilDate) parts.push(`until:${untilDate}`);
+    
+    setQuery(parts.filter(p => p).join(' ').trim());
+
+    // if (fromUser || replyToUser || sinceDate || untilDate) {
+    //   setShowAdvancedOptions(true);
+    // }
   }, [searchParams]);
+
+  // Derive values for advanced fields from the main query string
+  const { from, to, since, until } = useMemo(() => {
+    const { options } = parseQuery(query);
+    return {
+      from: options.from || '',
+      to: options.to || '',
+      since: options.since || '',
+      until: options.until || '',
+    };
+  }, [query]);
+
+  const handleFilterChange = (filter: 'from' | 'to' | 'since' | 'until', value: string) => {
+    const { words, options } = parseQuery(query);
+
+    // Update the specific filter's value
+    if (value) {
+      options[filter] = value;
+    } else {
+      delete options[filter];
+    }
+
+    // Reconstruct the query string
+    const newFilterParts = Object.entries(options).map(([key, val]) => `${key}:${val}`);
+    const newQuery = [...words, ...newFilterParts].join(' ');
+    setQuery(newQuery.trim().replace(/\s+/g, ' '));
+  };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const { options, words } = parseQuery(query);
+    const mainQuery = words.join(' ').trim();
+
     const params = new URLSearchParams();
-    if (query) params.set('q', query);
-    if (from) params.set('fromUser', from);
-    if (to) params.set('replyToUser', to);
-    if (since) params.set('sinceDate', since);
-    if (until) params.set('untilDate', until);
+    if (mainQuery) params.set('q', mainQuery);
+    if (options.from) params.set('fromUser', options.from);
+    if (options.to) params.set('replyToUser', options.to);
+    if (options.since) params.set('sinceDate', options.since);
+    if (options.until) params.set('untilDate', options.until);
 
     router.push(`/search?${params.toString()}`);
   };
@@ -54,11 +111,9 @@ export default function AdvancedSearchForm() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-            placeholder="Keywords... (e.g., concert, live event)"
+            placeholder="Search tweets (use from:, to:, since:, until: for advanced search)"
             className={inputClasses}
         />
-          {/* Simplified placeholder, as colon-based filters are not directly handled by this form anymore before sending to URL*/}
-          {/* <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">You can use from:, to:, since: YYYY-MM-DD, until: YYYY-MM-DD.</p> */}
         </div>
 
         <Button
@@ -83,7 +138,7 @@ export default function AdvancedSearchForm() {
                 id="from-user"
               type="text"
               value={from}
-              onChange={(e) => setFrom(e.target.value)}
+              onChange={(e) => handleFilterChange('from', e.target.value)}
                 placeholder="username (without @)"
                 className={inputClasses}
             />
@@ -94,7 +149,7 @@ export default function AdvancedSearchForm() {
                 id="to-user"
               type="text"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={(e) => handleFilterChange('to', e.target.value)}
                 placeholder="username (without @)"
                 className={inputClasses}
             />
@@ -110,7 +165,7 @@ export default function AdvancedSearchForm() {
                 id="since-date"
                 type="date"
                 value={since}
-                onChange={(e) => setSince(e.target.value)}
+                onChange={(e) => handleFilterChange('since', e.target.value)}
                 className={`${inputClasses} mt-1`}
               />
             </div>
@@ -125,7 +180,7 @@ export default function AdvancedSearchForm() {
                 id="until-date"
                 type="date"
                 value={until}
-                onChange={(e) => setUntil(e.target.value)}
+                onChange={(e) => handleFilterChange('until', e.target.value)}
                 className={`${inputClasses} mt-1`}
               />
             </div>

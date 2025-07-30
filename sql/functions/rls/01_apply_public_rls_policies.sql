@@ -20,7 +20,7 @@ BEGIN
 
     -- Update the public visibility policy to check for keep_private more efficiently
     EXECUTE format('
-        CREATE POLICY "Data is publicly visible unless marked private" ON %I.%I
+        CREATE POLICY "Data is publicly visible" ON %I.%I
         FOR SELECT
         USING (true)', schema_name, table_name);
 

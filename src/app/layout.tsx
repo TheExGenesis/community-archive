@@ -6,16 +6,10 @@ import './globals.css'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import ReactQueryProvider from '@/providers/ReactQueryProvider'
 import Link from 'next/link'
-import {
-  NavigationMenu,
-  NavigationMenuList,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  navigationMenuTriggerStyle,
-} from '@/components/ui/navigation-menu'
 import ThemeToggle from '@/components/ThemeToggle'
 import dynamic from 'next/dynamic'
-import { usePathname } from 'next/navigation'
+import HeaderNavigation from '@/components/HeaderNavigation'
+import MobileMenu from '@/components/MobileMenu'
 
 const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
   ssr: false,
@@ -39,11 +33,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={GeistSans.className}
+      className={`${GeistSans.className} antialiased`}
       style={{ colorScheme: 'dark' }}
+      suppressHydrationWarning={true}
     >
-      <body className="bg-background bg-gray-100 text-foreground text-gray-900 dark:bg-gray-900 dark:text-gray-100">
-        <NextTopLoader showSpinner={false} height={2} color="#2acf80" />
+      <body className="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300">
+        <NextTopLoader showSpinner={false} height={3} color="#2acf80" />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
@@ -51,55 +46,22 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <ReactQueryProvider>
-            <div className="flex items-center justify-between px-4 py-2">
-              <NavigationMenu>
-                <NavigationMenuList>
-                  <NavigationMenuItem>
-                    <Link href="/" legacyBehavior passHref>
-                      <NavigationMenuLink
-                        className={navigationMenuTriggerStyle()}
-                      >
-                        Home
-                      </NavigationMenuLink>
-                    </Link>
-                  </NavigationMenuItem>
-                  <NavigationMenuItem>
-                    <Link href="/user-dir" legacyBehavior passHref>
-                      <NavigationMenuLink
-                        className={navigationMenuTriggerStyle()}
-                      >
-                        User Directory
-                      </NavigationMenuLink>
-                    </Link>
-                  </NavigationMenuItem>
-                  <NavigationMenuItem>
-                    <Link href="/search" legacyBehavior passHref>
-                      <NavigationMenuLink
-                        className={navigationMenuTriggerStyle()}
-                      >
-                        Advanced Search
-                      </NavigationMenuLink>
-                    </Link>
-                  </NavigationMenuItem>
-                  <NavigationMenuItem>
-                    <Link href="https://github.com/TheExGenesis/community-archive/blob/main/docs/apps.md" legacyBehavior passHref>
-                      <NavigationMenuLink
-                        className={navigationMenuTriggerStyle()}
-                      >
-                        Apps
-                      </NavigationMenuLink>
-                    </Link>
-                  </NavigationMenuItem>
-                </NavigationMenuList>
-              </NavigationMenu>
-              <div className="flex items-center space-x-4">
-                <ThemeToggle side="bottom" />
-                <div className="text-sm dark:text-gray-300">
-                  <DynamicSignIn />
+            <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md">
+              <div className="container mx-auto flex h-16 max-w-screen-xl items-center justify-between px-4 sm:px-6 lg:px-8">
+                <Link href="/" className="flex items-center space-x-2">
+                  <span className="font-bold text-lg text-gray-800 dark:text-gray-200">Community Archive</span>
+                </Link>
+                <HeaderNavigation />
+                <div className="flex items-center space-x-3">
+                  <ThemeToggle side="bottom" />
+                  <div className="text-sm">
+                    <DynamicSignIn />
+                  </div>
+                  <MobileMenu />
                 </div>
               </div>
-            </div>
-            <main className="flex min-h-screen flex-col items-center bg-gray-100 dark:bg-gray-900">
+            </header>
+            <main className="flex min-h-[calc(100vh-4rem)] flex-col">
               {children}
               <Analytics />
             </main>

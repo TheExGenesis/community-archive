@@ -20,7 +20,7 @@ const customJestConfig = {
       ...commonConfig,
       displayName: 'server',
       testEnvironment: 'node',
-      testMatch: ['<rootDir>/src/lib-server/**/*.test.{js,jsx,ts,tsx}'],
+      testMatch: ['<rootDir>/src/lib/**/*.test.{js,jsx,ts,tsx}'],
       setupFilesAfterEnv: ['<rootDir>/jest.setup.server.ts'],
     },
     {
@@ -29,7 +29,7 @@ const customJestConfig = {
       testEnvironment: 'jsdom',
       testMatch: [
         '<rootDir>/src/**/*.test.{js,jsx,ts,tsx}',
-        '!<rootDir>/src/lib-server/**/*.test.{js,jsx,ts,tsx}',
+        '!<rootDir>/src/lib/**/*.test.{js,jsx,ts,tsx}',
       ],
       setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
     },

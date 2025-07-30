@@ -33,6 +33,7 @@
     },
     "types": [
       "@testing-library/jest-dom",
+      "node"
     ]
   },
   "include": [
@@ -49,6 +50,7 @@
     ".next",
     "out",
     "scratchpad/**",
-    "supabase/functions/**"
+    "supabase/functions/**",
+    "scripts/**"
   ]
 }

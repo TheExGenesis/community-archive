@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.all_profile (
     FOREIGN KEY (archive_upload_id) REFERENCES public.archive_upload (id),
     FOREIGN KEY (account_id) REFERENCES public.all_account (account_id)
 );
-CREATE INDEX "idx_all_profile_archive_upload_id" ON "public"."all_profile" USING "btree" ("archive_upload_id");
+CREATE INDEX IF NOT EXISTS "idx_all_profile_archive_upload_id" ON "public"."all_profile" USING "btree" ("archive_upload_id");
 SELECT public.apply_public_rls_policies_not_private('public', 'all_account');
 SELECT public.apply_public_rls_policies_not_private('public', 'all_profile');
  -- Then copy data
@@ -105,11 +105,24 @@ DO $$
 DECLARE
     account_count INTEGER;
     all_account_count INTEGER;
+    table_exists BOOLEAN;
 BEGIN
     SELECT COUNT(*) INTO account_count FROM public.account;
     SELECT COUNT(*) INTO all_account_count FROM public.all_account;
+    
+    -- Check if table exists without using nested DO block
+    SELECT EXISTS (
+        SELECT 1 FROM pg_tables 
+        WHERE schemaname = 'public' AND tablename = 'account'
+    ) INTO table_exists;
+    
     IF account_count = all_account_count THEN
-        DROP TABLE public.account;
+        -- Drop table if it exists
+        IF table_exists THEN
+            EXECUTE 'DROP TABLE public.account';
+        END IF;
+        
+        -- Create view
         CREATE OR REPLACE VIEW public.account AS
         SELECT a.*
         FROM all_account a
@@ -133,7 +146,12 @@ BEGIN
            AND p.archive_upload_id = latest.latest_archive_id;
     SELECT COUNT(*) INTO all_profile_count FROM public.all_profile;
     IF profile_count = all_profile_count THEN
-        DROP TABLE public.profile;
+        IF EXISTS (
+            SELECT 1 FROM pg_tables 
+            WHERE schemaname = 'public' AND tablename = 'profile'
+        ) THEN
+            DROP TABLE public.profile;
+        END IF;
         CREATE OR REPLACE VIEW public.profile AS
         SELECT  
             p.*
@@ -745,8 +763,11 @@ FOR SELECT
 TO public
 USING (true);
 --create bucket
-insert into storage.buckets (id, name,public) values  
-('twitter_api_files', 'twitter_api_files',false);
+INSERT INTO storage.buckets (id, name, public)
+SELECT 'twitter_api_files', 'twitter_api_files', false
+WHERE NOT EXISTS (
+    SELECT 1 FROM storage.buckets WHERE id = 'twitter_api_files'
+);
 CREATE TABLE IF NOT EXISTS public.temporary_data (
     type VARCHAR(255) NOT NULL,
     item_id VARCHAR(255) NOT NULL,

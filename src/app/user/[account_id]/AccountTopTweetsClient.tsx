@@ -2,8 +2,8 @@
 
 import React, { useState, useCallback } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { PopularTweet } from '@/lib-client/types'
-import Tweet from '@/components/Tweet'
+import { PopularTweet } from '@/lib/types'
+import  Tweet  from '@/components/Tweet'
 import { CopyButton } from '@/components/copy-button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -108,21 +108,32 @@ const AccountTopTweetsClient: React.FC<Props> = ({
           <TabsContent key={key} value={key}>
             <ScrollArea className="h-[33vh]">
               <ul>
-                {tweetData[key]?.map((tweet) => (
-                  <Tweet
-                    key={tweet.tweet_id}
-                    username={username}
-                    displayName={displayName}
-                    profilePicUrl={profilePicUrl}
-                    text={tweet.full_text}
-                    favoriteCount={tweet.favorite_count}
-                    retweetCount={tweet.retweet_count}
-                    date={tweet.created_at}
-                    tweetUrl={`https://twitter.com/${username}/status/${tweet.tweet_id}`}
-                    tweetId={tweet.tweet_id}
-                    replyToUsername={tweet.reply_to_username || undefined}
-                  />
-                ))}
+                {tweetData[key]?.map((popularTweet) => {
+                  // Construct the tweet object expected by the Tweet component
+                  const tweetForTweetComponent = {
+                    tweet_id: popularTweet.tweet_id,
+                    created_at: popularTweet.created_at,
+                    full_text: popularTweet.full_text,
+                    retweet_count: popularTweet.retweet_count,
+                    favorite_count: popularTweet.favorite_count,
+                    reply_to_username: popularTweet.reply_to_username || undefined,
+                    account: {
+                      username: username, // From AccountTopTweetsClient props
+                      account_display_name: displayName, // From AccountTopTweetsClient props
+                      profile: {
+                        avatar_media_url: profilePicUrl, // From AccountTopTweetsClient props
+                      },
+                    },
+                    // media is optional in TweetData and not in PopularTweet
+                  }
+
+                  return (
+                    <Tweet
+                      key={popularTweet.tweet_id}
+                      tweet={tweetForTweetComponent} // Pass the constructed object
+                    />
+                  )
+                })}
               </ul>
             </ScrollArea>
           </TabsContent>

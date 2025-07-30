@@ -1,0 +1,32 @@
+create or replace function tes.get_user_intercepted_stats(days_back int default 30)
+returns table (
+    date date,
+    type text,
+    count int
+)
+language plpgsql
+security definer
+as $$
+declare
+    current_user_id text;
+begin
+    -- Get the current authenticated user's account_id
+    SELECT auth.jwt() -> 'user_metadata' ->> 'sub' into current_user_id ;
+    
+    -- Verify user is authenticated
+    if current_user_id is null then
+        raise exception 'User must be authenticated';
+    end if;
+    
+    -- Return data only for the authenticated user within the specified date range
+    return query
+    select 
+        uis.date,
+        uis.type,
+        uis.count
+    from private.user_intercepted_stats uis
+    where uis.user_id = current_user_id
+      and uis.date >= current_date - interval '1 day' * days_back
+    order by uis.date desc, uis.type;
+end;
+$$;

@@ -10,7 +10,6 @@ NEXT_PUBLIC_USE_REMOTE_DEV_DB=false # Set to true to use the remote development 
 NEXT_PUBLIC_LOCAL_SUPABASE_URL=http://localhost:54321
 NEXT_PUBLIC_LOCAL_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
 NEXT_PUBLIC_LOCAL_SERVICE_ROLE=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
-SUPABASE_SERVICE_ROLE=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
 SUPABASE_AUTH_TWITTER_CLIENT_ID=<>
 SUPABASE_AUTH_TWITTER_SECRET=<>
 NEXT_PUBLIC_USER_ID=<>
@@ -43,7 +42,7 @@ The app should now be running on [localhost:3000](http://localhost:3000/).
 
 > Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
 
-4. Run tests: `pnpm jest --selectProjects server --testPathPattern=src/lib-server -t "insertProfiles"`
+4. Run tests: `pnpm jest --selectProjects server --testPathPattern=src/lib -t "insertProfiles"`
 
    `--selectProjects server` will run tests only for the server-side code in node, and `--selectProjects client` will run tests only for the client-side code in jsdom (see `jest.config.js`)
 
@@ -101,7 +100,7 @@ For each change you make to the db:
 - wait a bit and then you should be able to see the data in the local supabase studio at http://localhost:54323/project/default/editor
 - (OPTIONAL)run the script `pnpm dev:validateimport` to validate the data. afaict there's a few edge cases where the data might not import correctly. For now fixing this is not a priority, PR is welcome!
 
-Note: this process takes a bit of time because there's 100+ archives to import. Feel free to delete some of the archives from the `ARCHIVE_PATH` folder if you want to speed up the process. Another option is finding the optimal `BATCH_SIZE` value in `scripts/importFromFilesToDb.ts` for your machine.
+Note: this process takes a bit of time because there's 100+ archives to import. Feel free to delete some of the archives from the `ARCHIVE_PATH` folder if you want to speed up the process. Another option is finding the optimal `BATCH_SIZE` value in `scripts/import_from_files_to_db.ts` for your machine.
 
 ### Sign-in in dev mode
 

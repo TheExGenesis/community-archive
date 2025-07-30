@@ -1,5 +1,5 @@
-create or replace view public.account as
-select
+CREATE OR REPLACE VIEW public.account AS
+SELECT
   a.account_id,
   a.created_via,
   a.username,
@@ -8,19 +8,19 @@ select
   a.num_tweets,
   a.num_following,
   a.num_followers,
-  a.num_likes
-from
+  a.num_likes,
+  a.updated_at
+FROM
   all_account a
-  join archive_upload au on a.account_id = au.account_id
-  and au.id = (
+  JOIN archive_upload au ON a.account_id = au.account_id
+  AND au.id = (
     (
-      select
-        max(archive_upload.id) as max
-      from
+      SELECT
+        MAX(archive_upload.id) AS MAX
+      FROM
         archive_upload
-      where
+      WHERE
         archive_upload.account_id = a.account_id
-        AND
-        archive_upload.upload_phase = 'completed'
+        AND archive_upload.upload_phase = 'completed'
     )
   );

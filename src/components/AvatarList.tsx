@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { AvatarType } from '@/lib-client/types'
-import { formatNumber } from '@/lib-client/formatNumber'
+import { AvatarType } from '@/lib/types'
+import { formatNumber } from '@/lib/formatNumber'
 
 type AvatarListProps = {
   initialAvatars: AvatarType[]
@@ -22,12 +22,12 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
   return (
     <div>
       <div className="w-full">
-        <div className="flex justify-between pb-2">
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-6 pb-2">
           {avatars.map((avatar) => (
             <a
               key={avatar.username}
               href={`/user/${avatar.account_id}`}
-              className="flex flex-col items-center"
+              className="flex flex-col items-center text-center w-20"
             >
               <Avatar className="h-12 w-12">
                 <AvatarImage
@@ -39,21 +39,18 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
                 </AvatarFallback>
               </Avatar>
               <span
-                className="mt-1 whitespace-nowrap text-justify text-xs hover:underline"
-                style={{ maxWidth: '40px', fontSize: '10px' }}
+                className="mt-1 text-xs hover:underline break-words"
               >
                 {avatar.username}
               </span>
               <span
-                className="mt-1 whitespace-nowrap text-justify text-xs text-zinc-500 hover:underline"
-                style={{ maxWidth: '40px', fontSize: '10px' }}
+                className="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400"
               >
                 {avatar.num_followers &&
                   `${formatNumber(avatar.num_followers)} followers`}
               </span>
               <span
-                className="mt-1 whitespace-nowrap text-justify text-xs text-zinc-500 hover:underline"
-                style={{ maxWidth: '40px', fontSize: '10px' }}
+                className="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400"
               >
                 {avatar.num_tweets &&
                   `${formatNumber(avatar.num_tweets)} tweets`}

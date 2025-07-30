@@ -1,6 +1,6 @@
 'use client'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
-import { devLog } from '@/lib-client/devLog'
+import { devLog } from '@/lib/devLog'
 import { createBrowserClient } from '@/utils/supabase'
 
 export default function SignIn() {
@@ -87,26 +87,22 @@ export default function SignIn() {
       </form>
     </div>
   ) : (
-    <div className="dark:text-gray-300">
+    <div className="inline-block">
       <form action={signIn} className="inline-block">
-        {process.env.NODE_ENV === 'development' &&
-        process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'false' ? (
-          <button
-            type="submit"
-            className="text-blue-500 hover:underline dark:text-blue-400"
-          >
-            Sign in as Dev
-          </button>
-        ) : (
-          <button
-            type="submit"
-            className="text-blue-500 hover:underline dark:text-blue-400"
-          >
-            Sign in with Twitter
-          </button>
-        )}
+        <button
+          type="submit"
+          className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:focus:ring-offset-gray-800 transition-colors duration-300"
+        >
+          Sign in with Twitter
+        </button>
       </form>
-      <span className="ml-1">to upload your archive</span>
+      {process.env.NODE_ENV === 'development' &&
+        process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'false' && (
+        <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+         <br></br>
+          (Dev Mode)
+        </span>
+      )}
     </div>
   )
 }

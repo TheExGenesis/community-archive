@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS private.tweet_user (
+    tweet_id text not null,
+    user_id text not null,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    primary key (tweet_id)
+);

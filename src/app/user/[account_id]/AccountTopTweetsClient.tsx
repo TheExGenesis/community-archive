@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PopularTweet } from '@/lib/types'
-import  Tweet  from '@/components/Tweet'
+import TweetComponent from '@/components/TweetComponent'
 import { CopyButton } from '@/components/copy-button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -109,29 +109,33 @@ const AccountTopTweetsClient: React.FC<Props> = ({
             <ScrollArea className="h-[33vh]">
               <ul>
                 {tweetData[key]?.map((popularTweet) => {
-                  // Construct the tweet object expected by the Tweet component
+                  // Construct the tweet object expected by the TweetComponent
                   const tweetForTweetComponent = {
                     tweet_id: popularTweet.tweet_id,
+                    account_id: '',
                     created_at: popularTweet.created_at,
                     full_text: popularTweet.full_text,
                     retweet_count: popularTweet.retweet_count,
                     favorite_count: popularTweet.favorite_count,
+                    reply_to_tweet_id: null,
+                    quote_tweet_id: null,
+                    retweeted_tweet_id: null,
+                    avatar_media_url: profilePicUrl,
+                    username: username,
+                    account_display_name: displayName,
+                    media: [],
+                    urls: [],
                     reply_to_username: popularTweet.reply_to_username || undefined,
-                    account: {
-                      username: username, // From AccountTopTweetsClient props
-                      account_display_name: displayName, // From AccountTopTweetsClient props
-                      profile: {
-                        avatar_media_url: profilePicUrl, // From AccountTopTweetsClient props
-                      },
-                    },
-                    // media is optional in TweetData and not in PopularTweet
+                    mentioned_users: [],
                   }
 
                   return (
-                    <Tweet
-                      key={popularTweet.tweet_id}
-                      tweet={tweetForTweetComponent} // Pass the constructed object
-                    />
+                    <div className="bg-background dark:bg-secondary p-4 rounded-lg border border-gray-200 dark:border-gray-700 mb-4">
+                      <TweetComponent
+                        key={popularTweet.tweet_id}
+                        tweet={tweetForTweetComponent} // Pass the constructed object
+                      />
+                    </div>
                   )
                 })}
               </ul>

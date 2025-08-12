@@ -1,15 +1,21 @@
 import { getTweet } from '@/lib/tweet'
-import Tweet from '@/components/Tweet'
+import { getThreadTree } from '@/lib/threadUtils'
+import TweetComponent from '@/components/TweetComponent'
+import ThreadView from '@/components/ThreadView'
 
 export default async function TweetPage({ params }: any) {
+
   const { tweet_id } = params
-  const tweetResult = await getTweet(tweet_id)
+  const [tweetResult, threadTree] = await Promise.all([
+    getTweet(tweet_id),
+    getThreadTree(tweet_id)
+  ])
 
   // Style definitions copied from homepage
   const unifiedDeepBlueBase = "bg-white dark:bg-background";
   const sectionPaddingClasses = "py-12 md:py-16 lg:py-20"
-  // Using max-w-2xl for a single tweet display
-  const contentWrapperClasses = "w-full max-w-2xl mx-auto px-4 sm:px-6 lg:px-8"
+  // Using max-w-7xl to match stream monitor width
+  const contentWrapperClasses = "w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
 
   if (!tweetResult.data || tweetResult.data.length === 0) {
     return (
@@ -27,7 +33,6 @@ export default async function TweetPage({ params }: any) {
   }
 
   const tweet: any = tweetResult.data[0]
-  console.log("Raw tweet data for permalink:", JSON.stringify(tweet, null, 2));
 
   return (
     <main>
@@ -36,10 +41,21 @@ export default async function TweetPage({ params }: any) {
       >
         <div className={`${contentWrapperClasses}`}> 
           <div className="bg-slate-100 dark:bg-card p-6 md:p-8 rounded-lg">
-            <h2 className="mb-8 text-4xl font-bold text-center text-gray-900 dark:text-white">🔎 View Tweet</h2>
-            <div className="bg-background dark:bg-secondary p-4 rounded-lg">
-              <Tweet key={tweet.tweet_id} tweet={tweet} />
-            </div>
+            <h2 className="mb-8 text-4xl font-bold text-center text-gray-900 dark:text-white">
+              {threadTree && Object.keys(threadTree.tweets).length > 1 ? '🧵 View Thread' : '🔎 View Tweet'}
+            </h2>
+            
+            {threadTree && Object.keys(threadTree.tweets).length > 1 ? (
+              <ThreadView 
+                tree={threadTree} 
+                highlightTweetId={tweet_id}
+                className="bg-background dark:bg-secondary rounded-lg"
+              />
+            ) : (
+              <div className="bg-background dark:bg-secondary p-4 rounded-lg">
+                <TweetComponent key={tweet.tweet_id} tweet={tweet} />
+              </div>
+            )}
           </div>
         </div>
       </section>

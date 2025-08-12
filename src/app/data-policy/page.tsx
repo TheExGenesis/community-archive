@@ -114,7 +114,7 @@ export default function DataPolicyPage() {
         >
           @exgenesis
         </a>
-        . Or find us on <a href="https://discord.gg/5mbWEfVrqw" className="text-blue-500 hover:underline">Discord</a> or <a href="https://github.com/TheExGenesis/community-archive" className="text-blue-500 hover:underline">GitHub</a>  
+        . Or find us on <a href="https://discord.gg/RArTGrUawX" className="text-blue-500 hover:underline">Discord</a> or <a href="https://github.com/TheExGenesis/community-archive" className="text-blue-500 hover:underline">GitHub</a>  
       </p>
 
       <p className="mb-8">

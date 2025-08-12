@@ -8,10 +8,6 @@ _from Xiq's [Towards data sovereignty, and a backup of the twitter canon](https:
 
 The goals of this project are (1) create a public domain dataset so that we can analyze & build apps on top of our own data, commercial or otherwise (2) develop an open workflow for archival that people can self host or create private archives for their communities if they wish.
 
-## Join our Discord
-
-https://discord.gg/5mbWEfVrqw
-
 ## App showcase
 
 |  | | |

@@ -17,6 +17,7 @@ export default function HeaderNavigation() {
     { href: '/', label: 'Home' },
     { href: '/user-dir', label: 'User Directory' },
     { href: '/search', label: 'Advanced Search' },
+    { href: '/stream-monitor', label: 'Stream Monitor' },
   ]
 
   return (

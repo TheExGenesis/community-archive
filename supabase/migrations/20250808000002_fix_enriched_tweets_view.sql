@@ -1,3 +1,8 @@
+-- Fix enriched_tweets view to use correct all_profile table
+-- This migration fixes the enriched_tweets view to use all_profile instead of profile
+
+DROP VIEW IF EXISTS public.enriched_tweets;
+
 CREATE OR REPLACE VIEW public.enriched_tweets AS
 SELECT 
     t.tweet_id,
@@ -25,4 +30,10 @@ LEFT JOIN LATERAL (
     WHERE all_profile.account_id = t.account_id
     ORDER BY archive_upload_id DESC
     LIMIT 1
-) p ON true; 
+) p ON true;
+
+-- Grant necessary permissions
+GRANT SELECT ON public.enriched_tweets TO anon, authenticated;
+
+-- Add RLS policy if needed
+ALTER VIEW public.enriched_tweets OWNER TO postgres;

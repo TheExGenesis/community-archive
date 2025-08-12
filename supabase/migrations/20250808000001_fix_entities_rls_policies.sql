@@ -1,3 +1,4 @@
+-- Fix RLS policies for tweet entities (media, urls, mentions)
 CREATE OR REPLACE FUNCTION public.apply_public_entities_rls_policies(schema_name TEXT, table_name TEXT) 
 RETURNS void AS $$
 DECLARE
@@ -18,11 +19,13 @@ BEGIN
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', policy_name, schema_name, table_name);
     END LOOP;
 
+    -- Create public read policy
     EXECUTE format('
         CREATE POLICY "Entities are publicly visible" ON %I.%I
         FOR SELECT
-        USING (true)', schema_name, table_name, table_name);
+        USING (true)', schema_name, table_name);
 
+    -- Create authenticated write policy
     EXECUTE format('
         CREATE POLICY "Entities are modifiable by their users" ON %I.%I TO authenticated
         USING (
@@ -30,7 +33,7 @@ BEGIN
                 SELECT 1 
                 FROM public.tweets dt 
                 WHERE dt.tweet_id = %I.tweet_id 
-                AND dt.account_id = (SELECT auth.jwt()) -> ''app_metadata'' ->> ''provider_id''
+                AND dt.account_id = (SELECT auth.jwt() ->> ''sub'')
             )
         ) 
         WITH CHECK (
@@ -38,8 +41,13 @@ BEGIN
                 SELECT 1 
                 FROM public.tweets dt 
                 WHERE dt.tweet_id = %I.tweet_id 
-                AND dt.account_id = (SELECT auth.jwt()) -> ''app_metadata'' ->> ''provider_id''
+                AND dt.account_id = (SELECT auth.jwt() ->> ''sub'')
             )
         )', schema_name, table_name, table_name, table_name);
 END;
 $$ LANGUAGE plpgsql;
+
+-- Apply the fixed policies to tweet entities
+SELECT public.apply_public_entities_rls_policies('public', 'tweet_media');
+SELECT public.apply_public_entities_rls_policies('public', 'tweet_urls');
+SELECT public.apply_public_entities_rls_policies('public', 'user_mentions');

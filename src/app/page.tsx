@@ -251,7 +251,7 @@ export default async function Homepage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             <InfoPanel icon={<FaGithub />} title="GitHub Repository" description="Access the full source code, contribute to the project, and track issues." href="https://github.com/TheExGenesis/community-archive" />
-            <InfoPanel icon={<FaDiscord />} title="Join our Discord" description="Connect with the community, ask questions, and share your projects." href="https://discord.gg/5mbWEfVrqw" />
+            <InfoPanel icon={<FaDiscord />} title="Join our Discord" description="Connect with the community, ask questions, and share your projects." href="https://discord.gg/RArTGrUawX" />
             <InfoPanel icon={<FaBook />} title="Documentation & API" description="Explore our API, download data, and find examples to build your own apps." href="https://github.com/TheExGenesis/community-archive/tree/main/docs" />
           </div>
         </div>

@@ -7,12 +7,8 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import getLatestTweets from '@/lib/queries/getLatestTweets'
-import { getStreamedTweetCountByDate } from '@/lib/queries/getTweetCountByDate'
 import UnifiedTweetList from '@/components/UnifiedTweetList'
-
-type TimeRange = 'minute' | 'hour' | 'day' | 'week'
 
 // Get total unique scrapers for the period using server-side API
 async function getTotalUniqueScrapers(startDate: string, endDate: string) {
@@ -60,109 +56,45 @@ interface Tweet {
 }
 
 const StreamMonitor = () => {
-  const [timeRange, setTimeRange] = useState<TimeRange>('hour')
+  // Fixed to hour view only
   const [loadedTweets, setLoadedTweets] = useState<Tweet[]>([])
   const [tweetOffset, setTweetOffset] = useState(0)
-  const [timeOffset, setTimeOffset] = useState(0) // Number of periods to go back
   const tweetsPerPage = 20
   
   const supabase = createBrowserClient()
 
-  // Query for tweet count data based on time range
+  // Query for tweet count data - simplified to last 24 hours only
   const { data: chartData, isLoading: chartLoading, error: chartError } = useQuery({
-    queryKey: ['streamMonitorChart', timeRange, timeOffset],
+    queryKey: ['streamMonitorChart'],
     queryFn: async () => {
       const now = new Date()
-      let startDate: Date
-      let endDate: Date
+      const startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000) // Last 24 hours
       
-      // Calculate time periods based on offset
-      switch (timeRange) {
-        case 'minute':
-          endDate = new Date(now.getTime() - timeOffset * 60 * 60 * 1000) // Offset by hours
-          startDate = new Date(endDate.getTime() - 60 * 60 * 1000) // Last hour
-          break
-        case 'hour':
-          endDate = new Date(now.getTime() - timeOffset * 24 * 60 * 60 * 1000) // Offset by days
-          startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000) // Last 24 hours
-          break
-        case 'day':
-          endDate = new Date(now.getTime() - timeOffset * 7 * 24 * 60 * 60 * 1000) // Offset by weeks
-          startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
-          break
-        case 'week':
-          endDate = new Date(now.getTime() - timeOffset * 365 * 24 * 60 * 60 * 1000) // Offset by years
-          startDate = new Date(endDate.getTime() - 365 * 24 * 60 * 60 * 1000) // Last year
-          break
-        default:
-          endDate = new Date(now.getTime() - timeOffset * 24 * 60 * 60 * 1000)
-          startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000)
-      }
-
-      // Use cached API route for slow queries (week/year views) or when there's time offset
-      const shouldUseCache = timeRange === 'day' || timeRange === 'week' || timeOffset > 0
-      
-      if (shouldUseCache) {
-        const params = new URLSearchParams({
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-          granularity: timeRange,
-          timeOffset: timeOffset.toString()
+      // Use the simplified function directly
+      const { data, error } = await supabase
+        .rpc('get_simple_streamed_tweet_counts', {
+          start_date: startDate.toISOString(),
+          end_date: now.toISOString(),
+          granularity: 'hour'
         })
-        
-        const response = await fetch(`/api/tweet-counts?${params}`)
-        if (!response.ok) {
-          throw new Error('Failed to fetch cached chart data')
-        }
-        return response.json()
-      } else {
-        // For real-time minute/hour views, use direct database query
-        const data = await getStreamedTweetCountByDate(
-          supabase,
-          startDate.toISOString(),
-          endDate.toISOString(),
-          timeRange
-        )
-        return data
+      
+      if (error) {
+        throw new Error('Failed to fetch chart data: ' + error.message)
       }
+      
+      return data
     },
-    refetchInterval: timeOffset === 0 && (timeRange === 'minute' ? 30000 : timeRange === 'hour' ? 300000 : 0), // Only auto-refresh current time
-    // Increase stale time for cached queries to leverage server-side caching
-    staleTime: (timeRange === 'day' || timeRange === 'week' || timeOffset > 0) ? 300000 : 0 // 5 minutes for cached data
+    refetchInterval: 300000, // Refresh every 5 minutes
+    staleTime: 60000 // 1 minute stale time
   })
 
-  // Query for unique scraper count for the current time period
+  // Query for unique scraper count for the last 24 hours
   const { data: scraperCount, isLoading: scraperLoading } = useQuery({
-    queryKey: ['uniqueScrapers', timeRange, timeOffset],
+    queryKey: ['uniqueScrapers'],
     queryFn: async () => {
       const now = new Date()
-      let startDate: Date
-      let endDate: Date
-      
-      // Use same time calculation as chart
-      switch (timeRange) {
-        case 'minute':
-          endDate = new Date(now.getTime() - timeOffset * 60 * 60 * 1000)
-          startDate = new Date(endDate.getTime() - 60 * 60 * 1000)
-          break
-        case 'hour':
-          endDate = new Date(now.getTime() - timeOffset * 24 * 60 * 60 * 1000)
-          startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000)
-          break
-        case 'day':
-          endDate = new Date(now.getTime() - timeOffset * 7 * 24 * 60 * 60 * 1000)
-          startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000)
-          break
-        case 'week':
-          endDate = new Date(now.getTime() - timeOffset * 365 * 24 * 60 * 60 * 1000)
-          startDate = new Date(endDate.getTime() - 365 * 24 * 60 * 60 * 1000)
-          break
-        default:
-          endDate = new Date(now.getTime() - timeOffset * 24 * 60 * 60 * 1000)
-          startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000)
-      }
-
-      return getTotalUniqueScrapers(startDate.toISOString(), endDate.toISOString())
+      const startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000) // Last 24 hours
+      return getTotalUniqueScrapers(startDate.toISOString(), now.toISOString())
     },
     staleTime: 300000 // Cache for 5 minutes
   })
@@ -198,26 +130,16 @@ const StreamMonitor = () => {
 
   const formatXAxisLabel = (tickItem: string) => {
     const date = new Date(tickItem)
-    switch (timeRange) {
-      case 'minute':
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      case 'hour':
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      case 'day':
-        return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
-      case 'week':
-        return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
-      default:
-        return tickItem
-    }
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
   const getTotalTweets = () => {
-    return chartData?.reduce((sum, item) => sum + item.tweet_count, 0) || 0
+    if (!Array.isArray(chartData)) return 0
+    return chartData.reduce((sum: number, item: { tweet_count: number }) => sum + item.tweet_count, 0)
   }
 
   const getAverageTweetsPerPeriod = () => {
-    if (!chartData?.length) return 0
+    if (!Array.isArray(chartData) || chartData.length === 0) return 0
     return Math.round(getTotalTweets() / chartData.length)
   }
 
@@ -230,36 +152,6 @@ const StreamMonitor = () => {
     await refetchTweets()
   }
 
-
-  const goBackInTime = () => {
-    setTimeOffset(prev => prev + 1)
-  }
-
-  const goForwardInTime = () => {
-    setTimeOffset(prev => Math.max(0, prev - 1))
-  }
-
-  const resetToNow = () => {
-    setTimeOffset(0)
-  }
-
-  const getTimeRangeDescription = () => {
-    if (timeOffset === 0) {
-      switch (timeRange) {
-        case 'minute': return 'Current hour'
-        case 'hour': return 'Current day'
-        case 'day': return 'Current week'
-        case 'week': return 'Current year'
-        default: return 'Current period'
-      }
-    } else {
-      const periods = ['hour', 'day', 'week', 'year']
-      const periodIndex = ['minute', 'hour', 'day', 'week'].indexOf(timeRange)
-      const period = periods[periodIndex] || 'period'
-      return `${timeOffset} ${period}${timeOffset > 1 ? 's' : ''} ago`
-    }
-  }
-
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
       <div className="mb-8">
@@ -267,23 +159,11 @@ const StreamMonitor = () => {
           Stream Monitor
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Real-time monitoring of tweet streaming activity and latest tweets
+          Real-time monitoring of tweet streaming activity over the last 24 hours
         </p>
       </div>
 
-      <Tabs value={timeRange} onValueChange={(value) => {
-        setTimeRange(value as TimeRange)
-        setTimeOffset(0) // Reset to current time when switching ranges
-      }} className="mb-8">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="minute">Last Hour (by minute)</TabsTrigger>
-          <TabsTrigger value="hour">Last Day (by hour)</TabsTrigger>
-          <TabsTrigger value="day">Last Week (by day)</TabsTrigger>
-          <TabsTrigger value="week">Last Year (by week)</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Total Streamed</CardTitle>
@@ -298,7 +178,7 @@ const StreamMonitor = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Average per {timeRange}</CardTitle>
+            <CardTitle className="text-base">Average per hour</CardTitle>
             <CardDescription>Mean streaming rate</CardDescription>
           </CardHeader>
           <CardContent>
@@ -310,12 +190,12 @@ const StreamMonitor = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Data Points</CardTitle>
-            <CardDescription>Chart resolution</CardDescription>
+            <CardTitle className="text-base">Unique Scrapers</CardTitle>
+            <CardDescription>Number of distinct data sources</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {chartData?.length || 0}
+              {scraperLoading ? '...' : (scraperCount || 0)}
             </div>
           </CardContent>
         </Card>
@@ -323,46 +203,9 @@ const StreamMonitor = () => {
 
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <span>Tweet Streaming Activity</span>
-              {scraperLoading ? (
-                <span className="text-sm text-muted-foreground">Loading scrapers...</span>
-              ) : (
-                <span className="text-sm text-muted-foreground">
-                  {scraperCount || 0} unique scrapers in this {timeRange === 'minute' ? 'hour' : timeRange === 'hour' ? 'day' : timeRange === 'day' ? 'week' : 'year'}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goBackInTime}
-                disabled={chartLoading}
-              >
-                ←
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={resetToNow}
-                disabled={chartLoading || timeOffset === 0}
-              >
-                Now
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goForwardInTime}
-                disabled={chartLoading || timeOffset === 0}
-              >
-                →
-              </Button>
-            </div>
-          </CardTitle>
+          <CardTitle>Tweet Streaming Activity - Last 24 Hours</CardTitle>
           <CardDescription>
-            {getTimeRangeDescription()} - Navigate with arrows to view historical data
+            Real-time tweet streaming data updated every 5 minutes
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -376,7 +219,7 @@ const StreamMonitor = () => {
             </div>
           ) : (
             <ChartContainer config={chartConfig}>
-              <BarChart data={chartData || []}>
+              <BarChart data={Array.isArray(chartData) ? chartData : []}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
                   dataKey="tweet_date" 

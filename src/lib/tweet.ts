@@ -60,10 +60,49 @@ export const getTweet = async (tweet_id: any) => {
     .single()
 
   if (quoteData?.quoted_tweet_id) {
-    // Fetch the quoted tweet data
-    const quotedTweetResult = await getTweet(quoteData.quoted_tweet_id)
-    if (quotedTweetResult.data && quotedTweetResult.data[0]) {
-      (tweet as any).quoted_tweet = quotedTweetResult.data[0];
+    // Fetch the quoted tweet data with a simpler query to avoid infinite recursion
+    const { data: quotedTweetData } = await supabase
+      .schema('public')
+      .from('tweets')
+      .select(`
+        *,
+        account:all_account!inner (
+          username,
+          account_display_name,
+          account_id
+        ),
+        media:tweet_media (
+          media_url,
+          media_type,
+          width,
+          height
+        )
+      `)
+      .eq('tweet_id', quoteData.quoted_tweet_id)
+      .single()
+    
+    if (quotedTweetData) {
+      // Get profile data for the quoted tweet's author
+      const { data: quotedProfileData } = await supabase
+        .schema('public')
+        .from('all_profile')
+        .select('avatar_media_url')
+        .eq('account_id', quotedTweetData.account.account_id)
+        .single()
+      
+      // Format the quoted tweet to match expected structure
+      (tweet as any).quoted_tweet = {
+        tweet_id: quotedTweetData.tweet_id,
+        account_id: quotedTweetData.account_id,
+        created_at: quotedTweetData.created_at,
+        full_text: quotedTweetData.full_text,
+        retweet_count: quotedTweetData.retweet_count,
+        favorite_count: quotedTweetData.favorite_count,
+        avatar_media_url: quotedProfileData?.avatar_media_url,
+        username: quotedTweetData.account.username,
+        account_display_name: quotedTweetData.account.account_display_name,
+        media: quotedTweetData.media || []
+      };
       (tweet as any).quote_tweet_id = quoteData.quoted_tweet_id;
     }
   }

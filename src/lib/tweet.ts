@@ -91,7 +91,7 @@ export const getTweet = async (tweet_id: any) => {
         .single()
       
       // Format the quoted tweet to match expected structure
-      (tweet as any).quoted_tweet = {
+      const quotedTweet = {
         tweet_id: quotedTweetData.tweet_id,
         account_id: quotedTweetData.account_id,
         created_at: quotedTweetData.created_at,
@@ -102,8 +102,10 @@ export const getTweet = async (tweet_id: any) => {
         username: quotedTweetData.account.username,
         account_display_name: quotedTweetData.account.account_display_name,
         media: quotedTweetData.media || []
-      };
-      (tweet as any).quote_tweet_id = quoteData.quoted_tweet_id;
+      }
+      
+      ;(tweet as any).quoted_tweet = quotedTweet
+      ;(tweet as any).quote_tweet_id = quoteData.quoted_tweet_id
     }
   }
 

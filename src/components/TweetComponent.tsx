@@ -216,7 +216,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
     const quotedProfilePic = quotedTweet.avatar_media_url || '/placeholder.jpg'
     
     return (
-      <div className="mt-3 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-800">
+      <div className="mt-3 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-900">
         <div className="flex items-start space-x-3">
           <Avatar className="h-8 w-8 flex-shrink-0">
             <AvatarImage
@@ -257,13 +257,33 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
                   ))}
               </div>
             )}
-            <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400 mt-2">
-              <span className="flex items-center">
-                <FaHeart className="mr-1" /> {formatNumber(quotedTweet.favorite_count)}
-              </span>
-              <span className="flex items-center">
-                <FaRetweet className="mr-1" /> {formatNumber(quotedTweet.retweet_count)}
-              </span>
+            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
+              <div className="flex items-center space-x-4">
+                <span className="flex items-center">
+                  <FaHeart className="mr-1" /> {formatNumber(quotedTweet.favorite_count)}
+                </span>
+                <span className="flex items-center">
+                  <FaRetweet className="mr-1" /> {formatNumber(quotedTweet.retweet_count)}
+                </span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <a
+                  href={`/tweets/${quotedTweet.tweet_id}`}
+                  className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  title="Permalink to quoted tweet"
+                >
+                  <FaExternalLinkAlt className="w-3 h-3" />
+                </a>
+                <a
+                  href={`https://twitter.com/${quotedTweet.username}/status/${quotedTweet.tweet_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  title="View quoted tweet on Twitter"
+                >
+                  <FaExternalLinkAlt className="w-3 h-3" />
+                </a>
+              </div>
             </div>
           </div>
         </div>

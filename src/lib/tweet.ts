@@ -59,8 +59,6 @@ export const getTweet = async (tweet_id: any) => {
     .eq('TWEET_ID', tweet_id)
     .maybeSingle()
 
-  console.log('Quote tweet query for', tweet_id, ':', { quoteData, quoteError })
-
   if (quoteData?.QUOTED_TWEET_ID) {
     // Fetch the quoted tweet data with a simpler query to avoid infinite recursion
     const { data: quotedTweetData } = await supabase

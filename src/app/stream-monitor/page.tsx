@@ -69,73 +69,44 @@ const StreamMonitor = () => {
   const { data: scrapingStats, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ['scrapingStats', viewMode, timeOffset],
     queryFn: async () => {
-      // For now, only 24h view works with the API
-      if (viewMode === '24h') {
-        const hoursBack = 24 + (timeOffset * 24)
-        const stats = await getScrapingStats(hoursBack)
-        // Filter to show only the 24 hours for the selected offset
-        if (stats && stats.data) {
-          const startIdx = timeOffset * 24
-          stats.data = stats.data.slice(startIdx, startIdx + 24)
-        }
-        return stats
-      }
-      // For 7d and 1y views, we'll use direct database queries for now
       const now = new Date()
-      const startDate = viewMode === '7d' 
-        ? new Date(now.getTime() - (7 + timeOffset * 7) * 24 * 60 * 60 * 1000)
-        : new Date(now.getTime() - (52 + timeOffset * 52) * 7 * 24 * 60 * 60 * 1000)
-      const endDate = viewMode === '7d'
-        ? new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000)
-        : new Date(startDate.getTime() + 52 * 7 * 24 * 60 * 60 * 1000)
+      let startDate, endDate, granularity, periods
       
-      // Use simple direct query for now
-      const granularity = viewMode === '7d' ? 'day' : 'week'
-      const { data, error } = await supabase
-        .rpc('get_simple_streamed_tweet_counts', {
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
-          granularity: 'hour' // We only have hour granularity for now
-        })
-      
-      if (error) throw error
-      
-      // Aggregate hourly data into days or weeks
-      const aggregated = aggregateData(data || [], granularity)
-      
-      return {
-        data: aggregated,
-        summary: {
-          totalTweets: aggregated.reduce((sum, item) => sum + item.tweet_count, 0),
-          uniqueScrapers: 0, // Not available for these views yet
-          avgTweetsPerHour: 0
-        }
+      if (viewMode === '24h') {
+        periods = 24
+        startDate = new Date(now.getTime() - (periods + timeOffset * periods) * 60 * 60 * 1000)
+        endDate = new Date(now.getTime() - timeOffset * periods * 60 * 60 * 1000)
+        granularity = 'hour'
+      } else if (viewMode === '7d') {
+        periods = 7
+        startDate = new Date(now.getTime() - (periods + timeOffset * periods) * 24 * 60 * 60 * 1000)
+        endDate = new Date(now.getTime() - timeOffset * periods * 24 * 60 * 60 * 1000)
+        granularity = 'day'
+      } else { // 1y
+        periods = 52 // 52 weeks
+        startDate = new Date(now.getTime() - (periods + timeOffset * periods) * 7 * 24 * 60 * 60 * 1000)
+        endDate = new Date(now.getTime() - timeOffset * periods * 7 * 24 * 60 * 60 * 1000)
+        granularity = 'week'
       }
+      
+      // Use the new API with custom date ranges
+      const params = new URLSearchParams({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        granularity
+      })
+      
+      const response = await fetch(`/api/scraping-stats?${params}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch scraping stats')
+      }
+      
+      return response.json()
     },
-    refetchInterval: viewMode === '24h' ? 300000 : 0, // Only refresh 24h view
+    refetchInterval: viewMode === '24h' && timeOffset === 0 ? 300000 : 0, // Only refresh current 24h view
     staleTime: 60000 // 1 minute stale time
   })
 
-  // Helper function to aggregate data
-  const aggregateData = (hourlyData: any[], granularity: string) => {
-    if (!hourlyData || hourlyData.length === 0) return []
-    
-    const aggregated: { [key: string]: number } = {}
-    
-    hourlyData.forEach(item => {
-      const date = new Date(item.tweet_date || item.period_start)
-      const key = granularity === 'day' 
-        ? date.toISOString().split('T')[0]
-        : `Week ${Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))}`
-      
-      aggregated[key] = (aggregated[key] || 0) + (item.tweet_count || 0)
-    })
-    
-    return Object.entries(aggregated).map(([key, count]) => ({
-      period_start: key,
-      tweet_count: count
-    }))
-  }
 
   // Extract chart data and summary from scraping stats
   const chartData = scrapingStats?.data
@@ -211,7 +182,7 @@ const StreamMonitor = () => {
   }
 
   const getAverageTweetsPerPeriod = () => {
-    return scrapingStats?.summary?.avgTweetsPerHour || 0
+    return scrapingStats?.summary?.avgTweetsPerPeriod || 0
   }
 
   const loadMoreTweets = () => {

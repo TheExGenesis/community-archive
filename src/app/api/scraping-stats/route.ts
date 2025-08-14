@@ -49,8 +49,8 @@ export async function GET(request: NextRequest) {
       }
 
       // Calculate totals
-      const totalTweets = data?.reduce((sum, item) => sum + (item.tweet_count || 0), 0) || 0
-      const maxUniqueScrapers = data?.reduce((max, item) => Math.max(max, item.unique_scrapers || 0), 0) || 0
+      const totalTweets = data?.reduce((sum: number, item: any) => sum + (item.tweet_count || 0), 0) || 0
+      const maxUniqueScrapers = data?.reduce((max: number, item: any) => Math.max(max, item.unique_scrapers || 0), 0) || 0
       const avgTweetsPerPeriod = data?.length ? Math.round(totalTweets / data.length) : 0
 
       const response = {
@@ -88,8 +88,8 @@ export async function GET(request: NextRequest) {
       }
 
       // Calculate totals
-      const totalTweets = data?.reduce((sum, item) => sum + (item.tweet_count || 0), 0) || 0
-      const maxUniqueScrapers = data?.reduce((max, item) => Math.max(max, item.unique_scrapers || 0), 0) || 0
+      const totalTweets = data?.reduce((sum: number, item: any) => sum + (item.tweet_count || 0), 0) || 0
+      const maxUniqueScrapers = data?.reduce((max: number, item: any) => Math.max(max, item.unique_scrapers || 0), 0) || 0
       const avgTweetsPerPeriod = data?.length ? Math.round(totalTweets / data.length) : 0
 
       const response = {

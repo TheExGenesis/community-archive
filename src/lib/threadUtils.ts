@@ -114,7 +114,7 @@ async function getReplyChain(supabase: any, tweetId: string, visited: Set<string
   const allReplies = replies || []
   
   // Get media for replies
-  const replyIds = allReplies.map(r => r.tweet_id)
+  const replyIds = allReplies.map((r: any) => r.tweet_id)
   if (replyIds.length > 0) {
     const { data: mediaData } = await supabase
       .schema('public')
@@ -122,8 +122,8 @@ async function getReplyChain(supabase: any, tweetId: string, visited: Set<string
       .select('*')
       .in('tweet_id', replyIds)
 
-    allReplies.forEach(reply => {
-      reply.media = mediaData?.filter(m => m.tweet_id === reply.tweet_id) || []
+    allReplies.forEach((reply: any) => {
+      reply.media = mediaData?.filter((m: any) => m.tweet_id === reply.tweet_id) || []
     })
   }
   

@@ -112,7 +112,7 @@ const getLatestTweets = async (
   quoteTweets?.forEach(qt => quoteMap.set(qt.tweet_id, qt.quoted_tweet_id))
 
   // Fetch actual quoted tweet data
-  const quotedTweetIds = Array.from(new Set(quoteTweets?.map(qt => qt.quoted_tweet_id).filter(Boolean) || []))
+  const quotedTweetIds = Array.from(new Set(quoteTweets?.map(qt => qt.quoted_tweet_id).filter(Boolean) || [])) as string[]
   let quotedTweetsData: any[] = []
   
   if (quotedTweetIds.length > 0) {

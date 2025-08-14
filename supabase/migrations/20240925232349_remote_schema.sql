@@ -10,7 +10,14 @@ SET client_min_messages = warning;
 SET row_security = off;
 CREATE SCHEMA IF NOT EXISTS "dev";
 ALTER SCHEMA "dev" OWNER TO "postgres";
-CREATE EXTENSION IF NOT EXISTS "pgsodium" WITH SCHEMA "pgsodium";
+-- Create pgsodium extension only if available (not in preview environments)
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS "pgsodium" WITH SCHEMA "pgsodium";
+EXCEPTION
+    WHEN undefined_file THEN
+        RAISE NOTICE 'pgsodium extension not available, skipping...';
+END $$;
 CREATE SCHEMA IF NOT EXISTS "private";
 ALTER SCHEMA "private" OWNER TO "postgres";
 COMMENT ON SCHEMA "public" IS 'standard public schema';

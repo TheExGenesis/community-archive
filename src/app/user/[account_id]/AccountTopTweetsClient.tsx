@@ -130,9 +130,8 @@ const AccountTopTweetsClient: React.FC<Props> = ({
                   }
 
                   return (
-                    <div className="bg-background dark:bg-secondary p-4 rounded-lg border border-gray-200 dark:border-gray-700 mb-4">
+                    <div key={popularTweet.tweet_id} className="bg-background dark:bg-secondary p-4 rounded-lg border border-gray-200 dark:border-gray-700 mb-4">
                       <TweetComponent
-                        key={popularTweet.tweet_id}
                         tweet={tweetForTweetComponent} // Pass the constructed object
                       />
                     </div>

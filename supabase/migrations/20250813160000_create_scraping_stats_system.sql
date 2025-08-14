@@ -246,7 +246,18 @@ BEGIN
         )
         WHERE period_start IN (SELECT period_start FROM missing_periods)
     )
-    -- Insert computed stats into cache
+    -- Insert computed stats into cache and add to results
+    INSERT INTO temp_stats_results
+    SELECT 
+        cs.period_start,
+        cs.period_end,
+        cs.tweet_count,
+        cs.unique_scrapers,
+        cs.scraper_details,
+        false AS from_cache
+    FROM computed_stats cs;
+    
+    -- Also insert into persistent cache
     INSERT INTO ca_website.scraping_stats (
         period_type,
         period_start,
@@ -273,15 +284,7 @@ BEGIN
         unique_scrapers = EXCLUDED.unique_scrapers,
         scraper_details = EXCLUDED.scraper_details,
         last_updated = EXCLUDED.last_updated,
-        is_complete = EXCLUDED.is_complete
-    RETURNING 
-        period_start,
-        period_end,
-        tweet_count,
-        unique_scrapers,
-        scraper_details,
-        false AS from_cache
-    INTO temp_stats_results;
+        is_complete = EXCLUDED.is_complete;
     
     -- Return combined results
     RETURN QUERY

@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
     const granularity = searchParams.get('granularity') || 'hour'
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const streamedOnly = searchParams.get('streamedOnly') !== 'false' // Default to true
 
     // Validate input
     if (hoursBack < 1 || hoursBack > 720) { // Max 30 days
@@ -38,7 +39,8 @@ export async function GET(request: NextRequest) {
         .rpc('get_streaming_stats', {
           p_start_date: start.toISOString(),
           p_end_date: now.toISOString(),
-          p_granularity: granularity
+          p_granularity: granularity,
+          p_streamed_only: streamedOnly
         })
 
       if (error) {
@@ -76,7 +78,8 @@ export async function GET(request: NextRequest) {
         .rpc('get_streaming_stats', {
           p_start_date: startDate,
           p_end_date: endDate,
-          p_granularity: granularity
+          p_granularity: granularity,
+          p_streamed_only: streamedOnly
         })
 
       if (error) {

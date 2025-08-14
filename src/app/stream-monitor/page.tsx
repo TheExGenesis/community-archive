@@ -89,11 +89,12 @@ const StreamMonitor = () => {
         granularity = 'week'
       }
       
-      // Use the new API with custom date ranges
+      // Use the new API with custom date ranges (streamed-only by default)
       const params = new URLSearchParams({
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
-        granularity
+        granularity,
+        streamedOnly: 'true'  // Exclude system/archive uploads for stream monitor
       })
       
       const response = await fetch(`/api/scraping-stats?${params}`)

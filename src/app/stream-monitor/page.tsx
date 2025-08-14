@@ -10,21 +10,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import getLatestTweets from '@/lib/queries/getLatestTweets'
 import UnifiedTweetList from '@/components/UnifiedTweetList'
 
-// Get total unique scrapers for the period using server-side API
-async function getTotalUniqueScrapers(startDate: string, endDate: string) {
+// Get scraping stats using the new server-side API
+async function getScrapingStats(hoursBack: number = 24) {
   const params = new URLSearchParams({
-    startDate,
-    endDate
+    hoursBack: hoursBack.toString(),
+    granularity: 'hour'
   })
   
-  const response = await fetch(`/api/scraper-count?${params}`)
+  const response = await fetch(`/api/scraping-stats?${params}`)
   if (!response.ok) {
-    console.error('Failed to fetch scraper count')
-    return 0
+    console.error('Failed to fetch scraping stats')
+    return null
   }
   
-  const data = await response.json()
-  return data.count || 0
+  return response.json()
 }
 
 
@@ -63,41 +62,23 @@ const StreamMonitor = () => {
   
   const supabase = createBrowserClient()
 
-  // Query for tweet count data - simplified to last 24 hours only
-  const { data: chartData, isLoading: chartLoading, error: chartError } = useQuery({
-    queryKey: ['streamMonitorChart'],
+  // Query for scraping stats including tweet counts and unique scrapers
+  const { data: scrapingStats, isLoading: statsLoading, error: statsError } = useQuery({
+    queryKey: ['scrapingStats'],
     queryFn: async () => {
-      const now = new Date()
-      const startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000) // Last 24 hours
-      
-      // Use the simplified function directly
-      const { data, error } = await supabase
-        .rpc('get_simple_streamed_tweet_counts', {
-          start_date: startDate.toISOString(),
-          end_date: now.toISOString(),
-          granularity: 'hour'
-        })
-      
-      if (error) {
-        throw new Error('Failed to fetch chart data: ' + error.message)
-      }
-      
-      return data
+      const stats = await getScrapingStats(24)
+      return stats
     },
     refetchInterval: 300000, // Refresh every 5 minutes
     staleTime: 60000 // 1 minute stale time
   })
 
-  // Query for unique scraper count for the last 24 hours
-  const { data: scraperCount, isLoading: scraperLoading } = useQuery({
-    queryKey: ['uniqueScrapers'],
-    queryFn: async () => {
-      const now = new Date()
-      const startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000) // Last 24 hours
-      return getTotalUniqueScrapers(startDate.toISOString(), now.toISOString())
-    },
-    staleTime: 300000 // Cache for 5 minutes
-  })
+  // Extract chart data and summary from scraping stats
+  const chartData = scrapingStats?.data
+  const chartLoading = statsLoading
+  const chartError = statsError
+  const scraperCount = scrapingStats?.summary?.uniqueScrapers || 0
+  const scraperLoading = statsLoading
 
   // Query for latest tweets with pagination
   const { data: tweetsData, isLoading: tweetsLoading, error: tweetsError, refetch: refetchTweets } = useQuery({
@@ -134,13 +115,11 @@ const StreamMonitor = () => {
   }
 
   const getTotalTweets = () => {
-    if (!Array.isArray(chartData)) return 0
-    return chartData.reduce((sum: number, item: { tweet_count: number }) => sum + item.tweet_count, 0)
+    return scrapingStats?.summary?.totalTweets || 0
   }
 
   const getAverageTweetsPerPeriod = () => {
-    if (!Array.isArray(chartData) || chartData.length === 0) return 0
-    return Math.round(getTotalTweets() / chartData.length)
+    return scrapingStats?.summary?.avgTweetsPerHour || 0
   }
 
   const loadMoreTweets = () => {
@@ -222,7 +201,7 @@ const StreamMonitor = () => {
               <BarChart data={Array.isArray(chartData) ? chartData : []}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
-                  dataKey="tweet_date" 
+                  dataKey="period_start" 
                   tickFormatter={formatXAxisLabel}
                   angle={-45}
                   textAnchor="end"

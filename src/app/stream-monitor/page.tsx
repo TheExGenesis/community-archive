@@ -8,25 +8,12 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import getLatestTweets from '@/lib/queries/getLatestTweets'
 import UnifiedTweetList from '@/components/UnifiedTweetList'
 
-// Get scraping stats using the new server-side API
-async function getScrapingStats(hoursBack: number = 24) {
-  const params = new URLSearchParams({
-    hoursBack: hoursBack.toString(),
-    granularity: 'hour'
-  })
-  
-  const response = await fetch(`/api/scraping-stats?${params}`)
-  if (!response.ok) {
-    console.error('Failed to fetch scraping stats')
-    return null
-  }
-  
-  return response.json()
-}
 
 
 interface TweetMedia {
@@ -59,6 +46,7 @@ interface Tweet {
 const StreamMonitor = () => {
   const [viewMode, setViewMode] = useState<'24h' | '7d' | '1y'>('24h')
   const [timeOffset, setTimeOffset] = useState(0)
+  const [showStreamedOnly, setShowStreamedOnly] = useState(true)
   const [loadedTweets, setLoadedTweets] = useState<Tweet[]>([])
   const [tweetOffset, setTweetOffset] = useState(0)
   const tweetsPerPage = 20
@@ -67,7 +55,7 @@ const StreamMonitor = () => {
 
   // Query for scraping stats based on view mode and offset
   const { data: scrapingStats, isLoading: statsLoading, error: statsError } = useQuery({
-    queryKey: ['scrapingStats', viewMode, timeOffset],
+    queryKey: ['scrapingStats', viewMode, timeOffset, showStreamedOnly],
     queryFn: async () => {
       const now = new Date()
       let startDate, endDate, granularity, periods
@@ -89,12 +77,12 @@ const StreamMonitor = () => {
         granularity = 'week'
       }
       
-      // Use the new API with custom date ranges (streamed-only by default)
+      // Use the new API with custom date ranges
       const params = new URLSearchParams({
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         granularity,
-        streamedOnly: 'true'  // Exclude system/archive uploads for stream monitor
+        streamedOnly: showStreamedOnly.toString()
       })
       
       const response = await fetch(`/api/scraping-stats?${params}`)
@@ -140,7 +128,7 @@ const StreamMonitor = () => {
 
   const chartConfig = {
     tweet_count: {
-      label: "Tweets Streamed",
+      label: showStreamedOnly ? "Tweets Streamed" : "Total Tweets",
       color: "hsl(var(--chart-1))",
     },
   }
@@ -198,19 +186,37 @@ const StreamMonitor = () => {
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-          Stream Monitor
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Real-time monitoring of tweet streaming activity over the last 24 hours
-        </p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              Stream Monitor
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Real-time monitoring of tweet {showStreamedOnly ? 'streaming' : 'activity (including archives)'}
+            </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="stream-toggle" className="text-sm font-medium">
+              {showStreamedOnly ? 'Streamed Only' : 'Total (All)'}
+            </Label>
+            <Switch
+              id="stream-toggle"
+              checked={showStreamedOnly}
+              onCheckedChange={setShowStreamedOnly}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Total Streamed</CardTitle>
-            <CardDescription>In selected time range</CardDescription>
+            <CardTitle className="text-base">
+              {showStreamedOnly ? 'Total Streamed' : 'Total Tweets'}
+            </CardTitle>
+            <CardDescription>
+              {showStreamedOnly ? 'Streamed in time range' : 'All tweets in time range'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
@@ -221,8 +227,10 @@ const StreamMonitor = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Average per hour</CardTitle>
-            <CardDescription>Mean streaming rate</CardDescription>
+            <CardTitle className="text-base">Average per period</CardTitle>
+            <CardDescription>
+              {showStreamedOnly ? 'Mean streaming rate' : 'Mean tweet rate'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600 dark:text-green-400">
@@ -233,8 +241,10 @@ const StreamMonitor = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Unique Scrapers</CardTitle>
-            <CardDescription>Number of distinct data sources</CardDescription>
+            <CardTitle className="text-base">Unique Sources</CardTitle>
+            <CardDescription>
+              {showStreamedOnly ? 'Active streaming scrapers' : 'All data sources'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
@@ -248,7 +258,9 @@ const StreamMonitor = () => {
         <CardHeader>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <CardTitle>Tweet Streaming Activity</CardTitle>
+              <CardTitle>
+                {showStreamedOnly ? 'Tweet Streaming Activity' : 'Tweet Activity (All Sources)'}
+              </CardTitle>
               <CardDescription>
                 {getTimeRangeLabel()}
               </CardDescription>

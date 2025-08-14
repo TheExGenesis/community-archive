@@ -7,6 +7,8 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import getLatestTweets from '@/lib/queries/getLatestTweets'
 import UnifiedTweetList from '@/components/UnifiedTweetList'
 
@@ -55,23 +57,85 @@ interface Tweet {
 }
 
 const StreamMonitor = () => {
-  // Fixed to hour view only
+  const [viewMode, setViewMode] = useState<'24h' | '7d' | '1y'>('24h')
+  const [timeOffset, setTimeOffset] = useState(0)
   const [loadedTweets, setLoadedTweets] = useState<Tweet[]>([])
   const [tweetOffset, setTweetOffset] = useState(0)
   const tweetsPerPage = 20
   
   const supabase = createBrowserClient()
 
-  // Query for scraping stats including tweet counts and unique scrapers
+  // Query for scraping stats based on view mode and offset
   const { data: scrapingStats, isLoading: statsLoading, error: statsError } = useQuery({
-    queryKey: ['scrapingStats'],
+    queryKey: ['scrapingStats', viewMode, timeOffset],
     queryFn: async () => {
-      const stats = await getScrapingStats(24)
-      return stats
+      // For now, only 24h view works with the API
+      if (viewMode === '24h') {
+        const hoursBack = 24 + (timeOffset * 24)
+        const stats = await getScrapingStats(hoursBack)
+        // Filter to show only the 24 hours for the selected offset
+        if (stats && stats.data) {
+          const startIdx = timeOffset * 24
+          stats.data = stats.data.slice(startIdx, startIdx + 24)
+        }
+        return stats
+      }
+      // For 7d and 1y views, we'll use direct database queries for now
+      const now = new Date()
+      const startDate = viewMode === '7d' 
+        ? new Date(now.getTime() - (7 + timeOffset * 7) * 24 * 60 * 60 * 1000)
+        : new Date(now.getTime() - (52 + timeOffset * 52) * 7 * 24 * 60 * 60 * 1000)
+      const endDate = viewMode === '7d'
+        ? new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000)
+        : new Date(startDate.getTime() + 52 * 7 * 24 * 60 * 60 * 1000)
+      
+      // Use simple direct query for now
+      const granularity = viewMode === '7d' ? 'day' : 'week'
+      const { data, error } = await supabase
+        .rpc('get_simple_streamed_tweet_counts', {
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          granularity: 'hour' // We only have hour granularity for now
+        })
+      
+      if (error) throw error
+      
+      // Aggregate hourly data into days or weeks
+      const aggregated = aggregateData(data || [], granularity)
+      
+      return {
+        data: aggregated,
+        summary: {
+          totalTweets: aggregated.reduce((sum, item) => sum + item.tweet_count, 0),
+          uniqueScrapers: 0, // Not available for these views yet
+          avgTweetsPerHour: 0
+        }
+      }
     },
-    refetchInterval: 300000, // Refresh every 5 minutes
+    refetchInterval: viewMode === '24h' ? 300000 : 0, // Only refresh 24h view
     staleTime: 60000 // 1 minute stale time
   })
+
+  // Helper function to aggregate data
+  const aggregateData = (hourlyData: any[], granularity: string) => {
+    if (!hourlyData || hourlyData.length === 0) return []
+    
+    const aggregated: { [key: string]: number } = {}
+    
+    hourlyData.forEach(item => {
+      const date = new Date(item.tweet_date || item.period_start)
+      const key = granularity === 'day' 
+        ? date.toISOString().split('T')[0]
+        : `Week ${Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))}`
+      
+      aggregated[key] = (aggregated[key] || 0) + (item.tweet_count || 0)
+    })
+    
+    return Object.entries(aggregated).map(([key, count]) => ({
+      period_start: key,
+      tweet_count: count
+    }))
+  }
 
   // Extract chart data and summary from scraping stats
   const chartData = scrapingStats?.data
@@ -110,8 +174,36 @@ const StreamMonitor = () => {
   }
 
   const formatXAxisLabel = (tickItem: string) => {
-    const date = new Date(tickItem)
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    if (viewMode === '24h') {
+      const date = new Date(tickItem)
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    } else if (viewMode === '7d') {
+      const date = new Date(tickItem)
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+    } else {
+      return tickItem // Week labels
+    }
+  }
+  
+  const handlePrevious = () => {
+    setTimeOffset(prev => prev + 1)
+  }
+  
+  const handleNext = () => {
+    setTimeOffset(prev => Math.max(0, prev - 1))
+  }
+  
+  const getTimeRangeLabel = () => {
+    if (viewMode === '24h') {
+      if (timeOffset === 0) return 'Last 24 Hours'
+      return `${timeOffset * 24}-${(timeOffset + 1) * 24} hours ago`
+    } else if (viewMode === '7d') {
+      if (timeOffset === 0) return 'Last 7 Days'
+      return `${timeOffset * 7}-${(timeOffset + 1) * 7} days ago`
+    } else {
+      if (timeOffset === 0) return 'Last Year'
+      return `${timeOffset}-${timeOffset + 1} years ago`
+    }
   }
 
   const getTotalTweets = () => {
@@ -182,10 +274,38 @@ const StreamMonitor = () => {
 
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Tweet Streaming Activity - Last 24 Hours</CardTitle>
-          <CardDescription>
-            Real-time tweet streaming data updated every 5 minutes
-          </CardDescription>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <CardTitle>Tweet Streaming Activity</CardTitle>
+              <CardDescription>
+                {getTimeRangeLabel()}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrevious}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNext}
+                disabled={timeOffset === 0}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <Tabs value={viewMode} onValueChange={(v) => { setViewMode(v as any); setTimeOffset(0); }}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="24h">24 Hours</TabsTrigger>
+              <TabsTrigger value="7d">7 Days</TabsTrigger>
+              <TabsTrigger value="1y">1 Year</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </CardHeader>
         <CardContent>
           {chartLoading ? (

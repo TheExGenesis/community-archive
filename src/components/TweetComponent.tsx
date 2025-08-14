@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { FaHeart, FaRetweet, FaExternalLinkAlt, FaReply } from 'react-icons/fa'
@@ -76,6 +78,25 @@ interface TweetComponentProps {
   className?: string
 }
 
+// Helper function to decode HTML entities
+const decodeHtmlEntities = (text: string): string => {
+  if (typeof window === 'undefined') {
+    // Server-side fallback
+    return text
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#039;/g, "'")
+      .replace(/&#x27;/g, "'")
+      .replace(/&#x2F;/g, '/')
+  }
+  // Client-side: use DOM parser
+  const textarea = document.createElement('textarea')
+  textarea.innerHTML = text
+  return textarea.value
+}
+
 export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className = "" }) => {
   // Support both interface formats for backwards compatibility
   const originalUsername = tweet.username || tweet.account?.username || 'Unknown'
@@ -125,8 +146,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
   
 
   const formatText = (text: string) => {
-    // Use actual URLs from the tweet data for better formatting
-    let formattedText = text
+    // First decode HTML entities
+    let formattedText = decodeHtmlEntities(text)
 
     // Replace t.co URLs with their expanded versions or display URLs
     if (tweet.urls) {
@@ -217,7 +238,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
               </span>
             </div>
             <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
-              {quotedTweet.full_text}
+              {decodeHtmlEntities(quotedTweet.full_text)}
             </p>
             {quotedTweet.media && quotedTweet.media.length > 0 && (
               <div className="mt-2 flex flex-col space-y-1">

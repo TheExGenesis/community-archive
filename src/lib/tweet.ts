@@ -63,8 +63,8 @@ export const getTweet = async (tweet_id: any) => {
     // Fetch the quoted tweet data
     const quotedTweetResult = await getTweet(quoteData.quoted_tweet_id)
     if (quotedTweetResult.data && quotedTweetResult.data[0]) {
-      (tweet as any).quoted_tweet = quotedTweetResult.data[0]
-      (tweet as any).quote_tweet_id = quoteData.quoted_tweet_id
+      (tweet as any).quoted_tweet = quotedTweetResult.data[0];
+      (tweet as any).quote_tweet_id = quoteData.quoted_tweet_id;
     }
   }
 

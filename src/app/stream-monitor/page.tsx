@@ -338,7 +338,7 @@ const StreamMonitor = () => {
             </Button>
           </CardTitle>
           <CardDescription>
-            Recently streamed tweets - refreshes automatically
+            Recently streamed top-level tweets (no replies) - refreshes automatically
           </CardDescription>
         </CardHeader>
         <CardContent>

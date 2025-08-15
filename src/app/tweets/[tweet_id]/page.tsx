@@ -4,7 +4,7 @@ import TweetComponent from '@/components/TweetComponent'
 import ThreadView from '@/components/ThreadView'
 
 export default async function TweetPage({ params }: any) {
-
+  
   const { tweet_id } = params
   const [tweetResult, threadTree] = await Promise.all([
     getTweet(tweet_id),

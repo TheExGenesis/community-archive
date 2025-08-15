@@ -15,6 +15,19 @@ export interface ThreadTweet {
   account_display_name: string
   avatar_media_url?: string
   media?: any[]
+  quote_tweet_id?: string | null
+  quoted_tweet?: {
+    tweet_id: string
+    account_id: string
+    created_at: string
+    full_text: string
+    retweet_count: number
+    favorite_count: number
+    avatar_media_url?: string
+    username: string
+    account_display_name: string
+    media?: any[]
+  } | null
 }
 
 export interface ConversationTree {
@@ -64,18 +77,76 @@ export const getConversationTweets = async (tweet_id: string): Promise<ThreadTwe
     conversationTweets = [initialTweet, ...allReplies]
   }
 
-  // Get media for each tweet
+  // Get media and quote tweets for each tweet
   const tweetIds = conversationTweets.map(t => t.tweet_id)
   if (tweetIds.length > 0) {
+    // Get media
     const { data: mediaData } = await supabase
       .schema('public')
       .from('tweet_media')
       .select('*')
       .in('tweet_id', tweetIds)
 
-    // Add media to each tweet
+    // Get quote tweet relationships
+    const { data: quoteData } = await supabase
+      .schema('public')
+      .from('quote_tweets')
+      .select('tweet_id, quoted_tweet_id')
+      .in('tweet_id', tweetIds)
+
+    // Get all quoted tweet IDs
+    const quotedTweetIds = quoteData?.map(q => q.quoted_tweet_id).filter(Boolean) || []
+    
+    // Fetch quoted tweets if any
+    let quotedTweets: any[] = []
+    if (quotedTweetIds.length > 0) {
+      const { data: quotedTweetData } = await supabase
+        .schema('public')
+        .from('enriched_tweets')
+        .select('*')
+        .in('tweet_id', quotedTweetIds)
+      
+      if (quotedTweetData) {
+        // Get media for quoted tweets
+        const { data: quotedMediaData } = await supabase
+          .schema('public')
+          .from('tweet_media')
+          .select('*')
+          .in('tweet_id', quotedTweetIds)
+        
+        // Add media to quoted tweets
+        quotedTweetData.forEach(qt => {
+          qt.media = quotedMediaData?.filter(m => m.tweet_id === qt.tweet_id) || []
+        })
+        
+        quotedTweets = quotedTweetData
+      }
+    }
+
+    // Add media and quote tweets to each tweet
     conversationTweets.forEach(tweet => {
       tweet.media = mediaData?.filter(m => m.tweet_id === tweet.tweet_id) || []
+      
+      // Find quote tweet relationship
+      const quoteRelation = quoteData?.find(q => q.tweet_id === tweet.tweet_id)
+      if (quoteRelation) {
+        const quotedTweet = quotedTweets.find(qt => qt.tweet_id === quoteRelation.quoted_tweet_id)
+        if (quotedTweet) {
+          tweet.quote_tweet_id = quoteRelation.quoted_tweet_id
+          tweet.quoted_tweet = {
+            tweet_id: quotedTweet.tweet_id,
+            account_id: quotedTweet.account_id,
+            created_at: quotedTweet.created_at,
+            full_text: quotedTweet.full_text,
+            retweet_count: quotedTweet.retweet_count,
+            favorite_count: quotedTweet.favorite_count,
+            avatar_media_url: quotedTweet.avatar_media_url,
+            username: quotedTweet.username,
+            account_display_name: quotedTweet.account_display_name,
+            media: quotedTweet.media || []
+          }
+        }
+      }
     })
   }
 
@@ -93,7 +164,9 @@ export const getConversationTweets = async (tweet_id: string): Promise<ThreadTwe
     username: tweet.username,
     account_display_name: tweet.account_display_name,
     avatar_media_url: tweet.avatar_media_url,
-    media: tweet.media
+    media: tweet.media,
+    quote_tweet_id: tweet.quote_tweet_id || null,
+    quoted_tweet: tweet.quoted_tweet || null
   }))
 }
 

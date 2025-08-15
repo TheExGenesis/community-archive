@@ -51,15 +51,15 @@ export const getTweet = async (tweet_id: any) => {
     (tweet.account as any).profile = profileData
   }
 
-  // Get quote tweet data - note: materialized view uses UPPERCASE column names
+  // Get quote tweet data - note: view uses lowercase column names
   const { data: quoteData, error: quoteError } = await supabase
     .schema('public')
     .from('quote_tweets')
-    .select('QUOTED_TWEET_ID')
-    .eq('TWEET_ID', tweet_id)
+    .select('quoted_tweet_id')
+    .eq('tweet_id', tweet_id)
     .maybeSingle()
 
-  if (quoteData?.QUOTED_TWEET_ID) {
+  if (quoteData?.quoted_tweet_id) {
     // Fetch the quoted tweet data with a simpler query to avoid infinite recursion
     const { data: quotedTweetData } = await supabase
       .schema('public')
@@ -78,7 +78,7 @@ export const getTweet = async (tweet_id: any) => {
           height
         )
       `)
-      .eq('tweet_id', quoteData.QUOTED_TWEET_ID)
+      .eq('tweet_id', quoteData.quoted_tweet_id)
       .single()
     
     if (quotedTweetData) {
@@ -105,7 +105,7 @@ export const getTweet = async (tweet_id: any) => {
       }
       
       ;(tweet as any).quoted_tweet = quotedTweet
-      ;(tweet as any).quote_tweet_id = quoteData.QUOTED_TWEET_ID
+      ;(tweet as any).quote_tweet_id = quoteData.quoted_tweet_id
     }
   }
 

@@ -59,6 +59,13 @@ export const getTweet = async (tweet_id: any) => {
     .eq('tweet_id', tweet_id)
     .maybeSingle()
 
+  console.log('[DEBUG] Quote tweet query:', {
+    tweet_id,
+    quoteData,
+    quoteError,
+    hasQuotedTweetId: !!quoteData?.quoted_tweet_id
+  })
+
   if (quoteData?.quoted_tweet_id) {
     // Fetch the quoted tweet data with a simpler query to avoid infinite recursion
     const { data: quotedTweetData } = await supabase
@@ -80,6 +87,12 @@ export const getTweet = async (tweet_id: any) => {
       `)
       .eq('tweet_id', quoteData.quoted_tweet_id)
       .single()
+    
+    console.log('[DEBUG] Quoted tweet data fetch:', {
+      quoted_tweet_id: quoteData.quoted_tweet_id,
+      quotedTweetData,
+      hasData: !!quotedTweetData
+    })
     
     if (quotedTweetData) {
       // Get profile data for the quoted tweet's author
@@ -106,6 +119,11 @@ export const getTweet = async (tweet_id: any) => {
       
       ;(tweet as any).quoted_tweet = quotedTweet
       ;(tweet as any).quote_tweet_id = quoteData.quoted_tweet_id
+      
+      console.log('[DEBUG] Final tweet with quote:', {
+        has_quoted_tweet: !!(tweet as any).quoted_tweet,
+        quote_tweet_id: (tweet as any).quote_tweet_id
+      })
     }
   }
 

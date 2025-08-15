@@ -213,6 +213,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
     if (!isQuoteTweet || !tweet.quoted_tweet) return null
     
     const quotedTweet = tweet.quoted_tweet
+    console.log('[DEUBG] qt in tweet component', quotedTweet)
     const quotedProfilePic = quotedTweet.avatar_media_url || '/placeholder.jpg'
     
     return (

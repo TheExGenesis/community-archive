@@ -14,14 +14,14 @@
     "typescript"
   ],
   "scripts": {
-    "dev": "set NODE_ENV=development & set NEXT_PUBLIC_USE_REMOTE_DEV_DB=false & next dev",
-    "dev-as-prod": "set NODE_ENV=production & next dev",
-    "dev-remote-db": "set NEXT_PUBLIC_USE_REMOTE_DEV_DB=true & next dev",
+    "dev": "NODE_ENV=development NEXT_PUBLIC_USE_REMOTE_DEV_DB=false next dev",
+    "dev-as-prod": "NODE_ENV=production next dev",
+    "dev-remote-db": "NEXT_PUBLIC_USE_REMOTE_DEV_DB=true next dev",
     "dev:importfiles": "tsx --env-file=.env scripts/import_from_files_to_db.ts",
     "dev:validateimport": "tsx --env-file=.env scripts/validate_db_import.ts",
     "dev:downloadarchive": "tsx --env-file=.env scripts/download_supabase_storage.mts",
     "dev:testconversationids": "tsx --env-file=.env scripts/testConversationIds.ts",
-    "build": "set NODE_ENV=production & next build",
+    "build": "NODE_ENV=production next build",
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
@@ -127,5 +127,12 @@
     "workerDirectory": [
       "public"
     ]
+  },
+  "pnpm": {
+    "overrides": {
+      "form-data": "4.0.4"
+    }
   }
 }
+
+

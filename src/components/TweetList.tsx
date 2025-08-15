@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Tweet from '@/components/Tweet';
+import UnifiedTweetList from '@/components/UnifiedTweetList';
 import { Button } from '@/components/ui/button';
 import { createBrowserClient } from '@/utils/supabase';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -88,38 +88,6 @@ export default function TweetList({
     }
   };
 
-  const handleExportCsv = () => {
-    if (tweets.length === 0) {
-      alert("No tweets to export.");
-      return;
-    }
-    const headers = ['tweet_id', 'created_at', 'full_text', 'favorite_count', 'retweet_count', 'username', 'account_display_name', 'reply_to_tweet_id'];
-    const csvRows = [
-      headers.join(','),
-      ...tweets.map(tweet => [
-        `"${tweet.tweet_id}"`, 
-        `"${tweet.created_at}"`, 
-        `"${tweet.full_text.replace(/"/g, '""').replace(/\n/g, '\\n')}"`, 
-        tweet.favorite_count,
-        tweet.retweet_count,
-        `"${tweet.account.username}"`, 
-        `"${tweet.account.account_display_name}"`, 
-        `"${tweet.reply_to_tweet_id || ''}"`
-      ].join(','))
-    ];
-    const csvString = csvRows.join('\r\n');
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', csvExportFilename);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-  };
 
   const hasMoreTweets = totalCount !== null 
     ? (currentPage * itemsPerPage) < totalCount 
@@ -133,23 +101,38 @@ export default function TweetList({
     return <p className="text-xl text-red-500 text-center py-10">Error: {error}</p>;
   }
 
+  // Convert TimelineTweet to raw tweet format for consistency
+  const rawTweets = tweets.map(tweet => ({
+    tweet_id: tweet.tweet_id,
+    account_id: '', // TimelineTweet doesn't have this
+    created_at: tweet.created_at,
+    full_text: tweet.full_text,
+    retweet_count: tweet.retweet_count,
+    favorite_count: tweet.favorite_count,
+    reply_to_tweet_id: tweet.reply_to_tweet_id,
+    // Use raw format for account data
+    account: {
+      username: tweet.account.username,
+      account_display_name: tweet.account.account_display_name,
+      profile: tweet.account.profile ? {
+        avatar_media_url: tweet.account.profile.avatar_media_url
+      } : undefined
+    },
+    media: tweet.media || [],
+    mentioned_users: [], // TimelineTweet doesn't have this
+  }))
+
   return (
     <div className="space-y-8">
-      {showCsvExportButton && tweets.length > 0 && (
-        <div className="flex justify-end mb-4">
-          <Button onClick={handleExportCsv} variant="outline">Download CSV</Button>
-        </div>
-      )}
-      {tweets.length === 0 && !isLoading && !error && (
-        <p className="text-lg text-gray-600 dark:text-gray-400 text-center py-10">No tweets to display for the current filters.</p>
-      )}
-      <div className="space-y-4">
-        {tweets.map(tweet => (
-          <div key={tweet.tweet_id} className="bg-background dark:bg-secondary p-4 rounded-lg">
-            <Tweet tweet={tweet} />
-          </div>
-        ))}
-      </div>
+      <UnifiedTweetList 
+        tweets={rawTweets}
+        isLoading={isLoading}
+        emptyMessage="No tweets to display for the current filters."
+        className="space-y-4"
+        showCsvExport={showCsvExportButton}
+        csvFilename={csvExportFilename}
+      />
+      
       {error && tweets.length > 0 && (
         <p className="text-red-500 text-center mt-6">Error loading more tweets: {error}</p>
       )}

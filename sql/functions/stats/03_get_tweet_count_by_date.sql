@@ -5,8 +5,8 @@ RETURNS TABLE("tweet_date" timestamp without time zone, "tweet_count" bigint)
 BEGIN
     RAISE NOTICE 'Executing get_tweet_count_by_date with start_date %, end_date %, and granularity %', start_date, end_date, granularity;
     
-    IF granularity NOT IN ('day', 'week', 'month', 'year') THEN
-        RAISE EXCEPTION 'Invalid granularity. Must be "day", "week", "month", or "year".';
+    IF granularity NOT IN ('minute', 'hour', 'day', 'week', 'month', 'year') THEN
+        RAISE EXCEPTION 'Invalid granularity. Must be "minute", "hour", "day", "week", "month", or "year".';
     END IF;
 
     RETURN QUERY EXECUTE format('
@@ -17,12 +17,12 @@ BEGIN
         public.tweets 
     WHERE
         created_at >= $1
-        AND created_at < $2 + INTERVAL ''1 %s''
+        AND created_at < $2
     GROUP BY 
         date_trunc(%L, created_at AT TIME ZONE ''UTC'')
     ORDER BY 
         tweet_date
-    ', granularity, granularity, granularity)
+    ', granularity, granularity)
     USING start_date, end_date;
 END;
 $_$;

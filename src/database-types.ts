@@ -1150,6 +1150,58 @@ export type Database = {
         }
         Relationships: []
       }
+      all_account: {
+        Row: {
+          account_display_name: string
+          account_id: string
+          created_at: string
+          created_via: string
+          username: string
+          num_followers: number | null
+          num_following: number | null
+          num_likes: number | null
+          num_tweets: number | null
+        }
+        Relationships: []
+      }
+      all_profile: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          avatar_media_url: string | null
+          bio: string | null
+          header_media_url: string | null
+          id: number
+          location: string | null
+          website: string | null
+        }
+        Relationships: []
+      }
+      enriched_tweets: {
+        Row: {
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          reply_to_tweet_id: string | null
+          reply_to_user_id: string | null
+          reply_to_username: string | null
+          username: string
+          account_display_name: string
+          avatar_media_url: string | null
+          conversation_id: string | null
+        }
+        Relationships: []
+      }
+      quote_tweets: {
+        Row: {
+          tweet_id: string
+          quoted_tweet_id: string
+        }
+        Relationships: []
+      }
       global_activity_summary: {
         Row: {
           total_accounts: number | null
@@ -1549,6 +1601,62 @@ export type Database = {
           "": string
         }
         Returns: string[]
+      }
+      get_unique_scraper_count: {
+        Args: {
+          start_date: string
+          end_date: string
+        }
+        Returns: number
+      }
+      get_scraper_counts_by_granularity: {
+        Args: {
+          start_date: string
+          end_date: string
+          granularity: string
+        }
+        Returns: {
+          date: string
+          count: number
+        }[]
+      }
+      get_streaming_stats: {
+        Args: {
+          start_date: string
+          end_date: string
+        }
+        Returns: {
+          date: string
+          count: number
+        }[]
+      }
+      get_simple_streamed_tweet_counts: {
+        Args: {
+          start_date: string
+          end_date: string
+          granularity: string
+        }
+        Returns: {
+          date: string
+          count: number
+        }[]
+      }
+      get_tweet_counts_by_granularity: {
+        Args: {
+          start_date: string
+          end_date: string
+          granularity: string
+        }
+        Returns: {
+          date: string
+          count: number
+        }[]
+      }
+      delete_user_archive: {
+        Args: {
+          p_account_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

@@ -2,8 +2,11 @@
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { devLog } from '@/lib/devLog'
 import { createBrowserClient } from '@/utils/supabase'
+import { useSearchParams } from 'next/navigation'
 
 export default function SignIn() {
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirect')
   const { userMetadata, isArchiveUploaded } = useAuthAndArchive()
 
   const signIn = async () => {
@@ -42,6 +45,12 @@ export default function SignIn() {
         const result = await response.json()
         if (response.ok) {
           devLog('User ID updated:', result.data)
+          // Redirect to intended page after dev login
+          if (redirectTo) {
+            window.location.href = redirectTo
+          } else {
+            window.location.reload()
+          }
         } else {
           console.error('Failed to update user ID:', result.error)
         }
@@ -52,10 +61,14 @@ export default function SignIn() {
         userMetadata,
         origin: window.location.origin,
       })
+      const callbackUrl = redirectTo 
+        ? `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(redirectTo)}`
+        : `${window.location.origin}/api/auth/callback`
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'twitter',
         options: {
-          redirectTo: `${window.location.origin}/api/auth/callback`,
+          redirectTo: callbackUrl,
         },
       })
       devLog({ data, error })

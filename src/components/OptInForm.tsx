@@ -4,9 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 
 interface OptInFormProps {
   userId: string
@@ -16,26 +14,22 @@ interface OptInFormProps {
 
 export default function OptInForm({ userId, userEmail, initialOptInStatus }: OptInFormProps) {
   const router = useRouter()
+  const { userMetadata } = useAuthAndArchive()
   const [isOptedIn, setIsOptedIn] = useState(initialOptInStatus?.opted_in || false)
-  const [username, setUsername] = useState(initialOptInStatus?.username || '')
-  const [twitterUserId, setTwitterUserId] = useState(initialOptInStatus?.twitter_user_id || '')
-  const [agreeToTerms, setAgreeToTerms] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Get Twitter info from authenticated user metadata
+  const twitterUsername = userMetadata?.user_name
+  const twitterUserId = userMetadata?.provider_id
+
+  const handleSubmit = async () => {
     setError('')
     setSuccess('')
 
-    if (!isOptedIn && !agreeToTerms) {
-      setError('You must agree to the terms and conditions to opt in')
-      return
-    }
-
-    if (!username.trim()) {
-      setError('Twitter/X username is required')
+    if (!twitterUsername) {
+      setError('Twitter username not found. Please make sure you signed in with Twitter.')
       return
     }
 
@@ -49,9 +43,9 @@ export default function OptInForm({ userId, userEmail, initialOptInStatus }: Opt
         },
         body: JSON.stringify({
           userId,
-          username: username.trim().replace('@', ''), // Remove @ if present
-          twitterUserId: twitterUserId.trim() || null,
-          optedIn: !isOptedIn, // Toggle the status
+          username: twitterUsername.toLowerCase(),
+          twitterUserId: twitterUserId || null,
+          optedIn: !isOptedIn,
           termsVersion: 'v1.0'
         }),
       })
@@ -69,10 +63,6 @@ export default function OptInForm({ userId, userEmail, initialOptInStatus }: Opt
           : 'Successfully opted out of tweet streaming.'
       )
       
-      // Reset the terms checkbox
-      setAgreeToTerms(false)
-      
-      // Refresh the page data
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'An error occurred. Please try again.')
@@ -81,102 +71,84 @@ export default function OptInForm({ userId, userEmail, initialOptInStatus }: Opt
     }
   }
 
+  if (!twitterUsername) {
+    return (
+      <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+        <p className="text-red-800 dark:text-red-200">
+          No Twitter account found. Please sign in with Twitter to use the opt-in feature.
+        </p>
+      </div>
+    )
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div>
-        <Label htmlFor="username" className="text-gray-700 dark:text-gray-300">
-          Twitter/X Username <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="username"
-          type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="your_username"
-          className="mt-1"
-          disabled={isLoading || (initialOptInStatus && isOptedIn)}
-          required
-        />
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Enter your Twitter/X username without the @ symbol
+    <div className="text-center space-y-8">
+      {/* Display current Twitter account */}
+      <div className="inline-block p-6 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+        <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-3">
+          Signed in as
+        </h3>
+        <p className="text-xl font-bold text-blue-800 dark:text-blue-200">
+          @{twitterUsername}
         </p>
+        {twitterUserId && (
+          <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+            ID: {twitterUserId}
+          </p>
+        )}
       </div>
 
+      {/* Current status with large visual indicator */}
       <div>
-        <Label htmlFor="twitterUserId" className="text-gray-700 dark:text-gray-300">
-          Twitter/X User ID (Optional)
-        </Label>
-        <Input
-          id="twitterUserId"
-          type="text"
-          value={twitterUserId}
-          onChange={(e) => setTwitterUserId(e.target.value)}
-          placeholder="1234567890"
-          className="mt-1"
-          disabled={isLoading || (initialOptInStatus && isOptedIn)}
-        />
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Your numeric Twitter/X user ID (optional, helps with matching)
-        </p>
-      </div>
-
-      {!isOptedIn && (
-        <div className="flex items-start space-x-2">
-          <Checkbox
-            id="terms"
-            checked={agreeToTerms}
-            onCheckedChange={(checked) => setAgreeToTerms(checked as boolean)}
-            disabled={isLoading}
-            className="mt-1"
-          />
-          <Label 
-            htmlFor="terms" 
-            className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
-          >
-            I have read and agree to the Terms and Conditions and Privacy Policy. 
-            I understand that my public tweets will be archived and may persist even 
-            after deletion from Twitter/X.
-          </Label>
+        <div className="mb-6">
+          <span className="text-gray-600 dark:text-gray-400">Current Status:</span>
         </div>
-      )}
+        <div className={`inline-block px-8 py-4 rounded-full text-2xl font-bold ${
+          isOptedIn 
+            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-2 border-green-300 dark:border-green-700' 
+            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-2 border-gray-300 dark:border-gray-600'
+        }`}>
+          {isOptedIn ? '✓ Opted In' : '✗ Not Opted In'}
+        </div>
+      </div>
 
+      {/* Error and success messages */}
       {error && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="max-w-md mx-auto">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {success && (
-        <Alert className="border-green-500 bg-green-50 dark:bg-green-900/20">
+        <Alert className="border-green-500 bg-green-50 dark:bg-green-900/20 max-w-md mx-auto">
           <AlertDescription className="text-green-800 dark:text-green-200">
             {success}
           </AlertDescription>
         </Alert>
       )}
 
-      <div className="flex items-center justify-between pt-4">
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          Current Status: 
-          <span className={`ml-2 font-semibold ${isOptedIn ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-500'}`}>
-            {isOptedIn ? '✓ Opted In' : '✗ Not Opted In'}
-          </span>
-        </div>
-        
+      {/* Big center stage opt in/out button */}
+      <div className="py-8">
         <Button
-          type="submit"
-          disabled={isLoading || (!isOptedIn && !agreeToTerms) || !username.trim()}
+          onClick={handleSubmit}
+          disabled={isLoading}
           variant={isOptedIn ? 'destructive' : 'default'}
+          size="lg"
+          className="px-12 py-6 text-xl font-semibold min-w-[280px]"
         >
-          {isLoading ? 'Processing...' : (isOptedIn ? 'Opt Out' : 'Opt In')}
+          {isLoading ? 'Processing...' : (isOptedIn ? 'Opt Out' : 'Opt In to Tweet Streaming')}
         </Button>
       </div>
 
+      {/* Warning for opted-in users */}
       {isOptedIn && (
-        <p className="text-sm text-yellow-600 dark:text-yellow-400">
-          Note: Opting out will stop future tweet collection, but tweets already 
-          archived will remain unless you delete them manually.
-        </p>
+        <div className="max-w-md mx-auto p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+            <strong>Note:</strong> Opting out will stop future tweet collection, but tweets already 
+            archived will remain unless you delete them manually.
+          </p>
+        </div>
       )}
-    </form>
+    </div>
   )
 }

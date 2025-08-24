@@ -14,10 +14,15 @@ export default function DataPolicyPage() {
         you.
       </p>
 
-      <h2 className="mt-8 mb-4 text-2xl font-semibold">Data Collection and Usage</h2>
+      <h2 className="mt-8 mb-4 text-2xl font-semibold">Data Collection Methods</h2>
 
       <p className="mb-4">
-        The information we collect from your Twitter archive includes:
+        We collect Twitter/X data through two methods:
+      </p>
+
+      <h3 className="mt-6 mb-3 text-xl font-semibold">1. Twitter Archive Upload</h3>
+      <p className="mb-4">
+        You can upload your complete Twitter archive file. The information we collect includes:
       </p>
 
       <ol className="list-inside list-decimal space-y-2 my-5 pl-4">
@@ -27,14 +32,34 @@ export default function DataPolicyPage() {
         <li>Followers/following lists</li>
       </ol>
 
+      <h3 className="mt-6 mb-3 text-xl font-semibold">2. Browser Extension (Real-time Streaming)</h3>
       <p className="mb-4">
-        We do not access or upload:
+        With your explicit consent, our browser extension can automatically collect your public tweets in real-time. This includes:
+      </p>
+
+      <ul className="list-inside list-disc space-y-2 my-5 pl-4">
+        <li>Public tweets as they are posted</li>
+        <li>Tweet metadata (timestamps, engagement metrics)</li>
+        <li>Media URLs and attachments</li>
+        <li>Reply chains and quote tweets</li>
+      </ul>
+
+      <p className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        <strong>Important:</strong> The browser extension only works with users who have explicitly opted in to tweet streaming. 
+        You maintain full control and can opt out at any time through this website.
+      </p>
+
+      <h3 className="mt-6 mb-3 text-xl font-semibold">What We Do Not Collect</h3>
+      <p className="mb-4">
+        Regardless of the method, we never access:
       </p>
 
       <ul className="list-inside list-disc space-y-2 my-5 pl-4">
         <li>Direct messages</li>
         <li>Email addresses</li>
-        <li>Deleted tweets</li>
+        <li>Private account data</li>
+        <li>Protected tweets</li>
+        <li>Personal information beyond what's publicly visible</li>
       </ul>
 
       <h2 className="mt-8 mb-4 text-2xl font-semibold">Public Database and API</h2>
@@ -75,6 +100,31 @@ export default function DataPolicyPage() {
         </li>
       </ul>
 
+      <h2 className="mt-8 mb-4 text-2xl font-semibold">Browser Extension: How It Works</h2>
+
+      <p className="mb-4">
+        Our browser extension is designed with privacy and consent as core principles:
+      </p>
+
+      <ol className="list-inside list-decimal space-y-2 my-5 pl-4">
+        <li>
+          <strong>Explicit Opt-In Required</strong>: The extension only collects tweets from users who have 
+          explicitly opted in through this website after signing in with Twitter.
+        </li>
+        <li>
+          <strong>Public API Check</strong>: Before collecting any tweet, the extension checks our public API 
+          to verify the user has opted in and their consent is current.
+        </li>
+        <li>
+          <strong>Real-time Collection</strong>: When you post a public tweet, users with the extension 
+          installed can automatically save it to the Community Archive.
+        </li>
+        <li>
+          <strong>Distributed Preservation</strong>: This creates a distributed network of tweet preservation, 
+          helping maintain historical records even if tweets are later deleted.
+        </li>
+      </ol>
+
       <h2 className="mt-8 mb-4 text-2xl font-semibold">Privacy Options</h2>
 
       <p className="mb-4">
@@ -83,12 +133,20 @@ export default function DataPolicyPage() {
 
       <ol className="list-inside list-decimal space-y-2 my-5 pl-4">
         <li>
+          <strong>Tweet Streaming Opt-In/Opt-Out</strong>: You can enable or disable real-time tweet 
+          collection through the extension at any time via your account settings.
+        </li>
+        <li>
           <strong>Exclude Likes</strong>: You can opt to leave out your likes
           when uploading your archive.
         </li>
         <li>
           <strong>Date Filtering</strong>: You can choose to make only a
           specific date range of your archive public.
+        </li>
+        <li>
+          <strong>Manual Deletion</strong>: You can delete specific tweets from the archive 
+          at any time, even after opting out.
         </li>
         <li>
           <strong>Future Controls</strong>: We plan to implement more granular

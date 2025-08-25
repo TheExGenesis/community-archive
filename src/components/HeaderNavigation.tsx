@@ -13,13 +13,21 @@ import {
 export default function HeaderNavigation() {
   const pathname = usePathname()
 
-  const navItems = [
+  const baseNavItems = [
     { href: '/', label: 'Home' },
     { href: '/user-dir', label: 'User Directory' },
     { href: '/search', label: 'Advanced Search' },
+  ]
+
+  const streamingNavItems = [
     { href: '/stream-monitor', label: 'Stream Monitor' },
     { href: '/opt-in', label: 'Opt-In' },
   ]
+
+  // Only include streaming features if enabled
+  const navItems = process.env.NEXT_PUBLIC_ENABLE_STREAMING_FEATURES === 'true' 
+    ? [...baseNavItems, ...streamingNavItems]
+    : baseNavItems
 
   return (
     <NavigationMenu className="hidden md:flex">

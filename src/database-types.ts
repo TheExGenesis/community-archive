@@ -578,9 +578,34 @@ export type Database = {
       [_ in never]: never
     }
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          operationName?: string
+          query?: string
+          variables?: Json
+          extensions?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
-      all_account: {
+      account: {
         Row: {
           account_display_name: string
           account_id: string
@@ -590,7 +615,6 @@ export type Database = {
           num_following: number | null
           num_likes: number | null
           num_tweets: number | null
-          updated_at: string | null
           username: string
         }
         Insert: {
@@ -602,7 +626,6 @@ export type Database = {
           num_following?: number | null
           num_likes?: number | null
           num_tweets?: number | null
-          updated_at?: string | null
           username: string
         }
         Update: {
@@ -614,72 +637,9 @@ export type Database = {
           num_following?: number | null
           num_likes?: number | null
           num_tweets?: number | null
-          updated_at?: string | null
           username?: string
         }
         Relationships: []
-      }
-      all_profile: {
-        Row: {
-          account_id: string
-          archive_upload_id: number | null
-          avatar_media_url: string | null
-          bio: string | null
-          header_media_url: string | null
-          location: string | null
-          updated_at: string | null
-          website: string | null
-        }
-        Insert: {
-          account_id: string
-          archive_upload_id?: number | null
-          avatar_media_url?: string | null
-          bio?: string | null
-          header_media_url?: string | null
-          location?: string | null
-          updated_at?: string | null
-          website?: string | null
-        }
-        Update: {
-          account_id?: string
-          archive_upload_id?: number | null
-          avatar_media_url?: string | null
-          bio?: string | null
-          header_media_url?: string | null
-          location?: string | null
-          updated_at?: string | null
-          website?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "all_profile_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       archive_upload: {
         Row: {
@@ -730,87 +690,26 @@ export type Database = {
             referencedRelation: "account_activity_summary"
             referencedColumns: ["account_id"]
           },
-          {
-            foreignKeyName: "archive_upload_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-        ]
-      }
-      conversations: {
-        Row: {
-          conversation_id: string | null
-          tweet_id: string
-        }
-        Insert: {
-          conversation_id?: string | null
-          tweet_id: string
-        }
-        Update: {
-          conversation_id?: string | null
-          tweet_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversations_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "conversations_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "quote_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "conversations_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "conversations_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "tweets_enriched"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "conversations_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "tweets_w_conversation_id"
-            referencedColumns: ["tweet_id"]
-          },
         ]
       }
       followers: {
         Row: {
           account_id: string
-          archive_upload_id: number | null
+          archive_upload_id: number
           follower_account_id: string
           id: number
-          updated_at: string | null
         }
         Insert: {
           account_id: string
-          archive_upload_id?: number | null
+          archive_upload_id: number
           follower_account_id: string
           id?: never
-          updated_at?: string | null
         }
         Update: {
           account_id?: string
-          archive_upload_id?: number | null
+          archive_upload_id?: number
           follower_account_id?: string
           id?: never
-          updated_at?: string | null
         }
         Relationships: [
           {
@@ -825,13 +724,6 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "followers_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
             referencedColumns: ["account_id"]
           },
           {
@@ -846,24 +738,21 @@ export type Database = {
       following: {
         Row: {
           account_id: string
-          archive_upload_id: number | null
+          archive_upload_id: number
           following_account_id: string
           id: number
-          updated_at: string | null
         }
         Insert: {
           account_id: string
-          archive_upload_id?: number | null
+          archive_upload_id: number
           following_account_id: string
           id?: never
-          updated_at?: string | null
         }
         Update: {
           account_id?: string
-          archive_upload_id?: number | null
+          archive_upload_id?: number
           following_account_id?: string
           id?: never
-          updated_at?: string | null
         }
         Relationships: [
           {
@@ -878,13 +767,6 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "following_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
             referencedColumns: ["account_id"]
           },
           {
@@ -898,17 +780,14 @@ export type Database = {
       }
       liked_tweets: {
         Row: {
-          fts: unknown | null
           full_text: string
           tweet_id: string
         }
         Insert: {
-          fts?: unknown | null
           full_text: string
           tweet_id: string
         }
         Update: {
-          fts?: unknown | null
           full_text?: string
           tweet_id?: string
         }
@@ -917,24 +796,21 @@ export type Database = {
       likes: {
         Row: {
           account_id: string
-          archive_upload_id: number | null
+          archive_upload_id: number
           id: number
           liked_tweet_id: string
-          updated_at: string | null
         }
         Insert: {
           account_id: string
-          archive_upload_id?: number | null
+          archive_upload_id: number
           id?: never
           liked_tweet_id: string
-          updated_at?: string | null
         }
         Update: {
           account_id?: string
-          archive_upload_id?: number | null
+          archive_upload_id?: number
           id?: never
           liked_tweet_id?: string
-          updated_at?: string | null
         }
         Relationships: [
           {
@@ -949,13 +825,6 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "likes_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
             referencedColumns: ["account_id"]
           },
           {
@@ -995,68 +864,126 @@ export type Database = {
         }
         Relationships: []
       }
-      temporary_data: {
+      optin: {
         Row: {
-          data: Json
-          inserted: string | null
-          item_id: string
-          originator_id: string
-          stored: boolean | null
-          timestamp: string
-          type: string
+          id: string
           user_id: string
+          username: string
+          twitter_user_id: string | null
+          opted_in: boolean
+          terms_version: string
+          created_at: string
+          updated_at: string
+          opted_in_at: string | null
+          opted_out_at: string | null
         }
         Insert: {
-          data: Json
-          inserted?: string | null
-          item_id: string
-          originator_id: string
-          stored?: boolean | null
-          timestamp?: string
-          type: string
-          user_id?: string
+          id?: string
+          user_id: string
+          username: string
+          twitter_user_id?: string | null
+          opted_in?: boolean
+          terms_version?: string
+          created_at?: string
+          updated_at?: string
+          opted_in_at?: string | null
+          opted_out_at?: string | null
         }
         Update: {
-          data?: Json
-          inserted?: string | null
-          item_id?: string
-          originator_id?: string
-          stored?: boolean | null
-          timestamp?: string
-          type?: string
+          id?: string
           user_id?: string
+          username?: string
+          twitter_user_id?: string | null
+          opted_in?: boolean
+          terms_version?: string
+          created_at?: string
+          updated_at?: string
+          opted_in_at?: string | null
+          opted_out_at?: string | null
         }
         Relationships: []
       }
+      profile: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          avatar_media_url: string | null
+          bio: string | null
+          header_media_url: string | null
+          id: number
+          location: string | null
+          website: string | null
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          avatar_media_url?: string | null
+          bio?: string | null
+          header_media_url?: string | null
+          id?: never
+          location?: string | null
+          website?: string | null
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          avatar_media_url?: string | null
+          bio?: string | null
+          header_media_url?: string | null
+          id?: never
+          location?: string | null
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "profile_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_activity_summary"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "profile_archive_upload_id_fkey"
+            columns: ["archive_upload_id"]
+            isOneToOne: false
+            referencedRelation: "archive_upload"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tweet_media: {
         Row: {
-          archive_upload_id: number | null
+          archive_upload_id: number
           height: number
           media_id: number
           media_type: string
           media_url: string
           tweet_id: string
-          updated_at: string | null
           width: number
         }
         Insert: {
-          archive_upload_id?: number | null
+          archive_upload_id: number
           height: number
           media_id: number
           media_type: string
           media_url: string
           tweet_id: string
-          updated_at?: string | null
           width: number
         }
         Update: {
-          archive_upload_id?: number | null
+          archive_upload_id?: number
           height?: number
           media_id?: number
           media_type?: string
           media_url?: string
           tweet_id?: string
-          updated_at?: string | null
           width?: number
         }
         Relationships: [
@@ -1071,35 +998,7 @@ export type Database = {
             foreignKeyName: "tweet_media_tweet_id_fkey"
             columns: ["tweet_id"]
             isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_media_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "quote_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_media_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
             referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_media_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets_enriched"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_media_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets_w_conversation_id"
             referencedColumns: ["tweet_id"]
           },
         ]
@@ -1107,26 +1006,23 @@ export type Database = {
       tweet_urls: {
         Row: {
           display_url: string
-          expanded_url: string | null
+          expanded_url: string
           id: number
           tweet_id: string
-          updated_at: string | null
           url: string
         }
         Insert: {
           display_url: string
-          expanded_url?: string | null
+          expanded_url: string
           id?: never
           tweet_id: string
-          updated_at?: string | null
           url: string
         }
         Update: {
           display_url?: string
-          expanded_url?: string | null
+          expanded_url?: string
           id?: never
           tweet_id?: string
-          updated_at?: string | null
           url?: string
         }
         Relationships: [
@@ -1134,35 +1030,7 @@ export type Database = {
             foreignKeyName: "tweet_urls_tweet_id_fkey"
             columns: ["tweet_id"]
             isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_urls_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "quote_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_urls_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
             referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_urls_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets_enriched"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_urls_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets_w_conversation_id"
             referencedColumns: ["tweet_id"]
           },
         ]
@@ -1170,7 +1038,7 @@ export type Database = {
       tweets: {
         Row: {
           account_id: string
-          archive_upload_id: number | null
+          archive_upload_id: number
           created_at: string
           favorite_count: number
           fts: unknown | null
@@ -1180,11 +1048,10 @@ export type Database = {
           reply_to_username: string | null
           retweet_count: number
           tweet_id: string
-          updated_at: string | null
         }
         Insert: {
           account_id: string
-          archive_upload_id?: number | null
+          archive_upload_id: number
           created_at: string
           favorite_count: number
           fts?: unknown | null
@@ -1194,11 +1061,10 @@ export type Database = {
           reply_to_username?: string | null
           retweet_count: number
           tweet_id: string
-          updated_at?: string | null
         }
         Update: {
           account_id?: string
-          archive_upload_id?: number | null
+          archive_upload_id?: number
           created_at?: string
           favorite_count?: number
           fts?: unknown | null
@@ -1208,7 +1074,6 @@ export type Database = {
           reply_to_username?: string | null
           retweet_count?: number
           tweet_id?: string
-          updated_at?: string | null
         }
         Relationships: [
           {
@@ -1223,13 +1088,6 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
             referencedColumns: ["account_id"]
           },
           {
@@ -1246,19 +1104,16 @@ export type Database = {
           id: number
           mentioned_user_id: string
           tweet_id: string
-          updated_at: string | null
         }
         Insert: {
           id?: never
           mentioned_user_id: string
           tweet_id: string
-          updated_at?: string | null
         }
         Update: {
           id?: never
           mentioned_user_id?: string
           tweet_id?: string
-          updated_at?: string | null
         }
         Relationships: [
           {
@@ -1272,61 +1127,20 @@ export type Database = {
             foreignKeyName: "user_mentions_tweet_id_fkey"
             columns: ["tweet_id"]
             isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "user_mentions_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "quote_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "user_mentions_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
             referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "user_mentions_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets_enriched"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "user_mentions_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "tweets_w_conversation_id"
             referencedColumns: ["tweet_id"]
           },
         ]
       }
     }
     Views: {
-      account: {
-        Row: {
-          account_display_name: string | null
-          account_id: string | null
-          created_at: string | null
-          created_via: string | null
-          num_followers: number | null
-          num_following: number | null
-          num_likes: number | null
-          num_tweets: number | null
-          username: string | null
-        }
-        Relationships: []
-      }
       account_activity_summary: {
         Row: {
           account_id: string | null
-          last_updated: string | null
           mentioned_accounts: Json | null
           most_favorited_tweets: Json | null
+          most_liked_tweets_by_archive_users: Json | null
+          most_replied_tweets_by_archive_users: Json | null
           most_retweeted_tweets: Json | null
           num_followers: number | null
           num_tweets: number | null
@@ -1336,225 +1150,66 @@ export type Database = {
         }
         Relationships: []
       }
+      all_account: {
+        Row: {
+          account_display_name: string
+          account_id: string
+          created_at: string
+          created_via: string
+          username: string
+          num_followers: number | null
+          num_following: number | null
+          num_likes: number | null
+          num_tweets: number | null
+        }
+        Relationships: []
+      }
+      all_profile: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          avatar_media_url: string | null
+          bio: string | null
+          header_media_url: string | null
+          id: number
+          location: string | null
+          website: string | null
+        }
+        Relationships: []
+      }
       enriched_tweets: {
         Row: {
-          account_display_name: string | null
-          account_id: string | null
-          archive_upload_id: number | null
-          avatar_media_url: string | null
-          conversation_id: string | null
-          created_at: string | null
-          favorite_count: number | null
-          full_text: string | null
-          quoted_tweet_id: string | null
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
           reply_to_tweet_id: string | null
           reply_to_user_id: string | null
           reply_to_username: string | null
-          retweet_count: number | null
-          tweet_id: string | null
-          username: string | null
+          username: string
+          account_display_name: string
+          avatar_media_url: string | null
+          conversation_id: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
+      }
+      quote_tweets: {
+        Row: {
+          tweet_id: string
+          quoted_tweet_id: string
+        }
+        Relationships: []
       }
       global_activity_summary: {
         Row: {
-          last_updated: string | null
-          top_accounts_with_followers: Json | null
-          top_mentioned_users: Json | null
           total_accounts: number | null
           total_likes: number | null
           total_tweets: number | null
           total_user_mentions: number | null
         }
         Relationships: []
-      }
-      profile: {
-        Row: {
-          account_id: string | null
-          archive_upload_id: number | null
-          avatar_media_url: string | null
-          bio: string | null
-          header_media_url: string | null
-          location: string | null
-          website: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "all_profile_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      quote_tweets: {
-        Row: {
-          quoted_tweet_id: string | null
-          quoted_tweet_username: string | null
-          tweet_id: string | null
-        }
-        Relationships: []
-      }
-      tweet_replies_view: {
-        Row: {
-          reply_to_tweet_id: string | null
-          reply_to_user_id: string | null
-        }
-        Insert: {
-          reply_to_tweet_id?: string | null
-          reply_to_user_id?: string | null
-        }
-        Update: {
-          reply_to_tweet_id?: string | null
-          reply_to_user_id?: string | null
-        }
-        Relationships: []
-      }
-      tweets_enriched: {
-        Row: {
-          account_display_name: string | null
-          account_id: string | null
-          archive_upload_id: number | null
-          avatar_media_url: string | null
-          conversation_id: string | null
-          created_at: string | null
-          favorite_count: number | null
-          full_text: string | null
-          quoted_tweet_id: string | null
-          reply_to_tweet_id: string | null
-          reply_to_user_id: string | null
-          reply_to_username: string | null
-          retweet_count: number | null
-          tweet_id: string | null
-          username: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tweets_w_conversation_id: {
-        Row: {
-          account_id: string | null
-          archive_upload_id: number | null
-          conversation_id: string | null
-          created_at: string | null
-          favorite_count: number | null
-          fts: unknown | null
-          full_text: string | null
-          reply_to_tweet_id: string | null
-          reply_to_user_id: string | null
-          reply_to_username: string | null
-          retweet_count: number | null
-          tweet_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-        ]
       }
     }
     Functions: {
@@ -1721,48 +1376,6 @@ export type Database = {
           account_display_name: string
         }[]
       }
-      get_main_thread: {
-        Args: {
-          p_conversation_id: string
-        }
-        Returns: {
-          tweet_id: string
-          conversation_id: string
-          reply_to_tweet_id: string
-          account_id: string
-          depth: number
-          max_depth: number
-          favorite_count: number
-          retweet_count: number
-        }[]
-      }
-      get_monthly_tweet_counts: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          month: string
-          tweet_count: number
-        }[]
-      }
-      get_most_liked_tweets_by_username: {
-        Args: {
-          username_: string
-        }
-        Returns: {
-          tweet_id: string
-          full_text: string
-          num_likes: number
-        }[]
-      }
-      get_most_mentioned_accounts_by_username: {
-        Args: {
-          username_: string
-        }
-        Returns: {
-          mentioned_user_id: string
-          mentioned_username: string
-          mention_count: number
-        }[]
-      }
       get_top_accounts_with_followers: {
         Args: {
           limit_count: number
@@ -1782,17 +1395,6 @@ export type Database = {
           num_tweets: number
         }[]
       }
-      get_top_liked_users: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          tweet_id: string
-          full_text: string
-          like_count: number
-          reply_to_tweet_id: string
-          reply_to_user_id: string
-          reply_to_username: string
-        }[]
-      }
       get_top_mentioned_users: {
         Args: {
           limit_: number
@@ -1802,24 +1404,6 @@ export type Database = {
           name: string
           screen_name: string
           mention_count: number
-        }[]
-      }
-      get_top_retweeted_tweets_by_username: {
-        Args: {
-          username_: string
-          limit_: number
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          reply_to_tweet_id: string
-          reply_to_user_id: string
-          reply_to_username: string
-          archive_upload_id: number
         }[]
       }
       get_tweet_count_by_date:
@@ -1844,17 +1428,6 @@ export type Database = {
               tweet_count: number
             }[]
           }
-      get_tweets_in_user_conversations: {
-        Args: {
-          username_: string
-        }
-        Returns: {
-          conversation_id: string
-          tweet_id: string
-          created_at: string
-          full_text: string
-        }[]
-      }
       gtrgm_compress: {
         Args: {
           "": unknown
@@ -1960,6 +1533,23 @@ export type Database = {
           avatar_media_url: string
         }[]
       }
+      pg_search_tweets_with_trigram: {
+        Args: {
+          search_query: string
+          p_account_id?: string
+        }
+        Returns: {
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          username: string
+          account_display_name: string
+          avatar_media_url: string
+        }[]
+      }
       process_and_insert_tweet_entities: {
         Args: {
           p_tweets: Json
@@ -2012,140 +1602,1236 @@ export type Database = {
         }
         Returns: string[]
       }
-      tes_get_followers: {
+      get_unique_scraper_count: {
         Args: {
-          user_id: string
+          start_date: string
+          end_date: string
+        }
+        Returns: number
+      }
+      get_scraper_counts_by_granularity: {
+        Args: {
+          start_date: string
+          end_date: string
+          granularity: string
         }
         Returns: {
-          account_id: string
-          username: string
+          date: string
+          count: number
         }[]
       }
-      tes_get_followings: {
+      get_streaming_stats: {
         Args: {
-          user_id: string
+          start_date: string
+          end_date: string
         }
         Returns: {
-          account_id: string
-          username: string
+          date: string
+          count: number
         }[]
       }
-      tes_get_moots: {
+      get_simple_streamed_tweet_counts: {
         Args: {
-          user_id: string
+          start_date: string
+          end_date: string
+          granularity: string
         }
         Returns: {
-          account_id: string
-          username: string
+          date: string
+          count: number
         }[]
       }
-      tes_get_tweet_counts_by_date: {
+      get_tweet_counts_by_granularity: {
+        Args: {
+          start_date: string
+          end_date: string
+          granularity: string
+        }
+        Returns: {
+          date: string
+          count: number
+        }[]
+      }
+      delete_user_archive: {
         Args: {
           p_account_id: string
         }
-        Returns: {
-          tweet_date: string
-          tweet_count: number
-        }[]
-      }
-      tes_get_tweets_on_this_day: {
-        Args: {
-          p_limit?: number
-          p_account_id?: string
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          reply_to_tweet_id: string
-          reply_to_user_id: string
-          reply_to_username: string
-          username: string
-          account_display_name: string
-          avatar_media_url: string
-        }[]
-      }
-      tes_search_liked_tweets: {
-        Args: {
-          search_query: string
-          from_user?: string
-          to_user?: string
-          since_date?: string
-          until_date?: string
-          min_likes?: number
-          min_retweets?: number
-          max_likes?: number
-          max_retweets?: number
-          limit_?: number
-          auth_account_id?: string
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          reply_to_tweet_id: string
-          avatar_media_url: string
-          archive_upload_id: number
-          username: string
-          account_display_name: string
-        }[]
-      }
-      tes_search_tweets: {
-        Args: {
-          search_query: string
-          from_user?: string
-          to_user?: string
-          since_date?: string
-          until_date?: string
-          min_likes?: number
-          min_retweets?: number
-          max_likes?: number
-          max_retweets?: number
-          limit_?: number
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          reply_to_tweet_id: string
-          avatar_media_url: string
-          archive_upload_id: number
-          username: string
-          account_display_name: string
-        }[]
-      }
-      update_foreign_keys: {
-        Args: {
-          old_table_name: string
-          new_table_name: string
-          schema_name: string
-        }
         Returns: undefined
-      }
-      word_occurrences: {
-        Args: {
-          search_word: string
-          start_date?: string
-          end_date?: string
-          user_ids?: string[]
-        }
-        Returns: {
-          month: string
-          word_count: number
-        }[]
       }
     }
     Enums: {
       upload_phase_enum: "uploading" | "completed" | "failed"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  temp: {
+    Tables: {
+      account_1038586640: {
+        Row: {
+          account_display_name: string
+          account_id: string
+          created_at: string
+          created_via: string
+          num_followers: number | null
+          num_following: number | null
+          num_likes: number | null
+          num_tweets: number | null
+          username: string
+        }
+        Insert: {
+          account_display_name: string
+          account_id: string
+          created_at: string
+          created_via: string
+          num_followers?: number | null
+          num_following?: number | null
+          num_likes?: number | null
+          num_tweets?: number | null
+          username: string
+        }
+        Update: {
+          account_display_name?: string
+          account_id?: string
+          created_at?: string
+          created_via?: string
+          num_followers?: number | null
+          num_following?: number | null
+          num_likes?: number | null
+          num_tweets?: number | null
+          username?: string
+        }
+        Relationships: []
+      }
+      account_1378862677871751174: {
+        Row: {
+          account_display_name: string
+          account_id: string
+          created_at: string
+          created_via: string
+          num_followers: number | null
+          num_following: number | null
+          num_likes: number | null
+          num_tweets: number | null
+          username: string
+        }
+        Insert: {
+          account_display_name: string
+          account_id: string
+          created_at: string
+          created_via: string
+          num_followers?: number | null
+          num_following?: number | null
+          num_likes?: number | null
+          num_tweets?: number | null
+          username: string
+        }
+        Update: {
+          account_display_name?: string
+          account_id?: string
+          created_at?: string
+          created_via?: string
+          num_followers?: number | null
+          num_following?: number | null
+          num_likes?: number | null
+          num_tweets?: number | null
+          username?: string
+        }
+        Relationships: []
+      }
+      account_316970336: {
+        Row: {
+          account_display_name: string
+          account_id: string
+          created_at: string
+          created_via: string
+          num_followers: number | null
+          num_following: number | null
+          num_likes: number | null
+          num_tweets: number | null
+          username: string
+        }
+        Insert: {
+          account_display_name: string
+          account_id: string
+          created_at: string
+          created_via: string
+          num_followers?: number | null
+          num_following?: number | null
+          num_likes?: number | null
+          num_tweets?: number | null
+          username: string
+        }
+        Update: {
+          account_display_name?: string
+          account_id?: string
+          created_at?: string
+          created_via?: string
+          num_followers?: number | null
+          num_following?: number | null
+          num_likes?: number | null
+          num_tweets?: number | null
+          username?: string
+        }
+        Relationships: []
+      }
+      archive_upload_1038586640: {
+        Row: {
+          account_id: string
+          archive_at: string
+          created_at: string | null
+          id: number
+        }
+        Insert: {
+          account_id: string
+          archive_at: string
+          created_at?: string | null
+          id?: never
+        }
+        Update: {
+          account_id?: string
+          archive_at?: string
+          created_at?: string | null
+          id?: never
+        }
+        Relationships: []
+      }
+      archive_upload_1378862677871751174: {
+        Row: {
+          account_id: string
+          archive_at: string
+          created_at: string | null
+          id: number
+        }
+        Insert: {
+          account_id: string
+          archive_at: string
+          created_at?: string | null
+          id?: never
+        }
+        Update: {
+          account_id?: string
+          archive_at?: string
+          created_at?: string | null
+          id?: never
+        }
+        Relationships: []
+      }
+      archive_upload_316970336: {
+        Row: {
+          account_id: string
+          archive_at: string
+          created_at: string | null
+          id: number
+        }
+        Insert: {
+          account_id: string
+          archive_at: string
+          created_at?: string | null
+          id?: never
+        }
+        Update: {
+          account_id?: string
+          archive_at?: string
+          created_at?: string | null
+          id?: never
+        }
+        Relationships: []
+      }
+      followers_1038586640: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          follower_account_id: string
+          id: number
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          follower_account_id: string
+          id?: never
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          follower_account_id?: string
+          id?: never
+        }
+        Relationships: []
+      }
+      followers_1211134623285047297: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          follower_account_id: string
+          id: number
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          follower_account_id: string
+          id?: never
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          follower_account_id?: string
+          id?: never
+        }
+        Relationships: []
+      }
+      followers_1378862677871751174: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          follower_account_id: string
+          id: number
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          follower_account_id: string
+          id?: never
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          follower_account_id?: string
+          id?: never
+        }
+        Relationships: []
+      }
+      followers_316970336: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          follower_account_id: string
+          id: number
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          follower_account_id: string
+          id?: never
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          follower_account_id?: string
+          id?: never
+        }
+        Relationships: []
+      }
+      following_1038586640: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          following_account_id: string
+          id: number
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          following_account_id: string
+          id?: never
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          following_account_id?: string
+          id?: never
+        }
+        Relationships: []
+      }
+      following_1211134623285047297: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          following_account_id: string
+          id: number
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          following_account_id: string
+          id?: never
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          following_account_id?: string
+          id?: never
+        }
+        Relationships: []
+      }
+      following_1378862677871751174: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          following_account_id: string
+          id: number
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          following_account_id: string
+          id?: never
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          following_account_id?: string
+          id?: never
+        }
+        Relationships: []
+      }
+      following_316970336: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          following_account_id: string
+          id: number
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          following_account_id: string
+          id?: never
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          following_account_id?: string
+          id?: never
+        }
+        Relationships: []
+      }
+      liked_tweets_1038586640: {
+        Row: {
+          full_text: string
+          tweet_id: string
+        }
+        Insert: {
+          full_text: string
+          tweet_id: string
+        }
+        Update: {
+          full_text?: string
+          tweet_id?: string
+        }
+        Relationships: []
+      }
+      liked_tweets_1211134623285047297: {
+        Row: {
+          full_text: string
+          tweet_id: string
+        }
+        Insert: {
+          full_text: string
+          tweet_id: string
+        }
+        Update: {
+          full_text?: string
+          tweet_id?: string
+        }
+        Relationships: []
+      }
+      liked_tweets_1378862677871751174: {
+        Row: {
+          full_text: string
+          tweet_id: string
+        }
+        Insert: {
+          full_text: string
+          tweet_id: string
+        }
+        Update: {
+          full_text?: string
+          tweet_id?: string
+        }
+        Relationships: []
+      }
+      liked_tweets_316970336: {
+        Row: {
+          full_text: string
+          tweet_id: string
+        }
+        Insert: {
+          full_text: string
+          tweet_id: string
+        }
+        Update: {
+          full_text?: string
+          tweet_id?: string
+        }
+        Relationships: []
+      }
+      likes_1038586640: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          id: number
+          liked_tweet_id: string
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          id?: never
+          liked_tweet_id: string
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          id?: never
+          liked_tweet_id?: string
+        }
+        Relationships: []
+      }
+      likes_1211134623285047297: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          id: number
+          liked_tweet_id: string
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          id?: never
+          liked_tweet_id: string
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          id?: never
+          liked_tweet_id?: string
+        }
+        Relationships: []
+      }
+      likes_1378862677871751174: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          id: number
+          liked_tweet_id: string
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          id?: never
+          liked_tweet_id: string
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          id?: never
+          liked_tweet_id?: string
+        }
+        Relationships: []
+      }
+      likes_316970336: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          id: number
+          liked_tweet_id: string
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          id?: never
+          liked_tweet_id: string
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          id?: never
+          liked_tweet_id?: string
+        }
+        Relationships: []
+      }
+      mentioned_users_1038586640: {
+        Row: {
+          name: string
+          screen_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          name: string
+          screen_name: string
+          updated_at: string
+          user_id: string
+        }
+        Update: {
+          name?: string
+          screen_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mentioned_users_1211134623285047297: {
+        Row: {
+          name: string
+          screen_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          name: string
+          screen_name: string
+          updated_at: string
+          user_id: string
+        }
+        Update: {
+          name?: string
+          screen_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mentioned_users_1378862677871751174: {
+        Row: {
+          name: string
+          screen_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          name: string
+          screen_name: string
+          updated_at: string
+          user_id: string
+        }
+        Update: {
+          name?: string
+          screen_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mentioned_users_316970336: {
+        Row: {
+          name: string
+          screen_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          name: string
+          screen_name: string
+          updated_at: string
+          user_id: string
+        }
+        Update: {
+          name?: string
+          screen_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profile_1038586640: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          avatar_media_url: string | null
+          bio: string | null
+          header_media_url: string | null
+          id: number
+          location: string | null
+          website: string | null
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          avatar_media_url?: string | null
+          bio?: string | null
+          header_media_url?: string | null
+          id?: never
+          location?: string | null
+          website?: string | null
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          avatar_media_url?: string | null
+          bio?: string | null
+          header_media_url?: string | null
+          id?: never
+          location?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
+      profile_1211134623285047297: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          avatar_media_url: string | null
+          bio: string | null
+          header_media_url: string | null
+          id: number
+          location: string | null
+          website: string | null
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          avatar_media_url?: string | null
+          bio?: string | null
+          header_media_url?: string | null
+          id?: never
+          location?: string | null
+          website?: string | null
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          avatar_media_url?: string | null
+          bio?: string | null
+          header_media_url?: string | null
+          id?: never
+          location?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
+      profile_1378862677871751174: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          avatar_media_url: string | null
+          bio: string | null
+          header_media_url: string | null
+          id: number
+          location: string | null
+          website: string | null
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          avatar_media_url?: string | null
+          bio?: string | null
+          header_media_url?: string | null
+          id?: never
+          location?: string | null
+          website?: string | null
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          avatar_media_url?: string | null
+          bio?: string | null
+          header_media_url?: string | null
+          id?: never
+          location?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
+      profile_316970336: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          avatar_media_url: string | null
+          bio: string | null
+          header_media_url: string | null
+          id: number
+          location: string | null
+          website: string | null
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          avatar_media_url?: string | null
+          bio?: string | null
+          header_media_url?: string | null
+          id?: never
+          location?: string | null
+          website?: string | null
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          avatar_media_url?: string | null
+          bio?: string | null
+          header_media_url?: string | null
+          id?: never
+          location?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
+      tweet_media_1038586640: {
+        Row: {
+          archive_upload_id: number
+          height: number
+          media_id: number
+          media_type: string
+          media_url: string
+          tweet_id: string
+          width: number
+        }
+        Insert: {
+          archive_upload_id: number
+          height: number
+          media_id: number
+          media_type: string
+          media_url: string
+          tweet_id: string
+          width: number
+        }
+        Update: {
+          archive_upload_id?: number
+          height?: number
+          media_id?: number
+          media_type?: string
+          media_url?: string
+          tweet_id?: string
+          width?: number
+        }
+        Relationships: []
+      }
+      tweet_media_1211134623285047297: {
+        Row: {
+          archive_upload_id: number
+          height: number
+          media_id: number
+          media_type: string
+          media_url: string
+          tweet_id: string
+          width: number
+        }
+        Insert: {
+          archive_upload_id: number
+          height: number
+          media_id: number
+          media_type: string
+          media_url: string
+          tweet_id: string
+          width: number
+        }
+        Update: {
+          archive_upload_id?: number
+          height?: number
+          media_id?: number
+          media_type?: string
+          media_url?: string
+          tweet_id?: string
+          width?: number
+        }
+        Relationships: []
+      }
+      tweet_media_1378862677871751174: {
+        Row: {
+          archive_upload_id: number
+          height: number
+          media_id: number
+          media_type: string
+          media_url: string
+          tweet_id: string
+          width: number
+        }
+        Insert: {
+          archive_upload_id: number
+          height: number
+          media_id: number
+          media_type: string
+          media_url: string
+          tweet_id: string
+          width: number
+        }
+        Update: {
+          archive_upload_id?: number
+          height?: number
+          media_id?: number
+          media_type?: string
+          media_url?: string
+          tweet_id?: string
+          width?: number
+        }
+        Relationships: []
+      }
+      tweet_media_316970336: {
+        Row: {
+          archive_upload_id: number
+          height: number
+          media_id: number
+          media_type: string
+          media_url: string
+          tweet_id: string
+          width: number
+        }
+        Insert: {
+          archive_upload_id: number
+          height: number
+          media_id: number
+          media_type: string
+          media_url: string
+          tweet_id: string
+          width: number
+        }
+        Update: {
+          archive_upload_id?: number
+          height?: number
+          media_id?: number
+          media_type?: string
+          media_url?: string
+          tweet_id?: string
+          width?: number
+        }
+        Relationships: []
+      }
+      tweet_urls_1038586640: {
+        Row: {
+          display_url: string
+          expanded_url: string
+          id: number
+          tweet_id: string
+          url: string
+        }
+        Insert: {
+          display_url: string
+          expanded_url: string
+          id?: never
+          tweet_id: string
+          url: string
+        }
+        Update: {
+          display_url?: string
+          expanded_url?: string
+          id?: never
+          tweet_id?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      tweet_urls_1211134623285047297: {
+        Row: {
+          display_url: string
+          expanded_url: string
+          id: number
+          tweet_id: string
+          url: string
+        }
+        Insert: {
+          display_url: string
+          expanded_url: string
+          id?: never
+          tweet_id: string
+          url: string
+        }
+        Update: {
+          display_url?: string
+          expanded_url?: string
+          id?: never
+          tweet_id?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      tweet_urls_1378862677871751174: {
+        Row: {
+          display_url: string
+          expanded_url: string
+          id: number
+          tweet_id: string
+          url: string
+        }
+        Insert: {
+          display_url: string
+          expanded_url: string
+          id?: never
+          tweet_id: string
+          url: string
+        }
+        Update: {
+          display_url?: string
+          expanded_url?: string
+          id?: never
+          tweet_id?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      tweet_urls_316970336: {
+        Row: {
+          display_url: string
+          expanded_url: string
+          id: number
+          tweet_id: string
+          url: string
+        }
+        Insert: {
+          display_url: string
+          expanded_url: string
+          id?: never
+          tweet_id: string
+          url: string
+        }
+        Update: {
+          display_url?: string
+          expanded_url?: string
+          id?: never
+          tweet_id?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      tweets_1038586640: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          created_at: string
+          favorite_count: number
+          fts: unknown | null
+          full_text: string
+          reply_to_tweet_id: string | null
+          reply_to_user_id: string | null
+          reply_to_username: string | null
+          retweet_count: number
+          tweet_id: string
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          created_at: string
+          favorite_count: number
+          fts?: unknown | null
+          full_text: string
+          reply_to_tweet_id?: string | null
+          reply_to_user_id?: string | null
+          reply_to_username?: string | null
+          retweet_count: number
+          tweet_id: string
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          created_at?: string
+          favorite_count?: number
+          fts?: unknown | null
+          full_text?: string
+          reply_to_tweet_id?: string | null
+          reply_to_user_id?: string | null
+          reply_to_username?: string | null
+          retweet_count?: number
+          tweet_id?: string
+        }
+        Relationships: []
+      }
+      tweets_1211134623285047297: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          created_at: string
+          favorite_count: number
+          fts: unknown | null
+          full_text: string
+          reply_to_tweet_id: string | null
+          reply_to_user_id: string | null
+          reply_to_username: string | null
+          retweet_count: number
+          tweet_id: string
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          created_at: string
+          favorite_count: number
+          fts?: unknown | null
+          full_text: string
+          reply_to_tweet_id?: string | null
+          reply_to_user_id?: string | null
+          reply_to_username?: string | null
+          retweet_count: number
+          tweet_id: string
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          created_at?: string
+          favorite_count?: number
+          fts?: unknown | null
+          full_text?: string
+          reply_to_tweet_id?: string | null
+          reply_to_user_id?: string | null
+          reply_to_username?: string | null
+          retweet_count?: number
+          tweet_id?: string
+        }
+        Relationships: []
+      }
+      tweets_1378862677871751174: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          created_at: string
+          favorite_count: number
+          fts: unknown | null
+          full_text: string
+          reply_to_tweet_id: string | null
+          reply_to_user_id: string | null
+          reply_to_username: string | null
+          retweet_count: number
+          tweet_id: string
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          created_at: string
+          favorite_count: number
+          fts?: unknown | null
+          full_text: string
+          reply_to_tweet_id?: string | null
+          reply_to_user_id?: string | null
+          reply_to_username?: string | null
+          retweet_count: number
+          tweet_id: string
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          created_at?: string
+          favorite_count?: number
+          fts?: unknown | null
+          full_text?: string
+          reply_to_tweet_id?: string | null
+          reply_to_user_id?: string | null
+          reply_to_username?: string | null
+          retweet_count?: number
+          tweet_id?: string
+        }
+        Relationships: []
+      }
+      tweets_316970336: {
+        Row: {
+          account_id: string
+          archive_upload_id: number
+          created_at: string
+          favorite_count: number
+          fts: unknown | null
+          full_text: string
+          reply_to_tweet_id: string | null
+          reply_to_user_id: string | null
+          reply_to_username: string | null
+          retweet_count: number
+          tweet_id: string
+        }
+        Insert: {
+          account_id: string
+          archive_upload_id: number
+          created_at: string
+          favorite_count: number
+          fts?: unknown | null
+          full_text: string
+          reply_to_tweet_id?: string | null
+          reply_to_user_id?: string | null
+          reply_to_username?: string | null
+          retweet_count: number
+          tweet_id: string
+        }
+        Update: {
+          account_id?: string
+          archive_upload_id?: number
+          created_at?: string
+          favorite_count?: number
+          fts?: unknown | null
+          full_text?: string
+          reply_to_tweet_id?: string | null
+          reply_to_user_id?: string | null
+          reply_to_username?: string | null
+          retweet_count?: number
+          tweet_id?: string
+        }
+        Relationships: []
+      }
+      user_mentions_1038586640: {
+        Row: {
+          id: number
+          mentioned_user_id: string
+          tweet_id: string
+        }
+        Insert: {
+          id?: never
+          mentioned_user_id: string
+          tweet_id: string
+        }
+        Update: {
+          id?: never
+          mentioned_user_id?: string
+          tweet_id?: string
+        }
+        Relationships: []
+      }
+      user_mentions_1211134623285047297: {
+        Row: {
+          id: number
+          mentioned_user_id: string
+          tweet_id: string
+        }
+        Insert: {
+          id?: never
+          mentioned_user_id: string
+          tweet_id: string
+        }
+        Update: {
+          id?: never
+          mentioned_user_id?: string
+          tweet_id?: string
+        }
+        Relationships: []
+      }
+      user_mentions_1378862677871751174: {
+        Row: {
+          id: number
+          mentioned_user_id: string
+          tweet_id: string
+        }
+        Insert: {
+          id?: never
+          mentioned_user_id: string
+          tweet_id: string
+        }
+        Update: {
+          id?: never
+          mentioned_user_id?: string
+          tweet_id?: string
+        }
+        Relationships: []
+      }
+      user_mentions_316970336: {
+        Row: {
+          id: number
+          mentioned_user_id: string
+          tweet_id: string
+        }
+        Insert: {
+          id?: never
+          mentioned_user_id: string
+          tweet_id: string
+        }
+        Update: {
+          id?: never
+          mentioned_user_id?: string
+          tweet_id?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2235,17 +2921,3 @@ export type Enums<
     ? PublicSchema["Enums"][PublicEnumNameOrOptions]
     : never
 
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof PublicSchema["CompositeTypes"]
-    | { schema: keyof Database },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
-  }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
-    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never

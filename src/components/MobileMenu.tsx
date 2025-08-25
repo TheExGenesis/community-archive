@@ -18,6 +18,7 @@ const navItems = [
   { href: '/', label: 'Home' },
   { href: '/user-dir', label: 'User Directory' },
   { href: '/search', label: 'Advanced Search' },
+  { href: '/stream-monitor', label: 'Stream Monitor' },
 ]
 
 export default function MobileMenu() {

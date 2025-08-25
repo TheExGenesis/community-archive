@@ -1,7 +1,13 @@
 import { requireAuth, getOptInStatus } from '@/lib/auth-utils'
 import OptInForm from '@/components/OptInForm'
+import { notFound } from 'next/navigation'
 
 export default async function OptInPage() {
+  // Check if streaming features are enabled
+  if (process.env.NEXT_PUBLIC_ENABLE_STREAMING_FEATURES !== 'true') {
+    notFound()
+  }
+
   const { user } = await requireAuth()
   const { data: optInData } = await getOptInStatus(user.id)
 

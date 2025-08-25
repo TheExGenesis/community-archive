@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { createBrowserClient } from '@/utils/supabase'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
@@ -44,6 +45,7 @@ interface Tweet {
 }
 
 const StreamMonitor = () => {
+  const router = useRouter()
   const [viewMode, setViewMode] = useState<'24h' | '7d' | '1y'>('24h')
   const [timeOffset, setTimeOffset] = useState(0)
   const [showStreamedOnly, setShowStreamedOnly] = useState(true)
@@ -52,6 +54,13 @@ const StreamMonitor = () => {
   const tweetsPerPage = 20
   
   const supabase = createBrowserClient()
+
+  // Check if streaming features are enabled
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_ENABLE_STREAMING_FEATURES !== 'true') {
+      router.push('/404')
+    }
+  }, [router])
 
   // Query for scraping stats based on view mode and offset
   const { data: scrapingStats, isLoading: statsLoading, error: statsError } = useQuery({

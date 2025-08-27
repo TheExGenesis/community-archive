@@ -59,7 +59,7 @@ export default function DataPolicyPage() {
         <li>Email addresses</li>
         <li>Private account data</li>
         <li>Protected tweets</li>
-        <li>Personal information beyond what's publicly visible</li>
+        <li>Personal information beyond what&apos;s publicly visible</li>
       </ul>
 
       <h2 className="mt-8 mb-4 text-2xl font-semibold">Public Database and API</h2>

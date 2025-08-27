@@ -4,6 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
+**Node.js Version Requirement:**
+- Requires Node.js >= v18.17.0 (Next.js requirement)
+- If using older version, switch with NVM: `export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use 20`
+
 **Build & Development:**
 - `pnpm dev` - Start development server with local database
 - `pnpm dev-remote-db` - Start development server with remote database

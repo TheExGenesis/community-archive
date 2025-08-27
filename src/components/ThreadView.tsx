@@ -23,7 +23,7 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
     favorite_count: tweet.favorite_count,
     reply_to_tweet_id: tweet.reply_to_tweet_id,
     quote_tweet_id: tweet.quote_tweet_id || null,
-    quoted_tweet: tweet.quoted_tweet,
+    quoted_tweet: tweet.quoted_tweet || undefined,
     retweeted_tweet_id: null,
     avatar_media_url: tweet.avatar_media_url || null,
     username: tweet.username,

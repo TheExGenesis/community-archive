@@ -2,6 +2,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git Commit & PR Best Practices
+
+**IMPORTANT: Help maintain clean git history by reminding about commits at natural points:**
+- After fixing a specific bug or completing a discrete feature
+- When switching context to a different area of the codebase  
+- After making 3-5 related file changes
+- Before starting work on a different issue or feature
+- When refactoring is complete but before adding new features
+
+**Suggest creating a new PR when:**
+- The current changes address a complete, standalone issue
+- Switching from bug fixes to feature development (or vice versa)
+- Changes exceed ~200-300 lines of code
+- Working on a different subsystem or module
+
+**Commit message guidelines:**
+- Keep commits atomic - one logical change per commit
+- Suggest descriptive commit messages that explain the "why"
+- Remind to commit before context switching
+
 ## Development Commands
 
 **Node.js Version Requirement:**

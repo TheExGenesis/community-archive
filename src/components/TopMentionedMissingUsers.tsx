@@ -77,7 +77,7 @@ export default function TopMentionedUsers({
           return { ...user, uploaded: false }
         }
         const media_url = accountData.profile?.avatar_media_url
-          ? accountData.profile?.avatar_media_url
+          ? accountData.profile.avatar_media_url
           : undefined
         return {
           ...user,

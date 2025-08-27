@@ -58,30 +58,15 @@ export async function getArchiveMostMentionedAccounts(): Promise<
 > {
   const cookieStore = cookies()
   const supabase = createServerClient(cookieStore)
-  // const { data: rawUsers, error } = await supabase
-  //   .schema('public')
-  //   .rpc('get_top_mentioned_users' as any, { limit_: 10 })
-
   const { data: rawUsers, error } = await supabase
-    .schema('public')
-    .from('global_activity_summary')
-    .select('top_mentioned_users')
-    .single()
+    .rpc('get_top_mentioned_users', { limit_: 10 })
 
-  if (error || !rawUsers?.top_mentioned_users) {
+  if (error || !rawUsers) {
     console.error('Error fetching most mentioned accounts:', error)
     return []
   }
 
-  const users = (rawUsers.top_mentioned_users as any[]).reduce(
-    (acc: any, user: any) => {
-      if (!acc.some((u: any) => u.user_id === user.user_id)) {
-        acc.push(user)
-      }
-      return acc
-    },
-    [],
-  )
+  const users = rawUsers
 
   devLog('users', users)
   const userIds = users.map((user: any) => user.user_id)

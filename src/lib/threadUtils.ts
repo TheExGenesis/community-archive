@@ -95,7 +95,7 @@ export const getConversationTweets = async (tweet_id: string): Promise<ThreadTwe
       .in('tweet_id', tweetIds)
 
     // Get all quoted tweet IDs
-    const quotedTweetIds = quoteData?.map(q => q.quoted_tweet_id).filter(Boolean) || []
+    const quotedTweetIds = (quoteData?.map(q => q.quoted_tweet_id).filter((id): id is string => id !== null) || [])
     
     // Fetch quoted tweets if any
     let quotedTweets: any[] = []
@@ -115,25 +115,27 @@ export const getConversationTweets = async (tweet_id: string): Promise<ThreadTwe
           .in('tweet_id', quotedTweetIds)
         
         // Add media to quoted tweets
-        quotedTweetData.forEach(qt => {
-          qt.media = quotedMediaData?.filter(m => m.tweet_id === qt.tweet_id) || []
-        })
-        
-        quotedTweets = quotedTweetData
+        quotedTweets = quotedTweetData.map(qt => ({
+          ...qt,
+          media: quotedMediaData?.filter(m => m.tweet_id === qt.tweet_id) || []
+        }))
       }
     }
 
-    // Add media and quote tweets to each tweet
-    conversationTweets.forEach(tweet => {
-      tweet.media = mediaData?.filter(m => m.tweet_id === tweet.tweet_id) || []
+    // Transform to ThreadTweet format with media and quote tweets
+    return conversationTweets.map(tweet => {
+      const media = mediaData?.filter(m => m.tweet_id === tweet.tweet_id) || []
       
       // Find quote tweet relationship
       const quoteRelation = quoteData?.find(q => q.tweet_id === tweet.tweet_id)
+      let quote_tweet_id = null
+      let quoted_tweet = null
+      
       if (quoteRelation) {
         const quotedTweet = quotedTweets.find(qt => qt.tweet_id === quoteRelation.quoted_tweet_id)
         if (quotedTweet) {
-          tweet.quote_tweet_id = quoteRelation.quoted_tweet_id
-          tweet.quoted_tweet = {
+          quote_tweet_id = quoteRelation.quoted_tweet_id
+          quoted_tweet = {
             tweet_id: quotedTweet.tweet_id,
             account_id: quotedTweet.account_id,
             created_at: quotedTweet.created_at,
@@ -147,27 +149,29 @@ export const getConversationTweets = async (tweet_id: string): Promise<ThreadTwe
           }
         }
       }
+      
+      return {
+        tweet_id: tweet.tweet_id,
+        account_id: tweet.account_id,
+        created_at: tweet.created_at,
+        full_text: tweet.full_text,
+        retweet_count: tweet.retweet_count,
+        favorite_count: tweet.favorite_count,
+        reply_to_tweet_id: tweet.reply_to_tweet_id,
+        reply_to_user_id: tweet.reply_to_user_id,
+        reply_to_username: tweet.reply_to_username,
+        username: tweet.username,
+        account_display_name: tweet.account_display_name,
+        avatar_media_url: tweet.avatar_media_url,
+        media,
+        quote_tweet_id,
+        quoted_tweet
+      }
     })
   }
-
-  // Transform to ThreadTweet format
-  return conversationTweets.map(tweet => ({
-    tweet_id: tweet.tweet_id,
-    account_id: tweet.account_id,
-    created_at: tweet.created_at,
-    full_text: tweet.full_text,
-    retweet_count: tweet.retweet_count,
-    favorite_count: tweet.favorite_count,
-    reply_to_tweet_id: tweet.reply_to_tweet_id,
-    reply_to_user_id: tweet.reply_to_user_id,
-    reply_to_username: tweet.reply_to_username,
-    username: tweet.username,
-    account_display_name: tweet.account_display_name,
-    avatar_media_url: tweet.avatar_media_url,
-    media: tweet.media,
-    quote_tweet_id: tweet.quote_tweet_id || null,
-    quoted_tweet: tweet.quoted_tweet || null
-  }))
+  
+  // If no tweets, return empty array
+  return []
 }
 
 /**

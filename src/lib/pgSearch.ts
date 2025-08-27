@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/database-types'
 import { devLog } from '@/lib/devLog'
 import { SearchParams, TweetMediaItem } from './types'
+import { getMentionedUserAccount } from './mentionedUsers'
 
 export const searchTweetsExact = async (
   supabase: SupabaseClient<Database>,
@@ -42,7 +43,6 @@ const pgSearch = async (
   query: string,
   account_id?: string,
 ) => {
-  console.log('pgSearch', { supabase, query, account_id })
 
   const supabaseBaseQuery = supabase
     .from('tweets')
@@ -62,6 +62,13 @@ const pgSearch = async (
         ),
         username,
         account_display_name
+      ),
+      user_mentions (
+        mentioned_user:mentioned_users (
+          user_id,
+          name,
+          screen_name
+        )
       )
     `,
     )
@@ -80,28 +87,39 @@ const pgSearch = async (
   }
   devLog('base search tweets', tweets)
 
-  const formattedTweets = tweets.map((tweet: any) => ({
-    tweet_id: tweet.tweet_id,
-    account_id: tweet.account_id,
-    created_at: tweet.created_at,
-    full_text: tweet.full_text,
-    retweet_count: tweet.retweet_count,
-    favorite_count: tweet.favorite_count,
-    reply_to_tweet_id: tweet.reply_to_tweet_id,
-    archive_upload_id: tweet.archive_upload_id,
-    avatar_media_url: Array.isArray(tweet.account.profile)
-      ? tweet.account.profile.reduce((latest: any, profile: any) =>
-          !latest || profile.archive_upload_id > latest.archive_upload_id
-            ? profile
-            : latest,
-        )?.avatar_media_url
-      : tweet.account.profile?.avatar_media_url,
-    username: tweet.account.username,
-    account_display_name: tweet.account.account_display_name,
+  // Enrich tweets individually using the same logic as getTweet() for consistency
+
+  // Return raw tweet data with enriched mentioned_users (exactly like getTweet() does)
+  const enrichedTweets = await Promise.all(tweets.map(async (tweet: any) => {
+    // First, rename user_mentions to mentioned_users for compatibility
+    const tweetWithMentions = {
+      ...tweet,
+      mentioned_users: tweet.user_mentions || [],
+      user_mentions: undefined
+    }
+
+    // Then enrich with account data for mentioned users (same as getTweet())
+    if (tweetWithMentions.mentioned_users && tweetWithMentions.mentioned_users.length > 0) {
+      const enrichedMentionedUsers = await Promise.all(
+        tweetWithMentions.mentioned_users.map(async (userRecord: any) => {
+          const accountData = await getMentionedUserAccount(supabase, userRecord.mentioned_user.screen_name)
+          return {
+            ...userRecord,
+            mentioned_user: {
+              ...userRecord.mentioned_user,
+              account: accountData.data
+            }
+          }
+        })
+      )
+      tweetWithMentions.mentioned_users = enrichedMentionedUsers
+    }
+
+    return tweetWithMentions
   }))
 
-  devLog('search tweets', formattedTweets)
-  return formattedTweets
+  devLog('search tweets', enrichedTweets)
+  return enrichedTweets
 }
 
 export const parseSearchOptions = (query: string) => {

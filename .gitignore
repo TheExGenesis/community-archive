@@ -48,3 +48,7 @@ pnpm-lock.yaml
 data/**/*
 dumps/**/*
 supabase/schema.sql
+open-birdsite-db.code-workspace
+
+# mcp
+.mcp.json

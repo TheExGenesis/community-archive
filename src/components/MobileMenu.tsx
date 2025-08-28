@@ -13,17 +13,25 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 
-// Same nav items as in HeaderNavigation.tsx
-const navItems = [
+const baseNavItems = [
   { href: '/', label: 'Home' },
   { href: '/user-dir', label: 'User Directory' },
   { href: '/search', label: 'Advanced Search' },
+]
+
+const streamingNavItems = [
   { href: '/stream-monitor', label: 'Stream Monitor' },
+  { href: '/opt-in', label: 'Opt-In' },
 ]
 
 export default function MobileMenu() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
+
+  // Only include streaming features if enabled
+  const navItems = process.env.NEXT_PUBLIC_ENABLE_STREAMING_FEATURES === 'true' 
+    ? [...baseNavItems, ...streamingNavItems]
+    : baseNavItems
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>

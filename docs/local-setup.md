@@ -48,6 +48,43 @@ The app should now be running on [localhost:3000](http://localhost:3000/).
 
 5. If you make changes to the database schema, you'll want to update the types in `src/database-types.ts` with `pnpm gen-types`, you'll need a `SUPABASE_ACCESS_TOKEN` in your environment variables.
 
+### Git Hooks (Automatic Type Generation)
+
+This project uses [Husky](https://typicode.github.io/husky/) to automatically generate TypeScript types and API documentation before each commit. This ensures that database types are always in sync with the actual database schema.
+
+#### Setup
+
+Git hooks are automatically installed when you run `pnpm install` thanks to the `prepare` script. If hooks aren't working, you can manually install them:
+
+```bash
+pnpm install  # This runs 'husky install' automatically
+```
+
+#### What the pre-commit hook does
+
+Before each commit, the hook will:
+
+1. **Generate TypeScript types** from the database schema (`pnpm gen-types` or `pnpm dev:gen-types` depending on your environment)
+2. **Generate API documentation** (`pnpm gen-api-docs`)
+3. **Auto-stage changes** if the types or docs were updated
+
+#### Troubleshooting
+
+- **Hook not running?** Make sure Husky is installed: `npx husky install`
+- **Types generation failing?**
+  - For remote DB: Ensure `SUPABASE_ACCESS_TOKEN` is set in your environment
+  - For local DB: Make sure Supabase is running (`supabase start`)
+- **API docs generation failing?** Ensure `NEXT_PUBLIC_SUPABASE_ANON_KEY` is set
+- **Want to skip hooks temporarily?** Use `git commit --no-verify`
+
+#### Manual execution
+
+You can manually run the pre-commit checks anytime:
+
+```bash
+pnpm pre-commit
+```
+
 ### Supabase local instance setup
 
 Echoing [Supabase's Local Development instructions](https://supabase.com/docs/guides/cli/local-development?queryGroups=access-method&access-method=postgres#access-your-projects-services):

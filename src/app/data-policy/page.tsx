@@ -95,10 +95,38 @@ export default function DataPolicyPage() {
         </li>
         <li>
           <strong>Potential Risks</strong>: Be aware that malicious actors could
-          potentially use this data to make inferences about your psychology or
-          for targeted phishing attempts.
+          potentially use this data in various ways, such as making inferences about your psychology or
+          for targeted phishing attempts, among other potential risks.
         </li>
       </ul>
+
+      <h2 className="mt-8 mb-4 text-2xl font-semibold">Frequently Asked Questions</h2>
+
+      <div className="mb-8">
+        <h3 className="mt-6 mb-3 text-xl font-semibold">Do we stream every single tweet?</h3>
+        <p className="mb-4">
+          No. We have a temporary policy, and one we&apos;re aiming to adopt eventually.
+        </p>
+        <p className="mb-2">
+          <strong>The policy we&apos;re currently running:</strong> streaming tweets from people who&apos;ve been mentioned in the community archive.
+        </p>
+        <p className="mb-4">
+          <strong>The policy we&apos;re moving towards:</strong> only streaming tweets written by people who have explicitly opted in.
+        </p>
+        <p className="mb-4">
+          The reasoning for this is that streaming only opted-in users would severely affect utility at the beginning, as this would be very few tweets.
+        </p>
+
+        <h3 className="mt-6 mb-3 text-xl font-semibold">Will the stream be exhaustive?</h3>
+        <p className="mb-4">
+          The stream won&apos;t be exhaustive because it only knows about tweets if an extension user has seen them.
+        </p>
+
+        <h3 className="mt-6 mb-3 text-xl font-semibold">Will others know what my feed looks like?</h3>
+        <p className="mb-4">
+          No. We keep the ids of scrapers so we can detect and remove bad actors but these are not public.
+        </p>
+      </div>
 
       <h2 className="mt-8 mb-4 text-2xl font-semibold">Browser Extension: How It Works</h2>
 
@@ -145,8 +173,8 @@ export default function DataPolicyPage() {
           specific date range of your archive public.
         </li>
         <li>
-          <strong>Manual Deletion</strong>: You can delete specific tweets from the archive 
-          at any time, even after opting out.
+          <strong>Manual Deletion</strong>: We are planning to implement the ability to delete specific tweets from the archive, 
+          but this feature is not yet active.
         </li>
         <li>
           <strong>Future Controls</strong>: We plan to implement more granular

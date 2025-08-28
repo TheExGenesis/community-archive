@@ -28,6 +28,7 @@
     "format-check": "prettier --check .",
     "type-check": "tsc --pretty --noEmit",
     "gen-types": "supabase gen types typescript --project-id fabxmporizzqflnftavs --schema public,dev  > src/database-types.ts",
+    "pre-commit": "sh scripts/pre-commit.sh",
     "dev:gen-types": "supabase gen types typescript --local --schema public,dev  > src/database-types.ts",
     "prepare": "husky install",
     "test": "jest",

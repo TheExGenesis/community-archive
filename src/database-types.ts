@@ -1115,6 +1115,17 @@ export type Database = {
         Args: { p_suffix: string }
         Returns: undefined
       }
+      delete_tweets: {
+        Args: { p_tweet_ids: string[] }
+        Returns: {
+          deleted_conversations: number
+          deleted_private_tweet_user: number
+          deleted_tweet_media: number
+          deleted_tweet_urls: number
+          deleted_tweets: number
+          deleted_user_mentions: number
+        }[]
+      }
       delete_user_archive: {
         Args: { p_account_id: string }
         Returns: undefined

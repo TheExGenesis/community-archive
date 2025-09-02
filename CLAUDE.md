@@ -131,9 +131,11 @@ We are currently working directly with the remote database. For database schema 
 
 **Database Work Guidelines:**
 - Database schema information can be found in `sql/tables/` directory
-- Always create proper migrations for schema changes using `supabase migration new <name>`
+- **ALWAYS** use `supabase migration new <name>` to create migrations (it generates correct timestamps)
+- Never manually create migration files - always use the Supabase CLI
 - Test queries against existing schema before creating migrations
 - Use descriptive migration names (e.g., `add_user_analytics_table`, `fix_tweet_mentions_index`)
+- **IMPORTANT**: When creating migrations that add new SQL entities or change existing ones, always update the corresponding files in the `./sql` directory to keep the schema documentation in sync
 
 **Type Generation:**
 - Run `pnpm dev:gen-types` after schema changes to update TypeScript types

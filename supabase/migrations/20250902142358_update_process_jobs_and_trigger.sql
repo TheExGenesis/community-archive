@@ -51,12 +51,7 @@ BEGIN
             
         END IF;
 
-        IF v_job.job_name = 'update_conversation_ids' THEN
-            RAISE NOTICE 'Not updating conversation ids, update_conversation_ids needs optimization to not time out';
-            -- v_start_time := clock_timestamp();
-            -- PERFORM private.post_upload_update_conversation_ids();
-            -- RAISE NOTICE 'Updating conversation IDs took: %', clock_timestamp() - v_start_time;
-        END IF;
+
 
         IF v_job.job_name = 'commit_temp_data' THEN
             RAISE NOTICE 'Committing temp data for account: %', v_job.args->>'account_id';

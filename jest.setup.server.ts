@@ -7,7 +7,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
 // Set NODE_ENV for tests if not already set
 if (!process.env.NODE_ENV) {
-  process.env.NODE_ENV = 'test'
+  ;(process.env as any).NODE_ENV = 'test'
 }
 
 const queryCache = new QueryCache()

@@ -333,8 +333,8 @@ export const generateSmallExhaustiveMockArchive = (): Archive => {
         urls: [],
         media: []
       },
-      favorite_count: "5",
-      retweet_count: "2",
+      favorite_count: 5,
+      retweet_count: 2,
       favorited: false,
       retweeted: false,
       truncated: false,
@@ -359,8 +359,8 @@ export const generateSmallExhaustiveMockArchive = (): Archive => {
         urls: [],
         media: []
       },
-      favorite_count: "10",
-      retweet_count: "3",
+      favorite_count: 10,
+      retweet_count: 3,
       favorited: true,
       retweeted: false,
       truncated: false,
@@ -657,13 +657,4 @@ if (require.main === module) {
   main().catch(console.error)
 }
 
-// Export for use in tests
-export {
-  generateSmallExhaustiveMockArchive,
-  generateLargeBenchmarkArchive
-}
-
-export default {
-  generateSmallExhaustiveMockArchive,
-  generateLargeBenchmarkArchive
-}
+// Export for use in tests - functions already exported above

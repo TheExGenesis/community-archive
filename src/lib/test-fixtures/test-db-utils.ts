@@ -293,7 +293,7 @@ export const waitForCommit = async (
       return false
     }
     
-    if (data?.upload_phase === 'committed') {
+    if (data?.upload_phase === 'completed') {
       return true
     }
     

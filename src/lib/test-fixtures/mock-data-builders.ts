@@ -25,8 +25,8 @@ export const createTweet = (overrides: TweetOverrides) => {
       user_mentions: [],
       urls: []
     },
-    favorite_count: String(overrides.favorite_count || 0),
-    retweet_count: String(overrides.retweet_count || 0),
+    favorite_count: overrides.favorite_count || 0,
+    retweet_count: overrides.retweet_count || 0,
     favorited: false,
     retweeted: false,
     truncated: false,

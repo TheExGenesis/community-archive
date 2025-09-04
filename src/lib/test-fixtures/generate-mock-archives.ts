@@ -658,6 +658,11 @@ if (require.main === module) {
 }
 
 // Export for use in tests
+export {
+  generateSmallExhaustiveMockArchive,
+  generateLargeBenchmarkArchive
+}
+
 export default {
   generateSmallExhaustiveMockArchive,
   generateLargeBenchmarkArchive

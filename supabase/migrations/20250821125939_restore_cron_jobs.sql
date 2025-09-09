@@ -10,18 +10,19 @@ GRANT USAGE ON SCHEMA cron TO postgres;
 -- ==========================================
 -- 1. Restore process_jobs cron job
 -- ==========================================
--- First check if it already exists and remove if it does
+-- First check if it already exists and remove if it does (defensive approach)
 DO $$
 BEGIN
-    IF EXISTS (
-        SELECT 1 
-        FROM cron.job 
-        WHERE command LIKE '%SELECT private.process_jobs();%'
-    ) THEN
+    -- Try to unschedule existing process_jobs but ignore errors
+    BEGIN
         PERFORM cron.unschedule(j.jobid) 
         FROM cron.job j 
         WHERE j.command LIKE '%SELECT private.process_jobs();%';
-    END IF;
+    EXCEPTION 
+        WHEN OTHERS THEN
+            -- Log the error but don't fail the migration
+            RAISE NOTICE 'Could not unschedule existing process_jobs: %', SQLERRM;
+    END;
 END
 $$;
 
@@ -39,26 +40,24 @@ SELECT cron.schedule(
 -- Enable pg_net extension (required for TES)
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- Remove existing TES jobs if they exist
+-- Remove existing TES jobs if they exist (defensive approach)
 DO $$
 BEGIN
-    -- Remove tes-invoke-edge-function-scheduler if exists
-    IF EXISTS (
-        SELECT 1 
-        FROM cron.job 
-        WHERE jobname = 'tes-invoke-edge-function-scheduler'
-    ) THEN
+    -- Try to remove tes-invoke-edge-function-scheduler but ignore errors
+    BEGIN
         PERFORM cron.unschedule('tes-invoke-edge-function-scheduler');
-    END IF;
+    EXCEPTION 
+        WHEN OTHERS THEN
+            RAISE NOTICE 'Could not unschedule tes-invoke-edge-function-scheduler: %', SQLERRM;
+    END;
     
-    -- Remove tes-insert-temporary-data-into-tables if exists
-    IF EXISTS (
-        SELECT 1 
-        FROM cron.job 
-        WHERE jobname = 'tes-insert-temporary-data-into-tables'
-    ) THEN
+    -- Try to remove tes-insert-temporary-data-into-tables but ignore errors
+    BEGIN
         PERFORM cron.unschedule('tes-insert-temporary-data-into-tables');
-    END IF;
+    EXCEPTION 
+        WHEN OTHERS THEN
+            RAISE NOTICE 'Could not unschedule tes-insert-temporary-data-into-tables: %', SQLERRM;
+    END;
 END
 $$;
 
@@ -80,16 +79,17 @@ SELECT cron.schedule(
 -- 3. Restore scraping stats background job
 -- ==========================================
 
--- Remove existing job if it exists
+-- Remove existing job if it exists (more defensive approach)
 DO $$
 BEGIN
-    IF EXISTS (
-        SELECT 1 
-        FROM cron.job 
-        WHERE jobname = 'mark-completed-scraping-periods'
-    ) THEN
+    -- Try to unschedule but ignore errors if the job doesn't exist or cron is broken
+    BEGIN
         PERFORM cron.unschedule('mark-completed-scraping-periods');
-    END IF;
+    EXCEPTION 
+        WHEN OTHERS THEN
+            -- Log the error but don't fail the migration
+            RAISE NOTICE 'Could not unschedule mark-completed-scraping-periods: %', SQLERRM;
+    END;
 END
 $$;
 

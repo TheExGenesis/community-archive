@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/database-types'
-import { generateSmallExhaustiveMockArchive, generateLargeBenchmarkArchive } from '@/lib/test-fixtures/generate-mock-archives'
+import { generateSmallExhaustiveMockArchive, generateLargeBenchmarkArchive } from './fixtures/generate-mock-archives'
 import { 
   createTestClient, 
   generateTestAccountId,
@@ -10,7 +10,7 @@ import {
   cleanupOldTestData,
   verifyEntityExtraction,
   verifyNoteTweetPatching
-} from '@/lib/test-fixtures/test-db-utils-direct'
+} from './fixtures/test-db-utils'
 import { Archive } from '@/lib/types'
 
 /**

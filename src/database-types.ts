@@ -559,7 +559,7 @@ export type Database = {
         Insert: {
           name: string
           screen_name: string
-          updated_at: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -567,6 +567,45 @@ export type Database = {
           screen_name?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      optin: {
+        Row: {
+          created_at: string | null
+          id: string
+          opted_in: boolean
+          opted_in_at: string | null
+          opted_out_at: string | null
+          terms_version: string
+          twitter_user_id: string | null
+          updated_at: string | null
+          user_id: string
+          username: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          opted_in?: boolean
+          opted_in_at?: string | null
+          opted_out_at?: string | null
+          terms_version?: string
+          twitter_user_id?: string | null
+          updated_at?: string | null
+          user_id: string
+          username: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          opted_in?: boolean
+          opted_in_at?: string | null
+          opted_out_at?: string | null
+          terms_version?: string
+          twitter_user_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+          username?: string
         }
         Relationships: []
       }
@@ -1109,6 +1148,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      compute_hourly_scraping_stats: {
+        Args: {
+          p_start_date: string
+          p_end_date: string
+        }
+        Returns: {
+          period_start: string
+          period_end: string
+          tweet_count: number
+          unique_scrapers: number
+        }[]
+      }
       create_temp_tables: {
         Args: {
           p_suffix: string
@@ -1220,6 +1271,26 @@ export type Database = {
           archive_upload_id: number
         }[]
       }
+      get_hourly_scraping_stats: {
+        Args: {
+          p_hours_back?: number
+        }
+        Returns: {
+          period_start: string
+          period_end: string
+          tweet_count: number
+          unique_scrapers: number
+        }[]
+      }
+      get_hourly_stats_simple: {
+        Args: {
+          p_hours_back?: number
+        }
+        Returns: {
+          period_start: string
+          tweet_count: number
+        }[]
+      }
       get_latest_tweets: {
         Args: {
           count: number
@@ -1278,6 +1349,114 @@ export type Database = {
           mentioned_user_id: string
           mentioned_username: string
           mention_count: number
+        }[]
+      }
+      get_scraper_counts_by_granularity: {
+        Args: {
+          start_date: string
+          end_date: string
+          granularity: string
+        }
+        Returns: {
+          scraper_date: string
+          unique_scrapers: number
+        }[]
+      }
+      get_simple_streamed_tweet_counts: {
+        Args: {
+          start_date: string
+          end_date: string
+          granularity: string
+        }
+        Returns: {
+          tweet_date: string
+          tweet_count: number
+        }[]
+      }
+      get_streaming_stats: {
+        Args: {
+          p_start_date: string
+          p_end_date: string
+          p_granularity?: string
+          p_streamed_only?: boolean
+        }
+        Returns: {
+          period_start: string
+          period_end: string
+          tweet_count: number
+          unique_scrapers: number
+        }[]
+      }
+      get_streaming_stats_daily: {
+        Args: {
+          p_start_date: string
+          p_end_date: string
+        }
+        Returns: {
+          period_start: string
+          period_end: string
+          tweet_count: number
+          unique_scrapers: number
+        }[]
+      }
+      get_streaming_stats_daily_streamed_only: {
+        Args: {
+          p_start_date: string
+          p_end_date: string
+        }
+        Returns: {
+          period_start: string
+          period_end: string
+          tweet_count: number
+          unique_scrapers: number
+        }[]
+      }
+      get_streaming_stats_hourly: {
+        Args: {
+          p_start_date: string
+          p_end_date: string
+        }
+        Returns: {
+          period_start: string
+          period_end: string
+          tweet_count: number
+          unique_scrapers: number
+        }[]
+      }
+      get_streaming_stats_hourly_streamed_only: {
+        Args: {
+          p_start_date: string
+          p_end_date: string
+        }
+        Returns: {
+          period_start: string
+          period_end: string
+          tweet_count: number
+          unique_scrapers: number
+        }[]
+      }
+      get_streaming_stats_weekly: {
+        Args: {
+          p_start_date: string
+          p_end_date: string
+        }
+        Returns: {
+          period_start: string
+          period_end: string
+          tweet_count: number
+          unique_scrapers: number
+        }[]
+      }
+      get_streaming_stats_weekly_streamed_only: {
+        Args: {
+          p_start_date: string
+          p_end_date: string
+        }
+        Returns: {
+          period_start: string
+          period_end: string
+          tweet_count: number
+          unique_scrapers: number
         }[]
       }
       get_top_accounts_with_followers: {
@@ -1361,6 +1540,24 @@ export type Database = {
               tweet_count: number
             }[]
           }
+      get_tweet_counts_by_granularity: {
+        Args: {
+          start_date: string
+          end_date: string
+          granularity: string
+        }
+        Returns: {
+          tweet_date: string
+          tweet_count: number
+        }[]
+      }
+      get_unique_scraper_count: {
+        Args: {
+          start_date: string
+          end_date: string
+        }
+        Returns: number
+      }
       gtrgm_compress: {
         Args: {
           "": unknown
@@ -1487,6 +1684,7 @@ export type Database = {
           since_date?: string
           until_date?: string
           limit_?: number
+          offset_?: number
         }
         Returns: {
           tweet_id: string
@@ -1500,6 +1698,7 @@ export type Database = {
           archive_upload_id: number
           username: string
           account_display_name: string
+          media: Json
         }[]
       }
       set_limit: {

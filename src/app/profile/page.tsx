@@ -8,15 +8,10 @@ export default async function ProfilePage() {
   const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
 
-  // Get user's opt-in/opt-out status
-  const [optInResponse, optOutResponse, archivesResponse] = await Promise.all([
+  // Get user's opt-in/opt-out status and archives
+  const [optInResponse, archivesResponse] = await Promise.all([
     supabase
       .from('optin')
-      .select('*')
-      .eq('user_id', user.id)
-      .single(),
-    supabase
-      .from('optout')
       .select('*')
       .eq('user_id', user.id)
       .single(),
@@ -48,7 +43,6 @@ export default async function ProfilePage() {
         <ProfileContent
           user={user}
           initialOptInData={optInResponse.data}
-          initialOptOutData={optOutResponse.data}
           archives={archivesResponse.data || []}
         />
       </div>

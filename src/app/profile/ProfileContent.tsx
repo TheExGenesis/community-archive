@@ -17,20 +17,18 @@ import { formatDistanceToNow } from 'date-fns'
 interface ProfileContentProps {
   user: User
   initialOptInData: any
-  initialOptOutData: any
   archives: any[]
 }
 
 export default function ProfileContent({
   user,
   initialOptInData,
-  initialOptOutData,
   archives
 }: ProfileContentProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [optInStatus, setOptInStatus] = useState(initialOptInData?.opted_in || false)
-  const [optOutStatus, setOptOutStatus] = useState(initialOptOutData?.opted_out || false)
+  const [explicitOptOut, setExplicitOptOut] = useState(initialOptInData?.explicit_optout || false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [deletingArchive, setDeletingArchive] = useState<string | null>(null)
@@ -42,40 +40,22 @@ export default function ProfileContent({
     
     startTransition(async () => {
       try {
-        if (checked) {
-          // Opting in - remove from opt-out if exists
-          if (optOutStatus) {
-            await supabase
-              .from('optout')
-              .delete()
-              .eq('user_id', user.id)
-            setOptOutStatus(false)
-          }
+        // Create or update opt-in record
+        const { error: optInError } = await supabase
+          .from('optin')
+          .upsert({
+            user_id: user.id,
+            username: user.email?.split('@')[0] || 'unknown',
+            opted_in: checked,
+            explicit_optout: false,
+            opt_out_reason: null
+          })
 
-          // Create or update opt-in record
-          const { error: optInError } = await supabase
-            .from('optin')
-            .upsert({
-              user_id: user.id,
-              username: user.email?.split('@')[0] || 'unknown',
-              opted_in: true,
-              explicit_optout: false
-            })
-
-          if (optInError) throw optInError
-          setOptInStatus(true)
-          setSuccess('Successfully opted in to tweet streaming')
-        } else {
-          // Opting out from opt-in
-          const { error: optInError } = await supabase
-            .from('optin')
-            .update({ opted_in: false, explicit_optout: true })
-            .eq('user_id', user.id)
-
-          if (optInError) throw optInError
-          setOptInStatus(false)
-          setSuccess('Successfully opted out from tweet streaming')
-        }
+        if (optInError) throw optInError
+        
+        setOptInStatus(checked)
+        setExplicitOptOut(false)
+        setSuccess(checked ? 'Successfully opted in to tweet streaming' : 'Successfully opted out from tweet streaming')
         
         router.refresh()
       } catch (err: any) {
@@ -91,50 +71,29 @@ export default function ProfileContent({
     
     startTransition(async () => {
       try {
+        // Update opt-in table with explicit opt-out status
+        const { error: updateError } = await supabase
+          .from('optin')
+          .upsert({
+            user_id: user.id,
+            username: user.email?.split('@')[0] || 'unknown',
+            opted_in: false,
+            explicit_optout: checked,
+            opt_out_reason: checked ? 'User explicitly opted out via profile settings' : null
+          })
+
+        if (updateError) throw updateError
+
+        setExplicitOptOut(checked)
         if (checked) {
-          // Adding to explicit opt-out list
-          const { error: optOutError } = await supabase
-            .from('optout')
-            .upsert({
-              user_id: user.id,
-              username: user.email?.split('@')[0] || 'unknown',
-              opted_out: true
-            })
-
-          if (optOutError) throw optOutError
-
-          // Also update opt-in table if exists
-          await supabase
-            .from('optin')
-            .update({ opted_in: false, explicit_optout: true })
-            .eq('user_id', user.id)
-
-          setOptOutStatus(true)
           setOptInStatus(false)
-          setSuccess('Added to explicit opt-out list')
-        } else {
-          // Removing from explicit opt-out list
-          const { error: deleteError } = await supabase
-            .from('optout')
-            .delete()
-            .eq('user_id', user.id)
-
-          if (deleteError) throw deleteError
-
-          // Update opt-in table if exists
-          await supabase
-            .from('optin')
-            .update({ explicit_optout: false })
-            .eq('user_id', user.id)
-
-          setOptOutStatus(false)
-          setSuccess('Removed from explicit opt-out list')
         }
+        setSuccess(checked ? 'Added to explicit opt-out list' : 'Removed from explicit opt-out list')
         
         router.refresh()
       } catch (err: any) {
         setError(err.message || 'Failed to update opt-out status')
-        setOptOutStatus(!checked) // Revert on error
+        setExplicitOptOut(!checked) // Revert on error
       }
     })
   }
@@ -212,9 +171,9 @@ export default function ProfileContent({
                 </div>
                 <Switch
                   id="opt-in"
-                  checked={optInStatus && !optOutStatus}
+                  checked={optInStatus && !explicitOptOut}
                   onCheckedChange={handleOptInToggle}
-                  disabled={isPending || optOutStatus}
+                  disabled={isPending || explicitOptOut}
                 />
               </div>
 
@@ -230,14 +189,14 @@ export default function ProfileContent({
                 </div>
                 <Switch
                   id="opt-out"
-                  checked={optOutStatus}
+                  checked={explicitOptOut}
                   onCheckedChange={handleExplicitOptOut}
                   disabled={isPending}
                   className="data-[state=checked]:bg-destructive"
                 />
               </div>
 
-              {optOutStatus && (
+              {explicitOptOut && (
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
@@ -247,7 +206,7 @@ export default function ProfileContent({
                 </Alert>
               )}
 
-              {optInStatus && !optOutStatus && (
+              {optInStatus && !explicitOptOut && (
                 <Alert>
                   <CheckCircle className="h-4 w-4 text-green-600" />
                   <AlertDescription>

@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.2 (db9da0b)"
+  }
   dev: {
     Tables: {
       [_ in never]: never
@@ -16,140 +21,87 @@ export type Database = {
     }
     Functions: {
       apply_dev_entities_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
+        Args: { schema_name: string; table_name: string }
         Returns: undefined
       }
       apply_dev_liked_tweets_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
+        Args: { schema_name: string; table_name: string }
         Returns: undefined
       }
       apply_dev_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
+        Args: { schema_name: string; table_name: string }
         Returns: undefined
       }
       commit_temp_data: {
-        Args: {
-          p_suffix: string
-        }
+        Args: { p_suffix: string }
         Returns: undefined
       }
       create_temp_tables: {
-        Args: {
-          p_suffix: string
-        }
+        Args: { p_suffix: string }
         Returns: undefined
       }
       delete_all_archives: {
-        Args: {
-          p_account_id: string
-        }
+        Args: { p_account_id: string }
         Returns: undefined
       }
       drop_function_if_exists: {
-        Args: {
-          function_name: string
-          function_args: string[]
-        }
+        Args: { function_args: string[]; function_name: string }
         Returns: undefined
       }
       drop_temp_tables: {
-        Args: {
-          p_suffix: string
-        }
+        Args: { p_suffix: string }
         Returns: undefined
       }
       get_top_accounts_with_followers: {
-        Args: {
-          limit_count: number
-        }
+        Args: { limit_count: number }
         Returns: {
-          account_id: string
-          created_via: string
-          username: string
-          created_at: string
           account_display_name: string
+          account_id: string
           avatar_media_url: string
           bio: string
-          website: string
-          location: string
-          header_media_url: string
+          created_at: string
+          created_via: string
           follower_count: number
+          header_media_url: string
+          location: string
+          username: string
+          website: string
         }[]
       }
       insert_temp_account: {
-        Args: {
-          p_account: Json
-          p_suffix: string
-        }
+        Args: { p_account: Json; p_suffix: string }
         Returns: undefined
       }
       insert_temp_archive_upload: {
-        Args: {
-          p_account_id: string
-          p_archive_at: string
-          p_suffix: string
-        }
+        Args: { p_account_id: string; p_archive_at: string; p_suffix: string }
         Returns: number
       }
       insert_temp_followers: {
-        Args: {
-          p_followers: Json
-          p_account_id: string
-          p_suffix: string
-        }
+        Args: { p_account_id: string; p_followers: Json; p_suffix: string }
         Returns: undefined
       }
       insert_temp_following: {
-        Args: {
-          p_following: Json
-          p_account_id: string
-          p_suffix: string
-        }
+        Args: { p_account_id: string; p_following: Json; p_suffix: string }
         Returns: undefined
       }
       insert_temp_likes: {
-        Args: {
-          p_likes: Json
-          p_account_id: string
-          p_suffix: string
-        }
+        Args: { p_account_id: string; p_likes: Json; p_suffix: string }
         Returns: undefined
       }
       insert_temp_profiles: {
-        Args: {
-          p_profile: Json
-          p_account_id: string
-          p_suffix: string
-        }
+        Args: { p_account_id: string; p_profile: Json; p_suffix: string }
         Returns: undefined
       }
       insert_temp_tweets: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
+        Args: { p_suffix: string; p_tweets: Json }
         Returns: undefined
       }
       process_and_insert_tweet_entities: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
+        Args: { p_suffix: string; p_tweets: Json }
         Returns: undefined
       }
       process_archive: {
-        Args: {
-          archive_data: Json
-        }
+        Args: { archive_data: Json }
         Returns: undefined
       }
     }
@@ -609,39 +561,15 @@ export type Database = {
         }
         Relationships: []
       }
-      temporary_data: {
+      scraper_count: {
         Row: {
-          data: Json
-          id: number
-          inserted: string | null
-          item_id: string
-          originator_id: string
-          stored: boolean | null
-          timestamp: string
-          type: string
-          user_id: string
+          count: number | null
         }
         Insert: {
-          data: Json
-          id?: never
-          inserted?: string | null
-          item_id: string
-          originator_id: string
-          stored?: boolean | null
-          timestamp?: string
-          type: string
-          user_id?: string
+          count?: number | null
         }
         Update: {
-          data?: Json
-          id?: never
-          inserted?: string | null
-          item_id?: string
-          originator_id?: string
-          stored?: boolean | null
-          timestamp?: string
-          type?: string
-          user_id?: string
+          count?: number | null
         }
         Relationships: []
       }
@@ -913,7 +841,6 @@ export type Database = {
           num_following: number | null
           num_likes: number | null
           num_tweets: number | null
-          updated_at: string | null
           username: string | null
         }
         Relationships: []
@@ -994,6 +921,50 @@ export type Database = {
           total_user_mentions: number | null
         }
         Relationships: []
+      }
+      global_monthly_tweet_counts: {
+        Row: {
+          active_accounts: number | null
+          avg_tweets_per_account: number | null
+          month: string | null
+          total_tweets: number | null
+        }
+        Relationships: []
+      }
+      monthly_tweet_counts_mv: {
+        Row: {
+          account_id: string | null
+          avg_favorites: number | null
+          avg_retweets: number | null
+          days_active: number | null
+          max_favorites: number | null
+          max_retweets: number | null
+          month: string | null
+          tweet_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tweets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "tweets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account_activity_summary"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "tweets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "all_account"
+            referencedColumns: ["account_id"]
+          },
+        ]
       }
       profile: {
         Row: {
@@ -1108,220 +1079,178 @@ export type Database = {
     }
     Functions: {
       apply_public_entities_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
+        Args: { schema_name: string; table_name: string }
         Returns: undefined
       }
       apply_public_liked_tweets_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
+        Args: { schema_name: string; table_name: string }
         Returns: undefined
       }
       apply_public_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
+        Args: { schema_name: string; table_name: string }
         Returns: undefined
       }
       apply_public_rls_policies_not_private: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
+        Args: { schema_name: string; table_name: string }
         Returns: undefined
       }
       apply_readonly_rls_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
+        Args: { schema_name: string; table_name: string }
         Returns: undefined
       }
       commit_temp_data: {
-        Args: {
-          p_suffix: string
-        }
+        Args: { p_suffix: string }
         Returns: undefined
       }
       compute_hourly_scraping_stats: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
+        Args: { p_end_date: string; p_start_date: string }
         Returns: {
-          period_start: string
           period_end: string
+          period_start: string
           tweet_count: number
           unique_scrapers: number
         }[]
       }
       create_temp_tables: {
-        Args: {
-          p_suffix: string
-        }
+        Args: { p_suffix: string }
         Returns: undefined
       }
+      delete_tweets: {
+        Args: { p_tweet_ids: string[] }
+        Returns: {
+          deleted_conversations: number
+          deleted_private_tweet_user: number
+          deleted_tweet_media: number
+          deleted_tweet_urls: number
+          deleted_tweets: number
+          deleted_user_mentions: number
+        }[]
+      }
       delete_user_archive: {
-        Args: {
-          p_account_id: string
-        }
+        Args: { p_account_id: string }
         Returns: undefined
       }
       drop_all_policies: {
-        Args: {
-          schema_name: string
-          table_name: string
-        }
+        Args: { schema_name: string; table_name: string }
         Returns: undefined
       }
       drop_temp_tables: {
-        Args: {
-          p_suffix: string
-        }
+        Args: { p_suffix: string }
         Returns: undefined
       }
       get_account_most_liked_tweets_archive_users: {
-        Args: {
-          username_: string
-          limit_?: number
-        }
+        Args: { limit_?: number; username_: string }
         Returns: {
-          tweet_id: string
           account_id: string
+          archive_upload_id: number
           created_at: string
-          full_text: string
-          retweet_count: number
           favorite_count: number
+          full_text: string
+          num_likes: number
           reply_to_tweet_id: string
           reply_to_user_id: string
           reply_to_username: string
-          archive_upload_id: number
-          num_likes: number
+          retweet_count: number
+          tweet_id: string
         }[]
       }
       get_account_most_mentioned_accounts: {
-        Args: {
-          username_: string
-          limit_: number
-        }
+        Args: { limit_: number; username_: string }
         Returns: {
-          user_id: string
+          mention_count: number
           name: string
           screen_name: string
-          mention_count: number
+          user_id: string
         }[]
       }
       get_account_most_replied_tweets_by_archive_users: {
-        Args: {
-          username_: string
-          limit_: number
-        }
+        Args: { limit_: number; username_: string }
         Returns: {
-          tweet_id: string
           account_id: string
+          archive_upload_id: number
           created_at: string
-          full_text: string
-          retweet_count: number
           favorite_count: number
+          full_text: string
+          num_replies: number
           reply_to_tweet_id: string
           reply_to_user_id: string
           reply_to_username: string
-          archive_upload_id: number
-          num_replies: number
+          retweet_count: number
+          tweet_id: string
         }[]
       }
       get_account_top_favorite_count_tweets: {
-        Args: {
-          username_: string
-          limit_: number
-        }
+        Args: { limit_: number; username_: string }
         Returns: {
-          tweet_id: string
           account_id: string
+          archive_upload_id: number
           created_at: string
-          full_text: string
-          retweet_count: number
           favorite_count: number
+          full_text: string
           reply_to_tweet_id: string
           reply_to_user_id: string
           reply_to_username: string
-          archive_upload_id: number
+          retweet_count: number
+          tweet_id: string
         }[]
       }
       get_account_top_retweet_count_tweets: {
-        Args: {
-          username_: string
-          limit_: number
-        }
+        Args: { limit_: number; username_: string }
         Returns: {
-          tweet_id: string
           account_id: string
+          archive_upload_id: number
           created_at: string
-          full_text: string
-          retweet_count: number
           favorite_count: number
+          full_text: string
           reply_to_tweet_id: string
           reply_to_user_id: string
           reply_to_username: string
-          archive_upload_id: number
+          retweet_count: number
+          tweet_id: string
         }[]
       }
       get_hourly_scraping_stats: {
-        Args: {
-          p_hours_back?: number
-        }
+        Args: { p_hours_back?: number }
         Returns: {
-          period_start: string
           period_end: string
+          period_start: string
           tweet_count: number
           unique_scrapers: number
         }[]
       }
       get_hourly_stats_simple: {
-        Args: {
-          p_hours_back?: number
-        }
+        Args: { p_hours_back?: number }
         Returns: {
           period_start: string
           tweet_count: number
         }[]
       }
       get_latest_tweets: {
-        Args: {
-          count: number
-          p_account_id?: string
-        }
+        Args: { count: number; p_account_id?: string }
         Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          reply_to_tweet_id: string
-          avatar_media_url: string
-          username: string
           account_display_name: string
+          account_id: string
+          avatar_media_url: string
+          created_at: string
+          favorite_count: number
+          full_text: string
+          reply_to_tweet_id: string
+          retweet_count: number
+          tweet_id: string
+          username: string
         }[]
       }
       get_main_thread: {
-        Args: {
-          p_conversation_id: string
-        }
+        Args: { p_conversation_id: string }
         Returns: {
-          tweet_id: string
-          conversation_id: string
-          reply_to_tweet_id: string
           account_id: string
+          conversation_id: string
           depth: number
-          max_depth: number
           favorite_count: number
+          max_depth: number
+          reply_to_tweet_id: string
           retweet_count: number
+          tweet_id: string
         }[]
       }
       get_monthly_tweet_counts: {
@@ -1331,380 +1260,302 @@ export type Database = {
           tweet_count: number
         }[]
       }
-      get_most_liked_tweets_by_username: {
+      get_monthly_tweet_counts_fast: {
         Args: {
-          username_: string
+          p_account_id?: string
+          p_end_date?: string
+          p_start_date?: string
         }
         Returns: {
-          tweet_id: string
+          account_id: string
+          avg_favorites: number
+          avg_retweets: number
+          days_active: number
+          month: string
+          tweet_count: number
+        }[]
+      }
+      get_most_liked_tweets_by_username: {
+        Args: { username_: string }
+        Returns: {
           full_text: string
           num_likes: number
+          tweet_id: string
         }[]
       }
       get_most_mentioned_accounts_by_username: {
-        Args: {
-          username_: string
-        }
+        Args: { username_: string }
         Returns: {
+          mention_count: number
           mentioned_user_id: string
           mentioned_username: string
-          mention_count: number
         }[]
       }
       get_scraper_counts_by_granularity: {
-        Args: {
-          start_date: string
-          end_date: string
-          granularity: string
-        }
+        Args: { end_date: string; granularity: string; start_date: string }
         Returns: {
           scraper_date: string
           unique_scrapers: number
         }[]
       }
       get_simple_streamed_tweet_counts: {
-        Args: {
-          start_date: string
-          end_date: string
-          granularity: string
-        }
+        Args: { end_date: string; granularity: string; start_date: string }
         Returns: {
-          tweet_date: string
           tweet_count: number
+          tweet_date: string
         }[]
       }
       get_streaming_stats: {
         Args: {
-          p_start_date: string
           p_end_date: string
           p_granularity?: string
+          p_start_date: string
           p_streamed_only?: boolean
         }
         Returns: {
-          period_start: string
           period_end: string
+          period_start: string
           tweet_count: number
           unique_scrapers: number
         }[]
       }
       get_streaming_stats_daily: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
+        Args: { p_end_date: string; p_start_date: string }
         Returns: {
-          period_start: string
           period_end: string
+          period_start: string
           tweet_count: number
           unique_scrapers: number
         }[]
       }
       get_streaming_stats_daily_streamed_only: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
+        Args: { p_end_date: string; p_start_date: string }
         Returns: {
-          period_start: string
           period_end: string
+          period_start: string
           tweet_count: number
           unique_scrapers: number
         }[]
       }
       get_streaming_stats_hourly: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
+        Args: { p_end_date: string; p_start_date: string }
         Returns: {
-          period_start: string
           period_end: string
+          period_start: string
           tweet_count: number
           unique_scrapers: number
         }[]
       }
       get_streaming_stats_hourly_streamed_only: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
+        Args: { p_end_date: string; p_start_date: string }
         Returns: {
-          period_start: string
           period_end: string
+          period_start: string
           tweet_count: number
           unique_scrapers: number
         }[]
       }
       get_streaming_stats_weekly: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
+        Args: { p_end_date: string; p_start_date: string }
         Returns: {
-          period_start: string
           period_end: string
+          period_start: string
           tweet_count: number
           unique_scrapers: number
         }[]
       }
       get_streaming_stats_weekly_streamed_only: {
-        Args: {
-          p_start_date: string
-          p_end_date: string
-        }
+        Args: { p_end_date: string; p_start_date: string }
         Returns: {
-          period_start: string
           period_end: string
+          period_start: string
           tweet_count: number
           unique_scrapers: number
         }[]
       }
       get_top_accounts_with_followers: {
-        Args: {
-          limit_count: number
-        }
+        Args: { limit_count: number }
         Returns: {
-          account_id: string
-          created_via: string
-          username: string
-          created_at: string
           account_display_name: string
+          account_id: string
           avatar_media_url: string
           bio: string
-          website: string
-          location: string
+          created_at: string
+          created_via: string
           header_media_url: string
+          location: string
           num_followers: number
           num_tweets: number
+          username: string
+          website: string
         }[]
       }
       get_top_liked_users: {
         Args: Record<PropertyKey, never>
         Returns: {
-          tweet_id: string
           full_text: string
           like_count: number
           reply_to_tweet_id: string
           reply_to_user_id: string
           reply_to_username: string
+          tweet_id: string
         }[]
       }
       get_top_mentioned_users: {
-        Args: {
-          limit_: number
-        }
+        Args: { limit_: number }
         Returns: {
-          user_id: string
+          mention_count: number
           name: string
           screen_name: string
-          mention_count: number
+          user_id: string
         }[]
       }
       get_top_retweeted_tweets_by_username: {
-        Args: {
-          username_: string
-          limit_: number
-        }
+        Args: { limit_: number; username_: string }
         Returns: {
-          tweet_id: string
           account_id: string
+          archive_upload_id: number
           created_at: string
-          full_text: string
-          retweet_count: number
           favorite_count: number
+          full_text: string
           reply_to_tweet_id: string
           reply_to_user_id: string
           reply_to_username: string
-          archive_upload_id: number
+          retweet_count: number
+          tweet_id: string
         }[]
       }
-      get_tweet_count_by_date:
-        | {
-            Args: {
-              start_date: string
-              end_date: string
-            }
-            Returns: {
-              tweet_date: string
-              tweet_count: number
-            }[]
-          }
-        | {
-            Args: {
-              start_date: string
-              end_date: string
-              granularity: string
-            }
-            Returns: {
-              tweet_date: string
-              tweet_count: number
-            }[]
-          }
-      get_tweet_counts_by_granularity: {
-        Args: {
-          start_date: string
-          end_date: string
-          granularity: string
-        }
+      get_trending_tweets: {
+        Args: { hours_back?: number; limit_count?: number }
         Returns: {
-          tweet_date: string
+          account_id: string
+          created_at: string
+          engagement_score: number
+          favorite_count: number
+          full_text: string
+          retweet_count: number
+          tweet_id: string
+        }[]
+      }
+      get_tweet_count_by_date: {
+        Args:
+          | { end_date: string; granularity: string; start_date: string }
+          | { end_date: string; start_date: string }
+        Returns: {
           tweet_count: number
+          tweet_date: string
+        }[]
+      }
+      get_tweet_counts_by_granularity: {
+        Args: { end_date: string; granularity: string; start_date: string }
+        Returns: {
+          tweet_count: number
+          tweet_date: string
         }[]
       }
       get_unique_scraper_count: {
-        Args: {
-          start_date: string
-          end_date: string
-        }
+        Args: { end_date: string; start_date: string }
         Returns: number
       }
       gtrgm_compress: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       gtrgm_decompress: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       gtrgm_in: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       gtrgm_options: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: undefined
       }
       gtrgm_out: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       insert_temp_account: {
-        Args: {
-          p_account: Json
-          p_suffix: string
-        }
+        Args: { p_account: Json; p_suffix: string }
         Returns: undefined
       }
       insert_temp_archive_upload: {
         Args: {
           p_account_id: string
           p_archive_at: string
-          p_keep_private: boolean
-          p_upload_likes: boolean
-          p_start_date: string
           p_end_date: string
+          p_keep_private: boolean
+          p_start_date: string
           p_suffix: string
+          p_upload_likes: boolean
         }
         Returns: number
       }
       insert_temp_followers: {
-        Args: {
-          p_followers: Json
-          p_account_id: string
-          p_suffix: string
-        }
+        Args: { p_account_id: string; p_followers: Json; p_suffix: string }
         Returns: undefined
       }
       insert_temp_following: {
-        Args: {
-          p_following: Json
-          p_account_id: string
-          p_suffix: string
-        }
+        Args: { p_account_id: string; p_following: Json; p_suffix: string }
         Returns: undefined
       }
       insert_temp_likes: {
-        Args: {
-          p_likes: Json
-          p_account_id: string
-          p_suffix: string
-        }
+        Args: { p_account_id: string; p_likes: Json; p_suffix: string }
         Returns: undefined
       }
       insert_temp_profiles: {
-        Args: {
-          p_profile: Json
-          p_account_id: string
-          p_suffix: string
-        }
+        Args: { p_account_id: string; p_profile: Json; p_suffix: string }
         Returns: undefined
       }
       insert_temp_tweets: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
+        Args: { p_suffix: string; p_tweets: Json }
         Returns: undefined
       }
-      pg_search_tweets: {
-        Args: {
-          search_query: string
-          p_account_id?: string
-        }
-        Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          username: string
-          account_display_name: string
-          avatar_media_url: string
-        }[]
-      }
       process_and_insert_tweet_entities: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
+        Args: { p_suffix: string; p_tweets: Json }
         Returns: undefined
       }
       process_archive: {
-        Args: {
-          archive_data: Json
-        }
+        Args: { archive_data: Json }
         Returns: undefined
       }
       search_tweets: {
-        Args: {
-          search_query: string
-          from_user?: string
-          to_user?: string
-          since_date?: string
-          until_date?: string
-          limit_?: number
-          offset_?: number
-        }
+        Args:
+          | {
+              account_filter?: string
+              date_from?: string
+              date_to?: string
+              limit_count?: number
+              search_query: string
+            }
+          | {
+              from_user?: string
+              limit_?: number
+              offset_?: number
+              search_query: string
+              since_date?: string
+              to_user?: string
+              until_date?: string
+            }
         Returns: {
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          retweet_count: number
-          favorite_count: number
-          reply_to_tweet_id: string
-          avatar_media_url: string
-          archive_upload_id: number
-          username: string
           account_display_name: string
+          account_id: string
+          archive_upload_id: number
+          avatar_media_url: string
+          created_at: string
+          favorite_count: number
+          full_text: string
           media: Json
+          reply_to_tweet_id: string
+          retweet_count: number
+          tweet_id: string
+          username: string
         }[]
       }
       set_limit: {
-        Args: {
-          "": number
-        }
+        Args: { "": number }
         Returns: number
       }
       show_limit: {
@@ -1712,24 +1563,22 @@ export type Database = {
         Returns: number
       }
       show_trgm: {
-        Args: {
-          "": string
-        }
+        Args: { "": string }
         Returns: string[]
       }
       update_foreign_keys: {
         Args: {
-          old_table_name: string
           new_table_name: string
+          old_table_name: string
           schema_name: string
         }
         Returns: undefined
       }
       word_occurrences: {
         Args: {
+          end_date?: string
           search_word: string
           start_date?: string
-          end_date?: string
           user_ids?: string[]
         }
         Returns: {
@@ -1752,27 +1601,33 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
-  PublicTableNameOrOptions extends
-    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-        Database[PublicTableNameOrOptions["schema"]]["Views"])
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-        PublicSchema["Views"])
-    ? (PublicSchema["Tables"] &
-        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -1780,20 +1635,24 @@ export type Tables<
     : never
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -1801,20 +1660,24 @@ export type TablesInsert<
     : never
 
 export type TablesUpdate<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -1822,30 +1685,52 @@ export type TablesUpdate<
     : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends
-    | keyof PublicSchema["Enums"]
-    | { schema: keyof Database },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof PublicSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
-    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
+export const Constants = {
+  dev: {
+    Enums: {},
+  },
+  public: {
+    Enums: {
+      upload_phase_enum: [
+        "uploading",
+        "ready_for_commit",
+        "committing",
+        "completed",
+        "failed",
+      ],
+    },
+  },
+} as const

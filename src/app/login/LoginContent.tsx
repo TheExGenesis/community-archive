@@ -1,6 +1,7 @@
 'use client'
 
 import SignIn from '@/components/SignIn'
+import DevSignIn from '@/components/DevSignIn'
 
 interface LoginContentProps {
   redirectUrl?: string
@@ -28,17 +29,8 @@ export default function LoginContent({ redirectUrl }: LoginContentProps) {
           <div className="space-y-6">
             <SignIn />
             
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                <h3 className="text-sm font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-                  Development Mode
-                </h3>
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  In development mode, you can sign in with a mock account for testing purposes.
-                  This will not work in production.
-                </p>
-              </div>
-            )}
+            {/* Developer sign in option - always available in dev mode */}
+            <DevSignIn redirectUrl={redirectUrl} />
           </div>
         </div>
       </div>

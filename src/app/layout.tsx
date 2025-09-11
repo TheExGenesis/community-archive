@@ -15,6 +15,10 @@ const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
   ssr: false,
 })
 
+const DynamicQuickDevLogin = dynamic(() => import('@/components/QuickDevLogin'), {
+  ssr: false,
+})
+
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
   : 'http://localhost:3000'
@@ -65,6 +69,7 @@ export default function RootLayout({
               {children}
               <Analytics />
             </main>
+            <DynamicQuickDevLogin />
             <ReactQueryDevtools initialIsOpen={false} />
           </ReactQueryProvider>
         </ThemeProvider>

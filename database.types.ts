@@ -871,6 +871,7 @@ export type Database = {
           username: string
           twitter_user_id: string | null
           opted_in: boolean
+          explicit_optout: boolean
           terms_version: string
           created_at: string
           updated_at: string
@@ -883,6 +884,7 @@ export type Database = {
           username: string
           twitter_user_id?: string | null
           opted_in?: boolean
+          explicit_optout?: boolean
           terms_version?: string
           created_at?: string
           updated_at?: string
@@ -895,6 +897,7 @@ export type Database = {
           username?: string
           twitter_user_id?: string | null
           opted_in?: boolean
+          explicit_optout?: boolean
           terms_version?: string
           created_at?: string
           updated_at?: string
@@ -904,6 +907,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "optin_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      optout: {
+        Row: {
+          id: string
+          user_id: string | null
+          username: string
+          twitter_user_id: string | null
+          opted_out: boolean
+          reason: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          username: string
+          twitter_user_id?: string | null
+          opted_out?: boolean
+          reason?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          username?: string
+          twitter_user_id?: string | null
+          opted_out?: boolean
+          reason?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "optout_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"

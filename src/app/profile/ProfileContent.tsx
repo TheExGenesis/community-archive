@@ -40,18 +40,39 @@ export default function ProfileContent({
     
     startTransition(async () => {
       try {
-        // Create or update opt-in record
-        const { error: optInError } = await supabase
+        // Check if record exists first
+        const { data: existingRecord } = await supabase
           .from('optin')
-          .upsert({
-            user_id: user.id,
-            username: user.email?.split('@')[0] || 'unknown',
-            opted_in: checked,
-            explicit_optout: false,
-            opt_out_reason: null
-          })
+          .select('id')
+          .eq('user_id', user.id)
+          .single()
 
-        if (optInError) throw optInError
+        if (existingRecord) {
+          // Update existing record
+          const { error: updateError } = await supabase
+            .from('optin')
+            .update({
+              opted_in: checked,
+              explicit_optout: false,
+              opt_out_reason: null
+            })
+            .eq('user_id', user.id)
+
+          if (updateError) throw updateError
+        } else {
+          // Insert new record
+          const { error: insertError } = await supabase
+            .from('optin')
+            .insert({
+              user_id: user.id,
+              username: user.email?.split('@')[0] || 'unknown',
+              opted_in: checked,
+              explicit_optout: false,
+              opt_out_reason: null
+            })
+
+          if (insertError) throw insertError
+        }
         
         setOptInStatus(checked)
         setExplicitOptOut(false)
@@ -71,18 +92,39 @@ export default function ProfileContent({
     
     startTransition(async () => {
       try {
-        // Update opt-in table with explicit opt-out status
-        const { error: updateError } = await supabase
+        // Check if record exists first
+        const { data: existingRecord } = await supabase
           .from('optin')
-          .upsert({
-            user_id: user.id,
-            username: user.email?.split('@')[0] || 'unknown',
-            opted_in: false,
-            explicit_optout: checked,
-            opt_out_reason: checked ? 'User explicitly opted out via profile settings' : null
-          })
+          .select('id')
+          .eq('user_id', user.id)
+          .single()
 
-        if (updateError) throw updateError
+        if (existingRecord) {
+          // Update existing record
+          const { error: updateError } = await supabase
+            .from('optin')
+            .update({
+              opted_in: false,
+              explicit_optout: checked,
+              opt_out_reason: checked ? 'User explicitly opted out via profile settings' : null
+            })
+            .eq('user_id', user.id)
+
+          if (updateError) throw updateError
+        } else {
+          // Insert new record
+          const { error: insertError } = await supabase
+            .from('optin')
+            .insert({
+              user_id: user.id,
+              username: user.email?.split('@')[0] || 'unknown',
+              opted_in: false,
+              explicit_optout: checked,
+              opt_out_reason: checked ? 'User explicitly opted out via profile settings' : null
+            })
+
+          if (insertError) throw insertError
+        }
 
         setExplicitOptOut(checked)
         if (checked) {

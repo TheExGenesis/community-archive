@@ -1,22 +1,22 @@
 DROP VIEW IF EXISTS public.enriched_tweets;
 DROP MATERIALIZED VIEW IF EXISTS public.quote_tweets;
 
---- Create table for Quote Tweets  stores relationships between tweets and their quoted tweets
+-- Create table for Quote Tweets - stores relationships between tweets and their quoted tweets
 CREATE TABLE IF NOT EXISTS public.quote_tweets (
     tweet_id TEXT NOT NULL,
     quoted_tweet_id TEXT NOT NULL,
-
-     Composite primary key
+    
+    -- Composite primary key
     PRIMARY KEY (tweet_id, quoted_tweet_id),
-
-     Foreign key constraints
+    
+    -- Foreign key constraints
     CONSTRAINT fk_quote_tweets_tweet_id FOREIGN KEY (tweet_id) REFERENCES public.tweets (tweet_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS public.retweets (
     tweet_id TEXT NOT NULL PRIMARY KEY,
     retweeted_tweet_id TEXT NULL,
-
+       
     CONSTRAINT fk_retweets_tweet_id FOREIGN KEY (tweet_id) REFERENCES public.tweets (tweet_id) ON DELETE CASCADE,
     CONSTRAINT fk_retweets_retweeted_tweet_id FOREIGN KEY (retweeted_tweet_id) REFERENCES public.tweets (tweet_id) ON DELETE SET NULL
 );
@@ -37,7 +37,7 @@ COMMENT ON COLUMN public.retweets.retweeted_tweet_id IS 'The ID of the original 
 
 
 CREATE OR REPLACE VIEW public.enriched_tweets AS
-SELECT
+SELECT 
     t.tweet_id,
     t.account_id,
     a.username,
@@ -63,10 +63,10 @@ LEFT JOIN LATERAL (
     WHERE all_profile.account_id = t.account_id
     ORDER BY archive_upload_id DESC
     LIMIT 1
-) p ON true;
+) p ON true; 
 
 
---- Create a temporary table to batch process the data
+-- Create a temporary table to batch process the data
 CREATE TEMP TABLE temp_quote_tweets AS
 SELECT
   DISTINCT
@@ -74,7 +74,7 @@ SELECT
   SUBSTRING(
     tu.expanded_url
     FROM
-      'status/([09]+)'
+      'status/([0-9]+)'
   ) AS quoted_tweet_id
 FROM
   public.tweet_urls tu
@@ -82,16 +82,16 @@ FROM
 WHERE
   (tu.expanded_url LIKE '%twitter.com/%/status/%'
   OR tu.expanded_url LIKE '%x.com/%/status/%')
-  AND tu.expanded_url ~ 'status/[09]+(/|$|\?)';
+  AND tu.expanded_url ~ 'status/[0-9]+(/|$|\?)';
 
---- Create index on temp table for better performance
+-- Create index on temp table for better performance
 CREATE INDEX ON temp_quote_tweets (tweet_id, quoted_tweet_id);
 
---- Insert in batches to avoid memory issues
+-- Insert in batches to avoid memory issues
 INSERT INTO public.quote_tweets (tweet_id, quoted_tweet_id)
 SELECT tweet_id, quoted_tweet_id
 FROM temp_quote_tweets
 WHERE quoted_tweet_id IS NOT NULL;
 
---- Clean up temp table
+-- Clean up temp table
 DROP TABLE temp_quote_tweets;

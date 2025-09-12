@@ -1,1 +1,1 @@
-{"message":"No API key found in request","hint":"No `apikey` request header or url param was found."}
+{"message":"Invalid API key","hint":"Double check your Supabase `anon` or `service_role` API key."}

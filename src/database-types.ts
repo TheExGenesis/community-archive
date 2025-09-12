@@ -772,13 +772,6 @@ export type Database = {
             foreignKeyName: "conversations_tweet_id_fkey"
             columns: ["tweet_id"]
             isOneToOne: true
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "conversations_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: true
             referencedRelation: "tweets"
             referencedColumns: ["tweet_id"]
           },
@@ -1098,13 +1091,6 @@ export type Database = {
             foreignKeyName: "fk_quote_tweets_tweet_id"
             columns: ["tweet_id"]
             isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "fk_quote_tweets_tweet_id"
-            columns: ["tweet_id"]
-            isOneToOne: false
             referencedRelation: "tweets"
             referencedColumns: ["tweet_id"]
           },
@@ -1159,13 +1145,6 @@ export type Database = {
             foreignKeyName: "fk_retweets_retweeted_tweet_id"
             columns: ["retweeted_tweet_id"]
             isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "fk_retweets_retweeted_tweet_id"
-            columns: ["retweeted_tweet_id"]
-            isOneToOne: false
             referencedRelation: "tweets"
             referencedColumns: ["tweet_id"]
           },
@@ -1174,13 +1153,6 @@ export type Database = {
             columns: ["retweeted_tweet_id"]
             isOneToOne: false
             referencedRelation: "tweets_w_conversation_id"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "fk_retweets_tweet_id"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "enriched_tweets"
             referencedColumns: ["tweet_id"]
           },
           {
@@ -1239,13 +1211,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "all_account"
             referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "signal_boosts_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
           },
           {
             foreignKeyName: "signal_boosts_tweet_id_fkey"
@@ -1378,13 +1343,6 @@ export type Database = {
             foreignKeyName: "tweet_media_tweet_id_fkey"
             columns: ["tweet_id"]
             isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_media_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
             referencedRelation: "tweets"
             referencedColumns: ["tweet_id"]
           },
@@ -1438,13 +1396,6 @@ export type Database = {
           url?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "tweet_urls_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
           {
             foreignKeyName: "tweet_urls_tweet_id_fkey"
             columns: ["tweet_id"]
@@ -1581,13 +1532,6 @@ export type Database = {
             foreignKeyName: "user_mentions_tweet_id_fkey"
             columns: ["tweet_id"]
             isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "user_mentions_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
             referencedRelation: "tweets"
             referencedColumns: ["tweet_id"]
           },
@@ -1630,55 +1574,6 @@ export type Database = {
           username: string | null
         }
         Relationships: []
-      }
-      enriched_tweets: {
-        Row: {
-          account_display_name: string | null
-          account_id: string | null
-          archive_upload_id: number | null
-          avatar_media_url: string | null
-          conversation_id: string | null
-          created_at: string | null
-          favorite_count: number | null
-          full_text: string | null
-          quoted_tweet_id: string | null
-          reply_to_tweet_id: string | null
-          reply_to_user_id: string | null
-          reply_to_username: string | null
-          retweet_count: number | null
-          tweet_id: string | null
-          username: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account_activity_summary"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "tweets_archive_upload_id_fkey"
-            columns: ["archive_upload_id"]
-            isOneToOne: false
-            referencedRelation: "archive_upload"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       global_activity_summary: {
         Row: {

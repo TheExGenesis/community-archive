@@ -1,5 +1,5 @@
 DROP VIEW IF EXISTS public.enriched_tweets;
-DROP MATERIALIZED VIEW IF EXISTS public.quote_tweets;
+DROP VIEW IF EXISTS public.quote_tweets;
 
 -- Create table for Quote Tweets - stores relationships between tweets and their quoted tweets
 CREATE TABLE IF NOT EXISTS public.quote_tweets (

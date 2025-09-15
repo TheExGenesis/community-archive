@@ -1540,18 +1540,13 @@ export type Database = {
               until_date?: string
             }
         Returns: {
-          account_display_name: string
           account_id: string
-          archive_upload_id: number
-          avatar_media_url: string
           created_at: string
           favorite_count: number
           full_text: string
-          media: Json
-          reply_to_tweet_id: string
+          relevance: number
           retweet_count: number
           tweet_id: string
-          username: string
         }[]
       }
       set_limit: {

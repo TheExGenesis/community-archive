@@ -24,9 +24,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-**Node.js Version Requirement:**
-- Requires Node.js >= v18.17.0 (Next.js requirement)
+**CRITICAL: Node.js Version Requirement:**
+- **MUST use Node.js >= v18.17.0** (Next.js 14 strict requirement)
+- **ALWAYS verify Node version before running builds** - `pnpm build` will fail with older versions
+- **Automatic switching:** Project has `.nvmrc` file - if you have auto-switching enabled, it will use Node v20 automatically
 - If using older version, switch with NVM: `export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && nvm use 20`
+- **System configured:** NVM default is now set to Node v20, shell profile updated for auto-switching
 
 **Build & Development:**
 - `pnpm dev` - Start development server with local database

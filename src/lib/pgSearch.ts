@@ -164,12 +164,15 @@ export interface SearchTweetRpcResponseItem {
   full_text: string;
   retweet_count: number;
   favorite_count: number;
-  reply_to_tweet_id: string | null;
-  avatar_media_url: string | null;
-  archive_upload_id: number;
-  username: string;
-  account_display_name: string;
-  media: TweetMediaItem[] | null;
+  // Some deployments return a minimal shape; make enrichments optional
+  reply_to_tweet_id?: string | null;
+  avatar_media_url?: string | null;
+  archive_upload_id?: number | null;
+  username?: string | null;
+  account_display_name?: string | null;
+  media?: TweetMediaItem[] | null;
+  // Ranking score on some search implementations
+  relevance?: number;
 }
 
 export async function searchTweets(
@@ -199,5 +202,6 @@ export async function searchTweets(
     return [];
   }
 
+  // Aligns with generated types that may return a minimal shape; enriched fields are optional
   return data as SearchTweetRpcResponseItem[];
 }

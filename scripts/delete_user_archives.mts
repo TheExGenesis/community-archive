@@ -34,13 +34,7 @@ const supabase = createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
 })
 
 const usernamesToDelete = [
-  'z_nightwind',
-  'tasshinfogleman',
-  'myceliummage',
-  'gptbrooke',
-  'connerdelights',
-  'AndreiKlepatch',
-  '__loofah',
+
 ]
 
 const deleteUserArchive = async (
@@ -85,7 +79,7 @@ const deleteUserArchive = async (
 async function main() {
   console.log('Starting deletion process for user archives...')
   for (const username of usernamesToDelete) {
-    await deleteUserArchive(supabase, username)
+    await deleteUserArchive(supabase, username.toLowerCase())
   }
   console.log('Finished deletion process.')
 }

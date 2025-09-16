@@ -817,6 +817,20 @@ export type Database = {
             foreignKeyName: "user_mentions_tweet_id_fkey"
             columns: ["tweet_id"]
             isOneToOne: false
+            referencedRelation: "enriched_tweets"
+            referencedColumns: ["tweet_id"]
+          },
+          {
+            foreignKeyName: "user_mentions_tweet_id_fkey"
+            columns: ["tweet_id"]
+            isOneToOne: false
+            referencedRelation: "quote_tweets"
+            referencedColumns: ["tweet_id"]
+          },
+          {
+            foreignKeyName: "user_mentions_tweet_id_fkey"
+            columns: ["tweet_id"]
+            isOneToOne: false
             referencedRelation: "tweets"
             referencedColumns: ["tweet_id"]
           },
@@ -1291,20 +1305,6 @@ export type Database = {
           mentioned_username: string
         }[]
       }
-      get_scraper_counts_by_granularity: {
-        Args: { end_date: string; granularity: string; start_date: string }
-        Returns: {
-          scraper_date: string
-          unique_scrapers: number
-        }[]
-      }
-      get_simple_streamed_tweet_counts: {
-        Args: { end_date: string; granularity: string; start_date: string }
-        Returns: {
-          tweet_count: number
-          tweet_date: string
-        }[]
-      }
       get_streaming_stats: {
         Args: {
           p_end_date: string
@@ -1326,6 +1326,20 @@ export type Database = {
           period_start: string
           tweet_count: number
           unique_scrapers: number
+        }[]
+      }
+      get_scraper_counts_by_granularity: {
+        Args: { end_date: string; granularity: string; start_date: string }
+        Returns: {
+          scraper_date: string
+          unique_scrapers: number
+        }[]
+      }
+      get_simple_streamed_tweet_counts: {
+        Args: { end_date: string; granularity: string; start_date: string }
+        Returns: {
+          tweet_count: number
+          tweet_date: string
         }[]
       }
       get_streaming_stats_daily_streamed_only: {
@@ -1540,18 +1554,15 @@ export type Database = {
               until_date?: string
             }
         Returns: {
-          account_display_name: string
           account_id: string
           archive_upload_id: number
           avatar_media_url: string
           created_at: string
           favorite_count: number
           full_text: string
-          media: Json
-          reply_to_tweet_id: string
+          relevance: number
           retweet_count: number
           tweet_id: string
-          username: string
         }[]
       }
       set_limit: {

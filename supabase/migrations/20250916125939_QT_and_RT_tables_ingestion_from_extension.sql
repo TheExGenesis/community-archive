@@ -66,35 +66,96 @@ LEFT JOIN LATERAL (
 ) p ON true; 
 
 
--- Create a temporary table to batch process the data
-CREATE TEMP TABLE temp_quote_tweets AS
-SELECT
-  DISTINCT
-  t.tweet_id AS tweet_id,
-  SUBSTRING(
-    tu.expanded_url
-    FROM
-      'status/([0-9]+)'
-  ) AS quoted_tweet_id
-FROM
-  public.tweet_urls tu
-  JOIN public.tweets t ON tu.tweet_id = t.tweet_id
-WHERE
-  (tu.expanded_url LIKE '%twitter.com/%/status/%'
-  OR tu.expanded_url LIKE '%x.com/%/status/%')
-  AND tu.expanded_url ~ 'status/[0-9]+(/|$|\?)';
+-- Single transaction with batching for better memory management
+-- This approach processes in batches but keeps everything in one transaction for full rollback capability
+SET statement_timeout = '60min';  -- Longer timeout for complex transaction
+SET lock_timeout = '10min';       -- 10 minutes for lock acquisition
+SET idle_in_transaction_session_timeout = '120min';  -- Longer idle timeout
 
--- Create index on temp table for better performance
-CREATE INDEX ON temp_quote_tweets (tweet_id, quoted_tweet_id);
+DO $$
+DECLARE
+    batch_size INTEGER := 10000;  -- Process 10k records at a time
+    rows_processed INTEGER;
+    total_processed INTEGER := 0;
+    min_rowid BIGINT;
+    max_rowid BIGINT;
+    current_min BIGINT;
+    current_max BIGINT;
+    start_time TIMESTAMP;
+    batch_start_time TIMESTAMP;
+    temp_table_time TIMESTAMP;
+BEGIN
+    start_time := clock_timestamp();
+    RAISE NOTICE 'Starting batch processing (single transaction) at %...', start_time;
+    
+    -- Create temporary table with all quote tweet data
+    CREATE TEMP TABLE temp_quote_tweets_batch (
+        rowid BIGSERIAL PRIMARY KEY,
+        tweet_id TEXT NOT NULL,
+        quoted_tweet_id TEXT NOT NULL
+    );
+    
+    -- Populate temp table with all data
+    temp_table_time := clock_timestamp();
+    INSERT INTO temp_quote_tweets_batch (tweet_id, quoted_tweet_id)
+    SELECT DISTINCT
+        t.tweet_id,
+        SUBSTRING(
+            tu.expanded_url
+            FROM 'status/([0-9]+)'
+        ) AS quoted_tweet_id
+    FROM public.tweet_urls tu
+    JOIN public.tweets t ON tu.tweet_id = t.tweet_id
+    WHERE 
+        (tu.expanded_url LIKE '%twitter.com/%/status/%'
+        OR tu.expanded_url LIKE '%x.com/%/status/%')
+        AND tu.expanded_url ~ 'status/[0-9]+(/|$|\?)'
+        AND SUBSTRING(tu.expanded_url FROM 'status/([0-9]+)') IS NOT NULL;
+    
+    -- Get the range of row IDs to process
+    SELECT MIN(rowid), MAX(rowid) INTO min_rowid, max_rowid FROM temp_quote_tweets_batch;
+    
+    RAISE NOTICE 'Temp table created with % rows (rowid range: % to %, creation time: %s)', 
+                 max_rowid - min_rowid + 1, min_rowid, max_rowid,
+                 EXTRACT(EPOCH FROM (clock_timestamp() - temp_table_time));
+    
+    -- Process in batches using rowid ranges
+    current_min := min_rowid;
+    
+    WHILE current_min <= max_rowid LOOP
+        current_max := current_min + batch_size - 1;
+        batch_start_time := clock_timestamp();
+        
+        INSERT INTO public.quote_tweets (tweet_id, quoted_tweet_id)
+        SELECT tweet_id, quoted_tweet_id
+        FROM temp_quote_tweets_batch
+        WHERE rowid BETWEEN current_min AND current_max
+        ON CONFLICT (tweet_id, quoted_tweet_id) DO NOTHING;
+        
+        GET DIAGNOSTICS rows_processed = ROW_COUNT;
+        total_processed := total_processed + rows_processed;
+        
+        RAISE NOTICE 'Processed batch: % rows (rowid range: % to %, total so far: %, batch time: %s)', 
+                     rows_processed, current_min, current_max, total_processed,
+                     EXTRACT(EPOCH FROM (clock_timestamp() - batch_start_time));
+        
+        current_min := current_max + 1;
 
--- Insert in batches to avoid memory issues
-INSERT INTO public.quote_tweets (tweet_id, quoted_tweet_id)
-SELECT tweet_id, quoted_tweet_id
-FROM temp_quote_tweets
-WHERE quoted_tweet_id IS NOT NULL;
+        PERFORM pg_sleep(1);
+    END LOOP;
+    
+    -- Clean up temp table
+    DROP TABLE temp_quote_tweets_batch;
+    
+    RAISE NOTICE 'Batch processing complete. Total rows processed: %, total time: %s', 
+                 total_processed, EXTRACT(EPOCH FROM (clock_timestamp() - start_time));
+END $$;
 
--- Clean up temp table
-DROP TABLE temp_quote_tweets;
+
+-- Reset timeout settings back to defaults after processing
+RESET statement_timeout;
+RESET lock_timeout;
+RESET idle_in_transaction_session_timeout;
 
 
 DROP TRIGGER IF EXISTS trigger_commit_temp_data ON public.archive_upload;

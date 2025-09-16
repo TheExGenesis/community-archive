@@ -1,1 +1,0 @@
-CREATE INDEX IF NOT EXISTS idx_tweet_urls_expanded_url_gin ON public.tweet_urls USING gin (expanded_url gin_trgm_ops);

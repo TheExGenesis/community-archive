@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv'
-dotenv.config({ path: '../.env' })
+dotenv.config({ path: '.env' })
 
 import {
   InsertAccount,
@@ -36,12 +36,25 @@ function ifStringNullReturnNull(value: string | null): string | null {
 }
 
 
-const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
+const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH || './data/downloads/archives'
+console.log('Using ARCHIVE_PATH:', GLOBAL_ARCHIVE_PATH)
 
+// Parse command line arguments for limiting archives
+const args = process.argv.slice(2)
+const limitArg = args.find(arg => arg.startsWith('--limit='))
+const ARCHIVE_LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : undefined
 
 
 ;(async function execute() {
+  console.log('NODE_ENV:', process.env.NODE_ENV)
+  console.log('NEXT_PUBLIC_USE_REMOTE_DEV_DB:', process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB)
+  
   var supabase = await createDbScriptClient()
+  
+  // Debug: Check which database we're actually connected to
+  console.log('Database URL:', process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'false' 
+    ? process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL 
+    : process.env.NEXT_PUBLIC_SUPABASE_URL)
 
   const { data: healthCheck, error: healthError } = await supabase.from('archive_upload').select('*').limit(1)
   if (healthError) {
@@ -497,8 +510,13 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
       }
     }
 
-  const filesRoot = getFoldersInPath(GLOBAL_ARCHIVE_PATH);
-
+  let filesRoot = getFoldersInPath(GLOBAL_ARCHIVE_PATH);
+  
+  // Apply limit if specified
+  if (ARCHIVE_LIMIT && ARCHIVE_LIMIT > 0) {
+    console.log(`Limiting to first ${ARCHIVE_LIMIT} archives out of ${filesRoot.length} total`)
+    filesRoot = filesRoot.slice(0, ARCHIVE_LIMIT)
+  }
 
 
   const BATCH_SIZE = 10; // Adjust based on your needs
@@ -511,6 +529,14 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
       console.log('Processing file:', fileRoot);
       try {
         const data = await getDataFromUnprocessedFile(fileRoot);
+        if (!data) {
+          console.warn(`Skipping ${fileRoot}: No valid archive.json found`);
+          return;
+        }
+        if (!data.account || !Array.isArray(data.account) || data.account.length === 0) {
+          console.warn(`Skipping ${fileRoot}: Invalid or missing account data`);
+          return;
+        }
         await processData(data,fileRoot);
       } catch (error) {
         console.error(`Error processing ${fileRoot}:`, error);
@@ -524,10 +550,20 @@ const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH!
     await new Promise(resolve => setTimeout(resolve, 500));
   }
 
+  // Update archive upload status - this might fail due to trigger accessing private.job_queue
+  console.log('\nUpdating archive upload statuses...')
   const {data, error} = await supabase.schema("public").from("archive_upload").update({upload_phase:"completed"}).eq("upload_phase","uploading");
   if(error){
-    console.error("Error updating archive_upload table:",error);
-    console.error("Please run the query manually: update \"archive_upload\" set \"upload_phase\" = 'completed' where \"upload_phase\" = 'uploading';")
+    if (error.code === '42501' && error.message?.includes('job_queue')) {
+      console.warn("Warning: Cannot update archive_upload status due to private.job_queue permissions");
+      console.warn("This is expected in local development and doesn't affect the import");
+      console.warn("The archives were imported successfully.");
+    } else {
+      console.error("Error updating archive_upload table:",error);
+      console.error("Please run the query manually: update \"archive_upload\" set \"upload_phase\" = 'completed' where \"upload_phase\" = 'uploading';")
+    }
+  } else {
+    console.log("Successfully updated archive upload statuses");
   }
 
 

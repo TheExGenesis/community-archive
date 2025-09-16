@@ -150,6 +150,9 @@ const EXCLUDED_USERNAMES = [
   '_ceeeeeeee_',
 ]
 
+const INCLUDED_USERNAMES = ['exgenesis','milangriffes']
+
+
 async function checkAndProcessArchives() {
   const storageObjects = await fetchStoragePaths()
   const accountUsernames = await fetchAccountUsernames()
@@ -164,6 +167,7 @@ async function checkAndProcessArchives() {
   const archivesToProcess = [...archivesInStorage]
     .filter((archive) => !accountsInDb.has(archive))
     .filter((archive) => !EXCLUDED_USERNAMES.includes(archive))
+    .filter((archive) => INCLUDED_USERNAMES.length > 0 ? INCLUDED_USERNAMES.includes(archive) : true)
 
   console.log('Archives in storage but not in public.account:')
   archivesToProcess.forEach((archive) => console.log(archive))

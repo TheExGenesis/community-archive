@@ -273,7 +273,7 @@ export default function ProfileContent({
               {archives.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Archive className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>You haven't uploaded any archives yet</p>
+                  <p>You haven&apos;t uploaded any archives yet</p>
                   <Button
                     variant="outline"
                     className="mt-4"

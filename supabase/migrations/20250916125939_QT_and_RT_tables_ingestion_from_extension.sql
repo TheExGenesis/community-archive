@@ -95,3 +95,7 @@ WHERE quoted_tweet_id IS NOT NULL;
 
 -- Clean up temp table
 DROP TABLE temp_quote_tweets;
+
+
+DROP TRIGGER IF EXISTS trigger_commit_temp_data ON public.archive_upload;
+DROP FUNCTION IF EXISTS public.trigger_commit_temp_data;

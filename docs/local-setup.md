@@ -111,6 +111,8 @@ For example:
 
 ### Manage remote migrations
 
+Note: We now manage the database via declarative, ordered schema files. For the recommended end-to-end workflow (editing canonical files, verifying with `db reset` and `db diff`, generating migrations, and pushing), see `docs/supabase-declarative-schemas.md`.
+
 We can use Supabase's CLI to manage migrations locally, and then push them to the remote database. To do this fully you'll need a db password, so ask admins in the Discord.
 
 Setup:

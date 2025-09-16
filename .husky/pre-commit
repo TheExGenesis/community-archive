@@ -1,4 +1,20 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-pnpm run pre-commit
+# Ensure common package manager locations are on PATH (Homebrew, local)
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+# Prefer pnpm, fallback to corepack pnpm, then npm
+if command -v pnpm >/dev/null 2>&1; then
+  PM=pnpm
+elif command -v corepack >/dev/null 2>&1; then
+  PM="corepack pnpm"
+else
+  PM=npm
+fi
+
+if [ "$PM" = "npm" ]; then
+  npm run pre-commit
+else
+  sh -c "$PM run pre-commit"
+fi

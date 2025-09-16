@@ -11,6 +11,11 @@ const __dirname = path.dirname(__filename)
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../.env.local') })
 
+// Parse command line arguments for limiting archives
+const args = process.argv.slice(2)
+const limitArg = args.find(arg => arg.startsWith('--limit='))
+const ARCHIVE_LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : undefined
+
 // const isProd = process.argv[3]
 //   ? process.argv[3] === 'true'
 //   : process.env.NODE_ENV === 'production'
@@ -59,13 +64,20 @@ async function fetchObjects(bucketName: string): Promise<StorageObject[]> {
 }
 
 async function downloadBucketContents(bucketName: string) {
-  const objects = await fetchObjects(bucketName)
-  // Create base data directory (one level up)
-  await fs.mkdir(path.resolve(__dirname, '../../data'), { recursive: true })
+  let objects = await fetchObjects(bucketName)
+  
+  // Apply limit if specified
+  if (ARCHIVE_LIMIT && ARCHIVE_LIMIT > 0) {
+    console.log(`Limiting to first ${ARCHIVE_LIMIT} archives out of ${objects.length} total`)
+    objects = objects.slice(0, ARCHIVE_LIMIT)
+  }
+  
+  // Create base data directory
+  const baseDataDir = path.resolve(__dirname, '../data')
+  await fs.mkdir(baseDataDir, { recursive: true })
   // Define specific output directory within data/downloads
   const outputDir = path.resolve(
-    __dirname,
-    '../../data',
+    baseDataDir,
     'downloads',
     bucketName,
   )

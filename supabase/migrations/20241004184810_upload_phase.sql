@@ -1,1 +1,0 @@
--- UPDATE public.archive_upload SET upload_phase = 'completed';

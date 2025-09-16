@@ -1,1 +1,0 @@
-DROP VIEW IF EXISTS public.tweets_enriched;

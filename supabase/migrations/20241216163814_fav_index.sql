@@ -1,1 +1,0 @@
-CREATE INDEX idx_favorite_count ON tweets (favorite_count);

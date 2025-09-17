@@ -385,6 +385,19 @@ export const verifyInsertion = async (
   }
 }
 
+export const verifyArchiveUploadPhase = async (
+  supabase: SupabaseClient<Database>,
+  archiveUploadId: number,
+  expectedPhase: "uploading" | "completed" | "failed" | "ready_for_commit" | "committing" | null
+): Promise<{success: boolean}> => {
+  const { data: archiveUpload} = await supabase
+    .from('archive_upload')
+    .select('upload_phase')
+    .eq('id', archiveUploadId)
+    .single()
+  return {success: archiveUpload?.upload_phase === expectedPhase}
+}
+
 // Helper to clean up old test data (run periodically)
 export const cleanupOldTestData = async (
   supabase: SupabaseClient<Database>,

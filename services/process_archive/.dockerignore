@@ -1,0 +1,36 @@
+# Logs and lock files
+logs/
+*.log
+*.lock
+*.pid
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Node modules (will be installed in container)
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README*.md
+DEPLOY.md
+*.md
+
+# Development files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+
+logs/

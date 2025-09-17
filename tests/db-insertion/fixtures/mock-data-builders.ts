@@ -115,8 +115,8 @@ export const generateMedia = (count: number, seedOffset: number = 0) => {
     const extension = type === 'photo' ? 'jpg' : type === 'video' ? 'mp4' : 'gif'
     
     return {
-      id_str: `media_${1000000 + seedOffset + i}`,
-      id: `media_${1000000 + seedOffset + i}`,
+      id_str: `${1000000 + seedOffset + i}`,
+      id: `${1000000 + seedOffset + i}`,
       media_url: `http://pbs.twimg.com/media/test_${seedOffset + i}.${extension}`,
       media_url_https: `https://pbs.twimg.com/media/test_${seedOffset + i}.${extension}`,
       type: type,

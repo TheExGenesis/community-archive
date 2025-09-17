@@ -10,7 +10,7 @@ import { removeProblematicCharacters } from '../src/lib/removeProblematicChars'
 const { validateFileContents } = await import(
   '../src/lib/upload-archive/validateContent'
 )
-const { insertArchiveInTempTables } = await import('../src/lib/db_insert')
+const { insertArchiveForProcessing } = await import('../src/lib/db_insert')
 const { uploadArchiveToStorage } = await import(
   '../src/lib/upload-archive/uploadArchiveToStorage'
 )
@@ -108,7 +108,7 @@ const uploadArchive = async (filePath: string) => {
     await uploadArchiveToStorage(supabase, archive)
     console.log('Archive uploaded to storage successfully')
 
-    await insertArchiveInTempTables(supabase, archive, (progress) => {
+    await insertArchiveForProcessing(supabase, archive, (progress) => {
       console.log(`${progress.phase}: ${progress.percent?.toFixed(2)}%`)
     })
     console.log('Archive processing completed successfully')

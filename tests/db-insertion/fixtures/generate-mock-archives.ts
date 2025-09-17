@@ -87,8 +87,8 @@ export const generateSmallExhaustiveMockArchive = (): Archive => {
         ],
         media: [
           {
-            id_str: "m1001",
-            id: "m1001",
+            id_str: "9991001",
+            id: "9991001",
             media_url: "http://pbs.twimg.com/media/test1.jpg",
             media_url_https: "https://pbs.twimg.com/media/test1.jpg",
             type: "photo",
@@ -101,8 +101,8 @@ export const generateSmallExhaustiveMockArchive = (): Archive => {
             indices: ["36", "51"]
           },
           {
-            id_str: "m1002",
-            id: "m1002",
+            id_str: "9991002",
+            id: "9991002",
             media_url: "http://pbs.twimg.com/media/test2.mp4",
             media_url_https: "https://pbs.twimg.com/media/test2.mp4",
             type: "video",
@@ -210,8 +210,8 @@ export const generateSmallExhaustiveMockArchive = (): Archive => {
         urls: [],
         media: [
           {
-            id_str: "m1003",
-            id: "m1003",
+            id_str: "9991003",
+            id: "9991003",
             media_url: "http://pbs.twimg.com/media/orphan.jpg",
             media_url_https: "https://pbs.twimg.com/media/orphan.jpg",
             type: "photo",

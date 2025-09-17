@@ -62,13 +62,13 @@ The large archive simulates realistic Twitter usage with:
 
 ```typescript
 import { generateSmallExhaustiveMockArchive } from '@/lib/test-fixtures/generate-mock-archives'
-import { insertArchiveInTempTables } from '@/lib/db_insert'
+import { insertArchiveForProcessing } from '@/lib/db_insert'
 
 describe('Archive Insertion Tests', () => {
   it('should insert all tweets correctly', async () => {
     const mockArchive = generateSmallExhaustiveMockArchive()
     
-    await insertArchiveInTempTables(
+    await insertArchiveForProcessing(
       supabase,
       mockArchive,
       (progress) => {}

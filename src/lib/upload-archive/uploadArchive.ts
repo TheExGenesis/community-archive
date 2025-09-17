@@ -1,5 +1,5 @@
 import { Archive } from '../types'
-import { insertArchiveInTempTables } from '@/lib/db_insert'
+import { insertArchiveForProcessing } from '@/lib/db_insert'
 import { uploadArchiveToStorage } from '@/lib/upload-archive/uploadArchiveToStorage'
 import { SupabaseClient } from '@supabase/supabase-js'
 
@@ -22,5 +22,5 @@ export const uploadArchive = async (
   console.log(
     'Uploaded to storage, insertion into db will be handled by our worker.',
   )
-  await insertArchiveInTempTables(supabase, archive, progressCallback)
+  await insertArchiveForProcessing(supabase, archive, progressCallback)
 }

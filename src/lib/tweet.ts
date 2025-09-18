@@ -3,7 +3,8 @@ import { cookies } from 'next/headers'
 import { getMentionedUserAccount } from './mentionedUsers'
 
 export const getTweet = async (tweet_id: any) => {
-  const supabase = createServerClient(cookies())
+  const cookieStore = await cookies()
+  const supabase = createServerClient(cookieStore)
   const result = await supabase
     .schema('public')
     .from('tweets')

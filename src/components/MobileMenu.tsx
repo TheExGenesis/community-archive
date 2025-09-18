@@ -21,17 +21,18 @@ const baseNavItems = [
 
 const streamingNavItems = [
   { href: '/stream-monitor', label: 'Stream Monitor' },
-  { href: '/opt-in', label: 'Opt-In' },
+]
+
+const userNavItems = [
+  { href: '/profile', label: 'Profile' },
 ]
 
 export default function MobileMenu() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
 
-  // Only include streaming features if enabled
-  const navItems = process.env.NEXT_PUBLIC_ENABLE_STREAMING_FEATURES === 'true' 
-    ? [...baseNavItems, ...streamingNavItems]
-    : baseNavItems
+  // Include all navigation items
+  const navItems = [...baseNavItems, ...streamingNavItems, ...userNavItems]
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>

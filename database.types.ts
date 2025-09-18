@@ -871,6 +871,8 @@ export type Database = {
           username: string
           twitter_user_id: string | null
           opted_in: boolean
+          explicit_optout: boolean
+          opt_out_reason: string | null
           terms_version: string
           created_at: string
           updated_at: string
@@ -883,6 +885,8 @@ export type Database = {
           username: string
           twitter_user_id?: string | null
           opted_in?: boolean
+          explicit_optout?: boolean
+          opt_out_reason?: string | null
           terms_version?: string
           created_at?: string
           updated_at?: string
@@ -895,6 +899,8 @@ export type Database = {
           username?: string
           twitter_user_id?: string | null
           opted_in?: boolean
+          explicit_optout?: boolean
+          opt_out_reason?: string | null
           terms_version?: string
           created_at?: string
           updated_at?: string

@@ -42,7 +42,8 @@ export interface ConversationTree {
  * Get tweets in a conversation thread by following reply chains
  */
 export const getConversationTweets = async (tweet_id: string): Promise<ThreadTweet[]> => {
-  const supabase = createServerClient(cookies())
+  const cookieStore = await cookies()
+  const supabase = createServerClient(cookieStore)
   
   // First get the initial tweet using enriched_tweets view
   const { data: initialTweet, error: initialError } = await supabase

@@ -3,7 +3,8 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 export async function requireAuth() {
-  const supabase = createServerClient(cookies())
+  const cookieStore = await cookies()
+  const supabase = createServerClient(cookieStore)
   
   const { data: { user }, error } = await supabase.auth.getUser()
   
@@ -15,7 +16,8 @@ export async function requireAuth() {
 }
 
 export async function getOptInStatus(userId: string) {
-  const supabase = createServerClient(cookies())
+  const cookieStore = await cookies()
+  const supabase = createServerClient(cookieStore)
   
   const { data, error } = await supabase
     .from('optin')

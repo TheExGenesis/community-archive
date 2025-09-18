@@ -138,6 +138,12 @@
     ]
   },
   "pnpm": {
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "esbuild",
+      "msw",
+      "supabase"
+    ],
     "overrides": {
       "form-data": "4.0.4"
     }

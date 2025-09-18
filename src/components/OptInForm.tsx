@@ -125,7 +125,7 @@ export default function OptInForm({ userId, userEmail, initialOptInStatus }: Opt
         ) : (
           <div className="space-y-4">
             <p className="text-lg text-green-600 dark:text-green-400 font-semibold">
-              ✓ You're opted in to tweet streaming!
+              ✓ You&apos;re opted in to tweet streaming!
             </p>
             <Link href="/profile">
               <Button variant="outline" size="lg" className="px-8 py-3">

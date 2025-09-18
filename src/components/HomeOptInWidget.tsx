@@ -169,7 +169,7 @@ export default function HomeOptInWidget() {
       <Card className="border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/20">
         <CardContent className="pt-6 text-center space-y-4">
           <div className="text-4xl">✅</div>
-          <h3 className="text-xl font-semibold text-green-900 dark:text-green-100">You're Opted In!</h3>
+          <h3 className="text-xl font-semibold text-green-900 dark:text-green-100">You&apos;re Opted In!</h3>
           <p className="text-green-800 dark:text-green-200">
             Your public tweets are now being preserved in the community archive.
           </p>

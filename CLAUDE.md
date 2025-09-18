@@ -147,6 +147,13 @@ We are currently working directly with the remote database. For database schema 
 
 ## Code Patterns & Conventions
 
+**React Components & JSX:**
+- **CRITICAL**: Always escape apostrophes in JSX text content to avoid React ESLint errors
+  - Use `&apos;` instead of `'` in JSX text (e.g., `You&apos;re` instead of `You're`)
+  - This prevents the error: `react/no-unescaped-entities`
+  - Common cases: contractions like "don't", "can't", "won't", "you're", "it's", etc.
+  - Example: `<p>You haven&apos;t uploaded any archives yet</p>`
+
 **Database Operations:**
 - Use appropriate Supabase client for context (browser/server/admin)
 - Always handle authentication state for user-specific operations

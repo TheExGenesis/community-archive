@@ -518,7 +518,9 @@ export type Database = {
       optin: {
         Row: {
           created_at: string | null
+          explicit_optout: boolean | null
           id: string
+          opt_out_reason: string | null
           opted_in: boolean
           opted_in_at: string | null
           opted_out_at: string | null
@@ -530,7 +532,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          explicit_optout?: boolean | null
           id?: string
+          opt_out_reason?: string | null
           opted_in?: boolean
           opted_in_at?: string | null
           opted_out_at?: string | null
@@ -542,7 +546,9 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          explicit_optout?: boolean | null
           id?: string
+          opt_out_reason?: string | null
           opted_in?: boolean
           opted_in_at?: string | null
           opted_out_at?: string | null

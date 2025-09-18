@@ -109,7 +109,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ icon, title, description, href })
 )
 
 export default async function Homepage() {
-  const supabase = createServerClient(cookies())
+  const cookieStore = await cookies()
+  const supabase = createServerClient(cookieStore)
   const mostFollowed = (await getMostFollowedAccounts(supabase)).slice(0, 7)
   const financialContributors = await getOpenCollectiveContributors()
 

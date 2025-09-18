@@ -89,7 +89,15 @@ BEGIN
     IF OLD.opted_in = false AND NEW.opted_in = true THEN
         NEW.opted_in_at = NOW();
         NEW.opted_out_at = NULL;
+        NEW.explicit_optout = false; -- Clear explicit opt-out when opting in
+        NEW.opt_out_reason = NULL;
     ELSIF OLD.opted_in = true AND NEW.opted_in = false THEN
+        NEW.opted_out_at = NOW();
+    END IF;
+    
+    -- Handle explicit opt-out
+    IF OLD.explicit_optout = false AND NEW.explicit_optout = true THEN
+        NEW.opted_in = false;
         NEW.opted_out_at = NOW();
     END IF;
     

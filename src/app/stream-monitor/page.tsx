@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { createBrowserClient } from '@/utils/supabase'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
@@ -10,9 +12,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ExternalLink, Users, X } from 'lucide-react'
 import getLatestTweets from '@/lib/queries/getLatestTweets'
 import UnifiedTweetList from '@/components/UnifiedTweetList'
+
+// Dynamically import HomeOptInWidget with ssr disabled
+const DynamicHomeOptInWidget = dynamic(() => import('@/components/HomeOptInWidget'), {
+  ssr: false,
+})
 
 
 
@@ -49,6 +56,7 @@ const StreamMonitor = () => {
   const [showStreamedOnly, setShowStreamedOnly] = useState(true)
   const [loadedTweets, setLoadedTweets] = useState<Tweet[]>([])
   const [tweetOffset, setTweetOffset] = useState(0)
+  const [showBanner, setShowBanner] = useState(true)
   const tweetsPerPage = 20
   
   const supabase = createBrowserClient()
@@ -207,6 +215,54 @@ const StreamMonitor = () => {
           </div>
         </div>
       </div>
+
+      {/* Call-to-action section for opt-in and extension */}
+      {showBanner && (
+        <div className="mb-8">
+          <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 h-8 w-8 text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-100"
+              onClick={() => setShowBanner(false)}
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Dismiss banner</span>
+            </Button>
+            <CardContent className="pt-6">
+              <div className="text-center space-y-4">
+              <h3 className="text-xl font-semibold text-blue-900 dark:text-blue-100">
+                📡 Contribute to the Archive!
+              </h3>
+              <p className="text-blue-800 dark:text-blue-200 max-w-2xl mx-auto">
+                Stream tweets to the archive by installing our browser extension that archives tweets you see from other contributors.
+              </p>
+              <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                <DynamicHomeOptInWidget />
+                <Card className="border-blue-200 dark:border-blue-700">
+                  <CardContent className="pt-6 text-center space-y-4">
+                    <div className="text-4xl">🔌</div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Step 2: Install Extension</h3>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Use our browser extension to automatically contribute tweets to the archive as you browse X/Twitter.
+                    </p>
+                    <a href="https://chromewebstore.google.com/detail/community-archive-stream/igclpobjpjlphgllncjcgaookmncegbk" target="_blank" rel="noopener noreferrer">
+                      <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:text-blue-300 dark:hover:bg-blue-800">
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Install Browser Extension
+                      </Button>
+                    </a>
+                  </CardContent>
+                </Card>
+              </div>
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Only public tweets from opted-in users are collected • Chrome extension available now
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
         <Card>

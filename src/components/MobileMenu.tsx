@@ -21,7 +21,6 @@ const baseNavItems = [
 
 const streamingNavItems = [
   { href: '/stream-monitor', label: 'Stream Monitor' },
-  { href: '/opt-in', label: 'Opt-In' },
 ]
 
 const userNavItems = [

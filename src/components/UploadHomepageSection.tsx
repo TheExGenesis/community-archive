@@ -166,21 +166,23 @@ export default function UploadHomepageSection() {
             )}
             <div className="flex flex-col">
               <div className="flex justify-between">
-                <div className="mb-4">
-                  <p className="mb-6 text-xs dark:text-gray-300">
+                <div className="mb-4 flex-1">
+                  <p className="mb-6 text-xs text-center dark:text-gray-300">
                     Please upload your Twitter archive as a .zip file.
                   </p>
-                  <label className="mb-4 cursor-pointer rounded bg-zinc-500 px-4 py-3 text-sm text-white hover:bg-zinc-600 disabled:opacity-50 dark:bg-zinc-600 dark:hover:bg-zinc-700">
-                    Choose Files
-                    <input
-                      type="file"
-                      accept=".zip,application/zip"
-                      onChange={onFileUpload}
-                      disabled={state.isProcessing}
-                      multiple
-                      className="hidden"
-                    />
-                  </label>
+                  <div className="flex justify-center">
+                    <label className="mb-4 cursor-pointer rounded bg-zinc-500 px-4 py-3 text-sm text-white hover:bg-zinc-600 disabled:opacity-50 dark:bg-zinc-600 dark:hover:bg-zinc-700">
+                      Choose Files
+                      <input
+                        type="file"
+                        accept=".zip,application/zip"
+                        onChange={onFileUpload}
+                        disabled={state.isProcessing}
+                        multiple
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
                   {state.isProcessing && (
                     <div className="mt-4">
                       <p className="mb-2">{`Processing archive...`}</p>

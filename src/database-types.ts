@@ -298,13 +298,6 @@ export type Database = {
             foreignKeyName: "conversations_tweet_id_fkey"
             columns: ["tweet_id"]
             isOneToOne: true
-            referencedRelation: "quote_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "conversations_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: true
             referencedRelation: "tweets"
             referencedColumns: ["tweet_id"]
           },
@@ -561,6 +554,101 @@ export type Database = {
         }
         Relationships: []
       }
+      quote_tweets: {
+        Row: {
+          quoted_tweet_id: string
+          tweet_id: string
+        }
+        Insert: {
+          quoted_tweet_id: string
+          tweet_id: string
+        }
+        Update: {
+          quoted_tweet_id?: string
+          tweet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_quote_tweets_tweet_id"
+            columns: ["tweet_id"]
+            isOneToOne: false
+            referencedRelation: "enriched_tweets"
+            referencedColumns: ["tweet_id"]
+          },
+          {
+            foreignKeyName: "fk_quote_tweets_tweet_id"
+            columns: ["tweet_id"]
+            isOneToOne: false
+            referencedRelation: "tweets"
+            referencedColumns: ["tweet_id"]
+          },
+          {
+            foreignKeyName: "fk_quote_tweets_tweet_id"
+            columns: ["tweet_id"]
+            isOneToOne: false
+            referencedRelation: "tweets_w_conversation_id"
+            referencedColumns: ["tweet_id"]
+          },
+        ]
+      }
+      retweets: {
+        Row: {
+          retweeted_tweet_id: string | null
+          tweet_id: string
+        }
+        Insert: {
+          retweeted_tweet_id?: string | null
+          tweet_id: string
+        }
+        Update: {
+          retweeted_tweet_id?: string | null
+          tweet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_retweets_retweeted_tweet_id"
+            columns: ["retweeted_tweet_id"]
+            isOneToOne: false
+            referencedRelation: "enriched_tweets"
+            referencedColumns: ["tweet_id"]
+          },
+          {
+            foreignKeyName: "fk_retweets_retweeted_tweet_id"
+            columns: ["retweeted_tweet_id"]
+            isOneToOne: false
+            referencedRelation: "tweets"
+            referencedColumns: ["tweet_id"]
+          },
+          {
+            foreignKeyName: "fk_retweets_retweeted_tweet_id"
+            columns: ["retweeted_tweet_id"]
+            isOneToOne: false
+            referencedRelation: "tweets_w_conversation_id"
+            referencedColumns: ["tweet_id"]
+          },
+          {
+            foreignKeyName: "fk_retweets_tweet_id"
+            columns: ["tweet_id"]
+            isOneToOne: true
+            referencedRelation: "enriched_tweets"
+            referencedColumns: ["tweet_id"]
+          },
+          {
+            foreignKeyName: "fk_retweets_tweet_id"
+            columns: ["tweet_id"]
+            isOneToOne: true
+            referencedRelation: "tweets"
+            referencedColumns: ["tweet_id"]
+          },
+          {
+            foreignKeyName: "fk_retweets_tweet_id"
+            columns: ["tweet_id"]
+            isOneToOne: true
+            referencedRelation: "tweets_w_conversation_id"
+            referencedColumns: ["tweet_id"]
+          },
+        ]
+      }
       scraper_count: {
         Row: {
           count: number | null
@@ -623,13 +711,6 @@ export type Database = {
             foreignKeyName: "tweet_media_tweet_id_fkey"
             columns: ["tweet_id"]
             isOneToOne: false
-            referencedRelation: "quote_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_media_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
             referencedRelation: "tweets"
             referencedColumns: ["tweet_id"]
           },
@@ -673,13 +754,6 @@ export type Database = {
             columns: ["tweet_id"]
             isOneToOne: false
             referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "tweet_urls_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "quote_tweets"
             referencedColumns: ["tweet_id"]
           },
           {
@@ -804,27 +878,6 @@ export type Database = {
             columns: ["tweet_id"]
             isOneToOne: false
             referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "user_mentions_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "quote_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "user_mentions_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "user_mentions_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: false
-            referencedRelation: "quote_tweets"
             referencedColumns: ["tweet_id"]
           },
           {
@@ -1020,14 +1073,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      quote_tweets: {
-        Row: {
-          quoted_tweet_id: string | null
-          quoted_tweet_username: string | null
-          tweet_id: string | null
-        }
-        Relationships: []
       }
       tweet_replies_view: {
         Row: {
@@ -1305,6 +1350,20 @@ export type Database = {
           mentioned_username: string
         }[]
       }
+      get_scraper_counts_by_granularity: {
+        Args: { end_date: string; granularity: string; start_date: string }
+        Returns: {
+          scraper_date: string
+          unique_scrapers: number
+        }[]
+      }
+      get_simple_streamed_tweet_counts: {
+        Args: { end_date: string; granularity: string; start_date: string }
+        Returns: {
+          tweet_count: number
+          tweet_date: string
+        }[]
+      }
       get_streaming_stats: {
         Args: {
           p_end_date: string
@@ -1326,20 +1385,6 @@ export type Database = {
           period_start: string
           tweet_count: number
           unique_scrapers: number
-        }[]
-      }
-      get_scraper_counts_by_granularity: {
-        Args: { end_date: string; granularity: string; start_date: string }
-        Returns: {
-          scraper_date: string
-          unique_scrapers: number
-        }[]
-      }
-      get_simple_streamed_tweet_counts: {
-        Args: { end_date: string; granularity: string; start_date: string }
-        Returns: {
-          tweet_count: number
-          tweet_date: string
         }[]
       }
       get_streaming_stats_daily_streamed_only: {
@@ -1555,8 +1600,6 @@ export type Database = {
             }
         Returns: {
           account_id: string
-          archive_upload_id: number
-          avatar_media_url: string
           created_at: string
           favorite_count: number
           full_text: string

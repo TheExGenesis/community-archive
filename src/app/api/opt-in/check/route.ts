@@ -5,7 +5,8 @@ import { NextRequest, NextResponse } from 'next/server'
 // Public endpoint to check if a username is opted in
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createServerClient(cookies())
+    const cookieStore = await cookies()
+    const supabase = createServerClient(cookieStore)
     
     const searchParams = request.nextUrl.searchParams
     const username = searchParams.get('username')

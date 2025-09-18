@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = createServerClient(cookies())
+    const cookieStore = await cookies()
+    const supabase = createServerClient(cookieStore)
     
     const { data, error } = await supabase
       .rpc('get_simple_streamed_tweet_counts', {

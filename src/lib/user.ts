@@ -33,7 +33,8 @@ export const getFirstTweets = async (
   account_id: string,
   limit: number = 100,
 ) => {
-  const supabase = createServerClient(cookies())
+  const cookieStore = await cookies()
+  const supabase = createServerClient(cookieStore)
   const { data } = await supabase
     .schema('public')
     .from('tweets')
@@ -45,7 +46,8 @@ export const getFirstTweets = async (
 }
 
 export const getTopTweets = async (account_id: string, limit: number = 20) => {
-  const supabase = createServerClient(cookies())
+  const cookieStore = await cookies()
+  const supabase = createServerClient(cookieStore)
   const { data } = await supabase
     .schema('public')
     .from('tweets')

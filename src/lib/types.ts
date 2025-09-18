@@ -29,7 +29,8 @@ export interface Tweet {
   retweet_count: number
   created_at: string
   favorited: boolean
-  full_text: string
+  full_text: string,
+  truncated?: boolean
 }
 
 export interface Follower {

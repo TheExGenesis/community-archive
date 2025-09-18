@@ -31,10 +31,8 @@ export default function MobileMenu() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
 
-  // Only include streaming features if enabled
-  const navItems = process.env.NEXT_PUBLIC_ENABLE_STREAMING_FEATURES === 'true' 
-    ? [...baseNavItems, ...streamingNavItems, ...userNavItems]
-    : [...baseNavItems, ...userNavItems]
+  // Include all navigation items including streaming features
+  const navItems = [...baseNavItems, ...streamingNavItems, ...userNavItems]
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>

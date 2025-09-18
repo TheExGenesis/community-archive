@@ -13,6 +13,8 @@ import { createBrowserClient } from '@/utils/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { formatDistanceToNow } from 'date-fns'
+import { deleteArchive } from '@/lib/db_insert'
+import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 
 interface ProfileContentProps {
   user: User
@@ -26,6 +28,7 @@ export default function ProfileContent({
   archives
 }: ProfileContentProps) {
   const router = useRouter()
+  const { userMetadata } = useAuthAndArchive()
   const [isPending, startTransition] = useTransition()
   const [optInStatus, setOptInStatus] = useState(initialOptInData?.opted_in || false)
   const [explicitOptOut, setExplicitOptOut] = useState(initialOptInData?.explicit_optout || false)
@@ -140,8 +143,32 @@ export default function ProfileContent({
     })
   }
 
+  const deleteStorageFiles = async (username: string) => {
+    const { data: fileList, error: listError } = await supabase.storage
+      .from('archives')
+      .list(username)
+
+    if (listError) throw listError
+
+    if (fileList && fileList.length > 0) {
+      const filesToDelete = fileList.map(
+        (file: { name: string }) => `${username}/${file.name}`,
+      )
+      const { error: deleteError } = await supabase.storage
+        .from('archives')
+        .remove(filesToDelete)
+
+      if (deleteError) throw deleteError
+    }
+  }
+
   const handleDeleteArchive = async (archiveId: string) => {
-    if (!confirm('Are you sure you want to delete this archive? This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to delete ALL your archives? This action cannot be undone.')) {
+      return
+    }
+
+    if (!userMetadata?.provider_id) {
+      setError('Unable to identify user account')
       return
     }
 
@@ -150,17 +177,15 @@ export default function ProfileContent({
     setSuccess(null)
 
     try {
-      // Call the delete archive function
-      const { error } = await (supabase.rpc as any)('delete_single_user_archive', {
-        p_archive_upload_id: parseInt(archiveId)
-      })
-
-      if (error) throw error
-
-      setSuccess('Archive deleted successfully')
+      // Delete from database using the existing function
+      await deleteArchive(supabase, userMetadata.provider_id)
+      // Delete from storage
+      await deleteStorageFiles(userMetadata.provider_id)
+      
+      setSuccess('All archives deleted successfully')
       router.refresh()
     } catch (err: any) {
-      setError(err.message || 'Failed to delete archive')
+      setError(err.message || 'Failed to delete archives')
     } finally {
       setDeletingArchive(null)
     }
@@ -180,10 +205,6 @@ export default function ProfileContent({
             <div className="flex items-center space-x-2">
               <Label htmlFor="email">Email:</Label>
               <span className="text-muted-foreground">{user.email}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Label htmlFor="userId">User ID:</Label>
-              <span className="text-muted-foreground font-mono text-xs">{user.id}</span>
             </div>
           </div>
         </CardContent>

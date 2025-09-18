@@ -864,6 +864,59 @@ export type Database = {
         }
         Relationships: []
       }
+      optin: {
+        Row: {
+          id: string
+          user_id: string
+          username: string
+          twitter_user_id: string | null
+          opted_in: boolean
+          explicit_optout: boolean
+          opt_out_reason: string | null
+          terms_version: string
+          created_at: string
+          updated_at: string
+          opted_in_at: string | null
+          opted_out_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          username: string
+          twitter_user_id?: string | null
+          opted_in?: boolean
+          explicit_optout?: boolean
+          opt_out_reason?: string | null
+          terms_version?: string
+          created_at?: string
+          updated_at?: string
+          opted_in_at?: string | null
+          opted_out_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          username?: string
+          twitter_user_id?: string | null
+          opted_in?: boolean
+          explicit_optout?: boolean
+          opt_out_reason?: string | null
+          terms_version?: string
+          created_at?: string
+          updated_at?: string
+          opted_in_at?: string | null
+          opted_out_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "optin_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile: {
         Row: {
           account_id: string

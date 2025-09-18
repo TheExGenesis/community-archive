@@ -7,9 +7,9 @@ project_id = "canonball"
 port = 54321
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
 # endpoints. public and storage are always included.
-schemas = ["public", "graphql_public", "dev", "temp", "storage","tes"]
+schemas = ["public", "graphql_public", "temp", "storage", "tes"]
 # Extra schemas to add to the search_path of every request. public is always included.
-extra_search_path = ["public", "extensions", "dev", "temp"]
+extra_search_path = ["public", "extensions", "temp"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size
 # for accidental or malicious requests.
 max_rows = 1000
@@ -38,7 +38,7 @@ pop3_port = 54326
 file_size_limit = "1000MiB"
 
 [storage.buckets.archives]
-public = false
+public = true
 file_size_limit = "5000MiB"
 # objects_path = "../data/local_seed/archives"
 
@@ -89,3 +89,29 @@ vector_port = 54328
 gcp_project_id = ""
 gcp_project_number = ""
 gcp_jwt_path = "supabase/gcloud.json"
+
+[db.migrations]
+# Explicit schema file order for declarative schemas. Files are deduplicated and
+# applied in the order listed after glob expansion. Ensure foundational files
+# (extensions, roles, schemas, helpers) run BEFORE prod.sql so objects exist
+# when referenced by definitions retained in prod.sql.
+schema_paths = [
+  "./schemas/000_extensions.sql",
+  "./schemas/000_roles.sql",
+  "./schemas/001_schemas.sql",
+  "./schemas/010_types.sql",
+  "./schemas/020_tables.sql",
+  "./schemas/030_indexes.sql",
+  "./schemas/031_functions_prereq.sql",
+  "./schemas/032_views_prereq.sql",
+  "./schemas/035_matviews.sql",
+  "./schemas/036_matview_indexes.sql",
+  "./schemas/040_auth_helpers.sql",
+  "./schemas/040_views.sql",
+  "./schemas/050_constraints.sql",
+  "./schemas/060_grants.sql",
+  "./schemas/060_policies.sql",
+  "./schemas/070_functions.sql",
+  "./schemas/080_triggers.sql",
+  "./schemas/prod.sql",
+]

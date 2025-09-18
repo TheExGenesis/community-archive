@@ -1,0 +1,32 @@
+services:
+  process-archive:
+    build:
+      context: ../../
+      dockerfile: services/process_archive/Dockerfile
+    # container_name: service  # Commented out to allow multiple test instances
+    # No restart policy - this is a one-time job
+    
+    # Explicitly load environment file
+    env_file:
+      - ../../.env
+    
+    # Environment variables - customize these
+    
+    
+    # Volume mounts for data persistence
+    volumes:
+      # Logs persistence
+      - ./logs:/app/logs
+      
+      # Archive data files
+      - ${ARCHIVE_DATA_PATH:-./data}:/app/data
+    
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'

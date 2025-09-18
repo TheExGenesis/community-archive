@@ -1,16 +1,16 @@
 'use client'
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import Tweet from '@/components/Tweet'
+import UnifiedTweetList from '@/components/UnifiedTweetList'
 import { createBrowserClient } from '@/utils/supabase'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/database-types'
-import getLatestTweets from '@/lib-client/queries/getLatestTweets'
+import getLatestTweets from '@/lib/queries/getLatestTweets'
 import {
   searchTweetsExact,
   searchTweetsAND,
   searchTweetsOR,
-} from '@/lib-client/pgSearch'
+} from '@/lib/pgSearch'
 
 interface SearchProps {
   supabase: SupabaseClient | null
@@ -127,34 +127,14 @@ export default function SearchTweets({
       </div>
       <ScrollArea className="flex-grow">
         <div className="pr-4">
-          {isLoading ? (
-            <div>Loading tweets...</div>
-          ) : allTweets.length > 0 ? (
-            <div className="space-y-8">
-              {allTweets.map((tweet) => (
-                <Tweet
-                  key={tweet.tweet_id}
-                  tweetId={tweet.tweet_id}
-                  username={tweet.username || 'Unknown'}
-                  displayName={tweet.account_display_name || 'Unknown'}
-                  profilePicUrl={
-                    tweet.avatar_media_url ||
-                    'https://pbs.twimg.com/profile_images/1821884121850970112/f04rgSFD_400x400.jpg'
-                  }
-                  text={tweet.full_text}
-                  favoriteCount={tweet.favorite_count}
-                  retweetCount={tweet.retweet_count}
-                  date={tweet.created_at}
-                  tweetUrl={`https://twitter.com/${
-                    tweet['account']?.username || 'unknown'
-                  }/status/${tweet.tweet_id}`}
-                  replyToUsername={tweet.reply_to_username}
-                />
-              ))}
-            </div>
-          ) : (
-            <div>No tweets found</div>
-          )}
+          <UnifiedTweetList 
+            tweets={allTweets}
+            isLoading={isLoading}
+            emptyMessage="No tweets found"
+            className="space-y-8"
+            showCsvExport={true}
+            csvFilename="search_results.csv"
+          />
         </div>
       </ScrollArea>
     </div>

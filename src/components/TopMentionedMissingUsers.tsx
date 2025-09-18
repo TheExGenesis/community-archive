@@ -14,9 +14,9 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { createBrowserClient } from '@/utils/supabase'
-import { devLog } from '@/lib-client/devLog'
+import { devLog } from '@/lib/devLog'
 import { Label } from '@/components/ui/label'
-import { formatNumber } from '@/lib-client/formatNumber'
+import { formatNumber } from '@/lib/formatNumber'
 
 export type MentionedUser = {
   mentioned_user_id: string
@@ -76,7 +76,9 @@ export default function TopMentionedUsers({
         if (!accountData) {
           return { ...user, uploaded: false }
         }
-        const media_url = (accountData.profile?.avatar_media_url)? accountData.profile?.avatar_media_url : undefined;
+        const media_url = accountData.profile?.avatar_media_url
+          ? accountData.profile.avatar_media_url
+          : undefined
         return {
           ...user,
           account_display_name: accountData.account_display_name!,

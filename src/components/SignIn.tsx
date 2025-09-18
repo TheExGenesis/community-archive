@@ -1,9 +1,12 @@
 'use client'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
-import { devLog } from '@/lib-client/devLog'
+import { devLog } from '@/lib/devLog'
 import { createBrowserClient } from '@/utils/supabase'
+import { useSearchParams } from 'next/navigation'
 
 export default function SignIn() {
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirect')
   const { userMetadata, isArchiveUploaded } = useAuthAndArchive()
 
   const signIn = async () => {
@@ -11,51 +14,59 @@ export default function SignIn() {
     devLog('sign in', {
       userMetadata,
       useremote: process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB,
+      isDev: process.env.NODE_ENV === 'development',
     })
 
-    if (
-      process.env.NODE_ENV === 'development' &&
-      process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'false'
-    ) {
-      // Mock sign-in for local development
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: 'dev@gmail.com',
-        password: 'dev',
-      })
-      devLog('sign in with password', { data, error })
-      if (error) {
-        console.error('Error signing in:', error)
-      } else if (data.user) {
-        // Change the user ID after successful sign-in
-        const response = await fetch('/api/auth/changeuserid', {
+    // Always use dev login in development mode
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        // Use the dev-login API endpoint for consistent behavior
+        const response = await fetch('/api/auth/dev-login', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            userId: data.user.id,
-            providerId: process.env.NEXT_PUBLIC_USER_ID, // Replace with desired new user ID
-            userName: process.env.NEXT_PUBLIC_USER_NAME,
+            email: 'dev@example.com',
+            password: 'devpassword123'
           }),
         })
 
         const result = await response.json()
-        if (response.ok) {
-          devLog('User ID updated:', result.data)
-        } else {
-          console.error('Failed to update user ID:', result.error)
+
+        if (!response.ok) {
+          console.error('Dev login failed:', result.error)
+          // Fallback to showing an error message
+          alert(`Dev login failed: ${result.error || 'Unknown error'}`)
+          return
         }
+
+        devLog('Dev login successful:', result)
+        
+        // Redirect to intended page after dev login
+        if (redirectTo) {
+          window.location.href = redirectTo
+        } else {
+          window.location.href = '/profile'
+        }
+      } catch (error) {
+        console.error('Error during dev sign in:', error)
+        alert('Failed to sign in. Check the console for details.')
       }
     } else {
-      // Existing Twitter OAuth sign-in
+      // Production: Use Twitter OAuth sign-in
       devLog('sign in with twitter', {
         userMetadata,
         origin: window.location.origin,
       })
+      const callbackUrl = redirectTo 
+        ? `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(redirectTo)}`
+        : `${window.location.origin}/api/auth/callback`
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'twitter',
         options: {
-          redirectTo: `${window.location.origin}/api/auth/callback`,
+          redirectTo: callbackUrl,
         },
       })
       devLog({ data, error })
@@ -75,6 +86,8 @@ export default function SignIn() {
     }
   }
 
+  const isDev = process.env.NODE_ENV === 'development'
+  
   return userMetadata ? (
     <div className="inline-flex items-center text-sm dark:text-gray-300">
       <span>{`You're logged in as ${
@@ -87,26 +100,19 @@ export default function SignIn() {
       </form>
     </div>
   ) : (
-    <div className="dark:text-gray-300">
+    <div className="inline-block">
       <form action={signIn} className="inline-block">
-        {process.env.NODE_ENV === 'development' &&
-        process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'false' ? (
-          <button
-            type="submit"
-            className="text-blue-500 hover:underline dark:text-blue-400"
-          >
-            Sign in as Dev
-          </button>
-        ) : (
-          <button
-            type="submit"
-            className="text-blue-500 hover:underline dark:text-blue-400"
-          >
-            Sign in with Twitter
-          </button>
-        )}
+        <button
+          type="submit"
+          className={`px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-300 ${
+            isDev 
+              ? 'bg-yellow-600 hover:bg-yellow-700 dark:bg-yellow-500 dark:hover:bg-yellow-600 focus:ring-yellow-500' 
+              : 'bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 focus:ring-green-500'
+          }`}
+        >
+          {isDev ? 'Sign in (Dev Mode)' : 'Sign in with Twitter'}
+        </button>
       </form>
-      <span className="ml-1">to upload your archive</span>
     </div>
   )
 }

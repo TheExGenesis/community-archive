@@ -1,1 +1,0 @@
--- CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_quote_tweets ON public.quote_tweets (TWEET_ID, QUOTED_TWEET_ID);

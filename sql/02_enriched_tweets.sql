@@ -21,8 +21,8 @@ LEFT JOIN conversations c ON t.tweet_id = c.tweet_id
 LEFT JOIN quote_tweets qt ON t.tweet_id = qt.tweet_id
 LEFT JOIN LATERAL (
     SELECT avatar_media_url
-    FROM profile
-    WHERE profile.account_id = t.account_id
+    FROM all_profile
+    WHERE all_profile.account_id = t.account_id
     ORDER BY archive_upload_id DESC
     LIMIT 1
 ) p ON true; 

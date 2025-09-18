@@ -8,9 +8,10 @@ BEGIN
     -- Get provider_id from JWT
     SELECT ((auth.jwt()->'app_metadata'->>'provider_id')::text) INTO v_provider_id;
     
-    -- Verify the JWT provider_id matches the account_id being deleted
-    IF v_provider_id IS NULL OR v_provider_id != p_account_id THEN
-        RAISE EXCEPTION 'Unauthorized: provider_id % does not match account_id %', v_provider_id, v_account_id;
+    -- Verify the JWT provider_id matches the account_id being deleted, unless postgres/service_role
+    IF (current_role NOT IN ('postgres', 'service_role')) AND 
+       (v_provider_id IS NULL OR v_provider_id != p_account_id) THEN
+        RAISE EXCEPTION 'Unauthorized: provider_id % does not match account_id %', v_provider_id, p_account_id;
     END IF;
 
     SELECT ARRAY_AGG(id) INTO v_archive_upload_ids
@@ -49,8 +50,7 @@ BEGIN
             DELETE FROM %I.likes WHERE archive_upload_id = ANY($1);
             DELETE FROM %I.followers WHERE archive_upload_id = ANY($1);
             DELETE FROM %I.following WHERE archive_upload_id = ANY($1);
-            DELETE FROM %I.all_profile WHERE archive_upload_id = ANY($1);
-            DELETE FROM %I.tweet_media WHERE archive_upload_id = ANY($1);
+            DELETE FROM %I.all_profile WHERE account_id = $2;
             DELETE FROM %I.archive_upload WHERE id = ANY($1);
             DELETE FROM %I.all_account WHERE account_id = $2;
         ', 

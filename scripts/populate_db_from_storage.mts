@@ -4,12 +4,12 @@ import * as dotenv from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import os from 'os'
-const { pipe } = await import('../src/lib-server/fp')
+const { pipe } = await import('../src/lib/fp')
 const { removeProblematicCharacters } = await import(
-  '../src/lib-client/removeProblematicChars'
+  '../src/lib/removeProblematicChars'
 )
-const { commitTempTables, insertArchiveInTempTables } = await import(
-  '../src/lib-client/db_insert'
+const { insertArchiveForProcessing } = await import(
+  '../src/lib/db_insert'
 )
 
 // Initialize paths
@@ -109,19 +109,13 @@ async function uploadArchive(filePath: string) {
       JSON.parse,
     )(fileContents)
 
-    console.log('Processing archive for', archive.account)
+    console.log('Queueing archive for', archive.account)
 
-    await insertArchiveInTempTables(supabase, archive, (progress) => {
+    await insertArchiveForProcessing(supabase, archive, (progress) => {
       console.log(`${progress.phase}: ${progress.percent?.toFixed(2)}%`)
     })
 
-    const accountId = archive.account[0].account.accountId
-
-    console.log('accountId', accountId)
-    console.log('Committing temp tables...')
-    await commitTempTables(supabase, accountId)
-
-    console.log('Archive processing completed successfully')
+    console.log('Archive successfully queued for processing')
   } catch (error) {
     console.error('Error processing archive:', error)
   }
@@ -150,6 +144,9 @@ const EXCLUDED_USERNAMES = [
   '_ceeeeeeee_',
 ]
 
+const INCLUDED_USERNAMES = ['exgenesis','milangriffes']
+
+
 async function checkAndProcessArchives() {
   const storageObjects = await fetchStoragePaths()
   const accountUsernames = await fetchAccountUsernames()
@@ -164,6 +161,7 @@ async function checkAndProcessArchives() {
   const archivesToProcess = [...archivesInStorage]
     .filter((archive) => !accountsInDb.has(archive))
     .filter((archive) => !EXCLUDED_USERNAMES.includes(archive))
+    .filter((archive) => INCLUDED_USERNAMES.length > 0 ? INCLUDED_USERNAMES.includes(archive) : true)
 
   console.log('Archives in storage but not in public.account:')
   archivesToProcess.forEach((archive) => console.log(archive))

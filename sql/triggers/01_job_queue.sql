@@ -10,6 +10,8 @@ DROP TABLE IF EXISTS private.job_queue CASCADE;
 
 CREATE TABLE private.job_queue (
     key TEXT PRIMARY KEY,
+    job_name TEXT,
+    args JSONB,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     status TEXT CHECK (status IN ('QUEUED', 'PROCESSING', 'DONE', 'FAILED'))
 );
@@ -20,8 +22,8 @@ CREATE OR REPLACE FUNCTION private.queue_archive_changes()
 RETURNS TRIGGER AS $$
 BEGIN
 RAISE NOTICE 'queue_archive_changes:Queueing job: archive_changes';
-INSERT INTO private.job_queue (key, status)
-VALUES ('archive_changes', 'QUEUED')
+INSERT INTO private.job_queue (key, job_name, status)
+VALUES ('archive_changes', 'archive_changes', 'QUEUED')
 ON CONFLICT (key) DO UPDATE
 SET timestamp = CURRENT_TIMESTAMP,
     status = 'QUEUED';
@@ -45,70 +47,105 @@ EXECUTE FUNCTION private.queue_archive_changes();
 CREATE OR REPLACE FUNCTION private.process_jobs()
 RETURNS void AS $$
 DECLARE
-v_job RECORD;
-v_start_time TIMESTAMP;
+    v_job RECORD;
+    v_start_time TIMESTAMP;
 BEGIN
-RAISE NOTICE 'Starting process_jobs';
+    RAISE NOTICE 'Starting process_jobs';
 
--- Check for a job
-SELECT * INTO v_job
-FROM private.job_queue
-WHERE status = 'QUEUED'
-ORDER BY timestamp
-LIMIT 1
-FOR UPDATE SKIP LOCKED;
+    -- Check for a job using job_name
+    SELECT * INTO v_job
+    FROM private.job_queue
+    WHERE status = 'QUEUED'
+    ORDER BY timestamp
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED;
 
--- If no job, exit
-IF NOT FOUND THEN
-    RAISE NOTICE 'No jobs found, exiting';
-    RETURN;
-END IF;
-
-RAISE NOTICE 'Processing job: %', v_job.key;
-
--- Update job status to PROCESSING
-UPDATE private.job_queue
-SET status = 'PROCESSING'
-WHERE key = v_job.key;
-
-BEGIN  -- Start exception block
-    -- Set 30 minute timeout for this job's execution
-    SET LOCAL statement_timeout TO '1800000';  -- 30 minutes in milliseconds
-
-    -- Do the job
-    IF v_job.key = 'archive_changes' THEN
-        RAISE NOTICE 'Refreshing materialized views concurrently';
-        v_start_time := clock_timestamp();
-        REFRESH MATERIALIZED VIEW CONCURRENTLY public.global_activity_summary;
-        RAISE NOTICE 'Refreshing materialized view took: %', clock_timestamp() - v_start_time;
-        
-        v_start_time := clock_timestamp();
-        PERFORM private.post_upload_update_conversation_ids();
-        RAISE NOTICE 'Updating conversation IDs took: %', clock_timestamp() - v_start_time;
+    -- If no job, exit
+    IF NOT FOUND THEN
+        RAISE NOTICE 'No jobs found, exiting';
+        RETURN;
     END IF;
 
-    IF v_job.key = 'update_conversation_ids' THEN
-        RAISE NOTICE 'Updating conversation ids';
-        v_start_time := clock_timestamp();
-        
-        RAISE NOTICE 'Updating conversation IDs took: %', clock_timestamp() - v_start_time;
-    END IF;
+    RAISE NOTICE 'Processing job: %', v_job.job_name;
 
-    -- Delete the job only if successful
-    DELETE FROM private.job_queue WHERE key = v_job.key;
-    RAISE NOTICE 'Job completed and removed from queue: %', v_job.key;
-
-EXCEPTION WHEN OTHERS THEN
-    -- On any error, mark the job as failed
-    UPDATE private.job_queue 
-    SET status = 'FAILED'
+    -- Update job status to PROCESSING
+    UPDATE private.job_queue
+    SET status = 'PROCESSING'
     WHERE key = v_job.key;
-    
-    RAISE NOTICE 'Job failed with error: %', SQLERRM;
-END;
 
+    BEGIN  -- Start exception block
+        -- Set 30 minute timeout for this job's execution
+        SET LOCAL statement_timeout TO '1800000';  -- 30 minutes in milliseconds
+
+        -- Do the job based on job_name instead of key
+        IF v_job.job_name = 'archive_changes' THEN
+            RAISE NOTICE 'Refreshing materialized views concurrently';
+            v_start_time := clock_timestamp();
+            REFRESH MATERIALIZED VIEW CONCURRENTLY public.global_activity_summary;
+            RAISE NOTICE 'Refreshing materialized view took: %', clock_timestamp() - v_start_time;
+            
+        END IF;
+
+        IF v_job.job_name = 'update_conversation_ids' THEN
+            RAISE NOTICE 'Not updating conversation ids, update_conversation_ids needs optimization to not time out';
+            -- v_start_time := clock_timestamp();
+            -- PERFORM private.post_upload_update_conversation_ids();
+            -- RAISE NOTICE 'Updating conversation IDs took: %', clock_timestamp() - v_start_time;
+        END IF;
+
+        IF v_job.job_name = 'commit_temp_data' THEN
+            RAISE NOTICE 'Committing temp data for account: %', v_job.args->>'account_id';
+            v_start_time := clock_timestamp();
+            
+            PERFORM public.commit_temp_data(cast(v_job.args->>'account_id' as text));
+            
+            RAISE NOTICE 'Commit processing took: %', clock_timestamp() - v_start_time;
+        END IF;
+
+        -- Update status using key
+        UPDATE private.job_queue 
+        SET status = 'DONE'
+        WHERE key = v_job.key;
+        RAISE NOTICE 'Job completed and marked as done: %', v_job.job_name;
+
+    EXCEPTION WHEN OTHERS THEN
+        -- On any error, mark the job as failed
+        UPDATE private.job_queue 
+        SET status = 'FAILED'
+        WHERE key = v_job.key;
+        
+        RAISE NOTICE 'Job failed with error: %', SQLERRM;
+    END;
 END;
 $$ LANGUAGE plpgsql;
+
+-- trigger_commit_temp_data function
+CREATE OR REPLACE FUNCTION public.trigger_commit_temp_data()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Only trigger when upload_phase changes to 'ready_for_commit'
+    IF NEW.upload_phase = 'ready_for_commit' AND 
+       (OLD.upload_phase IS NULL OR OLD.upload_phase != 'ready_for_commit') THEN
+        RAISE NOTICE 'trigger_commit_temp_data: Running for account_id %', NEW.account_id;
+        -- Queue the commit job instead of running directly
+        INSERT INTO private.job_queue (key, job_name, status, args)
+        VALUES (
+            'commit_temp_data_' || NEW.account_id || '_' || extract(epoch from now())::text,
+            'commit_temp_data', 
+            'QUEUED', 
+            jsonb_build_object('account_id', NEW.account_id)
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create the trigger
+DROP TRIGGER IF EXISTS trigger_commit_temp_data ON public.archive_upload;
+CREATE TRIGGER trigger_commit_temp_data
+    AFTER UPDATE OF upload_phase ON public.archive_upload
+    FOR EACH ROW
+    EXECUTE FUNCTION public.trigger_commit_temp_data();
 
 
 -- Enable pg_cron extension if not already enabled
@@ -130,4 +167,3 @@ END $$;
 SELECT cron.schedule('* * * * *', $$
 SELECT private.process_jobs();
 $$);
-

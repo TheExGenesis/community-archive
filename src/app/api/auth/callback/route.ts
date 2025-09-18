@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerAdminClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
-import { devLog } from '@/lib-client/devLog'
+import { devLog } from '@/lib/devLog'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)

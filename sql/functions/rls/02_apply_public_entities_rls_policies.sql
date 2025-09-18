@@ -19,7 +19,7 @@ BEGIN
     END LOOP;
 
     EXECUTE format('
-        CREATE POLICY "Entities are publicly visible unless marked private" ON %I.%I
+        CREATE POLICY "Entities are publicly visible" ON %I.%I
         FOR SELECT
         USING (true)', schema_name, table_name, table_name);
 

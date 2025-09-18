@@ -1,15 +1,15 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { deleteArchive } from '../lib-client/db_insert'
+import { deleteArchive } from '../lib/db_insert'
 import { createBrowserClient } from '@/utils/supabase'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { FileUploadDialog } from './file-upload-dialog'
-import { ArchiveStats, Archive, ArchiveUpload } from '@/lib-client/types'
-import { devLog } from '@/lib-client/devLog'
-import { fetchArchiveUpload } from '@/lib-client/queries/fetchArchiveUpload'
-import { calculateArchiveStats } from '@/lib-client/upload-archive/calculateArchiveStats'
-import { handleFileUpload } from '@/lib-client/upload-archive/handleFileUpload'
+import { ArchiveStats, Archive, ArchiveUpload } from '@/lib/types'
+import { devLog } from '@/lib/devLog'
+import { fetchArchiveUpload } from '@/lib/queries/fetchArchiveUpload'
+import { calculateArchiveStats } from '@/lib/upload-archive/calculateArchiveStats'
+import { handleFileUpload } from '@/lib/upload-archive/handleFileUpload'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/database-types'
 
@@ -30,11 +30,9 @@ interface UploadArchiveState {
   showUploadButton: boolean
   isDeleting: boolean
 }
-export default function UploadHomepageSection(props: {
-  supabase: SupabaseClient<Database> | null
-}) {
+export default function UploadHomepageSection() {
   const { userMetadata } = useAuthAndArchive()
-  const supabase = props.supabase || createBrowserClient()
+  const supabase = createBrowserClient()
   const [state, setState] = useState<UploadArchiveState>({
     isProcessing: false,
     archive: null,
@@ -168,21 +166,23 @@ export default function UploadHomepageSection(props: {
             )}
             <div className="flex flex-col">
               <div className="flex justify-between">
-                <div className="mb-4">
-                  <p className="mb-6 text-xs dark:text-gray-300">
+                <div className="mb-4 flex-1">
+                  <p className="mb-6 text-xs text-center dark:text-gray-300">
                     Please upload your Twitter archive as a .zip file.
                   </p>
-                  <label className="mb-4 cursor-pointer rounded bg-zinc-500 px-4 py-3 text-sm text-white hover:bg-zinc-600 disabled:opacity-50 dark:bg-zinc-600 dark:hover:bg-zinc-700">
-                    Choose Files
-                    <input
-                      type="file"
-                      accept=".zip,application/zip"
-                      onChange={onFileUpload}
-                      disabled={state.isProcessing}
-                      multiple
-                      className="hidden"
-                    />
-                  </label>
+                  <div className="flex justify-center">
+                    <label className="mb-4 cursor-pointer rounded bg-zinc-500 px-4 py-3 text-sm text-white hover:bg-zinc-600 disabled:opacity-50 dark:bg-zinc-600 dark:hover:bg-zinc-700">
+                      Choose Files
+                      <input
+                        type="file"
+                        accept=".zip,application/zip"
+                        onChange={onFileUpload}
+                        disabled={state.isProcessing}
+                        multiple
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
                   {state.isProcessing && (
                     <div className="mt-4">
                       <p className="mb-2">{`Processing archive...`}</p>
@@ -235,17 +235,17 @@ export default function UploadHomepageSection(props: {
 
 const deleteStorageFiles = async (
   supabase: SupabaseClient<Database>,
-  providerId: string,
+  username: string,
 ) => {
   const { data: fileList, error: listError } = await supabase.storage
     .from('archives')
-    .list(providerId)
+    .list(username)
 
   if (listError) throw listError
 
   if (fileList && fileList.length > 0) {
     const filesToDelete = fileList.map(
-      (file: { name: string }) => `${providerId}/${file.name}`,
+      (file: { name: string }) => `${username}/${file.name}`,
     )
     const { error: deleteError } = await supabase.storage
       .from('archives')

@@ -1,23 +1,84 @@
 'use client'
-import ThemeToggle from '@/components/ThemeToggle'
 import AdvancedSearchForm from '@/components/AdvancedSearchForm'
+import TweetList from '@/components/TweetList';
+import { FilterCriteria } from '@/lib/queries/tweetQueries';
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
+
+// Style definitions
+const unifiedDeepBlueBase = "bg-white dark:bg-background";
+const sectionPaddingClasses = "py-12 md:py-16 lg:py-20";
+const contentWrapperClasses = "w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8";
+
+// This wrapper is needed because useSearchParams can only be used in Client Components,
+// and Suspense is recommended for pages that use it.
+function SearchPageContent() {
+  const searchParams = useSearchParams();
+
+  const rawQuery = searchParams.get('q');
+  let formattedQuery: string | undefined;
+
+  if (rawQuery) {
+    const trimmedQuery = rawQuery.trim();
+    if (trimmedQuery.startsWith('"') && trimmedQuery.endsWith('"')) {
+      // Exact phrase search: "cool project" -> cool <-> project
+      const phrase = trimmedQuery.substring(1, trimmedQuery.length - 1);
+      formattedQuery = phrase.trim().split(/\s+/).join(' <-> ');
+    } else {
+      // All words search: cool project -> cool & project
+      formattedQuery = trimmedQuery.split(/\s+/).join(' & ');
+    }
+  }
+
+  // Construct FilterCriteria from URL search parameters
+  const filterCriteria: FilterCriteria = {
+    searchQuery: formattedQuery,
+    fromUsername: searchParams.get('fromUser') || undefined,
+    replyToUsername: searchParams.get('replyToUser') || undefined,
+    startDate: searchParams.get('sinceDate') || undefined,
+    endDate: searchParams.get('untilDate') || undefined,
+    // isRootTweet, mentionedUser, hashtags are not currently set by AdvancedSearchForm directly to URL params
+    // They could be added if the form supports them explicitly or if 'q' is parsed for such syntax.
+  };
+  
+  // A key for TweetList to force re-render when search params change, ensuring new data is fetched.
+  // This is important because TweetList fetches data in its own useEffect based on initial props.
+  const tweetListKey = searchParams.toString();
+
+  return (
+    <main> 
+      <section 
+        className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} overflow-hidden min-h-screen`}
+      >
+        <div className={`${contentWrapperClasses}`}> 
+          <h2 className="mb-8 text-4xl font-bold text-center text-gray-900 dark:text-white">🔬 Advanced Search</h2>
+          <AdvancedSearchForm /> {/* This will pre-fill itself from URL params */}
+          
+          <div className="mt-12">
+            {/* Render TweetList only if there are actual search parameters present */} 
+            {searchParams.toString().length > 0 ? (
+              <div className="bg-slate-100 dark:bg-card p-6 md:p-8 rounded-lg">
+                <h3 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-white">Search Results</h3>
+                <TweetList 
+                  key={tweetListKey} // Force re-mount on new search
+                  filterCriteria={filterCriteria} 
+                />
+              </div>
+            ) : (
+              <p className="text-center text-gray-500 dark:text-gray-400 mt-12">Please enter your search criteria above.</p>
+            )}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
 
 export default function SearchTweetsPage() {
   return (
-    <div className="flex w-full flex-1 flex-col items-center gap-20">
-      <nav className="flex h-16 w-full justify-center border-b border-b-foreground/10">
-        <div className="flex w-full max-w-4xl items-center justify-between p-3 text-sm"></div>
-      </nav>
-
-      <div className="flex max-w-4xl flex-1 flex-col gap-20 px-3">
-        <main className="flex flex-1 flex-col gap-6">
-          <h2 className="mb-4 text-4xl font-bold">Advanced Search</h2>
-          <AdvancedSearchForm />
-        </main>
-      </div>
-      <footer className="w-full justify-center border-t border-t-foreground/10 p-8 text-center text-xs">
-        <ThemeToggle />
-      </footer>
-    </div>
-  )
+    // Suspense boundary for useSearchParams
+    <Suspense fallback={<div>Loading search...</div>}> 
+      <SearchPageContent />
+    </Suspense>
+  );
 }

@@ -4,6 +4,8 @@ import { cookies } from 'next/headers'
 import AvatarList from '@/components/AvatarList'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { FaGithub, FaDiscord, FaBook, FaHeart } from 'react-icons/fa'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import UploadHomepageSection from '@/components/UploadHomepageSection'
 import ShowcasedApps from '@/components/ShowcasedApps'
 import dynamic from 'next/dynamic'
@@ -16,6 +18,11 @@ export const revalidate = 0
 
 // Dynamically import SignIn component with ssr disabled
 const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
+  ssr: false,
+})
+
+// Dynamically import HomeOptInWidget with ssr disabled
+const DynamicHomeOptInWidget = dynamic(() => import('@/components/HomeOptInWidget'), {
   ssr: false,
 })
 
@@ -102,7 +109,8 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ icon, title, description, href })
 )
 
 export default async function Homepage() {
-  const supabase = createServerClient(cookies())
+  const cookieStore = await cookies()
+  const supabase = createServerClient(cookieStore)
   const mostFollowed = (await getMostFollowedAccounts(supabase)).slice(0, 7)
   const financialContributors = await getOpenCollectiveContributors()
 
@@ -198,9 +206,51 @@ export default async function Homepage() {
         </section>
       </section>
 
-      {/* Section 4: Upload your data - Removed glow */}
+      {/* Section 4: Real-time Tweet Streaming - NEW */}
       <section 
         className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}
+      >
+        <div className={`${contentWrapperClasses} space-y-8`}>
+          <div className="text-center space-y-4">
+            <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">📡 Contribute to the Archive!</h2>
+            <p className="text-lg text-gray-700 dark:text-gray-300 max-w-3xl mx-auto">
+              Stream tweets to the archive by installing our browser extension that archives tweets you see from other contributors.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <DynamicHomeOptInWidget />
+
+            <Card className="border-green-200 dark:border-green-700">
+              <CardContent className="pt-6 text-center space-y-4">
+                <div className="text-4xl">🔌</div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Step 2: Install Extension</h3>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Use our browser extension to automatically contribute tweets to the archive as you browse X/Twitter.
+                </p>
+                <a href="https://chromewebstore.google.com/detail/community-archive-stream/igclpobjpjlphgllncjcgaookmncegbk" target="_blank" rel="noopener noreferrer">
+                  <Button variant="outline" className="border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-800">
+                    Install Browser Extension
+                  </Button>
+                </a>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="text-center space-y-2">
+            <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+              🛡️ Privacy-first design • Only public tweets • Full control
+            </p>
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Chrome extension available now • See current streaming activity in the <Link href="/stream-monitor" className="text-green-600 dark:text-green-400 hover:underline font-medium">Stream Monitor</Link>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 5: Upload your data - Removed glow */}
+      <section 
+        className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} overflow-hidden`}
       >
         <div className={`${contentWrapperClasses} space-y-6 text-center`}>
           <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">📤 Upload Your Data</h2>
@@ -224,18 +274,18 @@ export default async function Homepage() {
         </div>
       </section>
       
-      {/* Section 5: Showcased Apps (Built with the Archive) - Removed glow */}
+      {/* Section 6: Showcased Apps (Built with the Archive) - Removed glow */}
       <section 
-        className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} overflow-hidden`}
+        className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}
       >
         <div className={contentWrapperClasses}>
            <ShowcasedApps />
         </div>
       </section>
 
-      {/* Section 6: Data & source code - Removed glow */}
+      {/* Section 7: Data & source code - Removed glow */}
       <section 
-        className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}
+        className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} overflow-hidden`}
       >
         <div className={`${contentWrapperClasses} space-y-8`}>
           <div className="text-center">
@@ -257,9 +307,9 @@ export default async function Homepage() {
         </div>
       </section>
 
-      {/* Section 7: Our Supporters - Unified and Re-ordered */}
+      {/* Section 8: Our Supporters - Unified and Re-ordered */}
       <section 
-        className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} overflow-hidden`}
+        className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}
       >
         <div className={`${contentWrapperClasses} text-center space-y-12`}>
           <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">💖 Our Supporters</h2>

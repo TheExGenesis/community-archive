@@ -100,18 +100,29 @@ const insertAccountAndUploadRow = async (
     endDate: null,
   }
 
-  // First try to update existing row
-  const { data: existingUpload, error: existingError } = await supabase
-    .from('archive_upload')
-    .update({ upload_phase: 'uploading' })
-    .eq('account_id', accountId)
-    .select('id')
-    .maybeSingle()
+  const {data: lastUploadedArchive, error: lastUploadedArchiveError} = await supabase.from('archive_upload').
+  select('id,archive_at').eq('account_id', accountId).in('upload_phase', ['uploading', 'ready_for_commit'])
+  .order('created_at', { ascending: false }).limit(1).maybeSingle()
 
-  // If no existing row, create new one
-  const { data: archiveUploadIdData, error: uploadError } = existingUpload
-    ? { data: existingUpload, error: existingError }
-    : await supabase
+  let supabaseUpsertQuery;
+  if (lastUploadedArchive) {
+     supabaseUpsertQuery = supabase
+      .from('archive_upload')
+      .update({ 
+        archive_at: latestTweetDate,
+        keep_private: uploadOptions.keepPrivate,
+        upload_likes: uploadOptions.uploadLikes,
+        start_date: uploadOptions.startDate,
+        end_date: uploadOptions.endDate,
+        upload_phase: 'uploading',
+        created_at: new Date().toISOString(),
+      })
+      .eq('id', lastUploadedArchive.id)
+      .select('id')
+      .maybeSingle()
+      console.log("has other records, updating")
+  }else{
+    supabaseUpsertQuery = supabase
         .from('archive_upload')
         .insert({
           account_id: accountId,
@@ -124,6 +135,10 @@ const insertAccountAndUploadRow = async (
         })
         .select('id')
         .single()
+        console.log("no other records, inserting")
+  }
+
+  const { data: archiveUploadIdData, error: uploadError } = await supabaseUpsertQuery;
 
   console.log('archiveUploadIdData', { archiveUploadIdData })
   const archiveUploadId = archiveUploadIdData?.id

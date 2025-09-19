@@ -237,10 +237,7 @@ export default async function Homepage() {
             </Card>
           </div>
 
-          <div className="text-center space-y-2">
-            <p className="text-sm text-green-700 dark:text-green-300 font-medium">
-              🛡️ Privacy-first design • Only public tweets • Full control
-            </p>
+          <div className="text-center">
             <p className="text-xs text-gray-600 dark:text-gray-400">
               Chrome extension available now • See current streaming activity in the <Link href="/stream-monitor" className="text-green-600 dark:text-green-400 hover:underline font-medium">Stream Monitor</Link>
             </p>

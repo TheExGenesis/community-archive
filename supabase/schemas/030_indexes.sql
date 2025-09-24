@@ -33,6 +33,7 @@ CREATE INDEX "idx_tweet_media_tweet_id" ON "public"."tweet_media" USING "btree" 
 
 -- public.optin
 CREATE INDEX "idx_optin_opted_in" ON "public"."optin" USING "btree" ("opted_in") WHERE ("opted_in" = true);
+CREATE INDEX "idx_optin_explicit_optout" ON "public"."optin" USING "btree" ("explicit_optout") WHERE ("explicit_optout" = true);
 CREATE INDEX "idx_optin_user_id" ON "public"."optin" USING "btree" ("user_id");
 CREATE INDEX "idx_optin_username" ON "public"."optin" USING "btree" ("username");
 

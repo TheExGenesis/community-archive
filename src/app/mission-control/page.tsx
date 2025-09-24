@@ -8,7 +8,8 @@ import { cookies } from 'next/headers';
 // export const revalidate = 0; // TODO: Decide on revalidation strategy
 
 export default async function MissionControlPage() {
-  const supabase = createServerClient(cookies());
+  const cookieStore = await cookies();
+  const supabase = createServerClient(cookieStore);
   const stats = await getStats(supabase).catch((error) => {
     console.error('Failed to fetch stats for mission control:', error)
     return {

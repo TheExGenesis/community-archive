@@ -7,6 +7,8 @@ interface LoginContentProps {
 }
 
 export default function LoginContent({ redirectUrl }: LoginContentProps) {
+  const isDev = process.env.NODE_ENV === 'development'
+  
   return (
     <main className="min-h-screen bg-white dark:bg-background">
       <div className="max-w-md mx-auto px-4 py-12 sm:px-6 lg:px-8">
@@ -28,14 +30,10 @@ export default function LoginContent({ redirectUrl }: LoginContentProps) {
           <div className="space-y-6">
             <SignIn />
             
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                <h3 className="text-sm font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
-                  Development Mode
-                </h3>
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  In development mode, you can sign in with a mock account for testing purposes.
-                  This will not work in production.
+            {isDev && (
+              <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                  <strong>Dev Mode:</strong> Clicking the button above will sign you in with a test account instead of Twitter OAuth.
                 </p>
               </div>
             )}

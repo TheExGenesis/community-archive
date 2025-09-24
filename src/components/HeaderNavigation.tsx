@@ -21,13 +21,14 @@ export default function HeaderNavigation() {
 
   const streamingNavItems = [
     { href: '/stream-monitor', label: 'Stream Monitor' },
-    { href: '/opt-in', label: 'Opt-In' },
   ]
 
-  // Only include streaming features if enabled
-  const navItems = process.env.NEXT_PUBLIC_ENABLE_STREAMING_FEATURES === 'true' 
-    ? [...baseNavItems, ...streamingNavItems]
-    : baseNavItems
+  const userNavItems = [
+    { href: '/profile', label: 'Profile' },
+  ]
+
+  // Include all navigation items
+  const navItems = [...baseNavItems, ...streamingNavItems, ...userNavItems]
 
   return (
     <NavigationMenu className="hidden md:flex">

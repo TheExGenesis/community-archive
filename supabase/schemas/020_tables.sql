@@ -199,7 +199,9 @@ CREATE TABLE IF NOT EXISTS "public"."optin" (
     "created_at" timestamp with time zone DEFAULT "now"(),
     "updated_at" timestamp with time zone DEFAULT "now"(),
     "opted_in_at" timestamp with time zone,
-    "opted_out_at" timestamp with time zone
+    "opted_out_at" timestamp with time zone,
+    "explicit_optout" boolean DEFAULT false,
+    "opt_out_reason" "text"
 );
 ALTER TABLE "public"."optin" OWNER TO "postgres";
 

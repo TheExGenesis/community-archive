@@ -9,7 +9,8 @@ export default async function LoginPage({
 }: {
   searchParams: { redirect?: string }
 }) {
-  const supabase = createServerClient(cookies())
+  const cookieStore = await cookies()
+  const supabase = createServerClient(cookieStore)
   
   // Check if user is already logged in
   const { data: { user } } = await supabase.auth.getUser()

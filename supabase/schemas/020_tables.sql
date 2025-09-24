@@ -209,3 +209,27 @@ CREATE TABLE IF NOT EXISTS "tes"."blocked_scraping_users" (
     "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 ALTER TABLE "tes"."blocked_scraping_users" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS public.quote_tweets (
+    tweet_id TEXT NOT NULL,
+    quoted_tweet_id TEXT NOT NULL,
+    
+    -- Composite primary key
+    PRIMARY KEY (tweet_id, quoted_tweet_id),
+    
+    -- Foreign key constraints
+    CONSTRAINT fk_quote_tweets_tweet_id FOREIGN KEY (tweet_id) REFERENCES public.tweets (tweet_id) ON DELETE CASCADE
+);
+
+ALTER TABLE "public"."quote_tweets" OWNER TO "postgres";
+
+CREATE TABLE IF NOT EXISTS public.retweets (
+    tweet_id TEXT NOT NULL PRIMARY KEY,
+    retweeted_tweet_id TEXT NULL,
+       
+    CONSTRAINT fk_retweets_tweet_id FOREIGN KEY (tweet_id) REFERENCES public.tweets (tweet_id) ON DELETE CASCADE,
+    CONSTRAINT fk_retweets_retweeted_tweet_id FOREIGN KEY (retweeted_tweet_id) REFERENCES public.tweets (tweet_id) ON DELETE SET NULL
+);
+
+ALTER TABLE "public"."retweets" OWNER TO "postgres";

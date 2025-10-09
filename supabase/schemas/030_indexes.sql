@@ -64,3 +64,10 @@ CREATE INDEX "idx_user_mentions_mentioned_user_id" ON "public"."user_mentions" U
 CREATE INDEX "idx_user_mentions_tweet_id" ON "public"."user_mentions" USING "btree" ("tweet_id");
 -- Duplicate index present in prod
 CREATE INDEX "user_mentions_tweet_id_idx" ON "public"."user_mentions" USING "btree" ("tweet_id");
+
+
+CREATE INDEX IF NOT EXISTS idx_quote_tweets_tweet_id ON public.quote_tweets (tweet_id);
+CREATE INDEX IF NOT EXISTS idx_quote_tweets_quoted_tweet_id ON public.quote_tweets (quoted_tweet_id);
+
+CREATE INDEX IF NOT EXISTS idx_retweets_tweet_id ON public.retweets (tweet_id);
+CREATE INDEX IF NOT EXISTS idx_retweets_retweeted_tweet_id ON public.retweets (retweeted_tweet_id);

@@ -253,15 +253,14 @@ export default async function Homepage() {
           <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">📤 Upload Your Data</h2>
           <div className="max-w-lg mx-auto px-2">
             <p className="mb-4 text-gray-700 dark:text-gray-300">
-              Export your data from X (formerly Twitter):{' '}
           <a
             href="https://x.com/settings/download_your_data"
                 className="font-medium text-blue-600 hover:underline dark:text-blue-400"
                 target="_blank"
                 rel="noopener noreferrer"
           >
-            https://x.com/settings/download_your_data
-          </a>
+            Export your data
+          </a> from X (formerly Twitter).
         </p>
             <div className="my-6">
         <DynamicSignIn />

@@ -267,6 +267,7 @@ export default async function Homepage() {
             </div>
         <UploadHomepageSection />
           </div>
+          <small>Questions on privacy? Learn about <a className="font-medium text-blue-600 hover:underline dark:text-blue-400" href="https://github.com/TheExGenesis/community-archive/blob/main/docs/archive_data.md">how we use your data</a>.</small>
         </div>
       </section>
       

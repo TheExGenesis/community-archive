@@ -177,3 +177,16 @@ ALTER TABLE ONLY "public"."optin"
     ADD CONSTRAINT "optin_username_key" UNIQUE ("username");
 ALTER TABLE ONLY "public"."optin"
     ADD CONSTRAINT "optin_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+-- public.quote_tweets foreign keys
+ALTER TABLE ONLY "public"."quote_tweets"
+    ADD CONSTRAINT "fk_quote_tweets_tweet_id" FOREIGN KEY ("tweet_id") REFERENCES "public"."tweets"("tweet_id") ON DELETE CASCADE;
+ALTER TABLE ONLY "public"."quote_tweets"
+    ADD CONSTRAINT "fk_quote_tweets_quoted_tweet_id" FOREIGN KEY ("quoted_tweet_id") REFERENCES "public"."tweets"("tweet_id") ON DELETE CASCADE;
+
+-- public.retweets foreign keys
+ALTER TABLE ONLY "public"."retweets"
+    ADD CONSTRAINT "fk_retweets_tweet_id" FOREIGN KEY ("tweet_id") REFERENCES "public"."tweets"("tweet_id") ON DELETE CASCADE;
+ALTER TABLE ONLY "public"."retweets"
+    ADD CONSTRAINT "fk_retweets_retweeted_tweet_id" FOREIGN KEY ("retweeted_tweet_id") REFERENCES "public"."tweets"("tweet_id") ON DELETE SET NULL;

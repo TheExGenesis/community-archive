@@ -934,6 +934,7 @@ CREATE OR REPLACE FUNCTION "public"."commit_temp_data"("p_suffix" "text") RETURN
 DECLARE
     v_archive_upload_id BIGINT;
     v_account_id TEXT;
+    v_username TEXT;
     v_archive_at TIMESTAMP WITH TIME ZONE;
     v_keep_private BOOLEAN;
     v_upload_likes BOOLEAN;
@@ -974,8 +975,8 @@ BEGIN
     v_phase_start := clock_timestamp();
     RAISE NOTICE 'Phase 2: Getting archive upload data';
     -- Get the archive upload that's ready for commit
-    SELECT id, archive_at, keep_private, upload_likes, start_date, end_date
-    INTO v_archive_upload_id, v_archive_at, v_keep_private, v_upload_likes, v_start_date, v_end_date
+    SELECT id, archive_at, keep_private, upload_likes, start_date, end_date, username
+    INTO v_archive_upload_id, v_archive_at, v_keep_private, v_upload_likes, v_start_date, v_end_date, v_username
     FROM public.archive_upload
     WHERE account_id = v_account_id
     AND upload_phase = 'ready_for_commit'

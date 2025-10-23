@@ -2,16 +2,6 @@
 
 -- public.account moved to 032_views_prereq.sql
 
--- public.quote_tweets
-CREATE OR REPLACE VIEW "public"."quote_tweets" AS
- SELECT "t"."tweet_id",
-    "substring"("tu"."expanded_url", 'status/([0-9]+)'::"text") AS "quoted_tweet_id",
-    "substring"("tu"."expanded_url", 'https?://(?:www\\.)?twitter\\.com/([^/]+)/status/'::"text") AS "quoted_tweet_username"
-   FROM ("public"."tweet_urls" "tu"
-     JOIN "public"."tweets" "t" ON (("tu"."tweet_id" = "t"."tweet_id")))
-  WHERE (("tu"."expanded_url" ~~ 'https://twitter.com/%/status/%'::"text") OR ("tu"."expanded_url" ~~ 'https://x.com/%/status/%'::"text"));
-ALTER TABLE "public"."quote_tweets" OWNER TO "postgres";
-
 -- public.enriched_tweets
 CREATE OR REPLACE VIEW "public"."enriched_tweets" AS
  SELECT "t"."tweet_id",

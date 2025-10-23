@@ -928,8 +928,8 @@ async function main() {
     logger.info('Fetching archive_upload records ready for processing...')
     
     const ready = await sql`
-      SELECT au.id, au.account_id, a.username, au.archive_at
-      FROM public.archive_upload au left join all_account a on au.account_id=a.account_id
+      SELECT au.id, au.account_id, au.username, au.archive_at
+      FROM public.archive_upload au
       WHERE upload_phase IN ('ready_for_commit')
       ORDER BY archive_at ASC
     `

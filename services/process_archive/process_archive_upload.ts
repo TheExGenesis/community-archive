@@ -843,10 +843,14 @@ async function loadArchiveData(username: string): Promise<any> {
 function patchArchive(archive: any): any {
   try{
     const tweets = archive.tweets
+    const hasNoteTweets = archive['note-tweet']?.length > 0 || false;
     for(const tweetRecord of tweets) {
       const tweet = tweetRecord.tweet
       
       tweet.full_text = removeProblematicCharacters(tweet.full_text)
+      if(!hasNoteTweets){
+        continue
+      }
       let noteTweets = archive['note-tweet'];
       const matchingNoteTweet = noteTweets.find((noteTweetObj:any) => {
         const noteTweet = noteTweetObj.noteTweet

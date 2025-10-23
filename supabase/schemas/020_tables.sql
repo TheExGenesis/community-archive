@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS "public"."archive_upload" (
     "upload_likes" boolean DEFAULT true,
     "start_date" "date",
     "end_date" "date",
-    "upload_phase" "public"."upload_phase_enum" DEFAULT 'uploading'::"public"."upload_phase_enum"
+    "upload_phase" "public"."upload_phase_enum" DEFAULT 'uploading'::"public"."upload_phase_enum",
+    "username" "text"
 );
 ALTER TABLE "public"."archive_upload" OWNER TO "postgres";
 
@@ -218,20 +219,14 @@ CREATE TABLE IF NOT EXISTS public.quote_tweets (
     quoted_tweet_id TEXT NOT NULL,
     
     -- Composite primary key
-    PRIMARY KEY (tweet_id, quoted_tweet_id),
-    
-    -- Foreign key constraints
-    CONSTRAINT fk_quote_tweets_tweet_id FOREIGN KEY (tweet_id) REFERENCES public.tweets (tweet_id) ON DELETE CASCADE
+    PRIMARY KEY (tweet_id, quoted_tweet_id)
 );
 
 ALTER TABLE "public"."quote_tweets" OWNER TO "postgres";
 
 CREATE TABLE IF NOT EXISTS public.retweets (
     tweet_id TEXT NOT NULL PRIMARY KEY,
-    retweeted_tweet_id TEXT NULL,
-       
-    CONSTRAINT fk_retweets_tweet_id FOREIGN KEY (tweet_id) REFERENCES public.tweets (tweet_id) ON DELETE CASCADE,
-    CONSTRAINT fk_retweets_retweeted_tweet_id FOREIGN KEY (retweeted_tweet_id) REFERENCES public.tweets (tweet_id) ON DELETE SET NULL
+    retweeted_tweet_id TEXT NULL
 );
 
 ALTER TABLE "public"."retweets" OWNER TO "postgres";

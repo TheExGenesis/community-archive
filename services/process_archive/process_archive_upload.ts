@@ -634,8 +634,8 @@ export class ArchiveUploadProcessor {
         urls.push({
           tweet_id: tweetId,
           url: url.url,
-          expanded_url: url.expanded_url || null,
-          display_url: url.display_url || null
+          expanded_url: url.expanded_url || '',
+          display_url: url.display_url || ''
         })
 
         const isQuoteTweet = (url.expanded_url?.includes('twitter.com/') || 

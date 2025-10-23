@@ -107,14 +107,6 @@ const insertArchiveDirectly = async (
     endDate: null,
   }
 
-  // First try to update existing row
-  const { data: existingUpload, error: existingError } = await supabase
-    .from('archive_upload')
-    .update({ upload_phase: 'uploading' })
-    .eq('account_id', accountId)
-    .select('id')
-    .maybeSingle()
-
   let latestTweetDate = archive.tweets.reduce(
     (latest: string, tweet: any) => {
       const tweetDate = new Date(tweet.tweet.created_at)
@@ -125,20 +117,18 @@ const insertArchiveDirectly = async (
         : tweetDate.toISOString()
     },new Date().toISOString());
 
-  // If no existing row, create new one
-  const { data: archiveUploadIdData, error: uploadError } = existingUpload
-    ? { data: existingUpload, error: existingError }
-    : await supabase
-        .from('archive_upload')
-        .insert({
-          account_id: accountId,
-          archive_at: latestTweetDate,
-          keep_private: uploadOptions.keepPrivate,
-          upload_likes: uploadOptions.uploadLikes,
-          upload_phase: 'ready_for_commit'
-        })
-        .select('id')
-        .single()
+  // Always create a new archive upload record for testing (don't reuse existing ones)
+  const { data: archiveUploadIdData, error: uploadError } = await supabase
+    .from('archive_upload')
+    .insert({
+      account_id: accountId,
+      archive_at: latestTweetDate,
+      keep_private: uploadOptions.keepPrivate,
+      upload_likes: uploadOptions.uploadLikes,
+      upload_phase: 'ready_for_commit'
+    })
+    .select('id')
+    .single()
 
  
 
@@ -776,6 +766,652 @@ describe('Direct DB Insertion Tests', () => {
   })
 
 
+
+  describe('Archive Upload ID Upsert Tests', () => {
+    it('should update archive_upload_id when upserting tweets', async () => {
+      // Create test tweet
+      const testTweet = {
+        tweet: {
+          id: '9999',
+          id_str: '9999',
+          created_at: '2023-01-01 00:00:00 +0000',
+          full_text: 'Test tweet for archive_upload_id upsert',
+          favorite_count: 5,
+          retweet_count: 2,
+          favorited: false,
+          truncated: false,
+          source: 'web',
+          entities: {
+            user_mentions: [],
+            hashtags: [],
+            symbols: [],
+            urls: []
+          }
+        }
+      }
+
+      // First archive upload
+      testArchive = {
+        account: [{
+          account: {
+            accountId: testAccountId,
+            username: `test_${Date.now()}`,
+            createdVia: 'web',
+            createdAt: '2010-01-01T00:00:00.000Z',
+            accountDisplayName: 'Test User'
+          }
+        }],
+        profile: [{
+          profile: {
+            description: { bio: 'Test bio', website: '', location: '' },
+            avatarMediaUrl: '',
+            headerMediaUrl: ''
+          }
+        }],
+        tweets: [testTweet],
+        'note-tweet': [],
+        like: [],
+        follower: [],
+        following: [],
+        'community-tweet': []
+      }
+
+      tracker.addAccountId(testAccountId)
+      tracker.addTweetId('9999')
+
+      // Insert first archive
+      await insertArchiveDirectly(supabase, testArchive)
+
+      // Get the first archive_upload_id
+      const { data: firstArchive } = await supabase
+        .from('archive_upload')
+        .select('id')
+        .eq('account_id', testAccountId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const firstArchiveUploadId = firstArchive?.id
+      expect(firstArchiveUploadId).toBeDefined()
+
+      // Verify tweet has first archive_upload_id
+      const { data: firstTweet } = await supabase
+        .from('tweets')
+        .select('archive_upload_id, favorite_count, retweet_count')
+        .eq('tweet_id', '9999')
+        .single()
+
+      expect(firstTweet?.archive_upload_id).toBe(firstArchiveUploadId)
+      expect(firstTweet?.favorite_count).toBe(5)
+      expect(firstTweet?.retweet_count).toBe(2)
+
+      // Create second archive upload with updated tweet data
+      const updatedTweet = {
+        ...testTweet,
+        tweet: {
+          ...testTweet.tweet,
+          favorite_count: 10, // Updated count
+          retweet_count: 5    // Updated count
+        }
+      }
+
+      const secondTestArchive = {
+        ...testArchive,
+        tweets: [updatedTweet]
+      }
+
+      // Wait a moment to ensure different timestamps
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Insert second archive (should upsert the tweet)
+      await insertArchiveDirectly(supabase, secondTestArchive)
+
+      // Get the second archive_upload_id
+      const { data: secondArchive } = await supabase
+        .from('archive_upload')
+        .select('id')
+        .eq('account_id', testAccountId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const secondArchiveUploadId = secondArchive?.id
+      expect(secondArchiveUploadId).toBeDefined()
+      expect(secondArchiveUploadId).not.toBe(firstArchiveUploadId)
+
+      // Verify tweet now has second archive_upload_id and updated counts
+      const { data: updatedTweetData } = await supabase
+        .from('tweets')
+        .select('archive_upload_id, favorite_count, retweet_count')
+        .eq('tweet_id', '9999')
+        .single()
+
+      expect(updatedTweetData?.archive_upload_id).toBe(secondArchiveUploadId)
+      expect(updatedTweetData?.favorite_count).toBe(10)
+      expect(updatedTweetData?.retweet_count).toBe(5)
+    })
+
+    it('should update archive_upload_id when upserting profile data', async () => {
+      // First archive upload
+      testArchive = {
+        account: [{
+          account: {
+            accountId: testAccountId,
+            username: `test_${Date.now()}`,
+            createdVia: 'web',
+            createdAt: '2010-01-01T00:00:00.000Z',
+            accountDisplayName: 'Test User'
+          }
+        }],
+        profile: [{
+          profile: {
+            description: {
+              bio: 'Original bio',
+              website: 'https://original.com',
+              location: 'Original Location'
+            },
+            avatarMediaUrl: 'https://original.com/avatar.jpg',
+            headerMediaUrl: 'https://original.com/header.jpg'
+          }
+        }],
+        tweets: [],
+        'note-tweet': [],
+        like: [],
+        follower: [],
+        following: [],
+        'community-tweet': []
+      }
+
+      tracker.addAccountId(testAccountId)
+
+      // Insert first archive
+      await insertArchiveDirectly(supabase, testArchive)
+
+      // Get the first archive_upload_id
+      const { data: firstArchive } = await supabase
+        .from('archive_upload')
+        .select('id')
+        .eq('account_id', testAccountId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const firstArchiveUploadId = firstArchive?.id
+
+      // Verify profile has first archive_upload_id
+      const { data: firstProfile } = await supabase
+        .from('all_profile')
+        .select('archive_upload_id, bio, website')
+        .eq('account_id', testAccountId)
+        .single()
+
+      expect(firstProfile?.archive_upload_id).toBe(firstArchiveUploadId)
+      expect(firstProfile?.bio).toBe('Original bio')
+      expect(firstProfile?.website).toBe('https://original.com')
+
+      // Create second archive upload with updated profile
+      const updatedTestArchive = {
+        ...testArchive,
+        profile: [{
+          profile: {
+            description: {
+              bio: 'Updated bio',
+              website: 'https://updated.com',
+              location: 'Updated Location'
+            },
+            avatarMediaUrl: 'https://updated.com/avatar.jpg',
+            headerMediaUrl: 'https://updated.com/header.jpg'
+          }
+        }]
+      }
+
+      // Wait a moment to ensure different timestamps
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Insert second archive
+      await insertArchiveDirectly(supabase, updatedTestArchive)
+
+      // Get the second archive_upload_id
+      const { data: secondArchive } = await supabase
+        .from('archive_upload')
+        .select('id')
+        .eq('account_id', testAccountId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const secondArchiveUploadId = secondArchive?.id
+      expect(secondArchiveUploadId).not.toBe(firstArchiveUploadId)
+
+      // Verify profile now has second archive_upload_id and updated data
+      const { data: updatedProfile } = await supabase
+        .from('all_profile')
+        .select('archive_upload_id, bio, website')
+        .eq('account_id', testAccountId)
+        .single()
+
+      expect(updatedProfile?.archive_upload_id).toBe(secondArchiveUploadId)
+      expect(updatedProfile?.bio).toBe('Updated bio')
+      expect(updatedProfile?.website).toBe('https://updated.com')
+    })
+
+    it('should update archive_upload_id when upserting tweet media', async () => {
+      const testTweetWithMedia = {
+        tweet: {
+          id: '8888',
+          id_str: '8888',
+          created_at: '2023-01-01 00:00:00 +0000',
+          full_text: 'Tweet with media',
+          favorite_count: 0,
+          retweet_count: 0,
+          favorited: false,
+          truncated: false,
+          source: 'web',
+          entities: {
+            user_mentions: [],
+            hashtags: [],
+            symbols: [],
+            urls: [],
+            media: [{
+              id_str: '123456789',
+              media_url_https: 'https://example.com/media1.jpg',
+              type: 'photo',
+              sizes: {
+                large: { w: 1024, h: 768 }
+              }
+            }]
+          }
+        }
+      }
+
+      // First archive upload
+      testArchive = {
+        account: [{
+          account: {
+            accountId: testAccountId,
+            username: `test_${Date.now()}`,
+            createdVia: 'web',
+            createdAt: '2010-01-01T00:00:00.000Z',
+            accountDisplayName: 'Test User'
+          }
+        }],
+        profile: [{
+          profile: {
+            description: { bio: '', website: '', location: '' },
+            avatarMediaUrl: '',
+            headerMediaUrl: ''
+          }
+        }],
+        tweets: [testTweetWithMedia],
+        'note-tweet': [],
+        like: [],
+        follower: [],
+        following: [],
+        'community-tweet': []
+      }
+
+      tracker.addAccountId(testAccountId)
+      tracker.addTweetId('8888')
+
+      // Insert first archive
+      await insertArchiveDirectly(supabase, testArchive)
+
+      // Get the first archive_upload_id
+      const { data: firstArchive } = await supabase
+        .from('archive_upload')
+        .select('id')
+        .eq('account_id', testAccountId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const firstArchiveUploadId = firstArchive?.id
+
+      // Verify media has first archive_upload_id
+      const { data: firstMedia } = await supabase
+        .from('tweet_media')
+        .select('archive_upload_id, media_url, width, height')
+        .eq('media_id', 123456789)
+        .single()
+
+      expect(firstMedia?.archive_upload_id).toBe(firstArchiveUploadId)
+      expect(firstMedia?.width).toBe(1024)
+      expect(firstMedia?.height).toBe(768)
+
+      // Create second archive with updated media dimensions
+      const updatedTweetWithMedia = {
+        ...testTweetWithMedia,
+        tweet: {
+          ...testTweetWithMedia.tweet,
+          entities: {
+            ...testTweetWithMedia.tweet.entities,
+            media: [{
+              ...testTweetWithMedia.tweet.entities.media[0],
+              media_url_https: 'https://example.com/media1_updated.jpg',
+              sizes: {
+                large: { w: 2048, h: 1536 } // Updated dimensions
+              }
+            }]
+          }
+        }
+      }
+
+      const secondTestArchive = {
+        ...testArchive,
+        tweets: [updatedTweetWithMedia]
+      }
+
+      // Wait a moment to ensure different timestamps
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Insert second archive
+      await insertArchiveDirectly(supabase, secondTestArchive)
+
+      // Get the second archive_upload_id
+      const { data: secondArchive } = await supabase
+        .from('archive_upload')
+        .select('id')
+        .eq('account_id', testAccountId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const secondArchiveUploadId = secondArchive?.id
+      expect(secondArchiveUploadId).not.toBe(firstArchiveUploadId)
+
+      // Verify media now has second archive_upload_id and updated data
+      const { data: updatedMedia } = await supabase
+        .from('tweet_media')
+        .select('archive_upload_id, media_url, width, height')
+        .eq('media_id', 123456789)
+        .single()
+
+      expect(updatedMedia?.archive_upload_id).toBe(secondArchiveUploadId)
+      expect(updatedMedia?.media_url).toBe('https://example.com/media1_updated.jpg')
+      expect(updatedMedia?.width).toBe(2048)
+      expect(updatedMedia?.height).toBe(1536)
+    })
+
+    it('should update archive_upload_id when upserting likes, following, and followers', async () => {
+      // First archive upload
+      testArchive = {
+        account: [{
+          account: {
+            accountId: testAccountId,
+            username: `test_${Date.now()}`,
+            createdVia: 'web',
+            createdAt: '2010-01-01T00:00:00.000Z',
+            accountDisplayName: 'Test User'
+          }
+        }],
+        profile: [{
+          profile: {
+            description: { bio: '', website: '', location: '' },
+            avatarMediaUrl: '',
+            headerMediaUrl: ''
+          }
+        }],
+        tweets: [],
+        'note-tweet': [],
+        like: [
+          { like: { tweetId: '1234567890123456789', fullText: 'First liked tweet' } }
+        ],
+        follower: [
+          { follower: { accountId: '1234567890', userLink: 'https://twitter.com/follower_1' } }
+        ],
+        following: [
+          { following: { accountId: '9876543210', userLink: 'https://twitter.com/following_1' } }
+        ],
+        'community-tweet': []
+      }
+
+      tracker.addAccountId(testAccountId)
+      tracker.addLikedTweetId('1234567890123456789')
+
+      // Insert first archive
+      await insertArchiveDirectly(supabase, testArchive)
+
+      // Get the first archive_upload_id
+      const { data: firstArchive } = await supabase
+        .from('archive_upload')
+        .select('id')
+        .eq('account_id', testAccountId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const firstArchiveUploadId = firstArchive?.id
+
+      // Verify likes, following, followers have first archive_upload_id
+      const { data: firstLike } = await supabase
+        .from('likes')
+        .select('archive_upload_id')
+        .eq('account_id', testAccountId)
+        .eq('liked_tweet_id', '1234567890123456789')
+        .single()
+
+      const { data: firstFollowing } = await supabase
+        .from('following')
+        .select('archive_upload_id')
+        .eq('account_id', testAccountId)
+        .eq('following_account_id', '9876543210')
+        .single()
+
+      const { data: firstFollower } = await supabase
+        .from('followers')
+        .select('archive_upload_id')
+        .eq('account_id', testAccountId)
+        .eq('follower_account_id', '1234567890')
+        .single()
+
+      expect(firstLike?.archive_upload_id).toBe(firstArchiveUploadId)
+      expect(firstFollowing?.archive_upload_id).toBe(firstArchiveUploadId)
+      expect(firstFollower?.archive_upload_id).toBe(firstArchiveUploadId)
+
+      // Wait a moment to ensure different timestamps
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Insert second archive (should upsert the same relationships)
+      await insertArchiveDirectly(supabase, testArchive)
+
+      // Get the second archive_upload_id
+      const { data: secondArchive } = await supabase
+        .from('archive_upload')
+        .select('id')
+        .eq('account_id', testAccountId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const secondArchiveUploadId = secondArchive?.id
+      expect(secondArchiveUploadId).not.toBe(firstArchiveUploadId)
+
+      // Verify all relationships now have second archive_upload_id
+      const { data: updatedLike } = await supabase
+        .from('likes')
+        .select('archive_upload_id')
+        .eq('account_id', testAccountId)
+        .eq('liked_tweet_id', '1234567890123456789')
+        .single()
+
+      const { data: updatedFollowing } = await supabase
+        .from('following')
+        .select('archive_upload_id')
+        .eq('account_id', testAccountId)
+        .eq('following_account_id', '9876543210')
+        .single()
+
+      const { data: updatedFollower } = await supabase
+        .from('followers')
+        .select('archive_upload_id')
+        .eq('account_id', testAccountId)
+        .eq('follower_account_id', '1234567890')
+        .single()
+
+      expect(updatedLike?.archive_upload_id).toBe(secondArchiveUploadId)
+      expect(updatedFollowing?.archive_upload_id).toBe(secondArchiveUploadId)
+      expect(updatedFollower?.archive_upload_id).toBe(secondArchiveUploadId)
+    })
+
+    it('should handle multiple archive uploads with different data sets', async () => {
+      // First archive with some tweets
+      const firstArchive = {
+        account: [{
+          account: {
+            accountId: testAccountId,
+            username: `test_${Date.now()}`,
+            createdVia: 'web',
+            createdAt: '2010-01-01T00:00:00.000Z',
+            accountDisplayName: 'Test User'
+          }
+        }],
+        profile: [{
+          profile: {
+            description: { bio: 'First bio', website: '', location: '' },
+            avatarMediaUrl: '',
+            headerMediaUrl: ''
+          }
+        }],
+        tweets: [
+          {
+            tweet: {
+              id: '7777',
+              id_str: '7777',
+              created_at: '2023-01-01 00:00:00 +0000',
+              full_text: 'First archive tweet',
+              favorite_count: 1,
+              retweet_count: 0,
+              favorited: false,
+              truncated: false,
+              source: 'web',
+              entities: { user_mentions: [], hashtags: [], symbols: [], urls: [] }
+            }
+          }
+        ],
+        'note-tweet': [],
+        like: [
+          { like: { tweetId: '1111111111111111111', fullText: 'Liked in first archive' } }
+        ],
+        follower: [],
+        following: [],
+        'community-tweet': []
+      }
+
+      tracker.addAccountId(testAccountId)
+      tracker.addTweetId('7777')
+      tracker.addLikedTweetId('1111111111111111111')
+
+      // Insert first archive
+      await insertArchiveDirectly(supabase, firstArchive)
+
+      // Second archive with overlapping and new data
+      const secondArchive = {
+        ...firstArchive,
+        profile: [{
+          profile: {
+            description: { bio: 'Updated bio', website: 'https://updated.com', location: '' },
+            avatarMediaUrl: '',
+            headerMediaUrl: ''
+          }
+        }],
+        tweets: [
+          {
+            tweet: {
+              id: '7777', // Same tweet, updated counts
+              id_str: '7777',
+              created_at: '2023-01-01 00:00:00 +0000',
+              full_text: 'First archive tweet',
+              favorite_count: 5, // Updated
+              retweet_count: 2,   // Updated
+              favorited: false,
+              truncated: false,
+              source: 'web',
+              entities: { user_mentions: [], hashtags: [], symbols: [], urls: [] }
+            }
+          },
+          {
+            tweet: {
+              id: '6666', // New tweet
+              id_str: '6666',
+              created_at: '2023-01-02 00:00:00 +0000',
+              full_text: 'Second archive tweet',
+              favorite_count: 3,
+              retweet_count: 1,
+              favorited: false,
+              truncated: false,
+              source: 'web',
+              entities: { user_mentions: [], hashtags: [], symbols: [], urls: [] }
+            }
+          }
+        ],
+        like: [
+          { like: { tweetId: '1111111111111111111', fullText: 'Liked in first archive' } }, // Same like
+          { like: { tweetId: '2222222222222222222', fullText: 'New like in second archive' } } // New like
+        ]
+      }
+
+      tracker.addTweetId('6666')
+      tracker.addLikedTweetId('2222222222222222222')
+
+      // Wait a moment to ensure different timestamps
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Insert second archive
+      await insertArchiveDirectly(supabase, secondArchive)
+
+      // Get both archive upload IDs
+      const { data: archives } = await supabase
+        .from('archive_upload')
+        .select('id')
+        .eq('account_id', testAccountId)
+        .order('created_at', { ascending: true })
+
+      expect(archives?.length).toBe(2)
+      const [firstArchiveUploadId, secondArchiveUploadId] = archives!.map(a => a.id)
+
+      // Verify tweet 7777 has updated archive_upload_id and counts
+      const { data: updatedTweet } = await supabase
+        .from('tweets')
+        .select('archive_upload_id, favorite_count, retweet_count')
+        .eq('tweet_id', '7777')
+        .single()
+
+      expect(updatedTweet?.archive_upload_id).toBe(secondArchiveUploadId)
+      expect(updatedTweet?.favorite_count).toBe(5)
+      expect(updatedTweet?.retweet_count).toBe(2)
+
+      // Verify tweet 6666 has second archive_upload_id
+      const { data: newTweet } = await supabase
+        .from('tweets')
+        .select('archive_upload_id')
+        .eq('tweet_id', '6666')
+        .single()
+
+      expect(newTweet?.archive_upload_id).toBe(secondArchiveUploadId)
+
+      // Verify profile has updated archive_upload_id
+      const { data: profile } = await supabase
+        .from('all_profile')
+        .select('archive_upload_id, bio, website')
+        .eq('account_id', testAccountId)
+        .single()
+
+      expect(profile?.archive_upload_id).toBe(secondArchiveUploadId)
+      expect(profile?.bio).toBe('Updated bio')
+      expect(profile?.website).toBe('https://updated.com')
+
+      // Verify both likes have second archive_upload_id
+      const { data: likes } = await supabase
+        .from('likes')
+        .select('archive_upload_id, liked_tweet_id')
+        .eq('account_id', testAccountId)
+        .order('liked_tweet_id')
+
+      expect(likes?.length).toBe(2)
+      expect(likes?.[0].archive_upload_id).toBe(secondArchiveUploadId) // 1111111111111111111
+      expect(likes?.[1].archive_upload_id).toBe(secondArchiveUploadId) // 2222222222222222222
+    })
+  })
 
   describe('Finalize archive_upload record', () => {
     it('should update archive_upload record to completed', async () => {

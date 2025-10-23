@@ -5,6 +5,7 @@ CREATE INDEX "idx_all_profile_archive_upload_id" ON "public"."all_profile" USING
 
 -- public.archive_upload
 CREATE INDEX "idx_archive_upload_account_id" ON "public"."archive_upload" USING "btree" ("account_id");
+CREATE INDEX "idx_archive_upload_username" ON "public"."archive_upload" USING "btree" ("username");
 
 -- public.conversations
 CREATE INDEX "idx_conversation_id" ON "public"."conversations" USING "btree" ("conversation_id");
@@ -58,6 +59,7 @@ CREATE INDEX "idx_tweets_updated_at_tweet_id" ON "public"."tweets" USING "btree"
 CREATE INDEX "text_fts" ON "public"."tweets" USING "gin" ("fts");
 CREATE INDEX "tweets_account_id_favorite_idx" ON "public"."tweets" USING "btree" ("account_id", "favorite_count" DESC);
 CREATE INDEX "tweets_account_id_retweet_idx" ON "public"."tweets" USING "btree" ("account_id", "retweet_count" DESC);
+CREATE INDEX "idx_tweets_account_created" ON public.tweets (account_id, created_at);
 
 -- public.user_mentions
 CREATE INDEX "idx_user_mentions_mentioned_user_id" ON "public"."user_mentions" USING "btree" ("mentioned_user_id");

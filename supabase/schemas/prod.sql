@@ -34,6 +34,7 @@ SET row_security = off;
 DECLARE
     v_archive_upload_id BIGINT;
     v_account_id TEXT;
+    v_username TEXT;
     v_archive_at TIMESTAMP WITH TIME ZONE;
     v_keep_private BOOLEAN;
     v_upload_likes BOOLEAN;
@@ -71,16 +72,17 @@ BEGIN
     RAISE NOTICE 'Phase 2: Getting archive upload data';
     -- 2. Get the latest archive upload data from temp.archive_upload
     EXECUTE format('
-        SELECT archive_at, keep_private, upload_likes, start_date, end_date
+        SELECT archive_at, keep_private, upload_likes, start_date, end_date, username
         FROM temp.archive_upload_%s
         ORDER BY archive_at DESC
         LIMIT 1
-    ', p_suffix) INTO v_archive_at, v_keep_private, v_upload_likes, v_start_date, v_end_date;
+    ', p_suffix) INTO v_archive_at, v_keep_private, v_upload_likes, v_start_date, v_end_date, v_username;
 
     RAISE NOTICE 'Phase 3: Inserting archive upload data';
     -- 3. Insert or update archive_upload and get the ID
     INSERT INTO public.archive_upload (
         account_id, 
+        username,
         archive_at, 
         created_at, 
         keep_private, 
@@ -91,6 +93,7 @@ BEGIN
     )
     VALUES (
         v_account_id, 
+        v_username,
         v_archive_at, 
         CURRENT_TIMESTAMP, 
         v_keep_private, 
@@ -102,6 +105,7 @@ BEGIN
     ON CONFLICT (account_id, archive_at)
     DO UPDATE SET
         account_id = EXCLUDED.account_id,
+        username = EXCLUDED.username,
         created_at = CURRENT_TIMESTAMP,
         keep_private = EXCLUDED.keep_private,
         upload_likes = EXCLUDED.upload_likes,

@@ -104,11 +104,14 @@ const insertAccountAndUploadRow = async (
   select('id,archive_at').eq('account_id', accountId).in('upload_phase', ['uploading', 'ready_for_commit'])
   .order('created_at', { ascending: false }).limit(1).maybeSingle()
 
+  const username = archiveData.account[0].account.username;
+
   let supabaseUpsertQuery;
   if (lastUploadedArchive) {
      supabaseUpsertQuery = supabase
       .from('archive_upload')
       .update({ 
+        username: username,
         archive_at: latestTweetDate,
         keep_private: uploadOptions.keepPrivate,
         upload_likes: uploadOptions.uploadLikes,
@@ -126,12 +129,13 @@ const insertAccountAndUploadRow = async (
         .from('archive_upload')
         .insert({
           account_id: accountId,
+          username: username,
           archive_at: latestTweetDate,
           keep_private: uploadOptions.keepPrivate,
           upload_likes: uploadOptions.uploadLikes,
           start_date: uploadOptions.startDate,
           end_date: uploadOptions.endDate,
-          upload_phase: 'uploading',
+          upload_phase: 'uploading'
         })
         .select('id')
         .single()

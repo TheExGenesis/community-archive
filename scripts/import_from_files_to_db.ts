@@ -36,7 +36,7 @@ function ifStringNullReturnNull(value: string | null): string | null {
 }
 
 
-const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH || './data/downloads/archives'
+const GLOBAL_ARCHIVE_PATH = process.env.ARCHIVE_PATH || '../data/downloads/archives'
 console.log('Using ARCHIVE_PATH:', GLOBAL_ARCHIVE_PATH)
 
 // Parse command line arguments for limiting archives
@@ -378,16 +378,18 @@ const ARCHIVE_LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : undefine
   }
   async function Upsert_Archive_Upload(data: any, fileRoot:string) {
     const accountId = data.account[0].account.accountId;
+    const username = data.account[0].account.username;
     const tweetsDate=data.tweets.map((t:any)=>new Date(t.tweet.created_at)).sort((a:any, b:any) => a - b);;
     const start_date = tweetsDate[0];
     const end_date = tweetsDate[tweetsDate.length-1];
 
-    const archive_upload : InsertArchiveUpload ={
-      account_id:accountId, 
+    const archive_upload = {
+      account_id:accountId,
+      username:username,
       start_date:start_date.toISOString(),
       end_date:end_date.toISOString(),
       archive_at:new Date().toISOString(),
-      keep_private:false}
+      keep_private:false} as InsertArchiveUpload
 
      let getItem = (item: any) => {
        return item as InsertArchiveUpload;

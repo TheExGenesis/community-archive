@@ -122,6 +122,7 @@ const insertArchiveDirectly = async (
     .from('archive_upload')
     .insert({
       account_id: accountId,
+      username: username,
       archive_at: latestTweetDate,
       keep_private: uploadOptions.keepPrivate,
       upload_likes: uploadOptions.uploadLikes,

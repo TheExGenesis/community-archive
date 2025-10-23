@@ -114,12 +114,12 @@ const TABLE_CONFIGS: Record<string, TableConfig> = {
   all_profile: {
     columns: ['account_id', 'avatar_media_url', 'header_media_url', 'bio', 'location', 'website', 'archive_upload_id'],
     conflict: 'account_id',
-    updates: ['avatar_media_url', 'header_media_url', 'bio', 'location', 'website']
+    updates: ['avatar_media_url', 'header_media_url', 'bio', 'location', 'website', 'archive_upload_id']
   },
   tweets: {
     columns: ['tweet_id', 'account_id', 'created_at', 'full_text', 'favorite_count', 'retweet_count', 'reply_to_tweet_id', 'reply_to_user_id', 'reply_to_username', 'archive_upload_id'],
     conflict: 'tweet_id',
-    updates: ['favorite_count', 'retweet_count']
+    updates: ['favorite_count', 'retweet_count', 'archive_upload_id']
   },
   mentioned_users: {
     columns: ['user_id', 'name', 'screen_name'],
@@ -137,7 +137,7 @@ const TABLE_CONFIGS: Record<string, TableConfig> = {
   tweet_media: {
     columns: ['tweet_id', 'media_id', 'media_url', 'media_type', 'width', 'height', 'archive_upload_id'],
     conflict: 'media_id',
-    updates: ['media_url', 'width', 'height']
+    updates: ['media_url', 'width', 'height', 'archive_upload_id']
   },
   quote_tweets: {
     columns: ['tweet_id', 'quoted_tweet_id'],
@@ -149,7 +149,8 @@ const TABLE_CONFIGS: Record<string, TableConfig> = {
   },
   likes: {
     columns: ['account_id', 'liked_tweet_id', 'archive_upload_id'],
-    conflict: ['account_id', 'liked_tweet_id']
+    conflict: ['account_id', 'liked_tweet_id'],
+    updates: ['archive_upload_id']
   },
   liked_tweets: {
     columns: ['tweet_id', 'full_text'],
@@ -157,11 +158,13 @@ const TABLE_CONFIGS: Record<string, TableConfig> = {
   },
   following: {
     columns: ['account_id', 'following_account_id', 'archive_upload_id'],
-    conflict: ['account_id', 'following_account_id']
+    conflict: ['account_id', 'following_account_id'],
+    updates: ['archive_upload_id']
   },
   followers: {
     columns: ['account_id', 'follower_account_id', 'archive_upload_id'],
-    conflict: ['account_id', 'follower_account_id']
+    conflict: ['account_id', 'follower_account_id'],
+    updates: ['archive_upload_id']
   }
 }
 
@@ -939,6 +942,7 @@ async function main() {
     const startTime = new Date()
     logger.info(`Found ${ready.length} record(s) to process.`)
     logger.debug(`Start time: ${startTime.toISOString()}`)
+    let archives_processed = 0
 
     for (const row of ready) {
       const { id: archiveUploadId, account_id, username } = row
@@ -968,6 +972,7 @@ async function main() {
           WHERE id = ${archiveUploadId}
           RETURNING id
         `
+        archives_processed++
 
         if (!completeResult.length) {
           throw new Error('Failed to mark as completed')
@@ -1003,7 +1008,7 @@ async function main() {
     logger.info(`Final memory usage: ${getMemoryUsageMB()}MB`)
 
 
-    if(CONFIG.PROCESS_RETWEETS) {
+    if(CONFIG.PROCESS_RETWEETS && archives_processed > 0) {
 
       let startTimeRetweet = new Date()
       logger.debug(`Starting retweet processing at: ${startTimeRetweet.toISOString()}`)

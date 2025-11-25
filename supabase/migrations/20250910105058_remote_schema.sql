@@ -1804,7 +1804,7 @@ BEGIN
         UPDATE private.job_queue 
         SET status = 'DONE'
         WHERE key = v_job.key;
-        RAISE NOTICE 'Job completed and marked as done: %', COALESCE(v_job.job_name, v_job.key);
+        RAISE NOTICE 'Job completed and marked as done: % (key: %)', COALESCE(v_job.job_name, 'unknown'), v_job.key;
 
     EXCEPTION WHEN OTHERS THEN
         -- On any error, mark the job as failed
@@ -1813,6 +1813,7 @@ BEGIN
         WHERE key = v_job.key;
         
         RAISE NOTICE 'Job failed with error: %', SQLERRM;
+        RAISE;
     END;
 END;
 $$;

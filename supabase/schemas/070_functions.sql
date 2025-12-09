@@ -2424,13 +2424,13 @@ BEGIN
     WITH matching_tweets AS (
         SELECT t.tweet_id
         FROM public.tweets t
-        JOIN public.archive_upload au ON t.archive_upload_id = au.id
+        LEFT JOIN public.archive_upload au ON t.archive_upload_id = au.id
         WHERE (search_query = '' OR search_query IS NULL OR t.fts @@ to_tsquery('english', search_query))
           AND (from_account_id IS NULL OR t.account_id = from_account_id)
           AND (to_account_id IS NULL OR t.reply_to_user_id = to_account_id)
           AND (since_date IS NULL OR t.created_at >= since_date)
           AND (until_date IS NULL OR t.created_at <= until_date)
-          AND (au.keep_private IS FALSE OR t.account_id = current_user_account_id OR current_user_account_id IS NULL)
+          AND (au.id IS NULL OR au.keep_private IS FALSE OR t.account_id = current_user_account_id OR current_user_account_id IS NULL)
         ORDER BY t.created_at DESC
         OFFSET offset_
         LIMIT limit_

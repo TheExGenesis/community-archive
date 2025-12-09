@@ -29,22 +29,25 @@ const extractZipContents = async (
   const zipReader = new ZipReader(new BlobReader(file))
   const entries = await zipReader.getEntries()
 
-  const tweetPartFilePaths = entries
+  // Filter out macOS metadata files to avoid duplicate processing
+  const dataEntries = entries.filter((e) => !e.filename.includes('__MACOSX'))
+
+  const tweetPartFilePaths = dataEntries
     .filter((e) => e.filename.includes('tweets-part'))
     .map((e) => e.filename.match(/tweets-part\d+/)?.[0] ?? '')
     .filter(Boolean)
 
-  const likePartFilePaths = entries
+  const likePartFilePaths = dataEntries
     .filter((e) => e.filename.includes('like-part'))
     .map((e) => e.filename.match(/like-part\d+/)?.[0] ?? '')
     .filter(Boolean)
 
-  const followingPartFilePaths = entries
+  const followingPartFilePaths = dataEntries
     .filter((e) => e.filename.includes('following-part'))
     .map((e) => e.filename.match(/following-part\d+/)?.[0] ?? '')
     .filter(Boolean)
 
-  const followerPartFilePaths = entries
+  const followerPartFilePaths = dataEntries
     .filter((e) => e.filename.includes('follower-part'))
     .map((e) => e.filename.match(/follower-part\d+/)?.[0] ?? '')
     .filter(Boolean)
@@ -61,7 +64,7 @@ const extractZipContents = async (
   const fileContents: { [key: string]: string[] } = {}
 
   for (const fileName of allFilePaths) {
-    const matchingEntries = entries.filter(
+    const matchingEntries = dataEntries.filter(
       (e) =>
         e.filename.includes(fileName) ||
         e.filename.includes(fileName.replace('tweets.js', 'tweet.js')),

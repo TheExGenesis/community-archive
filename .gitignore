@@ -37,6 +37,7 @@ yarn-error.log*
 
 # IDE
 .vscode
+.clj-kondo
 
 # swc
 .swc

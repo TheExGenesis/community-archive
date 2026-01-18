@@ -225,3 +225,4 @@ pnpm docker:run:process-archive
 - `SUPABASE_SERVICE_ROLE` - Admin operations
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Client access
 
+

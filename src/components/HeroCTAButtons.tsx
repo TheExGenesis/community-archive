@@ -1,16 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { createBrowserClient } from '@/utils/supabase'
-import { Users, Download, Puzzle } from 'lucide-react'
+import { Users, Puzzle } from 'lucide-react'
 import { devLog } from '@/lib/devLog'
-import { handleFileUpload } from '@/lib/upload-archive/handleFileUpload'
-import { FileUploadDialog } from './file-upload-dialog'
-import { Archive } from '@/lib/types'
-import { calculateArchiveStats } from '@/lib/upload-archive/calculateArchiveStats'
 
 const CHROME_EXTENSION_URL = 'https://chromewebstore.google.com/detail/community-archive-stream/igclpobjpjlphgllncjcgaookmncegbk'
 
@@ -22,11 +18,7 @@ export default function HeroCTAButtons() {
   const [user, setUser] = useState<any>(null)
   const [isOptedIn, setIsOptedIn] = useState<boolean | null>(null)
   const [isOptInLoading, setIsOptInLoading] = useState(false)
-  const [isUploadProcessing, setIsUploadProcessing] = useState(false)
-  const [archive, setArchive] = useState<Archive | null>(null)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const twitterUsername = userMetadata?.user_name
   const twitterUserId = userMetadata?.provider_id
 
@@ -71,14 +63,6 @@ export default function HeroCTAButtons() {
 
     checkOptInStatus()
   }, [user?.id, supabase])
-
-  // Handle archive stats calculation
-  useEffect(() => {
-    if (archive) {
-      calculateArchiveStats(archive)
-      setIsDialogOpen(true)
-    }
-  }, [archive])
 
   const signIn = async (redirectAction?: string) => {
     devLog('sign in for action:', redirectAction)
@@ -166,33 +150,6 @@ export default function HeroCTAButtons() {
     }
   }
 
-  const handleUploadClick = () => {
-    if (!user) {
-      signIn('upload')
-      return
-    }
-
-    fileInputRef.current?.click()
-  }
-
-  const onFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    setIsUploadProcessing(true)
-
-    try {
-      const uploadedArchive = await handleFileUpload(event, setIsUploadProcessing)
-      devLog('archive', uploadedArchive)
-      setArchive(uploadedArchive)
-    } catch (error) {
-      console.error('Error processing archive:', error)
-      alert(`Error processing archive: ${(error as Error).message}`)
-    } finally {
-      setIsUploadProcessing(false)
-      if (event.target) {
-        event.target.value = ''
-      }
-    }
-  }
-
   const getOptInButtonText = () => {
     if (isOptInLoading) return 'Processing...'
     if (isOptedIn) return 'Opted In'
@@ -210,23 +167,7 @@ export default function HeroCTAButtons() {
   return (
     <div className="flex flex-col items-center gap-6">
       <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 w-full sm:w-auto">
-        {/* Opt In Button */}
-        <div className="flex flex-col items-center">
-          <Button
-            onClick={handleOptIn}
-            disabled={isOptInLoading || isOptedIn === true}
-            className={`h-14 px-8 text-lg font-semibold rounded-xl ${getOptInButtonStyle()}`}
-            size="lg"
-          >
-            <Users className="w-5 h-5 mr-2" />
-            {getOptInButtonText()}
-          </Button>
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center max-w-[180px]">
-            {isOptedIn ? 'Your tweets are being archived' : 'Allow archiving your public tweets'}
-          </p>
-        </div>
-
-        {/* Install Extension Button */}
+        {/* Install Extension Button - Left */}
         <div className="flex flex-col items-center">
           <Button
             asChild
@@ -244,50 +185,22 @@ export default function HeroCTAButtons() {
           </p>
         </div>
 
-        {/* Upload Archive Button */}
+        {/* Opt In Button - Right */}
         <div className="flex flex-col items-center">
           <Button
-            onClick={handleUploadClick}
-            disabled={isUploadProcessing}
-            variant="outline"
-            className="h-14 px-8 text-lg font-semibold rounded-xl border-2"
+            onClick={handleOptIn}
+            disabled={isOptInLoading || isOptedIn === true}
+            className={`h-14 px-8 text-lg font-semibold rounded-xl ${getOptInButtonStyle()}`}
             size="lg"
           >
-            <Download className="w-5 h-5 mr-2" />
-            {isUploadProcessing ? 'Processing...' : 'Upload Archive'}
+            <Users className="w-5 h-5 mr-2" />
+            {getOptInButtonText()}
           </Button>
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center max-w-[180px]">
-            <a
-              href="https://x.com/settings/download_your_data"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-gray-700 dark:hover:text-gray-300"
-            >
-              Export from X
-            </a>
-            {' '}then upload here
+            {isOptedIn ? 'Your tweets are being archived' : 'Allow archiving your public tweets'}
           </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".zip,application/zip"
-            onChange={onFileUpload}
-            disabled={isUploadProcessing}
-            multiple
-            className="hidden"
-          />
         </div>
       </div>
-
-      {/* Upload Dialog */}
-      {archive && (
-        <FileUploadDialog
-          supabase={supabase}
-          isOpen={isDialogOpen}
-          onClose={() => setIsDialogOpen(false)}
-          archive={archive}
-        />
-      )}
     </div>
   )
 }

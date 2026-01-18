@@ -14,8 +14,12 @@ import AppGallery from '@/components/AppGallery'
 
 export const revalidate = 0
 
-// Dynamically import HeroCTAButtons with ssr disabled
+// Dynamically import client components with ssr disabled
 const DynamicHeroCTAButtons = dynamic(() => import('@/components/HeroCTAButtons'), {
+  ssr: false,
+})
+
+const DynamicUploadArchiveSection = dynamic(() => import('@/components/UploadArchiveSection'), {
   ssr: false,
 })
 
@@ -80,11 +84,18 @@ interface InfoPanelProps {
 }
 
 const InfoPanel: React.FC<InfoPanelProps> = ({ icon, title, description, href }) => (
-  <Link href={href} passHref>
-    <div className="flex flex-col items-center p-6 bg-slate-100 dark:bg-slate-700 rounded-xl transition-shadow duration-300 h-full">
-      <div className="text-4xl mb-4 text-blue-500 dark:text-blue-400">{icon}</div>
-      <h3 className="text-xl font-semibold mb-2 text-center text-gray-800 dark:text-gray-200">{title}</h3>
-      <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{description}</p>
+  <Link
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="group flex items-center gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors border border-gray-200 dark:border-slate-700"
+  >
+    <div className="text-2xl text-blue-500 dark:text-blue-400 flex-shrink-0">
+      {icon}
+    </div>
+    <div className="flex-1 min-w-0">
+      <h3 className="font-semibold text-gray-900 dark:text-white">{title}</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400">{description}</p>
     </div>
   </Link>
 )
@@ -138,7 +149,7 @@ export default async function Homepage() {
       </section>
 
       {/* Section 2: Social Proof */}
-      <section className="bg-white dark:bg-slate-900 pb-12 md:pb-16 overflow-hidden">
+      <section className="bg-white dark:bg-slate-900 pb-8 md:pb-12 overflow-hidden">
         <div
           className="max-w-5xl mx-auto rounded-xl p-6 md:p-8 space-y-4 text-center bg-slate-100 dark:bg-slate-700/60"
         >
@@ -158,7 +169,14 @@ export default async function Homepage() {
         </div>
       </section>
 
-      {/* Section 3: Get Started - Featured Apps */}
+      {/* Section 3: Upload Your Archive */}
+      <section className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} overflow-hidden`}>
+        <div className={contentWrapperClasses}>
+          <DynamicUploadArchiveSection />
+        </div>
+      </section>
+
+      {/* Section 4: Get Started - Featured Apps */}
       <section className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}>
         <div className={contentWrapperClasses}>
           <FeaturedAppsSection />
@@ -175,66 +193,73 @@ export default async function Homepage() {
               Access the data, explore the code, and see how everything works.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-            <InfoPanel icon={<FaGithub />} title="GitHub Repository" description="Access the full source code, contribute to the project, and track issues." href="https://github.com/TheExGenesis/community-archive" />
-            <InfoPanel icon={<FaDiscord />} title="Join our Discord" description="Connect with the community, ask questions, and share your projects." href="https://discord.gg/RArTGrUawX" />
-            <InfoPanel icon={<FaBook />} title="Documentation & API" description="Explore our API, download data, and find examples to build your own apps." href="https://github.com/TheExGenesis/community-archive/tree/main/docs" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            <InfoPanel icon={<FaGithub />} title="GitHub" description="Source code and contributions" href="https://github.com/TheExGenesis/community-archive" />
+            <InfoPanel icon={<FaDiscord />} title="Discord" description="Join the community" href="https://discord.gg/RArTGrUawX" />
+            <InfoPanel icon={<FaBook />} title="Documentation" description="API docs and examples" href="https://github.com/TheExGenesis/community-archive/tree/main/docs" />
           </div>
         </div>
       </section>
 
       {/* Section 5: Our Supporters */}
       <section className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}>
-        <div className={`${contentWrapperClasses} text-center space-y-12`}>
-          <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">Our Supporters</h2>
-
-          {/* Major Backers Section */}
-          <div className="w-full max-w-3xl mx-auto">
-            <h3 className="text-2xl font-semibold leading-8 text-gray-900 dark:text-white mb-8">
-              Special thanks to our major backers
-            </h3>
-            <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-6">
-              <Link href="https://survivalandflourishing.fund/" target="_blank" rel="noopener noreferrer" className="text-xl font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                Survival and Flourishing Fund
-              </Link>
-              <span className="text-gray-400 dark:text-gray-500 text-xl">•</span>
-              <span className="text-xl font-medium text-gray-700 dark:text-gray-300">
-                <Link href="https://x.com/VitalikButerin" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  Vitalik Buterin
-                </Link>
-                {' '}(via{' '}
-                <Link href="https://kanro.fi/" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  Kanro
-                </Link>)
-              </span>
-              <span className="text-gray-400 dark:text-gray-500 text-xl">•</span>
-              <Link href="https://x.com/pwang" target="_blank" rel="noopener noreferrer" className="text-xl font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                Peter Wang
-              </Link>
-            </div>
+        <div className={`${contentWrapperClasses} space-y-8`}>
+          <div className="text-center">
+            <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">Our Supporters</h2>
+            <p className="mt-3 text-lg text-gray-600 dark:text-gray-300">
+              Thanks to everyone who makes this possible
+            </p>
           </div>
 
-          {/* Divider */}
-          <div className="w-full max-w-2xl mx-auto border-t border-gray-200 dark:border-gray-700"></div>
-
-          {/* Community Supporters Section */}
-          <h3 className="text-2xl font-semibold leading-8 text-gray-900 dark:text-white -mb-4">
-            And to our community backers
-          </h3>
-          <TieredSupportersDisplay
-            highestDonorWithImage={highestDonorWithImage}
-            otherDonorsForStack={otherDonorsForStack}
-            topTenNames={topTenNames}
-            additionalSupportersCount={additionalSupportersCount}
-            totalAmountRaised={totalAmountRaised}
-            totalSupportersCount={totalSupportersCount}
-          />
-
-          <div className="pt-8">
-            <Link href="https://opencollective.com/community-archive/donate" passHref>
-              <div className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-lg font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 transition-colors duration-300 cursor-pointer">
-                <FaHeart className="mr-2" /> Donate to our Open Collective
+          {/* Main supporters card */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 md:p-8 border border-gray-200 dark:border-slate-700 max-w-4xl mx-auto">
+            {/* Major Backers */}
+            <div className="text-center mb-6">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Major Backers</p>
+              <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-3">
+                <Link href="https://survivalandflourishing.fund/" target="_blank" rel="noopener noreferrer" className="text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Survival and Flourishing Fund
+                </Link>
+                <span className="text-gray-300 dark:text-gray-600">•</span>
+                <span className="text-base font-medium text-gray-700 dark:text-gray-300">
+                  <Link href="https://x.com/VitalikButerin" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                    Vitalik Buterin
+                  </Link>
+                  {' '}via{' '}
+                  <Link href="https://kanro.fi/" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                    Kanro
+                  </Link>
+                </span>
+                <span className="text-gray-300 dark:text-gray-600">•</span>
+                <Link href="https://x.com/pwang" target="_blank" rel="noopener noreferrer" className="text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Peter Wang
+                </Link>
               </div>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-gray-200 dark:border-gray-700 my-6"></div>
+
+            {/* Community Supporters */}
+            <div className="text-center mb-4">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Community Backers</p>
+            </div>
+            <TieredSupportersDisplay
+              highestDonorWithImage={highestDonorWithImage}
+              otherDonorsForStack={otherDonorsForStack}
+              topTenNames={topTenNames}
+              additionalSupportersCount={additionalSupportersCount}
+              totalAmountRaised={totalAmountRaised}
+              totalSupportersCount={totalSupportersCount}
+            />
+          </div>
+
+          {/* Donate button */}
+          <div className="text-center">
+            <Link href="https://opencollective.com/community-archive/donate" target="_blank" rel="noopener noreferrer">
+              <button className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-xl text-white bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 transition-colors">
+                <FaHeart className="mr-2" /> Support the Project
+              </button>
             </Link>
           </div>
         </div>

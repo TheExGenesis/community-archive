@@ -142,7 +142,7 @@ export default async function Homepage() {
   return (
     <main>
       {/* Section 1: Hero with CTAs */}
-      <section className="bg-white dark:bg-slate-900 pt-12 md:pt-16 pb-8 overflow-hidden">
+      <section className="bg-white dark:bg-slate-900 pt-16 md:pt-24 pb-12 md:pb-16 overflow-hidden">
         <div className={`${contentWrapperClasses} text-center space-y-8`}>
           <div className="space-y-4">
             <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-gray-900 dark:text-white">

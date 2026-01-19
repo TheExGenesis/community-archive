@@ -9,6 +9,7 @@ import Link from 'next/link'
 import ThemeToggle from '@/components/ThemeToggle'
 import dynamic from 'next/dynamic'
 import HeaderNavigation from '@/components/HeaderNavigation'
+import HeaderSearch from '@/components/HeaderSearch'
 import MobileMenu from '@/components/MobileMenu'
 
 const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
@@ -52,6 +53,9 @@ export default function RootLayout({
                   <span className="font-bold text-lg text-gray-800 dark:text-gray-200">Community Archive</span>
                 </Link>
                 <HeaderNavigation />
+                <div className="flex items-center space-x-3">
+                  <HeaderSearch />
+                </div>
                 <div className="flex items-center space-x-3">
                   <ThemeToggle side="bottom" />
                   <div className="text-sm">

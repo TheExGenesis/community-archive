@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
 import { createBrowserClient } from '@/utils/supabase'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
@@ -12,16 +11,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { ChevronLeft, ChevronRight, ExternalLink, Users, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import getLatestTweets from '@/lib/queries/getLatestTweets'
 import UnifiedTweetList from '@/components/UnifiedTweetList'
-
-// Dynamically import HomeOptInWidget with ssr disabled
-const DynamicHomeOptInWidget = dynamic(() => import('@/components/HomeOptInWidget'), {
-  ssr: false,
-})
-
-
 
 interface TweetMedia {
   media_url: string
@@ -149,8 +141,25 @@ const StreamMonitor = () => {
       const date = new Date(tickItem)
       return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
     } else {
-      return tickItem // Week labels
+      // For 1-year view, format the week start date
+      const date = new Date(tickItem)
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+      }
+      return tickItem
     }
+  }
+
+  // Custom tooltip for week ranges
+  const formatTooltipLabel = (label: string) => {
+    if (viewMode === '1y') {
+      const startDate = new Date(label)
+      if (!isNaN(startDate.getTime())) {
+        const endDate = new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000)
+        return `${startDate.toLocaleDateString([], { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString([], { month: 'short', day: 'numeric' })}`
+      }
+    }
+    return label
   }
   
   const handlePrevious = () => {
@@ -191,8 +200,29 @@ const StreamMonitor = () => {
     await refetchTweets()
   }
 
+  // LocalStorage key for banner dismissal
+  const BANNER_DISMISSED_KEY = 'stream-monitor-banner-dismissed'
+  const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
+
+  useEffect(() => {
+    const dismissedAt = localStorage.getItem(BANNER_DISMISSED_KEY)
+    if (dismissedAt) {
+      const dismissedTime = parseInt(dismissedAt, 10)
+      if (Date.now() - dismissedTime < TWO_WEEKS_MS) {
+        setShowBanner(false)
+      } else {
+        localStorage.removeItem(BANNER_DISMISSED_KEY)
+      }
+    }
+  }, [])
+
+  const handleDismissBanner = () => {
+    localStorage.setItem(BANNER_DISMISSED_KEY, Date.now().toString())
+    setShowBanner(false)
+  }
+
   return (
-    <div className="container mx-auto max-w-7xl px-4 py-8">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -216,55 +246,37 @@ const StreamMonitor = () => {
         </div>
       </div>
 
-      {/* Call-to-action section for opt-in and extension */}
+      {/* Compact call-to-action banner */}
       {showBanner && (
-        <div className="mb-8">
-          <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 relative">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2 h-8 w-8 text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-100"
-              onClick={() => setShowBanner(false)}
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Dismiss banner</span>
-            </Button>
-            <CardContent className="pt-6">
-              <div className="text-center space-y-4">
-              <h3 className="text-xl font-semibold text-blue-900 dark:text-blue-100">
-                📡 Contribute to the Archive!
-              </h3>
-              <p className="text-blue-800 dark:text-blue-200 max-w-2xl mx-auto">
-                Stream tweets to the archive by installing our browser extension that archives tweets you see from other contributors.
-              </p>
-              <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-                <DynamicHomeOptInWidget />
-                <Card className="border-blue-200 dark:border-blue-700">
-                  <CardContent className="pt-6 text-center space-y-4">
-                    <div className="text-4xl">🔌</div>
-                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Step 2: Install Extension</h3>
-                    <p className="text-gray-600 dark:text-gray-400">
-                      Use our browser extension to automatically contribute tweets to the archive as you browse X/Twitter.
-                    </p>
-                    <a href="https://chromewebstore.google.com/detail/community-archive-stream/igclpobjpjlphgllncjcgaookmncegbk" target="_blank" rel="noopener noreferrer">
-                      <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:text-blue-300 dark:hover:bg-blue-800">
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        Install Browser Extension
-                      </Button>
-                    </a>
-                  </CardContent>
-                </Card>
-              </div>
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                Only public tweets from opted-in users are collected • Chrome extension available now
+        <div className="mb-6">
+          <div className="flex items-center justify-between gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <span className="text-xl flex-shrink-0">📡</span>
+              <p className="text-sm text-blue-800 dark:text-blue-200 truncate">
+                Help grow the archive! Opt in and install the extension to stream tweets.
               </p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Link href="/">
+                <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:text-blue-300 dark:hover:bg-blue-800">
+                  Get Started
+                </Button>
+              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-100"
+                onClick={handleDismissBanner}
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Dismiss</span>
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
@@ -368,7 +380,10 @@ const StreamMonitor = () => {
                   height={60}
                 />
                 <YAxis />
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <ChartTooltip
+                  content={<ChartTooltipContent />}
+                  labelFormatter={(label) => formatTooltipLabel(label as string)}
+                />
                 <Bar 
                   dataKey="tweet_count" 
                   fill="hsl(var(--foreground))" 

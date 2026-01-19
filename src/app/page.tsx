@@ -17,10 +17,19 @@ export const revalidate = 0
 // Dynamically import client components with ssr disabled
 const DynamicHeroCTAButtons = dynamic(() => import('@/components/HeroCTAButtons'), {
   ssr: false,
+  loading: () => (
+    <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
+      <div className="h-14 w-48 bg-gray-200 dark:bg-slate-700 rounded-xl animate-pulse" />
+      <div className="h-14 w-48 bg-gray-200 dark:bg-slate-700 rounded-xl animate-pulse" />
+    </div>
+  ),
 })
 
 const DynamicUploadArchiveSection = dynamic(() => import('@/components/UploadArchiveSection'), {
   ssr: false,
+  loading: () => (
+    <div className="w-full h-48 bg-gray-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+  ),
 })
 
 const getMostFollowedAccounts = async (supabase: SupabaseClient) => {

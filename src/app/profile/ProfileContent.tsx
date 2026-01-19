@@ -305,47 +305,51 @@ export default function ProfileContent({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {archives.map((archive) => (
-                    <div
-                      key={archive.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <Avatar>
-                          <AvatarImage
-                            src={archive.accounts?.avatar_media_url}
-                            alt={archive.accounts?.account_display_name}
-                          />
-                          <AvatarFallback>
-                            {archive.accounts?.account_display_name?.[0] || 'A'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">
-                            @{archive.accounts?.username || 'unknown'}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {archive.total_tweets || 0} tweets • Uploaded{' '}
-                            {formatDistanceToNow(new Date(archive.created_at), {
-                              addSuffix: true
-                            })}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {archive.keep_private ? '🔒 Private' : '🌐 Public'}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteArchive(archive.id)}
-                        disabled={deletingArchive === archive.id}
+                  {archives.map((archive) => {
+                    const account = archive.accounts
+                    const avatarUrl = account?.profile?.[0]?.avatar_media_url || account?.profile?.avatar_media_url
+                    return (
+                      <div
+                        key={archive.id}
+                        className="flex items-center justify-between p-4 border rounded-lg"
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        {deletingArchive === archive.id ? 'Deleting...' : 'Delete'}
-                      </Button>
-                    </div>
-                  ))}
+                        <div className="flex items-center space-x-4">
+                          <Avatar>
+                            <AvatarImage
+                              src={avatarUrl}
+                              alt={account?.account_display_name}
+                            />
+                            <AvatarFallback>
+                              {account?.account_display_name?.[0] || 'A'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">
+                              @{account?.username || 'unknown'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {account?.num_tweets || 0} tweets • Uploaded{' '}
+                              {formatDistanceToNow(new Date(archive.created_at), {
+                                addSuffix: true
+                              })}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {archive.keep_private ? '🔒 Private' : '🌐 Public'}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteArchive(archive.id)}
+                          disabled={deletingArchive === archive.id}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          {deletingArchive === archive.id ? 'Deleting...' : 'Delete'}
+                        </Button>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </CardContent>

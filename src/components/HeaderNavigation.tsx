@@ -15,8 +15,8 @@ export default function HeaderNavigation() {
 
   const baseNavItems = [
     { href: '/', label: 'Home' },
-    { href: '/user-dir', label: 'User Directory' },
-    { href: '/search', label: 'Advanced Search' },
+    { href: '/user-dir', label: 'Directory' },
+    { href: '/search', label: 'Search' },
   ]
 
   const streamingNavItems = [

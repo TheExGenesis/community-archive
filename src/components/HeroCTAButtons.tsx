@@ -165,8 +165,8 @@ export default function HeroCTAButtons() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-6">
-      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 w-full sm:w-auto">
+    <div className="flex flex-col items-center gap-4">
+      <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
         {/* Install Extension Button - Left */}
         <div className="flex flex-col items-center">
           <Button
@@ -190,7 +190,7 @@ export default function HeroCTAButtons() {
           <Button
             onClick={handleOptIn}
             disabled={isOptInLoading || isOptedIn === true}
-            className={`h-14 px-8 text-lg font-semibold rounded-xl ${getOptInButtonStyle()}`}
+            className={`h-14 px-12 text-lg font-semibold rounded-xl ${getOptInButtonStyle()}`}
             size="lg"
           >
             <Users className="w-5 h-5 mr-2" />

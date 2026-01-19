@@ -49,8 +49,8 @@ export default function RootLayout({
           <ReactQueryProvider>
             <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md">
               <div className="container mx-auto flex h-16 max-w-screen-xl items-center justify-between px-4 sm:px-6 lg:px-8">
-                <Link href="/" className="flex items-center space-x-2">
-                  <span className="font-bold text-lg text-gray-800 dark:text-gray-200">Community Archive</span>
+                <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
+                  <span className="font-bold text-lg text-gray-800 dark:text-gray-200 whitespace-nowrap">Community Archive</span>
                 </Link>
                 <HeaderNavigation />
                 <div className="flex items-center space-x-3">

@@ -89,16 +89,14 @@ export default function SignIn() {
   const isDev = process.env.NODE_ENV === 'development'
   
   return userMetadata ? (
-    <div className="inline-flex items-center text-sm dark:text-gray-300">
-      <span>{`You're logged in as ${
-        userMetadata.full_name || userMetadata.user_name || 'Unknown User'
-      } `}</span>
-      <form action={handleSignOut} className="ml-2 inline-block">
-        <button type="submit" className="hover:underline dark:text-blue-400">
-          (Sign Out)
-        </button>
-      </form>
-    </div>
+    <form action={handleSignOut} className="inline-block">
+      <button
+        type="submit"
+        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors whitespace-nowrap"
+      >
+        Sign Out
+      </button>
+    </form>
   ) : (
     <div className="inline-block">
       <form action={signIn} className="inline-block">

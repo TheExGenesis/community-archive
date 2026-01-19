@@ -37,10 +37,10 @@
     ]
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "**/*.test.ts",
-    "**/*.test.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
     "types.d.ts",
     "next-env.d.ts",
     ".next/types/**/*.ts"
@@ -51,6 +51,7 @@
     "out",
     "scratchpad/**",
     "supabase/functions/**",
-    "scripts/**"
+    "scripts/**",
+    "services/**"
   ]
 }

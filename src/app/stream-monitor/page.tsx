@@ -205,16 +205,17 @@ const StreamMonitor = () => {
   const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
 
   useEffect(() => {
+    const twoWeeksMs = TWO_WEEKS_MS
     const dismissedAt = localStorage.getItem(BANNER_DISMISSED_KEY)
     if (dismissedAt) {
       const dismissedTime = parseInt(dismissedAt, 10)
-      if (Date.now() - dismissedTime < TWO_WEEKS_MS) {
+      if (Date.now() - dismissedTime < twoWeeksMs) {
         setShowBanner(false)
       } else {
         localStorage.removeItem(BANNER_DISMISSED_KEY)
       }
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDismissBanner = () => {
     localStorage.setItem(BANNER_DISMISSED_KEY, Date.now().toString())

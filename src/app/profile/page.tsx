@@ -8,6 +8,9 @@ export default async function ProfilePage() {
   const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
 
+  // Get the Twitter provider_id from user metadata (this is the account_id in archive_upload)
+  const twitterAccountId = user.user_metadata?.provider_id || user.app_metadata?.provider_id
+
   // Get user's opt-in/opt-out status and archives
   const [optInResponse, archivesResponse] = await Promise.all([
     supabase
@@ -15,26 +18,28 @@ export default async function ProfilePage() {
       .select('*')
       .eq('user_id', user.id)
       .single(),
-    supabase
-      .from('archive_upload')
-      .select(`
-        id,
-        account_id,
-        filename,
-        upload_phase,
-        created_at,
-        archive_at,
-        keep_private,
-        total_tweets,
-        accounts!inner(
-          account_id,
-          username,
-          account_display_name,
-          avatar_media_url
-        )
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+    // Query archives by account_id (Twitter user ID), not user_id (Supabase auth ID)
+    twitterAccountId
+      ? supabase
+          .from('archive_upload')
+          .select(`
+            id,
+            account_id,
+            upload_phase,
+            created_at,
+            archive_at,
+            keep_private,
+            accounts:account!inner(
+              account_id,
+              username,
+              account_display_name,
+              num_tweets,
+              profile(avatar_media_url)
+            )
+          `)
+          .eq('account_id', twitterAccountId)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null })
   ])
 
   return (

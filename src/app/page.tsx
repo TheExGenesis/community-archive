@@ -4,33 +4,33 @@ import { cookies } from 'next/headers'
 import AvatarList from '@/components/AvatarList'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { FaGithub, FaDiscord, FaBook, FaHeart } from 'react-icons/fa'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import UploadHomepageSection from '@/components/UploadHomepageSection'
-import ShowcasedApps from '@/components/ShowcasedApps'
-import dynamic from 'next/dynamic'
 import Footer from '@/components/Footer'
 import Link from 'next/link'
 import { getStats } from '@/lib/stats'
 import TieredSupportersDisplay, { Contributor } from '@/components/TieredSupportersDisplay'
+import dynamic from 'next/dynamic'
+import FeaturedAppsSection from '@/components/FeaturedAppsSection'
+import AppGallery from '@/components/AppGallery'
 
 export const revalidate = 0
 
-// Dynamically import SignIn component with ssr disabled
-const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
+// Dynamically import client components with ssr disabled
+const DynamicHeroCTAButtons = dynamic(() => import('@/components/HeroCTAButtons'), {
   ssr: false,
+  loading: () => (
+    <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
+      <div className="h-14 w-48 bg-gray-200 dark:bg-slate-700 rounded-xl animate-pulse" />
+      <div className="h-14 w-48 bg-gray-200 dark:bg-slate-700 rounded-xl animate-pulse" />
+    </div>
+  ),
 })
 
-// Dynamically import HomeOptInWidget with ssr disabled
-const DynamicHomeOptInWidget = dynamic(() => import('@/components/HomeOptInWidget'), {
+const DynamicUploadArchiveSection = dynamic(() => import('@/components/UploadArchiveSection'), {
   ssr: false,
+  loading: () => (
+    <div className="w-full h-48 bg-gray-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+  ),
 })
-
-declare global {
-  interface Window {
-    supabase: any
-  }
-}
 
 const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
   let { data, error } = await supabase
@@ -45,10 +45,9 @@ const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
   return data?.top_accounts_with_followers || []
 }
 
-// Function to fetch Open Collective contributors
 async function getOpenCollectiveContributors(): Promise<Contributor[]> {
   try {
-    const res = await fetch('https://opencollective.com/community-archive/members/all.json', { next: { revalidate: 3600 } }) 
+    const res = await fetch('https://opencollective.com/community-archive/members/all.json', { next: { revalidate: 3600 } })
     if (!res.ok) {
       console.error(`Failed to fetch Open Collective data: ${res.status}`)
       return []
@@ -56,20 +55,18 @@ async function getOpenCollectiveContributors(): Promise<Contributor[]> {
     const members: any[] = await res.json()
 
     members.sort((a, b) => {
-      const amountA = typeof a.totalAmountDonated === 'number' ? a.totalAmountDonated : 0;
-      const amountB = typeof b.totalAmountDonated === 'number' ? b.totalAmountDonated : 0;
-      if (amountB !== amountA) { 
-        return amountB - amountA;
+      const amountA = typeof a.totalAmountDonated === 'number' ? a.totalAmountDonated : 0
+      const amountB = typeof b.totalAmountDonated === 'number' ? b.totalAmountDonated : 0
+      if (amountB !== amountA) {
+        return amountB - amountA
       }
-      return a.name.localeCompare(b.name);
-    });
+      return a.name.localeCompare(b.name)
+    })
 
-    // Filter for active, non-admin, financial contributors for the main list used for visuals
-    // The textual thank you can still draw from a broader list later if needed.
     return members
-      .filter(m => 
-        m.isActive && 
-        m.role !== 'ADMIN' && 
+      .filter(m =>
+        m.isActive &&
+        m.role !== 'ADMIN' &&
         (m.role === 'BACKER' || (m.role === 'MEMBER' && typeof m.totalAmountDonated === 'number' && m.totalAmountDonated > 0))
       )
       .map(m => ({
@@ -78,9 +75,9 @@ async function getOpenCollectiveContributors(): Promise<Contributor[]> {
         type: m.type,
         isActive: m.isActive,
         profile: m.profile,
-        image: m.image || null, 
+        image: m.image || null,
         slug: m.slug,
-        totalAmountDonated: typeof m.totalAmountDonated === 'number' ? m.totalAmountDonated : 0 
+        totalAmountDonated: typeof m.totalAmountDonated === 'number' ? m.totalAmountDonated : 0
       }))
   } catch (error) {
     console.error("Error fetching Open Collective contributors:", error)
@@ -88,7 +85,6 @@ async function getOpenCollectiveContributors(): Promise<Contributor[]> {
   }
 }
 
-// Define a type for the panel props for better type safety
 interface InfoPanelProps {
   icon: React.ReactElement
   title: string
@@ -96,14 +92,19 @@ interface InfoPanelProps {
   href: string
 }
 
-// InfoPanel: Removed shadows and gradient background
 const InfoPanel: React.FC<InfoPanelProps> = ({ icon, title, description, href }) => (
-  <Link href={href} passHref>
-    {/* Removed shadow-lg, hover:shadow-xl. Replaced gradient with solid bg-slate-100 dark:bg-slate-700 */}
-    <div className="flex flex-col items-center p-6 bg-slate-100 dark:bg-slate-700 rounded-xl transition-shadow duration-300 h-full">
-      <div className="text-4xl mb-4 text-blue-500 dark:text-blue-400">{icon}</div>
-      <h3 className="text-xl font-semibold mb-2 text-center text-gray-800 dark:text-gray-200">{title}</h3>
-      <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{description}</p>
+  <Link
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="group flex items-center gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors border border-gray-200 dark:border-slate-700"
+  >
+    <div className="text-2xl text-blue-500 dark:text-blue-400 flex-shrink-0">
+      {icon}
+    </div>
+    <div className="flex-1 min-w-0">
+      <h3 className="font-semibold text-gray-900 dark:text-white">{title}</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400">{description}</p>
     </div>
   </Link>
 )
@@ -114,22 +115,16 @@ export default async function Homepage() {
   const mostFollowed = (await getMostFollowedAccounts(supabase)).slice(0, 7)
   const financialContributors = await getOpenCollectiveContributors()
 
-  // Calculate total amount raised and total supporters count
-  const totalAmountRaised = financialContributors.reduce((sum, contributor) => sum + contributor.totalAmountDonated, 0);
-  const totalSupportersCount = financialContributors.length;
+  const totalAmountRaised = financialContributors.reduce((sum, contributor) => sum + contributor.totalAmountDonated, 0)
+  const totalSupportersCount = financialContributors.length
 
-  // Process contributors for the new display logic
-  // No need to filter admins again here as getOpenCollectiveContributors does it.
-  // financialContributors are already sorted and filtered appropriately for the image stack.
-  const contributorsWithImages = financialContributors.filter(c => c.image);
-  const highestDonorWithImage = contributorsWithImages.length > 0 ? contributorsWithImages[0] : null;
-  const otherDonorsForStack = contributorsWithImages.slice(1, 10); 
+  const contributorsWithImages = financialContributors.filter(c => c.image)
+  const highestDonorWithImage = contributorsWithImages.length > 0 ? contributorsWithImages[0] : null
+  const otherDonorsForStack = contributorsWithImages.slice(1, 10)
 
-  // For textual thank you, we might want a broader list of non-admins if desired,
-  // or just use the financial ones. For now, let's use the same financial list for top names.
-  const topTenFinancialContributors = financialContributors.slice(0, 10);
-  const topTenNames = topTenFinancialContributors.map(c => c.name);
-  const additionalSupportersCount = Math.max(0, financialContributors.length - topTenNames.length);
+  const topTenFinancialContributors = financialContributors.slice(0, 10)
+  const topTenNames = topTenFinancialContributors.map(c => c.name)
+  const additionalSupportersCount = Math.max(0, financialContributors.length - topTenNames.length)
 
   const stats = await getStats(supabase).catch((error) => {
     console.error('Failed to fetch stats for homepage:', error)
@@ -141,231 +136,145 @@ export default async function Homepage() {
     }
   })
 
-  const unifiedDeepBlueBase = "bg-white dark:bg-slate-900";
-  
   const sectionPaddingClasses = "py-12 md:py-16 lg:py-20"
   const contentWrapperClasses = "w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10"
 
   return (
-    <main> 
-      {/* Parent wrapper for the first three sections - Removed glow */}
-      <section 
-        className={`${unifiedDeepBlueBase} overflow-hidden`}
-      >
-
-        {/* Section 1: Header */}
-        <section 
-          className={`${sectionPaddingClasses} overflow-hidden`}
-        >
-          <div className={`${contentWrapperClasses} text-center space-y-4`}>
+    <main>
+      {/* Section 1: Hero with CTAs */}
+      <section className="bg-white dark:bg-slate-900 pt-12 md:pt-16 pb-8 overflow-hidden">
+        <div className={`${contentWrapperClasses} text-center space-y-8`}>
+          <div className="space-y-4">
             <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Community Archive
-        </h1>
-            <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-              An open database and API anyone can build on.
-            </p>
-          </div>
-        </section>
-
-        {/* Section 2: Featuring archives uploaded by - Inset panel */}
-        <section 
-          className={`pt-8 md:pt-10 pb-6 md:pb-8 overflow-hidden`}
-        >
-          <div 
-            className={`max-w-5xl mx-auto rounded-xl p-8 md:p-10 space-y-6 text-center relative z-10 bg-slate-100 dark:bg-slate-700/60`}
-          >
-            <CommunityStats 
-              accountCount={stats.accountCount}
-              tweetCount={stats.tweetCount}
-              likedTweetCount={stats.likedTweetCount}
-              showGoal={false} 
-            />
-            {mostFollowed.length > 0 ? (
-              <AvatarList initialAvatars={mostFollowed} />
-        ) : (
-              <p className="text-center text-gray-500 dark:text-gray-400 mt-4">
-                Featured archives are currently unavailable.
-          </p>
-        )}
-          </div>
-        </section>
-
-        {/* Section 3: Our Mission */}
-        <section 
-          className={`${sectionPaddingClasses} overflow-hidden`}
-        >
-          <div className={`${contentWrapperClasses} space-y-6 text-center`}>
-            <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">🌟 Our Mission</h2>
-            <div className="max-w-2xl mx-auto px-4 md:px-0">
-              <p className="text-lg text-gray-700 dark:text-gray-300 text-center">
-                We believe in the immense cultural, historical, and economic value embedded in our collective digital data. 
-                Our goal is to build open-source, public infrastructure to <strong className="font-semibold text-gray-800 dark:text-gray-100">collect, host, and serve</strong> this data, empowering communities to use it for any purpose they choose.
-              </p>
-            </div>
-          </div>
-        </section>
-      </section>
-
-      {/* Section 4: Real-time Tweet Streaming - NEW */}
-      <section 
-        className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}
-      >
-        <div className={`${contentWrapperClasses} space-y-8`}>
-          <div className="text-center space-y-4">
-            <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">📡 Contribute to the Archive!</h2>
-            <p className="text-lg text-gray-700 dark:text-gray-300 max-w-3xl mx-auto">
-              Stream tweets to the archive by installing our browser extension that archives tweets you see from other contributors.
+              Community Archive
+            </h1>
+            <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300">
+              An open Twitter database.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <DynamicHomeOptInWidget />
-
-            <Card className="border-green-200 dark:border-green-700">
-              <CardContent className="pt-6 text-center space-y-4">
-                <div className="text-4xl">🔌</div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Step 2: Install Extension</h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Use our browser extension to automatically contribute tweets to the archive as you browse X/Twitter.
-                </p>
-                <a href="https://chromewebstore.google.com/detail/community-archive-stream/igclpobjpjlphgllncjcgaookmncegbk" target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline" className="border-green-300 text-green-700 hover:bg-green-100 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-800">
-                    Install Browser Extension
-                  </Button>
-                </a>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="text-center">
-            <p className="text-xs text-gray-600 dark:text-gray-400">
-              Chrome extension available now • See current streaming activity in the <Link href="/stream-monitor" className="text-green-600 dark:text-green-400 hover:underline font-medium">Stream Monitor</Link>
-            </p>
-          </div>
+          <DynamicHeroCTAButtons />
         </div>
       </section>
 
-      {/* Section 5: Upload your data - Removed glow */}
-      <section 
-        className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} overflow-hidden`}
-      >
-        <div className={`${contentWrapperClasses} space-y-6 text-center`}>
-          <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">📤 Upload Your Data</h2>
-          <div className="max-w-lg mx-auto px-2">
-            <p className="mb-4 text-gray-700 dark:text-gray-300">
-              Export your data from X (formerly Twitter):{' '}
-          <a
-            href="https://x.com/settings/download_your_data"
-                className="font-medium text-blue-600 hover:underline dark:text-blue-400"
-                target="_blank"
-                rel="noopener noreferrer"
-          >
-            https://x.com/settings/download_your_data
-          </a>
-        </p>
-            <div className="my-6">
-        <DynamicSignIn />
-            </div>
-        <UploadHomepageSection />
-          </div>
+      {/* Section 2: Social Proof */}
+      <section className="bg-white dark:bg-slate-900 pb-8 md:pb-12 overflow-hidden">
+        <div
+          className="max-w-5xl mx-auto rounded-xl p-6 md:p-8 space-y-4 text-center bg-slate-100 dark:bg-slate-700/60"
+        >
+          <CommunityStats
+            accountCount={stats.accountCount}
+            tweetCount={stats.tweetCount}
+            likedTweetCount={stats.likedTweetCount}
+            showGoal={false}
+          />
+          {mostFollowed.length > 0 ? (
+            <AvatarList initialAvatars={mostFollowed} />
+          ) : (
+            <p className="text-center text-gray-500 dark:text-gray-400 mt-4">
+              Featured archives are currently unavailable.
+            </p>
+          )}
         </div>
       </section>
-      
-      {/* Section 6: Showcased Apps (Built with the Archive) - Removed glow */}
-      <section 
-        className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}
-      >
+
+      {/* Section 3: Upload Your Archive */}
+      <section className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} overflow-hidden`}>
         <div className={contentWrapperClasses}>
-           <ShowcasedApps />
+          <DynamicUploadArchiveSection />
         </div>
       </section>
 
-      {/* Section 7: Data & source code - Removed glow */}
-      <section 
-        className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} overflow-hidden`}
-      >
+      {/* Section 4: Get Started - Featured Apps */}
+      <section className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}>
+        <div className={contentWrapperClasses}>
+          <FeaturedAppsSection />
+          <AppGallery />
+        </div>
+      </section>
+
+      {/* Section 4: Data & Source Code */}
+      <section className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} overflow-hidden`}>
         <div className={`${contentWrapperClasses} space-y-8`}>
           <div className="text-center">
-            <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">💻 Data & Source Code</h2>
+            <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">Data & Source Code</h2>
             <p className="mt-3 text-lg text-gray-600 dark:text-gray-300 max-w-xl mx-auto px-4 md:px-0">
               Access the data, explore the code, and see how everything works.
-              For details on what data is processed, see our{' '}
-              <Link href="/data-policy" passHref>
-                <span className="font-medium text-blue-600 hover:underline dark:text-blue-400 cursor-pointer">Data Policy</span>
-              </Link>
-          .
-        </p>
+            </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-            <InfoPanel icon={<FaGithub />} title="GitHub Repository" description="Access the full source code, contribute to the project, and track issues." href="https://github.com/TheExGenesis/community-archive" />
-            <InfoPanel icon={<FaDiscord />} title="Join our Discord" description="Connect with the community, ask questions, and share your projects." href="https://discord.gg/RArTGrUawX" />
-            <InfoPanel icon={<FaBook />} title="Documentation & API" description="Explore our API, download data, and find examples to build your own apps." href="https://github.com/TheExGenesis/community-archive/tree/main/docs" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            <InfoPanel icon={<FaGithub />} title="GitHub" description="Source code and contributions" href="https://github.com/TheExGenesis/community-archive" />
+            <InfoPanel icon={<FaDiscord />} title="Discord" description="Join the community" href="https://discord.gg/RArTGrUawX" />
+            <InfoPanel icon={<FaBook />} title="Documentation" description="API docs and examples" href="https://github.com/TheExGenesis/community-archive/tree/main/docs" />
           </div>
         </div>
       </section>
 
-      {/* Section 8: Our Supporters - Unified and Re-ordered */}
-      <section 
-        className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}
-      >
-        <div className={`${contentWrapperClasses} text-center space-y-12`}>
-          <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">💖 Our Supporters</h2>
-
-          {/* Major Backers Section */}
-          <div className="w-full max-w-3xl mx-auto">
-            <h3 className="text-2xl font-semibold leading-8 text-gray-900 dark:text-white mb-8">
-              Special thanks to our major backers
-            </h3>
-            <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-6">
-              <Link href="https://survivalandflourishing.fund/" target="_blank" rel="noopener noreferrer" className="text-xl font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                Survival and Flourishing Fund
-              </Link>
-              <span className="text-gray-400 dark:text-gray-500 text-xl">•</span>
-              <span className="text-xl font-medium text-gray-700 dark:text-gray-300">
-                <Link href="https://x.com/VitalikButerin" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  Vitalik Buterin
-                </Link>
-                {' '}(via{' '}
-                <Link href="https://kanro.fi/" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  Kanro
-                </Link>)
-              </span>
-              <span className="text-gray-400 dark:text-gray-500 text-xl">•</span>
-              <Link href="https://x.com/pwang" target="_blank" rel="noopener noreferrer" className="text-xl font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                Peter Wang
-              </Link>
-            </div>
+      {/* Section 5: Our Supporters */}
+      <section className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}>
+        <div className={`${contentWrapperClasses} space-y-8`}>
+          <div className="text-center">
+            <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">Our Supporters</h2>
+            <p className="mt-3 text-lg text-gray-600 dark:text-gray-300">
+              Thanks to everyone who makes this possible
+            </p>
           </div>
-          
-          {/* Divider */}
-          <div className="w-full max-w-2xl mx-auto border-t border-gray-200 dark:border-gray-700"></div>
 
-          {/* Community Supporters Section */}
-          <h3 className="text-2xl font-semibold leading-8 text-gray-900 dark:text-white -mb-4">
-            And to our community backers
-          </h3>
-          <TieredSupportersDisplay 
-            highestDonorWithImage={highestDonorWithImage}
-            otherDonorsForStack={otherDonorsForStack}
-            topTenNames={topTenNames}
-            additionalSupportersCount={additionalSupportersCount}
-            totalAmountRaised={totalAmountRaised}
-            totalSupportersCount={totalSupportersCount}
-          />
+          {/* Main supporters card */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 md:p-8 border border-gray-200 dark:border-slate-700 max-w-4xl mx-auto">
+            {/* Major Backers */}
+            <div className="text-center mb-6">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Major Backers</p>
+              <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-3">
+                <Link href="https://survivalandflourishing.fund/" target="_blank" rel="noopener noreferrer" className="text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Survival and Flourishing Fund
+                </Link>
+                <span className="text-gray-300 dark:text-gray-600">•</span>
+                <span className="text-base font-medium text-gray-700 dark:text-gray-300">
+                  <Link href="https://x.com/VitalikButerin" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                    Vitalik Buterin
+                  </Link>
+                  {' '}via{' '}
+                  <Link href="https://kanro.fi/" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                    Kanro
+                  </Link>
+                </span>
+                <span className="text-gray-300 dark:text-gray-600">•</span>
+                <Link href="https://x.com/pwang" target="_blank" rel="noopener noreferrer" className="text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Peter Wang
+                </Link>
+              </div>
+            </div>
 
-          <div className="pt-8">
-            <Link href="https://opencollective.com/community-archive/donate" passHref>
-               <div className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-lg font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 transition-colors duration-300 cursor-pointer">
-                 <FaHeart className="mr-2" /> Donate to our Open Collective
-               </div>
+            {/* Divider */}
+            <div className="border-t border-gray-200 dark:border-gray-700 my-6"></div>
+
+            {/* Community Supporters */}
+            <div className="text-center mb-4">
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Community Backers</p>
+            </div>
+            <TieredSupportersDisplay
+              highestDonorWithImage={highestDonorWithImage}
+              otherDonorsForStack={otherDonorsForStack}
+              topTenNames={topTenNames}
+              additionalSupportersCount={additionalSupportersCount}
+              totalAmountRaised={totalAmountRaised}
+              totalSupportersCount={totalSupportersCount}
+            />
+          </div>
+
+          {/* Donate button */}
+          <div className="text-center">
+            <Link href="https://opencollective.com/community-archive/donate" target="_blank" rel="noopener noreferrer">
+              <button className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-xl text-white bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 transition-colors">
+                <FaHeart className="mr-2" /> Support the Project
+              </button>
             </Link>
           </div>
-
         </div>
       </section>
 
       <Footer />
-
     </main>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { User, SortKey } from '@/lib/types'
-import { fetchUsers } from '@/lib/queries/fetchUsers'
+import { fetchUsers, fetchUsersCount } from '@/lib/queries/fetchUsers'
 import Link from 'next/link'
 
 import {
@@ -12,18 +12,23 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table'
-import { ArrowUpDown } from 'lucide-react'
+import { ArrowUpDown, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { formatNumber } from '@/lib/formatNumber'
 import { createBrowserClient } from '@/utils/supabase'
 
+const USERS_PER_PAGE = 50
+
 export default function UserDirectoryPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('archive_uploaded_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [totalCount, setTotalCount] = useState<number>(0)
+  const [hasMore, setHasMore] = useState(true)
 
   // Style definitions copied from homepage
   const unifiedDeepBlueBase = "bg-white dark:bg-background";
@@ -31,47 +36,89 @@ export default function UserDirectoryPage() {
   // Using max-w-6xl for user directory to accommodate table width
   const contentWrapperClasses = "w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10"
 
-  useEffect(() => {
-    const loadUsers = async () => {
-      try {
-        const supabase = createBrowserClient()
-        const users = await fetchUsers(supabase)
-        const sortedUsers = [...users].sort((a, b) => {
+  const supabase = createBrowserClient()
+
+  const loadUsers = useCallback(async (reset: boolean = false) => {
+    try {
+      if (reset) {
+        setLoading(true)
+        setUsers([])
+      } else {
+        setLoadingMore(true)
+      }
+
+      const offset = reset ? 0 : users.length
+      const fetchedUsers = await fetchUsers(supabase, {
+        limit: USERS_PER_PAGE,
+        offset,
+        sortBy: sortKey === 'archive_uploaded_at' ? 'num_tweets' : sortKey,
+        sortOrder
+      })
+
+      // Client-side sort for archive_uploaded_at since it comes from a joined table
+      if (sortKey === 'archive_uploaded_at') {
+        fetchedUsers.sort((a, b) => {
           const aValue = a.archive_uploaded_at ?? ''
           const bValue = b.archive_uploaded_at ?? ''
-          return bValue < aValue ? -1 : bValue > aValue ? 1 : 0
+          if (sortOrder === 'desc') {
+            return bValue < aValue ? -1 : bValue > aValue ? 1 : 0
+          }
+          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0
         })
-        setUsers(sortedUsers)
-      } catch (error) {
-        setError('Failed to fetch users')
-        console.error('Error fetching users:', error)
-      } finally {
-        setLoading(false)
       }
+
+      if (reset) {
+        setUsers(fetchedUsers)
+      } else {
+        setUsers(prev => [...prev, ...fetchedUsers])
+      }
+
+      setHasMore(fetchedUsers.length === USERS_PER_PAGE)
+    } catch (err) {
+      setError('Failed to fetch users')
+      console.error('Error fetching users:', err)
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
     }
+  }, [supabase, users.length, sortKey, sortOrder])
 
-    loadUsers()
-  }, [])
+  // Load initial users and count
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const count = await fetchUsersCount(supabase)
+        setTotalCount(count)
+      } catch (err) {
+        console.error('Error fetching count:', err)
+      }
+      loadUsers(true)
+    }
+    init()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) return <div className="flex justify-center items-center min-h-screen"><p className="text-xl">Loading users...</p></div>
+  // Reload when sort changes
+  useEffect(() => {
+    loadUsers(true)
+  }, [sortKey, sortOrder]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (loading) return (
+    <div className="flex justify-center items-center min-h-screen">
+      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <p className="text-xl ml-3">Loading users...</p>
+    </div>
+  )
   if (error) return <div className="flex justify-center items-center min-h-screen"><p className="text-xl text-red-500">Error: {error}</p></div>
 
-  const sortData = (key: SortKey) => {
-    const newData = [...users].sort((a, b) => {
-      const aValue = a[key] ?? ''
-      const bValue = b[key] ?? ''
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1
-      return 0
-    })
-    setUsers(newData)
+  const handleSort = (key: SortKey) => {
     if (key === sortKey) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
     } else {
       setSortKey(key)
-      setSortOrder('asc')
+      setSortOrder('desc')
     }
   }
+
   const renderSortIcon = (key: SortKey) => {
     if (sortKey === key) {
       return (
@@ -87,11 +134,18 @@ export default function UserDirectoryPage() {
 
   return (
     <main>
-      <section 
+      <section
         className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} overflow-hidden min-h-screen`}
       >
         <div className={`${contentWrapperClasses}`}>
-          <h2 className="mb-8 text-4xl font-bold text-center text-gray-900 dark:text-white">User Directory</h2>
+          <div className="mb-8 text-center">
+            <h2 className="text-4xl font-bold text-gray-900 dark:text-white">User Directory</h2>
+            {totalCount > 0 && (
+              <p className="text-gray-600 dark:text-gray-400 mt-2">
+                Showing {users.length} of {formatNumber(totalCount)} users
+              </p>
+            )}
+          </div>
           <div className="w-full overflow-x-scroll bg-slate-100 dark:bg-card p-6 rounded-lg">
             <Table>
               <TableHeader>
@@ -100,34 +154,34 @@ export default function UserDirectoryPage() {
                   <TableHead>
                     <Button
                       variant="ghost"
-                      onClick={() => sortData('account_display_name')}
+                      onClick={() => handleSort('account_display_name')}
                           className="hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
                       Display Name {renderSortIcon('account_display_name')}
                     </Button>
                   </TableHead>
                   <TableHead>
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => sortData('username')} 
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleSort('username')}
                           className="hover:bg-slate-200 dark:hover:bg-slate-700"
                         >
                       Username {renderSortIcon('username')}
                     </Button>
                   </TableHead>
                   <TableHead>
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => sortData('num_tweets')} 
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleSort('num_tweets')}
                           className="hover:bg-slate-200 dark:hover:bg-slate-700"
                         >
                       Tweets {renderSortIcon('num_tweets')}
                     </Button>
                   </TableHead>
                   <TableHead>
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => sortData('num_likes')} 
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleSort('num_likes')}
                           className="hover:bg-slate-200 dark:hover:bg-slate-700"
                         >
                       Likes {renderSortIcon('num_likes')}
@@ -136,25 +190,25 @@ export default function UserDirectoryPage() {
                   <TableHead>
                     <Button
                       variant="ghost"
-                      onClick={() => sortData('num_followers')}
+                      onClick={() => handleSort('num_followers')}
                           className="hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
                       Followers {renderSortIcon('num_followers')}
                     </Button>
                   </TableHead>
                   <TableHead>
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => sortData('archive_at')} 
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleSort('archive_at')}
                           className="hover:bg-slate-200 dark:hover:bg-slate-700"
                         >
                       Archive Date {renderSortIcon('archive_at')}
                     </Button>
                   </TableHead>
                   <TableHead>
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => sortData('created_at')} 
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleSort('created_at')}
                           className="hover:bg-slate-200 dark:hover:bg-slate-700"
                         >
                       Account Created At {renderSortIcon('created_at')}
@@ -163,7 +217,7 @@ export default function UserDirectoryPage() {
                   <TableHead>
                     <Button
                       variant="ghost"
-                      onClick={() => sortData('archive_uploaded_at')}
+                      onClick={() => handleSort('archive_uploaded_at')}
                           className="hover:bg-slate-200 dark:hover:bg-slate-700"
                     >
                       Archive Uploaded At {renderSortIcon('archive_uploaded_at')}
@@ -224,6 +278,27 @@ export default function UserDirectoryPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* Load More Button */}
+          {hasMore && (
+            <div className="flex justify-center mt-6">
+              <Button
+                onClick={() => loadUsers(false)}
+                disabled={loadingMore}
+                variant="outline"
+                size="lg"
+              >
+                {loadingMore ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  `Load More (${Math.min(USERS_PER_PAGE, totalCount - users.length)} more)`
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       </section>
     </main>

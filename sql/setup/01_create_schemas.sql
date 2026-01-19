@@ -1,5 +1,0 @@
--- Create necessary schemas
-
-CREATE SCHEMA IF NOT EXISTS public;
-CREATE SCHEMA IF NOT EXISTS private;
-CREATE SCHEMA IF NOT EXISTS temp;

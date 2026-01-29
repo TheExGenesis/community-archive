@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, Archive, Trash2, UserX, CheckCircle } from 'lucide-react'
+import { AlertCircle, Archive, Trash2, UserX, CheckCircle, Upload } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@/utils/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -40,7 +40,7 @@ export default function ProfileContent({
   const handleOptInToggle = async (checked: boolean) => {
     setError(null)
     setSuccess(null)
-    
+
     startTransition(async () => {
       try {
         // Check if record exists first
@@ -76,11 +76,11 @@ export default function ProfileContent({
 
           if (insertError) throw insertError
         }
-        
+
         setOptInStatus(checked)
         setExplicitOptOut(false)
         setSuccess(checked ? 'Successfully opted in to tweet streaming' : 'Successfully opted out from tweet streaming')
-        
+
         router.refresh()
       } catch (err: any) {
         setError(err.message || 'Failed to update opt-in status')
@@ -92,7 +92,7 @@ export default function ProfileContent({
   const handleExplicitOptOut = async (checked: boolean) => {
     setError(null)
     setSuccess(null)
-    
+
     startTransition(async () => {
       try {
         // Check if record exists first
@@ -134,7 +134,7 @@ export default function ProfileContent({
           setOptInStatus(false)
         }
         setSuccess(checked ? 'Added to explicit opt-out list' : 'Removed from explicit opt-out list')
-        
+
         router.refresh()
       } catch (err: any) {
         setError(err.message || 'Failed to update opt-out status')
@@ -181,7 +181,7 @@ export default function ProfileContent({
       await deleteArchive(supabase, userMetadata.provider_id)
       // Delete from storage
       await deleteStorageFiles(userMetadata.provider_id)
-      
+
       setSuccess('All archives deleted successfully')
       router.refresh()
     } catch (err: any) {
@@ -218,7 +218,7 @@ export default function ProfileContent({
 
         <TabsContent value="privacy" className="space-y-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="space-y-1.5">
               <CardTitle>Tweet Streaming Settings</CardTitle>
               <CardDescription>
                 Control how your tweets are collected and stored
@@ -284,11 +284,24 @@ export default function ProfileContent({
 
         <TabsContent value="archives" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Your Archives</CardTitle>
-              <CardDescription>
-                Manage your uploaded Twitter archives
-              </CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between space-y-0">
+              <div className="space-y-1.5">
+                <CardTitle>Your Archives</CardTitle>
+                <CardDescription>
+                  Manage your uploaded Twitter archives
+                </CardDescription>
+              </div>
+              {archives?.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/#upload-archive')}
+                  className="gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  New Upload
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {archives.length === 0 ? (
@@ -298,7 +311,7 @@ export default function ProfileContent({
                   <Button
                     variant="outline"
                     className="mt-4"
-                    onClick={() => router.push('/upload-archive')}
+                    onClick={() => router.push('/#upload-archive')}
                   >
                     Upload Archive
                   </Button>

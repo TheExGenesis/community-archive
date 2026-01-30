@@ -2332,7 +2332,7 @@ BEGIN
     -- Get account_id for from_user
     IF from_user IS NOT NULL THEN
         SELECT a.account_id INTO from_account_id
-        FROM public.account AS a
+        FROM public.all_account AS a
         WHERE LOWER(a.username) = LOWER(from_user);
 
         IF from_account_id IS NULL THEN
@@ -2343,7 +2343,7 @@ BEGIN
     -- Get account_id for to_user
     IF to_user IS NOT NULL THEN
         SELECT a.account_id INTO to_account_id
-        FROM public.account AS a
+        FROM public.all_account AS a
         WHERE LOWER(a.username) = LOWER(to_user);
 
         IF to_account_id IS NULL THEN
@@ -2390,12 +2390,12 @@ BEGIN
         ) AS media
     FROM matching_tweets mt
     JOIN public.tweets t ON mt.tweet_id = t.tweet_id
-    JOIN public.account a ON t.account_id = a.account_id
+    JOIN public.all_account a ON t.account_id = a.account_id
     LEFT JOIN LATERAL (
         SELECT prof.avatar_media_url, prof.archive_upload_id
-        FROM public.profile AS prof
+        FROM public.all_profile AS prof
         WHERE prof.account_id = t.account_id
-        ORDER BY prof.archive_upload_id DESC
+        ORDER BY prof.archive_upload_id DESC NULLS LAST, prof.updated_at DESC
         LIMIT 1
     ) p ON true
     ORDER BY t.created_at DESC;

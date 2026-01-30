@@ -55,13 +55,13 @@ const pgSearch = async (
       retweet_count,
       favorite_count,
       reply_to_tweet_id,
-      account:account!inner (
-        profile (
+      account:all_account!inner (
+        username,
+        account_display_name,
+        profile:all_profile (
           avatar_media_url,
           archive_upload_id
-        ),
-        username,
-        account_display_name
+        )
       ),
       user_mentions (
         mentioned_user:mentioned_users (
@@ -91,9 +91,19 @@ const pgSearch = async (
 
   // Return raw tweet data with enriched mentioned_users (exactly like getTweet() does)
   const enrichedTweets = await Promise.all(tweets.map(async (tweet: any) => {
+    const profileEntry = Array.isArray(tweet.account?.profile)
+      ? tweet.account.profile.reduce((latest: any, current: any) => {
+          if (!latest) return current
+          const latestId = Number(latest.archive_upload_id ?? 0)
+          const currentId = Number(current.archive_upload_id ?? 0)
+          return currentId >= latestId ? current : latest
+        }, null as any)
+      : tweet.account?.profile
+
     // First, rename user_mentions to mentioned_users for compatibility
     const tweetWithMentions = {
       ...tweet,
+      avatar_media_url: tweet.avatar_media_url || profileEntry?.avatar_media_url,
       mentioned_users: tweet.user_mentions || [],
       user_mentions: undefined
     }

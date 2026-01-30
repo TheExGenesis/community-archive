@@ -1,15 +1,18 @@
-import { createBrowserClient } from '@/utils/supabase'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 const getLatestTweets = async (
-  supabase: any,
+  supabase: SupabaseClient,
   count: number,
   account_id?: string,
   offset = 0,
+  options?: {
+    includeEnrichments?: boolean
+  },
 ) => {
-  const newSupabaseClient = createBrowserClient()
+  const includeEnrichments = options?.includeEnrichments ?? true
 
   // Use tweets table with joined data for better performance
-  let query = newSupabaseClient
+  let query = supabase
     .from('tweets')
     .select(`
       tweet_id,
@@ -19,7 +22,7 @@ const getLatestTweets = async (
       retweet_count,
       favorite_count,
       reply_to_tweet_id,
-      account!inner (
+      account:all_account!inner (
         username,
         account_display_name
       ),
@@ -60,17 +63,18 @@ const getLatestTweets = async (
   const tweetIds = data?.map(t => t.tweet_id) || []
   
   // Get profile/avatar data
-  const { data: profileData } = await newSupabaseClient
+  const { data: profileData } = await supabase
     .from('all_profile')
     .select('account_id, avatar_media_url')
     .in('account_id', data?.map(t => t.account_id) || [])
     .order('archive_upload_id', { ascending: false })
 
-  // Get quote tweet data
-  const { data: quoteTweets } = await newSupabaseClient
-    .from('quote_tweets')
-    .select('tweet_id, quoted_tweet_id')
-    .in('tweet_id', tweetIds)
+  const quoteTweets = includeEnrichments
+    ? (await supabase
+        .from('quote_tweets')
+        .select('tweet_id, quoted_tweet_id')
+        .in('tweet_id', tweetIds)).data
+    : []
 
   // Get account data for mentioned users (for RT functionality)
   const allMentionedUsers = data?.flatMap((t: any) => t.user_mentions?.map((um: any) => um.mentioned_user?.screen_name) || []) || []
@@ -78,8 +82,8 @@ const getLatestTweets = async (
   
   // Get account data for mentioned users
   let mentionedAccountData: any[] = []
-  if (uniqueMentionedUsers.length > 0) {
-    const { data: accounts } = await newSupabaseClient
+  if (includeEnrichments && uniqueMentionedUsers.length > 0) {
+    const { data: accounts } = await supabase
       .from('all_account')
       .select('username, account_display_name, account_id')
       .in('username', uniqueMentionedUsers)
@@ -87,7 +91,7 @@ const getLatestTweets = async (
     if (accounts) {
       // Get profile data for these accounts
       const accountIds = accounts.map(acc => acc.account_id)
-      const { data: profiles } = await newSupabaseClient
+      const { data: profiles } = await supabase
         .from('all_profile')
         .select('account_id, avatar_media_url')
         .in('account_id', accountIds)
@@ -115,8 +119,8 @@ const getLatestTweets = async (
   const quotedTweetIds = Array.from(new Set(quoteTweets?.map(qt => qt.quoted_tweet_id).filter(Boolean) || [])) as string[]
   let quotedTweetsData: any[] = []
   
-  if (quotedTweetIds.length > 0) {
-    const { data: quotedTweets } = await newSupabaseClient
+  if (includeEnrichments && quotedTweetIds.length > 0) {
+    const { data: quotedTweets } = await supabase
       .from('tweets')
       .select(`
         tweet_id,
@@ -139,7 +143,7 @@ const getLatestTweets = async (
     if (quotedTweets) {
       // Get profile data for quoted tweet authors
       const quotedAccountIds = quotedTweets.map(qt => qt.account_id)
-      const { data: quotedProfileData } = await newSupabaseClient
+      const { data: quotedProfileData } = await supabase
         .from('all_profile')
         .select('account_id, avatar_media_url')
         .in('account_id', quotedAccountIds)
@@ -195,19 +199,27 @@ const getLatestTweets = async (
     )
     
     // Enrich mentioned_users with account data
-    const enrichedMentionedUsers = (tweet.user_mentions || []).map((userMention: any) => {
-      const accountData = mentionedAccountMap.get(userMention.mentioned_user?.screen_name)
-      return {
-        ...userMention,
-        mentioned_user: {
-          ...userMention.mentioned_user,
-          account: accountData
-        }
-      }
-    })
+    const enrichedMentionedUsers = includeEnrichments
+      ? (tweet.user_mentions || []).map((userMention: any) => {
+          const accountData = mentionedAccountMap.get(userMention.mentioned_user?.screen_name)
+          return {
+            ...userMention,
+            mentioned_user: {
+              ...userMention.mentioned_user,
+              account: accountData
+            }
+          }
+        })
+      : (tweet.user_mentions || []).map((userMention: any) => ({
+          ...userMention,
+          mentioned_user: {
+            ...userMention.mentioned_user,
+            account: undefined
+          }
+        }))
     
     const quotedTweetId = quoteMap.get(tweet.tweet_id)
-    const quotedTweet = quotedTweetId ? quotedTweetMap.get(quotedTweetId) : null
+    const quotedTweet = includeEnrichments && quotedTweetId ? quotedTweetMap.get(quotedTweetId) : null
 
     return {
       tweet_id: tweet.tweet_id,
@@ -217,7 +229,9 @@ const getLatestTweets = async (
       retweet_count: tweet.retweet_count,
       favorite_count: tweet.favorite_count,
       reply_to_tweet_id: tweet.reply_to_tweet_id,
-      quote_tweet_id: quotedTweetId || (hasTwitterUrl ? 'detected_from_url' : null),
+      quote_tweet_id: includeEnrichments
+        ? (quotedTweetId || (hasTwitterUrl ? 'detected_from_url' : null))
+        : null,
       quoted_tweet: quotedTweet,
       retweeted_tweet_id: isRetweet ? 'detected_from_text' : null,
       avatar_media_url: profileMap.get(tweet.account_id),

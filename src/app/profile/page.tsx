@@ -29,12 +29,12 @@ export default async function ProfilePage() {
             created_at,
             archive_at,
             keep_private,
-            accounts:account!inner(
+            accounts:all_account!left(
               account_id,
               username,
               account_display_name,
               num_tweets,
-              profile(avatar_media_url)
+              profile:all_profile(avatar_media_url)
             )
           `)
           .eq('account_id', twitterAccountId)

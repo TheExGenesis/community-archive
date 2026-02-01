@@ -158,7 +158,7 @@ export default async function Homepage() {
       </section>
 
       {/* Section 2: Social Proof */}
-      <section className="bg-white dark:bg-slate-900 pb-8 md:pb-12 overflow-hidden">
+      <section className="bg-white dark:bg-slate-900 overflow-hidden">
         <div
           className="max-w-5xl mx-auto rounded-xl p-6 md:p-8 space-y-4 text-center bg-slate-100 dark:bg-slate-700/60"
         >
@@ -179,7 +179,7 @@ export default async function Homepage() {
       </section>
 
       {/* Section 3: Upload Your Archive */}
-      <section className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} overflow-hidden`}>
+      <section id="upload-archive" className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} scroll-mt-16 overflow-hidden`}>
         <div className={contentWrapperClasses}>
           <DynamicUploadArchiveSection />
         </div>

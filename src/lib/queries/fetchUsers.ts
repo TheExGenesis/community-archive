@@ -8,13 +8,14 @@ export interface FetchUsersOptions {
   offset?: number
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
+  search?: string
 }
 
 export const fetchUsers = async (
   supabase: SupabaseClient,
   options?: FetchUsersOptions
 ): Promise<User[]> => {
-  const { limit, offset = 0, sortBy = 'archive_uploaded_at', sortOrder = 'desc' } = options || {}
+  const { limit, offset = 0, sortBy = 'archive_uploaded_at', sortOrder = 'desc', search } = options || {}
 
   let query = supabase
     .schema('public')
@@ -37,7 +38,12 @@ export const fetchUsers = async (
       archive_uploaded_at
     `,
     )
-    .order(sortBy, { ascending: sortOrder === 'asc' })
+
+  if (search) {
+    query = query.or(`username.ilike.%${search}%,account_display_name.ilike.%${search}%`)
+  }
+
+  query = query.order(sortBy, { ascending: sortOrder === 'asc' })
 
   if (limit) {
     query = query.range(offset, offset + limit - 1)
@@ -50,11 +56,17 @@ export const fetchUsers = async (
   return (data as User[]) || []
 }
 
-export const fetchUsersCount = async (supabase: SupabaseClient): Promise<number> => {
-  const { count, error } = await supabase
+export const fetchUsersCount = async (supabase: SupabaseClient, search?: string): Promise<number> => {
+  let query = supabase
     .schema('public')
     .from('user_directory')
     .select('account_id', { count: 'exact', head: true })
+
+  if (search) {
+    query = query.or(`username.ilike.%${search}%,account_display_name.ilike.%${search}%`)
+  }
+
+  const { count, error } = await query
 
   if (error) throw error
   return count || 0

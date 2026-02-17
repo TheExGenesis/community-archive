@@ -12,8 +12,9 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table'
-import { ArrowUpDown, Loader2 } from 'lucide-react'
+import { ArrowUpDown, Loader2, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { formatNumber } from '@/lib/formatNumber'
 import { createBrowserClient } from '@/utils/supabase'
@@ -29,6 +30,8 @@ export default function UserDirectoryPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [totalCount, setTotalCount] = useState<number>(0)
   const [hasMore, setHasMore] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
   // Style definitions copied from homepage
   const unifiedDeepBlueBase = "bg-white dark:bg-background";
@@ -37,6 +40,14 @@ export default function UserDirectoryPage() {
   const contentWrapperClasses = "w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10"
 
   const supabase = createBrowserClient()
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const loadUsers = useCallback(async (reset: boolean = false) => {
     try {
@@ -52,7 +63,8 @@ export default function UserDirectoryPage() {
         limit: USERS_PER_PAGE,
         offset,
         sortBy: sortKey,
-        sortOrder
+        sortOrder,
+        search: debouncedSearch || undefined
       })
 
       if (reset) {
@@ -69,7 +81,7 @@ export default function UserDirectoryPage() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [supabase, users.length, sortKey, sortOrder])
+  }, [supabase, users.length, sortKey, sortOrder, debouncedSearch])
 
   // Load initial users and count
   useEffect(() => {
@@ -85,12 +97,21 @@ export default function UserDirectoryPage() {
     init()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reload when sort changes
+  // Reload when sort or search changes
   useEffect(() => {
-    loadUsers(true)
-  }, [sortKey, sortOrder]) // eslint-disable-line react-hooks/exhaustive-deps
+    const reload = async () => {
+      try {
+        const count = await fetchUsersCount(supabase, debouncedSearch || undefined)
+        setTotalCount(count)
+      } catch (err) {
+        console.error('Error fetching count:', err)
+      }
+      loadUsers(true)
+    }
+    reload()
+  }, [sortKey, sortOrder, debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) return (
+  if (loading && !searchQuery) return (
     <div className="flex justify-center items-center min-h-screen">
       <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       <p className="text-xl ml-3">Loading users...</p>
@@ -133,6 +154,15 @@ export default function UserDirectoryPage() {
                 Showing {users.length} of {formatNumber(totalCount)} users
               </p>
             )}
+          </div>
+          <div className="relative mb-4 max-w-sm mx-auto">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search by name or username..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
           <div className="w-full overflow-x-scroll bg-slate-100 dark:bg-card p-6 rounded-lg">
             <Table>

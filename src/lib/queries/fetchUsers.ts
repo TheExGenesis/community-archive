@@ -90,7 +90,7 @@ export const getUserData = async (
       num_following,
       num_likes,
       profile:profile(bio, website, location, avatar_media_url, header_media_url),
-      archive_upload:archive_upload(archive_at, created_at)
+      archive_upload:archive_upload(id, archive_at, created_at)
     `,
     )
     .or(`account_id.eq.${account_id},username.ilike.${account_id}`)

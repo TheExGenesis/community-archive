@@ -5,9 +5,10 @@ import { devLog } from '@/lib/devLog'
 
 const tweetSelectString = `
         *,
-        ${'account'}!inner (
-          profile (
-            avatar_media_url
+        account:all_account!inner (
+          profile:all_profile (
+            avatar_media_url,
+            archive_upload_id
           ),
           username,
           account_display_name

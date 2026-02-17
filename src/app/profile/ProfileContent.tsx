@@ -37,6 +37,18 @@ export default function ProfileContent({
   const [deletingArchive, setDeletingArchive] = useState<string | null>(null)
   const supabase = createBrowserClient()
 
+  const twitterUsername =
+    userMetadata?.user_name ||
+    user.user_metadata?.user_name ||
+    user.user_metadata?.preferred_username ||
+    user.user_metadata?.username ||
+    user.app_metadata?.user_name
+
+  const twitterUserId =
+    userMetadata?.provider_id ||
+    user.user_metadata?.provider_id ||
+    user.app_metadata?.provider_id
+
   const handleOptInToggle = async (checked: boolean) => {
     setError(null)
     setSuccess(null)
@@ -50,25 +62,39 @@ export default function ProfileContent({
           .eq('user_id', user.id)
           .single()
 
+        const updatePayload: Record<string, any> = {
+          opted_in: checked,
+          explicit_optout: false,
+          opt_out_reason: null,
+        }
+
+        if (twitterUsername) {
+          updatePayload.username = twitterUsername.toLowerCase()
+        }
+        if (twitterUserId) {
+          updatePayload.twitter_user_id = twitterUserId
+        }
+
         if (existingRecord) {
           // Update existing record
           const { error: updateError } = await supabase
             .from('optin')
-            .update({
-              opted_in: checked,
-              explicit_optout: false,
-              opt_out_reason: null
-            })
+            .update(updatePayload)
             .eq('user_id', user.id)
 
           if (updateError) throw updateError
         } else {
+          if (!twitterUsername) {
+            throw new Error('Twitter username not found. Please sign in with Twitter to manage opt-in settings.')
+          }
+
           // Insert new record
           const { error: insertError } = await supabase
             .from('optin')
             .insert({
               user_id: user.id,
-              username: user.email?.split('@')[0] || 'unknown',
+              username: twitterUsername.toLowerCase(),
+              twitter_user_id: twitterUserId || null,
               opted_in: checked,
               explicit_optout: false,
               opt_out_reason: null
@@ -102,25 +128,39 @@ export default function ProfileContent({
           .eq('user_id', user.id)
           .single()
 
+        const updatePayload: Record<string, any> = {
+          opted_in: false,
+          explicit_optout: checked,
+          opt_out_reason: checked ? 'User explicitly opted out via profile settings' : null,
+        }
+
+        if (twitterUsername) {
+          updatePayload.username = twitterUsername.toLowerCase()
+        }
+        if (twitterUserId) {
+          updatePayload.twitter_user_id = twitterUserId
+        }
+
         if (existingRecord) {
           // Update existing record
           const { error: updateError } = await supabase
             .from('optin')
-            .update({
-              opted_in: false,
-              explicit_optout: checked,
-              opt_out_reason: checked ? 'User explicitly opted out via profile settings' : null
-            })
+            .update(updatePayload)
             .eq('user_id', user.id)
 
           if (updateError) throw updateError
         } else {
+          if (!twitterUsername) {
+            throw new Error('Twitter username not found. Please sign in with Twitter to manage opt-in settings.')
+          }
+
           // Insert new record
           const { error: insertError } = await supabase
             .from('optin')
             .insert({
               user_id: user.id,
-              username: user.email?.split('@')[0] || 'unknown',
+              username: twitterUsername.toLowerCase(),
+              twitter_user_id: twitterUserId || null,
               opted_in: false,
               explicit_optout: checked,
               opt_out_reason: checked ? 'User explicitly opted out via profile settings' : null

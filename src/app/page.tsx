@@ -12,7 +12,7 @@ import dynamic from 'next/dynamic'
 import FeaturedAppsSection from '@/components/FeaturedAppsSection'
 import AppGallery from '@/components/AppGallery'
 
-export const revalidate = 0
+export const revalidate = 60 // Cache for 60s to reduce server load from scrapers
 
 // Dynamically import client components with ssr disabled
 const DynamicHeroCTAButtons = dynamic(() => import('@/components/HeroCTAButtons'), {

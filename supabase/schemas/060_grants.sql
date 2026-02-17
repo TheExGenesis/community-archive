@@ -24,6 +24,7 @@ GRANT SELECT ON TABLE "public"."tweet_replies_view" TO "readclient";
 GRANT SELECT ON TABLE "public"."tweet_urls" TO "readclient";
 GRANT SELECT ON TABLE "public"."tweets" TO "readclient";
 GRANT SELECT ON TABLE "public"."tweets_w_conversation_id" TO "readclient";
+GRANT SELECT ON TABLE "public"."user_directory" TO "readclient";
 GRANT SELECT ON TABLE "public"."user_mentions" TO "readclient";
 
 -- Default privileges for readclient on future tables

@@ -43,7 +43,7 @@ interface Tweet {
 }
 
 const StreamMonitor = () => {
-  const [viewMode, setViewMode] = useState<'24h' | '7d' | '1y'>('24h')
+  const [viewMode, setViewMode] = useState<'24h' | '7d' | '1y'>('7d')
   const [timeOffset, setTimeOffset] = useState(0)
   const [showStreamedOnly, setShowStreamedOnly] = useState(true)
   const [loadedTweets, setLoadedTweets] = useState<Tweet[]>([])
@@ -108,7 +108,9 @@ const StreamMonitor = () => {
   const { data: tweetsData, isLoading: tweetsLoading, error: tweetsError, refetch: refetchTweets } = useQuery({
     queryKey: ['streamMonitorTweets', tweetOffset],
     queryFn: async () => {
-      return await getLatestTweets(supabase, tweetsPerPage, undefined, tweetOffset)
+      return await getLatestTweets(supabase, tweetsPerPage, undefined, tweetOffset, {
+        includeEnrichments: false,
+      })
     },
     refetchInterval: tweetOffset === 0 ? 60000 : 0 // Only auto-refresh latest tweets
   })

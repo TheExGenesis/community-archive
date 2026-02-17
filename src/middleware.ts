@@ -195,12 +195,25 @@ function isValidChallengeCookie(value: string | undefined): boolean {
   return value === expected || value === prevHour
 }
 
+// ─── Route classification ───────────────────────────────────────────────────
+
+/** Routes that are page navigations (not API/data endpoints) */
+function isPageRoute(pathname: string): boolean {
+  return (
+    !pathname.startsWith('/api/') &&
+    !pathname.startsWith('/_next/') &&
+    !pathname.endsWith('.json') &&
+    !pathname.endsWith('.xml') &&
+    !pathname.endsWith('.txt')
+  )
+}
+
 // ─── Main Middleware ─────────────────────────────────────────────────────────
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const ua = request.headers.get('user-agent') || ''
-  const isTweetsRoute = pathname.startsWith('/tweets/')
+  const pageRoute = isPageRoute(pathname)
   const previewBot = isPreviewBot(ua)
 
   // ── Stage 1: Bot User-Agent Detection (all routes) ──────────────────────
@@ -221,8 +234,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Stage 2: Browser Header Fingerprinting (/tweets/ only) ──────────────
-  if (isTweetsRoute && !previewBot) {
+  // ── Stage 2: Browser Header Fingerprinting (all page routes) ────────────
+  if (pageRoute && !previewBot) {
     const accept = request.headers.get('accept') || ''
     const acceptLang = request.headers.get('accept-language')
     const acceptEnc = request.headers.get('accept-encoding') || ''
@@ -239,8 +252,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Stage 3: Geo-Aware Rate Limiting (/tweets/ only) ────────────────────
-  if (isTweetsRoute) {
+  // ── Stage 3: Geo-Aware Rate Limiting (all page routes) ──────────────────
+  if (pageRoute) {
     const ip = getIp(request)
     const country = request.headers.get('x-vercel-ip-country') || ''
     const isSG = country === 'SG'
@@ -287,8 +300,8 @@ export async function middleware(request: NextRequest) {
     ;(request as any).__newRlData = newRlData
   }
 
-  // ── Stage 4: JS Challenge Gate (/tweets/[id] only, first visit) ─────────
-  if (isTweetsRoute && !previewBot) {
+  // ── Stage 4: JS Challenge Gate (all page routes, first visit) ───────────
+  if (pageRoute && !previewBot) {
     const challengeCookie = request.cookies.get('__cc')?.value
     if (!isValidChallengeCookie(challengeCookie)) {
       const challengeHtml = buildChallengeHtml(request.url)

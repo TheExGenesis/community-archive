@@ -68,3 +68,30 @@ CREATE OR REPLACE VIEW "public"."tweets_w_conversation_id" AS
    FROM ("public"."tweets"
      LEFT JOIN "public"."conversations" "c" ON (("tweets"."tweet_id" = "c"."tweet_id")));
 ALTER TABLE "public"."tweets_w_conversation_id" OWNER TO "postgres";
+
+-- public.user_directory
+CREATE OR REPLACE VIEW "public"."user_directory" AS
+SELECT
+  a.account_id,
+  a.username,
+  a.account_display_name,
+  a.created_at,
+  a.num_tweets,
+  a.num_followers,
+  a.num_following,
+  a.num_likes,
+  p.bio,
+  p.website,
+  p.location,
+  p.avatar_media_url,
+  au.archive_at,
+  au.created_at as archive_uploaded_at
+FROM public.account a
+LEFT JOIN public.profile p ON a.account_id = p.account_id
+JOIN public.archive_upload au ON a.account_id = au.account_id
+  AND au.id = (
+    SELECT max(au2.id) FROM public.archive_upload au2
+    WHERE au2.account_id = a.account_id
+    AND au2.upload_phase = 'completed'
+  );
+ALTER TABLE "public"."user_directory" OWNER TO "postgres";

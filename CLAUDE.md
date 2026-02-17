@@ -126,19 +126,35 @@ This is a **Twitter Community Archive** built with Next.js 14, Supabase, and Typ
 3. Use `pnpm dev-remote-db` to start with remote database
 
 **CURRENT DEVELOPMENT NOTE:**
-We are currently working directly with the remote database. For database schema changes:
-1. Create migration files using `supabase migration new <descriptive_name>`
-2. Edit the generated SQL file in `supabase/migrations/`
-3. Use `supabase db push` to apply them to the remote database
-4. Do NOT use local database reset commands
+We are currently working directly with the remote database.
+
+**Database Schema Change Workflow (Declarative):**
+1. Edit the schema files in `supabase/schemas/` (e.g., add a function to `070_functions.sql`, a table to `020_tables.sql`)
+2. Run `supabase db diff -f <descriptive_name>` to auto-generate a migration from your schema changes
+3. Review the generated migration file in `supabase/migrations/`
+4. Use `supabase db push` to apply the migration to the remote database
+5. Do NOT use local database reset commands
+6. **ALWAYS ask for permission before creating new tables or functions**
+
+**Schema files in `supabase/schemas/`:**
+- `000_extensions.sql` - PostgreSQL extensions
+- `000_roles.sql` - Database roles
+- `001_schemas.sql` - Schema definitions
+- `010_types.sql` - Custom types
+- `020_tables.sql` - Table definitions
+- `030_indexes.sql` - Indexes
+- `040_views.sql` - Views (including `enriched_tweets`)
+- `050_constraints.sql` - Constraints
+- `060_grants.sql` / `060_policies.sql` - Permissions and RLS
+- `070_functions.sql` - SQL functions
+- `080_triggers.sql` - Triggers
 
 **Database Work Guidelines:**
-- Database schema information can be found in `sql/tables/` directory
-- **ALWAYS** use `supabase migration new <name>` to create migrations (it generates correct timestamps)
-- Never manually create migration files - always use the Supabase CLI
-- Test queries against existing schema before creating migrations
+- **ALWAYS** edit schema files in `supabase/schemas/` first, then generate migrations with `supabase db diff -f <name>`
+- Never manually create or edit migration files - always use `supabase db diff` to generate them from schema changes
 - Use descriptive migration names (e.g., `add_user_analytics_table`, `fix_tweet_mentions_index`)
-- **IMPORTANT**: When creating migrations that add new SQL entities or change existing ones, always update the corresponding files in the `./sql` directory to keep the schema documentation in sync
+- Test queries against existing schema before making changes
+- The schema files in `supabase/schemas/` ARE the source of truth for the database schema
 
 **Type Generation:**
 - Run `pnpm dev:gen-types` after schema changes to update TypeScript types

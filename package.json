@@ -35,6 +35,7 @@
     "test": "jest",
     "test:ci": "jest --ci",
     "test:server": "jest --selectProjects server --testPathPattern=src/lib",
+    "test:db-schema": "NEXT_PUBLIC_USE_REMOTE_DEV_DB=false jest --selectProjects server --testPathPattern=tests/db-schema",
     "test:db": "set NODE_OPTIONS=--expose-gc && jest --selectProjects server --testPathPattern=tests/db-insertion",
     "test:db:watch": "set NODE_OPTIONS=--expose-gc && jest --selectProjects server --testPathPattern=tests/db-insertion --watch",
     "test:db:coverage": "set NODE_OPTIONS=--expose-gc && jest --selectProjects server --testPathPattern=tests/db-insertion --coverage",

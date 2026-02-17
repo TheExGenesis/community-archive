@@ -3,7 +3,7 @@ import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import AvatarList from '@/components/AvatarList'
 import { SupabaseClient } from '@supabase/supabase-js'
-import { FaGithub, FaDiscord, FaBook, FaHeart } from 'react-icons/fa'
+import { FaGithub, FaDiscord, FaBook, FaHeart, FaDatabase } from 'react-icons/fa'
 import Footer from '@/components/Footer'
 import Link from 'next/link'
 import { getStats } from '@/lib/stats'
@@ -206,6 +206,7 @@ export default async function Homepage() {
             <InfoPanel icon={<FaGithub />} title="GitHub" description="Source code and contributions" href="https://github.com/TheExGenesis/community-archive" />
             <InfoPanel icon={<FaDiscord />} title="Discord" description="Join the community" href="https://discord.gg/RArTGrUawX" />
             <InfoPanel icon={<FaBook />} title="Documentation" description="API docs and examples" href="https://github.com/TheExGenesis/community-archive/tree/main/docs" />
+            <InfoPanel icon={<FaDatabase />} title="Data Dump" description="Download the full dataset" href="https://github.com/TheExGenesis/community-archive/releases/tag/data_export" />
           </div>
         </div>
       </section>

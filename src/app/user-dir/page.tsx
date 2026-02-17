@@ -51,21 +51,9 @@ export default function UserDirectoryPage() {
       const fetchedUsers = await fetchUsers(supabase, {
         limit: USERS_PER_PAGE,
         offset,
-        sortBy: sortKey === 'archive_uploaded_at' ? 'num_tweets' : sortKey,
+        sortBy: sortKey,
         sortOrder
       })
-
-      // Client-side sort for archive_uploaded_at since it comes from a joined table
-      if (sortKey === 'archive_uploaded_at') {
-        fetchedUsers.sort((a, b) => {
-          const aValue = a.archive_uploaded_at ?? ''
-          const bValue = b.archive_uploaded_at ?? ''
-          if (sortOrder === 'desc') {
-            return bValue < aValue ? -1 : bValue > aValue ? 1 : 0
-          }
-          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0
-        })
-      }
 
       if (reset) {
         setUsers(fetchedUsers)

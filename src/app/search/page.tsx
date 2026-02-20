@@ -17,28 +17,29 @@ function SearchPageContent() {
 
   const rawQuery = searchParams.get('q');
   let formattedQuery: string | undefined;
+  // Strip quotes if present, keep the clean text for two-query exact-match-first logic
+  let cleanRawText: string | undefined;
 
   if (rawQuery) {
     const trimmedQuery = rawQuery.trim();
     if (trimmedQuery.startsWith('"') && trimmedQuery.endsWith('"')) {
-      // Exact phrase search: "cool project" -> cool <-> project
-      const phrase = trimmedQuery.substring(1, trimmedQuery.length - 1);
-      formattedQuery = phrase.trim().split(/\s+/).join(' <-> ');
+      cleanRawText = trimmedQuery.substring(1, trimmedQuery.length - 1).trim();
     } else {
-      // All words search: cool project -> cool & project
-      formattedQuery = trimmedQuery.split(/\s+/).join(' & ');
+      cleanRawText = trimmedQuery;
     }
+    // For single-word queries or fallback, still provide a formatted query
+    const words = cleanRawText.split(/\s+/).filter(Boolean);
+    formattedQuery = words.join(' & ');
   }
 
   // Construct FilterCriteria from URL search parameters
   const filterCriteria: FilterCriteria = {
     searchQuery: formattedQuery,
+    rawSearchQuery: cleanRawText,
     fromUsername: searchParams.get('fromUser') || undefined,
     replyToUsername: searchParams.get('replyToUser') || undefined,
     startDate: searchParams.get('sinceDate') || undefined,
     endDate: searchParams.get('untilDate') || undefined,
-    // isRootTweet, mentionedUser, hashtags are not currently set by AdvancedSearchForm directly to URL params
-    // They could be added if the form supports them explicitly or if 'q' is parsed for such syntax.
   };
   
   // A key for TweetList to force re-render when search params change, ensuring new data is fetched.

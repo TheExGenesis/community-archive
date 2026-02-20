@@ -1,4 +1,4 @@
-import { buildTsQueries, fetchTweets, FilterCriteria } from './tweetQueries'
+import { buildAndTsQuery, fetchTweets, FilterCriteria } from './tweetQueries'
 
 // Mock the RPC search function
 const mockRpcSearch = jest.fn()
@@ -6,8 +6,8 @@ jest.mock('../pgSearch', () => ({
   searchTweets: (...args: any[]) => mockRpcSearch(...args),
 }))
 
-// Helper to create a fake RPC result row
-function makeTweet(id: string, text: string = `Tweet ${id}`) {
+// Helper to create a fake RPC result row (flat shape from RPC)
+function makeRpcTweet(id: string, text: string = `Tweet ${id}`) {
   return {
     tweet_id: id,
     account_id: 'acc_1',
@@ -24,45 +24,83 @@ function makeTweet(id: string, text: string = `Tweet ${id}`) {
   }
 }
 
-// Stub Supabase client — only used as a pass-through to the mocked RPC
-const fakeSupabase = {} as any
+// Helper to create a fake direct-query result row (nested shape from PostgREST)
+function makeDirectTweet(id: string, text: string = `Tweet ${id}`) {
+  return {
+    tweet_id: id,
+    created_at: '2025-01-01T00:00:00Z',
+    full_text: text,
+    favorite_count: 0,
+    retweet_count: 0,
+    reply_to_tweet_id: null,
+    reply_to_username: null,
+    account: {
+      username: 'testuser',
+      account_display_name: 'Test User',
+      profile: { avatar_media_url: null },
+    },
+    media: [],
+  }
+}
 
-describe('buildTsQueries', () => {
-  it('returns identical phrase and AND for a single word', () => {
-    const result = buildTsQueries('hello')
-    expect(result).toEqual({ phrase: 'hello', and: 'hello', isMultiWord: false })
+/**
+ * Build a mock Supabase client whose query-builder chain resolves to `rows`.
+ * Tracks which `.ilike()` calls were made so tests can assert on them.
+ */
+function buildMockSupabase(rows: any[]) {
+  const ilikeCalls: Array<{ column: string; pattern: string }> = []
+  const gteCalls: Array<{ column: string; value: string }> = []
+  const lteCalls: Array<{ column: string; value: string }> = []
+
+  const builder: any = {
+    select: jest.fn().mockReturnThis(),
+    ilike: jest.fn(function (col: string, pattern: string) {
+      ilikeCalls.push({ column: col, pattern })
+      return builder
+    }),
+    gte: jest.fn(function (col: string, val: string) {
+      gteCalls.push({ column: col, value: val })
+      return builder
+    }),
+    lte: jest.fn(function (col: string, val: string) {
+      lteCalls.push({ column: col, value: val })
+      return builder
+    }),
+    order: jest.fn().mockReturnThis(),
+    range: jest.fn().mockResolvedValue({ data: rows, error: null }),
+  }
+
+  const supabase = {
+    from: jest.fn().mockReturnValue(builder),
+    rpc: jest.fn(), // not used in direct-query path
+    _builder: builder,
+    _ilikeCalls: ilikeCalls,
+    _gteCalls: gteCalls,
+    _lteCalls: lteCalls,
+  }
+
+  return supabase as any
+}
+
+describe('buildAndTsQuery', () => {
+  it('returns the word as-is for a single word', () => {
+    expect(buildAndTsQuery('hello')).toBe('hello')
   })
 
-  it('builds phrase with <-> and AND with & for multi-word input', () => {
-    const result = buildTsQueries('cool project')
-    expect(result).toEqual({
-      phrase: 'cool <-> project',
-      and: 'cool & project',
-      isMultiWord: true,
-    })
+  it('joins multi-word input with &', () => {
+    expect(buildAndTsQuery('cool project')).toBe('cool & project')
   })
 
   it('handles three or more words', () => {
-    const result = buildTsQueries('the quick fox')
-    expect(result).toEqual({
-      phrase: 'the <-> quick <-> fox',
-      and: 'the & quick & fox',
-      isMultiWord: true,
-    })
+    expect(buildAndTsQuery('the quick fox')).toBe('the & quick & fox')
   })
 
   it('trims and collapses extra whitespace', () => {
-    const result = buildTsQueries('  cool   project  ')
-    expect(result).toEqual({
-      phrase: 'cool <-> project',
-      and: 'cool & project',
-      isMultiWord: true,
-    })
+    expect(buildAndTsQuery('  cool   project  ')).toBe('cool & project')
   })
 
   it('handles empty string', () => {
-    const result = buildTsQueries('')
-    expect(result).toEqual({ phrase: '', and: '', isMultiWord: false })
+    expect(buildAndTsQuery('')).toBe('')
   })
 })
 
@@ -71,31 +109,30 @@ describe('fetchTweets — two-query exact-match-first logic', () => {
     mockRpcSearch.mockReset()
   })
 
-  it('runs phrase query first, then AND query to fill remaining slots', async () => {
-    const phraseResults = [makeTweet('1'), makeTweet('2')]
-    const andResults = [makeTweet('1'), makeTweet('2'), makeTweet('3'), makeTweet('4')]
+  it('runs ILIKE phrase query first, then FTS AND query to fill remaining slots', async () => {
+    // ILIKE returns 2 exact matches
+    const phraseRows = [makeDirectTweet('1'), makeDirectTweet('2')]
+    const supabase = buildMockSupabase(phraseRows)
 
-    mockRpcSearch
-      .mockResolvedValueOnce(phraseResults)   // phrase query
-      .mockResolvedValueOnce(andResults)       // AND query
+    // FTS AND returns some overlapping + new results
+    const andResults = [makeRpcTweet('1'), makeRpcTweet('2'), makeRpcTweet('3'), makeRpcTweet('4')]
+    mockRpcSearch.mockResolvedValueOnce(andResults)
 
     const criteria: FilterCriteria = {
       searchQuery: 'cool & project',
       rawSearchQuery: 'cool project',
     }
-    const result = await fetchTweets(fakeSupabase, criteria, 1, 5)
+    const result = await fetchTweets(supabase, criteria, 1, 5)
 
-    // Should have called RPC twice
-    expect(mockRpcSearch).toHaveBeenCalledTimes(2)
+    // ILIKE query was made on tweets table
+    expect(supabase.from).toHaveBeenCalledWith('tweets')
+    expect(supabase._ilikeCalls[0]).toEqual({ column: 'full_text', pattern: '%cool project%' })
 
-    // First call: phrase query
-    expect(mockRpcSearch.mock.calls[0][1].search_query).toBe('cool <-> project')
+    // AND RPC was called to fill remaining
+    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
+    expect(mockRpcSearch.mock.calls[0][1].search_query).toBe('cool & project')
 
-    // Second call: AND query
-    expect(mockRpcSearch.mock.calls[1][1].search_query).toBe('cool & project')
-
-    // Results: 2 phrase matches + 2 unique AND matches (IDs 3, 4) = 4 total
-    // (ID 1 and 2 are duplicates and excluded from AND results)
+    // Results: 2 exact + 2 unique AND (IDs 3, 4) = 4 total
     expect(result.tweets).toHaveLength(4)
     expect(result.tweets[0].tweet_id).toBe('1')
     expect(result.tweets[1].tweet_id).toBe('2')
@@ -104,96 +141,93 @@ describe('fetchTweets — two-query exact-match-first logic', () => {
     expect(result.error).toBeNull()
   })
 
-  it('skips AND query when phrase query fills the page', async () => {
-    const phraseResults = Array.from({ length: 5 }, (_, i) => makeTweet(`${i + 1}`))
-
-    mockRpcSearch.mockResolvedValueOnce(phraseResults)
+  it('skips AND query when ILIKE phrase query fills the page', async () => {
+    const phraseRows = Array.from({ length: 5 }, (_, i) => makeDirectTweet(`${i + 1}`))
+    const supabase = buildMockSupabase(phraseRows)
 
     const criteria: FilterCriteria = {
       searchQuery: 'cool & project',
       rawSearchQuery: 'cool project',
     }
-    const result = await fetchTweets(fakeSupabase, criteria, 1, 5)
+    const result = await fetchTweets(supabase, criteria, 1, 5)
 
-    // Only one RPC call — phrase filled the page
-    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
+    // No RPC call needed — ILIKE filled the page
+    expect(mockRpcSearch).not.toHaveBeenCalled()
     expect(result.tweets).toHaveLength(5)
     expect(result.error).toBeNull()
   })
 
-  it('handles phrase query returning zero results', async () => {
-    const andResults = [makeTweet('10'), makeTweet('11')]
+  it('handles phrase query returning zero results — falls back to AND', async () => {
+    const supabase = buildMockSupabase([]) // ILIKE returns nothing
 
-    mockRpcSearch
-      .mockResolvedValueOnce([])          // phrase: no results
-      .mockResolvedValueOnce(andResults)   // AND: some results
+    const andResults = [makeRpcTweet('10'), makeRpcTweet('11')]
+    mockRpcSearch.mockResolvedValueOnce(andResults)
 
     const criteria: FilterCriteria = {
       searchQuery: 'cool & project',
       rawSearchQuery: 'cool project',
     }
-    const result = await fetchTweets(fakeSupabase, criteria, 1, 5)
+    const result = await fetchTweets(supabase, criteria, 1, 5)
 
-    expect(mockRpcSearch).toHaveBeenCalledTimes(2)
+    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
     expect(result.tweets).toHaveLength(2)
     expect(result.tweets[0].tweet_id).toBe('10')
     expect(result.tweets[1].tweet_id).toBe('11')
   })
 
   it('deduplicates AND results that overlap with phrase results', async () => {
-    const phraseResults = [makeTweet('A'), makeTweet('B')]
-    // AND returns the same IDs plus one new one
-    const andResults = [makeTweet('A'), makeTweet('B'), makeTweet('C')]
+    const phraseRows = [makeDirectTweet('A'), makeDirectTweet('B')]
+    const supabase = buildMockSupabase(phraseRows)
 
-    mockRpcSearch
-      .mockResolvedValueOnce(phraseResults)
-      .mockResolvedValueOnce(andResults)
+    const andResults = [makeRpcTweet('A'), makeRpcTweet('B'), makeRpcTweet('C')]
+    mockRpcSearch.mockResolvedValueOnce(andResults)
 
     const criteria: FilterCriteria = {
       searchQuery: 'cool & project',
       rawSearchQuery: 'cool project',
     }
-    const result = await fetchTweets(fakeSupabase, criteria, 1, 10)
+    const result = await fetchTweets(supabase, criteria, 1, 10)
 
     expect(result.tweets).toHaveLength(3)
-    expect(result.tweets.map(t => t.tweet_id)).toEqual(['A', 'B', 'C'])
+    expect(result.tweets.map((t) => t.tweet_id)).toEqual(['A', 'B', 'C'])
   })
 
-  it('uses single query path for single-word searches', async () => {
-    const results = [makeTweet('1'), makeTweet('2')]
-    mockRpcSearch.mockResolvedValueOnce(results)
-
-    const criteria: FilterCriteria = {
-      searchQuery: 'hello',
-      rawSearchQuery: 'hello',
-    }
-    const result = await fetchTweets(fakeSupabase, criteria, 1, 50)
-
-    // Single word — only one RPC call
-    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
-    expect(mockRpcSearch.mock.calls[0][1].search_query).toBe('hello')
-    expect(result.tweets).toHaveLength(2)
-  })
-
-  it('uses single query path when rawSearchQuery is not provided', async () => {
-    const results = [makeTweet('1')]
-    mockRpcSearch.mockResolvedValueOnce(results)
+  it('applies date filters to the ILIKE phrase query', async () => {
+    const supabase = buildMockSupabase([makeDirectTweet('1')])
+    mockRpcSearch.mockResolvedValueOnce([])
 
     const criteria: FilterCriteria = {
       searchQuery: 'cool & project',
-      // no rawSearchQuery — falls back to single query
+      rawSearchQuery: 'cool project',
+      startDate: '2024-01-01',
+      endDate: '2024-12-31',
     }
-    const result = await fetchTweets(fakeSupabase, criteria, 1, 50)
+    await fetchTweets(supabase, criteria, 1, 5)
 
-    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
-    expect(mockRpcSearch.mock.calls[0][1].search_query).toBe('cool & project')
-    expect(result.tweets).toHaveLength(1)
+    expect(supabase._gteCalls).toContainEqual({ column: 'created_at', value: '2024-01-01' })
+    expect(supabase._lteCalls).toContainEqual({ column: 'created_at', value: '2024-12-31' })
   })
 
-  it('passes filters through to both queries', async () => {
-    mockRpcSearch
-      .mockResolvedValueOnce([makeTweet('1')])
-      .mockResolvedValueOnce([])
+  it('applies fromUsername filter to the ILIKE phrase query', async () => {
+    const supabase = buildMockSupabase([makeDirectTweet('1')])
+    mockRpcSearch.mockResolvedValueOnce([])
+
+    const criteria: FilterCriteria = {
+      searchQuery: 'cool & project',
+      rawSearchQuery: 'cool project',
+      fromUsername: 'alice',
+    }
+    await fetchTweets(supabase, criteria, 1, 5)
+
+    expect(supabase._ilikeCalls).toContainEqual({
+      column: 'all_account.username',
+      pattern: 'alice',
+    })
+  })
+
+  it('passes filters through to the AND RPC query', async () => {
+    const supabase = buildMockSupabase([]) // ILIKE returns nothing
+    mockRpcSearch.mockResolvedValueOnce([])
 
     const criteria: FilterCriteria = {
       searchQuery: 'cool & project',
@@ -203,25 +237,65 @@ describe('fetchTweets — two-query exact-match-first logic', () => {
       startDate: '2024-01-01',
       endDate: '2024-12-31',
     }
-    await fetchTweets(fakeSupabase, criteria, 1, 5)
+    await fetchTweets(supabase, criteria, 1, 5)
 
-    // Both calls should include the filter params
-    for (const call of mockRpcSearch.mock.calls) {
-      expect(call[1].from_user).toBe('alice')
-      expect(call[1].to_user).toBe('bob')
-      expect(call[1].since_date).toBe('2024-01-01')
-      expect(call[1].until_date).toBe('2024-12-31')
+    expect(mockRpcSearch.mock.calls[0][1]).toMatchObject({
+      from_user: 'alice',
+      to_user: 'bob',
+      since_date: '2024-01-01',
+      until_date: '2024-12-31',
+    })
+  })
+
+  it('uses single RPC query path for single-word searches', async () => {
+    const results = [makeRpcTweet('1'), makeRpcTweet('2')]
+    mockRpcSearch.mockResolvedValueOnce(results)
+
+    // Need a supabase mock even though it won't be used for ILIKE
+    const supabase = buildMockSupabase([])
+
+    const criteria: FilterCriteria = {
+      searchQuery: 'hello',
+      rawSearchQuery: 'hello',
     }
+    const result = await fetchTweets(supabase, criteria, 1, 50)
+
+    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
+    expect(mockRpcSearch.mock.calls[0][1].search_query).toBe('hello')
+    expect(result.tweets).toHaveLength(2)
+  })
+
+  it('uses single RPC query path when rawSearchQuery is not provided', async () => {
+    const results = [makeRpcTweet('1')]
+    mockRpcSearch.mockResolvedValueOnce(results)
+
+    const supabase = buildMockSupabase([])
+
+    const criteria: FilterCriteria = {
+      searchQuery: 'cool & project',
+    }
+    const result = await fetchTweets(supabase, criteria, 1, 50)
+
+    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
+    expect(mockRpcSearch.mock.calls[0][1].search_query).toBe('cool & project')
+    expect(result.tweets).toHaveLength(1)
   })
 
   it('returns timeout error message on statement timeout', async () => {
+    // The ILIKE query throws (supabase.from chain rejects)
+    const supabase = buildMockSupabase([])
+    supabase._builder.range.mockRejectedValueOnce(new Error('statement timeout'))
+
+    // Even if ILIKE fails, the catch block should handle it
+    // Actually, the ILIKE error is caught silently and returns [].
+    // The timeout would come from the RPC call.
     mockRpcSearch.mockRejectedValueOnce(new Error('statement timeout'))
 
     const criteria: FilterCriteria = {
       searchQuery: 'cool & project',
       rawSearchQuery: 'cool project',
     }
-    const result = await fetchTweets(fakeSupabase, criteria, 1, 50)
+    const result = await fetchTweets(supabase, criteria, 1, 50)
 
     expect(result.tweets).toHaveLength(0)
     expect(result.error.message).toContain('timed out')

@@ -74,7 +74,7 @@ function transformRawTweetsToTimelineTweets(rawData: any[], isRpcResult: boolean
  * Build phrase (exact adjacency) and AND tsquery strings from raw search text.
  * For single-word queries both are identical so the caller can skip the second query.
  */
-function buildTsQueries(raw: string): { phrase: string; and: string; isMultiWord: boolean } {
+export function buildTsQueries(raw: string): { phrase: string; and: string; isMultiWord: boolean } {
   const words = raw.trim().split(/\s+/).filter(Boolean);
   if (words.length <= 1) {
     return { phrase: words[0] || '', and: words[0] || '', isMultiWord: false };

@@ -5,7 +5,8 @@ import { type SearchParams } from '../types'; // Corrected import for SearchPara
 
 export interface FilterCriteria {
   userId?: string; // For fetching tweets by a specific user
-  searchQuery?: string; // For text search in tweets
+  searchQuery?: string; // For text search in tweets (tsquery-formatted)
+  rawSearchQuery?: string; // Original unformatted search text (for two-query exact-match-first logic)
   mentionedUser?: string; // For tweets mentioning a specific user
   fromUsername?: string; // For tweets from a specific username
   replyToUsername?: string; // For tweets in reply to a specific username
@@ -13,7 +14,6 @@ export interface FilterCriteria {
   hashtags?: string[]; // For tweets containing specific hashtags
   startDate?: string; // For tweets created after this date
   endDate?: string; // For tweets created before this date
-  // Add other potential criteria as needed, e.g., minLikes, minRetweets
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -70,6 +70,22 @@ function transformRawTweetsToTimelineTweets(rawData: any[], isRpcResult: boolean
   });
 }
 
+/**
+ * Build phrase (exact adjacency) and AND tsquery strings from raw search text.
+ * For single-word queries both are identical so the caller can skip the second query.
+ */
+function buildTsQueries(raw: string): { phrase: string; and: string; isMultiWord: boolean } {
+  const words = raw.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) {
+    return { phrase: words[0] || '', and: words[0] || '', isMultiWord: false };
+  }
+  return {
+    phrase: words.join(' <-> '),
+    and: words.join(' & '),
+    isMultiWord: true,
+  };
+}
+
 export async function fetchTweets(
   supabase: SupabaseClient,
   criteria: FilterCriteria,
@@ -84,8 +100,7 @@ export async function fetchTweets(
     criteria.startDate || // Filter by start date
     criteria.endDate // Filter by end date
   ) {
-    const searchParams: SearchParams = {
-      search_query: criteria.searchQuery || '', // Pass empty string if not provided
+    const baseParams = {
       from_user: criteria.fromUsername || null,
       to_user: criteria.replyToUsername || null,
       since_date: criteria.startDate || null,
@@ -94,22 +109,63 @@ export async function fetchTweets(
 
     try {
       const offset = (page - 1) * pageSize;
-      // Assuming rpcSearchTweets is an alias for the searchTweets function from pgSearch.ts
+      const rawText = criteria.rawSearchQuery;
+
+      // Two-query exact-match-first logic:
+      // If we have raw multi-word search text, do phrase search first, then fill
+      // remaining slots with AND search (excluding duplicates).
+      if (rawText && rawText.trim().split(/\s+/).length > 1) {
+        const { phrase, and } = buildTsQueries(rawText);
+
+        // Query 1: phrase (exact adjacency) matches
+        const phraseData = await rpcSearchTweets(
+          supabase,
+          { ...baseParams, search_query: phrase },
+          pageSize,
+          offset,
+        );
+        const phraseResults = phraseData || [];
+
+        if (phraseResults.length >= pageSize) {
+          // Page is full with exact matches — no need for a second query
+          return {
+            tweets: transformRawTweetsToTimelineTweets(phraseResults, true),
+            totalCount: null,
+            error: null,
+          };
+        }
+
+        // Query 2: AND matches to fill the rest, excluding phrase result IDs
+        const phraseIds = new Set(phraseResults.map((t) => t.tweet_id));
+        const remaining = pageSize - phraseResults.length;
+        // Fetch a bit extra so we can filter out duplicates and still fill the page
+        const andData = await rpcSearchTweets(
+          supabase,
+          { ...baseParams, search_query: and },
+          remaining + phraseIds.size,
+          offset,
+        );
+        const andResults = (andData || []).filter((t) => !phraseIds.has(t.tweet_id)).slice(0, remaining);
+
+        const combined = [...phraseResults, ...andResults];
+        return {
+          tweets: transformRawTweetsToTimelineTweets(combined, true),
+          totalCount: null,
+          error: null,
+        };
+      }
+
+      // Single-word or pre-formatted query — single query path
+      const searchParams: SearchParams = {
+        search_query: criteria.searchQuery || '',
+        ...baseParams,
+      };
       const rpcData = await rpcSearchTweets(supabase, searchParams, pageSize, offset);
-      
+
       if (!rpcData || rpcData.length === 0) {
         return { tweets: [], totalCount: rpcData?.length === 0 ? 0 : null, error: null };
       }
-      // The RPC result now includes 'total_count' if the SQL function is modified to return it.
-      // For now, totalCount from RPC is an estimate or based on limited results.
-      // The SQL function `search_tweets` currently doesn't return a total count for pagination.
-      // We might need to adjust this or the SQL if accurate pagination for RPC results is critical.
-      const transformedTweets = transformRawTweetsToTimelineTweets(rpcData, true);
-      // If rpcData has a total_count field from a modified SQL function:
-      // const totalCountFromRpc = rpcData[0]?.total_count_estimate || null; 
-      // For now, we don't get a separate total count from the current search_tweets RPC for pagination.
-      // It just returns a limited set.
-      return { tweets: transformedTweets, totalCount: null, error: null }; 
+      return { tweets: transformRawTweetsToTimelineTweets(rpcData, true), totalCount: null, error: null };
     } catch (error: any) {
       console.error('Error fetching tweets via RPC:', error);
       if (error.message && error.message.includes('statement timeout')) {

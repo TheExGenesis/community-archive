@@ -71,19 +71,75 @@ function transformRawTweetsToTimelineTweets(rawData: any[], isRpcResult: boolean
 }
 
 /**
- * Build phrase (exact adjacency) and AND tsquery strings from raw search text.
- * For single-word queries both are identical so the caller can skip the second query.
+ * Build AND tsquery string from raw search text.
  */
-function buildTsQueries(raw: string): { phrase: string; and: string; isMultiWord: boolean } {
+export function buildAndTsQuery(raw: string): string {
   const words = raw.trim().split(/\s+/).filter(Boolean);
-  if (words.length <= 1) {
-    return { phrase: words[0] || '', and: words[0] || '', isMultiWord: false };
+  return words.join(' & ');
+}
+
+/**
+ * Exact phrase search using ILIKE on full_text.
+ *
+ * PostgreSQL FTS drops English stop words ("you", "can", "do", "the", etc.),
+ * so the <-> phrase operator silently breaks for phrases heavy in stop words.
+ * ILIKE is the only reliable way to find an exact substring in full_text.
+ */
+async function searchExactPhrase(
+  supabase: SupabaseClient,
+  phrase: string,
+  criteria: FilterCriteria,
+  pageSize: number,
+  offset: number,
+): Promise<TimelineTweet[]> {
+  let query = supabase
+    .from('tweets')
+    .select(
+      `
+      tweet_id,
+      created_at,
+      full_text,
+      favorite_count,
+      retweet_count,
+      reply_to_tweet_id,
+      account:all_account!inner (
+        username,
+        account_display_name,
+        profile:profile!left (
+          avatar_media_url
+        )
+      ),
+      media:tweet_media (
+        media_url,
+        media_type,
+        width,
+        height
+      )
+    `,
+    )
+    .ilike('full_text', `%${phrase}%`);
+
+  if (criteria.fromUsername) {
+    query = query.ilike('all_account.username', criteria.fromUsername);
   }
-  return {
-    phrase: words.join(' <-> '),
-    and: words.join(' & '),
-    isMultiWord: true,
-  };
+  if (criteria.startDate) {
+    query = query.gte('created_at', criteria.startDate);
+  }
+  if (criteria.endDate) {
+    query = query.lte('created_at', criteria.endDate);
+  }
+
+  query = query.order('created_at', { ascending: false });
+  query = query.range(offset, offset + pageSize - 1);
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('Error in exact phrase search:', error);
+    return [];
+  }
+
+  return data ? transformRawTweetsToTimelineTweets(data, false) : [];
 }
 
 export async function fetchTweets(
@@ -112,44 +168,34 @@ export async function fetchTweets(
       const rawText = criteria.rawSearchQuery;
 
       // Two-query exact-match-first logic:
-      // If we have raw multi-word search text, do phrase search first, then fill
-      // remaining slots with AND search (excluding duplicates).
+      // If we have raw multi-word search text, do an ILIKE exact phrase search
+      // first (handles stop words correctly), then fill remaining slots with
+      // FTS AND search (fast, index-backed).
       if (rawText && rawText.trim().split(/\s+/).length > 1) {
-        const { phrase, and } = buildTsQueries(rawText);
+        const andQuery = buildAndTsQuery(rawText);
 
-        // Query 1: phrase (exact adjacency) matches
-        const phraseData = await rpcSearchTweets(
-          supabase,
-          { ...baseParams, search_query: phrase },
-          pageSize,
-          offset,
-        );
-        const phraseResults = phraseData || [];
+        // Query 1: exact substring match via ILIKE — reliable for stop-word-heavy phrases
+        const phraseResults = await searchExactPhrase(supabase, rawText, criteria, pageSize, offset);
 
         if (phraseResults.length >= pageSize) {
-          // Page is full with exact matches — no need for a second query
-          return {
-            tweets: transformRawTweetsToTimelineTweets(phraseResults, true),
-            totalCount: null,
-            error: null,
-          };
+          return { tweets: phraseResults, totalCount: null, error: null };
         }
 
-        // Query 2: AND matches to fill the rest, excluding phrase result IDs
+        // Query 2: FTS AND matches to fill the rest, excluding exact match IDs
         const phraseIds = new Set(phraseResults.map((t) => t.tweet_id));
         const remaining = pageSize - phraseResults.length;
-        // Fetch a bit extra so we can filter out duplicates and still fill the page
         const andData = await rpcSearchTweets(
           supabase,
-          { ...baseParams, search_query: and },
+          { ...baseParams, search_query: andQuery },
           remaining + phraseIds.size,
           offset,
         );
-        const andResults = (andData || []).filter((t) => !phraseIds.has(t.tweet_id)).slice(0, remaining);
+        const andResults = transformRawTweetsToTimelineTweets(andData || [], true)
+          .filter((t) => !phraseIds.has(t.tweet_id))
+          .slice(0, remaining);
 
-        const combined = [...phraseResults, ...andResults];
         return {
-          tweets: transformRawTweetsToTimelineTweets(combined, true),
+          tweets: [...phraseResults, ...andResults],
           totalCount: null,
           error: null,
         };

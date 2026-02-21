@@ -17,6 +17,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Changes exceed ~200-300 lines of code
 - Working on a different subsystem or module
 
+**Branch hygiene — check before coding:**
+- When the user brings up a new topic/feature that is unrelated to the current branch, **stop and ask whether to create a new branch from main before writing any code**
+- Do NOT commit unrelated work to the current feature branch and cherry-pick later — it's cleaner to switch branches upfront
+- If the current branch has a pending PR, the new work should almost always go on a separate branch
+
 **Commit message guidelines:**
 - Keep commits atomic - one logical change per commit
 - Suggest descriptive commit messages that explain the "why"

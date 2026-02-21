@@ -167,31 +167,34 @@ export async function fetchTweets(
       const offset = (page - 1) * pageSize;
       const rawText = criteria.rawSearchQuery;
 
-      // Two-query exact-match-first logic:
-      // If we have raw multi-word search text, do an ILIKE exact phrase search
-      // first (handles stop words correctly), then fill remaining slots with
-      // FTS AND search (fast, index-backed).
+      // Multi-word phrase search: ILIKE exact phrase first, FTS AND to fill remaining.
+      // ILIKE is backed by a pg_trgm GIN index on full_text, so it's fast.
+      // FTS drops English stop words, so it's only used as a secondary source.
       if (rawText && rawText.trim().split(/\s+/).length > 1) {
         const andQuery = buildAndTsQuery(rawText);
 
-        // Query 1: exact substring match via ILIKE — reliable for stop-word-heavy phrases
+        // Query 1: exact substring match via ILIKE (fast with pg_trgm GIN index)
         const phraseResults = await searchExactPhrase(supabase, rawText, criteria, pageSize, offset);
 
         if (phraseResults.length >= pageSize) {
           return { tweets: phraseResults, totalCount: null, error: null };
         }
 
-        // Query 2: FTS AND matches to fill the rest, excluding exact match IDs
+        // Query 2: FTS AND matches to fill the rest, excluding exact match IDs.
+        // Post-filter with word-boundary matching to prevent FTS stop-word garbage.
         const phraseIds = new Set(phraseResults.map((t) => t.tweet_id));
         const remaining = pageSize - phraseResults.length;
+        const wordPatterns = rawText.toLowerCase().split(/\s+/).filter(Boolean)
+          .map((w) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'));
         const andData = await rpcSearchTweets(
           supabase,
           { ...baseParams, search_query: andQuery },
-          remaining + phraseIds.size,
+          (remaining + phraseIds.size) * 3,
           offset,
         );
         const andResults = transformRawTweetsToTimelineTweets(andData || [], true)
           .filter((t) => !phraseIds.has(t.tweet_id))
+          .filter((t) => wordPatterns.every((re) => re.test(t.full_text)))
           .slice(0, remaining);
 
         return {

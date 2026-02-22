@@ -57,6 +57,8 @@ CREATE INDEX "idx_tweets_streaming" ON "public"."tweets" USING "btree" ("created
 CREATE INDEX "idx_tweets_updated_at" ON "public"."tweets" USING "btree" ("updated_at" DESC);
 CREATE INDEX "idx_tweets_updated_at_tweet_id" ON "public"."tweets" USING "btree" ("updated_at", "tweet_id");
 CREATE INDEX "text_fts" ON "public"."tweets" USING "gin" ("fts");
+CREATE INDEX "idx_tweets_full_text_trgm" ON "public"."tweets" USING "gin" ("full_text" "public"."gin_trgm_ops");
+CREATE INDEX "idx_tweets_fts_simple" ON "public"."tweets" USING "gin" (to_tsvector('simple'::regconfig, "full_text"));
 CREATE INDEX "tweets_account_id_favorite_idx" ON "public"."tweets" USING "btree" ("account_id", "favorite_count" DESC);
 CREATE INDEX "tweets_account_id_retweet_idx" ON "public"."tweets" USING "btree" ("account_id", "retweet_count" DESC);
 CREATE INDEX "idx_tweets_account_created" ON public.tweets (account_id, created_at);

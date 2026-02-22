@@ -1,9 +1,11 @@
 import { buildAndTsQuery, fetchTweets, FilterCriteria } from './tweetQueries'
 
-// Mock the RPC search function
+// Mock both RPC search functions
 const mockRpcSearch = jest.fn()
+const mockRpcExactPhrase = jest.fn()
 jest.mock('../pgSearch', () => ({
   searchTweets: (...args: any[]) => mockRpcSearch(...args),
+  searchTweetsExactPhrase: (...args: any[]) => mockRpcExactPhrase(...args),
 }))
 
 // Helper to create a fake RPC result row (flat shape from RPC)
@@ -24,62 +26,23 @@ function makeRpcTweet(id: string, text: string = `Tweet ${id}`) {
   }
 }
 
-// Helper to create a fake direct-query result row (nested shape from PostgREST)
-function makeDirectTweet(id: string, text: string = `Tweet ${id}`) {
-  return {
-    tweet_id: id,
-    created_at: '2025-01-01T00:00:00Z',
-    full_text: text,
-    favorite_count: 0,
-    retweet_count: 0,
-    reply_to_tweet_id: null,
-    reply_to_username: null,
-    account: {
-      username: 'testuser',
-      account_display_name: 'Test User',
-      profile: { avatar_media_url: null },
-    },
-    media: [],
-  }
-}
-
-/**
- * Build a mock Supabase client whose query-builder chain resolves to `rows`.
- * Tracks which `.ilike()` calls were made so tests can assert on them.
- */
-function buildMockSupabase(rows: any[]) {
-  const ilikeCalls: Array<{ column: string; pattern: string }> = []
-  const gteCalls: Array<{ column: string; value: string }> = []
-  const lteCalls: Array<{ column: string; value: string }> = []
-
+// Minimal mock Supabase (only needed for non-RPC fallback path)
+function buildMockSupabase() {
   const builder: any = {
     select: jest.fn().mockReturnThis(),
-    ilike: jest.fn(function (col: string, pattern: string) {
-      ilikeCalls.push({ column: col, pattern })
-      return builder
-    }),
-    gte: jest.fn(function (col: string, val: string) {
-      gteCalls.push({ column: col, value: val })
-      return builder
-    }),
-    lte: jest.fn(function (col: string, val: string) {
-      lteCalls.push({ column: col, value: val })
-      return builder
-    }),
+    ilike: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    gte: jest.fn().mockReturnThis(),
+    lte: jest.fn().mockReturnThis(),
+    is: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
-    range: jest.fn().mockResolvedValue({ data: rows, error: null }),
+    range: jest.fn().mockResolvedValue({ data: [], error: null }),
   }
-
-  const supabase = {
+  return {
     from: jest.fn().mockReturnValue(builder),
-    rpc: jest.fn(), // not used in direct-query path
+    rpc: jest.fn(),
     _builder: builder,
-    _ilikeCalls: ilikeCalls,
-    _gteCalls: gteCalls,
-    _lteCalls: lteCalls,
-  }
-
-  return supabase as any
+  } as any
 }
 
 describe('buildAndTsQuery', () => {
@@ -104,109 +67,73 @@ describe('buildAndTsQuery', () => {
   })
 })
 
-describe('fetchTweets — ILIKE phrase first + FTS AND fill with post-filter', () => {
+describe('fetchTweets — exact phrase search via FTS simple', () => {
   beforeEach(() => {
     mockRpcSearch.mockReset()
+    mockRpcExactPhrase.mockReset()
   })
 
-  it('shows ILIKE exact matches first, then FTS to fill remaining slots', async () => {
-    // ILIKE returns 2 exact matches
-    const ilikeRows = [makeDirectTweet('1', 'cool project A'), makeDirectTweet('2', 'cool project B')]
-    const supabase = buildMockSupabase(ilikeRows)
-
-    // FTS returns overlapping + new results (must contain both words to pass post-filter)
-    const ftsResults = [
+  it('returns exact phrase matches for multi-word queries', async () => {
+    mockRpcExactPhrase.mockResolvedValueOnce([
       makeRpcTweet('1', 'cool project A'),
       makeRpcTweet('2', 'cool project B'),
-      makeRpcTweet('3', 'this project is really cool'),
-      makeRpcTweet('4', 'cool project C'),
-    ]
-    mockRpcSearch.mockResolvedValueOnce(ftsResults)
+    ])
 
+    const supabase = buildMockSupabase()
     const criteria: FilterCriteria = {
       searchQuery: 'cool & project',
       rawSearchQuery: 'cool project',
     }
     const result = await fetchTweets(supabase, criteria, 1, 5)
 
-    // ILIKE query was made on tweets table
-    expect(supabase.from).toHaveBeenCalledWith('tweets')
-    expect(supabase._ilikeCalls[0]).toEqual({ column: 'full_text', pattern: '%cool project%' })
-
-    // FTS was called to fill remaining
-    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
-
-    // ILIKE results first, then deduplicated FTS results
-    expect(result.tweets).toHaveLength(4)
-    expect(result.tweets[0].tweet_id).toBe('1') // from ILIKE
-    expect(result.tweets[1].tweet_id).toBe('2') // from ILIKE
+    expect(mockRpcExactPhrase).toHaveBeenCalledTimes(1)
+    expect(mockRpcExactPhrase.mock.calls[0][1].exact_phrase).toBe('cool project')
+    // Only exact phrase RPC is called, no FTS fallback
+    expect(mockRpcSearch).not.toHaveBeenCalled()
+    expect(result.tweets).toHaveLength(2)
+    expect(result.tweets[0].tweet_id).toBe('1')
+    expect(result.tweets[1].tweet_id).toBe('2')
     expect(result.error).toBeNull()
   })
 
-  it('skips FTS when ILIKE fills the page', async () => {
-    const ilikeRows = Array.from({ length: 5 }, (_, i) =>
-      makeDirectTweet(`${i + 1}`, `cool project tweet ${i + 1}`),
+  it('returns full page of exact phrase matches', async () => {
+    mockRpcExactPhrase.mockResolvedValueOnce(
+      Array.from({ length: 5 }, (_, i) =>
+        makeRpcTweet(`${i + 1}`, `cool project tweet ${i + 1}`),
+      ),
     )
-    const supabase = buildMockSupabase(ilikeRows)
 
+    const supabase = buildMockSupabase()
     const criteria: FilterCriteria = {
       searchQuery: 'cool & project',
       rawSearchQuery: 'cool project',
     }
     const result = await fetchTweets(supabase, criteria, 1, 5)
 
-    // No FTS call needed — ILIKE filled the page
     expect(mockRpcSearch).not.toHaveBeenCalled()
     expect(result.tweets).toHaveLength(5)
     expect(result.error).toBeNull()
   })
 
-  it('falls back to FTS when ILIKE returns nothing', async () => {
-    const supabase = buildMockSupabase([]) // ILIKE returns nothing
+  it('returns empty when exact phrase has no matches', async () => {
+    mockRpcExactPhrase.mockResolvedValueOnce([])
 
-    const ftsResults = [
-      makeRpcTweet('1', 'cool project here'),
-      makeRpcTweet('2', 'the project is cool'),
-    ]
-    mockRpcSearch.mockResolvedValueOnce(ftsResults)
-
+    const supabase = buildMockSupabase()
     const criteria: FilterCriteria = {
       searchQuery: 'cool & project',
       rawSearchQuery: 'cool project',
     }
     const result = await fetchTweets(supabase, criteria, 1, 10)
 
-    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
-    expect(result.tweets).toHaveLength(2)
+    // No FTS fallback — only exact phrase RPC is used
+    expect(mockRpcSearch).not.toHaveBeenCalled()
+    expect(result.tweets).toHaveLength(0)
   })
 
-  it('post-filters FTS results for stop-word-heavy phrases (word boundary)', async () => {
-    const supabase = buildMockSupabase([]) // ILIKE returns nothing
+  it('passes all filters to exact phrase RPC', async () => {
+    mockRpcExactPhrase.mockResolvedValueOnce([])
 
-    const ftsResults = [
-      makeRpcTweet('1', 'you can just do things'),            // all words ✓
-      makeRpcTweet('2', 'the thing is interesting'),           // only "thing" ✗
-      makeRpcTweet('3', 'some things happened'),               // only "things" ✗
-      makeRpcTweet('4', 'You Can Just Do Things differently'), // all words ✓
-      makeRpcTweet('5', 'cancel doing things unjust'),         // substrings only ✗
-    ]
-    mockRpcSearch.mockResolvedValueOnce(ftsResults)
-
-    const criteria: FilterCriteria = {
-      searchQuery: 'you & can & just & do & things',
-      rawSearchQuery: 'you can just do things',
-    }
-    const result = await fetchTweets(supabase, criteria, 1, 50)
-
-    expect(result.tweets).toHaveLength(2)
-    expect(result.tweets[0].tweet_id).toBe('1')
-    expect(result.tweets[1].tweet_id).toBe('4')
-  })
-
-  it('passes filters through to the RPC query', async () => {
-    const supabase = buildMockSupabase([])
-    mockRpcSearch.mockResolvedValueOnce([])
-
+    const supabase = buildMockSupabase()
     const criteria: FilterCriteria = {
       searchQuery: 'cool & project',
       rawSearchQuery: 'cool project',
@@ -217,7 +144,8 @@ describe('fetchTweets — ILIKE phrase first + FTS AND fill with post-filter', (
     }
     await fetchTweets(supabase, criteria, 1, 5)
 
-    expect(mockRpcSearch.mock.calls[0][1]).toMatchObject({
+    expect(mockRpcExactPhrase.mock.calls[0][1]).toMatchObject({
+      exact_phrase: 'cool project',
       from_user: 'alice',
       to_user: 'bob',
       since_date: '2024-01-01',
@@ -225,36 +153,18 @@ describe('fetchTweets — ILIKE phrase first + FTS AND fill with post-filter', (
     })
   })
 
-  it('applies date and username filters to the ILIKE query', async () => {
-    const supabase = buildMockSupabase([makeDirectTweet('1', 'cool project')])
-    mockRpcSearch.mockResolvedValueOnce([])
-
-    const criteria: FilterCriteria = {
-      searchQuery: 'cool & project',
-      rawSearchQuery: 'cool project',
-      fromUsername: 'alice',
-      startDate: '2024-01-01',
-      endDate: '2024-12-31',
-    }
-    await fetchTweets(supabase, criteria, 1, 5)
-
-    expect(supabase._ilikeCalls).toContainEqual({ column: 'all_account.username', pattern: 'alice' })
-    expect(supabase._gteCalls).toContainEqual({ column: 'created_at', value: '2024-01-01' })
-    expect(supabase._lteCalls).toContainEqual({ column: 'created_at', value: '2024-12-31' })
-  })
-
   it('uses single RPC query path for single-word searches', async () => {
     const results = [makeRpcTweet('1'), makeRpcTweet('2')]
     mockRpcSearch.mockResolvedValueOnce(results)
 
-    const supabase = buildMockSupabase([])
-
+    const supabase = buildMockSupabase()
     const criteria: FilterCriteria = {
       searchQuery: 'hello',
       rawSearchQuery: 'hello',
     }
     const result = await fetchTweets(supabase, criteria, 1, 50)
 
+    expect(mockRpcExactPhrase).not.toHaveBeenCalled()
     expect(mockRpcSearch).toHaveBeenCalledTimes(1)
     expect(mockRpcSearch.mock.calls[0][1].search_query).toBe('hello')
     expect(result.tweets).toHaveLength(2)
@@ -264,23 +174,21 @@ describe('fetchTweets — ILIKE phrase first + FTS AND fill with post-filter', (
     const results = [makeRpcTweet('1')]
     mockRpcSearch.mockResolvedValueOnce(results)
 
-    const supabase = buildMockSupabase([])
-
+    const supabase = buildMockSupabase()
     const criteria: FilterCriteria = {
       searchQuery: 'cool & project',
     }
     const result = await fetchTweets(supabase, criteria, 1, 50)
 
+    expect(mockRpcExactPhrase).not.toHaveBeenCalled()
     expect(mockRpcSearch).toHaveBeenCalledTimes(1)
-    expect(mockRpcSearch.mock.calls[0][1].search_query).toBe('cool & project')
     expect(result.tweets).toHaveLength(1)
   })
 
   it('returns timeout error message on statement timeout', async () => {
-    const supabase = buildMockSupabase([])
-    supabase._builder.range.mockRejectedValueOnce(new Error('statement timeout'))
-    mockRpcSearch.mockRejectedValueOnce(new Error('statement timeout'))
+    mockRpcExactPhrase.mockRejectedValueOnce(new Error('statement timeout'))
 
+    const supabase = buildMockSupabase()
     const criteria: FilterCriteria = {
       searchQuery: 'cool & project',
       rawSearchQuery: 'cool project',

@@ -30,7 +30,7 @@ interface Tweet {
   account_id: string
   created_at: string
   full_text: string
-  retweet_count: number
+  retweet_count: number | null
   favorite_count: number
   reply_to_tweet_id: string | null
   quote_tweet_id: string | null

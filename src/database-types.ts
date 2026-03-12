@@ -255,6 +255,13 @@ export type Database = {
             referencedColumns: ["account_id"]
           },
           {
+            foreignKeyName: "all_profile_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "user_directory"
+            referencedColumns: ["account_id"]
+          },
+          {
             foreignKeyName: "all_profile_archive_upload_id_fkey"
             columns: ["archive_upload_id"]
             isOneToOne: false
@@ -320,6 +327,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "all_account"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "archive_upload_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "user_directory"
             referencedColumns: ["account_id"]
           },
         ]
@@ -406,6 +420,13 @@ export type Database = {
             referencedColumns: ["account_id"]
           },
           {
+            foreignKeyName: "followers_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "user_directory"
+            referencedColumns: ["account_id"]
+          },
+          {
             foreignKeyName: "followers_archive_upload_id_fkey"
             columns: ["archive_upload_id"]
             isOneToOne: false
@@ -456,6 +477,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "all_account"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "following_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "user_directory"
             referencedColumns: ["account_id"]
           },
           {
@@ -527,6 +555,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "all_account"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "likes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "user_directory"
             referencedColumns: ["account_id"]
           },
           {
@@ -721,33 +756,33 @@ export type Database = {
       tweet_media: {
         Row: {
           archive_upload_id: number | null
-          height: number
+          height: number | null
           media_id: number
           media_type: string
           media_url: string
           tweet_id: string
           updated_at: string | null
-          width: number
+          width: number | null
         }
         Insert: {
           archive_upload_id?: number | null
-          height: number
+          height?: number | null
           media_id: number
           media_type: string
           media_url: string
           tweet_id: string
           updated_at?: string | null
-          width: number
+          width?: number | null
         }
         Update: {
           archive_upload_id?: number | null
-          height?: number
+          height?: number | null
           media_id?: number
           media_type?: string
           media_url?: string
           tweet_id?: string
           updated_at?: string | null
-          width?: number
+          width?: number | null
         }
         Relationships: [
           {
@@ -840,7 +875,7 @@ export type Database = {
           reply_to_tweet_id: string | null
           reply_to_user_id: string | null
           reply_to_username: string | null
-          retweet_count: number
+          retweet_count: number | null
           tweet_id: string
           updated_at: string | null
         }
@@ -854,7 +889,7 @@ export type Database = {
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
-          retweet_count: number
+          retweet_count?: number | null
           tweet_id: string
           updated_at?: string | null
         }
@@ -868,7 +903,7 @@ export type Database = {
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
-          retweet_count?: number
+          retweet_count?: number | null
           tweet_id?: string
           updated_at?: string | null
         }
@@ -892,6 +927,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "all_account"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "tweets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "user_directory"
             referencedColumns: ["account_id"]
           },
           {
@@ -1026,6 +1068,13 @@ export type Database = {
             referencedColumns: ["account_id"]
           },
           {
+            foreignKeyName: "tweets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "user_directory"
+            referencedColumns: ["account_id"]
+          },
+          {
             foreignKeyName: "tweets_archive_upload_id_fkey"
             columns: ["archive_upload_id"]
             isOneToOne: false
@@ -1088,6 +1137,13 @@ export type Database = {
             referencedRelation: "all_account"
             referencedColumns: ["account_id"]
           },
+          {
+            foreignKeyName: "tweets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "user_directory"
+            referencedColumns: ["account_id"]
+          },
         ]
       }
       profile: {
@@ -1120,6 +1176,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: true
             referencedRelation: "all_account"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "all_profile_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "user_directory"
             referencedColumns: ["account_id"]
           },
           {
@@ -1184,6 +1247,13 @@ export type Database = {
             referencedColumns: ["account_id"]
           },
           {
+            foreignKeyName: "tweets_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "user_directory"
+            referencedColumns: ["account_id"]
+          },
+          {
             foreignKeyName: "tweets_archive_upload_id_fkey"
             columns: ["archive_upload_id"]
             isOneToOne: false
@@ -1191,6 +1261,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_directory: {
+        Row: {
+          account_display_name: string | null
+          account_id: string | null
+          archive_at: string | null
+          archive_uploaded_at: string | null
+          avatar_media_url: string | null
+          bio: string | null
+          created_at: string | null
+          location: string | null
+          num_followers: number | null
+          num_following: number | null
+          num_likes: number | null
+          num_tweets: number | null
+          username: string | null
+          website: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
@@ -1681,6 +1770,12 @@ export type Database = {
           tweet_count: number
         }[]
       }
+      get_tweet_page_data: {
+        Args: {
+          p_tweet_id: string
+        }
+        Returns: Json
+      }
       get_unique_scraper_count: {
         Args: {
           start_date: string
@@ -1833,6 +1928,31 @@ export type Database = {
               relevance: number
             }[]
           }
+      search_tweets_exact_phrase: {
+        Args: {
+          exact_phrase: string
+          from_user?: string
+          to_user?: string
+          since_date?: string
+          until_date?: string
+          limit_?: number
+          offset_?: number
+        }
+        Returns: {
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          reply_to_tweet_id: string
+          avatar_media_url: string
+          archive_upload_id: number
+          username: string
+          account_display_name: string
+          media: Json
+        }[]
+      }
       set_limit: {
         Args: {
           "": number

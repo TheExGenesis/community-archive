@@ -81,13 +81,13 @@ VALUES
   ('t_quoted_1', 'mock_quoted', '2024-10-15T12:00:00Z', 'The best code is the code you never write. Reduce complexity before adding features.', 30, 120, NULL, NULL, NULL, 107);
 
 -- Conversations (link tweets to conversation threads)
-INSERT INTO "public"."conversations" ("conversation_id", "tweet_id", "account_id")
+INSERT INTO "public"."conversations" ("conversation_id", "tweet_id")
 VALUES
   -- Alice's thread is one conversation
-  ('t_alice_1', 't_alice_1', 'mock_alice'),
-  ('t_alice_1', 't_alice_2', 'mock_alice'),
-  ('t_alice_1', 't_alice_3', 'mock_alice'),
-  ('t_alice_1', 't_bob_1',   'mock_bob');
+  ('t_alice_1', 't_alice_1'),
+  ('t_alice_1', 't_alice_2'),
+  ('t_alice_1', 't_alice_3'),
+  ('t_alice_1', 't_bob_1');
 
 -- Tweet media
 INSERT INTO "public"."tweet_media" ("media_id", "tweet_id", "media_url", "media_type", "width", "height", "archive_upload_id")

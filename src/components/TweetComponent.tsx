@@ -24,7 +24,7 @@ export interface TweetData {
   account_id: string
   created_at: string
   full_text: string
-  retweet_count: number
+  retweet_count: number | null
   favorite_count: number
   reply_to_tweet_id: string | null
   quote_tweet_id: string | null
@@ -41,7 +41,7 @@ export interface TweetData {
     account_id: string
     created_at: string
     full_text: string
-    retweet_count: number
+    retweet_count: number | null
     favorite_count: number
     avatar_media_url?: string
     username: string
@@ -263,7 +263,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
                   <FaHeart className="mr-1" /> {formatNumber(quotedTweet.favorite_count)}
                 </span>
                 <span className="flex items-center">
-                  <FaRetweet className="mr-1" /> {formatNumber(quotedTweet.retweet_count)}
+                  <FaRetweet className="mr-1" /> {formatNumber(quotedTweet.retweet_count ?? 0)}
                 </span>
               </div>
               <div className="flex items-center space-x-3">
@@ -342,7 +342,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
             <FaHeart className="mr-1" /> {formatNumber(tweet.favorite_count)}
           </span>
           <span className="flex items-center">
-            <FaRetweet className="mr-1" /> {formatNumber(tweet.retweet_count)}
+            <FaRetweet className="mr-1" /> {formatNumber(tweet.retweet_count ?? 0)}
           </span>
         </div>
         <div className="flex items-center space-x-3 text-xs text-gray-400 dark:text-gray-500">

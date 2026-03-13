@@ -39,7 +39,7 @@ class ArchiveTweetData(TypedDict):
     account_id: str
     created_at: datetime
     full_text: str
-    retweet_count: int
+    retweet_count: Optional[int]
     favorite_count: int
     reply_to_tweet_id: Optional[str]
     reply_to_user_id: Optional[str]
@@ -90,7 +90,7 @@ class ArchiveTweetData(TypedDict):
     account_id: str
     created_at: datetime
     full_text: str
-    retweet_count: int
+    retweet_count: Optional[int]
     favorite_count: int
     reply_to_tweet_id: Optional[str]
     reply_to_user_id: Optional[str]
@@ -142,7 +142,7 @@ class BaseTweetSchema(TypedDict):
     created_at: datetime
     full_text: str
     favorite_count: int
-    retweet_count: int
+    retweet_count: Optional[int]
     reply_to_tweet_id: Optional[str]
     reply_to_user_id: Optional[str]
     reply_to_username: Optional[str]

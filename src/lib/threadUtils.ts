@@ -6,7 +6,7 @@ export interface ThreadTweet {
   account_id: string
   created_at: string
   full_text: string
-  retweet_count: number
+  retweet_count: number | null
   favorite_count: number
   reply_to_tweet_id: string | null
   reply_to_user_id: string | null
@@ -21,7 +21,7 @@ export interface ThreadTweet {
     account_id: string
     created_at: string
     full_text: string
-    retweet_count: number
+    retweet_count: number | null
     favorite_count: number
     avatar_media_url?: string
     username: string

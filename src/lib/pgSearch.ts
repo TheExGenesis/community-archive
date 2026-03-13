@@ -172,7 +172,7 @@ export interface SearchTweetRpcResponseItem {
   account_id: string;
   created_at: string;
   full_text: string;
-  retweet_count: number;
+  retweet_count: number | null;
   favorite_count: number;
   // Some deployments return a minimal shape; make enrichments optional
   reply_to_tweet_id?: string | null;

@@ -1280,6 +1280,10 @@ BEGIN
             DELETE FROM %I.tweet_media WHERE archive_upload_id = ANY($1);
 
             DELETE FROM %I.archive_upload WHERE id = ANY($1);
+
+            -- Delete from ca_autorefresh before deleting account
+            DELETE FROM ca_autorefresh.account_refresh_log WHERE account_id = $2;
+
             DELETE FROM %I.all_account WHERE account_id = $2;
         ',
         v_schema_name, v_schema_name, v_schema_name, v_schema_name,

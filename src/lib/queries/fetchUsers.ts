@@ -43,7 +43,7 @@ export const fetchUsers = async (
     query = query.or(`username.ilike.%${search}%,account_display_name.ilike.%${search}%`)
   }
 
-  query = query.order(sortBy, { ascending: sortOrder === 'asc' })
+  query = query.order(sortBy, { ascending: sortOrder === 'asc', nullsFirst: false })
 
   if (limit) {
     query = query.range(offset, offset + limit - 1)

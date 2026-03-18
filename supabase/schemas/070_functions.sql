@@ -1274,13 +1274,19 @@ BEGIN
             DELETE FROM %I.followers WHERE archive_upload_id = ANY($1);
             DELETE FROM %I.following WHERE archive_upload_id = ANY($1);
             DELETE FROM %I.all_profile WHERE account_id = $2;
+
+            -- Delete any remaining tweet_media referencing these archive_uploads
+            -- (catches orphaned rows not covered by the tweet_id-based delete above)
+            DELETE FROM %I.tweet_media WHERE archive_upload_id = ANY($1);
+
             DELETE FROM %I.archive_upload WHERE id = ANY($1);
             DELETE FROM %I.all_account WHERE account_id = $2;
-        ', 
-        v_schema_name, v_schema_name, v_schema_name, v_schema_name, 
-        v_schema_name, v_schema_name, v_schema_name, v_schema_name, 
+        ',
         v_schema_name, v_schema_name, v_schema_name, v_schema_name,
-        v_schema_name, v_schema_name, v_schema_name, v_schema_name)
+        v_schema_name, v_schema_name, v_schema_name, v_schema_name,
+        v_schema_name, v_schema_name, v_schema_name, v_schema_name,
+        v_schema_name, v_schema_name, v_schema_name, v_schema_name,
+        v_schema_name, v_schema_name)
         USING v_archive_upload_ids, p_account_id;
     EXCEPTION WHEN OTHERS THEN
         RAISE NOTICE 'Error deleting archives for account %: %', p_account_id, SQLERRM;

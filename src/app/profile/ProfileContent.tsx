@@ -13,7 +13,7 @@ import { createBrowserClient } from '@/utils/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { formatDistanceToNow } from 'date-fns'
-import { deleteArchive } from '@/lib/db_insert'
+import { deleteArchive, deleteSingleArchive } from '@/lib/db_insert'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 
 interface ProfileContentProps {
@@ -202,7 +202,33 @@ export default function ProfileContent({
     }
   }
 
-  const handleDeleteArchive = async (archiveId: string) => {
+  const handleDeleteArchive = async (archiveId: number) => {
+    if (!confirm('Are you sure you want to delete this archive? This action cannot be undone.')) {
+      return
+    }
+
+    if (!userMetadata?.provider_id) {
+      setError('Unable to identify user account')
+      return
+    }
+
+    setDeletingArchive(String(archiveId))
+    setError(null)
+    setSuccess(null)
+
+    try {
+      await deleteSingleArchive(supabase, userMetadata.provider_id, archiveId)
+
+      setSuccess('Archive deleted successfully')
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete archive')
+    } finally {
+      setDeletingArchive(null)
+    }
+  }
+
+  const handleDeleteAllArchives = async () => {
     if (!confirm('Are you sure you want to delete ALL your archives? This action cannot be undone.')) {
       return
     }
@@ -212,14 +238,12 @@ export default function ProfileContent({
       return
     }
 
-    setDeletingArchive(archiveId)
+    setDeletingArchive('all')
     setError(null)
     setSuccess(null)
 
     try {
-      // Delete from database using the existing function
       await deleteArchive(supabase, userMetadata.provider_id)
-      // Delete from storage
       await deleteStorageFiles(userMetadata.provider_id)
 
       setSuccess('All archives deleted successfully')
@@ -395,14 +419,27 @@ export default function ProfileContent({
                           variant="destructive"
                           size="sm"
                           onClick={() => handleDeleteArchive(archive.id)}
-                          disabled={deletingArchive === archive.id}
+                          disabled={deletingArchive !== null}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
-                          {deletingArchive === archive.id ? 'Deleting...' : 'Delete'}
+                          {deletingArchive === String(archive.id) ? 'Deleting...' : 'Delete'}
                         </Button>
                       </div>
                     )
                   })}
+                  {archives.length > 1 && (
+                    <div className="pt-2 border-t">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleDeleteAllArchives}
+                        disabled={deletingArchive !== null}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {deletingArchive === 'all' ? 'Deleting all...' : 'Delete All Archives'}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

@@ -236,3 +236,26 @@ export const deleteArchive = async (
     )
   }
 }
+
+export const deleteSingleArchive = async (
+  supabase: SupabaseClient,
+  accountId: string,
+  archiveUploadId: number,
+): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .schema('public')
+      .rpc('delete_single_archive', {
+        p_account_id: accountId,
+        p_archive_upload_id: archiveUploadId,
+      })
+
+    if (error) throw error
+
+    console.log(`Archive ${archiveUploadId} for account ${accountId} deleted successfully`)
+  } catch (error: any) {
+    throw new Error(
+      `Error deleting archive ${archiveUploadId} of account ${accountId}: ${error.message}`,
+    )
+  }
+}

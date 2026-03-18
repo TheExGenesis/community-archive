@@ -26,7 +26,7 @@ export interface Tweet {
   entities: Record<string, any>
   favorite_count: number
   id_str: string
-  retweet_count: number
+  retweet_count: number | null
   created_at: string
   favorited: boolean
   full_text: string,
@@ -49,7 +49,7 @@ export interface CommunityTweet {
   entities: Record<string, any>
   favorite_count: number
   id_str: string
-  retweet_count: number
+  retweet_count: number | null
   created_at: string
   favorited: boolean
   full_text: string
@@ -148,7 +148,7 @@ export type PopularTweet = {
   account_id: string
   created_at: string
   full_text: string
-  retweet_count: number
+  retweet_count: number | null
   favorite_count: number
   reply_to_tweet_id: string | null
   reply_to_user_id: string | null
@@ -220,7 +220,7 @@ export interface RawSupabaseTweet {
   created_at: string;
   full_text: string;
   favorite_count: number;
-  retweet_count: number;
+  retweet_count: number | null;
   reply_to_tweet_id: string | null;
   account: RawSupabaseAccount; 
   media?: Array<{
@@ -236,7 +236,7 @@ export interface TimelineTweet {
   created_at: string;
   full_text: string;
   favorite_count: number;
-  retweet_count: number;
+  retweet_count: number | null;
   reply_to_tweet_id: string | null;
   account: { 
     username: string;

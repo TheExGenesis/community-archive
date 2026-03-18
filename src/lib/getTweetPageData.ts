@@ -10,7 +10,7 @@ interface RpcTweet {
   account_display_name: string
   created_at: string
   full_text: string
-  retweet_count: number
+  retweet_count: number | null
   favorite_count: number
   reply_to_tweet_id: string | null
   reply_to_user_id: string | null
@@ -46,7 +46,7 @@ interface RpcQuotedTweet {
   account_id: string
   created_at: string
   full_text: string
-  retweet_count: number
+  retweet_count: number | null
   favorite_count: number
   username: string
   account_display_name: string

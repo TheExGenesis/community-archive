@@ -172,7 +172,7 @@ export interface SearchTweetRpcResponseItem {
   account_id: string;
   created_at: string;
   full_text: string;
-  retweet_count: number;
+  retweet_count: number | null;
   favorite_count: number;
   // Some deployments return a minimal shape; make enrichments optional
   reply_to_tweet_id?: string | null;
@@ -214,4 +214,36 @@ export async function searchTweets(
 
   // Aligns with generated types that may return a minimal shape; enriched fields are optional
   return data as SearchTweetRpcResponseItem[];
+}
+
+export interface ExactPhraseParams {
+  exact_phrase: string;
+  from_user: string | null;
+  to_user: string | null;
+  since_date: string | null;
+  until_date: string | null;
+}
+
+export async function searchTweetsExactPhrase(
+  supabase: SupabaseClient,
+  params: ExactPhraseParams,
+  limit: number = 50,
+  offset: number = 0
+): Promise<SearchTweetRpcResponseItem[] | null> {
+  const { data, error } = await supabase.rpc('search_tweets_exact_phrase', {
+    exact_phrase: params.exact_phrase,
+    from_user: params.from_user || undefined,
+    to_user: params.to_user || undefined,
+    since_date: params.since_date || undefined,
+    until_date: params.until_date || undefined,
+    limit_: limit,
+    offset_: offset,
+  });
+
+  if (error) {
+    console.error('Error calling search_tweets_exact_phrase RPC:', error);
+    throw error;
+  }
+
+  return (data as SearchTweetRpcResponseItem[]) || [];
 }

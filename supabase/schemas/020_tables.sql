@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS "public"."tweets" (
     "account_id" "text" NOT NULL,
     "created_at" timestamp with time zone NOT NULL,
     "full_text" "text" NOT NULL,
-    "retweet_count" integer NOT NULL,
+    "retweet_count" integer,
     "favorite_count" integer NOT NULL,
     "reply_to_tweet_id" "text",
     "reply_to_user_id" "text",
@@ -176,8 +176,8 @@ CREATE TABLE IF NOT EXISTS "public"."tweet_media" (
     "tweet_id" "text" NOT NULL,
     "media_url" "text" NOT NULL,
     "media_type" "text" NOT NULL,
-    "width" integer NOT NULL,
-    "height" integer NOT NULL,
+    "width" integer,
+    "height" integer,
     "archive_upload_id" bigint,
     "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );

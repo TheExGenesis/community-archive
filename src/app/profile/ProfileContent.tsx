@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { AlertCircle, Archive, Trash2, UserX, CheckCircle, Upload } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@/utils/supabase'
@@ -35,6 +36,7 @@ export default function ProfileContent({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [deletingArchive, setDeletingArchive] = useState<string | null>(null)
+  const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false)
   const supabase = createBrowserClient()
 
   const twitterUsername =
@@ -229,10 +231,6 @@ export default function ProfileContent({
   }
 
   const handleDeleteAllArchives = async () => {
-    if (!confirm('Are you sure you want to delete ALL your archives? This action cannot be undone.')) {
-      return
-    }
-
     if (!userMetadata?.provider_id) {
       setError('Unable to identify user account')
       return
@@ -246,10 +244,11 @@ export default function ProfileContent({
       await deleteArchive(supabase, userMetadata.provider_id)
       await deleteStorageFiles(userMetadata.provider_id)
 
-      setSuccess('All archives deleted successfully')
+      setShowDeleteAllDialog(false)
+      setSuccess('All data deleted successfully')
       router.refresh()
     } catch (err: any) {
-      setError(err.message || 'Failed to delete archives')
+      setError(err.message || 'Failed to delete data')
     } finally {
       setDeletingArchive(null)
     }
@@ -427,21 +426,55 @@ export default function ProfileContent({
                       </div>
                     )
                   })}
-                  {archives.length > 1 && (
-                    <div className="pt-2 border-t">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={handleDeleteAllArchives}
-                        disabled={deletingArchive !== null}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        {deletingArchive === 'all' ? 'Deleting all...' : 'Delete All Archives'}
-                      </Button>
-                    </div>
-                  )}
                 </div>
               )}
+
+              <div className="pt-4 border-t">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowDeleteAllDialog(true)}
+                  disabled={deletingArchive !== null}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete All Your Data
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Remove all archives, tweets, likes, followers, and profile data — including data from the scraper/extension.
+                </p>
+              </div>
+
+              <Dialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Delete All Your Data</DialogTitle>
+                    <DialogDescription>
+                      This will permanently delete <strong>all</strong> of your data from the Community Archive:
+                    </DialogDescription>
+                  </DialogHeader>
+                  <ul className="list-disc pl-6 text-sm text-muted-foreground space-y-1">
+                    <li>All uploaded archives</li>
+                    <li>All tweets, likes, followers, and following data</li>
+                    <li>Profile information</li>
+                    <li>Data added by the scraper or browser extension</li>
+                  </ul>
+                  <p className="text-sm font-medium text-destructive">
+                    This action is irreversible.
+                  </p>
+                  <DialogFooter className="gap-2 sm:gap-0">
+                    <Button variant="outline" onClick={() => setShowDeleteAllDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={handleDeleteAllArchives}
+                      disabled={deletingArchive === 'all'}
+                    >
+                      {deletingArchive === 'all' ? 'Deleting...' : 'Delete Everything'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         </TabsContent>

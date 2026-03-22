@@ -230,3 +230,9 @@ CREATE TABLE IF NOT EXISTS public.retweets (
 );
 
 ALTER TABLE "public"."retweets" OWNER TO "postgres";
+
+-- ca_autorefresh.account_refresh_log
+CREATE TABLE IF NOT EXISTS "ca_autorefresh"."account_refresh_log" (
+    "account_id" "text" NOT NULL
+);
+ALTER TABLE "ca_autorefresh"."account_refresh_log" OWNER TO "postgres";

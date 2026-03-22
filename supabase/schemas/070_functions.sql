@@ -1270,9 +1270,9 @@ BEGIN
             DELETE FROM %I.tweets WHERE archive_upload_id = ANY($1) OR account_id = $2;
 
             -- Delete other related data
-            DELETE FROM %I.likes WHERE archive_upload_id = ANY($1);
-            DELETE FROM %I.followers WHERE archive_upload_id = ANY($1);
-            DELETE FROM %I.following WHERE archive_upload_id = ANY($1);
+            DELETE FROM %I.likes WHERE archive_upload_id = ANY($1) OR account_id = $2;
+            DELETE FROM %I.followers WHERE archive_upload_id = ANY($1) OR account_id = $2;
+            DELETE FROM %I.following WHERE archive_upload_id = ANY($1) OR account_id = $2;
             DELETE FROM %I.all_profile WHERE account_id = $2;
 
             -- Delete any remaining tweet_media referencing these archive_uploads

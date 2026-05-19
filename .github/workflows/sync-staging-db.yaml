@@ -39,4 +39,8 @@ jobs:
         env:
           SUPABASE_STAGING_PROJECT_REF: ${{ secrets.SUPABASE_STAGING_PROJECT_REF }}
           STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          # supabase config.toml references these for the local-dev Twitter OAuth provider.
+          # Hosted DB reset only needs them to satisfy config parsing — values aren't applied.
+          SUPABASE_AUTH_TWITTER_CLIENT_ID: unused-for-staging-reset
+          SUPABASE_AUTH_TWITTER_SECRET: unused-for-staging-reset
         run: ./scripts/sync-staging-db.sh

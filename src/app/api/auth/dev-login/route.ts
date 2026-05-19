@@ -15,7 +15,7 @@ const isKnownProductionSupabase = () =>
 
 const getStagingLoginConfig = () => ({
   email: process.env.STAGING_DEV_LOGIN_EMAIL ?? 'dev@example.com',
-  password: process.env.STAGING_DEV_LOGIN_PASSWORD ?? 'devpassword123',
+  password: process.env.STAGING_DEV_LOGIN_PASSWORD,
   username: process.env.STAGING_DEV_LOGIN_USERNAME ?? 'alice_dev',
   providerId: process.env.STAGING_DEV_LOGIN_PROVIDER_ID ?? 'mock_alice',
   displayName: process.env.STAGING_DEV_LOGIN_DISPLAY_NAME ?? 'Staging User',
@@ -52,11 +52,19 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}))
     const stagingConfig = getStagingLoginConfig()
+
+    if (!isDevelopment() && !stagingConfig.password) {
+      return NextResponse.json(
+        { error: 'STAGING_DEV_LOGIN_PASSWORD must be set for staging login' },
+        { status: 500 },
+      )
+    }
+
     const email = isDevelopment()
       ? (body.email ?? stagingConfig.email)
       : stagingConfig.email
     const password = isDevelopment()
-      ? (body.password ?? stagingConfig.password)
+      ? (body.password ?? stagingConfig.password ?? 'devpassword123')
       : stagingConfig.password
     const username = stagingConfig.username.toLowerCase()
 

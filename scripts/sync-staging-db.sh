@@ -69,7 +69,16 @@ if [[ -f supabase/roles.sql ]]; then
 fi
 
 echo "Applying repo migrations to staging..."
+# `yes` keeps writing after pnpm exits and dies with SIGPIPE (141); pipefail would surface
+# that as a script failure even though the push succeeded. Toggle pipefail around the call.
+set +o pipefail
 yes | pnpm supabase db push --include-all --db-url "$STAGING_DATABASE_URL"
+push_status=${PIPESTATUS[1]}
+set -o pipefail
+if [[ $push_status -ne 0 ]]; then
+  echo "supabase db push failed with status $push_status" >&2
+  exit $push_status
+fi
 
 if [[ -f supabase/seed.sql ]]; then
   echo "Loading mock seed data..."

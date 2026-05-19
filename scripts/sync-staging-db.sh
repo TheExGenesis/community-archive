@@ -63,6 +63,11 @@ grant all on schema public to postgres, service_role;
 comment on schema public is 'standard public schema';
 SQL
 
+if [[ -f supabase/roles.sql ]]; then
+  echo "Seeding global roles (supabase/roles.sql)..."
+  psql "$STAGING_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/roles.sql
+fi
+
 echo "Applying repo migrations to staging..."
 yes | pnpm supabase db push --include-all --db-url "$STAGING_DATABASE_URL"
 

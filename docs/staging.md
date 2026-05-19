@@ -115,12 +115,13 @@ After updating Preview env vars, redeploy the PR preview so the new values are p
 
 ## Keeping Staging Schema Current
 
-The `Sync staging database` GitHub Action resets staging from the repo schema and mock seed data:
+The `Sync staging database` GitHub Action soft-resets staging from the repo schema and mock seed data:
 
 - It runs manually via `workflow_dispatch`.
 - It runs on pushes to `main` that touch `supabase/**` or `scripts/sync-staging-db.sh`.
 - It refuses to run if `STAGING_DATABASE_URL` does not include `SUPABASE_STAGING_PROJECT_REF`.
 - It refuses the production project ref.
+- "Soft reset" means: drop every schema not on the Supabase-managed allowlist (so `auth`, `storage`, `realtime`, etc. are left intact), recreate `public`, then run `supabase db push --include-all` and load `supabase/seed.sql`. This avoids the "must be owner of …" errors `supabase db reset` hits against the hosted pooler role. `auth.users` carries over between runs — clean it manually from the Supabase dashboard if you want to wipe mock accounts.
 
 Required GitHub repository secrets (configured on the `Preview` GitHub Environment):
 

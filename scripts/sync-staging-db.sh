@@ -37,6 +37,44 @@ if [[ "$SUPABASE_STAGING_PROJECT_REF" == "fabxmporizzqflnftavs" ]]; then
   exit 1
 fi
 
-echo "Resetting staging database and loading repo migrations + supabase/seed.sql..."
-yes | pnpm supabase db reset --db-url "$STAGING_DATABASE_URL"
+echo "Soft-resetting staging: dropping project-owned schemas + migration history..."
+# `supabase db reset` against a hosted project fails because the pooler `postgres` role does
+# not own objects in auth/storage/realtime/etc. Instead, drop only the schemas this project
+# manages (everything outside the Supabase-managed allowlist below), recreate `public`, then
+# re-run migrations from history. `supabase_migrations` is dropped so all migrations re-apply.
+psql "$STAGING_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+do $$
+declare r record;
+begin
+  for r in
+    select n.nspname
+    from pg_namespace n
+    where n.nspname not in (
+      'pg_catalog','information_schema','pg_toast',
+      'auth','storage','realtime','vault','extensions',
+      'graphql','graphql_public','pgbouncer','pgsodium',
+      'pgsodium_masks','net','supabase_functions'
+    )
+    and n.nspname not like 'pg_%'
+  loop
+    execute format('drop schema if exists %I cascade', r.nspname);
+  end loop;
+end $$;
+
+create schema public;
+grant usage on schema public to anon, authenticated, service_role;
+grant all on schema public to postgres, service_role;
+comment on schema public is 'standard public schema';
+SQL
+
+echo "Applying repo migrations to staging..."
+yes | pnpm supabase db push --include-all --db-url "$STAGING_DATABASE_URL"
+
+if [[ -f supabase/seed.sql ]]; then
+  echo "Loading mock seed data..."
+  psql "$STAGING_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
+else
+  echo "supabase/seed.sql not found; skipping seed load."
+fi
+
 echo "Staging database is in sync with the current repo schema and mock seed data."

@@ -11,6 +11,9 @@ export default function SignIn() {
   const isDevLoginEnabled =
     process.env.NODE_ENV === 'development' ||
     process.env.NEXT_PUBLIC_ENABLE_STAGING_DEV_LOGIN === 'true'
+  const isStagingLogin =
+    process.env.NODE_ENV !== 'development' &&
+    process.env.NEXT_PUBLIC_ENABLE_STAGING_DEV_LOGIN === 'true'
 
   const signIn = async () => {
     const supabase = createBrowserClient()
@@ -28,10 +31,14 @@ export default function SignIn() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            email: 'dev@example.com',
-            password: 'devpassword123',
-          }),
+          body: JSON.stringify(
+            isStagingLogin
+              ? {}
+              : {
+                  email: 'dev@example.com',
+                  password: 'devpassword123',
+                },
+          ),
         })
 
         const result = await response.json()
@@ -108,7 +115,11 @@ export default function SignIn() {
               : 'bg-green-600 hover:bg-green-700 focus:ring-green-500 dark:bg-green-500 dark:hover:bg-green-600'
           }`}
         >
-          {isDevLoginEnabled ? 'Sign in (Staging)' : 'Sign in with Twitter'}
+          {isStagingLogin
+            ? 'Sign in as Alice Staging'
+            : isDevLoginEnabled
+              ? 'Sign in (Dev Mode)'
+              : 'Sign in with Twitter'}
         </button>
       </form>
     </div>

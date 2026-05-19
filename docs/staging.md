@@ -37,6 +37,8 @@ The default staging login identity is:
 - Mock Twitter username: value of `STAGING_DEV_LOGIN_USERNAME`
 - Mock Twitter account id: value of `STAGING_DEV_LOGIN_PROVIDER_ID`
 
+The staging UI does not ask for these credentials. When `NEXT_PUBLIC_ENABLE_STAGING_DEV_LOGIN=true`, the sign-in button calls the server-side staging login route with no client-side password. The server uses `STAGING_DEV_LOGIN_PASSWORD` from the staging environment.
+
 Do not commit the real password. The bootstrap script below writes it to an ignored `.env.staging.generated` file so it can be copied into Vercel's Preview environment.
 
 The server route refuses staging dev login against the known production Supabase host unless `ALLOW_STAGING_DEV_LOGIN_ON_PROD_SUPABASE=true`. Do not set that override for normal staging.
@@ -110,6 +112,22 @@ For PR-created Vercel Preview deployments, add the values from `.env.staging.gen
 - `ALLOW_STAGING_DEV_LOGIN_ON_PROD_SUPABASE=false`
 
 After updating Preview env vars, redeploy the PR preview so the new values are picked up.
+
+## Keeping Staging Schema Current
+
+The `Sync staging database` GitHub Action resets staging from the repo schema and mock seed data:
+
+- It runs manually via `workflow_dispatch`.
+- It runs on pushes to `main` that touch `supabase/**` or `scripts/sync-staging-db.sh`.
+- It refuses to run if `STAGING_DATABASE_URL` does not include `SUPABASE_STAGING_PROJECT_REF`.
+- It refuses the production project ref.
+
+Required GitHub repository secrets:
+
+- `SUPABASE_STAGING_PROJECT_REF`
+- `STAGING_DATABASE_URL`
+
+Use the Supabase Dashboard connection string for `STAGING_DATABASE_URL`. Prefer the session pooler connection string if direct database connections fail locally or in GitHub Actions because of IPv6 routing.
 
 ## What To Verify Before Privacy PRs
 

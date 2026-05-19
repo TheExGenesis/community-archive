@@ -39,9 +39,9 @@ fi
 
 echo "Soft-resetting staging: dropping project-owned schemas + migration history..."
 # `supabase db reset` against a hosted project fails because the pooler `postgres` role does
-# not own objects in auth/storage/realtime/etc. Instead, drop only the schemas this project
-# manages (everything outside the Supabase-managed allowlist below), recreate `public`, then
-# re-run migrations from history. `supabase_migrations` is dropped so all migrations re-apply.
+# not own objects in auth/storage/realtime/cron/etc. Instead, drop only schemas owned by us
+# (current_user), then recreate `public` and re-run migrations. `extensions` is owned by
+# `postgres` on Supabase but is Supabase-managed (holds installed extensions), so it's kept.
 psql "$STAGING_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
 do $$
 declare r record;
@@ -49,13 +49,9 @@ begin
   for r in
     select n.nspname
     from pg_namespace n
-    where n.nspname not in (
-      'pg_catalog','information_schema','pg_toast',
-      'auth','storage','realtime','vault','extensions',
-      'graphql','graphql_public','pgbouncer','pgsodium',
-      'pgsodium_masks','net','supabase_functions'
-    )
-    and n.nspname not like 'pg_%'
+    join pg_roles a on n.nspowner = a.oid
+    where a.rolname = current_user
+      and n.nspname <> 'extensions'
   loop
     execute format('drop schema if exists %I cascade', r.nspname);
   end loop;

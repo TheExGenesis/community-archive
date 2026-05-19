@@ -56,7 +56,7 @@ type AccountAdminRow = AccountRecord & {
 }
 
 type AdminData = {
-  optedInRows: Array<OptInRecord & { account: AccountRecord | null }>
+  optInRows: Array<OptInRecord & { account: AccountRecord | null }>
   accountRows: AccountAdminRow[]
   warnings: string[]
 }
@@ -284,25 +284,24 @@ async function fetchAdminData(search: string): Promise<AdminData> {
   const optInSelect =
     'id, username, twitter_user_id, opted_in, explicit_optout, opt_out_reason, updated_at, opted_in_at, opted_out_at'
 
-  const [optedInResponse, accountRows] = await Promise.all([
+  const [optInResponse, accountRows] = await Promise.all([
     admin
       .from('optin')
       .select(optInSelect)
-      .eq('opted_in', true)
       .order('updated_at', { ascending: false, nullsFirst: false })
       .limit(DEFAULT_LIMIT),
     fetchAccountRows(admin, search),
   ])
 
-  if (optedInResponse.error) {
-    throw optedInResponse.error
+  if (optInResponse.error) {
+    throw optInResponse.error
   }
 
-  const optedIn = (optedInResponse.data ?? []) as OptInRecord[]
-  const optedInAccountIds = optedIn
+  const optInRecords = (optInResponse.data ?? []) as OptInRecord[]
+  const optInAccountIds = optInRecords
     .map((record) => record.twitter_user_id)
     .filter((id): id is string => Boolean(id))
-  const optedInUsernames = optedIn.map((record) =>
+  const optInUsernames = optInRecords.map((record) =>
     record.username.toLowerCase(),
   )
 
@@ -317,21 +316,21 @@ async function fetchAdminData(search: string): Promise<AdminData> {
     fetchOptInMatches(admin, accountRows),
     fetchArchiveUploadCounts(admin, accountIds),
     fetchScrapeBlocklist(admin, accountIds),
-    optedInAccountIds.length
+    optInAccountIds.length
       ? admin
           .from('all_account')
           .select(
             'account_id, username, account_display_name, num_tweets, created_via, updated_at',
           )
-          .in('account_id', optedInAccountIds)
+          .in('account_id', optInAccountIds)
       : Promise.resolve({ data: [], error: null }),
-    optedInUsernames.length
+    optInUsernames.length
       ? admin
           .from('all_account')
           .select(
             'account_id, username, account_display_name, num_tweets, created_via, updated_at',
           )
-          .in('username', optedInUsernames)
+          .in('username', optInUsernames)
       : Promise.resolve({ data: [], error: null }),
   ])
 
@@ -374,7 +373,7 @@ async function fetchAdminData(search: string): Promise<AdminData> {
   )
 
   return {
-    optedInRows: optedIn.map((record) => ({
+    optInRows: optInRecords.map((record) => ({
       ...record,
       account:
         (record.twitter_user_id
@@ -612,10 +611,10 @@ export default async function AdminPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>Opted-in accounts</CardTitle>
+            <CardTitle>Opt-in table rows</CardTitle>
             <CardDescription>
-              Default operating table for known users who have opted in through
-              the app.
+              Default operating table for every row in the public.optin table,
+              including opted-in, explicitly opted-out, and neutral records.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -630,7 +629,7 @@ export default async function AdminPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.optedInRows.map((row) => (
+                {data.optInRows.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell>
                       <div className="font-medium">@{row.username}</div>
@@ -668,13 +667,13 @@ export default async function AdminPage({
                     </TableCell>
                   </TableRow>
                 ))}
-                {!data.optedInRows.length ? (
+                {!data.optInRows.length ? (
                   <TableRow>
                     <TableCell
                       colSpan={5}
                       className="text-center text-sm text-muted-foreground"
                     >
-                      No opted-in accounts found.
+                      No opt-in table rows found.
                     </TableCell>
                   </TableRow>
                 ) : null}

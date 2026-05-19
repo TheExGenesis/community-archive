@@ -30,14 +30,14 @@ STAGING_DEV_LOGIN_DISPLAY_NAME=Alice Staging
 ALLOW_STAGING_DEV_LOGIN_ON_PROD_SUPABASE=false
 ```
 
-The default staging login identity is:
+The default staging login identity is configured via env:
 
 - Email: value of `STAGING_DEV_LOGIN_EMAIL`
-- Password: value of `STAGING_DEV_LOGIN_PASSWORD`
+- Password: value of `STAGING_DEV_LOGIN_PASSWORD` (shared by every staging mock user)
 - Mock Twitter username: value of `STAGING_DEV_LOGIN_USERNAME`
 - Mock Twitter account id: value of `STAGING_DEV_LOGIN_PROVIDER_ID`
 
-The staging UI does not ask for these credentials. When `NEXT_PUBLIC_ENABLE_STAGING_DEV_LOGIN=true`, the sign-in button calls the server-side staging login route with no client-side password. The server uses `STAGING_DEV_LOGIN_PASSWORD` from the staging environment.
+The staging UI shows a dropdown of seeded mock users (currently `alice_dev` and `xiq_dev`, see `supabase/seed.sql`) plus a sign-in button. Picking a user posts `{ username, providerId, displayName }` to the dev-login route; the server uses `STAGING_DEV_LOGIN_PASSWORD` from the environment as the shared password and derives the email as `<username>@staging.local`. No password is sent from the client. You can also deep-link to a specific user with `?as=<username>` on the sign-in page.
 
 Do not commit the real password. The bootstrap script below writes it to an ignored `.env.staging.generated` file so it can be copied into Vercel's Preview environment.
 
@@ -132,12 +132,13 @@ Use the Supabase Dashboard connection string for `STAGING_DATABASE_URL`. Prefer 
 
 ## What To Verify Before Privacy PRs
 
-- Staging login creates/signs in the configured mock user.
+- Staging login creates/signs in the picked mock user (alice_dev, xiq_dev, etc.).
 - `/profile` resolves the mock account and shows archive state.
 - Upload and opt-in flows mutate only the staging database.
-- Explicit opt-out/deletion removes or hides the mock user's public data.
-- Thread pages still render acceptably when one account in the thread has been deleted or blocked.
+- Explicit opt-out/deletion removes or hides the mock user's public data, **including** orphan rows inserted with NULL `archive_upload_id` (the seed includes a few of these in `followers`, `following`, and `likes` so the fix can be exercised).
+- Thread pages still render acceptably when one account in the thread (e.g. `alice_dev` participating in the postgres-RPC conversation with `bob_writes` and `xiq_dev`) has been deleted or blocked.
 - Public pages do not show opted-out account data after deletion/hiding.
+- Quote-tweet relationships across two staging users (`alice_dev` quotes `xiq_dev`'s `t_xiq_1`; `eve_data` quotes `quoteduser`'s `t_quoted_1`) survive or are removed as expected.
 
 ## Thread Rendering TODO
 

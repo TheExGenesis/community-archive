@@ -21,6 +21,11 @@ const getStagingLoginConfig = () => ({
   displayName: process.env.STAGING_DEV_LOGIN_DISPLAY_NAME ?? 'Staging User',
 })
 
+// Staging signs in as one of the seeded mock accounts. The username chosen by the client
+// picks the provider_id (which delete/admin checks rely on); the password is shared across
+// mock users because they all live on a staging-only auth backend.
+const STAGING_EMAIL_DOMAIN = 'staging.local'
+
 export async function POST(request: NextRequest) {
   const allowDevLogin = isDevelopment() || isStagingDevLoginEnabled()
 
@@ -60,13 +65,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // In staging, the client may pick which seeded mock user to sign in as by passing
+    // `username` / `providerId` / `displayName`. When unspecified, fall back to the
+    // env-configured defaults (currently alice_dev). In dev, body.email/password still wins.
+    const username = (
+      body.username ??
+      (isDevelopment() ? undefined : stagingConfig.username) ??
+      stagingConfig.username
+    )
+      .toString()
+      .toLowerCase()
+    const providerId =
+      (body.providerId as string | undefined) ?? stagingConfig.providerId
+    const displayName =
+      (body.displayName as string | undefined) ?? stagingConfig.displayName
+
     const email = isDevelopment()
       ? (body.email ?? stagingConfig.email)
-      : stagingConfig.email
+      : body.username
+        ? `${username}@${STAGING_EMAIL_DOMAIN}`
+        : stagingConfig.email
     const password = isDevelopment()
       ? (body.password ?? stagingConfig.password ?? 'devpassword123')
       : stagingConfig.password
-    const username = stagingConfig.username.toLowerCase()
 
     // Try to sign in first
     const { data: signInData, error: signInError } =
@@ -84,13 +105,13 @@ export async function POST(request: NextRequest) {
             password,
             email_confirm: true,
             user_metadata: {
-              full_name: stagingConfig.displayName,
+              full_name: displayName,
               user_name: username,
-              provider_id: stagingConfig.providerId,
+              provider_id: providerId,
               provider: isDevelopment() ? 'email' : 'staging',
             },
             app_metadata: {
-              provider_id: stagingConfig.providerId,
+              provider_id: providerId,
               user_name: username,
               provider: isDevelopment() ? 'email' : 'staging',
             },

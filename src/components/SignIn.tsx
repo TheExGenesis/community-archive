@@ -3,6 +3,14 @@ import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { devLog } from '@/lib/devLog'
 import { createBrowserClient } from '@/utils/supabase'
 import { useSearchParams } from 'next/navigation'
+import { useState } from 'react'
+
+// Seeded mock users available for staging dev-login bypass.
+// Keep in sync with supabase/seed.sql.
+const STAGING_USERS = [
+  { username: 'alice_dev', providerId: 'mock_alice', displayName: 'Alice Developer' },
+  { username: 'xiq_dev',   providerId: 'mock_xiq',   displayName: 'XIQ Dev' },
+] as const
 
 export default function SignIn() {
   const searchParams = useSearchParams()
@@ -14,6 +22,14 @@ export default function SignIn() {
   const isStagingLogin =
     process.env.NODE_ENV !== 'development' &&
     process.env.NEXT_PUBLIC_ENABLE_STAGING_DEV_LOGIN === 'true'
+
+  // ?as=<username> lets you deep-link to a specific staging user, otherwise default to first.
+  const asParam = searchParams.get('as')
+  const initialUser =
+    STAGING_USERS.find((u) => u.username === asParam) ?? STAGING_USERS[0]
+  const [selectedUser, setSelectedUser] = useState<(typeof STAGING_USERS)[number]>(
+    initialUser,
+  )
 
   const signIn = async () => {
     const supabase = createBrowserClient()
@@ -33,7 +49,11 @@ export default function SignIn() {
           },
           body: JSON.stringify(
             isStagingLogin
-              ? {}
+              ? {
+                  username: selectedUser.username,
+                  providerId: selectedUser.providerId,
+                  displayName: selectedUser.displayName,
+                }
               : {
                   email: 'dev@example.com',
                   password: 'devpassword123',
@@ -105,7 +125,24 @@ export default function SignIn() {
       </button>
     </form>
   ) : (
-    <div className="inline-block">
+    <div className="inline-flex items-center gap-2">
+      {isStagingLogin && (
+        <select
+          value={selectedUser.username}
+          onChange={(e) => {
+            const next = STAGING_USERS.find((u) => u.username === e.target.value)
+            if (next) setSelectedUser(next)
+          }}
+          className="rounded-md border border-yellow-700 bg-white px-2 py-1.5 text-sm font-medium text-yellow-900 focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:border-yellow-500 dark:bg-gray-800 dark:text-yellow-200"
+          aria-label="Pick staging mock user"
+        >
+          {STAGING_USERS.map((u) => (
+            <option key={u.username} value={u.username}>
+              {u.displayName} (@{u.username})
+            </option>
+          ))}
+        </select>
+      )}
       <form action={signIn} className="inline-block">
         <button
           type="submit"
@@ -116,7 +153,7 @@ export default function SignIn() {
           }`}
         >
           {isStagingLogin
-            ? 'Sign in as Alice Staging'
+            ? `Sign in as ${selectedUser.displayName}`
             : isDevLoginEnabled
               ? 'Sign in (Dev Mode)'
               : 'Sign in with Twitter'}

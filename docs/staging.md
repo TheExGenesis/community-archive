@@ -122,7 +122,7 @@ The `Sync staging database` GitHub Action resets staging from the repo schema an
 - It refuses to run if `STAGING_DATABASE_URL` does not include `SUPABASE_STAGING_PROJECT_REF`.
 - It refuses the production project ref.
 
-Required GitHub repository secrets:
+Required GitHub repository secrets (configured on the `Preview` GitHub Environment):
 
 - `SUPABASE_STAGING_PROJECT_REF`
 - `STAGING_DATABASE_URL`

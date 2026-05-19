@@ -16,7 +16,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    environment: staging
+    environment: Preview
     steps:
       - name: Checkout
         uses: actions/checkout@v4

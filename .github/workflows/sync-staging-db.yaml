@@ -8,8 +8,14 @@ on:
     paths:
       - 'supabase/**'
       - 'scripts/sync-staging-db.sh'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'supabase/**'
+      - 'scripts/sync-staging-db.sh'
 
 concurrency:
+  # Single global mutex — only one run touches the staging DB at a time. Pushes queue.
   group: sync-staging-db
   cancel-in-progress: false
 
@@ -17,6 +23,9 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     environment: Preview
+    # Fork PRs can't access the Preview environment secrets — skip the job rather than
+    # let it fail. Trusted maintainers can still trigger via workflow_dispatch.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -8,6 +8,9 @@ export default function SignIn() {
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect')
   const { userMetadata, isArchiveUploaded } = useAuthAndArchive()
+  const isDevLoginEnabled =
+    process.env.NODE_ENV === 'development' ||
+    process.env.NEXT_PUBLIC_ENABLE_STAGING_DEV_LOGIN === 'true'
 
   const signIn = async () => {
     const supabase = createBrowserClient()
@@ -15,12 +18,11 @@ export default function SignIn() {
       userMetadata,
       useremote: process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB,
       isDev: process.env.NODE_ENV === 'development',
+      isDevLoginEnabled,
     })
 
-    // Always use dev login in development mode
-    if (process.env.NODE_ENV === 'development') {
+    if (isDevLoginEnabled) {
       try {
-        // Use the dev-login API endpoint for consistent behavior
         const response = await fetch('/api/auth/dev-login', {
           method: 'POST',
           headers: {
@@ -28,7 +30,7 @@ export default function SignIn() {
           },
           body: JSON.stringify({
             email: 'dev@example.com',
-            password: 'devpassword123'
+            password: 'devpassword123',
           }),
         })
 
@@ -42,7 +44,7 @@ export default function SignIn() {
         }
 
         devLog('Dev login successful:', result)
-        
+
         // Redirect to intended page after dev login
         if (redirectTo) {
           window.location.href = redirectTo
@@ -59,10 +61,10 @@ export default function SignIn() {
         userMetadata,
         origin: window.location.origin,
       })
-      const callbackUrl = redirectTo 
+      const callbackUrl = redirectTo
         ? `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(redirectTo)}`
         : `${window.location.origin}/api/auth/callback`
-      
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'twitter',
         options: {
@@ -86,13 +88,11 @@ export default function SignIn() {
     }
   }
 
-  const isDev = process.env.NODE_ENV === 'development'
-  
   return userMetadata ? (
     <form action={handleSignOut} className="inline-block">
       <button
         type="submit"
-        className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors whitespace-nowrap"
+        className="whitespace-nowrap rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
       >
         Sign Out
       </button>
@@ -102,13 +102,13 @@ export default function SignIn() {
       <form action={signIn} className="inline-block">
         <button
           type="submit"
-          className={`px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors duration-300 ${
-            isDev 
-              ? 'bg-yellow-600 hover:bg-yellow-700 dark:bg-yellow-500 dark:hover:bg-yellow-600 focus:ring-yellow-500' 
-              : 'bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 focus:ring-green-500'
+          className={`rounded-md border border-transparent px-4 py-2 text-sm font-medium text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+            isDevLoginEnabled
+              ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500 dark:bg-yellow-500 dark:hover:bg-yellow-600'
+              : 'bg-green-600 hover:bg-green-700 focus:ring-green-500 dark:bg-green-500 dark:hover:bg-green-600'
           }`}
         >
-          {isDev ? 'Sign in (Dev Mode)' : 'Sign in with Twitter'}
+          {isDevLoginEnabled ? 'Sign in (Staging)' : 'Sign in with Twitter'}
         </button>
       </form>
     </div>

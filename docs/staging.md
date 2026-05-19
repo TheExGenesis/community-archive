@@ -30,9 +30,47 @@ STAGING_DEV_LOGIN_DISPLAY_NAME=Alice Staging
 ALLOW_STAGING_DEV_LOGIN_ON_PROD_SUPABASE=false
 ```
 
+The default staging login identity is:
+
+- Email: value of `STAGING_DEV_LOGIN_EMAIL`
+- Password: value of `STAGING_DEV_LOGIN_PASSWORD`
+- Mock Twitter username: value of `STAGING_DEV_LOGIN_USERNAME`
+- Mock Twitter account id: value of `STAGING_DEV_LOGIN_PROVIDER_ID`
+
+Do not commit the real password. The bootstrap script below writes it to an ignored `.env.staging.generated` file so it can be copied into Vercel's Preview environment.
+
 The server route refuses staging dev login against the known production Supabase host unless `ALLOW_STAGING_DEV_LOGIN_ON_PROD_SUPABASE=true`. Do not set that override for normal staging.
 
-## Database Setup
+## Programmatic Database Setup
+
+If `SUPABASE_ACCESS_TOKEN` has organization/project management permissions, the repository can create and seed staging automatically.
+
+Required local environment:
+
+```env
+SUPABASE_ACCESS_TOKEN=<valid Supabase management token>
+SUPABASE_STAGING_ORG_ID=<Supabase org id>
+SUPABASE_STAGING_DB_PASSWORD=<new staging database password>
+SUPABASE_STAGING_REGION=eu-central-1
+```
+
+Then run:
+
+```bash
+./scripts/bootstrap-staging-supabase.sh
+```
+
+The script will:
+
+- create a `community-archive-staging` Supabase project if `SUPABASE_STAGING_PROJECT_REF` is not set
+- link the project locally
+- run `supabase db push --include-all`
+- load `supabase/seed.sql`
+- write Preview environment values to `.env.staging.generated`
+
+If you create the Supabase project manually, set `SUPABASE_STAGING_PROJECT_REF` and rerun the same script to apply schema, seed data, and generate the Vercel env file.
+
+## Manual Database Setup
 
 1. Create a new Supabase project.
 2. Link the project locally:
@@ -54,6 +92,24 @@ psql '<staging-db-connection-string>' -f supabase/seed.sql
 ```
 
 The default staging login identity maps to `mock_alice` / `alice_dev`, which exists in the seed data and has a multi-tweet thread.
+
+## Vercel Preview Setup
+
+For PR-created Vercel Preview deployments, add the values from `.env.staging.generated` to the Vercel project's Preview environment. At minimum:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE`
+- `NEXT_PUBLIC_ENABLE_STAGING_DEV_LOGIN=true`
+- `ENABLE_STAGING_DEV_LOGIN=true`
+- `STAGING_DEV_LOGIN_EMAIL`
+- `STAGING_DEV_LOGIN_PASSWORD`
+- `STAGING_DEV_LOGIN_USERNAME`
+- `STAGING_DEV_LOGIN_PROVIDER_ID`
+- `STAGING_DEV_LOGIN_DISPLAY_NAME`
+- `ALLOW_STAGING_DEV_LOGIN_ON_PROD_SUPABASE=false`
+
+After updating Preview env vars, redeploy the PR preview so the new values are picked up.
 
 ## What To Verify Before Privacy PRs
 

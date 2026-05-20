@@ -26,6 +26,7 @@ import { AdminConfirmAction } from './AdminConfirmAction'
 export const dynamic = 'force-dynamic'
 
 const ADMIN_USERNAME = 'exgenesis'
+const PRODUCTION_SUPABASE_HOST = 'fabxmporizzqflnftavs.supabase.co'
 const DEFAULT_LIMIT = 50
 
 type OptInRecord = {
@@ -91,6 +92,15 @@ const getTwitterUsername = (user: User) => {
   )?.toLowerCase()
 }
 
+const isKnownProductionSupabase = () =>
+  process.env.NEXT_PUBLIC_SUPABASE_URL?.includes(PRODUCTION_SUPABASE_HOST) ??
+  false
+
+const isStagingAdminAccessEnabled = () =>
+  process.env.ENABLE_STAGING_DEV_LOGIN === 'true' &&
+  process.env.ALLOW_STAGING_ADMIN_ON_PROD_SUPABASE !== 'true' &&
+  !isKnownProductionSupabase()
+
 async function requireAdmin() {
   const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
@@ -103,7 +113,10 @@ async function requireAdmin() {
     redirect('/login?redirect=/admin')
   }
 
-  if (getTwitterUsername(user) !== ADMIN_USERNAME) {
+  if (
+    getTwitterUsername(user) !== ADMIN_USERNAME &&
+    !isStagingAdminAccessEnabled()
+  ) {
     notFound()
   }
 

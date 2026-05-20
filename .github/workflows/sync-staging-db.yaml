@@ -73,6 +73,10 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          # `supabase gen types` parses supabase/config.toml the same way `db push`
+          # does, so it also fails without these env-referenced placeholders.
+          SUPABASE_AUTH_TWITTER_CLIENT_ID: unused-for-staging-gen-types
+          SUPABASE_AUTH_TWITTER_SECRET: unused-for-staging-gen-types
         run: |
           set -euo pipefail
           pnpm exec supabase gen types typescript \

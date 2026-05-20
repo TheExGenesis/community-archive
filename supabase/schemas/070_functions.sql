@@ -2831,3 +2831,48 @@ BEGIN
 END;
 $$;
 ALTER FUNCTION public.log_archive_upload_event() OWNER TO postgres;
+
+
+-- admin_list_blocked_scraping_users / admin_set_scrape_block: wrap
+-- tes.blocked_scraping_users so the admin dashboard can read/write the
+-- scrape blocklist without depending on PostgREST exposing the `tes` schema.
+CREATE OR REPLACE FUNCTION "public"."admin_list_blocked_scraping_users"(
+  "p_account_ids" text[]
+) RETURNS text[]
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT COALESCE(
+    array_agg(b.account_id),
+    ARRAY[]::text[]
+  )
+  FROM tes.blocked_scraping_users b
+  WHERE p_account_ids IS NULL
+     OR b.account_id = ANY(p_account_ids);
+$$;
+ALTER FUNCTION "public"."admin_list_blocked_scraping_users"(text[]) OWNER TO postgres;
+
+CREATE OR REPLACE FUNCTION "public"."admin_set_scrape_block"(
+  "p_account_id" text,
+  "p_blocked" boolean
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF p_account_id IS NULL OR p_account_id = '' THEN
+    RAISE EXCEPTION 'p_account_id is required';
+  END IF;
+
+  IF p_blocked THEN
+    INSERT INTO tes.blocked_scraping_users (account_id)
+    VALUES (p_account_id)
+    ON CONFLICT (account_id) DO NOTHING;
+  ELSE
+    DELETE FROM tes.blocked_scraping_users WHERE account_id = p_account_id;
+  END IF;
+END;
+$$;
+ALTER FUNCTION "public"."admin_set_scrape_block"(text, boolean) OWNER TO postgres;

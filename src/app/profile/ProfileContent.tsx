@@ -133,7 +133,9 @@ export default function ProfileContent({
         account_id: userMetadata?.provider_id ?? null,
         user_id: user.id,
         action_type,
-        metadata: metadata ?? null,
+        // Cast through unknown — Record<string, unknown> is structurally compatible
+        // with the recursive Json type Supabase generates but TS can't prove it.
+        metadata: (metadata ?? null) as unknown as never,
       })
       if (logError) console.warn('user_action_log insert failed:', logError)
     } catch (err) {

@@ -2,8 +2,34 @@ import {
   createServerClient,
   createServerServiceRoleClient,
 } from '@/utils/supabase'
+import type { User } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+
+// Derive the session's Twitter username from auth metadata. Used as the
+// source of truth for identity instead of trusting the request body —
+// otherwise a logged-in user could claim an unclaimed opt-in row for any
+// username (with the new service-role client, RLS no longer blocks this).
+function getSessionTwitterUsername(user: User): string | null {
+  const sources: Record<string, unknown>[] = [
+    user.user_metadata ?? {},
+    user.app_metadata ?? {},
+    ...((user.identities ?? []).map((i) => i.identity_data ?? {}) as Record<
+      string,
+      unknown
+    >[]),
+  ]
+  const keys = ['user_name', 'preferred_username', 'username', 'screen_name']
+  for (const src of sources) {
+    for (const k of keys) {
+      const v = src[k]
+      if (typeof v === 'string' && v.trim()) {
+        return v.trim().toLowerCase().replace(/^@/, '')
+      }
+    }
+  }
+  return null
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,25 +54,38 @@ export async function POST(request: NextRequest) {
     const admin = createServerServiceRoleClient()
     const body = await request.json()
     const {
-      username,
+      username: bodyUsername,
       twitterUserId,
       optedIn,
       termsVersion,
       explicitOptOut = false,
       optOutReason = null,
     } = body
-    const normalizedUsername = username
-      ?.toLowerCase()
-      .replace(/^@/, '')
-      .replace(/[^a-z0-9_]/g, '')
 
-    // Validate required fields
-    if (!normalizedUsername) {
+    // Identity: ignore body.username if it doesn't match the session.
+    // The body still has to send the username (for backwards compat with the
+    // existing client), but the session is what we actually trust.
+    const sessionUsername = getSessionTwitterUsername(user)
+    if (!sessionUsername) {
       return NextResponse.json(
-        { error: 'Username is required' },
-        { status: 400 },
+        { error: 'No Twitter username on session' },
+        { status: 403 },
       )
     }
+    const normalizedBody =
+      typeof bodyUsername === 'string'
+        ? bodyUsername
+            .toLowerCase()
+            .replace(/^@/, '')
+            .replace(/[^a-z0-9_]/g, '')
+        : null
+    if (normalizedBody && normalizedBody !== sessionUsername) {
+      return NextResponse.json(
+        { error: 'Username does not match your account' },
+        { status: 403 },
+      )
+    }
+    const normalizedUsername = sessionUsername
 
     const [byUserIdResponse, byUsernameResponse] = await Promise.all([
       admin.from('optin').select('*').eq('user_id', user.id).maybeSingle(),

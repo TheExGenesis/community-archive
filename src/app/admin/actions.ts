@@ -1,7 +1,6 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import {
   AccountsCursor,
   AccountsPage,
@@ -87,47 +86,64 @@ export async function searchAccountsAction(search: string): Promise<{
   }
 }
 
-export async function manualOptIn(formData: FormData) {
-  const admin = await getAdminClient()
-  const username = normalizeUsername(String(formData.get('username') ?? ''))
-  if (!username) {
-    redirect(
-      `/admin?flash=error&msg=${encodeURIComponent('Username is required')}`,
-    )
+export type ManualOptInResult =
+  | { ok: true; message: string }
+  | { ok: false; error: string }
+
+export async function manualOptIn(
+  formData: FormData,
+): Promise<ManualOptInResult> {
+  try {
+    const admin = await getAdminClient()
+    const username = normalizeUsername(String(formData.get('username') ?? ''))
+    if (!username) {
+      return { ok: false, error: 'Username is required' }
+    }
+
+    const accountId = await lookupAccountIdByUsername(admin, username)
+
+    const update = {
+      username,
+      twitter_user_id: accountId,
+      opted_in: true,
+      explicit_optout: false,
+      opt_out_reason: null,
+    }
+
+    const existingResponse = await admin
+      .from('optin')
+      .select('id')
+      .eq('username', username)
+      .maybeSingle()
+    if (existingResponse.error) {
+      return { ok: false, error: existingResponse.error.message }
+    }
+
+    const recordId = existingResponse.data?.id
+    const response = recordId
+      ? await admin.from('optin').update(update).eq('id', recordId)
+      : await admin.from('optin').insert({ ...update, user_id: null })
+    if (response.error) {
+      return { ok: false, error: response.error.message }
+    }
+
+    if (accountId) {
+      await deleteScrapeBlock(admin, accountId)
+    }
+
+    revalidatePath('/admin')
+    return {
+      ok: true,
+      message: accountId
+        ? `Opted in @${username} (account ${accountId})`
+        : `Opted in @${username} (no matching account found, stored without twitter id)`,
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : 'Failed to opt in',
+    }
   }
-
-  const accountId = await lookupAccountIdByUsername(admin, username)
-
-  const update = {
-    username,
-    twitter_user_id: accountId,
-    opted_in: true,
-    explicit_optout: false,
-    opt_out_reason: null,
-  }
-
-  const existingResponse = await admin
-    .from('optin')
-    .select('id')
-    .eq('username', username)
-    .maybeSingle()
-  if (existingResponse.error) throw existingResponse.error
-
-  const recordId = existingResponse.data?.id
-  const response = recordId
-    ? await admin.from('optin').update(update).eq('id', recordId)
-    : await admin.from('optin').insert({ ...update, user_id: null })
-  if (response.error) throw response.error
-
-  if (accountId) {
-    await deleteScrapeBlock(admin, accountId)
-  }
-
-  revalidatePath('/admin')
-  const msg = accountId
-    ? `Opted in @${username} (account ${accountId})`
-    : `Opted in @${username} (no matching account found, stored without twitter id)`
-  redirect(`/admin?flash=ok&msg=${encodeURIComponent(msg)}`)
 }
 
 export async function adminSetOptInState(formData: FormData) {

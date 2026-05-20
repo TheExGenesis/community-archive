@@ -1,5 +1,4 @@
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -7,9 +6,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { AdminTable } from './AdminTable'
-import { manualOptIn } from './actions'
+import { ManualOptInForm } from './ManualOptInForm'
 import {
   ADMIN_USERNAME,
   getTwitterUsername,
@@ -20,26 +18,13 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type Flash = { tone: 'ok' | 'error'; msg: string } | null
-
-const parseFlash = (
-  flash: string | undefined,
-  msg: string | undefined,
-): Flash => {
-  if (flash !== 'ok' && flash !== 'error') return null
-  const text = typeof msg === 'string' ? msg.trim() : ''
-  if (!text) return null
-  return { tone: flash, msg: text }
-}
-
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams?: { q?: string; flash?: string; msg?: string }
+  searchParams?: { q?: string }
 }) {
   const { user } = await requireAdmin()
   const search = normalizeUsername(searchParams?.q)
-  const flash = parseFlash(searchParams?.flash, searchParams?.msg)
   const data = await loadInitialAccounts(search)
   const twitterUsername = getTwitterUsername(user)
 
@@ -63,17 +48,6 @@ export default async function AdminPage({
             </div>
             <Badge variant="secondary">@{twitterUsername}</Badge>
           </div>
-          {flash ? (
-            <div
-              className={
-                flash.tone === 'ok'
-                  ? 'rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-950 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-100'
-                  : 'rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-950 dark:border-red-700 dark:bg-red-950/30 dark:text-red-100'
-              }
-            >
-              {flash.msg}
-            </div>
-          ) : null}
           {data.warning ? (
             <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-950 dark:border-red-700 dark:bg-red-950/30 dark:text-red-100">
               {data.warning}
@@ -92,13 +66,7 @@ export default async function AdminPage({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form
-              className="grid gap-3 sm:grid-cols-[1fr_auto]"
-              action={manualOptIn}
-            >
-              <Input name="username" placeholder="username" required />
-              <Button type="submit">Opt in</Button>
-            </form>
+            <ManualOptInForm />
           </CardContent>
         </Card>
 

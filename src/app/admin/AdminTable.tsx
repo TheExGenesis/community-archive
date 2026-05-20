@@ -17,7 +17,6 @@ import {
   adminSetOptInState,
   loadMoreAccountsAction,
   searchAccountsAction,
-  setScrapeBlock,
 } from './actions'
 import type { AccountsCursor, MergedRow, OptInRecord } from './data'
 
@@ -45,22 +44,24 @@ function buildAdminActions(args: {
   username: string
   twitterUserId: string
   optInRecord: OptInRecord | null
-  blockedFromScraping: boolean
 }): AdminMenuAction[] {
-  const { username, twitterUserId, optInRecord, blockedFromScraping } = args
+  const { username, twitterUserId, optInRecord } = args
   const commonInputs = [
     { name: 'id', value: optInRecord?.id ?? '' },
     { name: 'username', value: username },
     { name: 'twitter_user_id', value: twitterUserId },
   ]
 
+  // Opt out already adds the account to the scrape blocklist, and opt in
+  // already removes it. There's no standalone block/unblock-scraping action —
+  // it folds into the opt-in/opt-out lifecycle.
   return [
     {
       id: 'opt-in',
       label: 'Opt in',
       title: `Opt in @${username}?`,
       description:
-        'This will create or update a public.optin row and clear any explicit opt-out state.',
+        'Mark the account as opted in for archive collection and remove any scrape blocklist entry.',
       action: adminSetOptInState,
       hiddenInputs: [...commonInputs, { name: 'state', value: 'opted-in' }],
       consequences: [
@@ -69,27 +70,11 @@ function buildAdminActions(args: {
       ],
     },
     {
-      id: blockedFromScraping ? 'unblock-scraping' : 'block-scraping',
-      label: blockedFromScraping ? 'Unblock scraping' : 'Block scraping',
-      title: blockedFromScraping
-        ? `Unblock scraping for @${username}?`
-        : `Block scraping for @${username}?`,
-      description: blockedFromScraping
-        ? 'This will remove the account id from the scrape blocklist without changing opt-in state.'
-        : 'This will add the account id to the scrape blocklist without changing opt-in state.',
-      action: setScrapeBlock,
-      hiddenInputs: [
-        { name: 'account_id', value: twitterUserId },
-        { name: 'blocked', value: blockedFromScraping ? 'false' : 'true' },
-      ],
-      disabled: !twitterUserId,
-    },
-    {
       id: 'clear',
       label: 'Clear opt-in state',
       title: `Clear opt-in state for @${username}?`,
       description:
-        'This keeps the row but marks it neutral: not opted in and not explicitly opted out.',
+        'Mark the row neutral: not opted in and not explicitly opted out.',
       action: adminSetOptInState,
       hiddenInputs: [...commonInputs, { name: 'state', value: 'neutral' }],
       consequences: [
@@ -102,7 +87,7 @@ function buildAdminActions(args: {
       label: 'Opt out',
       title: `Opt out @${username}?`,
       description:
-        'This will add the account to the explicit opt-out list and block future scraping.',
+        'Add the account to the explicit opt-out list and block future scraping.',
       action: adminOptOutAccount,
       hiddenInputs: [
         ...commonInputs,
@@ -124,7 +109,7 @@ function buildAdminActions(args: {
       label: 'Opt out and delete data',
       title: `Opt out and delete @${username}?`,
       description:
-        'This will opt the account out and permanently delete their existing Community Archive data.',
+        'Opt the account out and permanently delete their existing Community Archive data.',
       action: adminOptOutAccount,
       hiddenInputs: [
         ...commonInputs,
@@ -208,6 +193,22 @@ export function AdminTable({
   }, [rows])
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+
+  // Re-fetches the first page for the currently active search. Called after
+  // any row action so the table reflects the mutation. We don't rely on
+  // revalidatePath -> new initialRows because this component owns its row
+  // state and ignores prop changes.
+  const refresh = useCallback(async () => {
+    setError(null)
+    try {
+      const page = await searchAccountsAction(activeSearch)
+      setRows(page.rows)
+      setCursor(page.nextCursor)
+      setOptInCount(page.optInCount)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Refresh failed')
+    }
+  }, [activeSearch])
 
   const loadMore = useCallback(async () => {
     if (!cursor || loadingMore) return
@@ -327,8 +328,8 @@ export function AdminTable({
                       username: row.username,
                       twitterUserId: accountId,
                       optInRecord: row.optInRecord,
-                      blockedFromScraping: row.blockedFromScraping,
                     })}
+                    onActionComplete={refresh}
                   />
                 </TableCell>
               </TableRow>

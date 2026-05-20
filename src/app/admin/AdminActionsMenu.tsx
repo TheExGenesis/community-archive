@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useTransition } from 'react'
 import { AlertCircle, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -40,10 +40,16 @@ export type AdminMenuAction = {
 
 type AdminActionsMenuProps = {
   actions: AdminMenuAction[]
+  onActionComplete?: () => void | Promise<void>
 }
 
-export function AdminActionsMenu({ actions }: AdminActionsMenuProps) {
+export function AdminActionsMenu({
+  actions,
+  onActionComplete,
+}: AdminActionsMenuProps) {
   const [selected, setSelected] = useState<AdminMenuAction | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
   const open = selected !== null
 
   return (
@@ -102,7 +108,30 @@ export function AdminActionsMenu({ actions }: AdminActionsMenuProps) {
                 This action is irreversible.
               </p>
             ) : null}
-            <form action={selected.action}>
+            {/* Client-side wrapper so we can: (a) await the server action,
+                (b) surface errors inline instead of throwing into the route
+                error boundary, (c) refresh the table after success.
+                The server action's revalidatePath alone re-fetches the RSC
+                payload, but AdminTable owns its row state and ignores fresh
+                props — so without an explicit refresh, the user sees the
+                dialog close and nothing else. */}
+            <form
+              action={(formData) => {
+                const action = selected.action
+                startTransition(async () => {
+                  setError(null)
+                  try {
+                    await action(formData)
+                    setSelected(null)
+                    if (onActionComplete) await onActionComplete()
+                  } catch (e) {
+                    setError(
+                      e instanceof Error ? e.message : 'Action failed',
+                    )
+                  }
+                })
+              }}
+            >
               {selected.hiddenInputs.map((input) => (
                 <input
                   key={input.name}
@@ -111,19 +140,26 @@ export function AdminActionsMenu({ actions }: AdminActionsMenuProps) {
                   value={input.value}
                 />
               ))}
+              {error ? (
+                <p className="mt-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-950 dark:border-red-700 dark:bg-red-950/30 dark:text-red-100">
+                  {error}
+                </p>
+              ) : null}
               <DialogFooter className="mt-4 gap-2 sm:gap-0">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setSelected(null)}
+                  disabled={isPending}
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   variant={selected.destructive ? 'destructive' : 'default'}
+                  disabled={isPending}
                 >
-                  {selected.label}
+                  {isPending ? 'Working…' : selected.label}
                 </Button>
               </DialogFooter>
             </form>

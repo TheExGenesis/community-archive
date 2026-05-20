@@ -110,12 +110,38 @@ export default function ProfileContent({
         setExplicitOptOut(false)
         setSuccess(checked ? 'Successfully opted in to tweet streaming' : 'Successfully opted out from tweet streaming')
 
+        await logUserAction(checked ? 'opt_in' : 'opt_out_streaming')
+
         router.refresh()
       } catch (err: any) {
         setError(err.message || 'Failed to update opt-in status')
         setOptInStatus(!checked) // Revert on error
       }
     })
+  }
+
+  // Best-effort append to the user action log. Never throws — logging failures
+  // shouldn't break the user-facing action.
+  // The `as any` cast on `from` is because database-types.ts is generated from the
+  // live remote schema, which won't include user_action_log until `pnpm dev:gen-types`
+  // is rerun (requires a valid SUPABASE_ACCESS_TOKEN). Drop the cast then.
+  const logUserAction = async (
+    action_type: string,
+    metadata?: Record<string, unknown>,
+  ) => {
+    try {
+      const { error: logError } = await (supabase as any)
+        .from('user_action_log')
+        .insert({
+          account_id: userMetadata?.provider_id ?? null,
+          user_id: user.id,
+          action_type,
+          metadata: metadata ?? null,
+        })
+      if (logError) console.warn('user_action_log insert failed:', logError)
+    } catch (err) {
+      console.warn('user_action_log insert threw:', err)
+    }
   }
 
   // Persists the explicit_optout flag on the optin table. Used by both the immediate
@@ -185,9 +211,29 @@ export default function ProfileContent({
         await persistOptOut(false)
         setExplicitOptOut(false)
         setSuccess('Removed from explicit opt-out list')
+        await logUserAction('opt_out_removed')
         router.refresh()
       } catch (err: any) {
         setError(err.message || 'Failed to update opt-out status')
+      }
+    })
+  }
+
+  // Confirmed from the opt-out modal: only add to the opt-out list, no delete.
+  const confirmOptOutOnly = () => {
+    setError(null)
+    setSuccess(null)
+    startTransition(async () => {
+      try {
+        await persistOptOut(true)
+        setExplicitOptOut(true)
+        setOptInStatus(false)
+        setShowOptOutDialog(false)
+        setSuccess('Added to explicit opt-out list')
+        await logUserAction('opt_out_only')
+        router.refresh()
+      } catch (err: any) {
+        setError(err.message || 'Failed to opt out')
       }
     })
   }
@@ -212,6 +258,7 @@ export default function ProfileContent({
       setOptInStatus(false)
       setShowOptOutDialog(false)
       setSuccess('Data deleted and added to explicit opt-out list')
+      await logUserAction('opt_out_and_delete')
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Failed to opt out and delete data')
@@ -257,6 +304,7 @@ export default function ProfileContent({
       await deleteSingleArchive(supabase, userMetadata.provider_id, archiveId)
 
       setSuccess('Archive deleted successfully')
+      await logUserAction('delete_archive', { archive_upload_id: archiveId })
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Failed to delete archive')
@@ -281,6 +329,7 @@ export default function ProfileContent({
 
       setShowDeleteAllDialog(false)
       setSuccess('All data deleted successfully')
+      await logUserAction('delete_all_archives')
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Failed to delete data')
@@ -479,74 +528,85 @@ export default function ProfileContent({
                 </p>
               </div>
 
-              <Dialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Delete All Your Data</DialogTitle>
-                    <DialogDescription>
-                      This will permanently delete <strong>all</strong> of your data from the Community Archive:
-                    </DialogDescription>
-                  </DialogHeader>
-                  <ul className="list-disc pl-6 text-sm text-muted-foreground space-y-1">
-                    <li>All uploaded archives</li>
-                    <li>All tweets, likes, followers, and following data</li>
-                    <li>Profile information</li>
-                    <li>Data added by the scraper or browser extension</li>
-                  </ul>
-                  <p className="text-sm font-medium text-destructive">
-                    This action is irreversible.
-                  </p>
-                  <DialogFooter className="gap-2 sm:gap-0">
-                    <Button variant="outline" onClick={() => setShowDeleteAllDialog(false)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={handleDeleteAllArchives}
-                      disabled={deletingArchive === 'all'}
-                    >
-                      {deletingArchive === 'all' ? 'Deleting...' : 'Delete Everything'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <Dialog open={showOptOutDialog} onOpenChange={setShowOptOutDialog}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Explicit Opt-Out</DialogTitle>
-                    <DialogDescription>
-                      Opting out will permanently delete <strong>all</strong> of your data from the Community Archive and add you to the opt-out list so future collection (including scraper/extension data) is prevented:
-                    </DialogDescription>
-                  </DialogHeader>
-                  <ul className="list-disc pl-6 text-sm text-muted-foreground space-y-1">
-                    <li>All uploaded archives</li>
-                    <li>All tweets, likes, followers, and following data</li>
-                    <li>Profile information</li>
-                    <li>Data added by the scraper or browser extension</li>
-                    <li>Your account will be added to the explicit opt-out list</li>
-                  </ul>
-                  <p className="text-sm font-medium text-destructive">
-                    This action is irreversible. You can later remove yourself from the opt-out list, but the deleted data will not return.
-                  </p>
-                  <DialogFooter className="gap-2 sm:gap-0">
-                    <Button variant="outline" onClick={() => setShowOptOutDialog(false)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={confirmOptOutAndDelete}
-                      disabled={deletingArchive === 'all'}
-                    >
-                      {deletingArchive === 'all' ? 'Opting out...' : 'Opt out and delete everything'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Dialogs live outside <Tabs> so the Opt-Out switch on the Privacy tab and the
+          Delete All button on the Archives tab can both open them regardless of which
+          TabsContent is currently mounted (Radix tabs lazy-mount their children). */}
+      <Dialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete All Your Data</DialogTitle>
+            <DialogDescription>
+              This will permanently delete <strong>all</strong> of your data from the Community Archive:
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="list-disc pl-6 text-sm text-muted-foreground space-y-1">
+            <li>All uploaded archives</li>
+            <li>All tweets, likes, followers, and following data</li>
+            <li>Profile information</li>
+            <li>Data added by the scraper or browser extension</li>
+          </ul>
+          <p className="text-sm font-medium text-destructive">
+            This action is irreversible.
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowDeleteAllDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAllArchives}
+              disabled={deletingArchive === 'all'}
+            >
+              {deletingArchive === 'all' ? 'Deleting...' : 'Delete Everything'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showOptOutDialog} onOpenChange={setShowOptOutDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Explicit Opt-Out</DialogTitle>
+            <DialogDescription>
+              Opting out adds you to the explicit opt-out list so future collection (including scraper/extension data) is prevented. You can choose whether to also delete the data already on file.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <div>
+              <p className="font-medium text-foreground">Opt out only</p>
+              <p>Add you to the opt-out list. Existing archives, tweets, and profile data stay where they are.</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Opt out and delete everything</p>
+              <p>Also permanently delete all your archives, tweets, likes, followers/following, profile, and any scraper/extension data. This part is irreversible.</p>
+            </div>
+          </div>
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setShowOptOutDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={confirmOptOutOnly}
+              disabled={isPending || deletingArchive === 'all'}
+            >
+              {isPending ? 'Opting out...' : 'Opt out only'}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmOptOutAndDelete}
+              disabled={deletingArchive === 'all'}
+            >
+              {deletingArchive === 'all' ? 'Deleting...' : 'Opt out and delete everything'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {error && (
         <Alert variant="destructive">

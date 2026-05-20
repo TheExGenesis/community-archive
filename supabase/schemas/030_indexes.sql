@@ -75,3 +75,11 @@ CREATE INDEX IF NOT EXISTS idx_quote_tweets_quoted_tweet_id ON public.quote_twee
 
 CREATE INDEX IF NOT EXISTS idx_retweets_tweet_id ON public.retweets (tweet_id);
 CREATE INDEX IF NOT EXISTS idx_retweets_retweeted_tweet_id ON public.retweets (retweeted_tweet_id);
+
+-- public.user_action_log
+CREATE INDEX IF NOT EXISTS user_action_log_account_id_created_at_idx
+  ON public.user_action_log (account_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS user_action_log_user_id_created_at_idx
+  ON public.user_action_log (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS user_action_log_action_type_created_at_idx
+  ON public.user_action_log (action_type, created_at DESC);

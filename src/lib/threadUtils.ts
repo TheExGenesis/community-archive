@@ -27,12 +27,19 @@ export interface ThreadTweet {
     username: string
     account_display_name: string
     media?: any[]
-    // True when the quoted tweet was deleted; other fields are placeholder defaults.
+    // True when the quoted tweet isn't in our archive AND syndication didn't find it
+    // either — renderer shows a tombstone.
     is_deleted?: boolean
+    // True when the quoted tweet content was hydrated from Twitter's public
+    // syndication endpoint rather than our DB. Renderer marks it as "not in archive".
+    from_external?: boolean
   } | null
-  // True when this node is a synthesized placeholder for a tweet that has been deleted
-  // but is still referenced by a surviving reply.
+  // True when this node was synthesized for a tweet that's missing from our archive
+  // AND Twitter syndication also couldn't supply it. Renderer shows a tombstone.
   is_deleted_placeholder?: boolean
+  // True when this tweet was hydrated at render time from Twitter's syndication
+  // endpoint, not from our DB. Renderer marks it as "not in archive".
+  from_external?: boolean
 }
 
 export interface ConversationTree {

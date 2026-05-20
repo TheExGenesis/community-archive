@@ -42,17 +42,22 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
     return (
       <div key={tweetId} className={`thread-tweet-container ${depth > 0 ? 'ml-8 pl-4 border-l-2 border-gray-200 dark:border-gray-700' : ''}`}>
         {tweet.is_deleted_placeholder ? (
-          // Tombstone for a tweet that was deleted but is still referenced as the
-          // parent of one or more surviving replies. We don't have author / timestamp /
-          // text since the source row is gone.
+          // Tombstone — deleted from the archive AND syndication couldn't find it.
           <div className="border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 text-gray-500 dark:text-gray-400 italic p-4 rounded-lg mb-4 text-sm">
             [Tweet deleted]
           </div>
         ) : (
           <div className={`
-            ${isHighlighted ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' : 'bg-background dark:bg-secondary'}
-            p-4 rounded-lg mb-4
+            ${isHighlighted ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' : tweet.from_external ? 'bg-amber-50/60 dark:bg-amber-900/10 border border-dashed border-amber-300 dark:border-amber-700' : 'bg-background dark:bg-secondary'}
+            p-4 rounded-lg mb-4 relative
           `}>
+            {tweet.from_external && (
+              // Hydrated at render time from Twitter syndication — not stored in our
+              // archive, not returned in search.
+              <span className="absolute right-3 top-3 text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded">
+                from Twitter · not archived
+              </span>
+            )}
             <TweetComponent tweet={convertToTweetData(tweet)} />
           </div>
         )}

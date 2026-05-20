@@ -47,8 +47,12 @@ export interface TweetData {
     username: string
     account_display_name: string
     media?: TweetMedia[]
-    // True when the quoted tweet was deleted; renderer shows a tombstone.
+    // True when the quoted tweet is missing from our archive AND wasn't recoverable
+    // via Twitter syndication; renderer shows a tombstone.
     is_deleted?: boolean
+    // True when the quoted tweet was hydrated at render time from Twitter's public
+    // syndication endpoint (not from our DB); renderer marks it as not archived.
+    from_external?: boolean
   }
   // Support both interface styles for compatibility
   account?: { 
@@ -226,9 +230,19 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
       )
     }
     const quotedProfilePic = quotedTweet.avatar_media_url || '/placeholder.jpg'
+    // Border + marker for syndication-hydrated quotes so it's clear the data isn't
+    // from this archive.
+    const externalClasses = quotedTweet.from_external
+      ? 'border-dashed border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-900/10'
+      : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-card'
     
     return (
-      <div className="mt-3 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-card">
+      <div className={`mt-3 border rounded-lg p-3 relative ${externalClasses}`}>
+        {quotedTweet.from_external && (
+          <span className="absolute right-2 top-2 text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded">
+            from Twitter · not archived
+          </span>
+        )}
         <div className="flex items-start space-x-3">
           <Avatar className="h-8 w-8 flex-shrink-0">
             <AvatarImage

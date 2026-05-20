@@ -124,22 +124,17 @@ export default function ProfileContent({
 
   // Best-effort append to the user action log. Never throws — logging failures
   // shouldn't break the user-facing action.
-  // The `as any` cast on `from` is because database-types.ts is generated from the
-  // live remote schema, which won't include user_action_log until `pnpm dev:gen-types`
-  // is rerun (requires a valid SUPABASE_ACCESS_TOKEN). Drop the cast then.
   const logUserAction = async (
     action_type: string,
     metadata?: Record<string, unknown>,
   ) => {
     try {
-      const { error: logError } = await (supabase as any)
-        .from('user_action_log')
-        .insert({
-          account_id: userMetadata?.provider_id ?? null,
-          user_id: user.id,
-          action_type,
-          metadata: metadata ?? null,
-        })
+      const { error: logError } = await supabase.from('user_action_log').insert({
+        account_id: userMetadata?.provider_id ?? null,
+        user_id: user.id,
+        action_type,
+        metadata: metadata ?? null,
+      })
       if (logError) console.warn('user_action_log insert failed:', logError)
     } catch (err) {
       console.warn('user_action_log insert threw:', err)

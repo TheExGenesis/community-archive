@@ -28,6 +28,25 @@ VALUES
   ('mock_quoted', 'web', 'quoteduser',  '2017-05-01T00:00:00Z', 'Quoted User',     1, 0, 0, 0),
   ('mock_xiq',    'web', 'xiq_dev',     '2018-08-20T09:00:00Z', 'XIQ Dev',         3, 2, 3, 1);
 
+-- Most mock accounts are opted in so staging/admin flows have realistic rows.
+INSERT INTO "public"."optin" ("username", "twitter_user_id", "opted_in", "explicit_optout", "opt_out_reason", "terms_version", "created_at", "updated_at", "opted_in_at", "opted_out_at")
+VALUES
+  ('alice_dev',   'mock_alice', true, false, NULL, 'v1.0', '2024-12-02T08:00:00Z', '2024-12-02T08:00:00Z', '2024-12-02T08:00:00Z', NULL),
+  ('bob_writes',  'mock_bob',   true, false, NULL, 'v1.0', '2024-12-02T08:05:00Z', '2024-12-02T08:05:00Z', '2024-12-02T08:05:00Z', NULL),
+  ('carol_ml',    'mock_carol', true, false, NULL, 'v1.0', '2024-12-02T08:10:00Z', '2024-12-02T08:10:00Z', '2024-12-02T08:10:00Z', NULL),
+  ('dave_design', 'mock_dave',  true, false, NULL, 'v1.0', '2024-12-02T08:15:00Z', '2024-12-02T08:15:00Z', '2024-12-02T08:15:00Z', NULL),
+  ('eve_data',    'mock_eve',   true, false, NULL, 'v1.0', '2024-12-02T08:20:00Z', '2024-12-02T08:20:00Z', '2024-12-02T08:20:00Z', NULL),
+  ('xiq_dev',     'mock_xiq',   true, false, NULL, 'v1.0', '2024-12-02T08:25:00Z', '2024-12-02T08:25:00Z', '2024-12-02T08:25:00Z', NULL)
+ON CONFLICT ("username") DO UPDATE SET
+  "twitter_user_id" = EXCLUDED."twitter_user_id",
+  "opted_in" = EXCLUDED."opted_in",
+  "explicit_optout" = EXCLUDED."explicit_optout",
+  "opt_out_reason" = EXCLUDED."opt_out_reason",
+  "terms_version" = EXCLUDED."terms_version",
+  "updated_at" = EXCLUDED."updated_at",
+  "opted_in_at" = EXCLUDED."opted_in_at",
+  "opted_out_at" = EXCLUDED."opted_out_at";
+
 -- Archive uploads (must be 'completed' for account/profile views to work)
 INSERT INTO "public"."archive_upload" ("id", "account_id", "archive_at", "created_at", "upload_phase") OVERRIDING SYSTEM VALUE
 VALUES

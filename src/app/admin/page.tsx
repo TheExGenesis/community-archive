@@ -21,7 +21,7 @@ import type { User } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
-import { AdminConfirmAction } from './AdminConfirmAction'
+import { AdminActionsMenu, type AdminMenuAction } from './AdminActionsMenu'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,8 +57,13 @@ type AccountAdminRow = AccountRecord & {
   optInRecord: OptInRecord | null
 }
 
+type OptInAdminRow = OptInRecord & {
+  account: AccountRecord | null
+  blockedFromScraping: boolean
+}
+
 type AdminData = {
-  optInRows: Array<OptInRecord & { account: AccountRecord | null }>
+  optInRows: OptInAdminRow[]
   accountRows: AccountAdminRow[]
   warnings: string[]
 }
@@ -323,13 +328,11 @@ async function fetchAdminData(search: string): Promise<AdminData> {
   const [
     optInMatches,
     uploadCounts,
-    scrapeBlocklist,
     accountsByIdResponse,
     accountsByUsernameResponse,
   ] = await Promise.all([
     fetchOptInMatches(admin, accountRows),
     fetchArchiveUploadCounts(admin, accountIds),
-    fetchScrapeBlocklist(admin, accountIds),
     optInAccountIds.length
       ? admin
           .from('all_account')
@@ -348,10 +351,6 @@ async function fetchAdminData(search: string): Promise<AdminData> {
       : Promise.resolve({ data: [], error: null }),
   ])
 
-  if (scrapeBlocklist.warning) {
-    warnings.push(scrapeBlocklist.warning)
-  }
-
   if (accountsByIdResponse.error) {
     throw accountsByIdResponse.error
   }
@@ -367,6 +366,20 @@ async function fetchAdminData(search: string): Promise<AdminData> {
     ],
     (account) => account.account_id,
   )
+  const adminAccountIds = uniqueBy(
+    [
+      ...accountIds,
+      ...optInAccountIds,
+      ...accountsForOptIns.map((account) => account.account_id),
+    ].filter(Boolean),
+    (accountId) => accountId,
+  )
+  const scrapeBlocklist = await fetchScrapeBlocklist(admin, adminAccountIds)
+
+  if (scrapeBlocklist.warning) {
+    warnings.push(scrapeBlocklist.warning)
+  }
+
   const accountsById = new Map(
     accountsForOptIns.map((account) => [account.account_id, account]),
   )
@@ -387,15 +400,21 @@ async function fetchAdminData(search: string): Promise<AdminData> {
   )
 
   return {
-    optInRows: optInRecords.map((record) => ({
-      ...record,
-      account:
+    optInRows: optInRecords.map((record) => {
+      const account =
         (record.twitter_user_id
           ? accountsById.get(record.twitter_user_id)
           : null) ??
         accountsByUsername.get(record.username.toLowerCase()) ??
-        null,
-    })),
+        null
+      const accountId = record.twitter_user_id ?? account?.account_id ?? ''
+
+      return {
+        ...record,
+        account,
+        blockedFromScraping: scrapeBlocklist.blockedAccountIds.has(accountId),
+      }
+    }),
     accountRows: accountRows.map((account) => ({
       ...account,
       archiveUploadCount: uploadCounts.get(account.account_id) ?? 0,
@@ -411,48 +430,23 @@ async function fetchAdminData(search: string): Promise<AdminData> {
   }
 }
 
-async function setOptInRecord(formData: FormData) {
-  'use server'
-
-  const admin = await getAdminClient()
-  const id = String(formData.get('id') ?? '')
-  const twitterUserId = String(formData.get('twitter_user_id') ?? '')
-  const state = String(formData.get('state') ?? '')
-  const reason = String(formData.get('reason') ?? '').trim()
-
-  if (!id) {
-    throw new Error('Missing opt-in record id')
+async function deleteScrapeBlock(
+  admin: Awaited<ReturnType<typeof getAdminClient>>,
+  accountId: string,
+) {
+  if (!accountId) {
+    return
   }
 
-  const update =
-    state === 'opted-in'
-      ? {
-          opted_in: true,
-          explicit_optout: false,
-          opt_out_reason: null,
-          twitter_user_id: twitterUserId || null,
-        }
-      : state === 'opted-out'
-        ? {
-            opted_in: false,
-            explicit_optout: true,
-            opt_out_reason: reason || 'Admin manual opt-out',
-            twitter_user_id: twitterUserId || null,
-          }
-        : {
-            opted_in: false,
-            explicit_optout: false,
-            opt_out_reason: null,
-            twitter_user_id: twitterUserId || null,
-          }
-
-  const { error } = await admin.from('optin').update(update).eq('id', id)
+  const tesClient = admin.schema('tes' as never) as any
+  const { error } = await tesClient
+    .from('blocked_scraping_users')
+    .delete()
+    .eq('account_id', accountId)
 
   if (error) {
     throw error
   }
-
-  revalidatePath('/admin')
 }
 
 async function upsertScrapeBlock(
@@ -526,15 +520,13 @@ async function adminOptOutAccount(formData: FormData) {
 
   const optOutResponse = id
     ? await admin.from('optin').update(optOutUpdate).eq('id', id)
-    : await admin
-        .from('optin')
-        .upsert(
-          {
-            ...optOutUpdate,
-            user_id: null,
-          },
-          { onConflict: 'username' },
-        )
+    : await admin.from('optin').upsert(
+        {
+          ...optOutUpdate,
+          user_id: null,
+        },
+        { onConflict: 'username' },
+      )
 
   if (optOutResponse.error) {
     throw optOutResponse.error
@@ -554,6 +546,73 @@ async function adminOptOutAccount(formData: FormData) {
     }
 
     await deleteStorageFiles(admin, username)
+  }
+
+  revalidatePath('/admin')
+}
+
+async function adminSetOptInState(formData: FormData) {
+  'use server'
+
+  const admin = await getAdminClient()
+  const id = String(formData.get('id') ?? '')
+  const username = normalizeSearch(String(formData.get('username') ?? ''))
+  const twitterUserId = String(formData.get('twitter_user_id') ?? '')
+  const state = String(formData.get('state') ?? '')
+
+  if (!username) {
+    throw new Error('Missing username')
+  }
+
+  const update =
+    state === 'opted-in'
+      ? {
+          username,
+          twitter_user_id: twitterUserId || null,
+          opted_in: true,
+          explicit_optout: false,
+          opt_out_reason: null,
+        }
+      : state === 'neutral'
+        ? {
+            username,
+            twitter_user_id: twitterUserId || null,
+            opted_in: false,
+            explicit_optout: false,
+            opt_out_reason: null,
+          }
+        : null
+
+  if (!update) {
+    throw new Error('Unsupported opt-in state')
+  }
+
+  const existingResponse = id
+    ? null
+    : await admin
+        .from('optin')
+        .select('id')
+        .eq('username', username)
+        .maybeSingle()
+
+  if (existingResponse?.error) {
+    throw existingResponse.error
+  }
+
+  const recordId = id || existingResponse?.data?.id
+  const response = recordId
+    ? await admin.from('optin').update(update).eq('id', recordId)
+    : await admin.from('optin').insert({
+        ...update,
+        user_id: null,
+      })
+
+  if (response.error) {
+    throw response.error
+  }
+
+  if (state === 'opted-in') {
+    await deleteScrapeBlock(admin, twitterUserId)
   }
 
   revalidatePath('/admin')
@@ -603,148 +662,136 @@ function OptInStatusBadge({ record }: { record: OptInRecord | null }) {
   return <Badge variant="secondary">Not opted in</Badge>
 }
 
-function OptInActions({
-  record,
-  accountId,
+function buildAdminActions({
+  username,
+  twitterUserId,
+  optInRecord,
+  blockedFromScraping,
 }: {
-  record: OptInRecord
-  accountId?: string
-}) {
-  const twitterUserId = accountId ?? record.twitter_user_id ?? ''
+  username: string
+  twitterUserId: string
+  optInRecord: OptInRecord | null
+  blockedFromScraping: boolean
+}): AdminMenuAction[] {
+  const commonInputs = [
+    { name: 'id', value: optInRecord?.id ?? '' },
+    { name: 'username', value: username },
+    { name: 'twitter_user_id', value: twitterUserId },
+  ]
 
-  return (
-    <div className="min-w-72 space-y-2">
-      <form action={setOptInRecord} className="flex flex-col gap-2">
-        <input type="hidden" name="id" value={record.id} />
-        <input type="hidden" name="twitter_user_id" value={twitterUserId} />
-        <Input
-          name="reason"
-          placeholder="Opt-out reason"
-          defaultValue={record.opt_out_reason ?? ''}
-          className="h-8"
-        />
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" name="state" value="opted-in">
-            Opt in
-          </Button>
-          <Button size="sm" variant="outline" name="state" value="neutral">
-            Clear
-          </Button>
-        </div>
-      </form>
-      <div className="flex flex-wrap gap-2">
-        <AdminConfirmAction
-          action={adminOptOutAccount}
-          buttonLabel="Opt out"
-          confirmLabel="Opt out"
-          title={`Opt out @${record.username}?`}
-          description="This will add the account to the explicit opt-out list and block future scraping."
-          hiddenInputs={[
-            { name: 'id', value: record.id },
-            { name: 'username', value: record.username },
-            { name: 'twitter_user_id', value: twitterUserId },
-            {
-              name: 'reason',
-              value: record.opt_out_reason ?? 'Admin manual opt-out',
-            },
-            { name: 'delete_data', value: 'false' },
-          ]}
-          consequences={[
-            'Their opt-in row will be marked explicitly opted out.',
-            'Their account id will be added to the scrape blocklist when available.',
-            'Existing archive data will stay in place.',
-          ]}
-          irreversible={false}
-        />
-        <AdminConfirmAction
-          action={adminOptOutAccount}
-          buttonLabel="Opt out + delete"
-          confirmLabel="Opt out and delete data"
-          title={`Opt out and delete @${record.username}?`}
-          description="This will opt the account out and permanently delete their existing Community Archive data."
-          disabled={!twitterUserId}
-          hiddenInputs={[
-            { name: 'id', value: record.id },
-            { name: 'username', value: record.username },
-            { name: 'twitter_user_id', value: twitterUserId },
-            {
-              name: 'reason',
-              value: record.opt_out_reason ?? 'Admin manual opt-out',
-            },
-            { name: 'delete_data', value: 'true' },
-          ]}
-          consequences={[
-            'Their opt-in row will be marked explicitly opted out.',
-            'Their account id will be added to the scrape blocklist.',
-            'All archives, tweets, likes, followers/following, profile rows, and scraper/extension rows for the account id will be deleted.',
-            'Archive files under the storage username folder will be removed.',
-          ]}
-        />
-      </div>
-    </div>
-  )
+  return [
+    {
+      id: 'opt-in',
+      label: 'Opt in',
+      title: `Opt in @${username}?`,
+      description:
+        'This will create or update a public.optin row and clear any explicit opt-out state.',
+      action: adminSetOptInState,
+      hiddenInputs: [...commonInputs, { name: 'state', value: 'opted-in' }],
+      consequences: [
+        'The account will be treated as opted in for archive collection.',
+        'Any scrape blocklist entry for this account id will be removed when an id is available.',
+      ],
+    },
+    {
+      id: blockedFromScraping ? 'unblock-scraping' : 'block-scraping',
+      label: blockedFromScraping ? 'Unblock scraping' : 'Block scraping',
+      title: blockedFromScraping
+        ? `Unblock scraping for @${username}?`
+        : `Block scraping for @${username}?`,
+      description: blockedFromScraping
+        ? 'This will remove the account id from the scrape blocklist without changing opt-in state.'
+        : 'This will add the account id to the scrape blocklist without changing opt-in state.',
+      action: setScrapeBlock,
+      hiddenInputs: [
+        { name: 'account_id', value: twitterUserId },
+        { name: 'blocked', value: blockedFromScraping ? 'false' : 'true' },
+      ],
+      disabled: !twitterUserId,
+    },
+    {
+      id: 'clear',
+      label: 'Clear opt-in state',
+      title: `Clear opt-in state for @${username}?`,
+      description:
+        'This keeps the row but marks it neutral: not opted in and not explicitly opted out.',
+      action: adminSetOptInState,
+      hiddenInputs: [...commonInputs, { name: 'state', value: 'neutral' }],
+      consequences: [
+        'The account will no longer be opted in.',
+        'The account will not be on the explicit opt-out list.',
+      ],
+    },
+    {
+      id: 'opt-out',
+      label: 'Opt out',
+      title: `Opt out @${username}?`,
+      description:
+        'This will add the account to the explicit opt-out list and block future scraping.',
+      action: adminOptOutAccount,
+      hiddenInputs: [
+        ...commonInputs,
+        {
+          name: 'reason',
+          value: optInRecord?.opt_out_reason ?? 'Admin manual opt-out',
+        },
+        { name: 'delete_data', value: 'false' },
+      ],
+      consequences: [
+        'The opt-in row will be marked explicitly opted out.',
+        'The account id will be added to the scrape blocklist when an id is available.',
+        'Existing archive data will stay in place.',
+      ],
+      separatorBefore: true,
+    },
+    {
+      id: 'opt-out-delete',
+      label: 'Opt out and delete data',
+      title: `Opt out and delete @${username}?`,
+      description:
+        'This will opt the account out and permanently delete their existing Community Archive data.',
+      action: adminOptOutAccount,
+      hiddenInputs: [
+        ...commonInputs,
+        {
+          name: 'reason',
+          value: optInRecord?.opt_out_reason ?? 'Admin manual opt-out',
+        },
+        { name: 'delete_data', value: 'true' },
+      ],
+      consequences: [
+        'The opt-in row will be marked explicitly opted out.',
+        'The account id will be added to the scrape blocklist.',
+        'All archives, tweets, likes, followers/following, profile rows, and scraper/extension rows for the account id will be deleted.',
+        'Archive files under the storage username folder will be removed.',
+      ],
+      disabled: !twitterUserId,
+      destructive: true,
+      irreversible: true,
+    },
+  ]
 }
 
-function AdminOptOutAction({ account }: { account: AccountRecord }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      <AdminConfirmAction
-        action={adminOptOutAccount}
-        buttonLabel="Opt out"
-        confirmLabel="Opt out"
-        title={`Opt out @${account.username}?`}
-        description="This will create an admin-managed explicit opt-out row and block future scraping."
-        hiddenInputs={[
-          { name: 'username', value: account.username },
-          { name: 'twitter_user_id', value: account.account_id },
-          { name: 'reason', value: 'Admin manual opt-out' },
-          { name: 'delete_data', value: 'false' },
-        ]}
-        consequences={[
-          'A public.optin row will be created without an auth user.',
-          'The account id will be added to the scrape blocklist.',
-          'Existing archive data will stay in place.',
-        ]}
-        irreversible={false}
-      />
-      <AdminConfirmAction
-        action={adminOptOutAccount}
-        buttonLabel="Opt out + delete"
-        confirmLabel="Opt out and delete data"
-        title={`Opt out and delete @${account.username}?`}
-        description="This will opt the account out and permanently delete their existing Community Archive data."
-        hiddenInputs={[
-          { name: 'username', value: account.username },
-          { name: 'twitter_user_id', value: account.account_id },
-          { name: 'reason', value: 'Admin manual opt-out' },
-          { name: 'delete_data', value: 'true' },
-        ]}
-        consequences={[
-          'A public.optin row will be created without an auth user.',
-          'The account id will be added to the scrape blocklist.',
-          'All archives, tweets, likes, followers/following, profile rows, and scraper/extension rows for the account id will be deleted.',
-          'Archive files under the storage username folder will be removed.',
-        ]}
-      />
-    </div>
-  )
-}
-
-function ScrapeBlockAction({
-  accountId,
-  blocked,
+function RowActions({
+  username,
+  twitterUserId,
+  optInRecord,
+  blockedFromScraping,
 }: {
-  accountId: string
-  blocked: boolean
+  username: string
+  twitterUserId: string
+  optInRecord: OptInRecord | null
+  blockedFromScraping: boolean
 }) {
   return (
-    <form action={setScrapeBlock}>
-      <input type="hidden" name="account_id" value={accountId} />
-      <input type="hidden" name="blocked" value={blocked ? 'false' : 'true'} />
-      <Button size="sm" variant={blocked ? 'outline' : 'destructive'}>
-        {blocked ? 'Unblock scraping' : 'Block scraping'}
-      </Button>
-    </form>
+    <AdminActionsMenu
+      actions={buildAdminActions({
+        username,
+        twitterUserId,
+        optInRecord,
+        blockedFromScraping,
+      })}
+    />
   )
 }
 
@@ -771,9 +818,9 @@ export default async function AdminPage({
                 Community Archive admin dashboard
               </h1>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                Visible only to @{ADMIN_USERNAME}. Reads and mutations use the
-                server-side Supabase service role after the Twitter identity
-                gate passes.
+                Visible only to @{ADMIN_USERNAME}, with staging-only dev access
+                when enabled. Reads and mutations use the server-side Supabase
+                service role after the identity gate passes.
               </p>
             </div>
             <Badge variant="secondary">@{twitterUsername}</Badge>
@@ -809,6 +856,32 @@ export default async function AdminPage({
                   <a href="/admin">Clear</a>
                 </Button>
               ) : null}
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Manual opt-in rows</CardTitle>
+            <CardDescription>
+              Create or update a public.optin row for someone who has not signed
+              in. If they later sign in with the same username, their auth user
+              claims the row.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form
+              className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]"
+              action={adminSetOptInState}
+            >
+              <Input name="username" placeholder="username" required />
+              <Input name="twitter_user_id" placeholder="Twitter account id" />
+              <Button name="state" value="opted-in">
+                Opt in
+              </Button>
+              <Button name="state" value="neutral" variant="outline">
+                Create neutral
+              </Button>
             </form>
           </CardContent>
         </Card>
@@ -864,9 +937,13 @@ export default async function AdminPage({
                       {formatDate(row.updated_at)}
                     </TableCell>
                     <TableCell>
-                      <OptInActions
-                        record={row}
-                        accountId={row.account?.account_id}
+                      <RowActions
+                        username={row.username}
+                        twitterUserId={
+                          row.twitter_user_id ?? row.account?.account_id ?? ''
+                        }
+                        optInRecord={row}
+                        blockedFromScraping={row.blockedFromScraping}
                       />
                     </TableCell>
                   </TableRow>
@@ -939,26 +1016,12 @@ export default async function AdminPage({
                       {formatDate(row.updated_at)}
                     </TableCell>
                     <TableCell>
-                      <div className="min-w-72 flex flex-col gap-3">
-                        <ScrapeBlockAction
-                          accountId={row.account_id}
-                          blocked={row.blockedFromScraping}
-                        />
-                        {row.optInRecord ? (
-                          <OptInActions
-                            record={row.optInRecord}
-                            accountId={row.account_id}
-                          />
-                        ) : (
-                          <p className="max-w-xs text-xs text-muted-foreground">
-                            No auth-linked opt-in row exists for this account.
-                            Admin opt-out will create a username/account-id row.
-                          </p>
-                        )}
-                        {!row.optInRecord ? (
-                          <AdminOptOutAction account={row} />
-                        ) : null}
-                      </div>
+                      <RowActions
+                        username={row.username}
+                        twitterUserId={row.account_id}
+                        optInRecord={row.optInRecord}
+                        blockedFromScraping={row.blockedFromScraping}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

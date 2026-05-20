@@ -47,6 +47,8 @@ export interface TweetData {
     username: string
     account_display_name: string
     media?: TweetMedia[]
+    // True when the quoted tweet was deleted; renderer shows a tombstone.
+    is_deleted?: boolean
   }
   // Support both interface styles for compatibility
   account?: { 
@@ -211,8 +213,18 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
 
   const renderQuotedTweet = () => {
     if (!isQuoteTweet || !tweet.quoted_tweet) return null
-    
+
     const quotedTweet = tweet.quoted_tweet
+    // The fetchers set is_deleted=true when the quote relationship exists but the
+    // target tweet has been deleted. Render a muted tombstone instead of trying to
+    // show an empty card.
+    if (quotedTweet.is_deleted) {
+      return (
+        <div className="mt-3 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-3 bg-gray-50 dark:bg-gray-900/40 text-sm italic text-gray-500 dark:text-gray-400">
+          [Quoted tweet deleted]
+        </div>
+      )
+    }
     const quotedProfilePic = quotedTweet.avatar_media_url || '/placeholder.jpg'
     
     return (

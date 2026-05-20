@@ -177,9 +177,9 @@ VALUES
   (5011, 'mock_frank',  'mock_eve',   106),
   (5012, 'mock_xiq',    'mock_alice', 108),
   (5013, 'mock_alice',  'mock_xiq',   101),
-  -- Orphan following rows
+  -- Orphan following rows (pairs must not collide with the in-archive rows above)
   (5014, 'mock_xiq',    'mock_bob',   NULL),
-  (5015, 'mock_alice',  'mock_carol', NULL);
+  (5015, 'mock_alice',  'mock_eve',   NULL);
 
 SELECT setval(pg_get_serial_sequence('public.following', 'id'), 6000);
 

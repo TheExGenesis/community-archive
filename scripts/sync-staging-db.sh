@@ -87,4 +87,22 @@ else
   echo "supabase/seed.sql not found; skipping seed load."
 fi
 
+# `global_activity_summary` and friends use `pg_class.reltuples` for tweet/like/mention
+# counts (returns -1 until ANALYZE runs) and freeze their data at REFRESH time. Without
+# this, the homepage renders "-1 tweets and -1 liked tweets from 0 accounts".
+echo "Analyzing tables and refreshing materialized views..."
+psql "$STAGING_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+analyze public.all_account;
+analyze public.tweets;
+analyze public.liked_tweets;
+analyze public.user_mentions;
+do $$
+declare r record;
+begin
+  for r in select schemaname, matviewname from pg_matviews where schemaname = 'public' loop
+    execute format('refresh materialized view %I.%I', r.schemaname, r.matviewname);
+  end loop;
+end $$;
+SQL
+
 echo "Staging database is in sync with the current repo schema and mock seed data."

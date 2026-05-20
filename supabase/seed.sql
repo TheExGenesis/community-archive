@@ -19,13 +19,14 @@ SET row_security = off;
 -- Accounts
 INSERT INTO "public"."all_account" ("account_id", "created_via", "username", "created_at", "account_display_name", "num_tweets", "num_following", "num_followers", "num_likes")
 VALUES
-  ('mock_alice',  'web', 'alice_dev',   '2019-03-15T10:00:00Z', 'Alice Developer', 3, 2, 4, 0),
+  ('mock_alice',  'web', 'alice_dev',   '2019-03-15T10:00:00Z', 'Alice Developer', 5, 3, 5, 1),
   ('mock_bob',    'web', 'bob_writes',  '2020-06-01T12:00:00Z', 'Bob Writes',      2, 1, 2, 0),
   ('mock_carol',  'web', 'carol_ml',    '2018-11-20T08:00:00Z', 'Carol ML',        2, 3, 2, 0),
   ('mock_dave',   'web', 'dave_design', '2021-01-10T14:00:00Z', 'Dave Design',     1, 2, 1, 0),
   ('mock_eve',    'web', 'eve_data',    '2020-09-05T16:00:00Z', 'Eve Data',        2, 1, 1, 0),
   ('mock_frank',  'web', 'frank_ops',   '2022-02-14T09:00:00Z', 'Frank Ops',       1, 2, 0, 0),
-  ('mock_quoted', 'web', 'quoteduser',  '2017-05-01T00:00:00Z', 'Quoted User',     1, 0, 0, 0);
+  ('mock_quoted', 'web', 'quoteduser',  '2017-05-01T00:00:00Z', 'Quoted User',     1, 0, 0, 0),
+  ('mock_xiq',    'web', 'xiq_dev',     '2018-08-20T09:00:00Z', 'XIQ Dev',         3, 2, 3, 1);
 
 -- Archive uploads (must be 'completed' for account/profile views to work)
 INSERT INTO "public"."archive_upload" ("id", "account_id", "archive_at", "created_at", "upload_phase") OVERRIDING SYSTEM VALUE
@@ -36,7 +37,8 @@ VALUES
   (104, 'mock_dave',   '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed'),
   (105, 'mock_eve',    '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed'),
   (106, 'mock_frank',  '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed'),
-  (107, 'mock_quoted', '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed');
+  (107, 'mock_quoted', '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed'),
+  (108, 'mock_xiq',    '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed');
 
 SELECT setval(pg_get_serial_sequence('public.archive_upload', 'id'), 200);
 
@@ -49,7 +51,8 @@ VALUES
   ('mock_dave',   'Design systems enthusiast',           NULL,                    'Berlin',        'https://api.dicebear.com/7.x/avataaars/svg?seed=dave_design', NULL, 104),
   ('mock_eve',    'Data engineering all day',            'https://evedata.io',    'Tokyo',         'https://api.dicebear.com/7.x/avataaars/svg?seed=eve_data',    NULL, 105),
   ('mock_frank',  'DevOps and infrastructure',           NULL,                    'Austin',        'https://api.dicebear.com/7.x/avataaars/svg?seed=frank_ops',   NULL, 106),
-  ('mock_quoted', 'Quotes and RTs',                      NULL,                    NULL,            'https://api.dicebear.com/7.x/avataaars/svg?seed=quoteduser',  NULL, 107);
+  ('mock_quoted', 'Quotes and RTs',                      NULL,                    NULL,            'https://api.dicebear.com/7.x/avataaars/svg?seed=quoteduser',  NULL, 107),
+  ('mock_xiq',    'Distributed systems & formal methods',NULL,                    'Lisbon',        'https://api.dicebear.com/7.x/avataaars/svg?seed=xiq_dev',     NULL, 108);
 
 -- Tweets (with conversation threads)
 INSERT INTO "public"."tweets" ("tweet_id", "account_id", "created_at", "full_text", "retweet_count", "favorite_count", "reply_to_tweet_id", "reply_to_user_id", "reply_to_username", "archive_upload_id")
@@ -78,16 +81,30 @@ VALUES
   ('t_frank_1', 'mock_frank', '2024-11-05T10:00:00Z', 'Deployed our new monitoring stack today. Grafana + Prometheus + custom alerting. Finally sleeping through the night.', 4, 18, NULL, NULL, NULL, 106),
 
   -- Quoted user
-  ('t_quoted_1', 'mock_quoted', '2024-10-15T12:00:00Z', 'The best code is the code you never write. Reduce complexity before adding features.', 30, 120, NULL, NULL, NULL, 107);
+  ('t_quoted_1', 'mock_quoted', '2024-10-15T12:00:00Z', 'The best code is the code you never write. Reduce complexity before adding features.', 30, 120, NULL, NULL, NULL, 107),
+
+  -- XIQ: standalone tweet (will be quoted by Alice)
+  ('t_xiq_1',   'mock_xiq',   '2024-10-28T09:00:00Z', 'Most distributed systems bugs are actually unhandled partial failures pretending to be edge cases.', 18, 72, NULL, NULL, NULL, 108),
+  -- XIQ joins Alice''s thread (reply to t_alice_3)
+  ('t_xiq_2',   'mock_xiq',   '2024-11-01T12:30:00Z', 'Add to this: if your RPC returns JSONB, version the response shape from day one. Cheap insurance.', 4, 22, 't_alice_3', 'mock_alice', 'alice_dev', 108),
+  -- Alice replies to XIQ in the same thread (and references xiq''s standalone tweet)
+  ('t_alice_4', 'mock_alice', '2024-11-01T12:45:00Z', '@xiq_dev good call — we wrap responses in {data, version} and the client picks a parser by version.', 1, 9, 't_xiq_2', 'mock_xiq', 'xiq_dev', 101),
+  -- Alice quotes XIQ''s standalone tweet (separate tweet, not in the thread)
+  ('t_alice_5', 'mock_alice', '2024-10-28T19:30:00Z', 'This — write your retry logic before you write your happy path.', 6, 28, NULL, NULL, NULL, 101),
+  -- XIQ replies to Bob''s reply in Alice''s thread (continues the conversation_id)
+  ('t_xiq_3',   'mock_xiq',   '2024-11-02T08:00:00Z', '90%! Sharing the migration notes would be a gift to the rest of us @bob_writes.', 0, 6, 't_bob_1', 'mock_bob', 'bob_writes', 108);
 
 -- Conversations (link tweets to conversation threads)
 INSERT INTO "public"."conversations" ("conversation_id", "tweet_id")
 VALUES
-  -- Alice's thread is one conversation
+  -- Alice's thread is one conversation; xiq + alice continue it after bob's reply
   ('t_alice_1', 't_alice_1'),
   ('t_alice_1', 't_alice_2'),
   ('t_alice_1', 't_alice_3'),
-  ('t_alice_1', 't_bob_1');
+  ('t_alice_1', 't_bob_1'),
+  ('t_alice_1', 't_xiq_2'),
+  ('t_alice_1', 't_alice_4'),
+  ('t_alice_1', 't_xiq_3');
 
 -- Tweet media
 INSERT INTO "public"."tweet_media" ("media_id", "tweet_id", "media_url", "media_type", "width", "height", "archive_upload_id")
@@ -101,22 +118,27 @@ INSERT INTO "public"."mentioned_users" ("user_id", "name", "screen_name", "updat
 VALUES
   ('mu_alice', 'Alice Developer', 'alice_dev',  '2024-12-01T00:00:00Z'),
   ('mu_carol', 'Carol ML',        'carol_ml',   '2024-12-01T00:00:00Z'),
-  ('mu_bob',   'Bob Writes',      'bob_writes', '2024-12-01T00:00:00Z')
+  ('mu_bob',   'Bob Writes',      'bob_writes', '2024-12-01T00:00:00Z'),
+  ('mu_xiq',   'XIQ Dev',         'xiq_dev',    '2024-12-01T00:00:00Z')
 ON CONFLICT ("user_id") DO NOTHING;
 
 -- User mentions (who was mentioned in which tweet)
 INSERT INTO "public"."user_mentions" ("id", "mentioned_user_id", "tweet_id") OVERRIDING SYSTEM VALUE
 VALUES
-  (2001, 'mu_alice', 't_bob_1');
+  (2001, 'mu_alice', 't_bob_1'),
+  (2002, 'mu_xiq',   't_alice_4'),
+  (2003, 'mu_bob',   't_xiq_3');
 
 SELECT setval(pg_get_serial_sequence('public.user_mentions', 'id'), 3000);
 
--- Quote tweets
+-- Quote tweets — Alice quotes XIQ; existing quote chain still here
 INSERT INTO "public"."quote_tweets" ("tweet_id", "quoted_tweet_id")
 VALUES
-  ('t_eve_2', 't_quoted_1');
+  ('t_eve_2',   't_quoted_1'),
+  ('t_alice_5', 't_xiq_1');
 
--- Followers
+-- Followers — also includes a few orphan rows with NULL archive_upload_id (simulating
+-- scraper/browser-extension inserts) so the delete_user_archive orphan fix can be exercised.
 INSERT INTO "public"."followers" ("id", "account_id", "follower_account_id", "archive_upload_id") OVERRIDING SYSTEM VALUE
 VALUES
   (3001, 'mock_alice', 'mock_bob',    101),
@@ -128,11 +150,18 @@ VALUES
   (3007, 'mock_carol', 'mock_alice',  103),
   (3008, 'mock_carol', 'mock_dave',   103),
   (3009, 'mock_dave',  'mock_alice',  104),
-  (3010, 'mock_eve',   'mock_frank',  105);
+  (3010, 'mock_eve',   'mock_frank',  105),
+  -- XIQ <-> Alice mutual + xiq followed by carol
+  (3011, 'mock_xiq',   'mock_alice',  108),
+  (3012, 'mock_alice', 'mock_xiq',    101),
+  (3013, 'mock_xiq',   'mock_carol',  108),
+  -- Orphan follower rows (scraper-inserted, NULL archive_upload_id)
+  (3014, 'mock_xiq',   'mock_eve',    NULL),
+  (3015, 'mock_alice', 'mock_frank',  NULL);
 
 SELECT setval(pg_get_serial_sequence('public.followers', 'id'), 4000);
 
--- Following
+-- Following — also includes orphan NULL archive_upload_id rows (scraper-inserted)
 INSERT INTO "public"."following" ("id", "account_id", "following_account_id", "archive_upload_id") OVERRIDING SYSTEM VALUE
 VALUES
   (5001, 'mock_alice',  'mock_bob',   101),
@@ -145,7 +174,12 @@ VALUES
   (5008, 'mock_dave',   'mock_eve',   104),
   (5009, 'mock_eve',    'mock_carol', 105),
   (5010, 'mock_frank',  'mock_alice', 106),
-  (5011, 'mock_frank',  'mock_eve',   106);
+  (5011, 'mock_frank',  'mock_eve',   106),
+  (5012, 'mock_xiq',    'mock_alice', 108),
+  (5013, 'mock_alice',  'mock_xiq',   101),
+  -- Orphan following rows (pairs must not collide with the in-archive rows above)
+  (5014, 'mock_xiq',    'mock_bob',   NULL),
+  (5015, 'mock_alice',  'mock_eve',   NULL);
 
 SELECT setval(pg_get_serial_sequence('public.following', 'id'), 6000);
 
@@ -153,14 +187,19 @@ SELECT setval(pg_get_serial_sequence('public.following', 'id'), 6000);
 INSERT INTO "public"."liked_tweets" ("tweet_id", "full_text")
 VALUES
   ('liked_t_1', 'This is a great insight about distributed systems'),
-  ('liked_t_2', 'Love this approach to API design')
+  ('liked_t_2', 'Love this approach to API design'),
+  ('liked_t_3', 'CRDTs are underrated for collaborative apps')
 ON CONFLICT ("tweet_id") DO NOTHING;
 
--- Likes
+-- Likes — also includes orphan NULL archive_upload_id rows (scraper-inserted)
 INSERT INTO "public"."likes" ("id", "account_id", "liked_tweet_id", "archive_upload_id") OVERRIDING SYSTEM VALUE
 VALUES
   (7001, 'mock_alice', 'liked_t_1', 101),
-  (7002, 'mock_bob',   'liked_t_2', 102);
+  (7002, 'mock_bob',   'liked_t_2', 102),
+  (7003, 'mock_xiq',   'liked_t_3', 108),
+  -- Orphan likes
+  (7004, 'mock_xiq',   'liked_t_1', NULL),
+  (7005, 'mock_alice', 'liked_t_3', NULL);
 
 SELECT setval(pg_get_serial_sequence('public.likes', 'id'), 8000);
 
@@ -170,6 +209,19 @@ VALUES
   (9001, 'https://t.co/abc123', 'https://github.com/community-archive', 'github.com/community-arc...', 't_alice_1');
 
 SELECT setval(pg_get_serial_sequence('public.tweet_urls', 'id'), 10000);
+
+-- User action log (mock history). Triggers are disabled by session_replication_role=replica
+-- during seeding, so we insert these rows explicitly rather than letting trg_log_archive_upload_event fire.
+INSERT INTO "public"."user_action_log" ("id", "account_id", "action_type", "metadata", "created_at") OVERRIDING SYSTEM VALUE
+VALUES
+  (1, 'mock_alice', 'archive_upload', '{"archive_upload_id": 101, "archive_at": "2024-12-01T00:00:00Z"}'::jsonb, '2024-12-01T00:05:00Z'),
+  (2, 'mock_bob',   'archive_upload', '{"archive_upload_id": 102, "archive_at": "2024-12-01T00:00:00Z"}'::jsonb, '2024-12-01T00:10:00Z'),
+  (3, 'mock_xiq',   'archive_upload', '{"archive_upload_id": 108, "archive_at": "2024-12-01T00:00:00Z"}'::jsonb, '2024-12-01T00:15:00Z'),
+  -- Demonstration of settings-change events
+  (4, 'mock_xiq',   'opt_in',         NULL,                                                                       '2024-12-02T08:00:00Z'),
+  (5, 'mock_alice', 'archive_upload', '{"archive_upload_id": 109, "archive_at": "2025-02-15T00:00:00Z", "note":"re-upload"}'::jsonb, '2025-02-15T00:00:00Z');
+
+SELECT setval(pg_get_serial_sequence('public.user_action_log', 'id'), 1000);
 
 -- Reset replication role
 SET session_replication_role = DEFAULT;

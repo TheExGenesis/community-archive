@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { AlertCircle, Archive, Trash2, UserX, CheckCircle, Upload } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@/utils/supabase'
@@ -35,6 +36,8 @@ export default function ProfileContent({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [deletingArchive, setDeletingArchive] = useState<string | null>(null)
+  const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false)
+  const [showOptOutDialog, setShowOptOutDialog] = useState(false)
   const supabase = createBrowserClient()
 
   const twitterUsername =
@@ -55,59 +58,37 @@ export default function ProfileContent({
 
     startTransition(async () => {
       try {
-        // Check if record exists first
-        const { data: existingRecord } = await supabase
-          .from('optin')
-          .select('id')
-          .eq('user_id', user.id)
-          .single()
-
-        const updatePayload: Record<string, any> = {
-          opted_in: checked,
-          explicit_optout: false,
-          opt_out_reason: null,
+        if (!twitterUsername) {
+          throw new Error(
+            'Twitter username not found. Please sign in with Twitter to manage opt-in settings.',
+          )
         }
 
-        if (twitterUsername) {
-          updatePayload.username = twitterUsername.toLowerCase()
-        }
-        if (twitterUserId) {
-          updatePayload.twitter_user_id = twitterUserId
-        }
+        const response = await fetch('/api/opt-in', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: twitterUsername.toLowerCase(),
+            twitterUserId: twitterUserId || null,
+            optedIn: checked,
+            termsVersion: 'v1.0',
+          }),
+        })
+        const result = await response.json()
 
-        if (existingRecord) {
-          // Update existing record
-          const { error: updateError } = await supabase
-            .from('optin')
-            .update(updatePayload)
-            .eq('user_id', user.id)
-
-          if (updateError) throw updateError
-        } else {
-          if (!twitterUsername) {
-            throw new Error('Twitter username not found. Please sign in with Twitter to manage opt-in settings.')
-          }
-
-          // Insert new record
-          const { error: insertError } = await supabase
-            .from('optin')
-            .insert({
-              user_id: user.id,
-              username: twitterUsername.toLowerCase(),
-              twitter_user_id: twitterUserId || null,
-              opted_in: checked,
-              explicit_optout: false,
-              opt_out_reason: null
-            })
-
-          if (insertError) throw insertError
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to update opt-in status')
         }
 
         setOptInStatus(checked)
         setExplicitOptOut(false)
         setSuccess(checked ? 'Successfully opted in to tweet streaming' : 'Successfully opted out from tweet streaming')
 
-        router.refresh()
+        await logUserAction(checked ? 'opt_in' : 'opt_out_streaming')
+
+        // Skip router.refresh() — the only thing that changed is the optin row, and we
+        // already updated the local state above. Refreshing here re-mounts the whole
+        // server-rendered page, which the user perceives as a full reload.
       } catch (err: any) {
         setError(err.message || 'Failed to update opt-in status')
         setOptInStatus(!checked) // Revert on error
@@ -115,72 +96,128 @@ export default function ProfileContent({
     })
   }
 
-  const handleExplicitOptOut = async (checked: boolean) => {
+  // Best-effort append to the user action log. Never throws — logging failures
+  // shouldn't break the user-facing action.
+  const logUserAction = async (
+    action_type: string,
+    metadata?: Record<string, unknown>,
+  ) => {
+    try {
+      const { error: logError } = await supabase.from('user_action_log').insert({
+        account_id: userMetadata?.provider_id ?? null,
+        user_id: user.id,
+        action_type,
+        // Cast through unknown — Record<string, unknown> is structurally compatible
+        // with the recursive Json type Supabase generates but TS can't prove it.
+        metadata: (metadata ?? null) as unknown as never,
+      })
+      if (logError) console.warn('user_action_log insert failed:', logError)
+    } catch (err) {
+      console.warn('user_action_log insert threw:', err)
+    }
+  }
+
+  // Persists the explicit_optout flag on the optin table. Used by both the immediate
+  // toggle-OFF path and the modal-confirmed toggle-ON-with-delete path.
+  const persistOptOut = async (checked: boolean) => {
+    if (!twitterUsername) {
+      throw new Error(
+        'Twitter username not found. Please sign in with Twitter to manage opt-in settings.',
+      )
+    }
+
+    const response = await fetch('/api/opt-in', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: twitterUsername.toLowerCase(),
+        twitterUserId: twitterUserId || null,
+        optedIn: false,
+        termsVersion: 'v1.0',
+        explicitOptOut: checked,
+        optOutReason: checked
+          ? 'User explicitly opted out via profile settings'
+          : null,
+      }),
+    })
+    const result = await response.json()
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update opt-out status')
+    }
+  }
+
+  // Toggle-ON opens a confirmation dialog (opt-out also deletes all data, mirroring
+  // the standalone "Delete All Your Data" flow). Toggle-OFF removes the user from the
+  // opt-out list without touching data.
+  const handleExplicitOptOut = (checked: boolean) => {
     setError(null)
     setSuccess(null)
 
+    if (checked) {
+      setShowOptOutDialog(true)
+      return
+    }
+
     startTransition(async () => {
       try {
-        // Check if record exists first
-        const { data: existingRecord } = await supabase
-          .from('optin')
-          .select('id')
-          .eq('user_id', user.id)
-          .single()
-
-        const updatePayload: Record<string, any> = {
-          opted_in: false,
-          explicit_optout: checked,
-          opt_out_reason: checked ? 'User explicitly opted out via profile settings' : null,
-        }
-
-        if (twitterUsername) {
-          updatePayload.username = twitterUsername.toLowerCase()
-        }
-        if (twitterUserId) {
-          updatePayload.twitter_user_id = twitterUserId
-        }
-
-        if (existingRecord) {
-          // Update existing record
-          const { error: updateError } = await supabase
-            .from('optin')
-            .update(updatePayload)
-            .eq('user_id', user.id)
-
-          if (updateError) throw updateError
-        } else {
-          if (!twitterUsername) {
-            throw new Error('Twitter username not found. Please sign in with Twitter to manage opt-in settings.')
-          }
-
-          // Insert new record
-          const { error: insertError } = await supabase
-            .from('optin')
-            .insert({
-              user_id: user.id,
-              username: twitterUsername.toLowerCase(),
-              twitter_user_id: twitterUserId || null,
-              opted_in: false,
-              explicit_optout: checked,
-              opt_out_reason: checked ? 'User explicitly opted out via profile settings' : null
-            })
-
-          if (insertError) throw insertError
-        }
-
-        setExplicitOptOut(checked)
-        if (checked) {
-          setOptInStatus(false)
-        }
-        setSuccess(checked ? 'Added to explicit opt-out list' : 'Removed from explicit opt-out list')
-
-        router.refresh()
+        await persistOptOut(false)
+        setExplicitOptOut(false)
+        setSuccess('Removed from explicit opt-out list')
+        await logUserAction('opt_out_removed')
+        // No router.refresh — toggle state already updated locally.
       } catch (err: any) {
         setError(err.message || 'Failed to update opt-out status')
-        setExplicitOptOut(!checked) // Revert on error
       }
     })
+  }
+
+  // Confirmed from the opt-out modal: only add to the opt-out list, no delete.
+  const confirmOptOutOnly = () => {
+    setError(null)
+    setSuccess(null)
+    startTransition(async () => {
+      try {
+        await persistOptOut(true)
+        setExplicitOptOut(true)
+        setOptInStatus(false)
+        setShowOptOutDialog(false)
+        setSuccess('Added to explicit opt-out list')
+        await logUserAction('opt_out_only')
+        // No router.refresh — toggle state already updated locally.
+      } catch (err: any) {
+        setError(err.message || 'Failed to opt out')
+      }
+    })
+  }
+
+  // Confirmed from the opt-out modal: delete all data first, then add to opt-out list.
+  const confirmOptOutAndDelete = async () => {
+    if (!userMetadata?.provider_id) {
+      setError('Unable to identify user account')
+      return
+    }
+
+    setDeletingArchive('all')
+    setError(null)
+    setSuccess(null)
+
+    try {
+      await deleteArchive(supabase, userMetadata.provider_id)
+      await deleteStorageFiles(userMetadata.provider_id)
+      await persistOptOut(true)
+
+      setExplicitOptOut(true)
+      setOptInStatus(false)
+      setShowOptOutDialog(false)
+      setSuccess('Data deleted and added to explicit opt-out list')
+      await logUserAction('opt_out_and_delete')
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message || 'Failed to opt out and delete data')
+    } finally {
+      setDeletingArchive(null)
+    }
   }
 
   const deleteStorageFiles = async (username: string) => {
@@ -220,6 +257,7 @@ export default function ProfileContent({
       await deleteSingleArchive(supabase, userMetadata.provider_id, archiveId)
 
       setSuccess('Archive deleted successfully')
+      await logUserAction('delete_archive', { archive_upload_id: archiveId })
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Failed to delete archive')
@@ -229,10 +267,6 @@ export default function ProfileContent({
   }
 
   const handleDeleteAllArchives = async () => {
-    if (!confirm('Are you sure you want to delete ALL your archives? This action cannot be undone.')) {
-      return
-    }
-
     if (!userMetadata?.provider_id) {
       setError('Unable to identify user account')
       return
@@ -246,10 +280,12 @@ export default function ProfileContent({
       await deleteArchive(supabase, userMetadata.provider_id)
       await deleteStorageFiles(userMetadata.provider_id)
 
-      setSuccess('All archives deleted successfully')
+      setShowDeleteAllDialog(false)
+      setSuccess('All data deleted successfully')
+      await logUserAction('delete_all_archives')
       router.refresh()
     } catch (err: any) {
-      setError(err.message || 'Failed to delete archives')
+      setError(err.message || 'Failed to delete data')
     } finally {
       setDeletingArchive(null)
     }
@@ -427,25 +463,103 @@ export default function ProfileContent({
                       </div>
                     )
                   })}
-                  {archives.length > 1 && (
-                    <div className="pt-2 border-t">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={handleDeleteAllArchives}
-                        disabled={deletingArchive !== null}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        {deletingArchive === 'all' ? 'Deleting all...' : 'Delete All Archives'}
-                      </Button>
-                    </div>
-                  )}
                 </div>
               )}
+
+              <div className="pt-4 border-t">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowDeleteAllDialog(true)}
+                  disabled={deletingArchive !== null}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete All Your Data
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Remove all archives, tweets, likes, followers, and profile data — including data from the scraper/extension.
+                </p>
+              </div>
+
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Dialogs live outside <Tabs> so the Opt-Out switch on the Privacy tab and the
+          Delete All button on the Archives tab can both open them regardless of which
+          TabsContent is currently mounted (Radix tabs lazy-mount their children). */}
+      <Dialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete All Your Data</DialogTitle>
+            <DialogDescription>
+              This will permanently delete <strong>all</strong> of your data from the Community Archive:
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="list-disc pl-6 text-sm text-muted-foreground space-y-1">
+            <li>All uploaded archives</li>
+            <li>All tweets, likes, followers, and following data</li>
+            <li>Profile information</li>
+            <li>Data added by the scraper or browser extension</li>
+          </ul>
+          <p className="text-sm font-medium text-destructive">
+            This action is irreversible.
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowDeleteAllDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAllArchives}
+              disabled={deletingArchive === 'all'}
+            >
+              {deletingArchive === 'all' ? 'Deleting...' : 'Delete Everything'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showOptOutDialog} onOpenChange={setShowOptOutDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Explicit Opt-Out</DialogTitle>
+            <DialogDescription>
+              Opting out adds you to the explicit opt-out list so future collection (including scraper/extension data) is prevented. You can choose whether to also delete the data already on file.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <div>
+              <p className="font-medium text-foreground">Opt out only</p>
+              <p>Add you to the opt-out list. Existing archives, tweets, and profile data stay where they are.</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">Opt out and delete everything</p>
+              <p>Also permanently delete all your archives, tweets, likes, followers/following, profile, and any scraper/extension data. This part is irreversible.</p>
+            </div>
+          </div>
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setShowOptOutDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={confirmOptOutOnly}
+              disabled={isPending || deletingArchive === 'all'}
+            >
+              {isPending ? 'Opting out...' : 'Opt out only'}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmOptOutAndDelete}
+              disabled={deletingArchive === 'all'}
+            >
+              {deletingArchive === 'all' ? 'Deleting...' : 'Opt out and delete everything'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {error && (
         <Alert variant="destructive">

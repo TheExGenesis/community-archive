@@ -1,4 +1,4 @@
-import { createServerClient } from '@/utils/supabase'
+import { createServerAdminClient, createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -17,37 +17,87 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const admin = createServerAdminClient(cookieStore)
     const body = await request.json()
-    const { username, twitterUserId, optedIn, termsVersion } = body
+    const {
+      username,
+      twitterUserId,
+      optedIn,
+      termsVersion,
+      explicitOptOut = false,
+      optOutReason = null,
+    } = body
+    const normalizedUsername = username
+      ?.toLowerCase()
+      .replace(/^@/, '')
+      .replace(/[^a-z0-9_]/g, '')
 
     // Validate required fields
-    if (!username) {
+    if (!normalizedUsername) {
       return NextResponse.json(
         { error: 'Username is required' },
         { status: 400 }
       )
     }
 
-    // Check if user already has an opt-in record
-    const { data: existingRecord, error: fetchError } = await supabase
-      .from('optin')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
+    const [byUserIdResponse, byUsernameResponse] = await Promise.all([
+      admin.from('optin').select('*').eq('user_id', user.id).maybeSingle(),
+      admin
+        .from('optin')
+        .select('*')
+        .eq('username', normalizedUsername)
+        .maybeSingle(),
+    ])
+
+    if (byUserIdResponse.error) {
+      console.error('Error fetching opt-in status:', byUserIdResponse.error)
+      return NextResponse.json(
+        { error: 'Failed to fetch opt-in status' },
+        { status: 500 }
+      )
+    }
+
+    if (byUsernameResponse.error) {
+      console.error('Error fetching username opt-in row:', byUsernameResponse.error)
+      return NextResponse.json(
+        { error: 'Failed to fetch opt-in status' },
+        { status: 500 }
+      )
+    }
+
+    const existingRecord = byUserIdResponse.data ?? byUsernameResponse.data
+
+    if (
+      byUsernameResponse.data?.user_id &&
+      byUsernameResponse.data.user_id !== user.id
+    ) {
+      return NextResponse.json(
+        { error: 'This username is already registered by another user' },
+        { status: 400 }
+      )
+    }
 
     let result
+    const nextExplicitOptOut = optedIn ? false : Boolean(explicitOptOut)
+    const payload = {
+      user_id: user.id,
+      username: normalizedUsername,
+      twitter_user_id: twitterUserId || null,
+      opted_in: Boolean(optedIn) && !nextExplicitOptOut,
+      terms_version: optedIn
+        ? termsVersion
+        : existingRecord?.terms_version ?? termsVersion ?? 'v1.0',
+      explicit_optout: nextExplicitOptOut,
+      opt_out_reason: nextExplicitOptOut
+        ? optOutReason || 'User explicitly opted out via profile settings'
+        : null,
+    }
 
     if (existingRecord) {
-      // Update existing record
-      const { data, error } = await supabase
+      const { data, error } = await admin
         .from('optin')
-        .update({
-          username: username.toLowerCase(),
-          twitter_user_id: twitterUserId,
-          opted_in: optedIn,
-          terms_version: optedIn ? termsVersion : existingRecord.terms_version,
-        })
-        .eq('user_id', user.id)
+        .update(payload)
+        .eq('id', existingRecord.id)
         .select()
         .single()
 
@@ -61,16 +111,9 @@ export async function POST(request: NextRequest) {
 
       result = data
     } else {
-      // Create new record
-      const { data, error } = await supabase
+      const { data, error } = await admin
         .from('optin')
-        .insert({
-          user_id: user.id,
-          username: username.toLowerCase(),
-          twitter_user_id: twitterUserId,
-          opted_in: optedIn,
-          terms_version: termsVersion,
-        })
+        .insert(payload)
         .select()
         .single()
 

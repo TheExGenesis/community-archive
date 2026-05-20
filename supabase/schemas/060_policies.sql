@@ -79,3 +79,23 @@ ALTER TABLE "public"."tweets" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."user_mentions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "tes"."blocked_scraping_users" ENABLE ROW LEVEL SECURITY;
 
+
+
+-- public.user_action_log: users can read and append their own action history.
+-- Service role bypasses RLS for the trigger and admin reads.
+ALTER TABLE "public"."user_action_log" ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can insert own action log" ON "public"."user_action_log"
+  FOR INSERT TO authenticated WITH CHECK (
+    user_id = auth.uid()
+    OR account_id = ((auth.jwt()->'app_metadata'->>'provider_id')::text)
+  );
+
+CREATE POLICY "Users can read own action log" ON "public"."user_action_log"
+  FOR SELECT TO authenticated USING (
+    user_id = auth.uid()
+    OR account_id = ((auth.jwt()->'app_metadata'->>'provider_id')::text)
+  );
+
+GRANT SELECT, INSERT ON public.user_action_log TO authenticated, service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.user_action_log_id_seq TO authenticated, service_role;

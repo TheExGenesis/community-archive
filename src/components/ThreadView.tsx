@@ -38,15 +38,24 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
     const tweet = tree.tweets[tweetId]
     const children = tree.children[tweetId] || []
     const isHighlighted = highlightTweetId === tweetId
-    
+
     return (
       <div key={tweetId} className={`thread-tweet-container ${depth > 0 ? 'ml-8 pl-4 border-l-2 border-gray-200 dark:border-gray-700' : ''}`}>
-        <div className={`
-          ${isHighlighted ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' : 'bg-background dark:bg-secondary'} 
-          p-4 rounded-lg mb-4
-        `}>
-          <TweetComponent tweet={convertToTweetData(tweet)} />
-        </div>
+        {tweet.is_deleted_placeholder ? (
+          // Tombstone for a tweet that was deleted but is still referenced as the
+          // parent of one or more surviving replies. We don't have author / timestamp /
+          // text since the source row is gone.
+          <div className="border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 text-gray-500 dark:text-gray-400 italic p-4 rounded-lg mb-4 text-sm">
+            [Tweet deleted]
+          </div>
+        ) : (
+          <div className={`
+            ${isHighlighted ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' : 'bg-background dark:bg-secondary'}
+            p-4 rounded-lg mb-4
+          `}>
+            <TweetComponent tweet={convertToTweetData(tweet)} />
+          </div>
+        )}
         
         {children.length > 0 && (
           <div className="thread-children">
@@ -63,7 +72,14 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
     )
   }
 
-  if (!tree.root) {
+  // Render all roots. When some parent tweets in the conversation were deleted, each
+  // surviving orphan reply gets a synthesized placeholder parent that becomes its own
+  // root, so the tree can have more than one.
+  const allRoots = tree.roots && tree.roots.length > 0
+    ? tree.roots
+    : tree.root ? [tree.root] : []
+
+  if (allRoots.length === 0) {
     return (
       <div className={`${className} text-center py-8`}>
         <p className="text-gray-500 dark:text-gray-400">No thread structure found</p>
@@ -71,15 +87,24 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
     )
   }
 
+  // Header count excludes placeholders.
+  const realCount = Object.values(tree.tweets).filter(
+    (t) => !t.is_deleted_placeholder,
+  ).length
+
   return (
     <div className={`thread-view ${className}`}>
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-          🧵 Thread ({Object.keys(tree.tweets).length} tweets)
+          🧵 Thread ({realCount} {realCount === 1 ? 'tweet' : 'tweets'})
         </h3>
       </div>
       <div className="thread-container">
-        {renderTweetWithThread(tree.root)}
+        {allRoots.map((rootId) => (
+          <React.Fragment key={rootId}>
+            {renderTweetWithThread(rootId)}
+          </React.Fragment>
+        ))}
       </div>
     </div>
   )

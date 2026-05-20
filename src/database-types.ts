@@ -613,7 +613,7 @@ export type Database = {
           terms_version: string
           twitter_user_id: string | null
           updated_at: string | null
-          user_id: string
+          user_id: string | null
           username: string
         }
         Insert: {
@@ -627,7 +627,7 @@ export type Database = {
           terms_version?: string
           twitter_user_id?: string | null
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
           username: string
         }
         Update: {
@@ -641,7 +641,7 @@ export type Database = {
           terms_version?: string
           twitter_user_id?: string | null
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
           username?: string
         }
         Relationships: []
@@ -944,6 +944,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_action_log: {
+        Row: {
+          account_id: string | null
+          action_type: string
+          created_at: string
+          id: number
+          metadata: Json | null
+          notes: string | null
+          user_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          action_type: string
+          created_at?: string
+          id?: number
+          metadata?: Json | null
+          notes?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          action_type?: string
+          created_at?: string
+          id?: number
+          metadata?: Json | null
+          notes?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       user_mentions: {
         Row: {
@@ -1339,6 +1369,13 @@ export type Database = {
       create_temp_tables: {
         Args: {
           p_suffix: string
+        }
+        Returns: undefined
+      }
+      delete_single_archive: {
+        Args: {
+          p_account_id: string
+          p_archive_upload_id: number
         }
         Returns: undefined
       }
@@ -2100,4 +2137,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-

@@ -1,0 +1,101 @@
+name: Sync staging database
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/**'
+      - 'scripts/sync-staging-db.sh'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'supabase/**'
+      - 'scripts/sync-staging-db.sh'
+
+concurrency:
+  # Single global mutex — only one run touches the staging DB at a time. Pushes queue.
+  group: sync-staging-db
+  cancel-in-progress: false
+
+# The auto-regenerate-types step on PR pushes commits back to the PR branch.
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    environment: Preview
+    # Fork PRs can't access the Preview environment secrets — skip the job rather than
+    # let it fail. Trusted maintainers can still trigger via workflow_dispatch.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # For PR events, check out the actual head branch (not the merge ref) so the
+          # auto-commit of regenerated types pushes back to the PR. For push/dispatch,
+          # fall through to the default ref.
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync staging database
+        env:
+          SUPABASE_STAGING_PROJECT_REF: ${{ secrets.SUPABASE_STAGING_PROJECT_REF }}
+          STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          # supabase config.toml references these for the local-dev Twitter OAuth provider.
+          # Hosted DB reset only needs them to satisfy config parsing — values aren't applied.
+          SUPABASE_AUTH_TWITTER_CLIENT_ID: unused-for-staging-reset
+          SUPABASE_AUTH_TWITTER_SECRET: unused-for-staging-reset
+        run: ./scripts/sync-staging-db.sh
+
+      # Regenerate src/database-types.ts from the now-synced staging DB and commit it
+      # back to the PR branch if it changed. Avoids manual `pnpm dev:gen-types`.
+      # Only runs for same-repo PRs (the job-level `if` above already filters forks);
+      # push-to-main events skip this because main is branch-protected and the merged
+      # PR should have already brought types up to date.
+      - name: Regenerate database types
+        if: github.event_name == 'pull_request'
+        env:
+          STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          # `supabase gen types` parses supabase/config.toml the same way `db push`
+          # does, so it also fails without these env-referenced placeholders.
+          SUPABASE_AUTH_TWITTER_CLIENT_ID: unused-for-staging-gen-types
+          SUPABASE_AUTH_TWITTER_SECRET: unused-for-staging-gen-types
+        run: |
+          set -euo pipefail
+          pnpm exec supabase gen types typescript \
+            --db-url "$STAGING_DATABASE_URL" \
+            --schema public,dev \
+            > src/database-types.ts.new
+          if diff -q src/database-types.ts src/database-types.ts.new > /dev/null 2>&1; then
+            echo "Types unchanged — nothing to commit."
+            rm src/database-types.ts.new
+            exit 0
+          fi
+          mv src/database-types.ts.new src/database-types.ts
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add src/database-types.ts
+          # --no-verify: the husky pre-commit hook would re-run gen-types against a
+          # non-existent local supabase (no `supabase start` here) and fail; the file
+          # we're committing is what that hook would produce anyway.
+          git commit --no-verify -m "chore: regenerate database types from staging schema"
+          # database-types.ts is not in the sync workflow's path filter, so this push
+          # will not retrigger the workflow (no infinite loop).
+          git push origin HEAD:"${GITHUB_HEAD_REF}"

@@ -183,7 +183,23 @@ function buildTweetData(
             height: m.height ?? undefined,
           })),
         }
-      : undefined,
+      : tweet.quoted_tweet_id
+        ? {
+            // enriched_tweets exposes quoted_tweet_id even when the quoted tweet has
+            // been deleted (the RPC's quoted_tweets join can't find it). Surface a
+            // placeholder so the renderer shows a "[Quoted tweet deleted]" card.
+            tweet_id: tweet.quoted_tweet_id,
+            account_id: '',
+            created_at: '',
+            full_text: '',
+            retweet_count: 0,
+            favorite_count: 0,
+            avatar_media_url: undefined,
+            username: '',
+            account_display_name: '',
+            is_deleted: true,
+          }
+        : undefined,
   }
 }
 
@@ -223,7 +239,10 @@ function buildThreadTree(
       account_display_name: ct.account_display_name,
       avatar_media_url: ct.avatar_media_url ?? undefined,
       media,
-      quote_tweet_id: quotedTweet ? quotedTweet.tweet_id : null,
+      // ct.quoted_tweet_id is sourced from enriched_tweets and survives even if the
+      // quoted tweet itself was deleted; the RPC's quoted_tweets list won't contain it
+      // in that case. Preserve the relationship and surface a placeholder.
+      quote_tweet_id: ct.quoted_tweet_id ?? (quotedTweet ? quotedTweet.tweet_id : null),
       quoted_tweet: quotedTweet
         ? {
             tweet_id: quotedTweet.tweet_id,
@@ -242,7 +261,19 @@ function buildThreadTree(
               height: m.height,
             })),
           }
-        : null,
+        : ct.quoted_tweet_id
+          ? {
+              tweet_id: ct.quoted_tweet_id,
+              account_id: '',
+              created_at: '',
+              full_text: '',
+              retweet_count: 0,
+              favorite_count: 0,
+              username: '',
+              account_display_name: '',
+              is_deleted: true,
+            }
+          : null,
     }
   })
 

@@ -112,7 +112,9 @@ export default function ProfileContent({
 
         await logUserAction(checked ? 'opt_in' : 'opt_out_streaming')
 
-        router.refresh()
+        // Skip router.refresh() — the only thing that changed is the optin row, and we
+        // already updated the local state above. Refreshing here re-mounts the whole
+        // server-rendered page, which the user perceives as a full reload.
       } catch (err: any) {
         setError(err.message || 'Failed to update opt-in status')
         setOptInStatus(!checked) // Revert on error
@@ -212,7 +214,7 @@ export default function ProfileContent({
         setExplicitOptOut(false)
         setSuccess('Removed from explicit opt-out list')
         await logUserAction('opt_out_removed')
-        router.refresh()
+        // No router.refresh — toggle state already updated locally.
       } catch (err: any) {
         setError(err.message || 'Failed to update opt-out status')
       }
@@ -231,7 +233,7 @@ export default function ProfileContent({
         setShowOptOutDialog(false)
         setSuccess('Added to explicit opt-out list')
         await logUserAction('opt_out_only')
-        router.refresh()
+        // No router.refresh — toggle state already updated locally.
       } catch (err: any) {
         setError(err.message || 'Failed to opt out')
       }

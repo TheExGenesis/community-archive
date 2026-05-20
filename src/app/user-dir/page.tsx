@@ -164,7 +164,10 @@ export default function UserDirectoryPage() {
               className="pl-9"
             />
           </div>
-          <div className="w-full overflow-x-scroll bg-slate-100 dark:bg-card p-6 rounded-lg">
+          {/* Shadcn <Table> already wraps in a `relative w-full overflow-auto` div, so it
+              handles horizontal overflow itself — no need for an additional scroll wrapper
+              (which gave us a second always-on scrollbar). */}
+          <div className="w-full bg-slate-100 dark:bg-card p-6 rounded-lg">
             <Table>
               <TableHeader>
                 <TableRow>

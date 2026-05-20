@@ -1313,6 +1313,19 @@ export type Database = {
       }
     }
     Functions: {
+      admin_list_blocked_scraping_users: {
+        Args: {
+          p_account_ids: string[]
+        }
+        Returns: string[]
+      }
+      admin_set_scrape_block: {
+        Args: {
+          p_account_id: string
+          p_blocked: boolean
+        }
+        Returns: undefined
+      }
       apply_public_entities_rls_policies: {
         Args: {
           schema_name: string

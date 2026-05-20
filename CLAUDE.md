@@ -22,6 +22,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Do NOT commit unrelated work to the current feature branch and cherry-pick later — it's cleaner to switch branches upfront
 - If the current branch has a pending PR, the new work should almost always go on a separate branch
 
+**Close-out-before-starting rule:**
+When the user pivots to a new task that warrants a new branch, do NOT silently switch branches. Instead:
+1. Detect it and name it out loud ("This is a different topic — the current branch should probably close out first").
+2. Offer to push the current branch and open a PR, or otherwise reconcile it with main.
+3. Tell the user about the PR (link it) and **wait** for them to confirm.
+4. Only then create the new branch from main and start the next task.
+
+This avoids half-finished branches piling up and mixes of unrelated commits.
+
 **Commit message guidelines:**
 - Keep commits atomic - one logical change per commit
 - Suggest descriptive commit messages that explain the "why"

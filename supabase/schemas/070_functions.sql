@@ -1270,9 +1270,9 @@ BEGIN
             DELETE FROM %I.tweets WHERE archive_upload_id = ANY($1) OR account_id = $2;
 
             -- Delete other related data
-            DELETE FROM %I.likes WHERE archive_upload_id = ANY($1);
-            DELETE FROM %I.followers WHERE archive_upload_id = ANY($1);
-            DELETE FROM %I.following WHERE archive_upload_id = ANY($1);
+            DELETE FROM %I.likes WHERE archive_upload_id = ANY($1) OR account_id = $2;
+            DELETE FROM %I.followers WHERE archive_upload_id = ANY($1) OR account_id = $2;
+            DELETE FROM %I.following WHERE archive_upload_id = ANY($1) OR account_id = $2;
             DELETE FROM %I.all_profile WHERE account_id = $2;
 
             -- Delete any remaining tweet_media referencing these archive_uploads
@@ -2805,3 +2805,29 @@ END;
 $$;
 
 ALTER FUNCTION "public"."get_tweet_page_data"("p_tweet_id" "text") OWNER TO "postgres";
+
+
+-- log_archive_upload_event(): write an 'archive_upload' row to public.user_action_log
+-- whenever archive_upload transitions into the 'completed' phase. SECURITY DEFINER
+-- so it bypasses RLS on user_action_log regardless of who marked the upload complete.
+CREATE OR REPLACE FUNCTION public.log_archive_upload_event() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF NEW.upload_phase = 'completed'
+     AND (TG_OP = 'INSERT' OR OLD.upload_phase IS DISTINCT FROM 'completed')
+  THEN
+    INSERT INTO public.user_action_log (account_id, action_type, metadata)
+    VALUES (
+      NEW.account_id,
+      'archive_upload',
+      jsonb_build_object(
+        'archive_upload_id', NEW.id,
+        'archive_at',        NEW.archive_at
+      )
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+ALTER FUNCTION public.log_archive_upload_event() OWNER TO postgres;

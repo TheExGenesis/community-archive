@@ -190,3 +190,9 @@ ALTER TABLE ONLY "public"."retweets"
     ADD CONSTRAINT "fk_retweets_tweet_id" FOREIGN KEY ("tweet_id") REFERENCES "public"."tweets"("tweet_id") ON DELETE CASCADE;
 ALTER TABLE ONLY "public"."retweets"
     ADD CONSTRAINT "fk_retweets_retweeted_tweet_id" FOREIGN KEY ("retweeted_tweet_id") REFERENCES "public"."tweets"("tweet_id") ON DELETE SET NULL;
+
+-- ca_autorefresh.account_refresh_log
+ALTER TABLE ONLY "ca_autorefresh"."account_refresh_log"
+    ADD CONSTRAINT "account_refresh_log_pkey" PRIMARY KEY ("account_id");
+ALTER TABLE ONLY "ca_autorefresh"."account_refresh_log"
+    ADD CONSTRAINT "account_refresh_log_account_id_fkey" FOREIGN KEY ("account_id") REFERENCES "public"."all_account"("account_id");

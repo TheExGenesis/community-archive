@@ -28,3 +28,9 @@ CREATE OR REPLACE TRIGGER "update_user_mentions_updated_at" BEFORE UPDATE ON "pu
 
 CREATE OR REPLACE TRIGGER "update_tes_blocked_scraping_timestamp" BEFORE UPDATE ON "tes"."blocked_scraping_users" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
+
+
+-- Record completed archive uploads in user_action_log.
+CREATE OR REPLACE TRIGGER trg_log_archive_upload_event
+  AFTER INSERT OR UPDATE OF upload_phase ON public.archive_upload
+  FOR EACH ROW EXECUTE FUNCTION public.log_archive_upload_event();

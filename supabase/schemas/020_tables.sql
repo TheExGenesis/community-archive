@@ -230,3 +230,25 @@ CREATE TABLE IF NOT EXISTS public.retweets (
 );
 
 ALTER TABLE "public"."retweets" OWNER TO "postgres";
+
+-- ca_autorefresh.account_refresh_log
+CREATE TABLE IF NOT EXISTS "ca_autorefresh"."account_refresh_log" (
+    "account_id" "text" NOT NULL
+);
+ALTER TABLE "ca_autorefresh"."account_refresh_log" OWNER TO "postgres";
+
+-- Append-only event log of user actions in the archive: uploads, opt-in/out state
+-- changes, and deletes. account_id (= twitter account, JWT provider_id) and user_id
+-- (auth.users.id at the time) are both nullable so events recorded after a delete
+-- still land cleanly. metadata is for ad-hoc per-event details (archive_upload_id,
+-- archive_at, etc.); notes is free-form.
+CREATE TABLE IF NOT EXISTS "public"."user_action_log" (
+    "id"          BIGSERIAL PRIMARY KEY,
+    "account_id"  TEXT,
+    "user_id"     UUID,
+    "action_type" TEXT NOT NULL,
+    "metadata"    JSONB,
+    "notes"       TEXT,
+    "created_at"  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE "public"."user_action_log" OWNER TO "postgres";

@@ -27,16 +27,43 @@ export interface ThreadTweet {
     username: string
     account_display_name: string
     media?: any[]
+    // True when the quoted tweet was deleted; other fields are placeholder defaults.
+    is_deleted?: boolean
   } | null
+  // True when this node is a synthesized placeholder for a tweet that has been deleted
+  // but is still referenced by a surviving reply.
+  is_deleted_placeholder?: boolean
 }
 
 export interface ConversationTree {
+  // Primary root for backward compat — the first non-placeholder top-level tweet, or any
+  // root if no real root survived. Prefer iterating `roots` for rendering.
   root: string
+  // All top-level nodes in the tree (one or more). Synthesized placeholders for missing
+  // deleted parents appear here too so their orphan replies still render.
+  roots: string[]
   tweets: { [tweet_id: string]: ThreadTweet }
   children: { [tweet_id: string]: string[] }
   parents: { [tweet_id: string]: string }
   paths: { [leaf_id: string]: string[] }
 }
+
+// Synthesized stand-in for a parent tweet that no longer exists. The renderer detects
+// is_deleted_placeholder and shows a muted "[Tweet deleted]" card in its place.
+export const makeDeletedPlaceholder = (tweet_id: string): ThreadTweet => ({
+  tweet_id,
+  account_id: '',
+  created_at: '',
+  full_text: '',
+  retweet_count: 0,
+  favorite_count: 0,
+  reply_to_tweet_id: null,
+  reply_to_user_id: null,
+  reply_to_username: null,
+  username: '',
+  account_display_name: '',
+  is_deleted_placeholder: true,
+})
 
 /**
  * Get tweets in a conversation thread by following reply chains
@@ -133,9 +160,9 @@ export const getConversationTweets = async (tweet_id: string): Promise<ThreadTwe
       let quoted_tweet = null
       
       if (quoteRelation) {
+        quote_tweet_id = quoteRelation.quoted_tweet_id
         const quotedTweet = quotedTweets.find(qt => qt.tweet_id === quoteRelation.quoted_tweet_id)
         if (quotedTweet) {
-          quote_tweet_id = quoteRelation.quoted_tweet_id
           quoted_tweet = {
             tweet_id: quotedTweet.tweet_id,
             account_id: quotedTweet.account_id,
@@ -147,6 +174,20 @@ export const getConversationTweets = async (tweet_id: string): Promise<ThreadTwe
             username: quotedTweet.username,
             account_display_name: quotedTweet.account_display_name,
             media: quotedTweet.media || []
+          }
+        } else {
+          // Quote relation exists but the target tweet was deleted — keep the id so the
+          // renderer can show a "[Quoted tweet deleted]" placeholder.
+          quoted_tweet = {
+            tweet_id: quoteRelation.quoted_tweet_id,
+            account_id: '',
+            created_at: '',
+            full_text: '',
+            retweet_count: 0,
+            favorite_count: 0,
+            username: '',
+            account_display_name: '',
+            is_deleted: true,
           }
         }
       }
@@ -221,45 +262,58 @@ async function getReplyChain(supabase: any, tweetId: string, visited: Set<string
 export const buildConversationTree = (tweets: ThreadTweet[]): ConversationTree => {
   const tree: ConversationTree = {
     root: '',
+    roots: [],
     tweets: {},
     children: {},
     parents: {},
     paths: {}
   }
 
-  // Organize tweets by ID and build parent/child relationships
+  // Phase 1: index every real tweet
   for (const tweet of tweets) {
     tree.tweets[tweet.tweet_id] = tweet
-    tree.children[tweet.tweet_id] = []
+    if (!tree.children[tweet.tweet_id]) tree.children[tweet.tweet_id] = []
+  }
 
+  // Phase 2: synthesize placeholders for any reply target that didn't survive
+  for (const tweet of tweets) {
     const reply_to = tweet.reply_to_tweet_id
-    if (reply_to && tree.tweets[reply_to]) {
-      tree.children[reply_to].push(tweet.tweet_id)
-      tree.parents[tweet.tweet_id] = reply_to
-    } else if (!reply_to) {
-      tree.root = tweet.tweet_id
+    if (reply_to && !tree.tweets[reply_to]) {
+      tree.tweets[reply_to] = makeDeletedPlaceholder(reply_to)
+      tree.children[reply_to] = []
     }
   }
 
-  // Build paths from root to each leaf
+  // Phase 3: wire parent/child relationships using the (now complete) tweet index
+  for (const id of Object.keys(tree.tweets)) {
+    const tweet = tree.tweets[id]
+    const reply_to = tweet.reply_to_tweet_id
+    if (reply_to && tree.tweets[reply_to]) {
+      tree.children[reply_to].push(id)
+      tree.parents[id] = reply_to
+    }
+  }
+
+  // Phase 4: collect every top-level node (no parent in the tree). Placeholders without
+  // a parent become roots so their orphan-reply descendants are reachable from rendering.
+  for (const id of Object.keys(tree.tweets)) {
+    if (!tree.parents[id]) tree.roots.push(id)
+  }
+  // Backward-compat: pick the primary `root`. Prefer real tweets over placeholders.
+  const realRoots = tree.roots.filter((id) => !tree.tweets[id].is_deleted_placeholder)
+  tree.root = realRoots[0] ?? tree.roots[0] ?? ''
+
+  // Phase 5: build root-to-leaf paths for every root.
   const buildPaths = (currentId: string, path: string[] = []): void => {
     const newPath = [...path, currentId]
     const children = tree.children[currentId] || []
-
     if (children.length === 0) {
-      // Leaf node - store the path
       tree.paths[currentId] = newPath
     } else {
-      // Has children - recurse
-      for (const childId of children) {
-        buildPaths(childId, newPath)
-      }
+      for (const childId of children) buildPaths(childId, newPath)
     }
   }
-
-  if (tree.root) {
-    buildPaths(tree.root)
-  }
+  for (const rootId of tree.roots) buildPaths(rootId)
 
   return tree
 }

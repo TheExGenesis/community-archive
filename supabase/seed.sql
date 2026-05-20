@@ -210,5 +210,18 @@ VALUES
 
 SELECT setval(pg_get_serial_sequence('public.tweet_urls', 'id'), 10000);
 
+-- User action log (mock history). Triggers are disabled by session_replication_role=replica
+-- during seeding, so we insert these rows explicitly rather than letting trg_log_archive_upload_event fire.
+INSERT INTO "public"."user_action_log" ("id", "account_id", "action_type", "metadata", "created_at") OVERRIDING SYSTEM VALUE
+VALUES
+  (1, 'mock_alice', 'archive_upload', '{"archive_upload_id": 101, "archive_at": "2024-12-01T00:00:00Z"}'::jsonb, '2024-12-01T00:05:00Z'),
+  (2, 'mock_bob',   'archive_upload', '{"archive_upload_id": 102, "archive_at": "2024-12-01T00:00:00Z"}'::jsonb, '2024-12-01T00:10:00Z'),
+  (3, 'mock_xiq',   'archive_upload', '{"archive_upload_id": 108, "archive_at": "2024-12-01T00:00:00Z"}'::jsonb, '2024-12-01T00:15:00Z'),
+  -- Demonstration of settings-change events
+  (4, 'mock_xiq',   'opt_in',         NULL,                                                                       '2024-12-02T08:00:00Z'),
+  (5, 'mock_alice', 'archive_upload', '{"archive_upload_id": 109, "archive_at": "2025-02-15T00:00:00Z", "note":"re-upload"}'::jsonb, '2025-02-15T00:00:00Z');
+
+SELECT setval(pg_get_serial_sequence('public.user_action_log', 'id'), 1000);
+
 -- Reset replication role
 SET session_replication_role = DEFAULT;

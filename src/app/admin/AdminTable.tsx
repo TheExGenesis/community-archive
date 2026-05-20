@@ -223,9 +223,7 @@ export function AdminTable({
       setRows((prev) => [...prev, ...page.rows])
       setCursor(page.nextCursor)
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : 'Failed to load more accounts',
-      )
+      setError(e instanceof Error ? e.message : 'Failed to load more accounts')
     } finally {
       setLoadingMore(false)
     }
@@ -280,9 +278,7 @@ export function AdminTable({
         <TableBody>
           {rows.map((row) => {
             const accountId =
-              row.account?.account_id ??
-              row.optInRecord?.twitter_user_id ??
-              ''
+              row.account?.account_id ?? row.optInRecord?.twitter_user_id ?? ''
             const updatedAt =
               row.account?.updated_at ?? row.optInRecord?.updated_at ?? null
             return (

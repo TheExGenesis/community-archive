@@ -17,10 +17,13 @@ async function deleteScrapeBlock(
   accountId: string,
 ) {
   if (!accountId) return
-  const { error } = await admin.rpc('admin_set_scrape_block' as never, {
-    p_account_id: accountId,
-    p_blocked: false,
-  } as never)
+  const { error } = await admin.rpc(
+    'admin_set_scrape_block' as never,
+    {
+      p_account_id: accountId,
+      p_blocked: false,
+    } as never,
+  )
   if (error) throw error
 }
 
@@ -29,10 +32,13 @@ async function upsertScrapeBlock(
   accountId: string,
 ) {
   if (!accountId) return
-  const { error } = await admin.rpc('admin_set_scrape_block' as never, {
-    p_account_id: accountId,
-    p_blocked: true,
-  } as never)
+  const { error } = await admin.rpc(
+    'admin_set_scrape_block' as never,
+    {
+      p_account_id: accountId,
+      p_blocked: true,
+    } as never,
+  )
   if (error) throw error
 }
 
@@ -66,9 +72,7 @@ export async function loadMoreAccountsAction(input: {
   )
 }
 
-export async function searchAccountsAction(
-  search: string,
-): Promise<{
+export async function searchAccountsAction(search: string): Promise<{
   rows: AccountsPage['rows']
   nextCursor: AccountsCursor | null
   warning: string | null
@@ -87,7 +91,9 @@ export async function manualOptIn(formData: FormData) {
   const admin = await getAdminClient()
   const username = normalizeUsername(String(formData.get('username') ?? ''))
   if (!username) {
-    redirect(`/admin?flash=error&msg=${encodeURIComponent('Username is required')}`)
+    redirect(
+      `/admin?flash=error&msg=${encodeURIComponent('Username is required')}`,
+    )
   }
 
   const accountId = await lookupAccountIdByUsername(admin, username)
@@ -201,10 +207,9 @@ export async function adminOptOutAccount(formData: FormData) {
 
   const optOutResponse = id
     ? await admin.from('optin').update(optOutUpdate).eq('id', id)
-    : await admin.from('optin').upsert(
-        { ...optOutUpdate, user_id: null },
-        { onConflict: 'username' },
-      )
+    : await admin
+        .from('optin')
+        .upsert({ ...optOutUpdate, user_id: null }, { onConflict: 'username' })
   if (optOutResponse.error) throw optOutResponse.error
 
   if (deleteData) {

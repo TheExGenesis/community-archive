@@ -191,9 +191,7 @@ async function fetchOptInRows(
     .limit(500)
 
   if (search) {
-    query = query.or(
-      `username.ilike.%${search}%,twitter_user_id.eq.${search}`,
-    )
+    query = query.or(`username.ilike.%${search}%,twitter_user_id.eq.${search}`)
   }
 
   const { data, error } = await query
@@ -220,9 +218,7 @@ async function fetchAccountsPage(
     .limit(overscan)
 
   if (search) {
-    query = query.or(
-      `username.ilike.%${search}%,account_id.eq.${search}`,
-    )
+    query = query.or(`username.ilike.%${search}%,account_id.eq.${search}`)
   }
 
   if (cursor) {
@@ -276,13 +272,14 @@ function buildOptInMergedRows(
         : null) ??
       accountsByUsername.get(record.username.toLowerCase()) ??
       null
-    const effectiveAccountId = record.twitter_user_id ?? account?.account_id ?? ''
+    const effectiveAccountId =
+      record.twitter_user_id ?? account?.account_id ?? ''
     return {
       key: `optin:${record.id}`,
       username: record.username,
       account,
       archiveUploadCount: account
-        ? uploadCounts.get(account.account_id) ?? 0
+        ? (uploadCounts.get(account.account_id) ?? 0)
         : 0,
       blockedFromScraping: effectiveAccountId
         ? blocked.has(effectiveAccountId)
@@ -371,10 +368,12 @@ export async function loadInitialAccounts(
   const [uploadCounts, scrapeBlocklist] = await Promise.all([
     fetchUploadCounts(
       admin,
-      Array.from(new Set([
-        ...optInAccountList.map((a) => a.account_id),
-        ...firstAccounts.map((a) => a.account_id),
-      ])),
+      Array.from(
+        new Set([
+          ...optInAccountList.map((a) => a.account_id),
+          ...firstAccounts.map((a) => a.account_id),
+        ]),
+      ),
     ),
     fetchScrapeBlocklist(admin, candidateAccountIds),
   ])

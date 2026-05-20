@@ -9,15 +9,15 @@ export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies()
     const supabase = createServerClient(cookieStore)
-    
+
     // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Real service-role client. The cookies-bound "admin" client only sets
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     if (!normalizedUsername) {
       return NextResponse.json(
         { error: 'Username is required' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -61,15 +61,18 @@ export async function POST(request: NextRequest) {
       console.error('Error fetching opt-in status:', byUserIdResponse.error)
       return NextResponse.json(
         { error: 'Failed to fetch opt-in status' },
-        { status: 500 }
+        { status: 500 },
       )
     }
 
     if (byUsernameResponse.error) {
-      console.error('Error fetching username opt-in row:', byUsernameResponse.error)
+      console.error(
+        'Error fetching username opt-in row:',
+        byUsernameResponse.error,
+      )
       return NextResponse.json(
         { error: 'Failed to fetch opt-in status' },
-        { status: 500 }
+        { status: 500 },
       )
     }
 
@@ -81,7 +84,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: 'This username is already registered by another user' },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
@@ -94,7 +97,7 @@ export async function POST(request: NextRequest) {
       opted_in: Boolean(optedIn) && !nextExplicitOptOut,
       terms_version: optedIn
         ? termsVersion
-        : existingRecord?.terms_version ?? termsVersion ?? 'v1.0',
+        : (existingRecord?.terms_version ?? termsVersion ?? 'v1.0'),
       explicit_optout: nextExplicitOptOut,
       opt_out_reason: nextExplicitOptOut
         ? optOutReason || 'User explicitly opted out via profile settings'
@@ -113,7 +116,7 @@ export async function POST(request: NextRequest) {
         console.error('Error updating opt-in status:', error)
         return NextResponse.json(
           { error: 'Failed to update opt-in status' },
-          { status: 500 }
+          { status: 500 },
         )
       }
 
@@ -127,18 +130,18 @@ export async function POST(request: NextRequest) {
 
       if (error) {
         console.error('Error creating opt-in record:', error)
-        
+
         // Check if username is already taken
         if (error.code === '23505' && error.message.includes('username')) {
           return NextResponse.json(
             { error: 'This username is already registered by another user' },
-            { status: 400 }
+            { status: 400 },
           )
         }
-        
+
         return NextResponse.json(
           { error: 'Failed to create opt-in record' },
-          { status: 500 }
+          { status: 500 },
         )
       }
 
@@ -148,16 +151,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: result,
-      message: optedIn 
-        ? 'Successfully opted in to tweet streaming' 
-        : 'Successfully opted out of tweet streaming'
+      message: optedIn
+        ? 'Successfully opted in to tweet streaming'
+        : 'Successfully opted out of tweet streaming',
     })
-
   } catch (error) {
     console.error('Unexpected error in opt-in API:', error)
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }
@@ -166,15 +168,15 @@ export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
     const supabase = createServerClient(cookieStore)
-    
+
     // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Get user's opt-in status
@@ -184,25 +186,25 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .single()
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+    if (error && error.code !== 'PGRST116') {
+      // PGRST116 = no rows returned
       console.error('Error fetching opt-in status:', error)
       return NextResponse.json(
         { error: 'Failed to fetch opt-in status' },
-        { status: 500 }
+        { status: 500 },
       )
     }
 
     return NextResponse.json({
       success: true,
       data: data || null,
-      isOptedIn: data?.opted_in || false
+      isOptedIn: data?.opted_in || false,
     })
-
   } catch (error) {
     console.error('Unexpected error in opt-in API:', error)
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

@@ -1,0 +1,55 @@
+name: Sync staging database
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/**'
+      - 'scripts/sync-staging-db.sh'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'supabase/**'
+      - 'scripts/sync-staging-db.sh'
+
+concurrency:
+  # Single global mutex — only one run touches the staging DB at a time. Pushes queue.
+  group: sync-staging-db
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    environment: Preview
+    # Fork PRs can't access the Preview environment secrets — skip the job rather than
+    # let it fail. Trusted maintainers can still trigger via workflow_dispatch.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync staging database
+        env:
+          SUPABASE_STAGING_PROJECT_REF: ${{ secrets.SUPABASE_STAGING_PROJECT_REF }}
+          STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          # supabase config.toml references these for the local-dev Twitter OAuth provider.
+          # Hosted DB reset only needs them to satisfy config parsing — values aren't applied.
+          SUPABASE_AUTH_TWITTER_CLIENT_ID: unused-for-staging-reset
+          SUPABASE_AUTH_TWITTER_SECRET: unused-for-staging-reset
+        run: ./scripts/sync-staging-db.sh

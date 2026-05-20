@@ -10,16 +10,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AdminActionsMenu, type AdminMenuAction } from './AdminActionsMenu'
-import { loadMoreAccountsAction } from './actions'
-import type { AccountsCursor, MergedRow, OptInRecord } from './data'
 import {
   adminOptOutAccount,
   adminSetOptInState,
+  loadMoreAccountsAction,
+  searchAccountsAction,
   setScrapeBlock,
 } from './actions'
+import type { AccountsCursor, MergedRow, OptInRecord } from './data'
 
 const formatDate = (value: string | null) => {
   if (!value) return 'never'
@@ -160,35 +160,42 @@ export function AdminTable({
   initialSearch,
   initialOptInCount,
 }: AdminTableProps) {
-  const router = useRouter()
   const [searchInput, setSearchInput] = useState(initialSearch)
+  const [activeSearch, setActiveSearch] = useState(initialSearch)
   const [rows, setRows] = useState<MergedRow[]>(initialRows)
   const [cursor, setCursor] = useState<AccountsCursor | null>(initialCursor)
+  const [optInCount, setOptInCount] = useState(initialOptInCount)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [searching, setSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const optInCount = initialOptInCount
 
-  // Server-side search via URL navigation. Debounce so we don't refetch on every
-  // keystroke. The page is a server component, so changing ?q= re-renders it
-  // with fresh initial data; we then reset the client state from props.
-  const initialSearchRef = useRef(initialSearch)
+  // Debounced server-action search. Doesn't touch the URL or trigger an RSC
+  // refetch — we just call a server action and replace the table contents.
+  // A monotonically-increasing token lets stale responses get discarded.
+  const searchTokenRef = useRef(0)
   useEffect(() => {
-    if (searchInput === initialSearchRef.current) return
-    const handle = setTimeout(() => {
-      const params = new URLSearchParams()
-      if (searchInput.trim()) params.set('q', searchInput.trim())
-      router.replace(`/admin${params.toString() ? `?${params}` : ''}`)
+    const trimmed = searchInput.trim()
+    if (trimmed === activeSearch) return
+    const handle = setTimeout(async () => {
+      const token = ++searchTokenRef.current
+      setSearching(true)
+      setError(null)
+      try {
+        const page = await searchAccountsAction(trimmed)
+        if (token !== searchTokenRef.current) return
+        setRows(page.rows)
+        setCursor(page.nextCursor)
+        setOptInCount(page.optInCount)
+        setActiveSearch(trimmed)
+      } catch (e) {
+        if (token !== searchTokenRef.current) return
+        setError(e instanceof Error ? e.message : 'Search failed')
+      } finally {
+        if (token === searchTokenRef.current) setSearching(false)
+      }
     }, 300)
     return () => clearTimeout(handle)
-  }, [searchInput, router])
-
-  // When props change (after navigation completes), sync state.
-  useEffect(() => {
-    initialSearchRef.current = initialSearch
-    setRows(initialRows)
-    setCursor(initialCursor)
-    setError(null)
-  }, [initialRows, initialCursor, initialSearch])
+  }, [searchInput, activeSearch])
 
   const accountRowKeys = useMemo(() => {
     const accountIds = new Set<string>()
@@ -208,7 +215,7 @@ export function AdminTable({
     setError(null)
     try {
       const page = await loadMoreAccountsAction({
-        search: initialSearch,
+        search: activeSearch,
         cursor,
         excludeAccountIds: Array.from(accountRowKeys.accountIds),
         excludeUsernames: Array.from(accountRowKeys.usernames),
@@ -222,7 +229,7 @@ export function AdminTable({
     } finally {
       setLoadingMore(false)
     }
-  }, [cursor, loadingMore, initialSearch, accountRowKeys])
+  }, [cursor, loadingMore, activeSearch, accountRowKeys])
 
   useEffect(() => {
     if (!cursor) return
@@ -250,6 +257,7 @@ export function AdminTable({
           className="sm:max-w-md"
         />
         <p className="text-xs text-muted-foreground">
+          {searching ? 'Searching… ' : ''}
           {optInCount > 0
             ? `${optInCount} opt-in row${optInCount === 1 ? '' : 's'} pinned at top · `
             : ''}

@@ -6,6 +6,7 @@ import {
   AccountsCursor,
   AccountsPage,
   getAdminClient,
+  loadInitialAccounts,
   loadMoreAccountsData,
   lookupAccountIdByUsername,
   normalizeUsername,
@@ -63,6 +64,23 @@ export async function loadMoreAccountsAction(input: {
     input.excludeAccountIds,
     input.excludeUsernames,
   )
+}
+
+export async function searchAccountsAction(
+  search: string,
+): Promise<{
+  rows: AccountsPage['rows']
+  nextCursor: AccountsCursor | null
+  warning: string | null
+  optInCount: number
+}> {
+  const data = await loadInitialAccounts(normalizeUsername(search))
+  return {
+    rows: data.rows,
+    nextCursor: data.nextCursor,
+    warning: data.warning,
+    optInCount: data.optInCount,
+  }
 }
 
 export async function manualOptIn(formData: FormData) {

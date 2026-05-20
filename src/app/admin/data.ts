@@ -1,4 +1,7 @@
-import { createServerAdminClient, createServerClient } from '@/utils/supabase'
+import {
+  createServerClient,
+  createServerServiceRoleClient,
+} from '@/utils/supabase'
 import type { User } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
@@ -121,8 +124,11 @@ export async function requireAdmin() {
 }
 
 export async function getAdminClient() {
-  const { cookieStore } = await requireAdmin()
-  return createServerAdminClient(cookieStore)
+  // requireAdmin gates access via the user's session, then we hand out a real
+  // service-role client (no cookies) so PostgREST sees service_role on the
+  // wire. Otherwise RLS + RPC EXECUTE grants reject the calls.
+  await requireAdmin()
+  return createServerServiceRoleClient()
 }
 
 export const normalizeUsername = (value: string | undefined | null) =>

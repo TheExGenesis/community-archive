@@ -1,4 +1,7 @@
-import { createServerAdminClient, createServerClient } from '@/utils/supabase'
+import {
+  createServerClient,
+  createServerServiceRoleClient,
+} from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -17,7 +20,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const admin = createServerAdminClient(cookieStore)
+    // Real service-role client. The cookies-bound "admin" client only sets
+    // service_role as `apikey` and still sends the user's JWT as Authorization,
+    // so PostgREST treats it as `authenticated` and RLS blocks updates to rows
+    // whose user_id is null or doesn't match (e.g. admin manual opt-in rows
+    // waiting to be claimed). All identity checks are enforced below.
+    const admin = createServerServiceRoleClient()
     const body = await request.json()
     const {
       username,

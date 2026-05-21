@@ -126,70 +126,122 @@ async function exportUserDataInline(
   const startedAt = new Date()
   const exportPrefix = `${startedAt.toISOString().replace(/[:.]/g, '-')}-${args.accountId}`
 
-  // 1. Copy archive files from `archives/{username}/` to
-  //    `admin-deleted-user-data/{exportPrefix}/archives/`.
+  // Phase timings printed to Vercel logs so we can see exactly which step
+  // dominates wall time when this gets re-run on bigger accounts.
+  const t0 = Date.now()
+  const phaseMs: Record<string, number> = {}
+  const markPhase = (name: string, sinceMs: number) => {
+    phaseMs[name] = Date.now() - sinceMs
+  }
+
+  // 1. Copy archive files in parallel. Each storage.copy is an
+  //    independent server-side copy, so the upper bound is Supabase's
+  //    rate limit, not our wall time.
+  const tArchives = Date.now()
   const { data: archiveFiles, error: listError } = await admin.storage
     .from('archives')
     .list(args.username)
   if (listError) {
     throw new Error(`Failed to list archives: ${listError.message}`)
   }
-  let archiveFilesCopied = 0
-  for (const file of archiveFiles ?? []) {
-    const src = `${args.username}/${file.name}`
-    const dst = `${exportPrefix}/archives/${file.name}`
-    const { error: copyError } = await admin.storage
-      .from('archives')
-      .copy(src, dst, { destinationBucket: EXPORT_BUCKET })
-    if (copyError) {
-      throw new Error(`Failed to copy ${src}: ${copyError.message}`)
-    }
-    archiveFilesCopied += 1
-  }
+  const copyResults = await Promise.all(
+    (archiveFiles ?? []).map(async (file) => {
+      const src = `${args.username}/${file.name}`
+      const dst = `${exportPrefix}/archives/${file.name}`
+      const { error: copyError } = await admin.storage
+        .from('archives')
+        .copy(src, dst, { destinationBucket: EXPORT_BUCKET })
+      if (copyError) {
+        throw new Error(`Failed to copy ${src}: ${copyError.message}`)
+      }
+      return file.name
+    }),
+  )
+  const archiveFilesCopied = copyResults.length
+  markPhase('archives_copy', tArchives)
 
   // 2. Dump tweets table as JSON. PostgREST silently caps SELECTs at
   //    1000 rows by default (`max-rows`), so we MUST page through with
   //    `.range()` — without this, an account with >1000 tweets gets a
   //    silently-truncated export. See AGENTS.md → "Supabase gotchas".
-  //    This is also the operation that can time out for large accounts;
-  //    the UI warns above 10k. Workaround for genuinely large accounts
-  //    is the Hetzner worker (TODO).
+  //
+  //    Pages are fetched in parallel BATCHES of TWEET_FETCH_CONCURRENCY
+  //    to keep wall time roughly numPages / concurrency * RTT, instead
+  //    of numPages * RTT. PostgREST + pgbouncer can comfortably handle
+  //    ~10 concurrent reads from one service-role connection; going
+  //    higher risks starving the pooler for other traffic.
+  //
+  //    Total count is queried first via head:true (cheap) so we can
+  //    bound the batch loop. If the count grows mid-export (it
+  //    shouldn't — opt-out already blocks new ingest), the final
+  //    `rows.length < TWEET_PAGE_SIZE` check below catches it.
+  const tTweets = Date.now()
   const TWEET_PAGE_SIZE = 1000
-  const tweets: unknown[] = []
-  let offset = 0
-  while (true) {
-    const { data: page, error: tweetsError } = await admin
-      .from('tweets')
-      .select('*')
-      // `.order('tweet_id')` keeps pagination stable even if rows shift
-      // mid-export. tweet_id is the table's PK so the index is free.
-      .order('tweet_id', { ascending: true })
-      .eq('account_id', args.accountId)
-      .range(offset, offset + TWEET_PAGE_SIZE - 1)
-    if (tweetsError) {
-      throw new Error(
-        `Failed to dump tweets (offset ${offset}): ${tweetsError.message}`,
-      )
-    }
-    const rows = page ?? []
-    tweets.push(...rows)
-    if (rows.length < TWEET_PAGE_SIZE) break
-    offset += rows.length
+  const TWEET_FETCH_CONCURRENCY = 10
+  const { count: totalTweets, error: countError } = await admin
+    .from('tweets')
+    .select('tweet_id', { count: 'exact', head: true })
+    .eq('account_id', args.accountId)
+  if (countError) {
+    throw new Error(`Failed to count tweets: ${countError.message}`)
   }
-  const tweetsBlob = new Blob([JSON.stringify(tweets, null, 0)], {
-    type: 'application/json',
-  })
+  const numPages = Math.max(
+    1,
+    Math.ceil((totalTweets ?? 0) / TWEET_PAGE_SIZE),
+  )
+  const tweets: unknown[] = []
+  for (
+    let pageStart = 0;
+    pageStart < numPages;
+    pageStart += TWEET_FETCH_CONCURRENCY
+  ) {
+    const batchSize = Math.min(
+      TWEET_FETCH_CONCURRENCY,
+      numPages - pageStart,
+    )
+    const batch = await Promise.all(
+      Array.from({ length: batchSize }, (_, i) => {
+        const pageIdx = pageStart + i
+        return admin
+          .from('tweets')
+          .select('*')
+          // `.order('tweet_id')` keeps pagination stable even if rows
+          // shift mid-export. tweet_id is the table's PK so free.
+          .order('tweet_id', { ascending: true })
+          .eq('account_id', args.accountId)
+          .range(
+            pageIdx * TWEET_PAGE_SIZE,
+            (pageIdx + 1) * TWEET_PAGE_SIZE - 1,
+          )
+      }),
+    )
+    for (const r of batch) {
+      if (r.error) {
+        throw new Error(`Failed to dump tweets: ${r.error.message}`)
+      }
+      tweets.push(...(r.data ?? []))
+    }
+  }
+  const tEncode = Date.now()
+  const tweetsJson = JSON.stringify(tweets, null, 0)
+  markPhase('tweets_json_encode', tEncode)
+
+  const tUpload = Date.now()
   const { error: tweetsUploadError } = await admin.storage
     .from(EXPORT_BUCKET)
-    .upload(`${exportPrefix}/tweets.json`, tweetsBlob, {
-      contentType: 'application/json',
-      upsert: false,
-    })
+    .upload(
+      `${exportPrefix}/tweets.json`,
+      new Blob([tweetsJson], { type: 'application/json' }),
+      { contentType: 'application/json', upsert: false },
+    )
   if (tweetsUploadError) {
     throw new Error(`Failed to upload tweets.json: ${tweetsUploadError.message}`)
   }
+  markPhase('tweets_upload', tUpload)
 
   // 3. Manifest.
+  const tManifest = Date.now()
+  const totalMs = Date.now() - t0
   const manifest = {
     account_id: args.accountId,
     username: args.username,
@@ -199,6 +251,8 @@ async function exportUserDataInline(
     completed_at: new Date().toISOString(),
     archive_files_copied: archiveFilesCopied,
     tweets_dumped: tweets.length,
+    total_tweets_expected: totalTweets ?? null,
+    phase_ms: { ...phaseMs, total: totalMs },
     notes:
       'Inline export from Vercel. Only the tweets table is dumped; other ' +
       'per-account tables (likes, followers, following, profile, etc.) ' +
@@ -218,6 +272,12 @@ async function exportUserDataInline(
   if (manifestError) {
     throw new Error(`Failed to upload manifest: ${manifestError.message}`)
   }
+  markPhase('manifest_upload', tManifest)
+
+  // Surfaced in Vercel function logs for post-mortem on timeouts.
+  console.log(
+    `[admin export] ${args.username} (${args.accountId}): tweets=${tweets.length}/${totalTweets} archives=${archiveFilesCopied} phases=${JSON.stringify(phaseMs)} total=${totalMs}ms`,
+  )
 
   return {
     exportPrefix,

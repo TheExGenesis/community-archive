@@ -2,6 +2,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Loader2, Search } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -289,14 +290,19 @@ export function AdminTable({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <Input
-          value={searchInput}
-          onChange={(event) => setSearchInput(event.target.value)}
-          placeholder="Search by @username or account id (server-side)"
-          className="sm:max-w-md"
-        />
+        <div className="relative sm:max-w-md sm:flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          {searching ? (
+            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          ) : null}
+          <Input
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search by @username or account id"
+            className="pl-9"
+          />
+        </div>
         <p className="text-xs text-muted-foreground">
-          {searching ? 'Searching… ' : ''}
           {optInCount > 0
             ? `${optInCount} opt-in row${optInCount === 1 ? '' : 's'} pinned at top · `
             : ''}

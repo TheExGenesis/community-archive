@@ -281,5 +281,46 @@ SELECT
 FROM generate_series(1, 5000) AS i
 ON CONFLICT ("tweet_id") DO NOTHING;
 
+-- Giant test account: 100,000 tweets — above the 10k inline ceiling so
+-- the "Opt out and delete data" dialog *should* show the ⚠ warning and
+-- (almost certainly) hit the Vercel 60s function timeout when exercised.
+-- Used to verify that the export gracefully fails halfway rather than
+-- silently truncating. After timeout: opt-out + scrape-block already
+-- committed synchronously, but archive copy + tweets dump and
+-- delete_user_archive don't run — needs the Hetzner worker (TODO).
+INSERT INTO "public"."all_account" ("account_id", "created_via", "username", "created_at", "account_display_name", "num_tweets", "num_following", "num_followers", "num_likes")
+VALUES
+  ('mock_giant', 'web', 'giant_test', '2015-01-01T00:00:00Z', 'Giant Test Account', 100000, 0, 0, 0)
+ON CONFLICT ("account_id") DO NOTHING;
+
+INSERT INTO "public"."archive_upload" ("id", "account_id", "archive_at", "created_at", "upload_phase") OVERRIDING SYSTEM VALUE
+VALUES
+  (201, 'mock_giant', '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed')
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "public"."all_profile" ("account_id", "bio", "website", "location", "avatar_media_url", "header_media_url", "archive_upload_id")
+VALUES
+  ('mock_giant', 'Synthetic 100k-tweet test account', NULL, NULL, 'https://api.dicebear.com/7.x/avataaars/svg?seed=giant_test', NULL, 201)
+ON CONFLICT ("account_id") DO NOTHING;
+
+-- 100,000 tweets generated inline. Note: the staging-sync workflow does
+-- a `supabase db reset` and re-applies this seed on every PR push, so
+-- expect the staging sync step to take noticeably longer (~10-20s extra)
+-- while this INSERT runs.
+INSERT INTO "public"."tweets" ("tweet_id", "account_id", "created_at", "full_text", "retweet_count", "favorite_count", "reply_to_tweet_id", "reply_to_user_id", "reply_to_username", "archive_upload_id")
+SELECT
+  't_giant_' || lpad(i::text, 6, '0'),
+  'mock_giant',
+  '2018-01-01T00:00:00Z'::timestamptz + (i || ' minutes')::interval,
+  'Synthetic giant-account tweet ' || i || ' for testing the inline export ceiling.',
+  0,
+  0,
+  NULL,
+  NULL,
+  NULL,
+  201
+FROM generate_series(1, 100000) AS i
+ON CONFLICT ("tweet_id") DO NOTHING;
+
 -- Reset replication role
 SET session_replication_role = DEFAULT;

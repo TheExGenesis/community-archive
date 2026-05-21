@@ -7,7 +7,6 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { AdminTable } from './AdminTable'
-import { ManualOptInForm } from './ManualOptInForm'
 import {
   ADMIN_USERNAME,
   getTwitterUsername,
@@ -57,27 +56,16 @@ export default async function AdminPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>Manual opt-in</CardTitle>
-            <CardDescription>
-              Opt someone in by Twitter username. If we already have an account
-              for that username, the opt-in row is linked to it; otherwise the
-              row is stored without a Twitter id and gets linked the next time
-              that user signs in or uploads an archive.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ManualOptInForm />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
             <CardTitle>Accounts</CardTitle>
             <CardDescription>
               Every public.optin row is pinned at the top, followed by accounts
-              with archive data sorted by most recently updated. Search runs
-              against the full database, not just the loaded rows. Scroll to
-              load more.
+              with archive data sorted by most recently updated. The manual
+              opt-in input below creates an opt-in row by Twitter username;
+              if we already have an archive account for that username the
+              opt-in row is linked to it, otherwise it&apos;s stored without a
+              Twitter id and gets linked the next time that user signs in or
+              uploads an archive. Search runs against the full database; the
+              table updates in place.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -86,7 +74,6 @@ export default async function AdminPage({
               initialRows={data.rows}
               initialCursor={data.nextCursor}
               initialSearch={search}
-              initialOptInCount={data.optInCount}
             />
           </CardContent>
         </Card>

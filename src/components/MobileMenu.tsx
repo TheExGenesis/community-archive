@@ -21,17 +21,23 @@ const baseNavItems = [
 
 const streamingNavItems = [{ href: '/stream-monitor', label: 'Stream Monitor' }]
 
-const userNavItems = [
-  { href: '/profile', label: 'Profile' },
-  { href: '/admin', label: 'Admin' },
-]
+const userNavItems = [{ href: '/profile', label: 'Profile' }]
+const adminNavItems = [{ href: '/admin', label: 'Admin' }]
 
-export default function MobileMenu() {
+export default function MobileMenu({
+  isAdmin = false,
+}: {
+  isAdmin?: boolean
+}) {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
 
-  // Include all navigation items
-  const navItems = [...baseNavItems, ...streamingNavItems, ...userNavItems]
+  const navItems = [
+    ...baseNavItems,
+    ...streamingNavItems,
+    ...userNavItems,
+    ...(isAdmin ? adminNavItems : []),
+  ]
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>

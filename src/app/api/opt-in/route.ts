@@ -6,26 +6,23 @@ import type { User } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
-// Derive the session's Twitter username from auth metadata. Used as the
-// source of truth for identity instead of trusting the request body —
-// otherwise a logged-in user could claim an unclaimed opt-in row for any
-// username (with the new service-role client, RLS no longer blocks this).
+// Derive the session's Twitter username from the OAuth identity entry.
+// SECURITY: only identity_data is trusted — user_metadata is user-mutable via
+// supabase.auth.updateUser({ data: ... }), so reading user_name from there
+// would let a logged-in user spoof their identity and claim an unclaimed
+// opt-in row for any username (combined with the service-role client that
+// bypasses RLS, this would be a real impersonation vector).
 function getSessionTwitterUsername(user: User): string | null {
-  const sources: Record<string, unknown>[] = [
-    user.user_metadata ?? {},
-    user.app_metadata ?? {},
-    ...((user.identities ?? []).map((i) => i.identity_data ?? {}) as Record<
-      string,
-      unknown
-    >[]),
-  ]
-  const keys = ['user_name', 'preferred_username', 'username', 'screen_name']
-  for (const src of sources) {
-    for (const k of keys) {
-      const v = src[k]
-      if (typeof v === 'string' && v.trim()) {
-        return v.trim().toLowerCase().replace(/^@/, '')
-      }
+  const identity =
+    user.identities?.find((i) =>
+      ['twitter', 'x'].includes(i.provider ?? ''),
+    ) ?? null
+  if (!identity) return null
+  const data = (identity.identity_data ?? {}) as Record<string, unknown>
+  for (const k of ['user_name', 'preferred_username', 'screen_name', 'username']) {
+    const v = data[k]
+    if (typeof v === 'string' && v.trim()) {
+      return v.trim().toLowerCase().replace(/^@/, '')
     }
   }
   return null

@@ -17,8 +17,8 @@ export type Database = {
     Functions: {
       apply_dev_entities_rls_policies: {
         Args: {
-          table_name: string
           schema_name: string
+          table_name: string
         }
         Returns: undefined
       }
@@ -72,11 +72,11 @@ export type Database = {
           limit_count: number
         }
         Returns: {
-          account_display_name: string
           account_id: string
           created_via: string
           username: string
           created_at: string
+          account_display_name: string
           avatar_media_url: string
           bio: string
           website: string
@@ -95,54 +95,54 @@ export type Database = {
       insert_temp_archive_upload: {
         Args: {
           p_account_id: string
-          p_suffix: string
           p_archive_at: string
+          p_suffix: string
         }
         Returns: number
       }
       insert_temp_followers: {
         Args: {
           p_followers: Json
-          p_suffix: string
           p_account_id: string
+          p_suffix: string
         }
         Returns: undefined
       }
       insert_temp_following: {
         Args: {
-          p_suffix: string
-          p_account_id: string
           p_following: Json
+          p_account_id: string
+          p_suffix: string
         }
         Returns: undefined
       }
       insert_temp_likes: {
         Args: {
+          p_likes: Json
           p_account_id: string
           p_suffix: string
-          p_likes: Json
         }
         Returns: undefined
       }
       insert_temp_profiles: {
         Args: {
-          p_suffix: string
-          p_account_id: string
           p_profile: Json
+          p_account_id: string
+          p_suffix: string
         }
         Returns: undefined
       }
       insert_temp_tweets: {
         Args: {
-          p_suffix: string
           p_tweets: Json
+          p_suffix: string
         }
         Returns: undefined
       }
       process_and_insert_tweet_entities: {
         Args: {
-          p_suffix: string
           p_tweets: Json
+          p_suffix: string
         }
         Returns: undefined
       }
@@ -1321,8 +1321,8 @@ export type Database = {
       }
       admin_set_scrape_block: {
         Args: {
-          p_blocked: boolean
           p_account_id: string
+          p_blocked: boolean
         }
         Returns: undefined
       }
@@ -1349,8 +1349,8 @@ export type Database = {
       }
       apply_public_rls_policies_not_private: {
         Args: {
-          table_name: string
           schema_name: string
+          table_name: string
         }
         Returns: undefined
       }
@@ -1387,8 +1387,8 @@ export type Database = {
       }
       delete_single_archive: {
         Args: {
-          p_archive_upload_id: number
           p_account_id: string
+          p_archive_upload_id: number
         }
         Returns: undefined
       }
@@ -1397,11 +1397,11 @@ export type Database = {
           p_tweet_ids: string[]
         }
         Returns: {
-          deleted_tweet_urls: number
           deleted_tweets: number
           deleted_conversations: number
           deleted_tweet_media: number
           deleted_user_mentions: number
+          deleted_tweet_urls: number
           deleted_private_tweet_user: number
         }[]
       }
@@ -1430,29 +1430,29 @@ export type Database = {
           limit_?: number
         }
         Returns: {
+          tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
           reply_to_tweet_id: string
           reply_to_user_id: string
           reply_to_username: string
           archive_upload_id: number
           num_likes: number
-          tweet_id: string
-          account_id: string
-          created_at: string
-          full_text: string
-          favorite_count: number
-          retweet_count: number
         }[]
       }
       get_account_most_mentioned_accounts: {
         Args: {
-          limit_: number
           username_: string
+          limit_: number
         }
         Returns: {
-          mention_count: number
-          name: string
           user_id: string
+          name: string
           screen_name: string
+          mention_count: number
         }[]
       }
       get_account_most_replied_tweets_by_archive_users: {
@@ -1461,11 +1461,11 @@ export type Database = {
           limit_: number
         }
         Returns: {
-          retweet_count: number
           tweet_id: string
           account_id: string
           created_at: string
           full_text: string
+          retweet_count: number
           favorite_count: number
           reply_to_tweet_id: string
           reply_to_user_id: string
@@ -1476,20 +1476,20 @@ export type Database = {
       }
       get_account_top_favorite_count_tweets: {
         Args: {
-          limit_: number
           username_: string
+          limit_: number
         }
         Returns: {
-          reply_to_tweet_id: string
-          favorite_count: number
-          retweet_count: number
-          full_text: string
-          created_at: string
-          account_id: string
           tweet_id: string
-          archive_upload_id: number
-          reply_to_username: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          reply_to_tweet_id: string
           reply_to_user_id: string
+          reply_to_username: string
+          archive_upload_id: number
         }[]
       }
       get_account_top_retweet_count_tweets: {
@@ -1498,16 +1498,16 @@ export type Database = {
           limit_: number
         }
         Returns: {
-          full_text: string
-          reply_to_tweet_id: string
-          favorite_count: number
-          reply_to_user_id: string
-          reply_to_username: string
-          archive_upload_id: number
-          retweet_count: number
           tweet_id: string
           account_id: string
           created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          reply_to_tweet_id: string
+          reply_to_user_id: string
+          reply_to_username: string
+          archive_upload_id: number
         }[]
       }
       get_hourly_scraping_stats: {
@@ -1515,10 +1515,10 @@ export type Database = {
           p_hours_back?: number
         }
         Returns: {
-          unique_scrapers: number
-          tweet_count: number
-          period_end: string
           period_start: string
+          period_end: string
+          tweet_count: number
+          unique_scrapers: number
         }[]
       }
       get_hourly_stats_simple: {
@@ -1526,8 +1526,8 @@ export type Database = {
           p_hours_back?: number
         }
         Returns: {
-          tweet_count: number
           period_start: string
+          tweet_count: number
         }[]
       }
       get_latest_tweets: {
@@ -1536,16 +1536,16 @@ export type Database = {
           p_account_id?: string
         }
         Returns: {
+          tweet_id: string
+          account_id: string
           created_at: string
           full_text: string
           retweet_count: number
           favorite_count: number
-          account_id: string
           reply_to_tweet_id: string
           avatar_media_url: string
-          account_display_name: string
           username: string
-          tweet_id: string
+          account_display_name: string
         }[]
       }
       get_main_thread: {
@@ -1553,7 +1553,6 @@ export type Database = {
           p_conversation_id: string
         }
         Returns: {
-          retweet_count: number
           tweet_id: string
           conversation_id: string
           reply_to_tweet_id: string
@@ -1561,6 +1560,7 @@ export type Database = {
           depth: number
           max_depth: number
           favorite_count: number
+          retweet_count: number
         }[]
       }
       get_monthly_tweet_counts: {
@@ -1577,12 +1577,12 @@ export type Database = {
           p_end_date?: string
         }
         Returns: {
-          avg_retweets: number
           month: string
           account_id: string
           tweet_count: number
           days_active: number
           avg_favorites: number
+          avg_retweets: number
         }[]
       }
       get_most_liked_tweets_by_username: {
@@ -1590,9 +1590,9 @@ export type Database = {
           username_: string
         }
         Returns: {
-          num_likes: number
           tweet_id: string
           full_text: string
+          num_likes: number
         }[]
       }
       get_most_mentioned_accounts_by_username: {
@@ -1600,15 +1600,15 @@ export type Database = {
           username_: string
         }
         Returns: {
-          mentioned_username: string
           mentioned_user_id: string
+          mentioned_username: string
           mention_count: number
         }[]
       }
       get_scraper_counts_by_granularity: {
         Args: {
-          end_date: string
           start_date: string
+          end_date: string
           granularity: string
         }
         Returns: {
@@ -1619,26 +1619,26 @@ export type Database = {
       get_simple_streamed_tweet_counts: {
         Args: {
           start_date: string
-          granularity: string
           end_date: string
+          granularity: string
         }
         Returns: {
-          tweet_count: number
           tweet_date: string
+          tweet_count: number
         }[]
       }
       get_streaming_stats: {
         Args: {
+          p_start_date: string
+          p_end_date: string
           p_granularity?: string
           p_streamed_only?: boolean
-          p_end_date: string
-          p_start_date: string
         }
         Returns: {
+          period_start: string
           period_end: string
           tweet_count: number
           unique_scrapers: number
-          period_start: string
         }[]
       }
       get_streaming_stats_daily: {
@@ -1655,20 +1655,20 @@ export type Database = {
       }
       get_streaming_stats_daily_streamed_only: {
         Args: {
-          p_end_date: string
           p_start_date: string
+          p_end_date: string
         }
         Returns: {
+          period_start: string
+          period_end: string
           tweet_count: number
           unique_scrapers: number
-          period_end: string
-          period_start: string
         }[]
       }
       get_streaming_stats_hourly: {
         Args: {
-          p_end_date: string
           p_start_date: string
+          p_end_date: string
         }
         Returns: {
           period_start: string
@@ -1695,22 +1695,22 @@ export type Database = {
           p_end_date: string
         }
         Returns: {
-          tweet_count: number
           period_start: string
           period_end: string
+          tweet_count: number
           unique_scrapers: number
         }[]
       }
       get_streaming_stats_weekly_streamed_only: {
         Args: {
-          p_end_date: string
           p_start_date: string
+          p_end_date: string
         }
         Returns: {
-          period_end: string
-          unique_scrapers: number
-          tweet_count: number
           period_start: string
+          period_end: string
+          tweet_count: number
+          unique_scrapers: number
         }[]
       }
       get_top_accounts_with_followers: {
@@ -1718,28 +1718,28 @@ export type Database = {
           limit_count: number
         }
         Returns: {
-          bio: string
-          avatar_media_url: string
-          account_display_name: string
+          account_id: string
           created_via: string
           username: string
           created_at: string
-          account_id: string
-          num_tweets: number
-          num_followers: number
-          header_media_url: string
-          location: string
+          account_display_name: string
+          avatar_media_url: string
+          bio: string
           website: string
+          location: string
+          header_media_url: string
+          num_followers: number
+          num_tweets: number
         }[]
       }
       get_top_liked_users: {
         Args: Record<PropertyKey, never>
         Returns: {
-          reply_to_user_id: string
           tweet_id: string
           full_text: string
           like_count: number
           reply_to_tweet_id: string
+          reply_to_user_id: string
           reply_to_username: string
         }[]
       }
@@ -1749,9 +1749,9 @@ export type Database = {
         }
         Returns: {
           user_id: string
-          mention_count: number
-          screen_name: string
           name: string
+          screen_name: string
+          mention_count: number
         }[]
       }
       get_top_retweeted_tweets_by_username: {
@@ -1760,6 +1760,9 @@ export type Database = {
           limit_: number
         }
         Returns: {
+          tweet_id: string
+          account_id: string
+          created_at: string
           full_text: string
           retweet_count: number
           favorite_count: number
@@ -1767,9 +1770,6 @@ export type Database = {
           reply_to_user_id: string
           reply_to_username: string
           archive_upload_id: number
-          tweet_id: string
-          account_id: string
-          created_at: string
         }[]
       }
       get_trending_tweets: {
@@ -1778,46 +1778,46 @@ export type Database = {
           limit_count?: number
         }
         Returns: {
-          favorite_count: number
-          full_text: string
-          engagement_score: number
-          retweet_count: number
-          created_at: string
           tweet_id: string
           account_id: string
+          full_text: string
+          created_at: string
+          favorite_count: number
+          retweet_count: number
+          engagement_score: number
         }[]
       }
       get_tweet_count_by_date:
         | {
             Args: {
-              granularity: string
               start_date: string
               end_date: string
             }
             Returns: {
-              tweet_count: number
               tweet_date: string
+              tweet_count: number
             }[]
           }
         | {
             Args: {
               start_date: string
               end_date: string
+              granularity: string
             }
             Returns: {
-              tweet_count: number
               tweet_date: string
+              tweet_count: number
             }[]
           }
       get_tweet_counts_by_granularity: {
         Args: {
-          end_date: string
           start_date: string
+          end_date: string
           granularity: string
         }
         Returns: {
-          tweet_count: number
           tweet_date: string
+          tweet_count: number
         }[]
       }
       get_tweet_page_data: {
@@ -1828,8 +1828,8 @@ export type Database = {
       }
       get_unique_scraper_count: {
         Args: {
-          end_date: string
           start_date: string
+          end_date: string
         }
         Returns: number
       }
@@ -1872,13 +1872,13 @@ export type Database = {
       }
       insert_temp_archive_upload: {
         Args: {
-          p_end_date: string
-          p_upload_likes: boolean
-          p_keep_private: boolean
-          p_archive_at: string
-          p_suffix: string
           p_account_id: string
+          p_archive_at: string
+          p_keep_private: boolean
+          p_upload_likes: boolean
           p_start_date: string
+          p_end_date: string
+          p_suffix: string
         }
         Returns: number
       }
@@ -1892,39 +1892,39 @@ export type Database = {
       }
       insert_temp_following: {
         Args: {
-          p_suffix: string
           p_following: Json
           p_account_id: string
+          p_suffix: string
         }
         Returns: undefined
       }
       insert_temp_likes: {
         Args: {
           p_likes: Json
-          p_suffix: string
           p_account_id: string
+          p_suffix: string
         }
         Returns: undefined
       }
       insert_temp_profiles: {
         Args: {
-          p_suffix: string
-          p_account_id: string
           p_profile: Json
+          p_account_id: string
+          p_suffix: string
         }
         Returns: undefined
       }
       insert_temp_tweets: {
         Args: {
-          p_suffix: string
           p_tweets: Json
+          p_suffix: string
         }
         Returns: undefined
       }
       process_and_insert_tweet_entities: {
         Args: {
-          p_suffix: string
           p_tweets: Json
+          p_suffix: string
         }
         Returns: undefined
       }
@@ -1937,36 +1937,36 @@ export type Database = {
       search_tweets:
         | {
             Args: {
-              offset_?: number
-              limit_?: number
-              until_date?: string
-              since_date?: string
-              to_user?: string
-              from_user?: string
               search_query: string
+              from_user?: string
+              to_user?: string
+              since_date?: string
+              until_date?: string
+              limit_?: number
+              offset_?: number
             }
             Returns: {
-              media: Json
-              account_display_name: string
-              username: string
-              archive_upload_id: number
-              avatar_media_url: string
-              reply_to_tweet_id: string
-              favorite_count: number
-              retweet_count: number
-              full_text: string
-              created_at: string
-              account_id: string
               tweet_id: string
+              account_id: string
+              created_at: string
+              full_text: string
+              retweet_count: number
+              favorite_count: number
+              reply_to_tweet_id: string
+              avatar_media_url: string
+              archive_upload_id: number
+              username: string
+              account_display_name: string
+              media: Json
             }[]
           }
         | {
             Args: {
               search_query: string
+              limit_count?: number
               account_filter?: string
               date_from?: string
               date_to?: string
-              limit_count?: number
             }
             Returns: {
               tweet_id: string
@@ -1980,27 +1980,27 @@ export type Database = {
           }
       search_tweets_exact_phrase: {
         Args: {
-          until_date?: string
-          since_date?: string
-          to_user?: string
-          from_user?: string
           exact_phrase: string
-          offset_?: number
+          from_user?: string
+          to_user?: string
+          since_date?: string
+          until_date?: string
           limit_?: number
+          offset_?: number
         }
         Returns: {
-          retweet_count: number
-          media: Json
-          account_display_name: string
-          username: string
-          archive_upload_id: number
-          avatar_media_url: string
-          reply_to_tweet_id: string
-          favorite_count: number
-          full_text: string
-          created_at: string
-          account_id: string
           tweet_id: string
+          account_id: string
+          created_at: string
+          full_text: string
+          retweet_count: number
+          favorite_count: number
+          reply_to_tweet_id: string
+          avatar_media_url: string
+          archive_upload_id: number
+          username: string
+          account_display_name: string
+          media: Json
         }[]
       }
       set_limit: {
@@ -2021,18 +2021,18 @@ export type Database = {
       }
       update_foreign_keys: {
         Args: {
-          schema_name: string
-          new_table_name: string
           old_table_name: string
+          new_table_name: string
+          schema_name: string
         }
         Returns: undefined
       }
       word_occurrences: {
         Args: {
-          end_date?: string
-          user_ids?: string[]
           search_word: string
           start_date?: string
+          end_date?: string
+          user_ids?: string[]
         }
         Returns: {
           month: string

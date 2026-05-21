@@ -2,6 +2,7 @@
 
 import { Fragment, useState, useTransition } from 'react'
 import { AlertCircle, MoreHorizontal } from 'lucide-react'
+import type { AdminActionResult } from './actions'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -29,7 +30,7 @@ export type AdminMenuAction = {
   label: string
   title: string
   description: string
-  action: (formData: FormData) => void | Promise<void>
+  action: (formData: FormData) => Promise<AdminActionResult>
   hiddenInputs: HiddenInput[]
   consequences?: string[]
   disabled?: boolean
@@ -40,7 +41,7 @@ export type AdminMenuAction = {
 
 type AdminActionsMenuProps = {
   actions: AdminMenuAction[]
-  onActionComplete?: () => void | Promise<void>
+  onActionComplete?: (result: AdminActionResult) => void | Promise<void>
 }
 
 export function AdminActionsMenu({
@@ -121,13 +122,23 @@ export function AdminActionsMenu({
                 startTransition(async () => {
                   setError(null)
                   try {
-                    await action(formData)
+                    const result = await action(formData)
+                    // Defensive: server actions can resolve to undefined when
+                    // the route redirects (e.g. session expired during the
+                    // action). Treat that as a generic failure rather than
+                    // crashing the consumer.
+                    if (!result) {
+                      setError('Action did not return a result')
+                      return
+                    }
+                    if (!result.ok) {
+                      setError(result.error)
+                      return
+                    }
                     setSelected(null)
-                    if (onActionComplete) await onActionComplete()
+                    if (onActionComplete) await onActionComplete(result)
                   } catch (e) {
-                    setError(
-                      e instanceof Error ? e.message : 'Action failed',
-                    )
+                    setError(e instanceof Error ? e.message : 'Action failed')
                   }
                 })
               }}

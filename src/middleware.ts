@@ -215,6 +215,12 @@ export async function middleware(request: NextRequest) {
   const ua = request.headers.get('user-agent') || ''
   const pageRoute = isPageRoute(pathname)
   const previewBot = isPreviewBot(ua)
+  // Server Action POSTs go to the page route URL (e.g. POST /admin) but with
+  // `next-action` header and Accept: text/x-component — not text/html. The
+  // browser-fingerprint check would otherwise 403 them and the client sees
+  // the action resolve to undefined.
+  const isServerAction =
+    request.method === 'POST' && request.headers.has('next-action')
 
   // ── Stage 1: Bot User-Agent Detection (all routes) ──────────────────────
   if (!previewBot) {
@@ -234,8 +240,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ── Stage 2: Browser Header Fingerprinting (all page routes) ────────────
-  if (pageRoute && !previewBot) {
+  // ── Stage 2: Browser Header Fingerprinting (page navigations only) ──────
+  if (pageRoute && !previewBot && !isServerAction) {
     const accept = request.headers.get('accept') || ''
     const acceptLang = request.headers.get('accept-language')
     const acceptEnc = request.headers.get('accept-encoding') || ''

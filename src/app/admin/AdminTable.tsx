@@ -17,6 +17,7 @@ import {
   adminSetOptInState,
   loadMoreAccountsAction,
   searchAccountsAction,
+  type AdminActionResult,
 } from './actions'
 import type { AccountsCursor, MergedRow, OptInRecord } from './data'
 
@@ -168,6 +169,10 @@ export function AdminTable({
       try {
         const page = await searchAccountsAction(trimmed)
         if (token !== searchTokenRef.current) return
+        if (!page) {
+          setError('Search failed (no data returned)')
+          return
+        }
         setRows(page.rows)
         setCursor(page.nextCursor)
         setOptInCount(page.optInCount)
@@ -194,21 +199,52 @@ export function AdminTable({
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
-  // Re-fetches the first page for the currently active search. Called after
-  // any row action so the table reflects the mutation. We don't rely on
-  // revalidatePath -> new initialRows because this component owns its row
-  // state and ignores prop changes.
-  const refresh = useCallback(async () => {
-    setError(null)
-    try {
-      const page = await searchAccountsAction(activeSearch)
-      setRows(page.rows)
-      setCursor(page.nextCursor)
-      setOptInCount(page.optInCount)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Refresh failed')
-    }
-  }, [activeSearch])
+  // Patches the row matching the action's updated optInRecord in place.
+  // Matching: same optInRecord.id (existing row) OR same username (newly
+  // created opt-in row, no prior id). archiveDeleted nulls out the account
+  // and zeroes the upload count without removing the row. Optimistic refetch
+  // intentionally avoided — it was the source of "Cannot read properties of
+  // undefined (reading 'rows')" when the searchAccountsAction resolved to
+  // undefined (server action redirect race).
+  const applyActionResult = useCallback((result: AdminActionResult) => {
+    if (!result.ok) return
+    const updated = result.optInRecord
+    setRows((prev) => {
+      let matched = false
+      const next = prev.map((row) => {
+        const sameRow =
+          row.optInRecord?.id === updated.id ||
+          row.username.toLowerCase() === updated.username.toLowerCase()
+        if (!sameRow) return row
+        matched = true
+        return {
+          ...row,
+          optInRecord: updated,
+          blockedFromScraping: result.blockedFromScraping,
+          account: result.archiveDeleted ? null : row.account,
+          archiveUploadCount: result.archiveDeleted
+            ? 0
+            : row.archiveUploadCount,
+        }
+      })
+      if (matched) return next
+      // The action created a brand-new opt-in row that wasn't yet shown
+      // (e.g. account-only row that hasn't been merged). Prepend it.
+      return [
+        {
+          key: `optin:${updated.id}`,
+          username: updated.username,
+          account: null,
+          archiveUploadCount: 0,
+          blockedFromScraping: result.blockedFromScraping,
+          optInRecord: updated,
+          fromOptIn: true,
+        },
+        ...prev,
+      ]
+    })
+    setOptInCount((prev) => prev) // count is informational; keep as is
+  }, [])
 
   const loadMore = useCallback(async () => {
     if (!cursor || loadingMore) return
@@ -221,6 +257,10 @@ export function AdminTable({
         excludeAccountIds: Array.from(accountRowKeys.accountIds),
         excludeUsernames: Array.from(accountRowKeys.usernames),
       })
+      if (!page) {
+        setError('Failed to load more accounts (no data returned)')
+        return
+      }
       setRows((prev) => [...prev, ...page.rows])
       setCursor(page.nextCursor)
     } catch (e) {
@@ -329,7 +369,7 @@ export function AdminTable({
                       twitterUserId: accountId,
                       optInRecord: row.optInRecord,
                     })}
-                    onActionComplete={refresh}
+                    onActionComplete={applyActionResult}
                   />
                 </TableCell>
               </TableRow>

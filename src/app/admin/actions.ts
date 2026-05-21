@@ -13,6 +13,46 @@ import {
   normalizeUsername,
 } from './data'
 
+// Supabase's PostgrestError is a plain TypeScript type alias, not an
+// Error subclass — so `error instanceof Error` is false and a bare
+// `e.message ?? 'Failed'` was the only thing preventing the real error
+// from being swallowed. Pull a message out of anything error-shaped, log
+// the full object server-side so it shows up in deploy logs, and
+// surface a useful string to the client.
+function describeError(e: unknown, context: string): string {
+  console.error(`[admin action] ${context}:`, e)
+  if (e instanceof Error) return e.message
+  if (e && typeof e === 'object') {
+    const obj = e as {
+      message?: unknown
+      details?: unknown
+      hint?: unknown
+      code?: unknown
+    }
+    const parts: string[] = []
+    if (typeof obj.message === 'string' && obj.message.trim()) {
+      parts.push(obj.message.trim())
+    }
+    if (typeof obj.details === 'string' && obj.details.trim()) {
+      parts.push(obj.details.trim())
+    }
+    if (typeof obj.hint === 'string' && obj.hint.trim()) {
+      parts.push(`hint: ${obj.hint.trim()}`)
+    }
+    if (typeof obj.code === 'string' && obj.code.trim()) {
+      parts.push(`(${obj.code})`)
+    }
+    if (parts.length) return parts.join(' — ')
+    try {
+      return JSON.stringify(e)
+    } catch {
+      // fall through
+    }
+  }
+  if (typeof e === 'string' && e.trim()) return e
+  return `${context} failed`
+}
+
 // Returned to the client so it can patch the affected row in place — no
 // refetch round-trip and no risk of resolving to undefined on the wire (which
 // is what threw "Cannot read properties of undefined (reading 'rows')" when
@@ -214,7 +254,7 @@ export async function manualOptIn(
   } catch (e) {
     return {
       ok: false,
-      error: e instanceof Error ? e.message : 'Failed to opt in',
+      error: describeError(e, 'manual opt-in'),
     }
   }
 }
@@ -295,7 +335,7 @@ export async function adminSetOptInState(
   } catch (e) {
     return {
       ok: false,
-      error: e instanceof Error ? e.message : 'Failed to update opt-in state',
+      error: describeError(e, 'set opt-in state'),
     }
   }
 }
@@ -372,7 +412,7 @@ export async function adminOptOutAccount(
   } catch (e) {
     return {
       ok: false,
-      error: e instanceof Error ? e.message : 'Failed to opt out',
+      error: describeError(e, 'opt out'),
     }
   }
 }

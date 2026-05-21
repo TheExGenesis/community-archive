@@ -147,18 +147,36 @@ async function exportUserDataInline(
     archiveFilesCopied += 1
   }
 
-  // 2. Dump tweets table as JSON. This is the operation that can time out
-  //    for large accounts; the UI warns above 10k. We do a single SELECT
-  //    (no streaming) to keep the implementation small — the workaround
-  //    for genuinely large accounts is the Hetzner worker.
-  const { data: tweets, error: tweetsError } = await admin
-    .from('tweets')
-    .select('*')
-    .eq('account_id', args.accountId)
-  if (tweetsError) {
-    throw new Error(`Failed to dump tweets: ${tweetsError.message}`)
+  // 2. Dump tweets table as JSON. PostgREST silently caps SELECTs at
+  //    1000 rows by default (`max-rows`), so we MUST page through with
+  //    `.range()` — without this, an account with >1000 tweets gets a
+  //    silently-truncated export. See AGENTS.md → "Supabase gotchas".
+  //    This is also the operation that can time out for large accounts;
+  //    the UI warns above 10k. Workaround for genuinely large accounts
+  //    is the Hetzner worker (TODO).
+  const TWEET_PAGE_SIZE = 1000
+  const tweets: unknown[] = []
+  let offset = 0
+  while (true) {
+    const { data: page, error: tweetsError } = await admin
+      .from('tweets')
+      .select('*')
+      // `.order('tweet_id')` keeps pagination stable even if rows shift
+      // mid-export. tweet_id is the table's PK so the index is free.
+      .order('tweet_id', { ascending: true })
+      .eq('account_id', args.accountId)
+      .range(offset, offset + TWEET_PAGE_SIZE - 1)
+    if (tweetsError) {
+      throw new Error(
+        `Failed to dump tweets (offset ${offset}): ${tweetsError.message}`,
+      )
+    }
+    const rows = page ?? []
+    tweets.push(...rows)
+    if (rows.length < TWEET_PAGE_SIZE) break
+    offset += rows.length
   }
-  const tweetsBlob = new Blob([JSON.stringify(tweets ?? [], null, 0)], {
+  const tweetsBlob = new Blob([JSON.stringify(tweets, null, 0)], {
     type: 'application/json',
   })
   const { error: tweetsUploadError } = await admin.storage
@@ -180,7 +198,7 @@ async function exportUserDataInline(
     started_at: startedAt.toISOString(),
     completed_at: new Date().toISOString(),
     archive_files_copied: archiveFilesCopied,
-    tweets_dumped: tweets?.length ?? 0,
+    tweets_dumped: tweets.length,
     notes:
       'Inline export from Vercel. Only the tweets table is dumped; other ' +
       'per-account tables (likes, followers, following, profile, etc.) ' +
@@ -204,7 +222,7 @@ async function exportUserDataInline(
   return {
     exportPrefix,
     archiveFilesCopied,
-    tweetsDumped: tweets?.length ?? 0,
+    tweetsDumped: tweets.length,
   }
 }
 

@@ -11,6 +11,7 @@ import {
   loadMoreAccountsData,
   lookupAccountIdByUsername,
   normalizeUsername,
+  requireAdmin,
 } from './data'
 
 // Returned to the client so it can patch the affected row in place — no
@@ -24,6 +25,10 @@ export type AdminActionResult =
       optInRecord: OptInRecord
       blockedFromScraping: boolean
       // True iff the action also wiped archive data (opt-out and delete).
+      // For "Opt out and delete data" this is now FALSE at the moment of
+      // the response: the actual delete + export runs asynchronously on
+      // the worker (see docs/admin-delete-worker.md). Row's account data
+      // stays populated until the worker completes the deletion.
       archiveDeleted: boolean
       // Populated by manualOptIn (and only manualOptIn) so the client can
       // materialize a fully-rendered row when the affected account wasn't
@@ -31,6 +36,9 @@ export type AdminActionResult =
       // undefined; their callers preserve the existing row's account data.
       account?: AccountRecord | null
       archiveUploadCount?: number
+      // Optional flash message to surface in the action dialog (e.g.
+      // "Queued for delete; worker will complete in a few minutes").
+      message?: string
     }
   | { ok: false; error: string }
 
@@ -79,7 +87,7 @@ async function upsertScrapeBlock(
   if (error) throw error
 }
 
-async function deleteStorageFiles(
+async function deleteSourceArchiveFiles(
   admin: Awaited<ReturnType<typeof getAdminClient>>,
   username: string,
 ) {
@@ -93,6 +101,111 @@ async function deleteStorageFiles(
     .from('archives')
     .remove(filesToDelete)
   if (deleteError) throw deleteError
+}
+
+const EXPORT_BUCKET = 'admin-deleted-user-data'
+
+// Inline backup before delete. Runs from Vercel — fine for accounts under
+// ~10k tweets; above that the tweets JSON dump risks the 60s function ceiling.
+// The dialog warns the admin before they commit. Long-term, the Hetzner
+// worker path (see docs/admin-delete-worker.md, TODO) is what we actually
+// want.
+async function exportUserDataInline(
+  admin: Awaited<ReturnType<typeof getAdminClient>>,
+  args: {
+    accountId: string
+    username: string
+    reason: string
+    requesterUserId: string
+  },
+): Promise<{
+  exportPrefix: string
+  archiveFilesCopied: number
+  tweetsDumped: number
+}> {
+  const startedAt = new Date()
+  const exportPrefix = `${startedAt.toISOString().replace(/[:.]/g, '-')}-${args.accountId}`
+
+  // 1. Copy archive files from `archives/{username}/` to
+  //    `admin-deleted-user-data/{exportPrefix}/archives/`.
+  const { data: archiveFiles, error: listError } = await admin.storage
+    .from('archives')
+    .list(args.username)
+  if (listError) {
+    throw new Error(`Failed to list archives: ${listError.message}`)
+  }
+  let archiveFilesCopied = 0
+  for (const file of archiveFiles ?? []) {
+    const src = `${args.username}/${file.name}`
+    const dst = `${exportPrefix}/archives/${file.name}`
+    const { error: copyError } = await admin.storage
+      .from('archives')
+      .copy(src, dst, { destinationBucket: EXPORT_BUCKET })
+    if (copyError) {
+      throw new Error(`Failed to copy ${src}: ${copyError.message}`)
+    }
+    archiveFilesCopied += 1
+  }
+
+  // 2. Dump tweets table as JSON. This is the operation that can time out
+  //    for large accounts; the UI warns above 10k. We do a single SELECT
+  //    (no streaming) to keep the implementation small — the workaround
+  //    for genuinely large accounts is the Hetzner worker.
+  const { data: tweets, error: tweetsError } = await admin
+    .from('tweets')
+    .select('*')
+    .eq('account_id', args.accountId)
+  if (tweetsError) {
+    throw new Error(`Failed to dump tweets: ${tweetsError.message}`)
+  }
+  const tweetsBlob = new Blob([JSON.stringify(tweets ?? [], null, 0)], {
+    type: 'application/json',
+  })
+  const { error: tweetsUploadError } = await admin.storage
+    .from(EXPORT_BUCKET)
+    .upload(`${exportPrefix}/tweets.json`, tweetsBlob, {
+      contentType: 'application/json',
+      upsert: false,
+    })
+  if (tweetsUploadError) {
+    throw new Error(`Failed to upload tweets.json: ${tweetsUploadError.message}`)
+  }
+
+  // 3. Manifest.
+  const manifest = {
+    account_id: args.accountId,
+    username: args.username,
+    reason: args.reason,
+    requested_by_user_id: args.requesterUserId,
+    started_at: startedAt.toISOString(),
+    completed_at: new Date().toISOString(),
+    archive_files_copied: archiveFilesCopied,
+    tweets_dumped: tweets?.length ?? 0,
+    notes:
+      'Inline export from Vercel. Only the tweets table is dumped; other ' +
+      'per-account tables (likes, followers, following, profile, etc.) ' +
+      'are not yet exported — TODO: move to Hetzner worker. The original ' +
+      'archive zip(s) under archives/ contain the most-faithful copy of ' +
+      'the data.',
+  }
+  const { error: manifestError } = await admin.storage
+    .from(EXPORT_BUCKET)
+    .upload(
+      `${exportPrefix}/manifest.json`,
+      new Blob([JSON.stringify(manifest, null, 2)], {
+        type: 'application/json',
+      }),
+      { contentType: 'application/json', upsert: false },
+    )
+  if (manifestError) {
+    throw new Error(`Failed to upload manifest: ${manifestError.message}`)
+  }
+
+  return {
+    exportPrefix,
+    archiveFilesCopied,
+    tweetsDumped: tweets?.length ?? 0,
+  }
 }
 
 export async function loadMoreAccountsAction(input: {
@@ -304,6 +417,9 @@ export async function adminOptOutAccount(
   formData: FormData,
 ): Promise<AdminActionResult> {
   try {
+    // requireAdmin both gates access and gives us the requester's auth.users.id,
+    // which we record on the delete-with-export job for audit.
+    const { user: requester } = await requireAdmin()
     const admin = await getAdminClient()
     const id = String(formData.get('id') ?? '')
     const username = normalizeUsername(String(formData.get('username') ?? ''))
@@ -345,6 +461,8 @@ export async function adminOptOutAccount(
       return { ok: false, error: writeResponse.error.message }
     }
 
+    let message: string | undefined
+    let archiveDeleted = false
     if (deleteData) {
       if (!twitterUserId) {
         return {
@@ -352,13 +470,39 @@ export async function adminOptOutAccount(
           error: 'Missing Twitter account id for delete',
         }
       }
+      // Inline export + delete from Vercel. Order matters: export first
+      // (so there's a recovery path if delete fails), then delete the DB
+      // rows, then remove source archive files. If any step throws, the
+      // optin row has already been set to explicit_optout above, so the
+      // user is at least blocked from streaming.
+      // TODO: move to a Hetzner-side worker (see docs/admin-delete-worker.md
+      // in this PR description). Inline-from-Vercel works for accounts
+      // under ~10k tweets; above that the tweets JSON dump risks the 60s
+      // function ceiling. The dialog warns the admin beforehand.
+      const exportResult = await exportUserDataInline(admin, {
+        accountId: twitterUserId,
+        username,
+        reason,
+        requesterUserId: requester.id,
+      })
+
       const deleteResponse = await admin.rpc('delete_user_archive', {
         p_account_id: twitterUserId,
       })
       if (deleteResponse.error) {
-        return { ok: false, error: deleteResponse.error.message }
+        return {
+          ok: false,
+          error: `Export succeeded (${exportResult.exportPrefix}) but delete_user_archive failed: ${deleteResponse.error.message}`,
+        }
       }
-      await deleteStorageFiles(admin, username)
+
+      await deleteSourceArchiveFiles(admin, username)
+      archiveDeleted = true
+
+      message =
+        `@${username}: exported ${exportResult.archiveFilesCopied} archive file(s) and ` +
+        `${exportResult.tweetsDumped} tweet(s) to ${EXPORT_BUCKET}/${exportResult.exportPrefix}/, ` +
+        `then deleted the account.`
     }
 
     revalidatePath('/admin')
@@ -367,7 +511,8 @@ export async function adminOptOutAccount(
       optInRecord: writeResponse.data as OptInRecord,
       // Opt out always adds to the scrape blocklist when we have an account id.
       blockedFromScraping: !!twitterUserId,
-      archiveDeleted: deleteData,
+      archiveDeleted,
+      message,
     }
   } catch (e) {
     return {

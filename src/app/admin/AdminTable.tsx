@@ -51,17 +51,25 @@ function OptInStatusBadge({ record }: { record: OptInRecord | null }) {
   return <Badge variant="secondary">Not opted in</Badge>
 }
 
+// Vercel inline-export ceiling. Above this, the dialog warns the admin that
+// the tweets JSON dump may exceed the 60s function timeout. Hard refusal
+// would be safer, but the user explicitly asked for "warn, don't block" so
+// they can try anyway and follow up manually if it fails.
+const INLINE_TWEET_LIMIT = 10_000
+
 function buildAdminActions(args: {
   username: string
   twitterUserId: string
   optInRecord: OptInRecord | null
+  numTweets: number | null
 }): AdminMenuAction[] {
-  const { username, twitterUserId, optInRecord } = args
+  const { username, twitterUserId, optInRecord, numTweets } = args
   const commonInputs = [
     { name: 'id', value: optInRecord?.id ?? '' },
     { name: 'username', value: username },
     { name: 'twitter_user_id', value: twitterUserId },
   ]
+  const isLarge = (numTweets ?? 0) > INLINE_TWEET_LIMIT
 
   // Opt out already adds the account to the scrape blocklist, and opt in
   // already removes it. There's no standalone block/unblock-scraping action —
@@ -120,7 +128,7 @@ function buildAdminActions(args: {
       label: 'Opt out and delete data',
       title: `Opt out and delete @${username}?`,
       description:
-        'Opt the account out and permanently delete their existing Community Archive data.',
+        'Opt the account out, copy archive files + tweets to the admin-deleted-user-data bucket, then permanently delete their Community Archive data.',
       action: adminOptOutAccount,
       hiddenInputs: [
         ...commonInputs,
@@ -133,8 +141,15 @@ function buildAdminActions(args: {
       consequences: [
         'The opt-in row will be marked explicitly opted out.',
         'The account id will be added to the scrape blocklist.',
-        'All archives, tweets, likes, followers/following, profile rows, and scraper/extension rows for the account id will be deleted.',
-        'Archive files under the storage username folder will be removed.',
+        `Archive files under archives/${username}/ will be copied to admin-deleted-user-data/<timestamp>-${twitterUserId || '<account_id>'}/archives/.`,
+        `All ${typeof numTweets === 'number' ? new Intl.NumberFormat('en').format(numTweets) : 'unknown'} tweets will be dumped as tweets.json into the same export folder.`,
+        'A manifest.json is written with metadata + counts.',
+        'delete_user_archive(account_id) then removes all rows for the account; the original archives/{username}/ files are removed last.',
+        ...(isLarge
+          ? [
+              `⚠ This account has ${new Intl.NumberFormat('en').format(numTweets ?? 0)} tweets, above the ~${new Intl.NumberFormat('en').format(INLINE_TWEET_LIMIT)} inline-from-Vercel ceiling. The tweets dump may exceed the 60s function timeout — if it does, the opt-out + scrape-block already took effect but the delete did not run. TODO: move this to a Hetzner worker.`,
+            ]
+          : []),
       ],
       disabled: !twitterUserId,
       destructive: true,
@@ -449,6 +464,7 @@ export function AdminTable({
                       username: row.username,
                       twitterUserId: accountId,
                       optInRecord: row.optInRecord,
+                      numTweets: row.account?.num_tweets ?? null,
                     })}
                     onActionComplete={applyActionResult}
                   />

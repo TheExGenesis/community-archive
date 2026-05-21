@@ -50,6 +50,10 @@ export function AdminActionsMenu({
 }: AdminActionsMenuProps) {
   const [selected, setSelected] = useState<AdminMenuAction | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Set when the action succeeded AND returned a `message` — we keep the
+  // dialog open so the admin sees the confirmation (e.g. "queued for
+  // delete"). Actions without a message close the dialog as before.
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const open = selected !== null
 
@@ -121,6 +125,7 @@ export function AdminActionsMenu({
                 const action = selected.action
                 startTransition(async () => {
                   setError(null)
+                  setSuccessMessage(null)
                   try {
                     const result = await action(formData)
                     // Defensive: server actions can resolve to undefined when
@@ -135,8 +140,15 @@ export function AdminActionsMenu({
                       setError(result.error)
                       return
                     }
-                    setSelected(null)
+                    // Patch the table immediately regardless of whether the
+                    // dialog stays open. Then either keep the dialog open to
+                    // show the queue confirmation, or close it.
                     if (onActionComplete) await onActionComplete(result)
+                    if (result.message) {
+                      setSuccessMessage(result.message)
+                    } else {
+                      setSelected(null)
+                    }
                   } catch (e) {
                     setError(e instanceof Error ? e.message : 'Action failed')
                   }
@@ -156,22 +168,41 @@ export function AdminActionsMenu({
                   {error}
                 </p>
               ) : null}
+              {successMessage ? (
+                <p className="mt-3 rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-950 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-100">
+                  {successMessage}
+                </p>
+              ) : null}
               <DialogFooter className="mt-4 gap-2 sm:gap-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setSelected(null)}
-                  disabled={isPending}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant={selected.destructive ? 'destructive' : 'default'}
-                  disabled={isPending}
-                >
-                  {isPending ? 'Working…' : selected.label}
-                </Button>
+                {successMessage ? (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setSelected(null)
+                      setSuccessMessage(null)
+                    }}
+                  >
+                    Done
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setSelected(null)}
+                      disabled={isPending}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant={selected.destructive ? 'destructive' : 'default'}
+                      disabled={isPending}
+                    >
+                      {isPending ? 'Working…' : selected.label}
+                    </Button>
+                  </>
+                )}
               </DialogFooter>
             </form>
           </DialogContent>

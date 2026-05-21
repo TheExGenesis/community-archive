@@ -3359,9 +3359,15 @@ GRANT ALL ON FUNCTION "public"."create_temp_tables"("p_suffix" "text") TO "servi
 
 
 
-GRANT ALL ON FUNCTION "public"."delete_tweets"("p_tweet_ids" "text"[]) TO "anon";
-GRANT ALL ON FUNCTION "public"."delete_tweets"("p_tweet_ids" "text"[]) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."delete_tweets"("p_tweet_ids" "text"[]) TO "service_role";
+-- public.delete_tweets is SECURITY DEFINER (runs as postgres, bypasses RLS)
+-- and has no per-tweet ownership check inside the body. Granting EXECUTE to
+-- anon/authenticated meant any holder of the public anon key could delete
+-- arbitrary tweets via PostgREST. Service-role only.
+-- See migration 20260521000000_lock_delete_tweets_grants.sql.
+REVOKE ALL ON FUNCTION "public"."delete_tweets"("p_tweet_ids" "text"[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."delete_tweets"("p_tweet_ids" "text"[]) FROM "anon";
+REVOKE ALL ON FUNCTION "public"."delete_tweets"("p_tweet_ids" "text"[]) FROM "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."delete_tweets"("p_tweet_ids" "text"[]) TO "service_role";
 
 
 

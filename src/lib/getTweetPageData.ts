@@ -2,6 +2,10 @@ import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import { ConversationTree, ThreadTweet, buildConversationTree } from './threadUtils'
 import { TweetData } from '@/components/TweetComponent'
+import {
+  fetchSyndicatedTweets,
+  type SyndicatedTweet,
+} from './twitterSyndication'
 
 interface RpcTweet {
   tweet_id: string
@@ -91,18 +95,104 @@ export async function getTweetPageData(tweetId: string): Promise<TweetPageResult
     return { tweet: null, threadTree: null }
   }
 
-  // Build the main tweet in TweetData format
-  const mainTweet = buildTweetData(result.tweet, result.media, result.mentioned_users, result.quoted_tweets)
+  // Collect every tweet id referenced by the conversation that the RPC couldn't
+  // return — these are reply targets and quoted tweets that have been deleted from
+  // our archive. Try Twitter's syndication endpoint to hydrate them so the thread
+  // view shows real content instead of a tombstone when the original tweet still
+  // exists on Twitter. Results are NOT persisted and NOT used in search.
+  const presentIds = new Set<string>(
+    result.conversation_tweets.map((ct) => ct.tweet_id),
+  )
+  const presentQuotedSources = new Set<string>(
+    result.quoted_tweets.map((qt) => qt.source_tweet_id),
+  )
+  const missingIds = new Set<string>()
 
-  // Build conversation tree
+  // Missing reply parents in the conversation
+  for (const ct of result.conversation_tweets) {
+    if (ct.reply_to_tweet_id && !presentIds.has(ct.reply_to_tweet_id)) {
+      missingIds.add(ct.reply_to_tweet_id)
+    }
+  }
+  // Missing quoted tweets (the RPC INNER JOINs enriched_tweets so deleted targets
+  // are absent from `quoted_tweets`; enriched_tweets.quoted_tweet_id still has the id)
+  if (
+    result.tweet.quoted_tweet_id &&
+    !presentQuotedSources.has(result.tweet.tweet_id)
+  ) {
+    missingIds.add(result.tweet.quoted_tweet_id)
+  }
+  for (const ct of result.conversation_tweets) {
+    if (ct.quoted_tweet_id && !presentQuotedSources.has(ct.tweet_id)) {
+      missingIds.add(ct.quoted_tweet_id)
+    }
+  }
+
+  const syndicated =
+    missingIds.size > 0
+      ? await fetchSyndicatedTweets(Array.from(missingIds))
+      : new Map<string, SyndicatedTweet | null>()
+
+  // Build the main tweet
+  const mainTweet = buildTweetData(
+    result.tweet,
+    result.media,
+    result.mentioned_users,
+    result.quoted_tweets,
+    syndicated,
+  )
+
+  // Build conversation tree, injecting hydrated tweets as ThreadTweets so they end
+  // up in their natural position instead of becoming placeholders.
   const threadTree = buildThreadTree(
     result.tweet,
     result.conversation_tweets,
     result.conversation_media,
     result.quoted_tweets,
+    syndicated,
   )
 
   return { tweet: mainTweet, threadTree }
+}
+
+// Convert a SyndicatedTweet into the quoted-tweet shape both ThreadTweet and TweetData
+// expect. Includes `from_external` so the renderer can mark it visually.
+function syndicatedToQuotedTweet(s: SyndicatedTweet) {
+  return {
+    tweet_id: s.tweet_id,
+    account_id: s.account_id,
+    created_at: s.created_at,
+    full_text: s.full_text,
+    retweet_count: s.retweet_count,
+    favorite_count: s.favorite_count,
+    avatar_media_url: s.avatar_media_url,
+    username: s.username,
+    account_display_name: s.account_display_name,
+    media: s.media,
+    from_external: true as const,
+  }
+}
+
+// Convert a SyndicatedTweet into a ThreadTweet for insertion into the conversation.
+function syndicatedToThreadTweet(s: SyndicatedTweet): ThreadTweet {
+  return {
+    tweet_id: s.tweet_id,
+    account_id: s.account_id,
+    created_at: s.created_at,
+    full_text: s.full_text,
+    retweet_count: s.retweet_count,
+    favorite_count: s.favorite_count,
+    reply_to_tweet_id: s.reply_to_tweet_id,
+    reply_to_user_id: s.reply_to_user_id,
+    reply_to_username: s.reply_to_username,
+    username: s.username,
+    account_display_name: s.account_display_name,
+    avatar_media_url: s.avatar_media_url,
+    media: s.media,
+    quote_tweet_id: null,
+    quoted_tweet: null,
+    from_external: true,
+  }
 }
 
 function buildTweetData(
@@ -110,6 +200,7 @@ function buildTweetData(
   media: RpcMedia[],
   mentionedUsers: RpcMentionedUser[],
   quotedTweets: RpcQuotedTweet[],
+  syndicated: Map<string, SyndicatedTweet | null>,
 ): TweetData {
   const tweetMedia = media.map((m) => ({
     media_url: m.media_url,
@@ -184,21 +275,22 @@ function buildTweetData(
           })),
         }
       : tweet.quoted_tweet_id
-        ? {
-            // enriched_tweets exposes quoted_tweet_id even when the quoted tweet has
-            // been deleted (the RPC's quoted_tweets join can't find it). Surface a
-            // placeholder so the renderer shows a "[Quoted tweet deleted]" card.
-            tweet_id: tweet.quoted_tweet_id,
-            account_id: '',
-            created_at: '',
-            full_text: '',
-            retweet_count: 0,
-            favorite_count: 0,
-            avatar_media_url: undefined,
-            username: '',
-            account_display_name: '',
-            is_deleted: true,
-          }
+        ? // The RPC didn't include the quoted tweet (deleted from our archive). Prefer
+          // a syndication hydration if Twitter still has it; fall back to tombstone.
+          syndicated.get(tweet.quoted_tweet_id)
+          ? syndicatedToQuotedTweet(syndicated.get(tweet.quoted_tweet_id)!)
+          : {
+              tweet_id: tweet.quoted_tweet_id,
+              account_id: '',
+              created_at: '',
+              full_text: '',
+              retweet_count: 0,
+              favorite_count: 0,
+              avatar_media_url: undefined,
+              username: '',
+              account_display_name: '',
+              is_deleted: true,
+            }
         : undefined,
   }
 }
@@ -208,6 +300,7 @@ function buildThreadTree(
   conversationTweets: RpcTweet[],
   conversationMedia: RpcMedia[],
   quotedTweets: RpcQuotedTweet[],
+  syndicated: Map<string, SyndicatedTweet | null>,
 ): ConversationTree | null {
   if (conversationTweets.length <= 1) {
     return null
@@ -262,20 +355,38 @@ function buildThreadTree(
             })),
           }
         : ct.quoted_tweet_id
-          ? {
-              tweet_id: ct.quoted_tweet_id,
-              account_id: '',
-              created_at: '',
-              full_text: '',
-              retweet_count: 0,
-              favorite_count: 0,
-              username: '',
-              account_display_name: '',
-              is_deleted: true,
-            }
+          ? // Quote target deleted from our archive — try syndication first, then
+            // fall back to a tombstone placeholder.
+            syndicated.get(ct.quoted_tweet_id)
+            ? syndicatedToQuotedTweet(syndicated.get(ct.quoted_tweet_id)!)
+            : {
+                tweet_id: ct.quoted_tweet_id,
+                account_id: '',
+                created_at: '',
+                full_text: '',
+                retweet_count: 0,
+                favorite_count: 0,
+                username: '',
+                account_display_name: '',
+                is_deleted: true,
+              }
           : null,
     }
   })
+
+  // For any reply target the RPC couldn't supply, inject the hydrated syndication
+  // result as a real ThreadTweet so it slots into its natural position in the tree
+  // (rather than appearing as a tombstone via buildConversationTree's placeholder).
+  const presentIds = new Set(threadTweets.map((t) => t.tweet_id))
+  for (const ct of conversationTweets) {
+    const parentId = ct.reply_to_tweet_id
+    if (!parentId || presentIds.has(parentId)) continue
+    const hydrated = syndicated.get(parentId)
+    if (hydrated) {
+      threadTweets.push(syndicatedToThreadTweet(hydrated))
+      presentIds.add(parentId)
+    }
+  }
 
   return buildConversationTree(threadTweets)
 }

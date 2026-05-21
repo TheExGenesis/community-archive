@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import {
+  AccountRecord,
   AccountsCursor,
   AccountsPage,
   OptInRecord,
@@ -24,6 +25,12 @@ export type AdminActionResult =
       blockedFromScraping: boolean
       // True iff the action also wiped archive data (opt-out and delete).
       archiveDeleted: boolean
+      // Populated by manualOptIn (and only manualOptIn) so the client can
+      // materialize a fully-rendered row when the affected account wasn't
+      // already in the visible list. Row-mutation actions leave this
+      // undefined; their callers preserve the existing row's account data.
+      account?: AccountRecord | null
+      archiveUploadCount?: number
     }
   | { ok: false; error: string }
 
@@ -117,13 +124,9 @@ export async function searchAccountsAction(search: string): Promise<{
   }
 }
 
-export type ManualOptInResult =
-  | { ok: true; message: string }
-  | { ok: false; error: string }
-
 export async function manualOptIn(
   formData: FormData,
-): Promise<ManualOptInResult> {
+): Promise<AdminActionResult> {
   try {
     const admin = await getAdminClient()
     const username = normalizeUsername(String(formData.get('username') ?? ''))
@@ -151,23 +154,62 @@ export async function manualOptIn(
     }
 
     const recordId = existingResponse.data?.id
-    const response = recordId
-      ? await admin.from('optin').update(update).eq('id', recordId)
-      : await admin.from('optin').insert({ ...update, user_id: null })
-    if (response.error) {
-      return { ok: false, error: response.error.message }
+    const writeResponse = recordId
+      ? await admin
+          .from('optin')
+          .update(update)
+          .eq('id', recordId)
+          .select(OPT_IN_SELECT)
+          .single()
+      : await admin
+          .from('optin')
+          .insert({ ...update, user_id: null })
+          .select(OPT_IN_SELECT)
+          .single()
+    if (writeResponse.error) {
+      return { ok: false, error: writeResponse.error.message }
     }
 
     if (accountId) {
       await deleteScrapeBlock(admin, accountId)
     }
 
+    // Fetch the matched all_account row + upload count so the client can
+    // render the newly-prepended row with its tweet/upload counts populated.
+    // Both are best-effort; on failure we just return null/0 and the user
+    // can refresh to fill them in.
+    let account: AccountRecord | null = null
+    let archiveUploadCount = 0
+    if (accountId) {
+      const [accountRes, uploadsRes] = await Promise.all([
+        admin
+          .from('all_account')
+          .select(
+            'account_id, username, account_display_name, num_tweets, created_via, updated_at',
+          )
+          .eq('account_id', accountId)
+          .maybeSingle(),
+        admin
+          .from('archive_upload')
+          .select('id', { count: 'exact', head: true })
+          .eq('account_id', accountId),
+      ])
+      if (!accountRes.error && accountRes.data) {
+        account = accountRes.data as AccountRecord
+      }
+      if (!uploadsRes.error) {
+        archiveUploadCount = uploadsRes.count ?? 0
+      }
+    }
+
     revalidatePath('/admin')
     return {
       ok: true,
-      message: accountId
-        ? `Opted in @${username} (account ${accountId})`
-        : `Opted in @${username} (no matching account found, stored without twitter id)`,
+      optInRecord: writeResponse.data as OptInRecord,
+      blockedFromScraping: false,
+      archiveDeleted: false,
+      account,
+      archiveUploadCount,
     }
   } catch (e) {
     return {

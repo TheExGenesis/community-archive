@@ -10,12 +10,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from 'react'
 import { AdminActionsMenu, type AdminMenuAction } from './AdminActionsMenu'
+import { Button } from '@/components/ui/button'
 import {
   adminOptOutAccount,
   adminSetOptInState,
   loadMoreAccountsAction,
+  manualOptIn,
   searchAccountsAction,
   type AdminActionResult,
 } from './actions'
@@ -137,23 +146,33 @@ type AdminTableProps = {
   initialRows: MergedRow[]
   initialCursor: AccountsCursor | null
   initialSearch: string
-  initialOptInCount: number
 }
 
 export function AdminTable({
   initialRows,
   initialCursor,
   initialSearch,
-  initialOptInCount,
 }: AdminTableProps) {
   const [searchInput, setSearchInput] = useState(initialSearch)
   const [activeSearch, setActiveSearch] = useState(initialSearch)
   const [rows, setRows] = useState<MergedRow[]>(initialRows)
   const [cursor, setCursor] = useState<AccountsCursor | null>(initialCursor)
-  const [optInCount, setOptInCount] = useState(initialOptInCount)
+  // Derived from rows so adding/removing opt-in entries can't drift the count
+  // (and so we don't have to coordinate two setState calls across a
+  // StrictMode-double-invoked updater — which doubled the count in dev).
+  const optInCount = useMemo(
+    () => rows.filter((row) => row.fromOptIn).length,
+    [rows],
+  )
   const [loadingMore, setLoadingMore] = useState(false)
   const [searching, setSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [manualMessage, setManualMessage] = useState<{
+    tone: 'ok' | 'error'
+    text: string
+  } | null>(null)
+  const [isManualPending, startManualTransition] = useTransition()
+  const manualFormRef = useRef<HTMLFormElement>(null)
 
   // Debounced server-action search. Doesn't touch the URL or trigger an RSC
   // refetch — we just call a server action and replace the table contents.
@@ -175,7 +194,6 @@ export function AdminTable({
         }
         setRows(page.rows)
         setCursor(page.nextCursor)
-        setOptInCount(page.optInCount)
         setActiveSearch(trimmed)
       } catch (e) {
         if (token !== searchTokenRef.current) return
@@ -210,40 +228,44 @@ export function AdminTable({
     if (!result.ok) return
     const updated = result.optInRecord
     setRows((prev) => {
-      let matched = false
-      const next = prev.map((row) => {
-        const sameRow =
+      const matchIdx = prev.findIndex(
+        (row) =>
           row.optInRecord?.id === updated.id ||
-          row.username.toLowerCase() === updated.username.toLowerCase()
-        if (!sameRow) return row
-        matched = true
-        return {
-          ...row,
-          optInRecord: updated,
-          blockedFromScraping: result.blockedFromScraping,
-          account: result.archiveDeleted ? null : row.account,
-          archiveUploadCount: result.archiveDeleted
-            ? 0
-            : row.archiveUploadCount,
-        }
-      })
-      if (matched) return next
-      // The action created a brand-new opt-in row that wasn't yet shown
-      // (e.g. account-only row that hasn't been merged). Prepend it.
-      return [
-        {
-          key: `optin:${updated.id}`,
-          username: updated.username,
-          account: null,
-          archiveUploadCount: 0,
-          blockedFromScraping: result.blockedFromScraping,
-          optInRecord: updated,
-          fromOptIn: true,
-        },
-        ...prev,
-      ]
+          row.username.toLowerCase() === updated.username.toLowerCase(),
+      )
+      if (matchIdx < 0) {
+        // The action created a brand-new opt-in row that wasn't yet shown
+        // (manual opt-in for an unknown account, or for an account outside
+        // the currently-loaded page). Prepend it; optInCount is derived
+        // from rows so the pinned-count display updates automatically.
+        return [
+          {
+            key: `optin:${updated.id}`,
+            username: updated.username,
+            account: result.account ?? null,
+            archiveUploadCount: result.archiveUploadCount ?? 0,
+            blockedFromScraping: result.blockedFromScraping,
+            optInRecord: updated,
+            fromOptIn: true,
+          },
+          ...prev,
+        ]
+      }
+      const next = [...prev]
+      const row = next[matchIdx]
+      next[matchIdx] = {
+        ...row,
+        optInRecord: updated,
+        blockedFromScraping: result.blockedFromScraping,
+        account: result.archiveDeleted
+          ? null
+          : (result.account ?? row.account),
+        archiveUploadCount: result.archiveDeleted
+          ? 0
+          : (result.archiveUploadCount ?? row.archiveUploadCount),
+      }
+      return next
     })
-    setOptInCount((prev) => prev) // count is informational; keep as is
   }, [])
 
   const loadMore = useCallback(async () => {
@@ -288,6 +310,59 @@ export function AdminTable({
 
   return (
     <div className="flex flex-col gap-4">
+      <form
+        ref={manualFormRef}
+        className="grid gap-2 sm:grid-cols-[1fr_auto]"
+        aria-label="Manual opt-in"
+        action={(formData) => {
+          startManualTransition(async () => {
+            setManualMessage(null)
+            const result = await manualOptIn(formData)
+            if (!result) {
+              setManualMessage({
+                tone: 'error',
+                text: 'Opt-in did not return a result',
+              })
+              return
+            }
+            if (!result.ok) {
+              setManualMessage({ tone: 'error', text: result.error })
+              return
+            }
+            applyActionResult(result)
+            manualFormRef.current?.reset()
+            const username = result.optInRecord.username
+            setManualMessage({
+              tone: 'ok',
+              text: result.account
+                ? `Opted in @${username} (account ${result.account.account_id})`
+                : `Opted in @${username} (no matching archive account; stored without twitter id)`,
+            })
+          })
+        }}
+      >
+        <Input
+          name="username"
+          placeholder="Manual opt-in: type a username and press Enter"
+          required
+          disabled={isManualPending}
+        />
+        <Button type="submit" disabled={isManualPending}>
+          {isManualPending ? 'Opting in…' : 'Opt in'}
+        </Button>
+        {manualMessage ? (
+          <p
+            className={
+              manualMessage.tone === 'ok'
+                ? 'rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-950 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-100 sm:col-span-2'
+                : 'rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-950 dark:border-red-700 dark:bg-red-950/30 dark:text-red-100 sm:col-span-2'
+            }
+          >
+            {manualMessage.text}
+          </p>
+        ) : null}
+      </form>
+
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <Input
           value={searchInput}

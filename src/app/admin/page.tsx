@@ -9,7 +9,7 @@ import {
 import { AdminTable } from './AdminTable'
 import {
   ADMIN_USERNAME,
-  getTwitterUsername,
+  getDisplayUsername,
   loadInitialAccounts,
   normalizeUsername,
   requireAdmin,
@@ -25,7 +25,7 @@ export default async function AdminPage({
   const { user } = await requireAdmin()
   const search = normalizeUsername(searchParams?.q)
   const data = await loadInitialAccounts(search)
-  const twitterUsername = getTwitterUsername(user)
+  const twitterUsername = getDisplayUsername(user)
 
   return (
     <main className="min-h-screen bg-white dark:bg-background">

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { Shield } from 'lucide-react'
 import {
   NavigationMenu,
   NavigationMenuList,
@@ -9,6 +10,7 @@ import {
   NavigationMenuLink,
   navigationMenuTriggerStyle,
 } from '@/components/ui/navigation-menu'
+import { cn } from '@/utils/tailwind'
 
 export default function HeaderNavigation() {
   const pathname = usePathname()
@@ -23,9 +25,7 @@ export default function HeaderNavigation() {
     { href: '/stream-monitor', label: 'Stream Monitor' },
   ]
 
-  const userNavItems = [
-    { href: '/profile', label: 'Profile' },
-  ]
+  const userNavItems = [{ href: '/profile', label: 'Profile' }]
 
   // Include all navigation items
   const navItems = [...baseNavItems, ...streamingNavItems, ...userNavItems]
@@ -39,16 +39,33 @@ export default function HeaderNavigation() {
               <NavigationMenuLink
                 className={`${navigationMenuTriggerStyle()} ${
                   pathname === item.href
-                    ? 'bg-gray-100 dark:bg-gray-800 font-semibold' // Enhanced active style
+                    ? 'bg-gray-100 font-semibold dark:bg-gray-800' // Enhanced active style
                     : ''
-                } hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150`}
+                } transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-800`}
               >
                 {item.label}
               </NavigationMenuLink>
             </Link>
           </NavigationMenuItem>
         ))}
+        <NavigationMenuItem>
+          <Link href="/admin" legacyBehavior passHref>
+            <NavigationMenuLink
+              aria-label="Admin dashboard"
+              title="Admin"
+              className={cn(
+                navigationMenuTriggerStyle(),
+                'w-10 px-0 hover:bg-gray-100 dark:hover:bg-gray-800',
+                pathname === '/admin'
+                  ? 'bg-gray-100 font-semibold dark:bg-gray-800'
+                  : '',
+              )}
+            >
+              <Shield className="h-4 w-4" />
+            </NavigationMenuLink>
+          </Link>
+        </NavigationMenuItem>
       </NavigationMenuList>
     </NavigationMenu>
   )
-} 
+}

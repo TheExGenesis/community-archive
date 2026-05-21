@@ -58,52 +58,26 @@ export default function ProfileContent({
 
     startTransition(async () => {
       try {
-        // Check if record exists first
-        const { data: existingRecord } = await supabase
-          .from('optin')
-          .select('id')
-          .eq('user_id', user.id)
-          .single()
-
-        const updatePayload: Record<string, any> = {
-          opted_in: checked,
-          explicit_optout: false,
-          opt_out_reason: null,
+        if (!twitterUsername) {
+          throw new Error(
+            'Twitter username not found. Please sign in with Twitter to manage opt-in settings.',
+          )
         }
 
-        if (twitterUsername) {
-          updatePayload.username = twitterUsername.toLowerCase()
-        }
-        if (twitterUserId) {
-          updatePayload.twitter_user_id = twitterUserId
-        }
+        const response = await fetch('/api/opt-in', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: twitterUsername.toLowerCase(),
+            twitterUserId: twitterUserId || null,
+            optedIn: checked,
+            termsVersion: 'v1.0',
+          }),
+        })
+        const result = await response.json()
 
-        if (existingRecord) {
-          // Update existing record
-          const { error: updateError } = await supabase
-            .from('optin')
-            .update(updatePayload)
-            .eq('user_id', user.id)
-
-          if (updateError) throw updateError
-        } else {
-          if (!twitterUsername) {
-            throw new Error('Twitter username not found. Please sign in with Twitter to manage opt-in settings.')
-          }
-
-          // Insert new record
-          const { error: insertError } = await supabase
-            .from('optin')
-            .insert({
-              user_id: user.id,
-              username: twitterUsername.toLowerCase(),
-              twitter_user_id: twitterUserId || null,
-              opted_in: checked,
-              explicit_optout: false,
-              opt_out_reason: null
-            })
-
-          if (insertError) throw insertError
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to update opt-in status')
         }
 
         setOptInStatus(checked)
@@ -146,50 +120,30 @@ export default function ProfileContent({
   // Persists the explicit_optout flag on the optin table. Used by both the immediate
   // toggle-OFF path and the modal-confirmed toggle-ON-with-delete path.
   const persistOptOut = async (checked: boolean) => {
-    const { data: existingRecord } = await supabase
-      .from('optin')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    const updatePayload: Record<string, any> = {
-      opted_in: false,
-      explicit_optout: checked,
-      opt_out_reason: checked
-        ? 'User explicitly opted out via profile settings'
-        : null,
+    if (!twitterUsername) {
+      throw new Error(
+        'Twitter username not found. Please sign in with Twitter to manage opt-in settings.',
+      )
     }
 
-    if (twitterUsername) {
-      updatePayload.username = twitterUsername.toLowerCase()
-    }
-    if (twitterUserId) {
-      updatePayload.twitter_user_id = twitterUserId
-    }
-
-    if (existingRecord) {
-      const { error: updateError } = await supabase
-        .from('optin')
-        .update(updatePayload)
-        .eq('user_id', user.id)
-      if (updateError) throw updateError
-    } else {
-      if (!twitterUsername) {
-        throw new Error(
-          'Twitter username not found. Please sign in with Twitter to manage opt-in settings.',
-        )
-      }
-      const { error: insertError } = await supabase.from('optin').insert({
-        user_id: user.id,
+    const response = await fetch('/api/opt-in', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         username: twitterUsername.toLowerCase(),
-        twitter_user_id: twitterUserId || null,
-        opted_in: false,
-        explicit_optout: checked,
-        opt_out_reason: checked
+        twitterUserId: twitterUserId || null,
+        optedIn: false,
+        termsVersion: 'v1.0',
+        explicitOptOut: checked,
+        optOutReason: checked
           ? 'User explicitly opted out via profile settings'
           : null,
-      })
-      if (insertError) throw insertError
+      }),
+    })
+    const result = await response.json()
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to update opt-out status')
     }
   }
 

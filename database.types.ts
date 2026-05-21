@@ -553,7 +553,7 @@ export type Database = {
           terms_version: string
           twitter_user_id: string | null
           updated_at: string | null
-          user_id: string
+          user_id: string | null
           username: string
         }
         Insert: {
@@ -567,7 +567,7 @@ export type Database = {
           terms_version?: string
           twitter_user_id?: string | null
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
           username: string
         }
         Update: {
@@ -581,7 +581,7 @@ export type Database = {
           terms_version?: string
           twitter_user_id?: string | null
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
           username?: string
         }
         Relationships: []

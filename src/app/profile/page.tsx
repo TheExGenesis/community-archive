@@ -1,23 +1,43 @@
 import { requireAuth } from '@/lib/auth-utils'
-import { createServerClient } from '@/utils/supabase'
+import { createServerAdminClient, createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import ProfileContent from './ProfileContent'
+
+const getTwitterUsername = (user: Awaited<ReturnType<typeof requireAuth>>['user']) =>
+  (
+    user.user_metadata?.user_name ||
+    user.user_metadata?.preferred_username ||
+    user.user_metadata?.username ||
+    user.app_metadata?.user_name ||
+    user.app_metadata?.preferred_username ||
+    user.app_metadata?.username ||
+    ''
+  )
+    .toLowerCase()
+    .replace(/^@/, '')
+    .replace(/[^a-z0-9_]/g, '')
 
 export default async function ProfilePage() {
   const { user } = await requireAuth()
   const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
+  const admin = createServerAdminClient(cookieStore)
 
   // Get the Twitter provider_id from user metadata (this is the account_id in archive_upload)
   const twitterAccountId = user.user_metadata?.provider_id || user.app_metadata?.provider_id
+  const twitterUsername = getTwitterUsername(user)
+  const optInQuery = twitterUsername
+    ? admin
+        .from('optin')
+        .select('*')
+        .or(`user_id.eq.${user.id},username.eq.${twitterUsername}`)
+        .limit(1)
+        .maybeSingle()
+    : admin.from('optin').select('*').eq('user_id', user.id).maybeSingle()
 
   // Get user's opt-in/opt-out status and archives
   const [optInResponse, archivesResponse] = await Promise.all([
-    supabase
-      .from('optin')
-      .select('*')
-      .eq('user_id', user.id)
-      .single(),
+    optInQuery,
     // Query archives by account_id (Twitter user ID), not user_id (Supabase auth ID)
     twitterAccountId
       ? supabase

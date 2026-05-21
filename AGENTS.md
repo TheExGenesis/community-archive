@@ -199,6 +199,42 @@ Both `lodash` and `fp-ts` are dependencies. Should pick one FP utility approach.
 
 ---
 
+## Migrations & staging sync
+
+**Staging deploy is automatic; prod is not.**
+
+The `.github/workflows/sync-staging-db.yaml` workflow runs on every PR push that
+touches `supabase/**` (path-filtered) and on push-to-`main`. On a PR push it:
+
+1. Resets the staging Supabase DB from `supabase/migrations/` (so any new
+   migration in your branch lands on staging).
+2. Regenerates `src/database-types.ts` against the synced staging schema and
+   auto-commits the result back onto your PR branch (`--no-verify` to skip the
+   husky pre-commit hook that would re-run gen-types against a non-existent
+   local supabase).
+
+**To land a migration on staging without touching prod:**
+- Add the migration under `supabase/migrations/` on your PR branch and push.
+- The workflow runs automatically; staging gets the migration; prod stays
+  unchanged.
+- Prod migration happens later via `supabase db push` against the prod project
+  (or whatever the maintainer runs after PR merge). Do not run `supabase db
+  push` against prod yourself unless explicitly asked.
+
+**Don't expect the workflow on fork PRs** — the job's `if:` guard skips it when
+`pull_request.head.repo.full_name != github.repository` (forks can't access the
+`Preview` environment secrets). Same-repo branches are fine.
+
+**Concurrency:** the workflow uses a global mutex (`group: sync-staging-db`,
+`cancel-in-progress: false`), so pushes from multiple PRs queue rather than
+collide on the shared staging DB. Expect a wait if someone else just pushed.
+
+**If you only edit `supabase/schemas/`** without producing a migration file,
+the workflow still triggers (path filter is `supabase/**`) but nothing
+applies — schemas are the declarative source of truth; migrations are what
+actually gets pushed. Always run `supabase db diff -f <name>` to generate the
+migration after editing schemas/.
+
 ## Quick Reference Commands
 
 ```bash

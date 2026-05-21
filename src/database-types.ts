@@ -613,7 +613,7 @@ export type Database = {
           terms_version: string
           twitter_user_id: string | null
           updated_at: string | null
-          user_id: string
+          user_id: string | null
           username: string
         }
         Insert: {
@@ -627,7 +627,7 @@ export type Database = {
           terms_version?: string
           twitter_user_id?: string | null
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
           username: string
         }
         Update: {
@@ -641,7 +641,7 @@ export type Database = {
           terms_version?: string
           twitter_user_id?: string | null
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
           username?: string
         }
         Relationships: []
@@ -1313,6 +1313,19 @@ export type Database = {
       }
     }
     Functions: {
+      admin_list_blocked_scraping_users: {
+        Args: {
+          p_account_ids: string[]
+        }
+        Returns: string[]
+      }
+      admin_set_scrape_block: {
+        Args: {
+          p_account_id: string
+          p_blocked: boolean
+        }
+        Returns: undefined
+      }
       apply_public_entities_rls_policies: {
         Args: {
           schema_name: string

@@ -192,7 +192,7 @@ ALTER TABLE "public"."scraper_count" OWNER TO "postgres";
 -- public.optin
 CREATE TABLE IF NOT EXISTS "public"."optin" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "user_id" "uuid" NOT NULL,
+    "user_id" "uuid",
     "username" "text" NOT NULL,
     "twitter_user_id" "text",
     "opted_in" boolean DEFAULT false NOT NULL,

@@ -28,6 +28,7 @@ STAGING_DEV_LOGIN_USERNAME=alice_dev
 STAGING_DEV_LOGIN_PROVIDER_ID=mock_alice
 STAGING_DEV_LOGIN_DISPLAY_NAME=Alice Staging
 ALLOW_STAGING_DEV_LOGIN_ON_PROD_SUPABASE=false
+ALLOW_STAGING_ADMIN_ON_PROD_SUPABASE=false
 ```
 
 The default staging login identity is configured via env:
@@ -42,6 +43,8 @@ The staging UI shows a dropdown of seeded mock users (currently `alice_dev` and 
 Do not commit the real password. The bootstrap script below writes it to an ignored `.env.staging.generated` file so it can be copied into Vercel's Preview environment.
 
 The server route refuses staging dev login against the known production Supabase host unless `ALLOW_STAGING_DEV_LOGIN_ON_PROD_SUPABASE=true`. Do not set that override for normal staging.
+
+When `ENABLE_STAGING_DEV_LOGIN=true` and the deployment is not pointed at the known production Supabase host, `/admin` is available to signed-in staging mock users. Production remains restricted to the Twitter username `exgenesis`.
 
 ## Programmatic Database Setup
 

@@ -122,6 +122,19 @@ export const createServerAdminClient = (
   })
 }
 
+// Real service-role client: NO cookies, NO session. Use this when a server
+// route needs to bypass RLS or call SECURITY DEFINER RPCs granted to
+// service_role only. `createServerAdminClient` above is the SSR variant that
+// passes the user's JWT as Authorization (service_role only as apikey), which
+// PostgREST treats as the user's authenticated role — fine for ops that
+// should still respect the user's identity, wrong for true admin ops.
+export const createServerServiceRoleClient = () => {
+  const { url, serviceRole } = getSupabaseConfig(true)
+  return createClient<Database>(url, serviceRole!, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+}
+
 export async function createDbScriptClient() {
   const isDevelopment = process.env.NODE_ENV === 'development'
   if (!isDevelopment) {

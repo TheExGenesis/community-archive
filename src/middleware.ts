@@ -259,7 +259,9 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Stage 3: Geo-Aware Rate Limiting (all page routes) ──────────────────
-  if (pageRoute) {
+  // Skipped in development — local reloads and devtools hot-refreshes easily
+  // burn through the 30 req/min budget and lock you out for a minute.
+  if (pageRoute && process.env.NODE_ENV !== 'development') {
     const ip = getIp(request)
     const country = request.headers.get('x-vercel-ip-country') || ''
     const isSG = country === 'SG'

@@ -64,33 +64,43 @@ const OPT_IN_SELECT =
 const ACCOUNT_SELECT =
   'account_id, username, account_display_name, num_tweets, created_via, updated_at'
 
-const getMetadataString = (
-  metadata: Record<string, unknown>,
-  keys: string[],
-) => {
-  for (const key of keys) {
-    const value = metadata[key]
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim()
+// SECURITY: only trust identity_data from the Twitter OAuth identity entry.
+// user_metadata is user-mutable via supabase.auth.updateUser({ data: ... }) —
+// reading user_name from there would let any logged-in user promote themselves
+// to admin by setting user_metadata.user_name = 'exgenesis'. identity_data is
+// set by Supabase during the OAuth callback from the provider's response and
+// is not user-editable.
+function getTwitterIdentity(user: User) {
+  return (
+    user.identities?.find((identity) =>
+      ['twitter', 'x'].includes(identity.provider ?? ''),
+    ) ?? null
+  )
+}
+
+export const getTwitterUsername = (user: User): string | null => {
+  const identity = getTwitterIdentity(user)
+  if (!identity) return null
+  const data = (identity.identity_data ?? {}) as Record<string, unknown>
+  for (const key of ['user_name', 'preferred_username', 'screen_name', 'username']) {
+    const v = data[key]
+    if (typeof v === 'string' && v.trim()) {
+      return v.trim().toLowerCase().replace(/^@/, '')
     }
   }
   return null
 }
 
-export const getTwitterUsername = (user: User) => {
-  const userMetadata = user.user_metadata ?? {}
-  const appMetadata = user.app_metadata ?? {}
-  const twitterIdentity =
-    user.identities?.find((identity) =>
-      ['twitter', 'x'].includes(identity.provider ?? ''),
-    ) ?? user.identities?.[0]
-  const identityData = twitterIdentity?.identity_data ?? {}
-
-  return getMetadataString(
-    { ...identityData, ...appMetadata, ...userMetadata },
-    ['user_name', 'preferred_username', 'username', 'screen_name'],
-  )?.toLowerCase()
+export const getTwitterProviderId = (user: User): string | null => {
+  const identity = getTwitterIdentity(user)
+  if (!identity) return null
+  const data = (identity.identity_data ?? {}) as Record<string, unknown>
+  const v = data.provider_id ?? data.sub ?? identity.id
+  return typeof v === 'string' && v.trim() ? v.trim() : null
 }
+
+const ADMIN_TWITTER_PROVIDER_ID =
+  process.env.ADMIN_TWITTER_PROVIDER_ID?.trim() || null
 
 const isKnownProductionSupabase = () =>
   process.env.NEXT_PUBLIC_SUPABASE_URL?.includes(PRODUCTION_SUPABASE_HOST) ??
@@ -100,6 +110,31 @@ const isStagingAdminAccessEnabled = () =>
   process.env.ENABLE_STAGING_DEV_LOGIN === 'true' &&
   process.env.ALLOW_STAGING_ADMIN_ON_PROD_SUPABASE !== 'true' &&
   !isKnownProductionSupabase()
+
+// Pure predicate: is this user the configured real admin? No redirects.
+// Belt-and-suspenders: matches username AND, when ADMIN_TWITTER_PROVIDER_ID is
+// configured, the immutable Twitter numeric id too. Without the env var only
+// the username is checked — strong enough as long as @exgenesis stays
+// registered to the same Twitter account.
+export function isAdminUser(user: User): boolean {
+  const usernameMatches = getTwitterUsername(user) === ADMIN_USERNAME
+  if (!usernameMatches) return false
+  if (ADMIN_TWITTER_PROVIDER_ID === null) return true
+  return getTwitterProviderId(user) === ADMIN_TWITTER_PROVIDER_ID
+}
+
+// Non-throwing variant for places that need to *know* whether the visitor is
+// admin (e.g. to hide nav links) but must not redirect.
+export async function checkIsAdmin(): Promise<boolean> {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(cookieStore)
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+  if (error || !user) return false
+  return isAdminUser(user) || isStagingAdminAccessEnabled()
+}
 
 export async function requireAdmin() {
   const cookieStore = await cookies()
@@ -113,10 +148,7 @@ export async function requireAdmin() {
     redirect('/login?redirect=/admin')
   }
 
-  if (
-    getTwitterUsername(user) !== ADMIN_USERNAME &&
-    !isStagingAdminAccessEnabled()
-  ) {
+  if (!isAdminUser(user) && !isStagingAdminAccessEnabled()) {
     notFound()
   }
 

@@ -111,16 +111,53 @@ const isStagingAdminAccessEnabled = () =>
   process.env.ALLOW_STAGING_ADMIN_ON_PROD_SUPABASE !== 'true' &&
   !isKnownProductionSupabase()
 
+// Specific staging usernames that get admin powers when dev-logged in. NOT
+// every staging user — that was the old (overly permissive) behavior. Only
+// these usernames pass the gate, and only when isStagingAdminAccessEnabled()
+// is true (which can only happen off-prod).
+const STAGING_ADMIN_USERNAMES = new Set(['xiq_dev'])
+
+// Read the username Supabase Auth Admin set for this user. app_metadata is
+// not mutable via the regular auth API (only the admin SDK can write to it),
+// so reading it for an identity decision is safe — unlike user_metadata.
+// Returns null on prod where the staging code path doesn't apply.
+function getStagingAdminUsername(user: User): string | null {
+  if (!isStagingAdminAccessEnabled()) return null
+  const v = (user.app_metadata as { user_name?: unknown } | undefined)
+    ?.user_name
+  if (typeof v !== 'string') return null
+  return v.trim().toLowerCase().replace(/^@/, '') || null
+}
+
 // Pure predicate: is this user the configured real admin? No redirects.
-// Belt-and-suspenders: matches username AND, when ADMIN_TWITTER_PROVIDER_ID is
-// configured, the immutable Twitter numeric id too. Without the env var only
-// the username is checked — strong enough as long as @exgenesis stays
-// registered to the same Twitter account.
+// Two paths:
+//
+//   1. Real Twitter OAuth identity matches ADMIN_USERNAME. On prod, this
+//      is the only path that returns true — guarded by username plus,
+//      when ADMIN_TWITTER_PROVIDER_ID is set, the immutable Twitter
+//      numeric id (belt-and-suspenders against a future handle takeover).
+//
+//   2. (staging only) app_metadata.user_name is in the
+//      STAGING_ADMIN_USERNAMES allowlist. The dev-login route sets
+//      app_metadata.user_name to whatever username the dev-login form
+//      requested, and app_metadata is server-set and not mutable via the
+//      regular auth API — so this is a safe identity claim on staging.
 export function isAdminUser(user: User): boolean {
-  const usernameMatches = getTwitterUsername(user) === ADMIN_USERNAME
-  if (!usernameMatches) return false
-  if (ADMIN_TWITTER_PROVIDER_ID === null) return true
-  return getTwitterProviderId(user) === ADMIN_TWITTER_PROVIDER_ID
+  const twitterUsername = getTwitterUsername(user)
+  if (twitterUsername === ADMIN_USERNAME) {
+    if (ADMIN_TWITTER_PROVIDER_ID === null) return true
+    return getTwitterProviderId(user) === ADMIN_TWITTER_PROVIDER_ID
+  }
+  const stagingName = getStagingAdminUsername(user)
+  if (stagingName && STAGING_ADMIN_USERNAMES.has(stagingName)) return true
+  return false
+}
+
+// Username to display at the top of the admin page. Identity_data first
+// (real Twitter OAuth), staging dev-login app_metadata as fallback so the
+// header shows '@xiq_dev' instead of '@' when signed in via dev-login.
+export function getDisplayUsername(user: User): string | null {
+  return getTwitterUsername(user) ?? getStagingAdminUsername(user)
 }
 
 // Non-throwing variant for places that need to *know* whether the visitor is
@@ -133,7 +170,7 @@ export async function checkIsAdmin(): Promise<boolean> {
     error,
   } = await supabase.auth.getUser()
   if (error || !user) return false
-  return isAdminUser(user) || isStagingAdminAccessEnabled()
+  return isAdminUser(user)
 }
 
 export async function requireAdmin() {
@@ -148,7 +185,9 @@ export async function requireAdmin() {
     redirect('/login?redirect=/admin')
   }
 
-  if (!isAdminUser(user) && !isStagingAdminAccessEnabled()) {
+  // The staging allowance is now baked into isAdminUser (specific
+  // usernames only); no blanket bypass.
+  if (!isAdminUser(user)) {
     notFound()
   }
 

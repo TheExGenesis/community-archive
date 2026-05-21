@@ -31,12 +31,24 @@ import {
 } from './actions'
 import type { AccountsCursor, MergedRow, OptInRecord } from './data'
 
+// Pinning to UTC + en-US so the same instant produces the same string on
+// both SSR (Vercel runs in UTC) and the client (any timezone). Without
+// this the SSR'd date row text differs from what the client formatter
+// produces during hydration, which surfaces as React error #423
+// ("hydration failed; React recovered by client-rendering the root").
 const formatDate = (value: string | null) => {
   if (!value) return 'never'
-  return new Intl.DateTimeFormat('en', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value))
+  return (
+    new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'UTC',
+    }).format(new Date(value)) + ' UTC'
+  )
 }
 
 const compactNumber = (value: number | null | undefined) =>

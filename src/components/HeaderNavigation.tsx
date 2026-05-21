@@ -12,7 +12,11 @@ import {
 } from '@/components/ui/navigation-menu'
 import { cn } from '@/utils/tailwind'
 
-export default function HeaderNavigation() {
+export default function HeaderNavigation({
+  isAdmin = false,
+}: {
+  isAdmin?: boolean
+}) {
   const pathname = usePathname()
 
   const baseNavItems = [
@@ -48,23 +52,25 @@ export default function HeaderNavigation() {
             </Link>
           </NavigationMenuItem>
         ))}
-        <NavigationMenuItem>
-          <Link href="/admin" legacyBehavior passHref>
-            <NavigationMenuLink
-              aria-label="Admin dashboard"
-              title="Admin"
-              className={cn(
-                navigationMenuTriggerStyle(),
-                'w-10 px-0 hover:bg-gray-100 dark:hover:bg-gray-800',
-                pathname === '/admin'
-                  ? 'bg-gray-100 font-semibold dark:bg-gray-800'
-                  : '',
-              )}
-            >
-              <Shield className="h-4 w-4" />
-            </NavigationMenuLink>
-          </Link>
-        </NavigationMenuItem>
+        {isAdmin ? (
+          <NavigationMenuItem>
+            <Link href="/admin" legacyBehavior passHref>
+              <NavigationMenuLink
+                aria-label="Admin dashboard"
+                title="Admin"
+                className={cn(
+                  navigationMenuTriggerStyle(),
+                  'w-10 px-0 hover:bg-gray-100 dark:hover:bg-gray-800',
+                  pathname === '/admin'
+                    ? 'bg-gray-100 font-semibold dark:bg-gray-800'
+                    : '',
+                )}
+              >
+                <Shield className="h-4 w-4" />
+              </NavigationMenuLink>
+            </Link>
+          </NavigationMenuItem>
+        ) : null}
       </NavigationMenuList>
     </NavigationMenu>
   )

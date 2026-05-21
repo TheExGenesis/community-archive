@@ -11,6 +11,7 @@ import dynamic from 'next/dynamic'
 import HeaderNavigation from '@/components/HeaderNavigation'
 import HeaderSearch from '@/components/HeaderSearch'
 import MobileMenu from '@/components/MobileMenu'
+import { checkIsAdmin } from '@/app/admin/data'
 
 const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
   ssr: false,
@@ -26,11 +27,12 @@ export const metadata = {
   description: "A public archive of everyone's tweets ",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const isAdmin = await checkIsAdmin()
   return (
     <html
       lang="en"
@@ -52,7 +54,7 @@ export default function RootLayout({
                 <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
                   <span className="font-bold text-lg text-gray-800 dark:text-gray-200 whitespace-nowrap">Community Archive</span>
                 </Link>
-                <HeaderNavigation />
+                <HeaderNavigation isAdmin={isAdmin} />
                 <div className="flex items-center space-x-3">
                   <HeaderSearch />
                 </div>
@@ -61,7 +63,7 @@ export default function RootLayout({
                   <div className="text-sm">
                     <DynamicSignIn />
                   </div>
-                  <MobileMenu />
+                  <MobileMenu isAdmin={isAdmin} />
                 </div>
               </div>
             </header>

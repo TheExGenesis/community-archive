@@ -257,6 +257,10 @@ export function AdminTable({
             username: updated.username,
             account: result.account ?? null,
             archiveUploadCount: result.archiveUploadCount ?? 0,
+            // Best-effort: server-side manualOptIn doesn't fetch the
+            // archived tweet count for the prepended row (would cost a
+            // COUNT per call). Page-level refresh fills it in.
+            archivedTweetCount: 0,
             blockedFromScraping: result.blockedFromScraping,
             optInRecord: updated,
             fromOptIn: true,
@@ -276,6 +280,9 @@ export function AdminTable({
         archiveUploadCount: result.archiveDeleted
           ? 0
           : (result.archiveUploadCount ?? row.archiveUploadCount),
+        // archiveDeleted clears archived count to 0; otherwise preserve
+        // the prior server-computed value.
+        archivedTweetCount: result.archiveDeleted ? 0 : row.archivedTweetCount,
       }
       return next
     })
@@ -431,12 +438,24 @@ export function AdminTable({
                   <OptInStatusBadge record={row.optInRecord} />
                 </TableCell>
                 <TableCell>
-                  {row.account ? (
+                  {row.account || row.archivedTweetCount > 0 ? (
                     <div>
-                      <div>{compactNumber(row.account.num_tweets)} tweets</div>
+                      <div>
+                        {compactNumber(row.archivedTweetCount)} archived
+                        {row.account &&
+                        row.account.num_tweets != null &&
+                        row.account.num_tweets !== row.archivedTweetCount ? (
+                          <span className="text-muted-foreground">
+                            {' '}
+                            (
+                            {compactNumber(row.account.num_tweets)} on
+                            Twitter)
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="text-xs text-muted-foreground">
-                        {row.archiveUploadCount} direct uploads · via{' '}
-                        {row.account.created_via}
+                        {row.archiveUploadCount} direct uploads
+                        {row.account ? ` · via ${row.account.created_via}` : ''}
                       </div>
                     </div>
                   ) : (

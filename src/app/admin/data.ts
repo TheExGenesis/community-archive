@@ -38,6 +38,15 @@ export type MergedRow = {
   username: string
   account: AccountRecord | null
   archiveUploadCount: number
+  /**
+   * Actual `COUNT(*) FROM public.tweets WHERE account_id = ?`. Distinct from
+   * `account.num_tweets`, which is the Twitter public-profile counter the
+   * scraper writes — that number reflects what the account has on Twitter,
+   * not what we have stored. For `twitter_import` accounts the two can
+   * differ by 10–1000x; for `web` (uploaded archive) accounts they roughly
+   * match (off by retweets/replies the archive sometimes excludes).
+   */
+  archivedTweetCount: number
   blockedFromScraping: boolean
   optInRecord: OptInRecord | null
   /** True when this row was sourced from public.optin (vs all_account only). */
@@ -249,6 +258,40 @@ async function fetchUploadCounts(
   }, new Map())
 }
 
+// Actual `COUNT(*)` of rows in public.tweets per account. We need this
+// alongside all_account.num_tweets because the latter is the Twitter
+// public-profile counter (what the scraper saw at ingest), not what we
+// have stored — they can differ by 10–1000x for scrape-sourced accounts.
+// Done as N parallel `head:true` counts (one per account) rather than a
+// SELECT-then-aggregate, because:
+//   - SELECT account_id would be capped at 1000 rows by PostgREST and we
+//     could be summing across millions of tweet rows
+//   - GROUP BY isn't expressible from supabase-js without an RPC
+//   - 50 accounts × 10 concurrency = 5 batches, ~250ms end-to-end —
+//     fine for a per-page admin view, no RPC migration needed
+async function fetchArchivedTweetCounts(
+  admin: AdminClient,
+  accountIds: string[],
+): Promise<Map<string, number>> {
+  if (!accountIds.length) return new Map()
+  const CONCURRENCY = 10
+  const result = new Map<string, number>()
+  for (let i = 0; i < accountIds.length; i += CONCURRENCY) {
+    const batch = accountIds.slice(i, i + CONCURRENCY)
+    const counts = await Promise.all(
+      batch.map(async (id) => {
+        const { count, error } = await admin
+          .from('tweets')
+          .select('tweet_id', { count: 'exact', head: true })
+          .eq('account_id', id)
+        return { id, count: error ? 0 : (count ?? 0) }
+      }),
+    )
+    for (const c of counts) result.set(c.id, c.count)
+  }
+  return result
+}
+
 async function fetchOptInRows(
   admin: AdminClient,
   search: string,
@@ -334,6 +377,7 @@ function buildOptInMergedRows(
   accountsByUsername: Map<string, AccountRecord>,
   accountsById: Map<string, AccountRecord>,
   uploadCounts: Map<string, number>,
+  archivedTweetCounts: Map<string, number>,
   blocked: Set<string>,
 ): MergedRow[] {
   return records.map((record) => {
@@ -352,6 +396,9 @@ function buildOptInMergedRows(
       archiveUploadCount: account
         ? (uploadCounts.get(account.account_id) ?? 0)
         : 0,
+      archivedTweetCount: effectiveAccountId
+        ? (archivedTweetCounts.get(effectiveAccountId) ?? 0)
+        : 0,
       blockedFromScraping: effectiveAccountId
         ? blocked.has(effectiveAccountId)
         : false,
@@ -364,6 +411,7 @@ function buildOptInMergedRows(
 function buildAccountMergedRows(
   accounts: AccountRecord[],
   uploadCounts: Map<string, number>,
+  archivedTweetCounts: Map<string, number>,
   blocked: Set<string>,
 ): MergedRow[] {
   return accounts.map((account) => ({
@@ -371,6 +419,7 @@ function buildAccountMergedRows(
     username: account.username,
     account,
     archiveUploadCount: uploadCounts.get(account.account_id) ?? 0,
+    archivedTweetCount: archivedTweetCounts.get(account.account_id) ?? 0,
     blockedFromScraping: blocked.has(account.account_id),
     optInRecord: null,
     fromOptIn: false,
@@ -436,29 +485,39 @@ export async function loadInitialAccounts(
     ...firstAccounts.map((a) => a.account_id),
   ].filter(Boolean)
 
-  const [uploadCounts, scrapeBlocklist] = await Promise.all([
-    fetchUploadCounts(
-      admin,
-      Array.from(
-        new Set([
-          ...optInAccountList.map((a) => a.account_id),
-          ...firstAccounts.map((a) => a.account_id),
-        ]),
-      ),
-    ),
-    fetchScrapeBlocklist(admin, candidateAccountIds),
-  ])
+  const accountIdsForCounts = Array.from(
+    new Set([
+      ...optInAccountList.map((a) => a.account_id),
+      ...firstAccounts.map((a) => a.account_id),
+      // Include opt-in rows' twitter_user_id even when no matching
+      // all_account exists, so the archived count can still resolve from
+      // tweets table (rare but possible for accounts the firehose touched
+      // before user_directory got refreshed).
+      ...optInRecords
+        .map((r) => r.twitter_user_id)
+        .filter((id): id is string => Boolean(id)),
+    ]),
+  )
+
+  const [uploadCounts, archivedTweetCounts, scrapeBlocklist] =
+    await Promise.all([
+      fetchUploadCounts(admin, accountIdsForCounts),
+      fetchArchivedTweetCounts(admin, accountIdsForCounts),
+      fetchScrapeBlocklist(admin, candidateAccountIds),
+    ])
 
   const optInRows = buildOptInMergedRows(
     optInRecords,
     accountsByUsernameMap,
     accountsByIdMap,
     uploadCounts,
+    archivedTweetCounts,
     scrapeBlocklist.blocked,
   )
   const accountRows = buildAccountMergedRows(
     firstAccounts,
     uploadCounts,
+    archivedTweetCounts,
     scrapeBlocklist.blocked,
   )
 
@@ -488,15 +547,18 @@ export async function loadMoreAccountsData(
   )
 
   const accountIds = accounts.map((a) => a.account_id)
-  const [uploadCounts, scrapeBlocklist] = await Promise.all([
-    fetchUploadCounts(admin, accountIds),
-    fetchScrapeBlocklist(admin, accountIds),
-  ])
+  const [uploadCounts, archivedTweetCounts, scrapeBlocklist] =
+    await Promise.all([
+      fetchUploadCounts(admin, accountIds),
+      fetchArchivedTweetCounts(admin, accountIds),
+      fetchScrapeBlocklist(admin, accountIds),
+    ])
 
   return {
     rows: buildAccountMergedRows(
       accounts,
       uploadCounts,
+      archivedTweetCounts,
       scrapeBlocklist.blocked,
     ),
     nextCursor,

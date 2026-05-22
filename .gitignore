@@ -6,6 +6,10 @@
 .pnp.js
 .yarn/install-state.gz
 
+# nested services have their own node_modules (admin-delete-worker, etc.)
+services/*/node_modules
+services/*/package-lock.json
+
 # testing
 /coverage
 

@@ -1,15 +1,17 @@
-# Admin delete-with-export Hetzner worker — plan
+# Admin delete-with-export Hetzner worker
 
-The current "Opt out and delete data" action runs **inline from Vercel**.
+The "Opt out and delete data" action runs **inline from Vercel** today.
 That works for small accounts but times out around the 100k-tweet mark
 even with the parallelized export. For genuinely large accounts the
 right home for the work is a long-running process on the
 community-archive Hetzner machine.
 
 This doc is the architectural plan + observability story for that worker.
-The worker is **not yet built** at the time of writing. Once it ships,
-the Vercel action stops running the destructive steps inline and just
-enqueues a job (see "Migration path" at the end).
+
+> **Implementation lives in [`services/admin-delete-worker/`](../services/admin-delete-worker/)**.
+> The worker's own README has deploy commands, observability queries,
+> and a TODO list. This file is the conceptual + contract spec; the
+> service README is the operational manual.
 
 ## What the worker does
 

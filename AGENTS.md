@@ -235,6 +235,48 @@ applies — schemas are the declarative source of truth; migrations are what
 actually gets pushed. Always run `supabase db diff -f <name>` to generate the
 migration after editing schemas/.
 
+### Pre-merge prod-migration check (REQUIRED for any PR that touches `supabase/migrations/`)
+
+There is **no automation** that applies migrations to prod, and several
+times now we've merged a PR with new migrations and forgotten to push
+them. Symptoms: PostgREST returns `PGRST202` ("Could not find the
+function …") or row-not-found errors, because prod's schema is behind
+what the application code expects.
+
+Before merging a PR with new migrations:
+
+```bash
+# Audit: are all the repo's migrations applied on prod?
+PROD_DATABASE_URL=postgres://… pnpm migrations:check
+
+# If it reports "✗ N migration(s) … NOT applied on prod":
+supabase db push --db-url "$PROD_DATABASE_URL"
+
+# Re-run to confirm in-sync:
+pnpm migrations:check        # exits 0 when prod matches the repo
+```
+
+`pnpm migrations:check` reads `PROD_DATABASE_URL` (or constructs the
+URL from `SUPABASE_DB_PASSWORD` + the prod project ref). To check
+staging instead: `pnpm migrations:check:staging` (uses
+`STAGING_DATABASE_URL`).
+
+If you don't have prod write access, this is the maintainer's job —
+mention "prod migration needed" in the PR description so the merge
+doesn't slip past anyone.
+
+### How prod ended up out of sync (so this doesn't happen again)
+
+Each of these PRs introduced migrations that landed on staging but
+**were never applied to prod**, in order:
+
+  - #331: admin scrape-block RPCs + audit log table + nullable optin.user_id
+  - #348: REVOKE delete_tweets from anon/authenticated
+
+The user hit "function admin_set_scrape_block does not exist" weeks
+after merge because of this. Avoid by following the pre-merge check
+above.
+
 ## Quick Reference Commands
 
 ```bash

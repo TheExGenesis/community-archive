@@ -199,6 +199,64 @@ Both `lodash` and `fp-ts` are dependencies. Should pick one FP utility approach.
 
 ---
 
+## Supabase gotchas
+
+**PostgREST silently caps SELECTs at 1,000 rows.** A `.select()` against
+a table with more rows than that returns only the first 1,000 with no
+error and no indication of truncation. This bit `exportUserDataInline`
+in `src/app/admin/actions.ts` (exported 1,000 of 5,000 tweets on the
+first test). When you need *all* rows for an account/condition:
+
+```ts
+const PAGE = 1000
+const all = []
+let offset = 0
+while (true) {
+  const { data, error } = await supabase
+    .from('tweets')
+    .select('*')
+    .order('tweet_id', { ascending: true }) // stable order so pagination doesn't shift rows
+    .eq('account_id', accountId)
+    .range(offset, offset + PAGE - 1)
+  if (error) throw error
+  const rows = data ?? []
+  all.push(...rows)
+  if (rows.length < PAGE) break
+  offset += rows.length
+}
+```
+
+`.order()` is required for stable pagination if rows can change
+mid-export. Use the table's PK or another indexed column.
+
+The default cap is controlled by the project's `db-settings.max-rows`
+in the Supabase config; you can raise it but defaulting to pagination
+in code is safer (and works regardless of project settings).
+
+For *counts only*, use `{ count: 'exact', head: true }` and read
+`count` from the response — no pagination needed and zero data
+transfer:
+
+```ts
+const { count } = await supabase
+  .from('tweets')
+  .select('*', { count: 'exact', head: true })
+  .eq('account_id', accountId)
+```
+
+**Other Supabase-shaped traps already documented elsewhere in the
+codebase:**
+- `createServerAdminClient` is *not* admin — it uses the SSR helper
+  which sends the user's JWT, not the service-role key.
+  `createServerServiceRoleClient` is the real elevated client. See
+  `src/utils/supabase.ts`.
+- `user_metadata` is client-mutable (`supabase.auth.updateUser({ data:
+  ... })`); never trust it for identity. Use the JWT's
+  `app_metadata.provider_id` or `auth.users.identities[].identity_data`.
+- `PostgrestError` is a plain TS type, not an Error subclass, so
+  `e instanceof Error` is false. See
+  `describeError` in `src/app/admin/actions.ts`.
+
 ## Migrations & staging sync
 
 **Staging deploy is automatic; prod is not.**

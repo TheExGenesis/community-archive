@@ -42,6 +42,12 @@ public = true
 file_size_limit = "5000MiB"
 # objects_path = "../data/local_seed/archives"
 
+# Created on hosted Supabase by migration
+# 20260521020000_admin_deleted_user_data_bucket.sql. Listed here so
+# `supabase start` provisions it for local dev too.
+[storage.buckets.admin-deleted-user-data]
+public = false
+
 
 [auth]
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used

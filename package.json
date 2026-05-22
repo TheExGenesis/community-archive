@@ -31,6 +31,8 @@
     "gen-types": "supabase gen types typescript --project-id fabxmporizzqflnftavs --schema public,dev  > src/database-types.ts",
     "pre-commit": "sh scripts/pre-commit.sh",
     "dev:gen-types": "supabase gen types typescript --local --schema public,dev  > src/database-types.ts",
+    "migrations:check": "tsx scripts/check-prod-migrations.ts",
+    "migrations:check:staging": "tsx scripts/check-prod-migrations.ts --staging",
     "prepare": "husky install",
     "test": "jest",
     "test:ci": "jest --ci",

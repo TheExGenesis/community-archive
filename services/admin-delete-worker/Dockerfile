@@ -1,7 +1,11 @@
-# Long-running worker that consumes private.job_queue. Mirrors the
-# services/process_archive/ layout (Node 20 Alpine, app code under /app).
-# See services/admin-delete-worker/README.md for deploy notes.
-FROM node:20-alpine
+# Long-running worker that consumes private.admin_jobs. Mirrors the
+# services/process_archive/ layout, but pinned to Node 22 — Node 20
+# ships without a native `WebSocket` global, and `@supabase/supabase-js`
+# >= 2.46 crashes at `createClient(...)` time with
+# "Node.js 20 detected without native WebSocket support".
+# Node 22 has WebSocket natively; do NOT downgrade without also pinning
+# supabase-js to a version that ships its own ws polyfill.
+FROM node:22-alpine
 
 # tini for proper SIGTERM forwarding into the Node process — without
 # it, `docker stop` sends SIGTERM to PID 1 (Node), but Node's signal

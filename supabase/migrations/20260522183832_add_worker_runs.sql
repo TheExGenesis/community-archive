@@ -4,9 +4,9 @@
 --
 -- Schema is intentionally simple — workers append rows; nothing else
 -- writes here. Indexes are tuned for the most common queries:
---   - "what ran in the last hour?"             → (worker_name, started_at DESC)
---   - "find the run for a specific job_queue row" → (job_key)
---   - "which jobs failed?"                     → (status, started_at DESC)
+--   - "what ran in the last hour?"              → (worker_name, started_at DESC)
+--   - "find the run for a specific admin_jobs row" → (job_key)
+--   - "which jobs failed?"                      → (status, started_at DESC)
 --
 -- See services/admin-delete-worker/ for the writer and
 -- docs/admin-delete-worker.md for the operational contract.
@@ -14,8 +14,9 @@
 CREATE TABLE IF NOT EXISTS private.worker_runs (
   id              bigserial PRIMARY KEY,
   worker_name     text        NOT NULL,
-  -- private.job_queue.key (UUID). Not a hard FK because old job_queue rows
-  -- may get archived/pruned without us wanting to drop the run history.
+  -- private.admin_jobs.key (UUID). Not a hard FK because old admin_jobs
+  -- rows may get archived/pruned without us wanting to drop the run
+  -- history.
   job_key         uuid,
   job_name        text,
   status          text        NOT NULL CHECK (status IN (

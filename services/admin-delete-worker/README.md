@@ -1,6 +1,6 @@
 # admin-delete-worker
 
-Long-running worker that consumes `private.job_queue` rows with
+Long-running worker that consumes `private.admin_jobs` rows with
 `job_name = 'admin_delete_with_export'`. Exports the affected
 account's data to the `admin-deleted-user-data` storage bucket and
 then calls `public.delete_user_archive` to wipe the account. Designed
@@ -28,6 +28,10 @@ multi-minute headroom).
 
 ## Deploy
 
+Current placement: **`ca-autorefresh` (95.217.12.23)**, container name
+`admin-delete-worker`. See `AGENTS.md` → "Hetzner inventory & worker
+placement" for why this box and not `prod-vector-store`.
+
 On the Hetzner box, first time:
 
 ```bash
@@ -35,7 +39,9 @@ git clone https://github.com/TheExGenesis/community-archive.git
 cd community-archive/services/admin-delete-worker
 cp env.example .env
 # Fill in DATABASE_URL (prod), SUPABASE_URL, SUPABASE_SERVICE_ROLE.
-# DATABASE_URL is the same connection string you use for `pnpm migrations:check`.
+# IMPORTANT: on Hetzner you MUST use the IPv4 pooler URL, not the direct
+# `db.<ref>.supabase.co` host (which is IPv6-only and unreachable from
+# ca-autorefresh). See env.example for the format.
 
 docker compose up -d --build
 ```
@@ -50,6 +56,10 @@ docker compose up -d --build
 # Old container is replaced gracefully (compose sends SIGTERM, worker
 # finishes any in-flight job, exits, new container starts).
 ```
+
+Gotcha: `docker compose restart` does NOT reload `.env`. If you change
+environment variables, you need `docker compose down && docker compose up -d`
+(or `up -d --force-recreate`).
 
 ## Observability
 
@@ -88,11 +98,15 @@ SELECT MAX(started_at) FROM private.worker_runs
 WHERE worker_name = 'admin_delete_with_export';
 
 -- Pending + processing jobs (queue side).
-SELECT key, status, "timestamp", args
-FROM private.job_queue
+SELECT key, status, created_at, args
+FROM private.admin_jobs
 WHERE job_name = 'admin_delete_with_export'
   AND status IN ('QUEUED', 'PROCESSING')
-ORDER BY "timestamp";
+ORDER BY created_at;
+
+-- Manually re-queue a FAILED job (rare; investigate first).
+-- UPDATE private.admin_jobs SET status = 'QUEUED', updated_at = now()
+--  WHERE key = '<uuid>';
 ```
 
 Run any of these from Supabase Studio's SQL editor (prod project →
@@ -151,9 +165,9 @@ appear in the `admin-deleted-user-data` bucket.
   `docker-compose.yml` runs exactly one container. Scale only if
   throughput becomes a problem.
 - **No retry on failure.** A job marked `FAILED` stays `FAILED`.
-  Re-running is manual: `UPDATE private.job_queue SET status='QUEUED'
-  WHERE key = '<uuid>'`. Worth adding bounded retries if failures
-  become routine.
+  Re-running is manual: `UPDATE private.admin_jobs SET status='QUEUED',
+  updated_at = now() WHERE key = '<uuid>'`. Worth adding bounded
+  retries if failures become routine.
 - **No alerting.** A failed job leaves a row in `private.worker_runs`
   with `status='failed'` and an error message, but nothing pages
   you. Wire whichever alerting you'd add to staging/prod monitoring

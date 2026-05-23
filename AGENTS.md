@@ -43,7 +43,27 @@
 - `supabase/` - Supabase config, migrations, schemas
 - `scripts/` - CLI utilities and one-off scripts
 
----
+### Hetzner inventory & worker placement (2026-05-23 audit)
+
+| Host | RAM (free) | vCPU | Disk free | Resident workload | Suitable for |
+| --- | --- | --- | --- | --- | --- |
+| `ca-autorefresh` (95.217.12.23) | 3.7 GB (3.0 GB free) | 2 | 30 GB | `dashboard-app` (small Node) + `caddy` | **default home for admin/maintenance workers** — admin-delete-worker lives here |
+| `prod-vector-store` (65.109.10.177) | 15 GB (3.0 GB free) | 4 | 58 GB | Qdrant (11.3 GB / 74% of cap), Coolify-managed app, Cloudflared tunnel | search/embeddings only — leave alone |
+| `hetzner` (65.108.63.153) | unknown | ? | ? | unknown (key in ~/.ssh/config rotated; can't reach) | re-verify before assuming it exists |
+
+**Don't put new workers on `prod-vector-store`.** Qdrant is at 74% of
+its hard memory limit and grows with the corpus. Anything else
+competing for the last 3 GB risks an OOM-kill that takes down vector
+search.
+
+**Long-term TODO: move the vector store off a continuously-running
+Hetzner box onto on-demand compute (Modal or similar).** Per the
+2026-05-23 conversation: we burst-use Qdrant every few months for
+analytics/research, not continuously. Paying for a 15 GB box 24/7 is
+wasteful. Modal's pay-per-use container model fits this pattern
+better. Open question: does Qdrant's storage model survive container
+sleep/wake? If not, persist the index to S3/R2 and reload on cold
+start.
 
 ## Refactor Audit
 

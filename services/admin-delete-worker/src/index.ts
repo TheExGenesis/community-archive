@@ -44,7 +44,7 @@ async function main() {
 
   logger.info(
     { poll_ms: POLL_INTERVAL_MS, worker: WORKER_NAME },
-    'worker started; polling private.job_queue',
+    'worker started; polling private.admin_jobs',
   )
 
   while (!stopping) {
@@ -88,6 +88,10 @@ async function drainOnce(
   // The `FOR UPDATE SKIP LOCKED` lets multiple worker replicas share
   // the queue without stepping on each other; today there's only one
   // replica but this is cheap to do correctly upfront.
+  //
+  // Table is private.admin_jobs (NOT private.job_queue) — see the
+  // migration 20260523180000_add_admin_jobs.sql comment for why we
+  // can't share a table with the pg_cron-driven process_jobs() queue.
   const claimed = await sql<
     {
       key: string
@@ -103,15 +107,16 @@ async function drainOnce(
   >`
     WITH next AS (
       SELECT key
-      FROM private.job_queue
+      FROM private.admin_jobs
       WHERE job_name = ${WORKER_NAME}
         AND status   = 'QUEUED'
-      ORDER BY timestamp ASC
+      ORDER BY created_at ASC
       LIMIT 1
       FOR UPDATE SKIP LOCKED
     )
-    UPDATE private.job_queue q
-       SET status = 'PROCESSING'
+    UPDATE private.admin_jobs q
+       SET status     = 'PROCESSING',
+           updated_at = now()
       FROM next
      WHERE q.key = next.key
     RETURNING q.key, q.job_name, q.args
@@ -140,13 +145,14 @@ async function drainOnce(
     })
     await recorder.finish(runId, { status: 'succeeded', result })
     await sql`
-      UPDATE private.job_queue
-         SET status = 'DONE',
-             args = COALESCE(args, '{}'::jsonb)
-                    || jsonb_build_object(
-                         'completed_at', now(),
-                         'export_prefix', ${result.exportPrefix}::text
-                       )
+      UPDATE private.admin_jobs
+         SET status     = 'DONE',
+             updated_at = now(),
+             args       = COALESCE(args, '{}'::jsonb)
+                          || jsonb_build_object(
+                               'completed_at', now(),
+                               'export_prefix', ${result.export_prefix}::text
+                             )
        WHERE key = ${job.key}
     `
     jobLogger.info({ result }, 'job done')
@@ -158,10 +164,11 @@ async function drainOnce(
       error: message,
     })
     await sql`
-      UPDATE private.job_queue
-         SET status = 'FAILED',
-             args = COALESCE(args, '{}'::jsonb)
-                    || jsonb_build_object('error', ${message}::text, 'failed_at', now())
+      UPDATE private.admin_jobs
+         SET status     = 'FAILED',
+             updated_at = now(),
+             args       = COALESCE(args, '{}'::jsonb)
+                          || jsonb_build_object('error', ${message}::text, 'failed_at', now())
        WHERE key = ${job.key}
     `
   }

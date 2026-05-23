@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Consumes private.job_queue rows where job_name='admin_delete_with_export' — exports the account's data to the admin-deleted-user-data bucket and then deletes the archive. Intended to run on a Hetzner box, not Vercel. See docs/admin-delete-worker.md.",
+  "description": "Consumes private.admin_jobs rows where job_name='admin_delete_with_export' — exports the account's data to the admin-deleted-user-data bucket and then deletes the archive. Intended to run on a Hetzner box, not Vercel. See docs/admin-delete-worker.md.",
   "scripts": {
     "dev": "tsx --watch src/index.ts",
     "start": "tsx src/index.ts",

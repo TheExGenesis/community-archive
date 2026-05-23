@@ -44,11 +44,16 @@ export interface ExportArgs {
   enqueuedAt: string
 }
 
+// snake_case to match the shape persisted into private.worker_runs.result
+// and admin-deleted-user-data/<prefix>/manifest.json. Keeping the wire
+// shape consistent lets the canned SQL queries in README.md
+// (result->'phase_ms', result->'row_counts', ...) work without
+// double-naming.
 export interface ExportResult {
-  exportPrefix: string
-  archiveFilesCopied: string[]
-  rowCounts: Record<string, number>
-  phaseMs: Record<string, number>
+  export_prefix: string
+  archive_files_copied: string[]
+  row_counts: Record<string, number>
+  phase_ms: Record<string, number>
 }
 
 /**
@@ -61,51 +66,51 @@ export interface ExportResult {
  *  5. Remove the original archives/{username}/ files
  *
  * Throws on the first failure. Caller (runJob) is responsible for marking
- * job_queue + worker_runs as FAILED with the error message.
+ * admin_jobs + worker_runs as FAILED with the error message.
  */
 export async function exportAndDelete(
   storage: SupabaseClient,
   sql: postgres.Sql,
   args: ExportArgs,
 ): Promise<ExportResult> {
-  const phaseMs: Record<string, number> = {}
+  const phase_ms: Record<string, number> = {}
   const tick = (name: string, since: number) => {
-    phaseMs[name] = Date.now() - since
+    phase_ms[name] = Date.now() - since
   }
 
-  const exportPrefix = `${args.enqueuedAt.replace(/[:.]/g, '-')}-${args.accountId}`
-  const log = logger.child({ account_id: args.accountId, prefix: exportPrefix })
+  const export_prefix = `${args.enqueuedAt.replace(/[:.]/g, '-')}-${args.accountId}`
+  const log = logger.child({ account_id: args.accountId, prefix: export_prefix })
 
   // 1. archives/<username>/* → admin-deleted-user-data/<prefix>/archives/*
   log.info('phase: archives_copy starting')
   const tArchives = Date.now()
-  const archiveFilesCopied = await copyArchiveFolder(
+  const archive_files_copied = await copyArchiveFolder(
     storage,
     args.username,
-    exportPrefix,
+    export_prefix,
   )
   tick('archives_copy', tArchives)
   log.info(
-    { copied: archiveFilesCopied.length, ms: phaseMs.archives_copy },
+    { copied: archive_files_copied.length, ms: phase_ms.archives_copy },
     'phase: archives_copy done',
   )
 
   // 2. Dump per-account tables.
-  const rowCounts: Record<string, number> = {}
+  const row_counts: Record<string, number> = {}
   for (const table of PER_ACCOUNT_TABLES) {
     const tTable = Date.now()
     const count = await dumpPerAccountTable(
       storage,
       sql,
-      exportPrefix,
+      export_prefix,
       table.name,
       table.column,
       args.accountId,
     )
-    rowCounts[table.name] = count
+    row_counts[table.name] = count
     tick(`dump_${table.name}`, tTable)
     log.info(
-      { table: table.name, rows: count, ms: phaseMs[`dump_${table.name}`] },
+      { table: table.name, rows: count, ms: phase_ms[`dump_${table.name}`] },
       'phase: table dump done',
     )
   }
@@ -118,14 +123,14 @@ export async function exportAndDelete(
     const count = await dumpTweetDependentTable(
       storage,
       sql,
-      exportPrefix,
+      export_prefix,
       table,
       args.accountId,
     )
-    rowCounts[table] = count
+    row_counts[table] = count
     tick(`dump_${table}`, tTable)
     log.info(
-      { table, rows: count, ms: phaseMs[`dump_${table}`] },
+      { table, rows: count, ms: phase_ms[`dump_${table}`] },
       'phase: tweet-dependent table dump done',
     )
   }
@@ -141,9 +146,9 @@ export async function exportAndDelete(
     requested_by_user_id: args.requesterUserId,
     enqueued_at: args.enqueuedAt,
     completed_at: new Date().toISOString(),
-    archive_files_copied: archiveFilesCopied,
-    row_counts: rowCounts,
-    phase_ms: phaseMs,
+    archive_files_copied,
+    row_counts,
+    phase_ms,
     notes:
       'Exported by services/admin-delete-worker before calling ' +
       'public.delete_user_archive. The archives/ subfolder mirrors the ' +
@@ -153,7 +158,7 @@ export async function exportAndDelete(
   const { error: manifestErr } = await storage.storage
     .from(EXPORT_BUCKET)
     .upload(
-      `${exportPrefix}/manifest.json`,
+      `${export_prefix}/manifest.json`,
       new Blob([JSON.stringify(manifest, null, 2)], {
         type: 'application/json',
       }),
@@ -168,20 +173,20 @@ export async function exportAndDelete(
   const tDelete = Date.now()
   await sql`SELECT public.delete_user_archive(${args.accountId})`
   tick('delete_user_archive', tDelete)
-  log.info({ ms: phaseMs.delete_user_archive }, 'phase: delete_user_archive done')
+  log.info({ ms: phase_ms.delete_user_archive }, 'phase: delete_user_archive done')
 
   // 5. Remove the source archives/{username}/ files.
   const tArchiveCleanup = Date.now()
   await removeArchiveFolder(storage, args.username)
   tick('archives_cleanup', tArchiveCleanup)
 
-  return { exportPrefix, archiveFilesCopied, rowCounts, phaseMs }
+  return { export_prefix, archive_files_copied, row_counts, phase_ms }
 }
 
 async function copyArchiveFolder(
   storage: SupabaseClient,
   username: string,
-  exportPrefix: string,
+  export_prefix: string,
 ): Promise<string[]> {
   const { data: files, error } = await storage.storage
     .from(ARCHIVES_BUCKET)
@@ -194,7 +199,7 @@ async function copyArchiveFolder(
   const copied = await Promise.all(
     (files as { name: string }[]).map(async (file) => {
       const src = `${username}/${file.name}`
-      const dst = `${exportPrefix}/archives/${file.name}`
+      const dst = `${export_prefix}/archives/${file.name}`
       const { error: copyErr } = await storage.storage
         .from(ARCHIVES_BUCKET)
         .copy(src, dst, { destinationBucket: EXPORT_BUCKET })
@@ -226,7 +231,7 @@ async function removeArchiveFolder(
 async function dumpPerAccountTable(
   storage: SupabaseClient,
   sql: postgres.Sql,
-  exportPrefix: string,
+  export_prefix: string,
   table: string,
   column: 'account_id' | 'user_id' | 'tweet_id',
   accountId: string,
@@ -245,14 +250,14 @@ async function dumpPerAccountTable(
     if (page.length < PAGE_SIZE) break
     offset += page.length
   }
-  await uploadJson(storage, exportPrefix, `${table}.json`, rows)
+  await uploadJson(storage, export_prefix, `${table}.json`, rows)
   return rows.length
 }
 
 async function dumpTweetDependentTable(
   storage: SupabaseClient,
   sql: postgres.Sql,
-  exportPrefix: string,
+  export_prefix: string,
   table: string,
   accountId: string,
 ): Promise<number> {
@@ -272,7 +277,7 @@ async function dumpTweetDependentTable(
     if (page.length < PAGE_SIZE) break
     offset += page.length
   }
-  await uploadJson(storage, exportPrefix, `${table}.json`, rows)
+  await uploadJson(storage, export_prefix, `${table}.json`, rows)
   return rows.length
 }
 
@@ -303,7 +308,7 @@ function columnsToOrder(table: string): string {
 
 async function uploadJson(
   storage: SupabaseClient,
-  exportPrefix: string,
+  export_prefix: string,
   filename: string,
   rows: unknown[],
 ): Promise<void> {
@@ -311,7 +316,7 @@ async function uploadJson(
   const { error } = await storage.storage
     .from(EXPORT_BUCKET)
     .upload(
-      `${exportPrefix}/${filename}`,
+      `${export_prefix}/${filename}`,
       new Blob([body], { type: 'application/json' }),
       { contentType: 'application/json', upsert: false },
     )

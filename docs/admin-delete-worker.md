@@ -1,19 +1,26 @@
-# Admin delete-with-export Hetzner worker — plan
+# Admin delete-with-export Hetzner worker
 
-The current "Opt out and delete data" action runs **inline from Vercel**.
+The "Opt out and delete data" action runs **inline from Vercel** today.
 That works for small accounts but times out around the 100k-tweet mark
 even with the parallelized export. For genuinely large accounts the
 right home for the work is a long-running process on the
 community-archive Hetzner machine.
 
 This doc is the architectural plan + observability story for that worker.
-The worker is **not yet built** at the time of writing. Once it ships,
-the Vercel action stops running the destructive steps inline and just
-enqueues a job (see "Migration path" at the end).
+
+> **Implementation lives in [`services/admin-delete-worker/`](../services/admin-delete-worker/)**.
+> The worker's own README has deploy commands, observability queries,
+> and a TODO list. This file is the conceptual + contract spec; the
+> service README is the operational manual.
 
 ## What the worker does
 
-For each `admin_delete_with_export` job in `private.job_queue`:
+For each `admin_delete_with_export` job in `private.admin_jobs`
+(deliberately a separate table from `private.job_queue` — see
+[migration `20260523180000_add_admin_jobs.sql`](../supabase/migrations/20260523180000_add_admin_jobs.sql)
+for the rationale: the existing `job_queue` is consumed by `pg_cron`'s
+`private.process_jobs()` which would silently mark unknown job_names
+`DONE`):
 
 1. **Claim** the job (atomic UPDATE from `QUEUED` → `PROCESSING`,
    matching on the old status so two workers can't grab the same row).
@@ -55,7 +62,7 @@ even if the worker fails.
 │   ↳ returns "queued" message to admin          │
 └─────────────────────┬──────────────────────────┘
                       │
-              private.job_queue
+              private.admin_jobs
                       │
 ┌─ Hetzner worker (long-running process) ────────┘
 │ - polls every N seconds (or LISTEN/NOTIFY)
@@ -133,14 +140,14 @@ services/admin_delete_worker/
 Use a single UPDATE with `RETURNING`:
 
 ```sql
-UPDATE private.job_queue
+UPDATE private.admin_jobs
    SET status = 'PROCESSING',
        args   = args || jsonb_build_object('claimed_at', now())
  WHERE key = (
-   SELECT key FROM private.job_queue
+   SELECT key FROM private.admin_jobs
     WHERE job_name = 'admin_delete_with_export'
       AND status   = 'QUEUED'
-    ORDER BY "timestamp"
+    ORDER BY created_at
     LIMIT 1
     FOR UPDATE SKIP LOCKED
  )
@@ -168,7 +175,7 @@ into the worker host.
 | **stdout (Docker logs)** | Structured JSON, one line per event. Goes to journald or Docker log driver on Hetzner. | Whatever the host's log rotation does (~30d default). |
 | **`admin-deleted-user-data/<prefix>/worker.log`** | The same structured log, but specific to that job, uploaded at the end of processing (success OR failure). | Forever (until admin manually clears the bucket). |
 | **`manifest.json`** | Summary: who/when/what counts, phase timings, final status. Per-job, alongside `worker.log`. | Forever. |
-| **`private.job_queue.args`** | Status transitions + final error message (truncated to ~1KB) for `gh / SQL editor` triage. | Until the row is purged. |
+| **`private.admin_jobs.args`** | Status transitions + final error message (truncated to ~1KB) for `gh / SQL editor` triage. | Until the row is purged. |
 | **Sentry (optional)** | Worker crashes + per-job exceptions, with the job's `key` as the tag for grouping. | Whatever Sentry retention is. |
 
 ### Per-job log file format
@@ -249,7 +256,7 @@ tail it in real time.
 ### How an admin debugs a failed job
 
 1. **Admin UI** (future): a "Recent delete jobs" section on `/admin`
-   that shows the last N rows from `private.job_queue WHERE job_name
+   that shows the last N rows from `private.admin_jobs WHERE job_name
    = 'admin_delete_with_export'`. Each row links to its export
    prefix in the bucket.
 2. **Browse `admin-deleted-user-data/<prefix>/`**:
@@ -258,8 +265,8 @@ tail it in real time.
    - `archives/` — what got copied before the failure
    - `*.ndjson` — partial dumps if export got partway through
 3. **`gh` or SQL editor**: `SELECT key, status, args FROM
-   private.job_queue WHERE job_name='admin_delete_with_export'
-   ORDER BY timestamp DESC LIMIT 20`.
+   private.admin_jobs WHERE job_name='admin_delete_with_export'
+   ORDER BY created_at DESC LIMIT 20`.
 
 ### Health endpoint
 

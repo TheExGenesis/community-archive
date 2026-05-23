@@ -2018,6 +2018,61 @@ CREATE TABLE IF NOT EXISTS "private"."job_queue" (
 ALTER TABLE "private"."job_queue" OWNER TO "postgres";
 
 
+-- Dedicated queue for admin-initiated jobs consumed by the Hetzner
+-- admin-delete-worker. Kept separate from private.job_queue because
+-- private.process_jobs() (pg_cron-driven) would silently mark unknown
+-- job_names DONE. See migration 20260523180000_add_admin_jobs.sql.
+CREATE TABLE IF NOT EXISTS "private"."admin_jobs" (
+    "key" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "job_name" "text" NOT NULL,
+    "status" "text" DEFAULT 'QUEUED'::"text" NOT NULL,
+    "args" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "admin_jobs_status_check" CHECK (("status" = ANY (ARRAY['QUEUED'::"text", 'PROCESSING'::"text", 'DONE'::"text", 'FAILED'::"text"])))
+);
+
+
+ALTER TABLE "private"."admin_jobs" OWNER TO "postgres";
+
+
+-- One row per Hetzner-worker job attempt. Written by
+-- services/admin-delete-worker; consumed by the canned forensics
+-- queries in services/admin-delete-worker/README.md.
+CREATE TABLE IF NOT EXISTS "private"."worker_runs" (
+    "id" bigint NOT NULL,
+    "worker_name" "text" NOT NULL,
+    "job_key" "uuid",
+    "job_name" "text",
+    "status" "text" NOT NULL,
+    "started_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "completed_at" timestamp with time zone,
+    "duration_ms" integer,
+    "args" "jsonb",
+    "result" "jsonb",
+    "error" "text",
+    "host" "text",
+    CONSTRAINT "worker_runs_status_check" CHECK (("status" = ANY (ARRAY['started'::"text", 'succeeded'::"text", 'failed'::"text", 'skipped'::"text"])))
+);
+
+
+ALTER TABLE "private"."worker_runs" OWNER TO "postgres";
+
+
+CREATE SEQUENCE IF NOT EXISTS "private"."worker_runs_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE "private"."worker_runs_id_seq" OWNER TO "postgres";
+
+
+ALTER SEQUENCE "private"."worker_runs_id_seq" OWNED BY "private"."worker_runs"."id";
+
+
 CREATE TABLE IF NOT EXISTS "private"."logs" (
     "log_id" integer NOT NULL,
     "log_timestamp" timestamp with time zone DEFAULT "now"() NOT NULL,
@@ -2387,6 +2442,20 @@ ALTER TABLE ONLY "private"."job_queue"
 
 
 
+ALTER TABLE ONLY "private"."admin_jobs"
+    ADD CONSTRAINT "admin_jobs_pkey" PRIMARY KEY ("key");
+
+
+
+ALTER TABLE ONLY "private"."worker_runs" ALTER COLUMN "id" SET DEFAULT "nextval"('"private"."worker_runs_id_seq"'::"regclass");
+
+
+
+ALTER TABLE ONLY "private"."worker_runs"
+    ADD CONSTRAINT "worker_runs_pkey" PRIMARY KEY ("id");
+
+
+
 -- moved to 050_constraints.sql: logs pkey
 
 
@@ -2538,6 +2607,26 @@ CREATE INDEX "idx_job_queue_job_name" ON "private"."job_queue" USING "btree" ("j
 
 
 CREATE INDEX "idx_job_queue_status_timestamp" ON "private"."job_queue" USING "btree" ("status", "timestamp");
+
+
+
+CREATE INDEX "idx_admin_jobs_claim" ON "private"."admin_jobs" USING "btree" ("job_name", "created_at") WHERE ("status" = ANY (ARRAY['QUEUED'::"text", 'PROCESSING'::"text"]));
+
+
+
+CREATE INDEX "idx_admin_jobs_job_name_status" ON "private"."admin_jobs" USING "btree" ("job_name", "status");
+
+
+
+CREATE INDEX "worker_runs_worker_name_started_at_idx" ON "private"."worker_runs" USING "btree" ("worker_name", "started_at" DESC);
+
+
+
+CREATE INDEX "worker_runs_job_key_idx" ON "private"."worker_runs" USING "btree" ("job_key");
+
+
+
+CREATE INDEX "worker_runs_status_started_at_idx" ON "private"."worker_runs" USING "btree" ("status", "started_at" DESC);
 
 
 

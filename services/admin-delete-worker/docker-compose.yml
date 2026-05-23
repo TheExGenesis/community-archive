@@ -1,0 +1,36 @@
+# Deploy on Hetzner:
+#   1. cp env.example .env  (or scp the .env you maintain elsewhere)
+#   2. docker compose up -d --build
+#   3. docker compose logs -f admin-delete-worker
+#
+# The worker runs forever, polling private.job_queue every
+# POLL_INTERVAL_MS. SIGTERM (docker stop / systemd) cleanly exits after
+# the in-flight job, if any.
+
+services:
+  admin-delete-worker:
+    build:
+      context: ../../
+      dockerfile: services/admin-delete-worker/Dockerfile
+    container_name: admin-delete-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    # No volume mounts — the worker is purely stateless. All state goes
+    # to Postgres (private.worker_runs, private.job_queue) and to the
+    # admin-deleted-user-data storage bucket.
+
+    # Resource caps. A single job at a time, paginated DB reads. 1G
+    # RAM is comfortable headroom; bump if you start exporting accounts
+    # with millions of rows.
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+
+    # Health: the worker writes a 'started' worker_runs row on every
+    # claim, so the simplest healthcheck is "did we touch the DB
+    # recently?" — but that only proves liveness when there's traffic.
+    # Skipping for the first cut; rely on docker's restart=unless-stopped
+    # plus the structured logs.

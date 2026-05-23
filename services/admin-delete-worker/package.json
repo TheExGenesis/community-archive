@@ -1,0 +1,27 @@
+{
+  "name": "admin-delete-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Consumes private.admin_jobs rows where job_name='admin_delete_with_export' — exports the account's data to the admin-deleted-user-data bucket and then deletes the archive. Intended to run on a Hetzner box, not Vercel. See docs/admin-delete-worker.md.",
+  "scripts": {
+    "dev": "tsx --watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit",
+    "docker:build": "cd ../../ && docker build -f services/admin-delete-worker/Dockerfile -t admin-delete-worker:latest .",
+    "docker:up": "docker compose up -d --build",
+    "docker:logs": "docker compose logs -f admin-delete-worker",
+    "docker:down": "docker compose down"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.2",
+    "dotenv": "^16.4.5",
+    "pino": "^9.5.0",
+    "postgres": "^3.4.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.1.3"
+  }
+}

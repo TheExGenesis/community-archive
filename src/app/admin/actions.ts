@@ -127,204 +127,6 @@ async function upsertScrapeBlock(
   if (error) throw error
 }
 
-async function deleteSourceArchiveFiles(
-  admin: Awaited<ReturnType<typeof getAdminClient>>,
-  username: string,
-) {
-  const { data: fileList, error: listError } = await admin.storage
-    .from('archives')
-    .list(username)
-  if (listError) throw listError
-  if (!fileList?.length) return
-  const filesToDelete = fileList.map((file) => `${username}/${file.name}`)
-  const { error: deleteError } = await admin.storage
-    .from('archives')
-    .remove(filesToDelete)
-  if (deleteError) throw deleteError
-}
-
-const EXPORT_BUCKET = 'admin-deleted-user-data'
-
-// Inline backup before delete. Runs from Vercel — fine for accounts under
-// ~10k tweets; above that the tweets JSON dump risks the 60s function ceiling.
-// The dialog warns the admin before they commit. Long-term, the Hetzner
-// worker path (see docs/admin-delete-worker.md, TODO) is what we actually
-// want.
-async function exportUserDataInline(
-  admin: Awaited<ReturnType<typeof getAdminClient>>,
-  args: {
-    accountId: string
-    username: string
-    reason: string
-    requesterUserId: string
-  },
-): Promise<{
-  exportPrefix: string
-  archiveFilesCopied: number
-  tweetsDumped: number
-}> {
-  const startedAt = new Date()
-  const exportPrefix = `${startedAt.toISOString().replace(/[:.]/g, '-')}-${args.accountId}`
-
-  // Phase timings printed to Vercel logs so we can see exactly which step
-  // dominates wall time when this gets re-run on bigger accounts.
-  const t0 = Date.now()
-  const phaseMs: Record<string, number> = {}
-  const markPhase = (name: string, sinceMs: number) => {
-    phaseMs[name] = Date.now() - sinceMs
-  }
-
-  // 1. Copy archive files in parallel. Each storage.copy is an
-  //    independent server-side copy, so the upper bound is Supabase's
-  //    rate limit, not our wall time.
-  const tArchives = Date.now()
-  const { data: archiveFiles, error: listError } = await admin.storage
-    .from('archives')
-    .list(args.username)
-  if (listError) {
-    throw new Error(`Failed to list archives: ${listError.message}`)
-  }
-  const copyResults = await Promise.all(
-    (archiveFiles ?? []).map(async (file) => {
-      const src = `${args.username}/${file.name}`
-      const dst = `${exportPrefix}/archives/${file.name}`
-      const { error: copyError } = await admin.storage
-        .from('archives')
-        .copy(src, dst, { destinationBucket: EXPORT_BUCKET })
-      if (copyError) {
-        throw new Error(`Failed to copy ${src}: ${copyError.message}`)
-      }
-      return file.name
-    }),
-  )
-  const archiveFilesCopied = copyResults.length
-  markPhase('archives_copy', tArchives)
-
-  // 2. Dump tweets table as JSON. PostgREST silently caps SELECTs at
-  //    1000 rows by default (`max-rows`), so we MUST page through with
-  //    `.range()` — without this, an account with >1000 tweets gets a
-  //    silently-truncated export. See AGENTS.md → "Supabase gotchas".
-  //
-  //    Pages are fetched in parallel BATCHES of TWEET_FETCH_CONCURRENCY
-  //    to keep wall time roughly numPages / concurrency * RTT, instead
-  //    of numPages * RTT. PostgREST + pgbouncer can comfortably handle
-  //    ~10 concurrent reads from one service-role connection; going
-  //    higher risks starving the pooler for other traffic.
-  //
-  //    Total count is queried first via head:true (cheap) so we can
-  //    bound the batch loop. If the count grows mid-export (it
-  //    shouldn't — opt-out already blocks new ingest), the final
-  //    `rows.length < TWEET_PAGE_SIZE` check below catches it.
-  const tTweets = Date.now()
-  const TWEET_PAGE_SIZE = 1000
-  const TWEET_FETCH_CONCURRENCY = 10
-  const { count: totalTweets, error: countError } = await admin
-    .from('tweets')
-    .select('tweet_id', { count: 'exact', head: true })
-    .eq('account_id', args.accountId)
-  if (countError) {
-    throw new Error(`Failed to count tweets: ${countError.message}`)
-  }
-  const numPages = Math.max(
-    1,
-    Math.ceil((totalTweets ?? 0) / TWEET_PAGE_SIZE),
-  )
-  const tweets: unknown[] = []
-  for (
-    let pageStart = 0;
-    pageStart < numPages;
-    pageStart += TWEET_FETCH_CONCURRENCY
-  ) {
-    const batchSize = Math.min(
-      TWEET_FETCH_CONCURRENCY,
-      numPages - pageStart,
-    )
-    const batch = await Promise.all(
-      Array.from({ length: batchSize }, (_, i) => {
-        const pageIdx = pageStart + i
-        return admin
-          .from('tweets')
-          .select('*')
-          // `.order('tweet_id')` keeps pagination stable even if rows
-          // shift mid-export. tweet_id is the table's PK so free.
-          .order('tweet_id', { ascending: true })
-          .eq('account_id', args.accountId)
-          .range(
-            pageIdx * TWEET_PAGE_SIZE,
-            (pageIdx + 1) * TWEET_PAGE_SIZE - 1,
-          )
-      }),
-    )
-    for (const r of batch) {
-      if (r.error) {
-        throw new Error(`Failed to dump tweets: ${r.error.message}`)
-      }
-      tweets.push(...(r.data ?? []))
-    }
-  }
-  const tEncode = Date.now()
-  const tweetsJson = JSON.stringify(tweets, null, 0)
-  markPhase('tweets_json_encode', tEncode)
-
-  const tUpload = Date.now()
-  const { error: tweetsUploadError } = await admin.storage
-    .from(EXPORT_BUCKET)
-    .upload(
-      `${exportPrefix}/tweets.json`,
-      new Blob([tweetsJson], { type: 'application/json' }),
-      { contentType: 'application/json', upsert: false },
-    )
-  if (tweetsUploadError) {
-    throw new Error(`Failed to upload tweets.json: ${tweetsUploadError.message}`)
-  }
-  markPhase('tweets_upload', tUpload)
-
-  // 3. Manifest.
-  const tManifest = Date.now()
-  const totalMs = Date.now() - t0
-  const manifest = {
-    account_id: args.accountId,
-    username: args.username,
-    reason: args.reason,
-    requested_by_user_id: args.requesterUserId,
-    started_at: startedAt.toISOString(),
-    completed_at: new Date().toISOString(),
-    archive_files_copied: archiveFilesCopied,
-    tweets_dumped: tweets.length,
-    total_tweets_expected: totalTweets ?? null,
-    phase_ms: { ...phaseMs, total: totalMs },
-    notes:
-      'Inline export from Vercel. Only the tweets table is dumped; other ' +
-      'per-account tables (likes, followers, following, profile, etc.) ' +
-      'are not yet exported — TODO: move to Hetzner worker. The original ' +
-      'archive zip(s) under archives/ contain the most-faithful copy of ' +
-      'the data.',
-  }
-  const { error: manifestError } = await admin.storage
-    .from(EXPORT_BUCKET)
-    .upload(
-      `${exportPrefix}/manifest.json`,
-      new Blob([JSON.stringify(manifest, null, 2)], {
-        type: 'application/json',
-      }),
-      { contentType: 'application/json', upsert: false },
-    )
-  if (manifestError) {
-    throw new Error(`Failed to upload manifest: ${manifestError.message}`)
-  }
-  markPhase('manifest_upload', tManifest)
-
-  // Surfaced in Vercel function logs for post-mortem on timeouts.
-  console.log(
-    `[admin export] ${args.username} (${args.accountId}): tweets=${tweets.length}/${totalTweets} archives=${archiveFilesCopied} phases=${JSON.stringify(phaseMs)} total=${totalMs}ms`,
-  )
-
-  return {
-    exportPrefix,
-    archiveFilesCopied,
-    tweetsDumped: tweets.length,
-  }
-}
 
 export async function loadMoreAccountsAction(input: {
   search: string
@@ -588,39 +390,40 @@ export async function adminOptOutAccount(
           error: 'Missing Twitter account id for delete',
         }
       }
-      // Inline export + delete from Vercel. Order matters: export first
-      // (so there's a recovery path if delete fails), then delete the DB
-      // rows, then remove source archive files. If any step throws, the
-      // optin row has already been set to explicit_optout above, so the
-      // user is at least blocked from streaming.
-      // TODO: move to a Hetzner-side worker (see docs/admin-delete-worker.md
-      // in this PR description). Inline-from-Vercel works for accounts
-      // under ~10k tweets; above that the tweets JSON dump risks the 60s
-      // function ceiling. The dialog warns the admin beforehand.
-      const exportResult = await exportUserDataInline(admin, {
-        accountId: twitterUserId,
-        username,
-        reason,
-        requesterUserId: requester.id,
-      })
-
-      const deleteResponse = await admin.rpc('delete_user_archive', {
-        p_account_id: twitterUserId,
-      })
-      if (deleteResponse.error) {
+      // Enqueue the delete-with-export job for the Hetzner worker
+      // (services/admin-delete-worker) and return immediately. The opt-in
+      // row above is already marked explicit_optout=true and the scrape
+      // block is already in place, so the user is functionally cut off
+      // even before the worker runs.
+      //
+      // The RPC (public.admin_enqueue_delete_with_export) writes into
+      // private.admin_jobs, which isn't exposed via PostgREST — that's
+      // why we go through a SECURITY DEFINER bridge rather than .from().
+      const enqueueResponse = await admin.rpc(
+        'admin_enqueue_delete_with_export' as never,
+        {
+          p_account_id: twitterUserId,
+          p_username: username,
+          p_reason: reason,
+          p_requested_by_user_id: requester.id,
+        } as never,
+      )
+      if (enqueueResponse.error) {
         return {
           ok: false,
-          error: `Export succeeded (${exportResult.exportPrefix}) but delete_user_archive failed: ${deleteResponse.error.message}`,
+          error: `Opt-out + scrape-block applied, but enqueue failed: ${enqueueResponse.error.message}`,
         }
       }
 
-      await deleteSourceArchiveFiles(admin, username)
-      archiveDeleted = true
-
+      // archiveDeleted stays false — the delete happens asynchronously
+      // on the worker. The admin row will show populated counts until
+      // the worker completes and the next page refresh re-queries.
+      const jobKey = enqueueResponse.data as string
       message =
-        `@${username}: exported ${exportResult.archiveFilesCopied} archive file(s) and ` +
-        `${exportResult.tweetsDumped} tweet(s) to ${EXPORT_BUCKET}/${exportResult.exportPrefix}/, ` +
-        `then deleted the account.`
+        `@${username}: queued for export + delete (job ${jobKey.slice(0, 8)}). ` +
+        `The Hetzner worker (admin-delete-worker) typically picks the job up within ~10s ` +
+        `and finishes within ~1 minute per 10k tweets. Refresh the page in a minute to ` +
+        `see the row's archive counts drop to zero.`
     }
 
     revalidatePath('/admin')

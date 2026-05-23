@@ -1253,6 +1253,15 @@ export type Database = {
       }
     }
     Functions: {
+      admin_enqueue_delete_with_export: {
+        Args: {
+          p_account_id: string
+          p_reason?: string
+          p_requested_by_user_id?: string
+          p_username: string
+        }
+        Returns: string
+      }
       admin_list_blocked_scraping_users: {
         Args: { p_account_ids: string[] }
         Returns: string[]

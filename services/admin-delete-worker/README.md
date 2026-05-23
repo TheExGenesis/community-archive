@@ -61,6 +61,37 @@ Gotcha: `docker compose restart` does NOT reload `.env`. If you change
 environment variables, you need `docker compose down && docker compose up -d`
 (or `up -d --force-recreate`).
 
+### Running multiple replicas on the same box (e.g. staging + prod)
+
+Compose derives the **project name** from the containing directory by
+default. If two checkouts have the same deepest dir name
+(`services/admin-delete-worker` for both), compose treats them as the
+same project, and the second `up -d` will *delete* the first one's
+container — a real footgun when adding a prod replica next to staging.
+
+To run staging + prod on the same host:
+
+1. Use distinct clone paths (e.g. `~/community-archive` for staging,
+   `~/community-archive-prod-worker` for prod).
+2. Always pass `-p <project-name>` to scope the second replica:
+   ```bash
+   # On the prod-worker clone:
+   cd ~/community-archive-prod-worker/services/admin-delete-worker
+   docker compose -p admin-delete-worker-prod up -d --build
+   docker compose -p admin-delete-worker-prod logs -f
+   docker compose -p admin-delete-worker-prod down
+   ```
+3. Add a local-only (gitignored) `docker-compose.override.yml` to the
+   non-default replica's clone so `container_name` doesn't collide:
+   ```yaml
+   services:
+     admin-delete-worker:
+       container_name: admin-delete-worker-prod
+   ```
+4. Set `WORKER_HOST_LABEL` in the prod `.env` to something distinct
+   (`ca-autorefresh-prod`) so `private.worker_runs.host` lets you tell
+   the two replicas apart in SQL.
+
 ## Observability
 
 Three places to look, in order from "I want a quick status" to "I want

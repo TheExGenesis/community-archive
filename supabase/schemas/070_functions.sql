@@ -54,18 +54,19 @@ ALTER FUNCTION "private"."queue_update_conversation_ids"() OWNER TO "postgres";
 -- Trigger to queue commit_temp_data when archive upload is ready
 CREATE OR REPLACE FUNCTION "public"."trigger_commit_temp_data"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 BEGIN
     -- Only trigger when upload_phase changes to 'ready_for_commit'
-    IF NEW.upload_phase = 'ready_for_commit' AND 
+    IF NEW.upload_phase = 'ready_for_commit' AND
        (OLD.upload_phase IS NULL OR OLD.upload_phase != 'ready_for_commit') THEN
         RAISE NOTICE 'trigger_commit_temp_data: Running for account_id %', NEW.account_id;
         -- Queue the commit job with UUID key
         INSERT INTO private.job_queue (key, job_name, status, args)
         VALUES (
             gen_random_uuid(),
-            'commit_temp_data', 
-            'QUEUED', 
+            'commit_temp_data',
+            'QUEUED',
             jsonb_build_object('account_id', NEW.account_id)
         );
     END IF;
@@ -123,6 +124,7 @@ ALTER FUNCTION "public"."update_updated_at_column"() OWNER TO "postgres";
 -- Minimal private auth helpers used by grants/policies
 CREATE OR REPLACE FUNCTION "private"."get_provider_id"() RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 begin
   return (
@@ -192,6 +194,7 @@ ALTER FUNCTION "ca_website"."compute_hourly_scraping_stats"("p_start_date" times
 
 CREATE OR REPLACE FUNCTION "public"."compute_hourly_scraping_stats"("p_start_date" timestamp with time zone, "p_end_date" timestamp with time zone) RETURNS TABLE("period_start" timestamp with time zone, "period_end" timestamp with time zone, "tweet_count" bigint, "unique_scrapers" integer)
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 BEGIN
     RETURN QUERY
@@ -559,6 +562,7 @@ ALTER FUNCTION "private"."time_conversation_update"("since_timestamp" timestamp 
 
 CREATE OR REPLACE FUNCTION "public"."create_temp_tables"("p_suffix" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
     v_provider_id TEXT;
@@ -601,6 +605,7 @@ ALTER FUNCTION "public"."create_temp_tables"("p_suffix" "text") OWNER TO "postgr
 
 CREATE OR REPLACE FUNCTION "public"."drop_temp_tables"("p_suffix" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
     v_provider_id TEXT;
@@ -861,6 +866,7 @@ ALTER FUNCTION "public"."apply_readonly_rls_policies"("schema_name" "text", "tab
 CREATE OR REPLACE FUNCTION "public"."commit_temp_data"("p_suffix" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "statement_timeout" TO '30min'
+    SET "search_path" TO ''
     AS $_$
 DECLARE
     v_archive_upload_id BIGINT;
@@ -1102,6 +1108,7 @@ COMMENT ON FUNCTION "public"."commit_temp_data"("p_suffix" "text") IS 'Commits t
 CREATE OR REPLACE FUNCTION "public"."delete_tweets"("p_tweet_ids" "text"[]) RETURNS TABLE("deleted_tweets" integer, "deleted_conversations" integer, "deleted_tweet_media" integer, "deleted_user_mentions" integer, "deleted_tweet_urls" integer, "deleted_private_tweet_user" integer)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "statement_timeout" TO '10min'
+    SET "search_path" TO ''
     AS $$
 DECLARE
     v_deleted_tweets INTEGER := 0;
@@ -1222,6 +1229,7 @@ ALTER FUNCTION "public"."delete_tweets"("p_tweet_ids" "text"[]) OWNER TO "postgr
 CREATE OR REPLACE FUNCTION "public"."delete_user_archive"("p_account_id" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "statement_timeout" TO '20min'
+    SET "search_path" TO ''
     AS $_$
 DECLARE
     v_schema_name TEXT := 'public';
@@ -1305,6 +1313,7 @@ ALTER FUNCTION "public"."delete_user_archive"("p_account_id" "text") OWNER TO "p
 CREATE OR REPLACE FUNCTION "public"."delete_single_archive"("p_account_id" "text", "p_archive_upload_id" bigint) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "statement_timeout" TO '20min'
+    SET "search_path" TO ''
     AS $_$
 DECLARE
     v_schema_name TEXT := 'public';
@@ -1399,15 +1408,16 @@ ALTER FUNCTION "public"."delete_single_archive"("p_account_id" "text", "p_archiv
 
 CREATE OR REPLACE FUNCTION "tes"."get_current_account_id"() RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
     v_account_id TEXT;
 BEGIN
     SELECT a.account_id INTO v_account_id
     FROM auth.users u
-    JOIN account a ON a.account_id = u.raw_user_meta_data->>'provider_id'
+    JOIN public.account a ON a.account_id = u.raw_user_meta_data->>'provider_id'
     WHERE u.id = auth.uid();
-    
+
     RETURN v_account_id;
 END;
 $$;
@@ -1417,6 +1427,7 @@ ALTER FUNCTION "tes"."get_current_account_id"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "tes"."get_followers"() RETURNS TABLE("account_id" "text", "username" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
     v_account_id TEXT;
@@ -1425,11 +1436,11 @@ BEGIN
     v_account_id := tes.get_current_account_id();
 
     RETURN QUERY
-    SELECT 
+    SELECT
         f1.follower_account_id AS account_id,
         mu.screen_name AS username
     FROM public.followers f1
-    LEFT JOIN mentioned_users mu ON mu.user_id = f1.follower_account_id
+    LEFT JOIN public.mentioned_users mu ON mu.user_id = f1.follower_account_id
     WHERE f1.account_id = v_account_id and mu.screen_name is not null;
 END;
 $$;
@@ -1439,6 +1450,7 @@ ALTER FUNCTION "tes"."get_followers"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "tes"."get_followings"() RETURNS TABLE("account_id" "text", "username" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
     v_account_id TEXT;
@@ -1447,11 +1459,11 @@ BEGIN
     v_account_id := tes.get_current_account_id();
 
     RETURN QUERY
-    SELECT 
+    SELECT
         f2.following_account_id AS account_id,
         mu.screen_name AS username
     FROM public.following f2
-    LEFT JOIN mentioned_users mu ON mu.user_id = f2.following_account_id
+    LEFT JOIN public.mentioned_users mu ON mu.user_id = f2.following_account_id
     WHERE f2.account_id = v_account_id and mu.screen_name is not null;
 END;
 $$;
@@ -1461,6 +1473,7 @@ ALTER FUNCTION "tes"."get_followings"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "tes"."get_moots"() RETURNS TABLE("account_id" "text", "username" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
     v_account_id TEXT;
@@ -1469,14 +1482,14 @@ BEGIN
     v_account_id := tes.get_current_account_id();
 
     RETURN QUERY
-    SELECT 
+    SELECT
         f1.follower_account_id as account_id,
         mu.screen_name as username
     FROM public.followers f1
-    INNER JOIN public.following f2 
-        ON f1.account_id = f2.account_id 
+    INNER JOIN public.following f2
+        ON f1.account_id = f2.account_id
         AND f1.follower_account_id = f2.following_account_id
-    left join mentioned_users mu on mu.user_id = f1.follower_account_id
+    left join public.mentioned_users mu on mu.user_id = f1.follower_account_id
     where f1.account_id = v_account_id;
 END;
 $$;
@@ -1840,6 +1853,7 @@ ALTER FUNCTION "public"."get_simple_streamed_tweet_counts"("start_date" timestam
 
 CREATE OR REPLACE FUNCTION "public"."get_hourly_scraping_stats"("p_hours_back" integer DEFAULT 24) RETURNS TABLE("period_start" timestamp with time zone, "period_end" timestamp with time zone, "tweet_count" bigint, "unique_scrapers" integer)
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
     AS $$
 DECLARE
     v_start_date timestamp with time zone;
@@ -2417,6 +2431,7 @@ ALTER FUNCTION "public"."search_tweets"("search_query" "text", "limit_count" int
 CREATE OR REPLACE FUNCTION "public"."search_tweets"("search_query" "text", "from_user" "text" DEFAULT NULL::"text", "to_user" "text" DEFAULT NULL::"text", "since_date" "date" DEFAULT NULL::"date", "until_date" "date" DEFAULT NULL::"date", "limit_" integer DEFAULT 50, "offset_" integer DEFAULT 0) RETURNS TABLE("tweet_id" "text", "account_id" "text", "created_at" timestamp with time zone, "full_text" "text", "retweet_count" integer, "favorite_count" integer, "reply_to_tweet_id" "text", "avatar_media_url" "text", "archive_upload_id" bigint, "username" "text", "account_display_name" "text", "media" "jsonb")
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "statement_timeout" TO '5min'
+    SET "search_path" TO ''
     AS $$
 DECLARE
     from_account_id TEXT;
@@ -2514,6 +2529,7 @@ ALTER FUNCTION "public"."search_tweets"("search_query" "text", "from_user" "text
 CREATE OR REPLACE FUNCTION "public"."search_tweets_exact_phrase"("exact_phrase" "text", "from_user" "text" DEFAULT NULL::"text", "to_user" "text" DEFAULT NULL::"text", "since_date" "date" DEFAULT NULL::"date", "until_date" "date" DEFAULT NULL::"date", "limit_" integer DEFAULT 50, "offset_" integer DEFAULT 0) RETURNS TABLE("tweet_id" "text", "account_id" "text", "created_at" timestamp with time zone, "full_text" "text", "retweet_count" integer, "favorite_count" integer, "reply_to_tweet_id" "text", "avatar_media_url" "text", "archive_upload_id" bigint, "username" "text", "account_display_name" "text", "media" "jsonb")
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "statement_timeout" TO '5min'
+    SET "search_path" TO ''
     AS $$
 DECLARE
     from_account_id TEXT;

@@ -1,49 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerAdminClient } from '@/utils/supabase'
-import { cookies } from 'next/headers'
+import { createServerServiceRoleClient } from '@/utils/supabase'
+
+const MAX_RANGE_MS = 365 * 24 * 60 * 60 * 1000 // 365 days
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const startDate = searchParams.get('startDate')
-    const endDate = searchParams.get('endDate')
+    const startDateRaw = searchParams.get('startDate')
+    const endDateRaw = searchParams.get('endDate')
 
-    if (!startDate || !endDate) {
+    if (!startDateRaw || !endDateRaw) {
       return NextResponse.json(
         { error: 'Missing required parameters: startDate, endDate' },
         { status: 400 }
       )
     }
 
-    // Use service role client for elevated permissions to access private schema
-    const supabase = createServerAdminClient(cookies())
-    
-    console.log('Using service role client to access private.tweet_user table')
-    console.log('Querying scrapers from', startDate, 'to', endDate)
-    
-    // Use RPC function to access private schema data
+    const startDate = new Date(startDateRaw)
+    const endDate = new Date(endDateRaw)
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return NextResponse.json(
+        { error: 'Invalid date format. Use ISO 8601 timestamps.' },
+        { status: 400 }
+      )
+    }
+
+    if (startDate.getTime() > endDate.getTime()) {
+      return NextResponse.json(
+        { error: 'startDate must be before endDate' },
+        { status: 400 }
+      )
+    }
+
+    if (endDate.getTime() - startDate.getTime() > MAX_RANGE_MS) {
+      return NextResponse.json(
+        { error: 'Date range too large. Maximum 365 days.' },
+        { status: 400 }
+      )
+    }
+
+    // Use the real service-role client to access SECURITY DEFINER RPCs that
+    // read from `private.tweet_user`. `createServerAdminClient` is the SSR
+    // helper that forwards the user JWT — it would not actually be elevated.
+    const supabase = createServerServiceRoleClient()
+
     const { data: countData, error: countError } = await supabase
       .rpc('get_unique_scraper_count', {
-        start_date: startDate,
-        end_date: endDate
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString()
       })
-    
+
     if (countError) {
       console.error('Error calling get_unique_scraper_count RPC:', countError)
       return NextResponse.json(
-        { error: `RPC query failed: ${countError.message}` },
+        { error: 'Failed to fetch scraper count' },
         { status: 500 }
       )
     }
-    
+
     const count = countData || 0
 
-    console.log('RPC query result:', { 
-      count: countData,
-      error: countError
-    })
-
-    // Cache for 5 minutes
     const headers = {
       'Content-Type': 'application/json',
       'Cache-Control': 's-maxage=300, stale-while-revalidate=3600'

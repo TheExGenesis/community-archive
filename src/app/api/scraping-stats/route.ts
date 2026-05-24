@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+const MAX_RANGE_MS = 365 * 24 * 60 * 60 * 1000 // 365 days
+const ALLOWED_GRANULARITIES = new Set(['minute', 'hour', 'day', 'week', 'month'])
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -11,11 +14,50 @@ export async function GET(request: NextRequest) {
     const streamedOnly = searchParams.get('streamedOnly') !== 'false' // Default to true
 
     // Validate input
-    if (hoursBack < 1 || hoursBack > 720) { // Max 30 days
+    if (isNaN(hoursBack) || hoursBack < 1 || hoursBack > 720) { // Max 30 days
       return NextResponse.json(
         { error: 'Invalid hoursBack parameter. Must be between 1 and 720.' },
         { status: 400 }
       )
+    }
+
+    if (!ALLOWED_GRANULARITIES.has(granularity)) {
+      return NextResponse.json(
+        { error: 'Invalid granularity. Must be one of: minute, hour, day, week, month.' },
+        { status: 400 }
+      )
+    }
+
+    // Validate custom date range up front so we can reject before we waste
+    // a service-role RPC call. An attacker could otherwise request a 10-year
+    // minute-granularity report and exhaust DB resources.
+    if (startDate || endDate) {
+      if (!startDate || !endDate) {
+        return NextResponse.json(
+          { error: 'Both startDate and endDate are required for custom range.' },
+          { status: 400 }
+        )
+      }
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid date format. Use ISO 8601 timestamps.' },
+          { status: 400 }
+        )
+      }
+      if (start.getTime() > end.getTime()) {
+        return NextResponse.json(
+          { error: 'startDate must be before endDate' },
+          { status: 400 }
+        )
+      }
+      if (end.getTime() - start.getTime() > MAX_RANGE_MS) {
+        return NextResponse.json(
+          { error: 'Date range too large. Maximum 365 days.' },
+          { status: 400 }
+        )
+      }
     }
 
     // Create service role client to access private schema functions

@@ -808,17 +808,33 @@ export class ArchiveUploadProcessor {
   }
 }
 
+// Twitter handle rules: 1-15 chars, alphanumerics and underscore only.
+// Used as a chokepoint validator before any path/URL construction to prevent
+// path traversal (e.g. `../foo`) or other injection via the archive_upload.username
+// column. Applied to both the dev filesystem branch and the Supabase Storage
+// branch (defense in depth — do not rely on Storage's rejection of `..`).
+const TWITTER_USERNAME_REGEX = /^[A-Za-z0-9_]{1,15}$/
+
+function assertValidUsername(username: string): void {
+  if (typeof username !== 'string' || !TWITTER_USERNAME_REGEX.test(username)) {
+    throw new Error(
+      `Invalid username for archive path construction: ${JSON.stringify(username)} (must match ${TWITTER_USERNAME_REGEX})`
+    )
+  }
+}
+
 async function loadArchiveData(username: string): Promise<any> {
+  assertValidUsername(username)
   if (CONFIG.DEV_ARCHIVE_PATH) {
     const archivePath = path.join(CONFIG.DEV_ARCHIVE_PATH, `${username}/archive.json`)
     logger.debug(`Reading archive from filesystem: ${archivePath}`)
-    
+
     // For very large files, consider streaming JSON parsing
     const fileSize = fs.statSync(archivePath).size
     const fileSizeMB = fileSize / (1024 * 1024)
-    
+
     logger.info(`Archive file size: ${fileSizeMB.toFixed(1)}MB`)
-       
+
     const archiveData = fs.readFileSync(archivePath, 'utf8')
     return JSON.parse(archiveData)
   }

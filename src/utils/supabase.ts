@@ -8,34 +8,7 @@ import {
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
-
-const getSupabaseConfig = (includeServiceRole: boolean = false) => {
-  const isDevelopment = process.env.NODE_ENV === 'development'
-  const useRemoteDevDb = process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true'
-
-  const getUrl = () =>
-    isDevelopment && !useRemoteDevDb
-      ? process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL!
-      : process.env.NEXT_PUBLIC_SUPABASE_URL!
-
-  const getAnonKey = () =>
-    isDevelopment && !useRemoteDevDb
-      ? process.env.NEXT_PUBLIC_LOCAL_ANON_KEY!
-      : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-  const getServiceRole = () =>
-    isDevelopment && !useRemoteDevDb
-      ? process.env.NEXT_PUBLIC_LOCAL_SERVICE_ROLE!
-      : process.env.SUPABASE_SERVICE_ROLE!
-
-  const config = {
-    url: getUrl(),
-    anonKey: getAnonKey(),
-    ...(includeServiceRole ? { serviceRole: getServiceRole() } : {}),
-  }
-
-  return config
-}
+import { getSupabaseConfig } from '@/utils/supabaseConfig'
 
 const createCookieHandler = (cookieStore: ReturnType<typeof cookies>) => ({
   get: (name: string) => cookieStore.get(name)?.value,

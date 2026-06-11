@@ -48,7 +48,7 @@ export const retryOperation = async <T>(
 
 type UploadPhase = 'uploading' | 'ready_for_commit' | 'committed' | 'failed'
 
-const setUploadPhase = async (
+export const setUploadPhase = async (
   supabase: SupabaseClient,
   archiveUploadId: number,
   phase: UploadPhase,
@@ -58,6 +58,10 @@ const setUploadPhase = async (
       .from('archive_upload')
       .update({ upload_phase: phase })
       .eq('id', archiveUploadId)
+    // supabase-js does not throw on errors, so surface it explicitly — otherwise a
+    // failed phase update is silently dropped and retryOperation never retries,
+    // leaving the row stuck (e.g. in 'uploading', which the worker never picks up).
+    if (error) throw error
   }, `Error updating archive upload phase to ${phase}`)
 }
 
@@ -147,8 +151,10 @@ const insertAccountAndUploadRow = async (
   console.log('archiveUploadIdData', { archiveUploadIdData })
   const archiveUploadId = archiveUploadIdData?.id
 
-  if (!archiveUploadId) throw new Error('Archive upload ID not found')
+  // Check the DB error first so the real failure (RLS denial, constraint, etc.) is
+  // surfaced instead of the generic "Archive upload ID not found".
   if (uploadError) throw uploadError
+  if (!archiveUploadId) throw new Error('Archive upload ID not found')
 
   return archiveUploadId
 }

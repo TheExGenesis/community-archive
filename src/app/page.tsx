@@ -149,8 +149,10 @@ export default async function Homepage() {
             <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-gray-900 dark:text-white">
               Community Archive
             </h1>
-            <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300">
-              An open Twitter database.
+            <p className="text-xl text-gray-600 dark:text-gray-300">
+              An open Twitter database. Join the archive to{' '}
+              <br className="hidden sm:block" />
+              contribute to open source public infrastructure.
             </p>
           </div>
 

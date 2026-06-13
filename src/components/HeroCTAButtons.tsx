@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { createBrowserClient } from '@/utils/supabase'
-import { Users, Puzzle } from 'lucide-react'
+import { Users, Puzzle, Upload } from 'lucide-react'
 import { devLog } from '@/lib/devLog'
 
 const CHROME_EXTENSION_URL = 'https://chromewebstore.google.com/detail/community-archive-stream/igclpobjpjlphgllncjcgaookmncegbk'
@@ -167,37 +167,55 @@ export default function HeroCTAButtons() {
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-        {/* Install Extension Button - Left */}
-        <div className="flex flex-col items-center">
-          <Button
-            asChild
-            variant="outline"
-            className="h-14 px-8 text-lg font-semibold rounded-xl border-2"
-            size="lg"
-          >
-            <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">
-              <Puzzle className="w-5 h-5 mr-2" />
-              Install Extension
-            </a>
-          </Button>
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center max-w-[180px]">
-            Archive tweets as you browse
-          </p>
-        </div>
-
-        {/* Opt In Button - Right */}
+        {/* Opt In Button */}
         <div className="flex flex-col items-center">
           <Button
             onClick={handleOptIn}
             disabled={isOptInLoading || isOptedIn === true}
-            className={`h-14 px-12 text-lg font-semibold rounded-xl ${getOptInButtonStyle()}`}
+            className={`h-14 px-8 text-lg font-semibold rounded-xl w-full ${getOptInButtonStyle()}`}
             size="lg"
           >
             <Users className="w-5 h-5 mr-2" />
             {getOptInButtonText()}
           </Button>
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center max-w-[180px]">
-            {isOptedIn ? 'Your tweets are being archived' : 'Allow archiving your public tweets'}
+            {isOptedIn ? 'Your tweets are being archived' : 'Archive your public tweets'}
+          </p>
+        </div>
+
+        {/* Install Extension Button */}
+        <div className="flex flex-col items-center">
+          <Button
+            asChild
+            variant="outline"
+            className="h-14 px-8 text-lg font-semibold rounded-xl border-2 w-full"
+            size="lg"
+          >
+            <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">
+              <Puzzle className="w-5 h-5 mr-2" />
+              Extension
+            </a>
+          </Button>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center max-w-[180px]">
+            Archive as you browse
+          </p>
+        </div>
+
+        {/* Upload Archive Button */}
+        <div className="flex flex-col items-center">
+          <Button
+            asChild
+            variant="outline"
+            className="h-14 px-8 text-lg font-semibold rounded-xl border-2 w-full"
+            size="lg"
+          >
+            <a href="#upload-archive">
+              <Upload className="w-5 h-5 mr-2" />
+              Upload
+            </a>
+          </Button>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center max-w-[180px]">
+            Import your X data export
           </p>
         </div>
       </div>

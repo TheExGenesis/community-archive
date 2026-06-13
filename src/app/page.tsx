@@ -21,6 +21,7 @@ const DynamicHeroCTAButtons = dynamic(() => import('@/components/HeroCTAButtons'
     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
       <div className="h-14 w-48 bg-gray-200 dark:bg-slate-700 rounded-xl animate-pulse" />
       <div className="h-14 w-48 bg-gray-200 dark:bg-slate-700 rounded-xl animate-pulse" />
+      <div className="h-14 w-48 bg-gray-200 dark:bg-slate-700 rounded-xl animate-pulse" />
     </div>
   ),
 })

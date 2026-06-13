@@ -377,10 +377,11 @@ export const config = {
      * Match all request paths except for the ones starting with:
      * - _next/static (static files)
      * - _next/image (image optimization files)
+     * - images/ (static assets in /public/images, e.g. featured-app thumbnails)
      * - favicon.ico (favicon file)
      * - robots.txt (crawler rules)
      * - sitemap.xml (sitemap)
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)',
+    '/((?!_next/static|_next/image|images/|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)',
   ],
 }

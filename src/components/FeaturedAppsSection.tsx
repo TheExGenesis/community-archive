@@ -79,10 +79,10 @@ export default function FeaturedAppsSection() {
   return (
     <section className="space-y-8">
       <div className="text-center">
-        <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
           Explore the archive
         </h2>
-        <p className="mt-3 text-lg text-gray-600 dark:text-gray-300 max-w-xl mx-auto">
+        <p className="mt-3 text-base text-gray-600 dark:text-gray-300 max-w-xl mx-auto">
           Browse the evolution of Twitter narratives, ideas, memes, and stories that shape our culture today.
         </p>
       </div>

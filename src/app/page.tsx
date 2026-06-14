@@ -156,14 +156,19 @@ export default async function Homepage() {
             </p>
           </div>
 
-          <DynamicHeroCTAButtons />
+          <div className="space-y-4">
+            <DynamicHeroCTAButtons />
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Backed by Survival and Flourishing Fund and Vitalik Buterin
+            </p>
+          </div>
         </div>
       </section>
 
       {/* Section 2: Social Proof */}
       <section className="bg-white dark:bg-slate-900 overflow-hidden">
         <div
-          className="max-w-5xl mx-auto rounded-xl p-6 md:p-8 space-y-4 text-center bg-slate-100 dark:bg-slate-700/60"
+          className="max-w-5xl mx-auto rounded-none sm:rounded-xl p-6 md:p-8 space-y-4 text-center bg-slate-100 dark:bg-slate-700/60"
         >
           <CommunityStats
             accountCount={stats.accountCount}
@@ -200,8 +205,8 @@ export default async function Homepage() {
       <section className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} overflow-hidden`}>
         <div className={`${contentWrapperClasses} space-y-8`}>
           <div className="text-center">
-            <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">Data & Source Code</h2>
-            <p className="mt-3 text-lg text-gray-600 dark:text-gray-300 max-w-xl mx-auto px-4 md:px-0">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Data & Source Code</h2>
+            <p className="mt-3 text-base text-gray-600 dark:text-gray-300 max-w-xl mx-auto px-4 md:px-0">
               Access the data, explore the code, and see how everything works.
             </p>
           </div>
@@ -218,8 +223,8 @@ export default async function Homepage() {
       <section className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}>
         <div className={`${contentWrapperClasses} space-y-8`}>
           <div className="text-center">
-            <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">Our Supporters</h2>
-            <p className="mt-3 text-lg text-gray-600 dark:text-gray-300">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Our Supporters</h2>
+            <p className="mt-3 text-base text-gray-600 dark:text-gray-300">
               Thanks to everyone who makes this possible
             </p>
           </div>
@@ -228,7 +233,7 @@ export default async function Homepage() {
           <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 md:p-8 border border-gray-200 dark:border-slate-700 max-w-4xl mx-auto">
             {/* Major Backers */}
             <div className="text-center mb-6">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Major Backers</p>
+              <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Major Backers</p>
               <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-3">
                 <Link href="https://survivalandflourishing.fund/" target="_blank" rel="noopener noreferrer" className="text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                   Survival and Flourishing Fund
@@ -255,7 +260,7 @@ export default async function Homepage() {
 
             {/* Community Supporters */}
             <div className="text-center mb-4">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Community Backers</p>
+              <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Community Backers</p>
             </div>
             <TieredSupportersDisplay
               highestDonorWithImage={highestDonorWithImage}

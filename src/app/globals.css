@@ -56,4 +56,10 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Petrona is reserved for the hero (h1) and section headers (h2).
+     Smaller headings (card titles, etc.) stay on the Manrope body font. */
+  h1,
+  h2 {
+    font-family: var(--font-petrona), Georgia, 'Times New Roman', serif;
+  }
 }

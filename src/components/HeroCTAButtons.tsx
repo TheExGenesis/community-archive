@@ -158,9 +158,9 @@ export default function HeroCTAButtons() {
 
   const getOptInButtonText = () => {
     if (isOptInLoading) return 'Processing...'
-    if (isOptedIn) return 'Opted In'
-    if (!user) return 'Opt In'
-    return 'Opt In'
+    if (isOptedIn) return 'Opted in'
+    if (!user) return 'Opt in'
+    return 'Opt in'
   }
 
   const getOptInButtonStyle = () => {
@@ -180,7 +180,7 @@ export default function HeroCTAButtons() {
               <Button
                 onClick={handleOptIn}
                 disabled={isOptInLoading || isOptedIn === true}
-                className={`h-14 px-8 text-lg font-semibold rounded-xl w-full ${getOptInButtonStyle()}`}
+                className={`h-14 px-8 text-lg font-semibold w-full ${getOptInButtonStyle()}`}
                 size="lg"
               >
                 <Users className="w-5 h-5 mr-2" />
@@ -198,12 +198,12 @@ export default function HeroCTAButtons() {
               <Button
                 asChild
                 variant="outline"
-                className="h-14 px-8 text-lg font-semibold rounded-xl border-2 w-full"
+                className="h-14 px-8 text-lg font-semibold border-2 w-full"
                 size="lg"
               >
                 <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">
                   <Puzzle className="w-5 h-5 mr-2" />
-                  Extension
+                  Get extension
                 </a>
               </Button>
             </TooltipTrigger>
@@ -216,12 +216,12 @@ export default function HeroCTAButtons() {
               <Button
                 asChild
                 variant="outline"
-                className="h-14 px-8 text-lg font-semibold rounded-xl border-2 w-full"
+                className="h-14 px-8 text-lg font-semibold border-2 w-full"
                 size="lg"
               >
                 <a href="#upload-archive">
                   <Upload className="w-5 h-5 mr-2" />
-                  Upload
+                  Upload archive
                 </a>
               </Button>
             </TooltipTrigger>

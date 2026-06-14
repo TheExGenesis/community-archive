@@ -41,11 +41,13 @@ export default function HeaderNavigation({
           <NavigationMenuItem key={item.href}>
             <Link href={item.href} legacyBehavior passHref>
               <NavigationMenuLink
-                className={`${navigationMenuTriggerStyle()} ${
+                className={cn(
+                  navigationMenuTriggerStyle(),
+                  'transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-800',
                   pathname === item.href
                     ? 'bg-gray-100 font-semibold dark:bg-gray-800' // Enhanced active style
-                    : ''
-                } transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-800`}
+                    : '',
+                )}
               >
                 {item.label}
               </NavigationMenuLink>

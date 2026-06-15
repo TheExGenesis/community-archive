@@ -136,7 +136,7 @@ export default function UploadArchiveSection() {
   return (
     <div className="w-full">
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Upload your archive</h2>
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Upload your tweets</h2>
         <p className="mt-3 text-base text-gray-600 dark:text-gray-300">
           Contribute to collective intelligence research{' '}
           <br className="hidden sm:block" />

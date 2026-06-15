@@ -70,7 +70,7 @@ export default async function RootLayout({
                     alt="Community Archive logo"
                     width={28}
                     height={28}
-                    className="h-7 w-7 flex-shrink-0 rounded-full"
+                    className="h-7 w-7 flex-shrink-0"
                     priority
                   />
                   <span

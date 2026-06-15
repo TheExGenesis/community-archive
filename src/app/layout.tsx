@@ -6,6 +6,7 @@ import './globals.css'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import ReactQueryProvider from '@/providers/ReactQueryProvider'
 import Link from 'next/link'
+import Image from 'next/image'
 import ThemeToggle from '@/components/ThemeToggle'
 import dynamic from 'next/dynamic'
 import HeaderNavigation from '@/components/HeaderNavigation'
@@ -64,6 +65,14 @@ export default async function RootLayout({
             <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md">
               <div className="container mx-auto flex h-16 max-w-screen-xl items-center justify-between px-4 sm:px-6 lg:px-8">
                 <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
+                  <Image
+                    src="/images/logo.png"
+                    alt="Community Archive logo"
+                    width={28}
+                    height={28}
+                    className="h-7 w-7 flex-shrink-0 rounded-full"
+                    priority
+                  />
                   <span
                     className="font-bold text-lg text-gray-800 dark:text-gray-200 whitespace-nowrap"
                     style={{ fontFamily: 'var(--font-petrona), Georgia, "Times New Roman", serif' }}

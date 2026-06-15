@@ -30,7 +30,7 @@ export default async function OptInPage() {
               By opting in, you agree to our{' '}
               <a 
                 href="/data-policy" 
-                className="text-blue-600 dark:text-blue-400 hover:underline"
+                className="text-blue-600 dark:text-blue-300 hover:underline"
                 target="_blank"
                 rel="noopener noreferrer"
               >

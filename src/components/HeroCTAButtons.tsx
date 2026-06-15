@@ -167,13 +167,13 @@ export default function HeroCTAButtons() {
     if (isOptedIn) {
       return 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 cursor-default'
     }
-    return 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-600 dark:hover:bg-green-700'
+    return 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-400 dark:hover:bg-green-300 dark:text-green-950'
   }
 
   return (
     <TooltipProvider delayDuration={150}>
       <div className="flex flex-col items-center gap-4">
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
           {/* Opt In Button */}
           <Tooltip>
             <TooltipTrigger asChild>

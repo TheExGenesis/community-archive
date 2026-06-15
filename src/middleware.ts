@@ -378,10 +378,11 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - images/ (static assets in /public/images, e.g. featured-app thumbnails)
+     * - icon.png / apple-icon.png (Next.js app-icon convention)
      * - favicon.ico (favicon file)
      * - robots.txt (crawler rules)
      * - sitemap.xml (sitemap)
      */
-    '/((?!_next/static|_next/image|images/|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)',
+    '/((?!_next/static|_next/image|images/|icon\\.png|apple-icon\\.png|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)',
   ],
 }

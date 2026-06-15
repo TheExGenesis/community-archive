@@ -186,18 +186,18 @@ export default async function Homepage() {
         </div>
       </section>
 
-      {/* Section 3: Upload Your Archive */}
-      <section id="upload-archive" className={`bg-white dark:bg-gray-950 ${sectionPaddingClasses} scroll-mt-16 overflow-hidden`}>
-        <div className={contentWrapperClasses}>
-          <DynamicUploadArchiveSection />
-        </div>
-      </section>
-
-      {/* Section 4: Get Started - Featured Apps */}
-      <section className={`bg-sky-100 dark:bg-gray-900 ${sectionPaddingClasses} overflow-hidden`}>
+      {/* Section 3: Explore the archive - Featured Apps */}
+      <section className={`bg-white dark:bg-gray-950 ${sectionPaddingClasses} overflow-hidden`}>
         <div className={contentWrapperClasses}>
           <FeaturedAppsSection />
           <AppGallery />
+        </div>
+      </section>
+
+      {/* Section 4: Upload Your Archive */}
+      <section id="upload-archive" className={`bg-sky-100 dark:bg-gray-900 ${sectionPaddingClasses} scroll-mt-16 overflow-hidden`}>
+        <div className={contentWrapperClasses}>
+          <DynamicUploadArchiveSection />
         </div>
       </section>
 

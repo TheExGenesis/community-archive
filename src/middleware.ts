@@ -80,6 +80,10 @@ const rateLimitMap = new Map<string, number[]>()
 const RATE_LIMIT_WINDOW_MS = 60_000
 const IN_MEMORY_MAX_DEFAULT = 30
 const IN_MEMORY_MAX_SG = 5
+// API routes get a tighter per-minute quota since they're a more attractive
+// DoS target (no HTML rendering cost shifts the attacker's effort lower).
+const IN_MEMORY_MAX_API_DEFAULT = 20
+const IN_MEMORY_MAX_API_SG = 5
 const CLEANUP_INTERVAL_MS = 5 * 60_000
 
 let lastCleanup = Date.now()
@@ -306,6 +310,37 @@ export async function middleware(request: NextRequest) {
     // Update the cookie for non-limited requests (carried forward in Stage 5 response)
     // We'll set it on the final response below
     ;(request as any).__newRlData = newRlData
+  }
+
+  // ── Stage 3b: In-Memory Rate Limit for /api/* routes ───────────────────
+  // The page-route rate-limit above intentionally skips /api/ so JSON
+  // endpoints don't fight with the cookie/challenge flow. But unprotected
+  // /api routes are a cheap DoS target, so apply the in-memory IP bucket
+  // (no cookie, no challenge) here. Tighter quota than page routes.
+  if (
+    pathname.startsWith('/api/') &&
+    process.env.NODE_ENV !== 'development'
+  ) {
+    const ip = getIp(request)
+    const country = request.headers.get('x-vercel-ip-country') || ''
+    const isSG = country === 'SG'
+    const maxRequests = isSG ? IN_MEMORY_MAX_API_SG : IN_MEMORY_MAX_API_DEFAULT
+
+    cleanupStaleEntries()
+
+    if (checkInMemoryRateLimit(ip, maxRequests)) {
+      const resp = new NextResponse(
+        JSON.stringify({ error: 'Too Many Requests' }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': '60',
+          },
+        }
+      )
+      return addSecurityHeaders(resp)
+    }
   }
 
   // ── Stage 4: JS Challenge Gate (all page routes, first visit) ───────────

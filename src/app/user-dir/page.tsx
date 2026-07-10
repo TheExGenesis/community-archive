@@ -1,327 +1,365 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
-import { User, SortKey } from '@/lib/types'
-import { fetchUsers, fetchUsersCount } from '@/lib/queries/fetchUsers'
-import Link from 'next/link'
 
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from '@/components/ui/table'
-import { ArrowUpDown, Loader2, Search } from 'lucide-react'
+  Archive,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Loader2,
+  Radio,
+  Search,
+} from 'lucide-react'
+
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { formatNumber } from '@/lib/formatNumber'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { fetchUsers, fetchUsersCount } from '@/lib/queries/fetchUsers'
+import { DirectoryUser, SortKey } from '@/lib/types'
 import { createBrowserClient } from '@/utils/supabase'
 
 const USERS_PER_PAGE = 50
 
+const joinedDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+})
+
+function formatJoinedDate(date: string | null) {
+  if (!date) return '—'
+  return joinedDateFormatter.format(new Date(date))
+}
+
 export default function UserDirectoryPage() {
-  const [users, setUsers] = useState<User[]>([])
+  const supabase = useMemo(() => createBrowserClient(), [])
+  const [users, setUsers] = useState<DirectoryUser[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [sortKey, setSortKey] = useState<SortKey>('archive_uploaded_at')
+  const [sortKey, setSortKey] = useState<SortKey>('joined_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [totalCount, setTotalCount] = useState<number>(0)
-  const [hasMore, setHasMore] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
-  // Style definitions copied from homepage
-  const unifiedDeepBlueBase = "bg-white dark:bg-background";
-  const sectionPaddingClasses = "py-12 md:py-16 lg:py-20"
-  // Using max-w-6xl for user directory to accommodate table width
-  const contentWrapperClasses = "w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10"
-
-  const supabase = createBrowserClient()
-
-  // Debounce search input
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery)
-    }, 300)
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300)
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  const loadUsers = useCallback(async (reset: boolean = false) => {
-    try {
-      if (reset) {
-        setLoading(true)
-        setUsers([])
-      } else {
-        setLoadingMore(true)
-      }
+  useEffect(() => {
+    let isCurrentRequest = true
 
-      const offset = reset ? 0 : users.length
+    const reload = async () => {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const search = debouncedSearch || undefined
+        const [count, fetchedUsers] = await Promise.all([
+          fetchUsersCount(supabase, search),
+          fetchUsers(supabase, {
+            limit: USERS_PER_PAGE,
+            offset: 0,
+            sortBy: sortKey,
+            sortOrder,
+            search,
+          }),
+        ])
+
+        if (!isCurrentRequest) return
+        setTotalCount(count)
+        setUsers(fetchedUsers)
+      } catch (err) {
+        if (!isCurrentRequest) return
+        setError('We could not load the directory. Please try again.')
+        console.error('Error fetching users:', err)
+      } finally {
+        if (isCurrentRequest) setLoading(false)
+      }
+    }
+
+    reload()
+    return () => {
+      isCurrentRequest = false
+    }
+  }, [debouncedSearch, sortKey, sortOrder, supabase])
+
+  const loadMore = async () => {
+    setLoadingMore(true)
+    setError(null)
+
+    try {
       const fetchedUsers = await fetchUsers(supabase, {
         limit: USERS_PER_PAGE,
-        offset,
+        offset: users.length,
         sortBy: sortKey,
         sortOrder,
-        search: debouncedSearch || undefined
+        search: debouncedSearch || undefined,
       })
-
-      if (reset) {
-        setUsers(fetchedUsers)
-      } else {
-        setUsers(prev => [...prev, ...fetchedUsers])
-      }
-
-      setHasMore(fetchedUsers.length === USERS_PER_PAGE)
+      setUsers((currentUsers) => [...currentUsers, ...fetchedUsers])
     } catch (err) {
-      setError('Failed to fetch users')
-      console.error('Error fetching users:', err)
+      setError('We could not load more members. Please try again.')
+      console.error('Error fetching more users:', err)
     } finally {
-      setLoading(false)
       setLoadingMore(false)
     }
-  }, [supabase, users.length, sortKey, sortOrder, debouncedSearch])
-
-  // Load initial users and count
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const count = await fetchUsersCount(supabase)
-        setTotalCount(count)
-      } catch (err) {
-        console.error('Error fetching count:', err)
-      }
-      loadUsers(true)
-    }
-    init()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Reload when sort or search changes
-  useEffect(() => {
-    const reload = async () => {
-      try {
-        const count = await fetchUsersCount(supabase, debouncedSearch || undefined)
-        setTotalCount(count)
-      } catch (err) {
-        console.error('Error fetching count:', err)
-      }
-      loadUsers(true)
-    }
-    reload()
-  }, [sortKey, sortOrder, debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (loading && !searchQuery) return (
-    <div className="flex justify-center items-center min-h-screen">
-      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      <p className="text-xl ml-3">Loading users...</p>
-    </div>
-  )
-  if (error) return <div className="flex justify-center items-center min-h-screen"><p className="text-xl text-red-500">Error: {error}</p></div>
+  }
 
   const handleSort = (key: SortKey) => {
     if (key === sortKey) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+      setSortOrder((current) => (current === 'asc' ? 'desc' : 'asc'))
     } else {
       setSortKey(key)
-      setSortOrder('desc')
+      setSortOrder('asc')
     }
   }
 
   const renderSortIcon = (key: SortKey) => {
-    if (sortKey === key) {
-      return (
-        <ArrowUpDown
-          className={`ml-2 h-4 w-4 ${
-            sortOrder === 'desc' ? 'rotate-180 transform' : ''
-          }`}
-        />
-      )
-    }
-    return <ArrowUpDown className="ml-2 h-4 w-4 opacity-20" />
+    const SortIcon =
+      sortKey !== key ? ArrowUpDown : sortOrder === 'asc' ? ArrowUp : ArrowDown
+
+    return (
+      <SortIcon
+        aria-hidden="true"
+        className={`ml-2 h-3.5 w-3.5 transition-opacity ${
+          sortKey === key ? 'opacity-70' : 'opacity-25'
+        }`}
+      />
+    )
   }
 
   return (
-    <main>
-      <section
-        className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} overflow-hidden min-h-screen`}
-      >
-        <div className={`${contentWrapperClasses}`}>
-          <div className="mb-8 text-center">
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white">User Directory</h2>
-            {totalCount > 0 && (
-              <p className="text-gray-600 dark:text-gray-400 mt-2">
-                Showing {users.length} of {formatNumber(totalCount)} users
-              </p>
-            )}
-          </div>
-          <div className="relative mb-4 max-w-sm mx-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search by name or username..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          {/* Shadcn <Table> already wraps in a `relative w-full overflow-auto` div, so it
-              handles horizontal overflow itself — no need for an additional scroll wrapper
-              (which gave us a second always-on scrollbar). */}
-          <div className="w-full bg-slate-100 dark:bg-card p-6 rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Avatar</TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort('account_display_name')}
-                          className="hover:bg-slate-200 dark:hover:bg-slate-700"
-                    >
-                      Display Name {renderSortIcon('account_display_name')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                        <Button
-                          variant="ghost"
-                          onClick={() => handleSort('username')}
-                          className="hover:bg-slate-200 dark:hover:bg-slate-700"
-                        >
-                      Username {renderSortIcon('username')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                        <Button
-                          variant="ghost"
-                          onClick={() => handleSort('num_tweets')}
-                          className="hover:bg-slate-200 dark:hover:bg-slate-700"
-                        >
-                      Tweets {renderSortIcon('num_tweets')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                        <Button
-                          variant="ghost"
-                          onClick={() => handleSort('num_likes')}
-                          className="hover:bg-slate-200 dark:hover:bg-slate-700"
-                        >
-                      Likes {renderSortIcon('num_likes')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort('num_followers')}
-                          className="hover:bg-slate-200 dark:hover:bg-slate-700"
-                    >
-                      Followers {renderSortIcon('num_followers')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                        <Button
-                          variant="ghost"
-                          onClick={() => handleSort('archive_at')}
-                          className="hover:bg-slate-200 dark:hover:bg-slate-700"
-                        >
-                      Archive Date {renderSortIcon('archive_at')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                        <Button
-                          variant="ghost"
-                          onClick={() => handleSort('created_at')}
-                          className="hover:bg-slate-200 dark:hover:bg-slate-700"
-                        >
-                      Account Created At {renderSortIcon('created_at')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <Button
-                      variant="ghost"
-                      onClick={() => handleSort('archive_uploaded_at')}
-                          className="hover:bg-slate-200 dark:hover:bg-slate-700"
-                    >
-                      Archive Uploaded At {renderSortIcon('archive_uploaded_at')}
-                    </Button>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                      <TableRow key={user.account_id} className="dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                    <TableCell>
-                      <Link href={`/user/${user.account_id}`}>
-                        <Avatar>
-                          <AvatarImage
-                            src={user.avatar_media_url || '/placeholder.jpg'}
-                            alt={`${user.account_display_name}'s avatar`}
-                          />
-                          <AvatarFallback>
-                            {user.account_display_name.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      </Link>
-                    </TableCell>
-                        <TableCell className="font-medium">
-                      <Link
-                        href={`/user/${user.account_id}`}
-                        className="hover:underline"
-                      >
-                        {user.account_display_name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/user/${user.account_id}`}
-                        className="hover:underline"
-                      >
-                            @{user.username}
-                      </Link>
-                    </TableCell>
-                        <TableCell className="text-right">{formatNumber(user.num_tweets)}</TableCell>
-                        <TableCell className="text-right">{formatNumber(user.num_likes)}</TableCell>
-                        <TableCell className="text-right">{formatNumber(user.num_followers)}</TableCell>
-                    <TableCell>
-                      {user.archive_at
-                        ? new Date(user.archive_at).toLocaleDateString()
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      {user.archive_uploaded_at
-                        ? new Date(user.archive_uploaded_at).toLocaleDateString()
-                        : '-'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Load More Button */}
-          {hasMore && (
-            <div className="flex justify-center mt-6">
-              <Button
-                onClick={() => loadUsers(false)}
-                disabled={loadingMore}
-                variant="outline"
-                size="lg"
-              >
-                {loadingMore ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  `Load More (${Math.min(USERS_PER_PAGE, totalCount - users.length)} more)`
-                )}
-              </Button>
-            </div>
-          )}
+    <main className="min-h-screen bg-white py-12 dark:bg-background md:py-16">
+      <div className="relative mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto mb-10 max-w-2xl text-center">
+          <h1 className="text-4xl font-bold tracking-tight text-gray-950 dark:text-white sm:text-5xl">
+            User Directory
+          </h1>
+          <p className="mt-3 text-base text-gray-600 dark:text-gray-400">
+            People preserving and participating in the Community Archive.
+          </p>
+          <p className="mt-2 text-sm font-medium text-gray-500 dark:text-gray-500">
+            {loading && users.length === 0
+              ? 'Loading members…'
+              : `${users.length} of ${totalCount.toLocaleString()} members`}
+          </p>
         </div>
-      </section>
+
+        <div className="relative mx-auto mb-6 max-w-xl">
+          <Search
+            aria-hidden="true"
+            className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+          />
+          <Input
+            aria-label="Search the user directory"
+            placeholder="Search by name or username…"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="h-12 rounded-xl border-gray-300 bg-white pl-11 shadow-sm dark:border-gray-700 dark:bg-gray-950"
+          />
+        </div>
+
+        <div
+          className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-card"
+          aria-busy={loading}
+        >
+          <Table>
+            <TableHeader className="bg-gray-50/80 dark:bg-gray-900/60">
+              <TableRow className="hover:bg-transparent">
+                <TableHead
+                  className="w-[52%] py-2"
+                  aria-sort={
+                    sortKey === 'account_display_name'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('account_display_name')}
+                    aria-label="Sort by member name"
+                    className="-ml-3 h-8 px-3 text-xs font-semibold uppercase tracking-wider hover:bg-gray-200/70 dark:hover:bg-gray-800"
+                  >
+                    Member {renderSortIcon('account_display_name')}
+                  </Button>
+                </TableHead>
+                <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wider">
+                  Participation
+                </TableHead>
+                <TableHead
+                  className="w-[18%] py-2 text-right"
+                  aria-sort={
+                    sortKey === 'joined_at'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('joined_at')}
+                    aria-label="Sort by join date"
+                    className="-mr-3 h-8 px-3 text-xs font-semibold uppercase tracking-wider hover:bg-gray-200/70 dark:hover:bg-gray-800"
+                  >
+                    Joined {renderSortIcon('joined_at')}
+                  </Button>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="h-40 text-center">
+                    <span className="inline-flex items-center text-sm text-gray-500 dark:text-gray-400">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading members…
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ) : error && users.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={3}
+                    className="h-40 text-center text-sm text-red-600 dark:text-red-400"
+                  >
+                    {error}
+                  </TableCell>
+                </TableRow>
+              ) : users.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={3}
+                    className="h-40 text-center text-sm text-gray-500 dark:text-gray-400"
+                  >
+                    No members match “{debouncedSearch}”.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                users.map((user) => {
+                  const identity = (
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Avatar className="h-11 w-11 border border-gray-200 dark:border-gray-700">
+                        <AvatarImage
+                          src={user.avatar_media_url || '/placeholder.jpg'}
+                          alt={`${user.account_display_name}'s avatar`}
+                        />
+                        <AvatarFallback>
+                          {user.account_display_name.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-gray-950 dark:text-gray-100">
+                          {user.account_display_name}
+                        </div>
+                        <div className="truncate text-sm text-gray-500 dark:text-gray-400">
+                          @{user.username}
+                        </div>
+                      </div>
+                    </div>
+                  )
+
+                  return (
+                    <TableRow
+                      key={user.directory_id}
+                      className="group border-gray-200 hover:bg-gray-50/80 dark:border-gray-800 dark:hover:bg-gray-900/60"
+                    >
+                      <TableCell className="py-4">
+                        {user.has_archive && user.account_id ? (
+                          <Link
+                            href={`/user/${user.account_id}`}
+                            className="block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group-hover:[&_div.font-semibold]:underline"
+                          >
+                            {identity}
+                          </Link>
+                        ) : (
+                          identity
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                          {user.has_archive && (
+                            <Badge
+                              variant="outline"
+                              title="Contributed a Twitter archive"
+                              className="gap-1.5 border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300"
+                            >
+                              <Archive
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5"
+                              />
+                              Archive
+                            </Badge>
+                          )}
+                          {user.is_opted_in && (
+                            <Badge
+                              variant="outline"
+                              title="Opted in to tweet streaming"
+                              className="gap-1.5 border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300"
+                            >
+                              <Radio
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5"
+                              />
+                              Opted in
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-right text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <time dateTime={user.joined_at || undefined}>
+                          {formatJoinedDate(user.joined_at)}
+                        </time>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {error && users.length > 0 && (
+          <p className="mt-4 text-center text-sm text-red-600 dark:text-red-400">
+            {error}
+          </p>
+        )}
+
+        {!loading && users.length < totalCount && (
+          <div className="mt-6 flex justify-center">
+            <Button
+              onClick={loadMore}
+              disabled={loadingMore}
+              variant="outline"
+              size="lg"
+              className="rounded-full px-6"
+            >
+              {loadingMore ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading…
+                </>
+              ) : (
+                `Load ${Math.min(USERS_PER_PAGE, totalCount - users.length)} more`
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
     </main>
   )
 }

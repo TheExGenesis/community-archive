@@ -1,4 +1,4 @@
-import { User } from '@/lib/types'
+import { DirectoryUser, SortKey } from '@/lib/types'
 import { formatUserData } from '@/lib/user-utils'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { devLog } from '@/lib/devLog'
@@ -6,16 +6,22 @@ import { devLog } from '@/lib/devLog'
 export interface FetchUsersOptions {
   limit?: number
   offset?: number
-  sortBy?: string
+  sortBy?: SortKey
   sortOrder?: 'asc' | 'desc'
   search?: string
 }
 
 export const fetchUsers = async (
   supabase: SupabaseClient,
-  options?: FetchUsersOptions
-): Promise<User[]> => {
-  const { limit, offset = 0, sortBy = 'archive_uploaded_at', sortOrder = 'desc', search } = options || {}
+  options?: FetchUsersOptions,
+): Promise<DirectoryUser[]> => {
+  const {
+    limit,
+    offset = 0,
+    sortBy = 'joined_at',
+    sortOrder = 'desc',
+    search,
+  } = options || {}
 
   let query = supabase
     .schema('public')
@@ -25,25 +31,26 @@ export const fetchUsers = async (
       account_id,
       username,
       account_display_name,
-      created_at,
-      num_tweets,
-      num_followers,
-      num_following,
-      num_likes,
-      bio,
-      website,
-      location,
       avatar_media_url,
-      archive_at,
-      archive_uploaded_at
+      archive_uploaded_at,
+      directory_id,
+      has_archive,
+      is_opted_in,
+      opted_in_at,
+      joined_at
     `,
     )
 
   if (search) {
-    query = query.or(`username.ilike.%${search}%,account_display_name.ilike.%${search}%`)
+    query = query.or(
+      `username.ilike.%${search}%,account_display_name.ilike.%${search}%`,
+    )
   }
 
-  query = query.order(sortBy, { ascending: sortOrder === 'asc', nullsFirst: false })
+  query = query.order(sortBy, {
+    ascending: sortOrder === 'asc',
+    nullsFirst: false,
+  })
 
   if (limit) {
     query = query.range(offset, offset + limit - 1)
@@ -53,17 +60,22 @@ export const fetchUsers = async (
 
   if (error) throw error
 
-  return (data as User[]) || []
+  return (data as DirectoryUser[]) || []
 }
 
-export const fetchUsersCount = async (supabase: SupabaseClient, search?: string): Promise<number> => {
+export const fetchUsersCount = async (
+  supabase: SupabaseClient,
+  search?: string,
+): Promise<number> => {
   let query = supabase
     .schema('public')
     .from('user_directory')
     .select('account_id', { count: 'exact', head: true })
 
   if (search) {
-    query = query.or(`username.ilike.%${search}%,account_display_name.ilike.%${search}%`)
+    query = query.or(
+      `username.ilike.%${search}%,account_display_name.ilike.%${search}%`,
+    )
   }
 
   const { count, error } = await query

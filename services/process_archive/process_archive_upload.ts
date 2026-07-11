@@ -7,15 +7,9 @@ dotenv.config({ path: '.env' })
 
 import postgres from 'postgres'
 
-// Real postgres.js connection-tag type. Replaces the prior `type Sql = any`
-// that silently disabled type-checking on every query in this file.
-// `sql.begin(trx => ...)` hands the callback a `postgres.TransactionSql`,
-// which is assignable to `Sql` (TransactionSql extends Sql), so the existing
-// `(trx: Sql)` annotations on transaction helpers continue to work.
 type Sql = postgres.Sql
 
 import { createClient } from '@supabase/supabase-js'
-import { getSupabaseConfig } from '../../src/utils/supabaseConfig'
 
 // Configuration
 const CONFIG = {
@@ -30,6 +24,33 @@ const CONFIG = {
 } as const
 
 export async function createServerScriptClient() {
+  const getSupabaseConfig = (includeServiceRole: boolean = false) => {
+    const isDevelopment = process.env.NODE_ENV === 'development'
+    const useRemoteDevDb = process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true'
+  
+    const getUrl = () =>
+      isDevelopment && !useRemoteDevDb
+        ? process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL!
+        : process.env.NEXT_PUBLIC_SUPABASE_URL!
+  
+    const getAnonKey = () =>
+      isDevelopment && !useRemoteDevDb
+        ? process.env.NEXT_PUBLIC_LOCAL_ANON_KEY!
+        : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  
+    const getServiceRole = () =>
+      isDevelopment && !useRemoteDevDb
+        ? process.env.NEXT_PUBLIC_LOCAL_SERVICE_ROLE!
+        : process.env.SUPABASE_SERVICE_ROLE!
+  
+    const config = {
+      url: getUrl(),
+      anonKey: getAnonKey(),
+      ...(includeServiceRole ? { serviceRole: getServiceRole() } : {}),
+    }
+  
+    return config
+  }
   const { url, serviceRole } = getSupabaseConfig(true)
   return createClient(url!, serviceRole!)
 }

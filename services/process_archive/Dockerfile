@@ -25,14 +25,6 @@ COPY src ./src
 COPY database.types.ts ./database.types.ts
 COPY .env .env
 
-# The worker imports `../../src/utils/supabaseConfig` (shared with the Next.js
-# app). Locally that resolves from services/process_archive/, but the Dockerfile
-# flattens the worker into /app/, so we mirror the worker source under the
-# expected nested path. The CMD below runs the file via this nested path so
-# Node/tsx resolves the relative import to /app/src.
-RUN mkdir -p /app/services/process_archive \
- && cp /app/process_archive_upload.ts /app/services/process_archive/process_archive_upload.ts
-
 # Create logs directory
 RUN mkdir -p logs
 
@@ -53,14 +45,5 @@ ENV MAX_MEMORY_MB=2000
 # Use entrypoint script for execution logging
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
-# Default command - can be overridden.
-# Run the worker via its repo-relative path so relative imports
-# (e.g. `../../src/utils/supabaseConfig`) resolve the same way as locally.
-# We invoke tsx directly (rather than `npm run start`) because npm scripts
-# are run from the package.json's directory (here, /app), and tsx resolves
-# the entry file relative to its own CWD — we want the entry file at
-# /app/services/process_archive/process_archive_upload.ts so its imports
-# resolve to /app/src. --expose-gc preserves the manual GC hooks the worker
-# code calls (see `global.gc?.()` sites in process_archive_upload.ts).
-ENV NODE_OPTIONS=--expose-gc
-CMD ["npx", "tsx", "--env-file=/app/.env", "/app/services/process_archive/process_archive_upload.ts"]
+# Default command - can be overridden
+CMD ["npm", "run", "start"]

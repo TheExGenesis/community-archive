@@ -93,12 +93,12 @@ function cleanupStaleEntries() {
   if (now - lastCleanup < CLEANUP_INTERVAL_MS) return
   lastCleanup = now
   const cutoff = now - RATE_LIMIT_WINDOW_MS
-  rateLimitMap.forEach((timestamps, ip) => {
+  rateLimitMap.forEach((timestamps, key) => {
     const filtered = timestamps.filter((t) => t > cutoff)
     if (filtered.length === 0) {
-      rateLimitMap.delete(ip)
+      rateLimitMap.delete(key)
     } else {
-      rateLimitMap.set(ip, filtered)
+      rateLimitMap.set(key, filtered)
     }
   })
 }
@@ -294,7 +294,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // In-memory rate limit (secondary)
-    const memoryLimited = checkInMemoryRateLimit(ip, maxRequests)
+    const memoryLimited = checkInMemoryRateLimit(`page:${ip}`, maxRequests)
 
     if (cookieLimited || memoryLimited) {
       const resp = blocked(429, 'Too Many Requests', { 'Retry-After': '60' })
@@ -328,7 +328,7 @@ export async function middleware(request: NextRequest) {
 
     cleanupStaleEntries()
 
-    if (checkInMemoryRateLimit(ip, maxRequests)) {
+    if (checkInMemoryRateLimit(`api:${ip}`, maxRequests)) {
       const resp = new NextResponse(
         JSON.stringify({ error: 'Too Many Requests' }),
         {

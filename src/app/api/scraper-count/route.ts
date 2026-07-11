@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerServiceRoleClient } from '@/utils/supabase'
-
-const MAX_RANGE_MS = 365 * 24 * 60 * 60 * 1000 // 365 days
+import {
+  MAX_AGGREGATE_RANGE_MS,
+  validateDateRange,
+} from '@/lib/apiInputValidation'
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,24 +18,27 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const startDate = new Date(startDateRaw)
-    const endDate = new Date(endDateRaw)
+    const range = validateDateRange(
+      startDateRaw,
+      endDateRaw,
+      MAX_AGGREGATE_RANGE_MS,
+    )
 
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    if (!range.ok && range.error === 'invalid') {
       return NextResponse.json(
         { error: 'Invalid date format. Use ISO 8601 timestamps.' },
         { status: 400 }
       )
     }
 
-    if (startDate.getTime() > endDate.getTime()) {
+    if (!range.ok && range.error === 'order') {
       return NextResponse.json(
         { error: 'startDate must be before endDate' },
         { status: 400 }
       )
     }
 
-    if (endDate.getTime() - startDate.getTime() > MAX_RANGE_MS) {
+    if (!range.ok) {
       return NextResponse.json(
         { error: 'Date range too large. Maximum 365 days.' },
         { status: 400 }
@@ -47,8 +52,8 @@ export async function GET(request: NextRequest) {
 
     const { data: countData, error: countError } = await supabase
       .rpc('get_unique_scraper_count', {
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString()
+        start_date: range.start.toISOString(),
+        end_date: range.end.toISOString()
       })
 
     if (countError) {

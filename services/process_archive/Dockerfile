@@ -38,7 +38,6 @@ ENV LOG_LEVEL=info
 ENV PG_BATCH_SIZE=5000
 ENV MEMORY_BATCH_SIZE=15000
 ENV MAX_MEMORY_MB=2000
-ENV USE_COPY=true
 
 # Run as root user for simplicity in batch job environment
 # Note: This is acceptable for batch jobs/cronjobs where security isolation is less critical

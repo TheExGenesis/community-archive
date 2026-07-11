@@ -501,8 +501,7 @@ export class ArchiveUploadProcessor {
     ];
 
     for(const promiseCreator of promisesToWork){
-      let promise = promiseCreator();
-      await promise;
+      await promiseCreator();
     }
 
     // Clear references to help GC

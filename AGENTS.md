@@ -84,13 +84,10 @@ The archive processor—the most critical part of the system—has no type safet
 Any environment variable changes require updating multiple files.
 
 #### 3. Migration Drift
-The `supabase/migrations-pending-review/` folder contains unapplied migrations dating back to March 2025. Schema changes are split across:
-- `sql/tables/` (documentation)
-- `supabase/schemas/` (declarative)
-- `supabase/migrations/` (applied)
-- `database.types.ts` (generated)
-
-No single source of truth for schema.
+Historical pending drafts have been audited and moved to
+`supabase/migrations-archived/`. The current sources of truth are
+`supabase/schemas/` (declarative state), `supabase/migrations/` (applied
+history), and `src/database-types.ts` (generated client types).
 
 #### 4. Dead/Disabled Code (resolved)
 The permanently disabled COPY branch and its unused helpers have been removed

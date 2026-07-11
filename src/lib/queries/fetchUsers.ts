@@ -11,6 +11,13 @@ export interface FetchUsersOptions {
   search?: string
 }
 
+export const buildDirectorySearchFilter = (search: string) => {
+  const escapedSearch = search.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  const pattern = `"%${escapedSearch}%"`
+
+  return `username.ilike.${pattern},account_display_name.ilike.${pattern}`
+}
+
 export const fetchUsers = async (
   supabase: SupabaseClient,
   options?: FetchUsersOptions,
@@ -42,15 +49,14 @@ export const fetchUsers = async (
     )
 
   if (search) {
-    query = query.or(
-      `username.ilike.%${search}%,account_display_name.ilike.%${search}%`,
-    )
+    query = query.or(buildDirectorySearchFilter(search))
   }
 
   query = query.order(sortBy, {
     ascending: sortOrder === 'asc',
     nullsFirst: false,
   })
+  query = query.order('directory_id', { ascending: true })
 
   if (limit) {
     query = query.range(offset, offset + limit - 1)
@@ -73,9 +79,7 @@ export const fetchUsersCount = async (
     .select('account_id', { count: 'exact', head: true })
 
   if (search) {
-    query = query.or(
-      `username.ilike.%${search}%,account_display_name.ilike.%${search}%`,
-    )
+    query = query.or(buildDirectorySearchFilter(search))
   }
 
   const { count, error } = await query

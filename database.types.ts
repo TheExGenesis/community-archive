@@ -1211,16 +1211,11 @@ export type Database = {
           avatar_media_url: string | null
           bio: string | null
           created_at: string | null
-          directory_id: string | null
-          has_archive: boolean | null
-          is_opted_in: boolean | null
-          joined_at: string | null
           location: string | null
           num_followers: number | null
           num_following: number | null
           num_likes: number | null
           num_tweets: number | null
-          opted_in_at: string | null
           username: string | null
           website: string | null
         }

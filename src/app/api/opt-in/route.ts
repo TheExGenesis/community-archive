@@ -14,18 +14,29 @@ import { NextRequest, NextResponse } from 'next/server'
 // bypasses RLS, this would be a real impersonation vector).
 function getSessionTwitterUsername(user: User): string | null {
   const identity =
-    user.identities?.find((i) =>
-      ['twitter', 'x'].includes(i.provider ?? ''),
-    ) ?? null
+    user.identities?.find((i) => ['twitter', 'x'].includes(i.provider ?? '')) ??
+    null
   if (!identity) return null
   const data = (identity.identity_data ?? {}) as Record<string, unknown>
-  for (const k of ['user_name', 'preferred_username', 'screen_name', 'username']) {
+  for (const k of [
+    'user_name',
+    'preferred_username',
+    'screen_name',
+    'username',
+  ]) {
     const v = data[k]
     if (typeof v === 'string' && v.trim()) {
       return v.trim().toLowerCase().replace(/^@/, '')
     }
   }
   return null
+}
+
+function getSessionTwitterUserId(user: User): string | null {
+  const providerId = user.app_metadata?.provider_id
+  return typeof providerId === 'string' && providerId.trim()
+    ? providerId.trim()
+    : null
 }
 
 export async function POST(request: NextRequest) {
@@ -52,7 +63,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       username: bodyUsername,
-      twitterUserId,
       optedIn,
       termsVersion,
       explicitOptOut = false,
@@ -83,6 +93,7 @@ export async function POST(request: NextRequest) {
       )
     }
     const normalizedUsername = sessionUsername
+    const sessionTwitterUserId = getSessionTwitterUserId(user)
 
     const [byUserIdResponse, byUsernameResponse] = await Promise.all([
       admin.from('optin').select('*').eq('user_id', user.id).maybeSingle(),
@@ -129,7 +140,10 @@ export async function POST(request: NextRequest) {
     const payload = {
       user_id: user.id,
       username: normalizedUsername,
-      twitter_user_id: twitterUserId || null,
+      // Never associate a directory/archive account from a client-supplied ID.
+      // app_metadata is set by the auth provider and cannot be changed by users.
+      twitter_user_id:
+        sessionTwitterUserId ?? existingRecord?.twitter_user_id ?? null,
       opted_in: Boolean(optedIn) && !nextExplicitOptOut,
       terms_version: optedIn
         ? termsVersion

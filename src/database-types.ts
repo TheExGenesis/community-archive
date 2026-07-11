@@ -255,13 +255,6 @@ export type Database = {
             referencedColumns: ["account_id"]
           },
           {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "user_directory"
-            referencedColumns: ["account_id"]
-          },
-          {
             foreignKeyName: "all_profile_archive_upload_id_fkey"
             columns: ["archive_upload_id"]
             isOneToOne: false
@@ -327,13 +320,6 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "archive_upload_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "user_directory"
             referencedColumns: ["account_id"]
           },
         ]
@@ -420,13 +406,6 @@ export type Database = {
             referencedColumns: ["account_id"]
           },
           {
-            foreignKeyName: "followers_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "user_directory"
-            referencedColumns: ["account_id"]
-          },
-          {
             foreignKeyName: "followers_archive_upload_id_fkey"
             columns: ["archive_upload_id"]
             isOneToOne: false
@@ -477,13 +456,6 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "following_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "user_directory"
             referencedColumns: ["account_id"]
           },
           {
@@ -555,13 +527,6 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "likes_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "user_directory"
             referencedColumns: ["account_id"]
           },
           {
@@ -930,13 +895,6 @@ export type Database = {
             referencedColumns: ["account_id"]
           },
           {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "user_directory"
-            referencedColumns: ["account_id"]
-          },
-          {
             foreignKeyName: "tweets_archive_upload_id_fkey"
             columns: ["archive_upload_id"]
             isOneToOne: false
@@ -1098,13 +1056,6 @@ export type Database = {
             referencedColumns: ["account_id"]
           },
           {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "user_directory"
-            referencedColumns: ["account_id"]
-          },
-          {
             foreignKeyName: "tweets_archive_upload_id_fkey"
             columns: ["archive_upload_id"]
             isOneToOne: false
@@ -1167,13 +1118,6 @@ export type Database = {
             referencedRelation: "all_account"
             referencedColumns: ["account_id"]
           },
-          {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "user_directory"
-            referencedColumns: ["account_id"]
-          },
         ]
       }
       profile: {
@@ -1206,13 +1150,6 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: true
             referencedRelation: "all_account"
-            referencedColumns: ["account_id"]
-          },
-          {
-            foreignKeyName: "all_profile_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: true
-            referencedRelation: "user_directory"
             referencedColumns: ["account_id"]
           },
           {
@@ -1277,13 +1214,6 @@ export type Database = {
             referencedColumns: ["account_id"]
           },
           {
-            foreignKeyName: "tweets_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "user_directory"
-            referencedColumns: ["account_id"]
-          },
-          {
             foreignKeyName: "tweets_archive_upload_id_fkey"
             columns: ["archive_upload_id"]
             isOneToOne: false
@@ -1301,11 +1231,16 @@ export type Database = {
           avatar_media_url: string | null
           bio: string | null
           created_at: string | null
+          directory_id: string | null
+          has_archive: boolean | null
+          is_opted_in: boolean | null
+          joined_at: string | null
           location: string | null
           num_followers: number | null
           num_following: number | null
           num_likes: number | null
           num_tweets: number | null
+          opted_in_at: string | null
           username: string | null
           website: string | null
         }

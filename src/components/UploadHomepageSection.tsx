@@ -146,7 +146,7 @@ export default function UploadHomepageSection() {
               setState((prev) => ({ ...prev, showUploadButton: true }))
             }
           >
-            <button className="cursor-pointer text-sm font-bold text-blue-500 hover:underline dark:text-blue-400">
+            <button className="cursor-pointer text-sm font-bold text-blue-500 hover:underline dark:text-blue-300">
               Upload a new archive, or delete your data. :)
             </button>
           </div>
@@ -158,7 +158,7 @@ export default function UploadHomepageSection() {
                   onClick={() =>
                     setState((prev) => ({ ...prev, showUploadButton: false }))
                   }
-                  className="cursor-pointer text-sm text-blue-500 underline dark:text-blue-400"
+                  className="cursor-pointer text-sm text-blue-500 underline dark:text-blue-300"
                 >
                   Close
                 </button>

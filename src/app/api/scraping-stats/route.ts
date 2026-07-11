@@ -1,21 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import {
+  DateRangeValidation,
+  getStatsRangeLimitMs,
+  validateDateRange,
+} from '@/lib/apiInputValidation'
+
+const MAX_HOURS_BACK = 720
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const hoursBack = parseInt(searchParams.get('hoursBack') || '24')
+    const hoursBack = Number(searchParams.get('hoursBack') || '24')
     const granularity = searchParams.get('granularity') || 'hour'
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const streamedOnly = searchParams.get('streamedOnly') !== 'false' // Default to true
 
     // Validate input
-    if (hoursBack < 1 || hoursBack > 720) { // Max 30 days
+    if (!Number.isInteger(hoursBack) || hoursBack < 1 || hoursBack > MAX_HOURS_BACK) { // Max 30 days
       return NextResponse.json(
         { error: 'Invalid hoursBack parameter. Must be between 1 and 720.' },
         { status: 400 }
       )
+    }
+
+    const maxRangeMs = getStatsRangeLimitMs(granularity)
+    if (maxRangeMs === null) {
+      return NextResponse.json(
+        { error: 'Invalid granularity. Must be one of: minute, hour, day, week, month.' },
+        { status: 400 }
+      )
+    }
+
+    if (hoursBack * 60 * 60 * 1000 > maxRangeMs) {
+      return NextResponse.json(
+        { error: `Date range too large for ${granularity} granularity.` },
+        { status: 400 }
+      )
+    }
+
+    // Validate custom date range up front so we can reject before we waste
+    // a service-role RPC call. An attacker could otherwise request a 10-year
+    // minute-granularity report and exhaust DB resources.
+    let customRange: Extract<DateRangeValidation, { ok: true }> | null = null
+    if (startDate || endDate) {
+      if (!startDate || !endDate) {
+        return NextResponse.json(
+          { error: 'Both startDate and endDate are required for custom range.' },
+          { status: 400 }
+        )
+      }
+      const range = validateDateRange(startDate, endDate, maxRangeMs)
+      if (!range.ok && range.error === 'invalid') {
+        return NextResponse.json(
+          { error: 'Invalid date format. Use ISO 8601 timestamps.' },
+          { status: 400 }
+        )
+      }
+      if (!range.ok && range.error === 'order') {
+        return NextResponse.json(
+          { error: 'startDate must be before endDate' },
+          { status: 400 }
+        )
+      }
+      if (!range.ok) {
+        return NextResponse.json(
+          { error: `Date range too large for ${granularity} granularity.` },
+          { status: 400 }
+        )
+      }
+      customRange = range
     }
 
     // Create service role client to access private schema functions
@@ -30,7 +85,7 @@ export async function GET(request: NextRequest) {
     })
     
     // Handle different time ranges
-    if (!startDate && !endDate) {
+    if (!customRange) {
       // Simple hour-based query
       const now = new Date()
       const start = new Date(now.getTime() - hoursBack * 60 * 60 * 1000)
@@ -73,11 +128,11 @@ export async function GET(request: NextRequest) {
     }
     
     // Handle custom date ranges
-    if (startDate && endDate) {
+    if (customRange) {
       const { data, error } = await supabase
         .rpc('get_streaming_stats', {
-          p_start_date: startDate,
-          p_end_date: endDate,
+          p_start_date: customRange.start.toISOString(),
+          p_end_date: customRange.end.toISOString(),
           p_granularity: granularity,
           p_streamed_only: streamedOnly
         })
@@ -104,7 +159,7 @@ export async function GET(request: NextRequest) {
 
       // Cache headers
       const now = new Date()
-      const end = new Date(endDate)
+      const end = customRange.end
       const isCurrentPeriod = end > new Date(now.getTime() - 60 * 60 * 1000) // Within last hour
       
       const headers: Record<string, string> = {
@@ -129,4 +184,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-

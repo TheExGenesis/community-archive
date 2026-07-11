@@ -135,7 +135,7 @@ export async function loadMoreAccountsAction(input: {
   excludeUsernames: string[]
 }): Promise<AccountsPage> {
   return loadMoreAccountsData(
-    input.search,
+    normalizeUsername(input.search),
     input.cursor,
     input.excludeAccountIds,
     input.excludeUsernames,

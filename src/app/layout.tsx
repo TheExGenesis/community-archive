@@ -1,4 +1,4 @@
-import { GeistSans } from 'geist/font/sans'
+import { Petrona, Manrope } from 'next/font/google'
 import ThemeProvider from '@/providers/ThemeProvider'
 import NextTopLoader from 'nextjs-toploader'
 import { Analytics } from '@vercel/analytics/react'
@@ -6,6 +6,7 @@ import './globals.css'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import ReactQueryProvider from '@/providers/ReactQueryProvider'
 import Link from 'next/link'
+import Image from 'next/image'
 import ThemeToggle from '@/components/ThemeToggle'
 import dynamic from 'next/dynamic'
 import HeaderNavigation from '@/components/HeaderNavigation'
@@ -15,6 +16,18 @@ import { checkIsAdmin } from '@/app/admin/data'
 
 const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
   ssr: false,
+})
+
+// Headings use Petrona (serif); body uses Manrope (sans).
+const petrona = Petrona({
+  subsets: ['latin'],
+  variable: '--font-petrona',
+  display: 'swap',
+})
+const manrope = Manrope({
+  subsets: ['latin'],
+  variable: '--font-manrope',
+  display: 'swap',
 })
 
 const defaultUrl = process.env.VERCEL_URL
@@ -36,7 +49,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${GeistSans.className} antialiased`}
+      className={`${manrope.className} ${petrona.variable} antialiased`}
       style={{ colorScheme: 'dark' }}
       suppressHydrationWarning={true}
     >
@@ -52,7 +65,20 @@ export default async function RootLayout({
             <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md">
               <div className="container mx-auto flex h-16 max-w-screen-xl items-center justify-between px-4 sm:px-6 lg:px-8">
                 <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
-                  <span className="font-bold text-lg text-gray-800 dark:text-gray-200 whitespace-nowrap">Community Archive</span>
+                  <Image
+                    src="/images/logo.png"
+                    alt="Community Archive logo"
+                    width={28}
+                    height={28}
+                    className="h-7 w-7 flex-shrink-0"
+                    priority
+                  />
+                  <span
+                    className="font-bold text-lg text-gray-800 dark:text-gray-200 whitespace-nowrap"
+                    style={{ fontFamily: 'var(--font-petrona), Georgia, "Times New Roman", serif' }}
+                  >
+                    Community Archive
+                  </span>
                 </Link>
                 <HeaderNavigation isAdmin={isAdmin} />
                 <div className="flex items-center space-x-3">

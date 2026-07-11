@@ -3460,7 +3460,6 @@ GRANT EXECUTE ON FUNCTION "public"."delete_tweets"("p_tweet_ids" "text"[]) TO "s
 
 
 
-GRANT ALL ON FUNCTION "public"."delete_user_archive"("p_account_id" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."delete_user_archive"("p_account_id" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."delete_user_archive"("p_account_id" "text") TO "service_role";
 
@@ -4089,8 +4088,6 @@ GRANT ALL ON TABLE "public"."likes" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."mentioned_users" TO "anon";
-GRANT ALL ON TABLE "public"."mentioned_users" TO "authenticated";
 GRANT ALL ON TABLE "public"."mentioned_users" TO "service_role";
 -- moved to 060_grants.sql
 
@@ -4144,8 +4141,6 @@ GRANT ALL ON TABLE "public"."tweet_urls" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."quote_tweets" TO "anon";
-GRANT ALL ON TABLE "public"."quote_tweets" TO "authenticated";
 GRANT ALL ON TABLE "public"."quote_tweets" TO "service_role";
 -- moved to 060_grants.sql
 
@@ -4205,8 +4200,6 @@ GRANT ALL ON TABLE "public"."global_monthly_tweet_counts" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."liked_tweets" TO "anon";
-GRANT ALL ON TABLE "public"."liked_tweets" TO "authenticated";
 GRANT ALL ON TABLE "public"."liked_tweets" TO "service_role";
 -- moved to 060_grants.sql
 
@@ -4290,8 +4283,6 @@ GRANT ALL ON TABLE "tes"."blocked_scraping_users" TO "service_role";
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES  TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES  TO "anon";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES  TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQUENCES  TO "service_role";
 
 
@@ -4300,8 +4291,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON SEQ
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "anon";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUNCTIONS  TO "service_role";
 
 
@@ -4310,8 +4299,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUN
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "anon";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES  TO "service_role";
 -- moved to 060_grants.sql
 

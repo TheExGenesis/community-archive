@@ -1113,6 +1113,7 @@ ALTER FUNCTION "public"."insert_temp_account"("p_account" "jsonb", "p_suffix" "t
 
 CREATE OR REPLACE FUNCTION "public"."insert_temp_archive_upload"("p_account_id" "text", "p_archive_at" timestamp with time zone, "p_keep_private" boolean, "p_upload_likes" boolean, "p_start_date" "date", "p_end_date" "date", "p_suffix" "text") RETURNS bigint
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $_$
 DECLARE
     v_id BIGINT;
@@ -1166,6 +1167,7 @@ COMMENT ON FUNCTION "public"."insert_temp_archive_upload"("p_account_id" "text",
 
 CREATE OR REPLACE FUNCTION "public"."insert_temp_followers"("p_followers" "jsonb", "p_account_id" "text", "p_suffix" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $_$
 DECLARE
     v_provider_id TEXT;
@@ -1201,6 +1203,7 @@ ALTER FUNCTION "public"."insert_temp_followers"("p_followers" "jsonb", "p_accoun
 
 CREATE OR REPLACE FUNCTION "public"."insert_temp_following"("p_following" "jsonb", "p_account_id" "text", "p_suffix" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $_$
 DECLARE
     v_provider_id TEXT;
@@ -1236,6 +1239,7 @@ ALTER FUNCTION "public"."insert_temp_following"("p_following" "jsonb", "p_accoun
 
 CREATE OR REPLACE FUNCTION "public"."insert_temp_likes"("p_likes" "jsonb", "p_account_id" "text", "p_suffix" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $_$
 DECLARE
     v_provider_id TEXT;
@@ -1279,6 +1283,7 @@ ALTER FUNCTION "public"."insert_temp_likes"("p_likes" "jsonb", "p_account_id" "t
 
 CREATE OR REPLACE FUNCTION "public"."insert_temp_profiles"("p_profile" "jsonb", "p_account_id" "text", "p_suffix" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $_$
 DECLARE
     v_provider_id TEXT;
@@ -1316,6 +1321,7 @@ ALTER FUNCTION "public"."insert_temp_profiles"("p_profile" "jsonb", "p_account_i
 
 CREATE OR REPLACE FUNCTION "public"."insert_temp_tweets"("p_tweets" "jsonb", "p_suffix" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $_$
 DECLARE
     v_provider_id TEXT;
@@ -1360,6 +1366,7 @@ ALTER FUNCTION "public"."insert_temp_tweets"("p_tweets" "jsonb", "p_suffix" "tex
 
 CREATE OR REPLACE FUNCTION "public"."process_and_insert_tweet_entities"("p_tweets" "jsonb", "p_suffix" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $_$
 DECLARE
     v_provider_id TEXT;
@@ -1432,6 +1439,7 @@ ALTER FUNCTION "public"."process_and_insert_tweet_entities"("p_tweets" "jsonb", 
 CREATE OR REPLACE FUNCTION "public"."process_archive"("archive_data" "jsonb") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "statement_timeout" TO '10min'
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $$
   DECLARE
       v_account_id TEXT;
@@ -1581,6 +1589,7 @@ ALTER FUNCTION "public"."sync_meta_data"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "tes"."get_tweet_counts_by_date"() RETURNS TABLE("tweet_date" "date", "tweet_count" bigint)
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $$
 DECLARE
     v_account_id TEXT;
@@ -1609,6 +1618,7 @@ ALTER FUNCTION "tes"."get_tweet_counts_by_date"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "tes"."get_tweets_on_this_day"("p_limit" integer DEFAULT NULL::integer) RETURNS TABLE("tweet_id" "text", "account_id" "text", "created_at" timestamp with time zone, "full_text" "text", "retweet_count" integer, "favorite_count" integer, "reply_to_tweet_id" "text", "reply_to_user_id" "text", "reply_to_username" "text", "username" "text", "account_display_name" "text", "avatar_media_url" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $$
 DECLARE
     current_month INTEGER;
@@ -1648,6 +1658,7 @@ ALTER FUNCTION "tes"."get_tweets_on_this_day"("p_limit" integer) OWNER TO "postg
 
 CREATE OR REPLACE FUNCTION "tes"."get_user_intercepted_stats"("days_back" integer DEFAULT 30) RETURNS TABLE("date" "date", "type" "text", "count" integer)
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $$
 declare
     current_user_id text;
@@ -1696,6 +1707,7 @@ ALTER FUNCTION "tes"."hash_user_id"("user_id" "text") OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "tes"."search_liked_tweets"("search_query" "text", "from_user" "text" DEFAULT NULL::"text", "to_user" "text" DEFAULT NULL::"text", "since_date" "date" DEFAULT NULL::"date", "until_date" "date" DEFAULT NULL::"date", "min_likes" integer DEFAULT 0, "min_retweets" integer DEFAULT 0, "max_likes" integer DEFAULT 100000000, "max_retweets" integer DEFAULT 100000000, "limit_" integer DEFAULT 50) RETURNS TABLE("tweet_id" "text", "account_id" "text", "created_at" timestamp with time zone, "full_text" "text", "retweet_count" integer, "favorite_count" integer, "reply_to_tweet_id" "text", "avatar_media_url" "text", "archive_upload_id" bigint, "username" "text", "account_display_name" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $$
 DECLARE
   from_account_id TEXT;
@@ -3922,12 +3934,6 @@ GRANT ALL ON FUNCTION "public"."strict_word_similarity_op"("text", "text") TO "s
 GRANT ALL ON FUNCTION "public"."sync_meta_data"() TO "anon";
 GRANT ALL ON FUNCTION "public"."sync_meta_data"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."sync_meta_data"() TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."trigger_commit_temp_data"() TO "anon";
-GRANT ALL ON FUNCTION "public"."trigger_commit_temp_data"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."trigger_commit_temp_data"() TO "service_role";
 
 
 

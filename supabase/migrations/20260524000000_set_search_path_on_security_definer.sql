@@ -21,9 +21,6 @@ BEGIN;
 -- ALTER FUNCTION: bodies already fully-qualified, only need search_path
 -- =========================
 
-ALTER FUNCTION "public"."trigger_commit_temp_data"()
-    SET "search_path" TO '';
-
 ALTER FUNCTION "private"."get_provider_id"()
     SET "search_path" TO '';
 
@@ -56,6 +53,45 @@ ALTER FUNCTION "public"."search_tweets"("text", "text", "text", "date", "date", 
 
 ALTER FUNCTION "public"."search_tweets_exact_phrase"("text", "text", "text", "date", "date", integer, integer)
     SET "search_path" TO '';
+
+-- The original audit list missed legacy SECURITY DEFINER functions that are
+-- still present in production. Their bodies contain intentional unqualified
+-- references, so pin them to app-owned schemas instead of inheriting a
+-- caller-controlled path. None of these schemas is writable by API roles.
+ALTER FUNCTION "public"."get_non_allowlist_streamed_tweet_candidates"(integer)
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "public"."delete_non_allowlist_streamed_tweet_batch"(integer)
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "public"."insert_temp_archive_upload"(text, timestamp with time zone, boolean, boolean, date, date, text)
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "public"."insert_temp_followers"(jsonb, text, text)
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "public"."insert_temp_following"(jsonb, text, text)
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "public"."insert_temp_likes"(jsonb, text, text)
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "public"."insert_temp_profiles"(jsonb, text, text)
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "public"."insert_temp_tweets"(jsonb, text)
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "public"."process_and_insert_tweet_entities"(jsonb, text)
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "public"."process_archive"(jsonb)
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "public"."refresh_global_activity_summary"()
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "tes"."get_tweet_counts_by_date"()
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "tes"."get_tweets_on_this_day"(integer)
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "tes"."get_user_intercepted_stats"(integer)
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+ALTER FUNCTION "tes"."search_liked_tweets"(text, text, text, date, date, integer, integer, integer, integer, integer)
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions';
+
+-- Test-only helper was meant to be removed by the 20250912 cleanup but is
+-- still present in production. It is PUBLIC-executable and has no live caller.
+DROP FUNCTION IF EXISTS "private"."commit_temp_data_test"(text);
 
 -- =========================
 -- CREATE OR REPLACE: bodies contained unqualified references that must be

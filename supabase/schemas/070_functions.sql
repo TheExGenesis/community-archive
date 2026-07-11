@@ -51,34 +51,6 @@ $$;
 ALTER FUNCTION "private"."queue_update_conversation_ids"() OWNER TO "postgres";
 
 
--- Trigger to queue commit_temp_data when archive upload is ready
-CREATE OR REPLACE FUNCTION "public"."trigger_commit_temp_data"() RETURNS "trigger"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-BEGIN
-    -- Only trigger when upload_phase changes to 'ready_for_commit'
-    IF NEW.upload_phase = 'ready_for_commit' AND
-       (OLD.upload_phase IS NULL OR OLD.upload_phase != 'ready_for_commit') THEN
-        RAISE NOTICE 'trigger_commit_temp_data: Running for account_id %', NEW.account_id;
-        -- Queue the commit job with UUID key
-        INSERT INTO private.job_queue (key, job_name, status, args)
-        VALUES (
-            gen_random_uuid(),
-            'commit_temp_data',
-            'QUEUED',
-            jsonb_build_object('account_id', NEW.account_id)
-        );
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-ALTER FUNCTION "public"."trigger_commit_temp_data"() OWNER TO "postgres";
-
-COMMENT ON FUNCTION "public"."trigger_commit_temp_data"() IS 'Queue commit_temp_data job when archive upload is ready for commit';
-
-
 -- Update updated_at and track opt-in/out timestamps on optin table
 CREATE OR REPLACE FUNCTION "public"."update_optin_updated_at"() RETURNS "trigger"
     LANGUAGE "plpgsql"

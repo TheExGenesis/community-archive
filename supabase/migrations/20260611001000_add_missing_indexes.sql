@@ -1,12 +1,12 @@
 -- Add indexes on hot lookup columns and drop duplicate indexes on the two
 -- highest-write tables. Refs #387.
 --
--- PRODUCTION NOTE: `tweets`, `likes`, `user_mentions`, `all_account`, and
--- private.tweet_user are large. On prod, prefer running each CREATE/DROP as
--- `... CONCURRENTLY` outside a transaction to avoid blocking writes. The plain
--- forms below are kept for the declarative schema / local + staging apply, which
--- run inside a transaction. If this migration is applied transactionally on prod,
--- schedule it during low traffic.
+-- PRODUCTION NOTE: private.tweet_user, likes, and user_mentions are large.
+-- Before recording this migration with `supabase db push`, run the equivalent
+-- CREATE/DROP statements with `CONCURRENTLY` outside a transaction and verify
+-- the new indexes are valid. The IF EXISTS / IF NOT EXISTS guards then make the
+-- tracked migration a no-op on production while local/preview databases can use
+-- these ordinary transactional forms.
 
 -- private.tweet_user grows one row per streamed tweet; every get_streaming_stats_*
 -- function filters on created_at, but the only index was the PK on tweet_id.

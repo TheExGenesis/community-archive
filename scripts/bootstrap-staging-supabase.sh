@@ -68,7 +68,7 @@ pnpm supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_STAGING_DB
 echo "Applying migrations to staging..."
 pnpm supabase db push --password "$SUPABASE_STAGING_DB_PASSWORD" --include-all
 
-for seed_file in supabase/seed.sql scripts/fixtures/staging-heavy-seed.sql; do
+for seed_file in scripts/fixtures/staging-seed.sql scripts/fixtures/staging-heavy-seed.sql; do
   if [[ -f "$seed_file" ]]; then
     echo "Loading mock seed data from $seed_file..."
     psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$seed_file"

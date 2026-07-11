@@ -1,3 +1,7 @@
+-- Functional mock data for the dedicated staging project.
+-- Kept outside supabase/ because the managed preview seeder rejects this
+-- otherwise-valid SQL payload with HTTP 413. Staging scripts apply it via psql.
+
 SET session_replication_role = replica;
 
 --

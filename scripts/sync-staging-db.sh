@@ -80,7 +80,7 @@ if [[ $push_status -ne 0 ]]; then
   exit $push_status
 fi
 
-for seed_file in supabase/seed.sql scripts/fixtures/staging-heavy-seed.sql; do
+for seed_file in scripts/fixtures/staging-seed.sql scripts/fixtures/staging-heavy-seed.sql; do
   if [[ -f "$seed_file" ]]; then
     echo "Loading mock seed data from $seed_file..."
     psql "$STAGING_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$seed_file"

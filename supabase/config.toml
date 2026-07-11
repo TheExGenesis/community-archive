@@ -21,6 +21,12 @@ port = 54322
 # server_version;` on the remote database to check.
 major_version = 15
 
+[db.seed]
+# Supabase's managed preview seeder rejects this repository's otherwise-valid
+# seed with HTTP 413. Staging bootstrap/sync scripts load the normal and stress
+# fixtures explicitly with psql; production deployments ignore seed files.
+enabled = false
+
 [studio]
 # Port to use for Supabase Studio.
 port = 54323

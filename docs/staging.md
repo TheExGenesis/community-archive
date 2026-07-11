@@ -12,6 +12,10 @@ Staging should be safe enough to exercise login, upload, opt-in, explicit opt-ou
 - No production archive storage files.
 - No production service role key.
 
+Supabase's managed ephemeral previews validate configuration and migrations but
+do not auto-load mock data. The dedicated staging project remains the seeded
+environment for data-dependent testing.
+
 ## Required Environment Variables
 
 Set these in the staging deployment, for example a Vercel preview/staging environment:

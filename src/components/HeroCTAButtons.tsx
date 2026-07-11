@@ -3,9 +3,15 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { createBrowserClient } from '@/utils/supabase'
-import { Users, Puzzle } from 'lucide-react'
+import { Users, Puzzle, Upload } from 'lucide-react'
 import { devLog } from '@/lib/devLog'
 
 const CHROME_EXTENSION_URL = 'https://chromewebstore.google.com/detail/community-archive-stream/igclpobjpjlphgllncjcgaookmncegbk'
@@ -152,55 +158,77 @@ export default function HeroCTAButtons() {
 
   const getOptInButtonText = () => {
     if (isOptInLoading) return 'Processing...'
-    if (isOptedIn) return 'Opted In'
-    if (!user) return 'Opt In'
-    return 'Opt In'
+    if (isOptedIn) return 'Opted in'
+    if (!user) return 'Opt in'
+    return 'Opt in'
   }
 
   const getOptInButtonStyle = () => {
     if (isOptedIn) {
       return 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 cursor-default'
     }
-    return 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-600 dark:hover:bg-green-700'
+    return 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-400 dark:hover:bg-green-300 dark:text-green-950'
   }
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-        {/* Install Extension Button - Left */}
-        <div className="flex flex-col items-center">
-          <Button
-            asChild
-            variant="outline"
-            className="h-14 px-8 text-lg font-semibold rounded-xl border-2"
-            size="lg"
-          >
-            <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">
-              <Puzzle className="w-5 h-5 mr-2" />
-              Install Extension
-            </a>
-          </Button>
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center max-w-[180px]">
-            Archive tweets as you browse
-          </p>
-        </div>
+    <TooltipProvider delayDuration={150}>
+      <div className="flex flex-col items-center gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
+          {/* Opt In Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={handleOptIn}
+                disabled={isOptInLoading || isOptedIn === true}
+                className={`h-14 px-8 text-lg font-semibold w-full ${getOptInButtonStyle()}`}
+                size="lg"
+              >
+                <Users className="w-5 h-5 mr-2" />
+                {getOptInButtonText()}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isOptedIn ? 'Your tweets are being archived' : 'Archive your public tweets'}
+            </TooltipContent>
+          </Tooltip>
 
-        {/* Opt In Button - Right */}
-        <div className="flex flex-col items-center">
-          <Button
-            onClick={handleOptIn}
-            disabled={isOptInLoading || isOptedIn === true}
-            className={`h-14 px-12 text-lg font-semibold rounded-xl ${getOptInButtonStyle()}`}
-            size="lg"
-          >
-            <Users className="w-5 h-5 mr-2" />
-            {getOptInButtonText()}
-          </Button>
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center max-w-[180px]">
-            {isOptedIn ? 'Your tweets are being archived' : 'Allow archiving your public tweets'}
-          </p>
+          {/* Install Extension Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                asChild
+                variant="outline"
+                className="h-14 px-8 text-lg font-semibold border-2 w-full"
+                size="lg"
+              >
+                <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">
+                  <Puzzle className="w-5 h-5 mr-2" />
+                  Get extension
+                </a>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Archive as you browse</TooltipContent>
+          </Tooltip>
+
+          {/* Upload Archive Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                asChild
+                variant="outline"
+                className="h-14 px-8 text-lg font-semibold border-2 w-full"
+                size="lg"
+              >
+                <a href="#upload-archive">
+                  <Upload className="w-5 h-5 mr-2" />
+                  Upload archive
+                </a>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Import your X data export</TooltipContent>
+          </Tooltip>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   )
 }

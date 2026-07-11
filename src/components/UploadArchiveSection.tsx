@@ -136,9 +136,11 @@ export default function UploadArchiveSection() {
   return (
     <div className="w-full">
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">Upload Your Archive</h2>
-        <p className="mt-3 text-lg text-gray-600 dark:text-gray-300">
-          Add your full Twitter history to the archive
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Upload your tweets</h2>
+        <p className="mt-3 text-base text-gray-600 dark:text-gray-300">
+          Contribute to collective intelligence research{' '}
+          <br className="hidden sm:block" />
+          to build on top of our data and access our tools.
         </p>
       </div>
 
@@ -146,9 +148,9 @@ export default function UploadArchiveSection() {
         {steps.map((step) => (
           <div
             key={step.number}
-            className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-slate-700 text-center"
+            className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-slate-700 text-center"
           >
-            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-bold text-lg flex items-center justify-center mx-auto mb-4">
+            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 font-bold text-lg flex items-center justify-center mx-auto mb-4">
               {step.number}
             </div>
             <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{step.title}</h3>
@@ -159,7 +161,7 @@ export default function UploadArchiveSection() {
                 href={step.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                className="inline-flex items-center text-sm text-blue-600 dark:text-blue-300 hover:underline"
               >
                 {step.linkText}
                 <ExternalLink className="w-3 h-3 ml-1" />
@@ -171,7 +173,7 @@ export default function UploadArchiveSection() {
                 <Button
                   onClick={handleUploadClick}
                   disabled={isUploadProcessing}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-400 dark:hover:bg-blue-300 dark:text-blue-950"
                 >
                   <Upload className="w-4 h-4 mr-2" />
                   {isUploadProcessing ? 'Processing...' : 'Upload .zip'}
@@ -197,7 +199,7 @@ export default function UploadArchiveSection() {
           href="https://github.com/TheExGenesis/community-archive/blob/main/docs/archive_data.md"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 dark:text-blue-400 hover:underline"
+          className="text-blue-600 dark:text-blue-300 hover:underline"
         >
           what data we use
         </a>

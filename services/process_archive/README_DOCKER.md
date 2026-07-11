@@ -58,11 +58,10 @@ SUPABASE_SERVICE_ROLE=your-service-role-key
 # Logging level
 LOG_LEVEL=info
 
-# Batch sizes (for COPY optimization)
+# Batch sizes
 PG_BATCH_SIZE=5000
 MEMORY_BATCH_SIZE=15000
 MAX_MEMORY_MB=1000
-USE_COPY=true
 
 # Development mode
 DEV_ARCHIVE_PATH=/path/to/test/archive.json
@@ -233,7 +232,6 @@ deploy:
 - **Batch Sizes:** Tune `PG_BATCH_SIZE` and `MEMORY_BATCH_SIZE`
 
 ### Database Performance
-- **COPY Optimization:** Enabled by default (`USE_COPY=true`)
 - **Connection Pooling:** Max 5 connections
 - **Batch Processing:** Optimized batch sizes
 

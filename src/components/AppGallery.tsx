@@ -63,9 +63,9 @@ function GalleryAppCard({ app }: { app: GalleryApp }) {
       href={app.link}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex items-center gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors border border-gray-200 dark:border-slate-700"
+      className="group flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border border-gray-200 dark:border-slate-700"
     >
-      <div className="text-2xl text-blue-500 dark:text-blue-400 flex-shrink-0">
+      <div className="text-2xl text-blue-500 dark:text-blue-300 flex-shrink-0">
         {app.icon}
       </div>
       <div className="flex-1 min-w-0">

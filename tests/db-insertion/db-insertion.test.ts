@@ -721,8 +721,9 @@ describe('Direct DB Insertion Tests', () => {
         'community-tweet': []
       }
       
-      // The ArchiveUploadProcessor handles invalid data gracefully by skipping problematic records
-      // rather than throwing errors, so we expect it to resolve without throwing
+      // An empty accountId is still an insertable text value and the archive has no
+      // tweets/likes, so processing completes without a DB error. (Inserts that DO
+      // fail now propagate and mark the upload 'failed' — see insertIfNotEmpty.)
       await expect(
         insertArchiveDirectly(supabase, testArchive)
       ).resolves.not.toThrow()

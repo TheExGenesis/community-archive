@@ -214,6 +214,20 @@ export async function getAdminClient() {
 export const normalizeUsername = (value: string | undefined | null) =>
   (value ?? '').trim().replace(/^@/, '').toLowerCase().slice(0, 80)
 
+// SECURITY: PostgREST's `.or(...)` accepts a comma-separated list of filter
+// expressions, with parentheses for nested `and(...)` / `or(...)` groups.
+// Interpolating untrusted input directly into that string lets a caller
+// smuggle extra predicates onto the same table (filter injection).
+//
+// The admin search box only ever needs to match Twitter usernames
+// (`[A-Za-z0-9_]+`) or numeric Twitter user IDs / account IDs (digits), so
+// we collapse the input to that allowlist. Any `,`, `(`, `)`, `.`, `*`,
+// quote, backslash, etc. is stripped — eliminating every metacharacter
+// PostgREST's filter grammar treats as structural. Admin-only surface so
+// the practical impact is self-exfil, but worth fixing as defense in depth.
+export const sanitizeAdminSearch = (value: string | undefined | null) =>
+  normalizeUsername(value).replace(/[^a-z0-9_]/g, '')
+
 type AdminClient = Awaited<ReturnType<typeof getAdminClient>>
 
 async function fetchScrapeBlocklist(
@@ -304,8 +318,14 @@ async function fetchOptInRows(
     .order('updated_at', { ascending: false, nullsFirst: false })
     .limit(500)
 
-  if (search) {
-    query = query.or(`username.ilike.%${search}%,twitter_user_id.eq.${search}`)
+  // Defense in depth: callers already pass a normalized string, but we
+  // re-sanitize at the chokepoint before building a PostgREST .or() filter.
+  // See sanitizeAdminSearch for the threat model.
+  const safeSearch = sanitizeAdminSearch(search)
+  if (safeSearch) {
+    query = query.or(
+      `username.ilike.%${safeSearch}%,twitter_user_id.eq.${safeSearch}`,
+    )
   }
 
   const { data, error } = await query
@@ -331,8 +351,13 @@ async function fetchAccountsPage(
     .order('account_id', { ascending: true })
     .limit(overscan)
 
-  if (search) {
-    query = query.or(`username.ilike.%${search}%,account_id.eq.${search}`)
+  // Defense in depth: re-sanitize before interpolating into the PostgREST
+  // .or() filter — see sanitizeAdminSearch for the threat model.
+  const safeSearch = sanitizeAdminSearch(search)
+  if (safeSearch) {
+    query = query.or(
+      `username.ilike.%${safeSearch}%,account_id.eq.${safeSearch}`,
+    )
   }
 
   if (cursor) {

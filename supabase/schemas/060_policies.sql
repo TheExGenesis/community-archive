@@ -18,16 +18,10 @@ CREATE POLICY "Data is publicly visible" ON "public"."following" FOR SELECT USIN
 CREATE POLICY "Data is publicly visible" ON "public"."likes" FOR SELECT USING (true);
 
 -- Entity-specific modify/read policies
-CREATE POLICY "Entities are modifiable by their users" ON "public"."liked_tweets" TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM "public"."account" "dt"
-  WHERE ("dt"."account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))))) WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."account" "dt"
-  WHERE ("dt"."account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")))));
-CREATE POLICY "Entities are modifiable by their users" ON "public"."mentioned_users" TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM "public"."all_account" "dt"
-  WHERE ("dt"."account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))))) WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."all_account" "dt"
-  WHERE ("dt"."account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")))));
+-- NOTE: liked_tweets and mentioned_users are global dedup tables written only by
+-- the service_role worker (which bypasses RLS). They intentionally have NO
+-- authenticated write policy: the previous "modifiable by their users" policy was
+-- uncorrelated to the row being changed and allowed cross-user modification (#370).
 CREATE POLICY "Entities are modifiable by their users" ON "public"."tweet_media" TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM "public"."tweets" "dt"
   WHERE (("dt"."tweet_id" = "tweet_media"."tweet_id") AND ("dt"."account_id" = ( SELECT ("auth"."jwt"() ->> 'sub'::"text"))))))) WITH CHECK ((EXISTS ( SELECT 1
@@ -49,6 +43,12 @@ CREATE POLICY "Entities are publicly visible" ON "public"."mentioned_users" FOR 
 CREATE POLICY "Entities are publicly visible" ON "public"."tweet_media" FOR SELECT USING (true);
 CREATE POLICY "Entities are publicly visible" ON "public"."tweet_urls" FOR SELECT USING (true);
 CREATE POLICY "Entities are publicly visible" ON "public"."user_mentions" FOR SELECT USING (true);
+
+-- quote_tweets / retweets are written only by the service_role (firehose + worker).
+-- Reads are public; anon/authenticated writes are revoked in 060_grants and enforced
+-- by RLS being enabled here (#369).
+CREATE POLICY "Quote tweets are publicly visible" ON "public"."quote_tweets" FOR SELECT USING (true);
+CREATE POLICY "Retweets are publicly visible" ON "public"."retweets" FOR SELECT USING (true);
 
 -- Opt-in table policies
 CREATE POLICY "Public can view opted-in users" ON "public"."optin" FOR SELECT USING (("opted_in" = true));
@@ -77,6 +77,8 @@ ALTER TABLE "public"."tweet_media" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."tweet_urls" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."tweets" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."user_mentions" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."quote_tweets" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."retweets" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "tes"."blocked_scraping_users" ENABLE ROW LEVEL SECURITY;
 
 

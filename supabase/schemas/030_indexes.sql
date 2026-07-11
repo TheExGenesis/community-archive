@@ -22,8 +22,6 @@ CREATE INDEX "idx_following_archive_upload_id" ON "public"."following" USING "bt
 CREATE INDEX "idx_likes_account_id" ON "public"."likes" USING "btree" ("account_id");
 CREATE INDEX "idx_likes_archive_upload_id" ON "public"."likes" USING "btree" ("archive_upload_id");
 CREATE INDEX "idx_likes_liked_tweet_id" ON "public"."likes" USING "btree" ("liked_tweet_id");
--- Duplicate index present in prod; keep to maintain exact state
-CREATE INDEX "likes_account_id_idx" ON "public"."likes" USING "btree" ("account_id");
 
 -- public.mentioned_users
 CREATE INDEX "idx_mentioned_users_user_id" ON "public"."mentioned_users" USING "btree" ("user_id");
@@ -66,8 +64,6 @@ CREATE INDEX "idx_tweets_account_created" ON public.tweets (account_id, created_
 -- public.user_mentions
 CREATE INDEX "idx_user_mentions_mentioned_user_id" ON "public"."user_mentions" USING "btree" ("mentioned_user_id");
 CREATE INDEX "idx_user_mentions_tweet_id" ON "public"."user_mentions" USING "btree" ("tweet_id");
--- Duplicate index present in prod
-CREATE INDEX "user_mentions_tweet_id_idx" ON "public"."user_mentions" USING "btree" ("tweet_id");
 
 
 CREATE INDEX IF NOT EXISTS idx_quote_tweets_tweet_id ON public.quote_tweets (tweet_id);
@@ -83,3 +79,14 @@ CREATE INDEX IF NOT EXISTS user_action_log_user_id_created_at_idx
   ON public.user_action_log (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS user_action_log_action_type_created_at_idx
   ON public.user_action_log (action_type, created_at DESC);
+
+-- public.all_account: username is a hot lookup key (search_tweets from:/to:,
+-- get_tweet_page_data, client .eq/.in('username')). See #387.
+CREATE INDEX IF NOT EXISTS "idx_all_account_username"
+  ON "public"."all_account" USING "btree" ("username");
+CREATE INDEX IF NOT EXISTS "idx_all_account_lower_username"
+  ON "public"."all_account" USING "btree" ("lower"("username"));
+
+-- private.tweet_user: every get_streaming_stats_* function filters on created_at.
+CREATE INDEX IF NOT EXISTS "idx_tweet_user_created_at"
+  ON "private"."tweet_user" USING "btree" ("created_at");

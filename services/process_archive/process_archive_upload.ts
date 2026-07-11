@@ -25,7 +25,6 @@ const CONFIG = {
   DEV_ARCHIVE_PATH: process.env.DEV_ARCHIVE_PATH,
   POSTGRES_CONNECTION_STRING: process.env.POSTGRES_CONNECTION_STRING,
   MAX_MEMORY_MB: parseInt(process.env.MAX_MEMORY_MB || '1000', 10), // Memory limit
-  USE_COPY: process.env.USE_COPY !== 'false', // Enable COPY by default
   PROCESS_RETWEETS: process.env.PROCESS_RETWEETS !== 'false', // Enable retweet processing by default
   DEBUG_PG_QUERIES: process.env.DEBUG_PG_QUERIES === 'true' // only log if it has been explicitly enabled
 } as const
@@ -173,24 +172,6 @@ function checkMemoryLimit(): void {
   }
 }
 
-// CSV formatting utilities
-function escapeCSVValue(value: any): string {
-  if (value === null || value === undefined) {
-    return ''
-  }
-  
-  const str = String(value)
-  // Escape quotes and wrap in quotes if contains comma, quote, or newline
-  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
-    return '"' + str.replace(/"/g, '""') + '"'
-  }
-  return str
-}
-
-function arrayToCSVRow(values: any[]): string {
-  return values.map(escapeCSVValue).join(',') + '\n'
-}
-
 // High-performance COPY-based insert function
 async function bulkInsertWithCopy<T>({
   sql,
@@ -204,189 +185,13 @@ async function bulkInsertWithCopy<T>({
   if (!data?.length) return
 
   const startTime = Date.now()
-  
 
-  // TODO: this is a possible path for COPY optimization, but it is not properly working yet
-  if ( false &&CONFIG.USE_COPY) {
-    try {
-      logger.debug(`COPY inserting ${data.length} rows into ${tableName}`)
-      // For tables with conflicts, we need a different approach
-      if (conflictTarget && (updateColumns?.length || true)) {
-        await bulkInsertWithConflictHandling({
-          sql, tableName, columns, conflictTarget, updateColumns, data, mapFn
-        })
-      } else {
-        // Direct COPY for tables without conflicts
-        await directCopyInsert({ sql, tableName, columns, data, mapFn })
-      }
-
-      const duration = Date.now() - startTime
-      logger.debug(`✅ COPY inserted ${data.length} rows into ${tableName} in ${duration}ms (${Math.round(data.length / (duration / 1000))} rows/sec)`)
-      return
-      
-    } catch (error: any) {
-      logger.error(`❌ COPY insert failed for ${tableName}: ${error.message}`)
-      logger.debug(`Falling back to traditional batch insert for ${tableName}`)
-    }
-  }
   logger.debug(`BATCH inserting ${data.length} rows into ${tableName}`)
   // Use optimized batch insert with larger batches
   await optimizedBatchInsert({ sql, tableName, columns, conflictTarget, updateColumns, data, mapFn })
   
   const duration = Date.now() - startTime
   logger.debug(`✅ Optimized batch inserted ${data.length} rows into ${tableName} in ${duration}ms (${Math.round(data.length / (duration / 1000))} rows/sec)`)
-}
-
-// Direct COPY insert for tables without conflict handling
-async function directCopyInsert<T>({
-  sql,
-  tableName,
-  columns,
-  data,
-  mapFn,
-}: {
-  sql: Sql
-  tableName: string
-  columns: string[]
-  data: T[]
-  mapFn: (item: T) => any[]
-}): Promise<void> {
-  if (data.length === 0) return
-  logger.info(`Direct COPY inserting ${data.length} rows into ${tableName}`)
-  
-  // Helper function to format a row as CSV
-  const formatCSVRow = (values: any[]): string => {
-    return values.map(escapeCSVValue).join(',') + '\n'
-  }
-  
-  // Convert data to CSV format
-  const csvData = data.map(item => {
-    const values = mapFn(item)
-    return formatCSVRow(values)
-  }).join('\n')
-  try{
-    // Format data as arrays for the postgres COPY helper
-    const rows = data.map(item => mapFn(item))
-    
-    // Use the postgres library's COPY helper syntax
-    // This is done by using sql.unsafe with a raw COPY command
-    // and then using the special postgres COPY API
-    
-    // Build the COPY command string
-    const columnList = columns.map(c => `"${c}"`).join(',')
-    const copyCommand = `COPY "${tableName}" (${columnList}) FROM STDIN WITH (FORMAT CSV, DELIMITER E'\\t', NULL '\\N')`
-    
-    // Format data as TSV
-    const tsvLines: string[] = []
-    for (const row of rows) {
-      const line = row.map(value => {
-        if (value === null || value === undefined) {
-          return '\\N'
-        }
-        // For CSV/TSV format, we need to escape certain characters
-        let str = String(value)
-        // If the value contains tab, newline, carriage return, or backslash, we need to quote it
-        if (str.includes('\t') || str.includes('\n') || str.includes('\r') || str.includes('\\') || str.includes('"')) {
-          // Escape quotes by doubling them
-          str = str.replace(/"/g, '""')
-          // Wrap in quotes
-          str = `"${str}"`
-        }
-        return str
-      }).join('\t')
-      tsvLines.push(line)
-    }
-    
-    const tsvData = tsvLines.join('\n')
-    
-    // Use sql.unsafe for the COPY command
-    const stream = await sql.unsafe(copyCommand).writable()
-    
-    // Write the data
-    await new Promise((resolve, reject) => {
-      stream.on('error', reject)
-      stream.on('finish', resolve)
-      stream.write(tsvData)
-      stream.end()
-    })
-    
-    logger.debug(`Successfully copied ${data.length} rows into ${tableName}`)
-    
-  }catch(error){
-    logger.error(`Error directly copying ${data.length} rows into ${tableName}: ${error}`)
-    throw error
-  }
-}
-
-// COPY insert with conflict handling using temporary table approach
-async function bulkInsertWithConflictHandling<T>({
-  sql,
-  tableName,
-  columns,
-  conflictTarget,
-  updateColumns,
-  data,
-  mapFn,
-}: CopyInsertConfig<T>): Promise<void> {
-  logger.info(`COPY insert with conflict handling using temporary table approach for ${tableName}`)
-  const tempTableName = `temp_${tableName}_${Date.now()}`
-  const conflictColumns = conflictTarget 
-    ? Array.isArray(conflictTarget) ? conflictTarget : [conflictTarget]
-    : null
-
-  try {
-    
-    // Create temporary table with same structure
-    // this is throwing an error on user_mentions null value in column "id" of relation "temp_user_mentions_1757464658764" violates not-null constraint
-    // because we are including the ID column and we shouln't be.
-    // there's 5 other tables in a similar situation
-    await sql`
-      CREATE TEMP TABLE ${sql(tempTableName)} (LIKE ${sql(tableName)} INCLUDING DEFAULTS EXCLUDING IDENTITY EXCLUDING GENERATED)
-    `
-
-    // Use COPY to insert into temp table (much faster)
-    await directCopyInsert({
-      sql,
-      tableName: tempTableName,
-      columns,
-      data,
-      mapFn
-    })
-
-    // Merge from temp table to main table with conflict handling
-    if (conflictColumns && updateColumns?.length) {
-      const updateSet = updateColumns.map(col => 
-        `${col} = EXCLUDED.${col}`
-      ).join(', ')
-
-      await sql`
-        INSERT INTO ${sql(tableName)} (${sql(columns)})
-        SELECT ${sql(columns)} FROM ${sql(tempTableName)}
-        ON CONFLICT (${sql(conflictColumns)}) DO UPDATE SET ${sql.unsafe(updateSet)}
-      `
-    } else if (conflictColumns) {
-      await sql`
-        INSERT INTO ${sql(tableName)} (${sql(columns)})
-        SELECT ${sql(columns)} FROM ${sql(tempTableName)}
-        ON CONFLICT (${sql(conflictColumns)}) DO NOTHING
-      `
-    } else {
-      await sql`
-        INSERT INTO ${sql(tableName)} (${sql(columns)})
-        SELECT ${sql(columns)} FROM ${sql(tempTableName)}
-      `
-    }
-
-    // Drop temp table
-    await sql`DROP TABLE ${sql(tempTableName)}`
-
-  } catch (error) {
-    // Clean up temp table if it exists
-    try {
-      await sql`DROP TABLE IF EXISTS ${sql(tempTableName)}`
-    } catch {}
-    throw error
-  }
 }
 
 // Optimized batch insert with larger batches
@@ -673,14 +478,8 @@ export class ArchiveUploadProcessor {
         [rt.tweet_id, rt.retweeted_tweet_id])
     ];
 
-    if(CONFIG.USE_COPY){
-      for(const promiseCreator of promisesToWork){
-        let promise = promiseCreator();
-        await promise;
-      }
-    }else{
-      let promises = promisesToWork.map(promiseCreator => promiseCreator());
-      await Promise.all(promises);
+    for(const promiseCreator of promisesToWork){
+      await promiseCreator();
     }
 
     // Clear references to help GC
@@ -762,6 +561,11 @@ export class ArchiveUploadProcessor {
         records: data.length
       }
       logger.error(`Error in insertIfNotEmpty ${JSON.stringify(errorData)}`)
+      // Rethrow: these inserts run inside a single transaction (sql.begin). A failed
+      // statement aborts the whole transaction, so swallowing the error here let the
+      // archive be marked 'completed' while every row was rolled back (silent data
+      // loss). Propagating it lets main()'s catch mark the upload 'failed' instead.
+      throw error
     }
   }
 
@@ -786,17 +590,33 @@ export class ArchiveUploadProcessor {
   }
 }
 
+// Twitter handle rules: 1-15 chars, alphanumerics and underscore only.
+// Used as a chokepoint validator before any path/URL construction to prevent
+// path traversal (e.g. `../foo`) or other injection via the archive_upload.username
+// column. Applied to both the dev filesystem branch and the Supabase Storage
+// branch (defense in depth — do not rely on Storage's rejection of `..`).
+const TWITTER_USERNAME_REGEX = /^[A-Za-z0-9_]{1,15}$/
+
+function assertValidUsername(username: string): void {
+  if (typeof username !== 'string' || !TWITTER_USERNAME_REGEX.test(username)) {
+    throw new Error(
+      `Invalid username for archive path construction: ${JSON.stringify(username)} (must match ${TWITTER_USERNAME_REGEX})`
+    )
+  }
+}
+
 async function loadArchiveData(username: string): Promise<any> {
+  assertValidUsername(username)
   if (CONFIG.DEV_ARCHIVE_PATH) {
     const archivePath = path.join(CONFIG.DEV_ARCHIVE_PATH, `${username}/archive.json`)
     logger.debug(`Reading archive from filesystem: ${archivePath}`)
-    
+
     // For very large files, consider streaming JSON parsing
     const fileSize = fs.statSync(archivePath).size
     const fileSizeMB = fileSize / (1024 * 1024)
-    
+
     logger.info(`Archive file size: ${fileSizeMB.toFixed(1)}MB`)
-       
+
     const archiveData = fs.readFileSync(archivePath, 'utf8')
     return JSON.parse(archiveData)
   }
@@ -820,12 +640,14 @@ async function loadArchiveData(username: string): Promise<any> {
 
 function patchArchive(archive: any): any {
   try{
-    const tweets = archive.tweets
+    // `tweets` and `like` are optional files in third-party / scripted uploads;
+    // default to [] so a missing section doesn't throw and fail the whole archive.
+    const tweets = archive.tweets ?? []
     const hasNoteTweets = archive['note-tweet']?.length > 0 || false;
     for(const tweetRecord of tweets) {
       const tweet = tweetRecord.tweet
-      
-      tweet.full_text = removeProblematicCharacters(tweet.full_text)
+
+      tweet.full_text = removeProblematicCharacters(tweet.full_text ?? '')
       if(!hasNoteTweets){
         continue
       }
@@ -833,7 +655,7 @@ function patchArchive(archive: any): any {
       const matchingNoteTweet = noteTweets.find((noteTweetObj:any) => {
         const noteTweet = noteTweetObj.noteTweet
         return (
-          tweet.full_text.includes(noteTweet.core.text.substring(0, 200)) &&
+          (tweet.full_text ?? '').includes(noteTweet.core.text.substring(0, 200)) &&
           Math.abs(
             new Date(tweet.created_at).getTime() -
               new Date(noteTweet.createdAt).getTime(),
@@ -845,7 +667,7 @@ function patchArchive(archive: any): any {
         tweet.full_text = removeProblematicCharacters(matchingNoteTweet.noteTweet.core.text)
       }
     }
-    for (const likeRecord of archive.like) {
+    for (const likeRecord of archive.like ?? []) {
       const like = likeRecord.like;
       like.fullText = removeProblematicCharacters(like.fullText||'')
     }
@@ -907,8 +729,9 @@ async function main() {
 
   try {
     logger.debug(`Starting optimized batch processing with ${getMemoryUsageMB()}MB memory usage`)
+
     logger.info('Fetching archive_upload records ready for processing...')
-    
+
     const ready = await sql`
       SELECT au.id, au.account_id, au.username, au.archive_at
       FROM public.archive_upload au

@@ -12,6 +12,7 @@
 CREATE OR REPLACE FUNCTION "public"."get_non_allowlist_streamed_tweet_candidates"("p_limit" integer DEFAULT 500) RETURNS TABLE("tweet_id" text, "account_id" text, "created_at" timestamp with time zone, "reply_to_tweet_id" text, "is_quote" boolean)
     LANGUAGE "sql" SECURITY DEFINER
     SET "statement_timeout" TO '10min'
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $$
     WITH allowed_accounts AS (
         SELECT a.account_id
@@ -104,6 +105,7 @@ ALTER FUNCTION "public"."get_non_allowlist_streamed_tweet_candidates"("p_limit" 
 CREATE OR REPLACE FUNCTION "public"."delete_non_allowlist_streamed_tweet_batch"("p_limit" integer DEFAULT 500) RETURNS TABLE("requested_tweets" integer, "deleted_tweets" integer, "deleted_conversations" integer, "deleted_tweet_media" integer, "deleted_user_mentions" integer, "deleted_tweet_urls" integer, "deleted_private_tweet_user" integer)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "statement_timeout" TO '10min'
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $$
 DECLARE
     v_tweet_ids text[];

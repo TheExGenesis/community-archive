@@ -189,7 +189,7 @@ export default function AdvancedSearchForm() {
 
         <Button
           type="submit"
-          className="w-full rounded bg-blue-600 p-3 text-lg text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors duration-300"
+          className="w-full rounded bg-blue-600 p-3 text-lg text-white hover:bg-blue-700 dark:bg-blue-400 dark:hover:bg-blue-300 dark:text-blue-950 transition-colors duration-300"
           // disabled={isLoading} // isLoading state is removed
         >
           Search

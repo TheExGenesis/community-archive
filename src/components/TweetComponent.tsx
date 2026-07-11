@@ -181,7 +181,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
             href={part} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+            className="text-blue-500 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-300"
           >
             {part}
           </a>

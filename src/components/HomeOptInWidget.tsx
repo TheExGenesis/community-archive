@@ -199,7 +199,7 @@ export default function HomeOptInWidget() {
         
         {/* Current status */}
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Signed in as <span className="font-medium text-blue-600 dark:text-blue-400">@{twitterUsername}</span>
+          Signed in as <span className="font-medium text-blue-600 dark:text-blue-300">@{twitterUsername}</span>
         </p>
         <p className="text-sm text-gray-700 dark:text-gray-300">
           Current Status: <span className="font-semibold text-gray-600 dark:text-gray-400">Not Opted In</span>
@@ -223,7 +223,7 @@ export default function HomeOptInWidget() {
         <Button
           onClick={handleOptIn}
           disabled={isLoading}
-          className="bg-green-600 hover:bg-green-700 text-white"
+          className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-400 dark:hover:bg-green-300 dark:text-green-950"
         >
           <Users className="w-4 h-4 mr-2" />
           {isLoading ? 'Processing...' : 'Opt In to Tweet Streaming'}

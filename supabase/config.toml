@@ -35,7 +35,8 @@ pop3_port = 54326
 
 [storage]
 # The maximum file size allowed (e.g. "5MB", "500KB").
-file_size_limit = "1000MiB"
+# Must be at least as large as every bucket-level limit below.
+file_size_limit = "5000MiB"
 
 [storage.buckets.archives]
 public = true

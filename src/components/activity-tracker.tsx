@@ -35,31 +35,31 @@ const colorIntensity = (
   isBeforeStart: boolean,
 ) => {
   if (isBeforeStart) return 'bg-transparent'
-  if (count === 0) return 'bg-gray-200'
+  if (count === 0) return 'bg-gray-200 dark:bg-gray-800'
   const intensity = Math.ceil((count / maxCount) * 10)
   switch (intensity) {
     case 1:
-      return 'bg-green-100'
+      return 'bg-green-100 dark:bg-green-900'
     case 2:
-      return 'bg-green-200'
+      return 'bg-green-200 dark:bg-green-800'
     case 3:
-      return 'bg-green-300'
+      return 'bg-green-300 dark:bg-green-800'
     case 4:
-      return 'bg-green-400'
+      return 'bg-green-400 dark:bg-green-700'
     case 5:
-      return 'bg-green-500'
+      return 'bg-green-500 dark:bg-green-700'
     case 6:
-      return 'bg-green-600'
+      return 'bg-green-600 dark:bg-green-600'
     case 7:
-      return 'bg-green-700'
+      return 'bg-green-700 dark:bg-green-600'
     case 8:
-      return 'bg-green-800'
+      return 'bg-green-800 dark:bg-green-500'
     case 9:
-      return 'bg-green-900'
+      return 'bg-green-900 dark:bg-green-500'
     case 10:
-      return 'bg-green-950'
+      return 'bg-green-950 dark:bg-green-400'
     default:
-      return 'bg-green-950'
+      return 'bg-green-950 dark:bg-green-400'
   }
 }
 

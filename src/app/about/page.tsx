@@ -27,7 +27,7 @@ export default function AboutPage() {
         <h2 className="mt-8 mb-4 text-2xl font-semibold">The Team</h2>
 
         <div className="space-y-6">
-          <div className="flex items-start gap-4 p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
+          <div className="flex items-start gap-4 p-4 bg-slate-100 dark:bg-gray-900 rounded-lg">
             <div className="flex-1">
               <h3 className="text-xl font-semibold mb-1">
                 <a
@@ -51,7 +51,7 @@ export default function AboutPage() {
             </a>
           </div>
 
-          <div className="flex items-start gap-4 p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
+          <div className="flex items-start gap-4 p-4 bg-slate-100 dark:bg-gray-900 rounded-lg">
             <div className="flex-1">
               <h3 className="text-xl font-semibold mb-1">
                 <a
@@ -88,7 +88,7 @@ export default function AboutPage() {
             href="https://github.com/TheExGenesis/community-archive"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            className="flex items-center gap-3 p-4 bg-slate-100 dark:bg-gray-900 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-800 transition-colors"
           >
             <FaGithub className="text-2xl" />
             <div>
@@ -101,7 +101,7 @@ export default function AboutPage() {
             href="https://discord.gg/RArTGrUawX"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            className="flex items-center gap-3 p-4 bg-slate-100 dark:bg-gray-900 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-800 transition-colors"
           >
             <FaDiscord className="text-2xl text-indigo-500" />
             <div>
@@ -114,7 +114,7 @@ export default function AboutPage() {
             href="https://opencollective.com/community-archive/donate"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 p-4 bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            className="flex items-center gap-3 p-4 bg-slate-100 dark:bg-gray-900 rounded-lg hover:bg-slate-200 dark:hover:bg-gray-800 transition-colors"
           >
             <span className="text-2xl">💖</span>
             <div>

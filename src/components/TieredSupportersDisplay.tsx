@@ -113,7 +113,7 @@ const TieredSupportersDisplay: React.FC<TieredSupportersDisplayProps> = ({
         {/* Column 3: Supporter Count */}
         <div className="flex flex-col justify-center items-center text-center order-2 md:order-3 h-full">
           <div>
-            <p className="text-2xl lg:text-3xl font-bold text-blue-600 dark:text-blue-400">
+            <p className="text-2xl lg:text-3xl font-bold text-blue-600 dark:text-blue-300">
               {formatNumber(totalSupportersCount)}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Supporters</p>

@@ -47,9 +47,6 @@ yarn-error.log*
 # swc
 .swc
 
-# ignore pnmp lockfile
-pnpm-lock.yaml
-
 # data
 data/**/*
 dumps/**/*
@@ -58,3 +55,13 @@ open-birdsite-db.code-workspace
 
 # mcp
 .mcp.json
+
+# logs
+*.log
+
+# python caches
+__pycache__/
+*.pyc
+
+# local scratch / dev notes (kept out of the repo; move keepers into docs/)
+scratchpad/

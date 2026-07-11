@@ -27,7 +27,6 @@ STAGING_DEV_LOGIN_PASSWORD=<strong-staging-password>
 STAGING_DEV_LOGIN_USERNAME=alice_dev
 STAGING_DEV_LOGIN_PROVIDER_ID=mock_alice
 STAGING_DEV_LOGIN_DISPLAY_NAME=Alice Staging
-ALLOW_STAGING_DEV_LOGIN_ON_PROD_SUPABASE=false
 ALLOW_STAGING_ADMIN_ON_PROD_SUPABASE=false
 ```
 
@@ -42,7 +41,8 @@ The staging UI shows a dropdown of seeded mock users (currently `alice_dev` and 
 
 Do not commit the real password. The bootstrap script below writes it to an ignored `.env.staging.generated` file so it can be copied into Vercel's Preview environment.
 
-The server route refuses staging dev login against the known production Supabase host unless `ALLOW_STAGING_DEV_LOGIN_ON_PROD_SUPABASE=true`. Do not set that override for normal staging.
+The server route always refuses staging dev login against the known production
+Supabase project. No environment flag can override that production guard.
 
 When `ENABLE_STAGING_DEV_LOGIN=true` and the deployment is not pointed at the known production Supabase host, `/admin` is available to signed-in staging mock users. Production remains restricted to the Twitter username `exgenesis`.
 
@@ -112,7 +112,6 @@ For PR-created Vercel Preview deployments, add the values from `.env.staging.gen
 - `STAGING_DEV_LOGIN_USERNAME`
 - `STAGING_DEV_LOGIN_PROVIDER_ID`
 - `STAGING_DEV_LOGIN_DISPLAY_NAME`
-- `ALLOW_STAGING_DEV_LOGIN_ON_PROD_SUPABASE=false`
 
 After updating Preview env vars, redeploy the PR preview so the new values are picked up.
 

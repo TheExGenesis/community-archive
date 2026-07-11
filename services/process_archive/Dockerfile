@@ -22,8 +22,6 @@ COPY package.json ./root-package.json
 # Copy the entire project structure (needed for imports from src/utils)
 COPY services/process_archive/ ./
 COPY src ./src
-COPY database.types.ts ./database.types.ts
-COPY .env .env
 
 # Create logs directory
 RUN mkdir -p logs

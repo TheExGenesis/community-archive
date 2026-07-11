@@ -21,7 +21,7 @@ export default function LoginContent({ redirectUrl }: LoginContentProps) {
               Sign in to access your account and manage your tweet streaming preferences
             </p>
             {redirectUrl && (
-              <p className="text-sm text-blue-600 dark:text-blue-400 mt-2">
+              <p className="text-sm text-blue-600 dark:text-blue-300 mt-2">
                 You&apos;ll be redirected to: {decodeURIComponent(redirectUrl)}
               </p>
             )}

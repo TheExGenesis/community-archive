@@ -6,7 +6,8 @@ Staging should be safe enough to exercise login, upload, opt-in, explicit opt-ou
 
 - Separate Supabase project from production.
 - Same schema as production.
-- Mock seed data from `supabase/seed.sql`.
+- Mock seed data from `supabase/seed.sql` plus the staging-only stress fixtures
+  in `supabase/seed-heavy.sql`.
 - Email/password staging login bypass instead of Twitter OAuth.
 - No production archive storage files.
 - No production service role key.
@@ -70,7 +71,7 @@ The script will:
 - create a `community-archive-staging` Supabase project if `SUPABASE_STAGING_PROJECT_REF` is not set
 - link the project locally
 - run `supabase db push --include-all`
-- load `supabase/seed.sql`
+- load `supabase/seed.sql` and `supabase/seed-heavy.sql`
 - write Preview environment values to `.env.staging.generated`
 
 If you create the Supabase project manually, set `SUPABASE_STAGING_PROJECT_REF` and rerun the same script to apply schema, seed data, and generate the Vercel env file.
@@ -94,6 +95,7 @@ supabase db push
 
 ```bash
 psql '<staging-db-connection-string>' -f supabase/seed.sql
+psql '<staging-db-connection-string>' -f supabase/seed-heavy.sql
 ```
 
 The default staging login identity maps to `mock_alice` / `alice_dev`, which exists in the seed data and has a multi-tweet thread.
@@ -124,7 +126,7 @@ The `Sync staging database` GitHub Action soft-resets staging from the repo sche
 - It runs on pushes to `main` that touch `supabase/**` or `scripts/sync-staging-db.sh`.
 - It refuses to run if `STAGING_DATABASE_URL` does not include `SUPABASE_STAGING_PROJECT_REF`.
 - It refuses the production project ref.
-- "Soft reset" means: drop every schema not on the Supabase-managed allowlist (so `auth`, `storage`, `realtime`, etc. are left intact), recreate `public`, then run `supabase db push --include-all` and load `supabase/seed.sql`. This avoids the "must be owner of …" errors `supabase db reset` hits against the hosted pooler role. `auth.users` carries over between runs — clean it manually from the Supabase dashboard if you want to wipe mock accounts.
+- "Soft reset" means: drop every schema not on the Supabase-managed allowlist (so `auth`, `storage`, `realtime`, etc. are left intact), recreate `public`, then run `supabase db push --include-all` and load `supabase/seed.sql` plus `supabase/seed-heavy.sql`. This avoids the "must be owner of …" errors `supabase db reset` hits against the hosted pooler role. `auth.users` carries over between runs — clean it manually from the Supabase dashboard if you want to wipe mock accounts.
 
 Required GitHub repository secrets (configured on the `Preview` GitHub Environment):
 

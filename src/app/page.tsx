@@ -21,6 +21,7 @@ const DynamicHeroCTAButtons = dynamic(() => import('@/components/HeroCTAButtons'
     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
       <div className="h-14 w-48 bg-gray-200 dark:bg-slate-700 rounded-xl animate-pulse" />
       <div className="h-14 w-48 bg-gray-200 dark:bg-slate-700 rounded-xl animate-pulse" />
+      <div className="h-14 w-48 bg-gray-200 dark:bg-slate-700 rounded-xl animate-pulse" />
     </div>
   ),
 })
@@ -28,7 +29,7 @@ const DynamicHeroCTAButtons = dynamic(() => import('@/components/HeroCTAButtons'
 const DynamicUploadArchiveSection = dynamic(() => import('@/components/UploadArchiveSection'), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-48 bg-gray-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+    <div className="w-full h-48 bg-gray-100 dark:bg-gray-900 rounded-xl animate-pulse" />
   ),
 })
 
@@ -97,9 +98,9 @@ const InfoPanel: React.FC<InfoPanelProps> = ({ icon, title, description, href })
     href={href}
     target="_blank"
     rel="noopener noreferrer"
-    className="group flex items-center gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors border border-gray-200 dark:border-slate-700"
+    className="group flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border border-gray-200 dark:border-slate-700"
   >
-    <div className="text-2xl text-blue-500 dark:text-blue-400 flex-shrink-0">
+    <div className="text-2xl text-blue-500 dark:text-blue-300 flex-shrink-0">
       {icon}
     </div>
     <div className="flex-1 min-w-0">
@@ -142,25 +143,32 @@ export default async function Homepage() {
   return (
     <main>
       {/* Section 1: Hero with CTAs */}
-      <section className="bg-white dark:bg-slate-900 pt-16 md:pt-24 pb-12 md:pb-16 overflow-hidden">
-        <div className={`${contentWrapperClasses} text-center space-y-8`}>
+      <section className="bg-white dark:bg-gray-950 pt-16 md:pt-24 pb-12 md:pb-16 overflow-hidden">
+        <div className={`${contentWrapperClasses} text-center space-y-11`}>
           <div className="space-y-4">
             <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-gray-900 dark:text-white">
               Community Archive
             </h1>
-            <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300">
-              An open Twitter database.
+            <p className="text-xl text-gray-600 dark:text-gray-300">
+              An open Twitter database. Join the archive to{' '}
+              <br className="hidden sm:block" />
+              contribute to open source public infrastructure.
             </p>
           </div>
 
-          <DynamicHeroCTAButtons />
+          <div className="space-y-4">
+            <DynamicHeroCTAButtons />
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Backed by Survival and Flourishing Fund and Vitalik Buterin
+            </p>
+          </div>
         </div>
       </section>
 
       {/* Section 2: Social Proof */}
-      <section className="bg-white dark:bg-slate-900 overflow-hidden">
+      <section className="bg-white dark:bg-gray-950 overflow-hidden">
         <div
-          className="max-w-5xl mx-auto rounded-xl p-6 md:p-8 space-y-4 text-center bg-slate-100 dark:bg-slate-700/60"
+          className="max-w-5xl mx-auto rounded-none sm:rounded-xl p-6 md:p-8 space-y-4 text-center bg-slate-100 dark:bg-gray-900"
         >
           <CommunityStats
             accountCount={stats.accountCount}
@@ -178,27 +186,27 @@ export default async function Homepage() {
         </div>
       </section>
 
-      {/* Section 3: Upload Your Archive */}
-      <section id="upload-archive" className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} scroll-mt-16 overflow-hidden`}>
-        <div className={contentWrapperClasses}>
-          <DynamicUploadArchiveSection />
-        </div>
-      </section>
-
-      {/* Section 4: Get Started - Featured Apps */}
-      <section className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}>
+      {/* Section 3: Explore the archive - Featured Apps */}
+      <section className={`bg-white dark:bg-gray-950 ${sectionPaddingClasses} overflow-hidden`}>
         <div className={contentWrapperClasses}>
           <FeaturedAppsSection />
           <AppGallery />
         </div>
       </section>
 
+      {/* Section 4: Upload Your Archive */}
+      <section id="upload-archive" className={`bg-sky-100 dark:bg-gray-900 ${sectionPaddingClasses} scroll-mt-16 overflow-hidden`}>
+        <div className={contentWrapperClasses}>
+          <DynamicUploadArchiveSection />
+        </div>
+      </section>
+
       {/* Section 4: Data & Source Code */}
-      <section className={`bg-white dark:bg-slate-900 ${sectionPaddingClasses} overflow-hidden`}>
+      <section className={`bg-white dark:bg-gray-950 ${sectionPaddingClasses} overflow-hidden`}>
         <div className={`${contentWrapperClasses} space-y-8`}>
           <div className="text-center">
-            <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">Data & Source Code</h2>
-            <p className="mt-3 text-lg text-gray-600 dark:text-gray-300 max-w-xl mx-auto px-4 md:px-0">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Data & Source Code</h2>
+            <p className="mt-3 text-base text-gray-600 dark:text-gray-300 max-w-xl mx-auto px-4 md:px-0">
               Access the data, explore the code, and see how everything works.
             </p>
           </div>
@@ -212,36 +220,36 @@ export default async function Homepage() {
       </section>
 
       {/* Section 5: Our Supporters */}
-      <section className={`bg-sky-100 dark:bg-slate-800 ${sectionPaddingClasses} overflow-hidden`}>
+      <section className={`bg-sky-100 dark:bg-gray-900 ${sectionPaddingClasses} overflow-hidden`}>
         <div className={`${contentWrapperClasses} space-y-8`}>
           <div className="text-center">
-            <h2 className="text-3xl font-semibold text-gray-900 dark:text-white">Our Supporters</h2>
-            <p className="mt-3 text-lg text-gray-600 dark:text-gray-300">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Our Supporters</h2>
+            <p className="mt-3 text-base text-gray-600 dark:text-gray-300">
               Thanks to everyone who makes this possible
             </p>
           </div>
 
           {/* Main supporters card */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 md:p-8 border border-gray-200 dark:border-slate-700 max-w-4xl mx-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 md:p-8 border border-gray-200 dark:border-slate-700 max-w-4xl mx-auto">
             {/* Major Backers */}
             <div className="text-center mb-6">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Major Backers</p>
+              <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Major Backers</p>
               <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-3">
-                <Link href="https://survivalandflourishing.fund/" target="_blank" rel="noopener noreferrer" className="text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                <Link href="https://survivalandflourishing.fund/" target="_blank" rel="noopener noreferrer" className="text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-300 transition-colors">
                   Survival and Flourishing Fund
                 </Link>
                 <span className="text-gray-300 dark:text-gray-600">•</span>
                 <span className="text-base font-medium text-gray-700 dark:text-gray-300">
-                  <Link href="https://x.com/VitalikButerin" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  <Link href="https://x.com/VitalikButerin" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-300 transition-colors">
                     Vitalik Buterin
                   </Link>
                   {' '}via{' '}
-                  <Link href="https://kanro.fi/" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  <Link href="https://kanro.fi/" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-300 transition-colors">
                     Kanro
                   </Link>
                 </span>
                 <span className="text-gray-300 dark:text-gray-600">•</span>
-                <Link href="https://x.com/pwang" target="_blank" rel="noopener noreferrer" className="text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                <Link href="https://x.com/pwang" target="_blank" rel="noopener noreferrer" className="text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-300 transition-colors">
                   Peter Wang
                 </Link>
               </div>
@@ -252,7 +260,7 @@ export default async function Homepage() {
 
             {/* Community Supporters */}
             <div className="text-center mb-4">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Community Backers</p>
+              <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">Community Backers</p>
             </div>
             <TieredSupportersDisplay
               highestDonorWithImage={highestDonorWithImage}
@@ -267,7 +275,7 @@ export default async function Homepage() {
           {/* Donate button */}
           <div className="text-center">
             <Link href="https://opencollective.com/community-archive/donate" target="_blank" rel="noopener noreferrer">
-              <button className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-xl text-white bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 transition-colors">
+              <button className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-xl text-white bg-green-600 hover:bg-green-700 dark:bg-green-400 dark:hover:bg-green-300 dark:text-green-950 transition-colors">
                 <FaHeart className="mr-2" /> Support the Project
               </button>
             </Link>

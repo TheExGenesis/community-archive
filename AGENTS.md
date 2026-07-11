@@ -89,12 +89,9 @@ Historical pending drafts have been audited and moved to
 `supabase/schemas/` (declarative state), `supabase/migrations/` (applied
 history), and `src/database-types.ts` (generated client types).
 
-#### 4. Dead/Disabled Code
-```typescript
-// process_archive_upload.ts:232
-if (false && CONFIG.USE_COPY) { // COPY optimization disabled forever
-```
-The COPY optimization is permanently disabled but the code remains, adding 100+ lines of dead weight.
+#### 4. Dead/Disabled Code (resolved)
+The permanently disabled COPY branch and its unused helpers have been removed
+from the archive worker.
 
 ### 🟠 Architectural Issues
 

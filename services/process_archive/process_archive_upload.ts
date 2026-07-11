@@ -5,10 +5,9 @@ import winston from 'winston'
 import type { Logform } from 'winston'
 dotenv.config({ path: '.env' })
 
-import postgres from 'postgres';
+import postgres from 'postgres'
 
-
-type Sql = any
+type Sql = postgres.Sql
 
 import { createClient } from '@supabase/supabase-js'
 

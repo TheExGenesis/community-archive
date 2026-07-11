@@ -20,8 +20,8 @@ notes.
 ```bash
 pnpm type-check   # tsc --noEmit
 pnpm lint         # next lint
-pnpm format       # prettier --write .
-pnpm test         # jest (unit/integration; the DB suite needs a local Supabase)
+pnpm exec prettier --write <changed-files>
+pnpm test -- <changed-test-file>  # when applicable
 ```
 
 CI runs lint and type-check on every PR. Database tests (`pnpm test:db`) require
@@ -34,7 +34,9 @@ service, and the autorefresh pipeline all share one Postgres). Please:
 
 - Add a migration under `supabase/migrations/` **and** update the matching
   declarative files under `supabase/schemas/`.
-- Apply to **staging first** and follow `docs/schema-change-checklist.md`.
+- Apply to **staging first** and follow
+  [`docs/supabase-declarative-schemas.md`](docs/supabase-declarative-schemas.md)
+  plus the production checklist in [`AGENTS.md`](AGENTS.md).
 - Regenerate types with `pnpm gen-types` if the public/dev schema changed.
 
 ## Reporting issues

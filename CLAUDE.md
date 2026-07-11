@@ -111,7 +111,7 @@ This is a **Twitter Community Archive** built with Next.js 14, Supabase, and Typ
 ### Important File Locations
 
 **Core Configuration:**
-- `database.types.ts` - Generated TypeScript types from Supabase schema
+- `src/database-types.ts` - Generated TypeScript types from Supabase schema
 - `src/utils/supabase.ts` - Database client configurations
 - `supabase/config.toml` - Supabase local configuration
 

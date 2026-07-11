@@ -141,7 +141,9 @@ cd services/process_archive
 npm run docker:build
 ```
 
-> **Note**: The Docker build context is set to the project root to access `src/` and `database.types.ts` files.
+> **Note**: The Docker build context is set to the project root so the worker
+> can copy the shared `src/` utilities. Runtime secrets are supplied through
+> the environment; they are not baked into the image.
 
 ### Test Run
 

@@ -185,7 +185,6 @@ This document outlines the directory structure of the Community Archive project.
 ├── .prettierrc.yaml             # Prettier configuration
 ├── .testenv                     # Environment variables for testing
 ├── components.json              # Configuration for UI components (e.g., shadcn/ui)
-├── database.types.ts            # (Potentially duplicated or older version of src/database-types.ts)
 ├── jest.config.js               # Jest test runner configuration
 ├── jest.polyfills.js            # Polyfills for Jest tests
 ├── jest.setup.server.ts         # Jest setup for server-side tests
@@ -199,4 +198,4 @@ This document outlines the directory structure of the Community Archive project.
 ├── README.md                    # Main project README file
 ├── tailwind.config.js           # Tailwind CSS configuration
 └── tsconfig.json                # TypeScript configuration
-``` 
+```

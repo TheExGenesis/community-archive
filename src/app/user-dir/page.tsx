@@ -25,7 +25,11 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatNumber } from '@/lib/formatNumber'
-import { fetchUsers, fetchUsersCount } from '@/lib/queries/fetchUsers'
+import {
+  fetchUsers,
+  fetchUsersCount,
+  getDirectoryProfileHref,
+} from '@/lib/queries/fetchUsers'
 import { DirectoryUser, SortKey } from '@/lib/types'
 import { createBrowserClient } from '@/utils/supabase'
 
@@ -299,16 +303,12 @@ export default function UserDirectoryPage() {
                       className="group border-gray-200 hover:bg-gray-50/80 dark:border-gray-800 dark:hover:bg-gray-900/60"
                     >
                       <TableCell className="py-4">
-                        {user.has_archive && user.account_id ? (
-                          <Link
-                            href={`/user/${user.account_id}`}
-                            className="block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group-hover:[&_div.font-semibold]:underline"
-                          >
-                            {identity}
-                          </Link>
-                        ) : (
-                          identity
-                        )}
+                        <Link
+                          href={getDirectoryProfileHref(user)}
+                          className="block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group-hover:[&_div.font-semibold]:underline"
+                        >
+                          {identity}
+                        </Link>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-2">

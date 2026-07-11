@@ -1,5 +1,4 @@
-import { DirectoryUser, SortKey } from '@/lib/types'
-import { formatUserData } from '@/lib/user-utils'
+import { DirectoryUser, FormattedUser, SortKey } from '@/lib/types'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { devLog } from '@/lib/devLog'
 
@@ -17,6 +16,9 @@ export const buildDirectorySearchFilter = (search: string) => {
 
   return `username.ilike.${pattern},account_display_name.ilike.${pattern}`
 }
+
+export const getDirectoryProfileHref = (user: DirectoryUser) =>
+  `/user/${encodeURIComponent(user.directory_id)}`
 
 export const fetchUsers = async (
   supabase: SupabaseClient,
@@ -91,33 +93,87 @@ export const fetchUsersCount = async (
 
 export const getUserData = async (
   supabase: SupabaseClient,
-  account_id: string,
+  identifier: string,
 ) => {
-  const { data } = await supabase
+  let decodedIdentifier: string
+  try {
+    decodedIdentifier = decodeURIComponent(identifier)
+  } catch {
+    return null
+  }
+  const select = `
+    account_id,
+    username,
+    account_display_name,
+    created_at,
+    bio,
+    website,
+    location,
+    avatar_media_url,
+    archive_at,
+    archive_uploaded_at,
+    num_tweets,
+    num_followers,
+    num_following,
+    num_likes,
+    joined_at,
+    has_archive,
+    is_opted_in
+  `
+
+  const isDirectoryIdentifier = /^(archive|optin):/.test(decodedIdentifier)
+  const initialQuery = supabase
     .schema('public')
-    .from('account')
-    .select(
-      `
-      account_id,
-      username,
-      account_display_name,
-      created_at,
-      num_tweets,
-      num_followers,
-      num_following,
-      num_likes,
-      profile:profile(bio, website, location, avatar_media_url, header_media_url),
-      archive_upload:archive_upload(id, archive_at, created_at)
-    `,
-    )
-    .or(`account_id.eq.${account_id},username.ilike.${account_id}`)
-    .single()
+    .from('user_directory')
+    .select(select)
+
+  const { data: accountMatch, error: accountError } = isDirectoryIdentifier
+    ? await initialQuery.eq('directory_id', decodedIdentifier).maybeSingle()
+    : await initialQuery.eq('account_id', decodedIdentifier).maybeSingle()
+
+  if (accountError) throw accountError
+
+  let data = accountMatch
+  if (!data) {
+    const { data: usernameMatch, error: usernameError } = await supabase
+      .schema('public')
+      .from('user_directory')
+      .select(select)
+      .ilike('username', decodedIdentifier)
+      .limit(1)
+      .maybeSingle()
+
+    if (usernameError) throw usernameError
+    data = usernameMatch
+  }
 
   if (!data) {
     return null
   }
 
-  const formattedUser = formatUserData(data)
+  let headerMediaUrl: string | null = null
+  if (data.account_id) {
+    const { data: profile } = await supabase
+      .schema('public')
+      .from('all_profile')
+      .select('header_media_url')
+      .eq('account_id', data.account_id)
+      .order('archive_upload_id', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle()
+
+    headerMediaUrl = profile?.header_media_url ?? null
+  }
+
+  const formattedUser: FormattedUser = {
+    ...data,
+    username: data.username || decodedIdentifier,
+    account_display_name:
+      data.account_display_name || data.username || decodedIdentifier,
+    header_media_url: headerMediaUrl,
+    has_archive: data.has_archive === true,
+    is_opted_in: data.is_opted_in === true,
+  }
   devLog('getUserData', { data, formattedUser })
 
   return formattedUser

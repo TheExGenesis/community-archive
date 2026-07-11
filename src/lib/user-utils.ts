@@ -48,5 +48,8 @@ export function formatUserData(data: any): FormattedUser {
     num_following: data.num_following,
     num_likes: data.num_likes,
     archive_uploaded_at: getLatestValue(data.archive_upload, 'created_at'),
+    joined_at: data.joined_at ?? data.created_at,
+    has_archive: data.has_archive ?? true,
+    is_opted_in: data.is_opted_in ?? false,
   }
 }

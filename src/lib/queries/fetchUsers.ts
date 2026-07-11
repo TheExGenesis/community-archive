@@ -39,6 +39,7 @@ export const fetchUsers = async (
       username,
       account_display_name,
       avatar_media_url,
+      num_followers,
       archive_uploaded_at,
       directory_id,
       has_archive,

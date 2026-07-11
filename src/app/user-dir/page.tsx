@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { formatNumber } from '@/lib/formatNumber'
 import { fetchUsers, fetchUsersCount } from '@/lib/queries/fetchUsers'
 import { DirectoryUser, SortKey } from '@/lib/types'
 import { createBrowserClient } from '@/utils/supabase'
@@ -122,7 +123,7 @@ export default function UserDirectoryPage() {
       setSortOrder((current) => (current === 'asc' ? 'desc' : 'asc'))
     } else {
       setSortKey(key)
-      setSortOrder('asc')
+      setSortOrder(key === 'num_followers' ? 'desc' : 'asc')
     }
   }
 
@@ -142,7 +143,7 @@ export default function UserDirectoryPage() {
 
   return (
     <main className="min-h-screen bg-white py-12 dark:bg-background md:py-16">
-      <div className="relative mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8">
+      <div className="relative mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto mb-10 max-w-2xl text-center">
           <h1 className="text-4xl font-bold tracking-tight text-gray-950 dark:text-white sm:text-5xl">
             User Directory
@@ -179,7 +180,7 @@ export default function UserDirectoryPage() {
             <TableHeader className="bg-gray-50/80 dark:bg-gray-900/60">
               <TableRow className="hover:bg-transparent">
                 <TableHead
-                  className="w-[52%] py-2"
+                  className="w-[42%] py-2"
                   aria-sort={
                     sortKey === 'account_display_name'
                       ? sortOrder === 'asc'
@@ -197,8 +198,27 @@ export default function UserDirectoryPage() {
                     Member {renderSortIcon('account_display_name')}
                   </Button>
                 </TableHead>
-                <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wider">
+                <TableHead className="w-[25%] text-xs font-semibold uppercase tracking-wider">
                   Participation
+                </TableHead>
+                <TableHead
+                  className="w-[15%] py-2 text-right"
+                  aria-sort={
+                    sortKey === 'num_followers'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('num_followers')}
+                    aria-label="Sort by follower count"
+                    className="-mr-3 h-8 px-3 text-xs font-semibold uppercase tracking-wider hover:bg-gray-200/70 dark:hover:bg-gray-800"
+                  >
+                    Followers {renderSortIcon('num_followers')}
+                  </Button>
                 </TableHead>
                 <TableHead
                   className="w-[18%] py-2 text-right"
@@ -224,7 +244,7 @@ export default function UserDirectoryPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-40 text-center">
+                  <TableCell colSpan={4} className="h-40 text-center">
                     <span className="inline-flex items-center text-sm text-gray-500 dark:text-gray-400">
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Loading members…
@@ -234,7 +254,7 @@ export default function UserDirectoryPage() {
               ) : error && users.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={3}
+                    colSpan={4}
                     className="h-40 text-center text-sm text-red-600 dark:text-red-400"
                   >
                     {error}
@@ -243,7 +263,7 @@ export default function UserDirectoryPage() {
               ) : users.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={3}
+                    colSpan={4}
                     className="h-40 text-center text-sm text-gray-500 dark:text-gray-400"
                   >
                     No members match “{debouncedSearch}”.
@@ -319,6 +339,11 @@ export default function UserDirectoryPage() {
                             </Badge>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-right text-sm font-medium tabular-nums text-gray-700 dark:text-gray-300">
+                        {user.num_followers == null
+                          ? '—'
+                          : formatNumber(user.num_followers)}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-right text-sm font-medium text-gray-700 dark:text-gray-300">
                         <time dateTime={user.joined_at || undefined}>

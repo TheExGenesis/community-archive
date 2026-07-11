@@ -164,6 +164,7 @@ export type DirectoryUser = {
   username: string
   account_display_name: string
   avatar_media_url: string | null
+  num_followers: number | null
   has_archive: boolean
   is_opted_in: boolean
   opted_in_at: string | null
@@ -171,7 +172,11 @@ export type DirectoryUser = {
   joined_at: string | null
 }
 
-export type SortKey = 'username' | 'account_display_name' | 'joined_at'
+export type SortKey =
+  | 'username'
+  | 'account_display_name'
+  | 'num_followers'
+  | 'joined_at'
 
 export type FormattedUser = {
   account_id: string

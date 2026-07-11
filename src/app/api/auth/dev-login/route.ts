@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isProductionSupabaseUrl } from '@/lib/isProductionSupabaseUrl'
 import { createServerAdminClient, createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
-
-// Hardcoded prod project ref — sourced from package.json `gen-types` script.
-// This is intentionally a string literal (not env-driven) so that no env flip
-// can disable the guard below.
-const PRODUCTION_SUPABASE_PROJECT_REF = 'fabxmporizzqflnftavs'
-const PRODUCTION_SUPABASE_HOST = `${PRODUCTION_SUPABASE_PROJECT_REF}.supabase.co`
 
 const isDevelopment = () => process.env.NODE_ENV === 'development'
 
@@ -14,22 +9,17 @@ const isStagingDevLoginEnabled = () =>
   process.env.ENABLE_STAGING_DEV_LOGIN === 'true'
 
 const isKnownProductionSupabase = () =>
-  process.env.NEXT_PUBLIC_SUPABASE_URL?.includes(PRODUCTION_SUPABASE_HOST) ??
-  false
+  isProductionSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL)
 
-// Defense-in-depth: this route must be physically inert in any production
-// build OR when the configured Supabase URL points at the prod project,
-// regardless of `ENABLE_STAGING_DEV_LOGIN` /
-// `ALLOW_STAGING_DEV_LOGIN_ON_PROD_SUPABASE`. The route lets callers choose
+// Defense-in-depth: this route must be physically inert whenever the configured
+// Supabase URL points at the prod project, regardless of
+// `ENABLE_STAGING_DEV_LOGIN`. The route lets callers choose
 // `username` / `providerId` and writes them into `app_metadata.user_name`,
 // which is what the admin allowlist in `src/app/admin/data.ts` consults —
 // so a single env flip would otherwise let any client mint an admin session.
-const isHardDisabledEnvironment = () =>
-  process.env.NODE_ENV === 'production' ||
-  (process.env.NEXT_PUBLIC_SUPABASE_URL?.includes(
-    PRODUCTION_SUPABASE_PROJECT_REF,
-  ) ??
-    false)
+// Do not gate on NODE_ENV: deployed staging/preview builds correctly use
+// NODE_ENV=production and still need the explicitly enabled staging login.
+const isHardDisabledEnvironment = isKnownProductionSupabase
 
 // Evaluate at module load so that a misconfigured prod deploy fails fast
 // (in addition to the per-request 404 below). This is intentionally a
@@ -39,7 +29,7 @@ const HARD_DISABLED_AT_LOAD = isHardDisabledEnvironment()
 if (HARD_DISABLED_AT_LOAD) {
   // eslint-disable-next-line no-console
   console.warn(
-    '[security] /api/auth/dev-login is hard-disabled: NODE_ENV=production or NEXT_PUBLIC_SUPABASE_URL points at the prod Supabase project. All requests will 404.',
+    '[security] /api/auth/dev-login is hard-disabled because NEXT_PUBLIC_SUPABASE_URL points at the prod Supabase project. All requests will 404.',
   )
 }
 
@@ -57,10 +47,9 @@ const getStagingLoginConfig = () => ({
 const STAGING_EMAIL_DOMAIN = 'staging.local'
 
 export async function POST(request: NextRequest) {
-  // Hard gate: refuse unconditionally if this build/runtime is pointed at
-  // prod (either via NODE_ENV or the prod Supabase project ref). Returns 404
-  // to make the route indistinguishable from a non-existent endpoint. Both
-  // checks are evaluated — either failing is sufficient to block.
+  // Hard gate: refuse unconditionally if this build/runtime is pointed at the
+  // production Supabase project. Returns 404 to make the route
+  // indistinguishable from a non-existent endpoint.
   if (HARD_DISABLED_AT_LOAD || isHardDisabledEnvironment()) {
     return new NextResponse('Not Found', { status: 404 })
   }
@@ -71,20 +60,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: 'Dev login is disabled for this environment' },
       { status: 403 },
-    )
-  }
-
-  if (
-    !isDevelopment() &&
-    isKnownProductionSupabase() &&
-    process.env.ALLOW_STAGING_DEV_LOGIN_ON_PROD_SUPABASE !== 'true'
-  ) {
-    return NextResponse.json(
-      {
-        error:
-          'Refusing staging dev login against the production Supabase project',
-      },
-      { status: 500 },
     )
   }
 

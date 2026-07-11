@@ -92,12 +92,9 @@ The `supabase/migrations-pending-review/` folder contains unapplied migrations d
 
 No single source of truth for schema.
 
-#### 4. Dead/Disabled Code
-```typescript
-// process_archive_upload.ts:232
-if (false && CONFIG.USE_COPY) { // COPY optimization disabled forever
-```
-The COPY optimization is permanently disabled but the code remains, adding 100+ lines of dead weight.
+#### 4. Dead/Disabled Code (resolved)
+The permanently disabled COPY branch and its unused helpers have been removed
+from the archive worker.
 
 ### 🟠 Architectural Issues
 
@@ -380,5 +377,4 @@ pnpm docker:run:process-archive
 - `POSTGRES_CONNECTION_STRING` - For archive processor
 - `SUPABASE_SERVICE_ROLE` - Admin operations
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Client access
-
 

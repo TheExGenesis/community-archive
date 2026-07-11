@@ -290,7 +290,7 @@ const StreamMonitor = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">
               {getTotalTweets().toLocaleString()}
             </div>
           </CardContent>

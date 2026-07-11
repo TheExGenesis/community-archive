@@ -74,8 +74,8 @@ const appsData: AppItem[] = [
 
 const AppCard: React.FC<AppItem> = ({ icon, name, description, link }) => (
   <Link href={link} passHref legacyBehavior>
-    <a target="_blank" rel="noopener noreferrer" className="flex flex-col items-center p-6 bg-slate-100 dark:bg-slate-700 rounded-xl transition-shadow duration-300 h-full cursor-pointer">
-      <div className="text-4xl mb-4 text-blue-500 dark:text-blue-400">{icon}</div>
+    <a target="_blank" rel="noopener noreferrer" className="flex flex-col items-center p-6 bg-slate-100 dark:bg-gray-900 rounded-xl transition-shadow duration-300 h-full cursor-pointer">
+      <div className="text-4xl mb-4 text-blue-500 dark:text-blue-300">{icon}</div>
       <h3 className="text-xl font-semibold mb-2 text-center text-gray-800 dark:text-gray-200">{name}</h3>
       <p className="text-sm text-gray-600 dark:text-gray-400 text-center flex-grow">{description}</p>
       <div className="mt-4 flex items-center text-xs text-gray-500 dark:text-gray-400">

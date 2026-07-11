@@ -49,12 +49,6 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
                 {avatar.num_followers &&
                   `${formatNumber(avatar.num_followers)} followers`}
               </span>
-              <span
-                className="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400"
-              >
-                {avatar.num_tweets &&
-                  `${formatNumber(avatar.num_tweets)} tweets`}
-              </span>
             </a>
           ))}
         </div>

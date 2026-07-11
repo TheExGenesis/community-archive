@@ -18,19 +18,26 @@ describe('setUploadPhase', () => {
     const updates: unknown[] = []
     const supabase = makeSupabase(null, (v) => updates.push(v))
 
-    await expect(setUploadPhase(supabase, 123, 'ready_for_commit')).resolves.toBeUndefined()
+    await expect(
+      setUploadPhase(supabase, 123, 'ready_for_commit'),
+    ).resolves.toBeUndefined()
     expect(updates).toEqual([{ upload_phase: 'ready_for_commit' }])
   })
 
   it('rejects when supabase returns an error (regression: error must not be swallowed)', async () => {
     // Before the fix, the destructured `error` was dropped, so a failed phase update
     // resolved silently and left the row stuck. It must now propagate.
-    const supabase = makeSupabase({ message: 'permission denied for table archive_upload' })
+    const supabase = makeSupabase({
+      message: 'permission denied for table archive_upload',
+    })
 
-    await expect(setUploadPhase(supabase, 123, 'failed')).rejects.toThrow(
-      /Error updating archive upload phase to failed/,
-    )
-  }, 15000) // retryOperation backs off 5x before giving up
+    await expect(
+      setUploadPhase(supabase, 123, 'failed', {
+        maxRetries: 2,
+        retryDelay: 1,
+      }),
+    ).rejects.toThrow(/Error updating archive upload phase to failed/)
+  })
 })
 
 describe('retryOperation', () => {

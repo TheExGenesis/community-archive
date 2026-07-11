@@ -854,7 +854,7 @@ function patchArchive(archive: any): any {
     for(const tweetRecord of tweets) {
       const tweet = tweetRecord.tweet
 
-      tweet.full_text = removeProblematicCharacters(tweet.full_text)
+      tweet.full_text = removeProblematicCharacters(tweet.full_text ?? '')
       if(!hasNoteTweets){
         continue
       }
@@ -936,22 +936,6 @@ async function main() {
 
   try {
     logger.debug(`Starting optimized batch processing with ${getMemoryUsageMB()}MB memory usage`)
-
-    // Recover uploads stranded in 'committing' by a previous run that died mid-process
-    // (e.g. OOM/SIGKILL). The transaction rolls back on crash but the row stays
-    // 'committing' forever, and only 'ready_for_commit' rows are picked up below.
-    // Inserts are idempotent upserts, so reprocessing is safe. The cron + flock
-    // single-instance guarantee (docker-entrypoint.sh) means no live worker is
-    // actively holding a 'committing' row at startup.
-    const recovered = await sql`
-      UPDATE public.archive_upload
-      SET upload_phase = 'ready_for_commit'
-      WHERE upload_phase = 'committing'
-      RETURNING id
-    `
-    if (recovered.length) {
-      logger.warn(`Recovered ${recovered.length} upload(s) stranded in 'committing' and reset to 'ready_for_commit'`)
-    }
 
     logger.info('Fetching archive_upload records ready for processing...')
 

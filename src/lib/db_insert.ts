@@ -52,6 +52,7 @@ export const setUploadPhase = async (
   supabase: SupabaseClient,
   archiveUploadId: number,
   phase: UploadPhase,
+  retryOptions?: RetryOptions,
 ): Promise<void> => {
   await retryOperation(async () => {
     const { error } = await supabase
@@ -62,7 +63,7 @@ export const setUploadPhase = async (
     // failed phase update is silently dropped and retryOperation never retries,
     // leaving the row stuck (e.g. in 'uploading', which the worker never picks up).
     if (error) throw error
-  }, `Error updating archive upload phase to ${phase}`)
+  }, `Error updating archive upload phase to ${phase}`, retryOptions)
 }
 
 

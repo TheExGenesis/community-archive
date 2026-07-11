@@ -31,21 +31,28 @@ GRANT SELECT ON TABLE "public"."user_mentions" TO "readclient";
 -- only (firehose + worker). See #369. The blanket "GRANT ALL ON TABLE ... TO anon"
 -- previously applied to these tables (via ALTER DEFAULT PRIVILEGES in prod.sql) is
 -- intentionally NOT reproduced here.
-REVOKE INSERT, UPDATE, DELETE ON TABLE "public"."quote_tweets" FROM "anon", "authenticated";
-REVOKE INSERT, UPDATE, DELETE ON TABLE "public"."retweets"     FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."quote_tweets" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."retweets"     FROM "anon", "authenticated";
 GRANT SELECT ON TABLE "public"."quote_tweets" TO "anon", "authenticated";
 GRANT SELECT ON TABLE "public"."retweets"     TO "anon", "authenticated";
 
 -- liked_tweets / mentioned_users: global dedup tables, read-only for clients (#370).
-REVOKE INSERT, UPDATE, DELETE ON TABLE "public"."liked_tweets"    FROM "anon", "authenticated";
-REVOKE INSERT, UPDATE, DELETE ON TABLE "public"."mentioned_users" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."liked_tweets"    FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."mentioned_users" FROM "anon", "authenticated";
 GRANT SELECT ON TABLE "public"."liked_tweets"    TO "anon", "authenticated";
 GRANT SELECT ON TABLE "public"."mentioned_users" TO "anon", "authenticated";
 
 -- Archive-delete functions: not callable by anon (#372).
-REVOKE ALL ON FUNCTION "public"."delete_user_archive"("p_account_id" "text") FROM "anon";
-REVOKE ALL ON FUNCTION "public"."delete_single_archive"("p_account_id" "text", "p_archive_upload_id" bigint) FROM "anon";
+REVOKE EXECUTE ON FUNCTION "public"."delete_user_archive"("p_account_id" "text") FROM PUBLIC, "anon";
+REVOKE EXECUTE ON FUNCTION "public"."delete_single_archive"("p_account_id" "text", "p_archive_upload_id" bigint) FROM PUBLIC, "anon";
+GRANT EXECUTE ON FUNCTION "public"."delete_user_archive"("p_account_id" "text") TO "authenticated", "service_role";
+GRANT EXECUTE ON FUNCTION "public"."delete_single_archive"("p_account_id" "text", "p_archive_upload_id" bigint) TO "authenticated", "service_role";
 
--- Default privileges for readclient on future tables
+-- Secure-by-default privileges for future app-owned objects. Public API access
+-- must be granted explicitly by the migration that creates the object.
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL PRIVILEGES ON TABLES FROM "anon", "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL PRIVILEGES ON SEQUENCES FROM "anon", "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, "anon", "authenticated";
+
+-- Default privileges for readclient on future tables.
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT ON TABLES  TO "readclient";
-

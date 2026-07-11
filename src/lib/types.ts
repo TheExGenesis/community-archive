@@ -179,21 +179,24 @@ export type SortKey =
   | 'joined_at'
 
 export type FormattedUser = {
-  account_id: string
+  account_id: string | null
   username: string
   account_display_name: string
-  created_at: string
+  created_at: string | null
   bio: string | null
   website: string | null
   location: string | null
   avatar_media_url: string | null
   header_media_url?: string | null
   archive_at: string | null
-  num_tweets: number
-  num_followers: number
-  num_following: number
-  num_likes: number
+  num_tweets: number | null
+  num_followers: number | null
+  num_following: number | null
+  num_likes: number | null
   archive_uploaded_at: string | null
+  joined_at: string | null
+  has_archive: boolean
+  is_opted_in: boolean
 }
 
 // Interfaces for fetching and displaying tweets via Supabase queries

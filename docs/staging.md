@@ -6,15 +6,10 @@ Staging should be safe enough to exercise login, upload, opt-in, explicit opt-ou
 
 - Separate Supabase project from production.
 - Same schema as production.
-- Mock seed data from `scripts/fixtures/staging-seed.sql` plus the staging-only
-  stress fixtures in `scripts/fixtures/staging-heavy-seed.sql`.
+- Mock seed data from `supabase/seed.sql`.
 - Email/password staging login bypass instead of Twitter OAuth.
 - No production archive storage files.
 - No production service role key.
-
-Supabase's managed ephemeral previews validate configuration and migrations but
-do not auto-load mock data. The dedicated staging project remains the seeded
-environment for data-dependent testing.
 
 ## Required Environment Variables
 
@@ -43,7 +38,7 @@ The default staging login identity is configured via env:
 - Mock Twitter username: value of `STAGING_DEV_LOGIN_USERNAME`
 - Mock Twitter account id: value of `STAGING_DEV_LOGIN_PROVIDER_ID`
 
-The staging UI shows a dropdown of seeded mock users (currently `alice_dev` and `xiq_dev`, see `scripts/fixtures/staging-seed.sql`) plus a sign-in button. Picking a user posts `{ username, providerId, displayName }` to the dev-login route; the server uses `STAGING_DEV_LOGIN_PASSWORD` from the environment as the shared password and derives the email as `<username>@staging.local`. No password is sent from the client. You can also deep-link to a specific user with `?as=<username>` on the sign-in page.
+The staging UI shows a dropdown of seeded mock users (currently `alice_dev` and `xiq_dev`, see `supabase/seed.sql`) plus a sign-in button. Picking a user posts `{ username, providerId, displayName }` to the dev-login route; the server uses `STAGING_DEV_LOGIN_PASSWORD` from the environment as the shared password and derives the email as `<username>@staging.local`. No password is sent from the client. You can also deep-link to a specific user with `?as=<username>` on the sign-in page.
 
 Do not commit the real password. The bootstrap script below writes it to an ignored `.env.staging.generated` file so it can be copied into Vercel's Preview environment.
 
@@ -75,7 +70,7 @@ The script will:
 - create a `community-archive-staging` Supabase project if `SUPABASE_STAGING_PROJECT_REF` is not set
 - link the project locally
 - run `supabase db push --include-all`
-- load `scripts/fixtures/staging-seed.sql` and `scripts/fixtures/staging-heavy-seed.sql`
+- load `supabase/seed.sql`
 - write Preview environment values to `.env.staging.generated`
 
 If you create the Supabase project manually, set `SUPABASE_STAGING_PROJECT_REF` and rerun the same script to apply schema, seed data, and generate the Vercel env file.
@@ -98,8 +93,7 @@ supabase db push
 4. Load mock data:
 
 ```bash
-psql '<staging-db-connection-string>' -f scripts/fixtures/staging-seed.sql
-psql '<staging-db-connection-string>' -f scripts/fixtures/staging-heavy-seed.sql
+psql '<staging-db-connection-string>' -f supabase/seed.sql
 ```
 
 The default staging login identity maps to `mock_alice` / `alice_dev`, which exists in the seed data and has a multi-tweet thread.
@@ -130,7 +124,7 @@ The `Sync staging database` GitHub Action soft-resets staging from the repo sche
 - It runs on pushes to `main` that touch `supabase/**` or `scripts/sync-staging-db.sh`.
 - It refuses to run if `STAGING_DATABASE_URL` does not include `SUPABASE_STAGING_PROJECT_REF`.
 - It refuses the production project ref.
-- "Soft reset" means: drop every schema not on the Supabase-managed allowlist (so `auth`, `storage`, `realtime`, etc. are left intact), recreate `public`, then run `supabase db push --include-all` and load the two seed files under `scripts/fixtures/`. This avoids the "must be owner of …" errors `supabase db reset` hits against the hosted pooler role. `auth.users` carries over between runs — clean it manually from the Supabase dashboard if you want to wipe mock accounts.
+- "Soft reset" means: drop every schema not on the Supabase-managed allowlist (so `auth`, `storage`, `realtime`, etc. are left intact), recreate `public`, then run `supabase db push --include-all` and load `supabase/seed.sql`. This avoids the "must be owner of …" errors `supabase db reset` hits against the hosted pooler role. `auth.users` carries over between runs — clean it manually from the Supabase dashboard if you want to wipe mock accounts.
 
 Required GitHub repository secrets (configured on the `Preview` GitHub Environment):
 

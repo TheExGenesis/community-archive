@@ -1,7 +1,3 @@
--- Functional mock data for the dedicated staging project.
--- Kept outside supabase/ because the managed preview seeder rejects this
--- otherwise-valid SQL payload with HTTP 413. Staging scripts apply it via psql.
-
 SET session_replication_role = replica;
 
 --
@@ -245,6 +241,86 @@ VALUES
   (5, 'mock_alice', 'archive_upload', '{"archive_upload_id": 109, "archive_at": "2025-02-15T00:00:00Z", "note":"re-upload"}'::jsonb, '2025-02-15T00:00:00Z');
 
 SELECT setval(pg_get_serial_sequence('public.user_action_log', 'id'), 1000);
+
+-- Bulky test account for verifying the inline export+delete path
+-- ("Opt out and delete data" in /admin). Sized just under the 10k inline
+-- ceiling so the dialog *doesn't* show the timeout warning — the delete
+-- should run end-to-end against this account. If the warning needs
+-- exercising too, bump num_tweets above 10000 (or seed a second account).
+INSERT INTO "public"."all_account" ("account_id", "created_via", "username", "created_at", "account_display_name", "num_tweets", "num_following", "num_followers", "num_likes")
+VALUES
+  ('mock_bulky', 'web', 'bulky_test', '2018-01-01T00:00:00Z', 'Bulky Test Account', 5000, 0, 0, 0)
+ON CONFLICT ("account_id") DO NOTHING;
+
+INSERT INTO "public"."archive_upload" ("id", "account_id", "archive_at", "created_at", "upload_phase") OVERRIDING SYSTEM VALUE
+VALUES
+  (200, 'mock_bulky', '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed')
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "public"."all_profile" ("account_id", "bio", "website", "location", "avatar_media_url", "header_media_url", "archive_upload_id")
+VALUES
+  ('mock_bulky', 'Synthetic test account for admin delete flow', NULL, NULL, 'https://api.dicebear.com/7.x/avataaars/svg?seed=bulky_test', NULL, 200)
+ON CONFLICT ("account_id") DO NOTHING;
+
+-- 5000 tweets generated inline. Keeps seed.sql small while still hitting
+-- the row count the export path needs to exercise. Tweet ids are
+-- 't_bulky_00001' .. 't_bulky_05000' so they sort lexically and don't
+-- collide with hand-written ids elsewhere.
+INSERT INTO "public"."tweets" ("tweet_id", "account_id", "created_at", "full_text", "retweet_count", "favorite_count", "reply_to_tweet_id", "reply_to_user_id", "reply_to_username", "archive_upload_id")
+SELECT
+  't_bulky_' || lpad(i::text, 5, '0'),
+  'mock_bulky',
+  '2024-01-01T00:00:00Z'::timestamptz + (i || ' minutes')::interval,
+  'Synthetic tweet ' || i || ' for testing the admin export + delete flow.',
+  0,
+  0,
+  NULL,
+  NULL,
+  NULL,
+  200
+FROM generate_series(1, 5000) AS i
+ON CONFLICT ("tweet_id") DO NOTHING;
+
+-- Giant test account: 100,000 tweets — above the 10k inline ceiling so
+-- the "Opt out and delete data" dialog *should* show the ⚠ warning and
+-- (almost certainly) hit the Vercel 60s function timeout when exercised.
+-- Used to verify that the export gracefully fails halfway rather than
+-- silently truncating. After timeout: opt-out + scrape-block already
+-- committed synchronously, but archive copy + tweets dump and
+-- delete_user_archive don't run — needs the Hetzner worker (TODO).
+INSERT INTO "public"."all_account" ("account_id", "created_via", "username", "created_at", "account_display_name", "num_tweets", "num_following", "num_followers", "num_likes")
+VALUES
+  ('mock_giant', 'web', 'giant_test', '2015-01-01T00:00:00Z', 'Giant Test Account', 100000, 0, 0, 0)
+ON CONFLICT ("account_id") DO NOTHING;
+
+INSERT INTO "public"."archive_upload" ("id", "account_id", "archive_at", "created_at", "upload_phase") OVERRIDING SYSTEM VALUE
+VALUES
+  (201, 'mock_giant', '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed')
+ON CONFLICT ("id") DO NOTHING;
+
+INSERT INTO "public"."all_profile" ("account_id", "bio", "website", "location", "avatar_media_url", "header_media_url", "archive_upload_id")
+VALUES
+  ('mock_giant', 'Synthetic 100k-tweet test account', NULL, NULL, 'https://api.dicebear.com/7.x/avataaars/svg?seed=giant_test', NULL, 201)
+ON CONFLICT ("account_id") DO NOTHING;
+
+-- 100,000 tweets generated inline. Note: the staging-sync workflow does
+-- a `supabase db reset` and re-applies this seed on every PR push, so
+-- expect the staging sync step to take noticeably longer (~10-20s extra)
+-- while this INSERT runs.
+INSERT INTO "public"."tweets" ("tweet_id", "account_id", "created_at", "full_text", "retweet_count", "favorite_count", "reply_to_tweet_id", "reply_to_user_id", "reply_to_username", "archive_upload_id")
+SELECT
+  't_giant_' || lpad(i::text, 6, '0'),
+  'mock_giant',
+  '2018-01-01T00:00:00Z'::timestamptz + (i || ' minutes')::interval,
+  'Synthetic giant-account tweet ' || i || ' for testing the inline export ceiling.',
+  0,
+  0,
+  NULL,
+  NULL,
+  NULL,
+  201
+FROM generate_series(1, 100000) AS i
+ON CONFLICT ("tweet_id") DO NOTHING;
 
 -- Reset replication role
 SET session_replication_role = DEFAULT;

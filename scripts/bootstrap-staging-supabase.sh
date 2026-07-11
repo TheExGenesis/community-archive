@@ -68,14 +68,8 @@ pnpm supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_STAGING_DB
 echo "Applying migrations to staging..."
 pnpm supabase db push --password "$SUPABASE_STAGING_DB_PASSWORD" --include-all
 
-for seed_file in scripts/fixtures/staging-seed.sql scripts/fixtures/staging-heavy-seed.sql; do
-  if [[ -f "$seed_file" ]]; then
-    echo "Loading mock seed data from $seed_file..."
-    psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$seed_file"
-  else
-    echo "$seed_file not found; skipping."
-  fi
-done
+echo "Loading mock seed data from supabase/seed.sql..."
+psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
 
 echo "Fetching staging API keys..."
 KEYS_JSON="$(pnpm supabase projects api-keys --project-ref "$PROJECT_REF" --output json)"
@@ -114,7 +108,7 @@ EOF
 echo
 echo "Staging Supabase is ready."
 echo "Project ref: $PROJECT_REF"
-echo "Mock data loaded from the Supabase seed files."
+echo "Mock data loaded from supabase/seed.sql."
 echo "Generated Vercel env file: $GENERATED_ENV_FILE"
 echo
 echo "Add those values to Vercel's Preview environment for this project."

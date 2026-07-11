@@ -80,14 +80,12 @@ if [[ $push_status -ne 0 ]]; then
   exit $push_status
 fi
 
-for seed_file in scripts/fixtures/staging-seed.sql scripts/fixtures/staging-heavy-seed.sql; do
-  if [[ -f "$seed_file" ]]; then
-    echo "Loading mock seed data from $seed_file..."
-    psql "$STAGING_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$seed_file"
-  else
-    echo "$seed_file not found; skipping."
-  fi
-done
+if [[ -f supabase/seed.sql ]]; then
+  echo "Loading mock seed data..."
+  psql "$STAGING_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
+else
+  echo "supabase/seed.sql not found; skipping seed load."
+fi
 
 # `global_activity_summary` and friends use `pg_class.reltuples` for tweet/like/mention
 # counts (returns -1 until ANALYZE runs) and freeze their data at REFRESH time. Without

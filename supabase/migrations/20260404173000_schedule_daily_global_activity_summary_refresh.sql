@@ -12,6 +12,7 @@
 CREATE OR REPLACE FUNCTION "public"."refresh_global_activity_summary"() RETURNS void
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "statement_timeout" TO '20min'
+    SET "search_path" TO 'pg_catalog', 'public', 'private', 'temp', 'tes', 'ca_website', 'auth', 'extensions'
     AS $$
 BEGIN
     BEGIN

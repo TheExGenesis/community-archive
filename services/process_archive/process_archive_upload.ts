@@ -784,6 +784,11 @@ export class ArchiveUploadProcessor {
         records: data.length
       }
       logger.error(`Error in insertIfNotEmpty ${JSON.stringify(errorData)}`)
+      // Rethrow: these inserts run inside a single transaction (sql.begin). A failed
+      // statement aborts the whole transaction, so swallowing the error here let the
+      // archive be marked 'completed' while every row was rolled back (silent data
+      // loss). Propagating it lets main()'s catch mark the upload 'failed' instead.
+      throw error
     }
   }
 
@@ -808,17 +813,33 @@ export class ArchiveUploadProcessor {
   }
 }
 
+// Twitter handle rules: 1-15 chars, alphanumerics and underscore only.
+// Used as a chokepoint validator before any path/URL construction to prevent
+// path traversal (e.g. `../foo`) or other injection via the archive_upload.username
+// column. Applied to both the dev filesystem branch and the Supabase Storage
+// branch (defense in depth — do not rely on Storage's rejection of `..`).
+const TWITTER_USERNAME_REGEX = /^[A-Za-z0-9_]{1,15}$/
+
+function assertValidUsername(username: string): void {
+  if (typeof username !== 'string' || !TWITTER_USERNAME_REGEX.test(username)) {
+    throw new Error(
+      `Invalid username for archive path construction: ${JSON.stringify(username)} (must match ${TWITTER_USERNAME_REGEX})`
+    )
+  }
+}
+
 async function loadArchiveData(username: string): Promise<any> {
+  assertValidUsername(username)
   if (CONFIG.DEV_ARCHIVE_PATH) {
     const archivePath = path.join(CONFIG.DEV_ARCHIVE_PATH, `${username}/archive.json`)
     logger.debug(`Reading archive from filesystem: ${archivePath}`)
-    
+
     // For very large files, consider streaming JSON parsing
     const fileSize = fs.statSync(archivePath).size
     const fileSizeMB = fileSize / (1024 * 1024)
-    
+
     logger.info(`Archive file size: ${fileSizeMB.toFixed(1)}MB`)
-       
+
     const archiveData = fs.readFileSync(archivePath, 'utf8')
     return JSON.parse(archiveData)
   }
@@ -842,12 +863,14 @@ async function loadArchiveData(username: string): Promise<any> {
 
 function patchArchive(archive: any): any {
   try{
-    const tweets = archive.tweets
+    // `tweets` and `like` are optional files in third-party / scripted uploads;
+    // default to [] so a missing section doesn't throw and fail the whole archive.
+    const tweets = archive.tweets ?? []
     const hasNoteTweets = archive['note-tweet']?.length > 0 || false;
     for(const tweetRecord of tweets) {
       const tweet = tweetRecord.tweet
-      
-      tweet.full_text = removeProblematicCharacters(tweet.full_text)
+
+      tweet.full_text = removeProblematicCharacters(tweet.full_text ?? '')
       if(!hasNoteTweets){
         continue
       }
@@ -855,7 +878,7 @@ function patchArchive(archive: any): any {
       const matchingNoteTweet = noteTweets.find((noteTweetObj:any) => {
         const noteTweet = noteTweetObj.noteTweet
         return (
-          tweet.full_text.includes(noteTweet.core.text.substring(0, 200)) &&
+          (tweet.full_text ?? '').includes(noteTweet.core.text.substring(0, 200)) &&
           Math.abs(
             new Date(tweet.created_at).getTime() -
               new Date(noteTweet.createdAt).getTime(),
@@ -867,7 +890,7 @@ function patchArchive(archive: any): any {
         tweet.full_text = removeProblematicCharacters(matchingNoteTweet.noteTweet.core.text)
       }
     }
-    for (const likeRecord of archive.like) {
+    for (const likeRecord of archive.like ?? []) {
       const like = likeRecord.like;
       like.fullText = removeProblematicCharacters(like.fullText||'')
     }
@@ -929,8 +952,9 @@ async function main() {
 
   try {
     logger.debug(`Starting optimized batch processing with ${getMemoryUsageMB()}MB memory usage`)
+
     logger.info('Fetching archive_upload records ready for processing...')
-    
+
     const ready = await sql`
       SELECT au.id, au.account_id, au.username, au.archive_at
       FROM public.archive_upload au

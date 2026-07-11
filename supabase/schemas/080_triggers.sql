@@ -4,8 +4,6 @@ CREATE OR REPLACE TRIGGER "queue_job_on_upload_complete" AFTER UPDATE OF "upload
 
 CREATE OR REPLACE TRIGGER "queue_job_on_upload_delete" AFTER DELETE ON "public"."archive_upload" FOR EACH ROW EXECUTE FUNCTION "private"."queue_archive_changes"();
 
-CREATE OR REPLACE TRIGGER "trigger_commit_temp_data" AFTER UPDATE OF "upload_phase" ON "public"."archive_upload" FOR EACH ROW WHEN (("new"."upload_phase" = 'ready_for_commit'::"public"."upload_phase_enum")) EXECUTE FUNCTION "public"."trigger_commit_temp_data"();
-
 CREATE OR REPLACE TRIGGER "update_all_account_updated_at" BEFORE UPDATE ON "public"."all_account" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 CREATE OR REPLACE TRIGGER "update_all_profile_updated_at" BEFORE UPDATE ON "public"."all_profile" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();

@@ -146,20 +146,9 @@ opted_in_candidates AS (
     o.opted_in_at,
     COALESCE(o.opted_in_at, o.created_at, o.updated_at) AS joined_at
   FROM public.optin o
-  LEFT JOIN LATERAL (
-    SELECT candidate.*
-    FROM public.all_account candidate
-    WHERE (
-      o.twitter_user_id IS NOT NULL
-      AND candidate.account_id = o.twitter_user_id
-    )
-      OR lower(candidate.username) = lower(o.username)
-    ORDER BY (
-      o.twitter_user_id IS NOT NULL
-      AND candidate.account_id = o.twitter_user_id
-    ) DESC
-    LIMIT 1
-  ) a ON true
+  LEFT JOIN public.all_account a
+    ON o.twitter_user_id IS NOT NULL
+    AND a.account_id = o.twitter_user_id
   LEFT JOIN LATERAL (
     SELECT candidate.*
     FROM public.all_profile candidate

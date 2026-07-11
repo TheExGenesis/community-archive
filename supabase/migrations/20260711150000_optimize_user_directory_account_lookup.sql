@@ -1,3 +1,6 @@
+-- Avoid a case-insensitive scan of the full all_account table for every
+-- opted-in member. New opt-ins receive a trusted Twitter user ID from auth;
+-- legacy rows without one remain visible but are not enriched from all_account.
 CREATE OR REPLACE VIEW "public"."user_directory" AS
 WITH archived_members AS (
   SELECT

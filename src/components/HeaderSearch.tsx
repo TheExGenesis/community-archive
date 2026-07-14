@@ -6,23 +6,17 @@ import Link from 'next/link'
 import { ListFilter, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { buildSearchHref } from '@/lib/searchParams'
 
 export default function HeaderSearch() {
   const router = useRouter()
   const [query, setQuery] = useState('')
+  const searchHref = buildSearchHref(query)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (query.trim()) {
-      router.push(`/search?q=${encodeURIComponent(query.trim())}`)
-    } else {
-      router.push('/search')
-    }
+    router.push(searchHref)
   }
-
-  const advancedSearchHref = query.trim()
-    ? `/search?q=${encodeURIComponent(query.trim())}`
-    : '/search'
 
   return (
     <form onSubmit={handleSubmit} className="hidden items-center sm:flex">
@@ -44,7 +38,7 @@ export default function HeaderSearch() {
           className="h-9 w-9 rounded-l-none border-l-0"
         >
           <Link
-            href={advancedSearchHref}
+            href={searchHref}
             aria-label="Open advanced search"
             title="Advanced search"
           >

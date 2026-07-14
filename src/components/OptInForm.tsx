@@ -9,13 +9,11 @@ import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 
 interface OptInFormProps {
   userId: string
-  userEmail: string
   initialOptInStatus: any
 }
 
 export default function OptInForm({
   userId,
-  userEmail,
   initialOptInStatus,
 }: OptInFormProps) {
   const router = useRouter()

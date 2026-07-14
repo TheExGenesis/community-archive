@@ -20,11 +20,7 @@ export default async function OptInPage() {
             </p>
           </div>
 
-          <OptInForm
-            userId={user.id}
-            userEmail={user.email || ''}
-            initialOptInStatus={optInData}
-          />
+          <OptInForm userId={user.id} initialOptInStatus={optInData} />
 
           <div className="mt-8 border-t border-border pt-6 text-center">
             <p className="text-sm text-muted-foreground">

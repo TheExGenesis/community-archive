@@ -11,17 +11,17 @@ export function DownloadArchiveButton({ username }: { username: string }) {
       // Fetch the file
       const response = await fetch(archiveUrl)
       const blob = await response.blob()
-      
+
       // Create a temporary link element
       const downloadUrl = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = downloadUrl
       link.download = `${username}_twitter_archive.json` // Set filename
-      
+
       // Trigger download
       document.body.appendChild(link)
       link.click()
-      
+
       // Cleanup
       document.body.removeChild(link)
       window.URL.revokeObjectURL(downloadUrl)
@@ -32,17 +32,17 @@ export function DownloadArchiveButton({ username }: { username: string }) {
 
   return (
     <div className="mt-4">
-      <Button 
-        variant="outline" 
+      <Button
+        variant="outline"
         onClick={handleDownload}
         className="flex items-center gap-2"
       >
         <FileDown size={16} />
         Download Raw Archive
       </Button>
-      <p className="mt-1 text-xs text-gray-500">
+      <p className="mt-1 text-xs text-muted-foreground">
         Downloads the complete Twitter archive in JSON format
       </p>
     </div>
   )
-} 
+}

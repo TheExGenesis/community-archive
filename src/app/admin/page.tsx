@@ -35,7 +35,7 @@ export default async function AdminPage({
   const twitterUsername = getDisplayUsername(user)
 
   return (
-    <main className="min-h-screen bg-white dark:bg-background">
+    <main className="min-h-screen bg-card dark:bg-background">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-8">
         <section className="flex flex-col gap-3">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -67,12 +67,12 @@ export default async function AdminPage({
             <CardDescription>
               Every public.optin row is pinned at the top, followed by accounts
               with archive data sorted by most recently updated. The manual
-              opt-in input below creates an opt-in row by Twitter username;
-              if we already have an archive account for that username the
-              opt-in row is linked to it, otherwise it&apos;s stored without a
-              Twitter id and gets linked the next time that user signs in or
-              uploads an archive. Search runs against the full database; the
-              table updates in place.
+              opt-in input below creates an opt-in row by Twitter username; if
+              we already have an archive account for that username the opt-in
+              row is linked to it, otherwise it&apos;s stored without a Twitter
+              id and gets linked the next time that user signs in or uploads an
+              archive. Search runs against the full database; the table updates
+              in place.
             </CardDescription>
           </CardHeader>
           <CardContent>

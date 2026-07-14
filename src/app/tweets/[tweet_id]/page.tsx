@@ -11,10 +11,10 @@ export default async function TweetPage({ params }: any) {
   const { tweet, threadTree } = await getTweetPageData(tweet_id)
 
   // Style definitions copied from homepage
-  const unifiedDeepBlueBase = "bg-white dark:bg-background";
-  const sectionPaddingClasses = "py-12 md:py-16 lg:py-20"
+  const unifiedDeepBlueBase = 'bg-card dark:bg-background'
+  const sectionPaddingClasses = 'py-12 md:py-16 lg:py-20'
   // Using max-w-7xl to match stream monitor width
-  const contentWrapperClasses = "w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+  const contentWrapperClasses = 'w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'
 
   if (!tweet) {
     notFound()
@@ -23,22 +23,24 @@ export default async function TweetPage({ params }: any) {
   return (
     <main>
       <section
-        className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} overflow-hidden min-h-screen`}
+        className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} min-h-screen overflow-hidden`}
       >
         <div className={`${contentWrapperClasses}`}>
-          <div className="bg-slate-100 dark:bg-card p-6 md:p-8 rounded-lg">
-            <h2 className="mb-8 text-4xl font-bold text-center text-gray-900 dark:text-white">
-              {threadTree && Object.keys(threadTree.tweets).length > 1 ? '🧵 View Thread' : '🔎 View Tweet'}
+          <div className="rounded-lg bg-muted p-6 dark:bg-card md:p-8">
+            <h2 className="mb-8 text-center text-4xl font-bold text-foreground">
+              {threadTree && Object.keys(threadTree.tweets).length > 1
+                ? '🧵 View Thread'
+                : '🔎 View Tweet'}
             </h2>
 
             {threadTree && Object.keys(threadTree.tweets).length > 1 ? (
               <ThreadView
                 tree={threadTree}
                 highlightTweetId={tweet_id}
-                className="bg-background dark:bg-secondary rounded-lg"
+                className="rounded-lg bg-background dark:bg-secondary"
               />
             ) : (
-              <div className="bg-background dark:bg-secondary p-4 rounded-lg">
+              <div className="rounded-lg bg-background p-4 dark:bg-secondary">
                 <TweetComponent key={tweet.tweet_id} tweet={tweet} />
               </div>
             )}

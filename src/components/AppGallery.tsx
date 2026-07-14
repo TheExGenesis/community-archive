@@ -63,17 +63,15 @@ function GalleryAppCard({ app }: { app: GalleryApp }) {
       href={app.link}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border border-gray-200 dark:border-slate-700"
+      className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-accent"
     >
-      <div className="text-2xl text-blue-500 dark:text-blue-300 flex-shrink-0">
-        {app.icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+      <div className="flex-shrink-0 text-2xl text-brand">{app.icon}</div>
+      <div className="min-w-0 flex-1">
+        <h3 className="flex items-center gap-2 font-semibold text-foreground">
           {app.name}
-          <FaExternalLinkAlt className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+          <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
         </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+        <p className="truncate text-sm text-muted-foreground">
           {app.description}
         </p>
       </div>
@@ -84,10 +82,10 @@ function GalleryAppCard({ app }: { app: GalleryApp }) {
 export default function AppGallery() {
   return (
     <div className="mt-8">
-      <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-4 text-center">
+      <h3 className="mb-4 text-center text-lg font-medium text-muted-foreground">
         More Tools & Projects
       </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
+      <div className="mx-auto grid max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {galleryApps.map((app) => (
           <GalleryAppCard key={app.name} app={app} />
         ))}

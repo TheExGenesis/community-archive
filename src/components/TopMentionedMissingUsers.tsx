@@ -162,7 +162,7 @@ export default function TopMentionedUsers({
                     {user.account_display_name && (
                       <div
                         key={`screen-name-${user.mentioned_user_id}`}
-                        className="text-sm text-gray-500"
+                        className="text-sm text-muted-foreground"
                       >
                         @{user.screen_name}
                       </div>

@@ -130,10 +130,10 @@ export default function UploadHomepageSection() {
 
   return (
     userMetadata && (
-      <div className="text-sm dark:text-gray-300">
+      <div className="text-sm dark:text-muted-foreground">
         {state.archiveUpload && (
           <>
-            <p className="mb-2 text-xs text-zinc-400 dark:text-zinc-500">
+            <p className="mb-2 text-xs text-muted-foreground">
               Your last archive upload was from{' '}
               {formatDate(state.archiveUpload.archive_at)}.
             </p>
@@ -141,24 +141,24 @@ export default function UploadHomepageSection() {
         )}
         {state.archiveUpload && !state.showUploadButton ? (
           <div
-            className="transition-colsors rounded-md bg-zinc-100 p-4 duration-200 hover:bg-zinc-50 dark:bg-gray-900 dark:hover:bg-gray-800"
+            className="transition-colsors rounded-md bg-muted p-4 duration-200 hover:bg-accent dark:bg-card dark:hover:bg-accent"
             onClick={() =>
               setState((prev) => ({ ...prev, showUploadButton: true }))
             }
           >
-            <button className="cursor-pointer text-sm font-bold text-blue-500 hover:underline dark:text-blue-300">
+            <button className="cursor-pointer text-sm font-bold text-brand hover:underline dark:text-brand">
               Upload a new archive, or delete your data. :)
             </button>
           </div>
         ) : (
-          <div className="transition-colsors rounded-md bg-zinc-100 p-4 duration-200 hover:bg-zinc-50 dark:bg-gray-900 dark:hover:bg-gray-800">
+          <div className="transition-colsors rounded-md bg-muted p-4 duration-200 hover:bg-accent dark:bg-card dark:hover:bg-accent">
             {state.archiveUpload && (
               <div>
                 <button
                   onClick={() =>
                     setState((prev) => ({ ...prev, showUploadButton: false }))
                   }
-                  className="cursor-pointer text-sm text-blue-500 underline dark:text-blue-300"
+                  className="cursor-pointer text-sm text-brand underline dark:text-brand"
                 >
                   Close
                 </button>
@@ -167,11 +167,11 @@ export default function UploadHomepageSection() {
             <div className="flex flex-col">
               <div className="flex justify-between">
                 <div className="mb-4 flex-1">
-                  <p className="mb-6 text-xs text-center dark:text-gray-300">
+                  <p className="mb-6 text-center text-xs dark:text-muted-foreground">
                     Please upload your Twitter archive as a .zip file.
                   </p>
                   <div className="flex justify-center">
-                    <label className="mb-4 cursor-pointer rounded bg-zinc-500 px-4 py-3 text-sm text-white hover:bg-zinc-600 disabled:opacity-50 dark:bg-zinc-600 dark:hover:bg-zinc-700">
+                    <label className="mb-4 cursor-pointer rounded bg-primary px-4 py-3 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
                       Choose Files
                       <input
                         type="file"
@@ -186,9 +186,9 @@ export default function UploadHomepageSection() {
                   {state.isProcessing && (
                     <div className="mt-4">
                       <p className="mb-2">{`Processing archive...`}</p>
-                      <div className="w-full rounded bg-gray-200">
+                      <div className="w-full rounded bg-muted">
                         <div
-                          className="rounded bg-blue-500 py-1 text-center text-xs leading-none text-white"
+                          className="rounded bg-brand py-1 text-center text-xs leading-none text-white"
                           style={{ width: '0%' }}
                         >
                           0%
@@ -200,7 +200,7 @@ export default function UploadHomepageSection() {
                 <div>
                   {state.archiveUpload && (
                     <>
-                      <p className="mb-4 text-xs dark:text-gray-300">
+                      <p className="mb-4 text-xs dark:text-muted-foreground">
                         This will delete all your data
                       </p>
                       <button

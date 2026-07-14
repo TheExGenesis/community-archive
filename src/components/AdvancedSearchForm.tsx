@@ -5,122 +5,135 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 const parseQuery = (q: string) => {
-  const parts = q.split(' ');
-  const options: { [key: string]: string } = {};
-  const words: string[] = [];
-  const validFilters = ['from', 'to', 'since', 'until'];
+  const parts = q.split(' ')
+  const options: { [key: string]: string } = {}
+  const words: string[] = []
+  const validFilters = ['from', 'to', 'since', 'until']
 
   parts.forEach((part) => {
-    const separatorIndex = part.indexOf(':');
-    if (separatorIndex > 0) { // must not start with ':' and must contain ':'
-      const key = part.substring(0, separatorIndex);
-      const value = part.substring(separatorIndex + 1);
+    const separatorIndex = part.indexOf(':')
+    if (separatorIndex > 0) {
+      // must not start with ':' and must contain ':'
+      const key = part.substring(0, separatorIndex)
+      const value = part.substring(separatorIndex + 1)
       if (validFilters.includes(key) && value) {
-        options[key] = value;
-        return; // Go to next part
+        options[key] = value
+        return // Go to next part
       }
     }
-    words.push(part); // Not a valid filter, so it's a keyword
-  });
+    words.push(part) // Not a valid filter, so it's a keyword
+  })
 
-  return { options, words };
-};
+  return { options, words }
+}
 
 export default function AdvancedSearchForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
-  const [query, setQuery] = useState('');
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [query, setQuery] = useState('')
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
 
   // Effect to set initial query from URL params
   useEffect(() => {
-    const q = searchParams.get('q') || '';
-    const fromUser = searchParams.get('fromUser') || '';
-    const replyToUser = searchParams.get('replyToUser') || '';
-    const sinceDate = searchParams.get('sinceDate') || '';
-    const untilDate = searchParams.get('untilDate') || '';
-    
-    const parts = [q];
-    if (fromUser) parts.push(`from:${fromUser}`);
-    if (replyToUser) parts.push(`to:${replyToUser}`);
-    if (sinceDate) parts.push(`since:${sinceDate}`);
-    if (untilDate) parts.push(`until:${untilDate}`);
-    
-    setQuery(parts.filter(p => p).join(' ').trim());
+    const q = searchParams.get('q') || ''
+    const fromUser = searchParams.get('fromUser') || ''
+    const replyToUser = searchParams.get('replyToUser') || ''
+    const sinceDate = searchParams.get('sinceDate') || ''
+    const untilDate = searchParams.get('untilDate') || ''
+
+    const parts = [q]
+    if (fromUser) parts.push(`from:${fromUser}`)
+    if (replyToUser) parts.push(`to:${replyToUser}`)
+    if (sinceDate) parts.push(`since:${sinceDate}`)
+    if (untilDate) parts.push(`until:${untilDate}`)
+
+    setQuery(
+      parts
+        .filter((p) => p)
+        .join(' ')
+        .trim(),
+    )
 
     // if (fromUser || replyToUser || sinceDate || untilDate) {
     //   setShowAdvancedOptions(true);
     // }
-  }, [searchParams]);
+  }, [searchParams])
 
   // Derive values for advanced fields from the main query string
   const { from, to, since, until } = useMemo(() => {
-    const { options } = parseQuery(query);
+    const { options } = parseQuery(query)
     return {
       from: options.from || '',
       to: options.to || '',
       since: options.since || '',
       until: options.until || '',
-    };
-  }, [query]);
+    }
+  }, [query])
 
-  const handleFilterChange = (filter: 'from' | 'to' | 'since' | 'until', value: string) => {
-    const { words, options } = parseQuery(query);
+  const handleFilterChange = (
+    filter: 'from' | 'to' | 'since' | 'until',
+    value: string,
+  ) => {
+    const { words, options } = parseQuery(query)
 
     // Update the specific filter's value
     if (value) {
-      options[filter] = value;
+      options[filter] = value
     } else {
-      delete options[filter];
+      delete options[filter]
     }
 
     // Reconstruct the query string
-    const newFilterParts = Object.entries(options).map(([key, val]) => `${key}:${val}`);
-    const newQuery = [...words, ...newFilterParts].join(' ');
-    setQuery(newQuery.trim().replace(/\s+/g, ' '));
-  };
-
+    const newFilterParts = Object.entries(options).map(
+      ([key, val]) => `${key}:${val}`,
+    )
+    const newQuery = [...words, ...newFilterParts].join(' ')
+    setQuery(newQuery.trim().replace(/\s+/g, ' '))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const { options, words } = parseQuery(query);
-    const mainQuery = words.join(' ').trim();
+    e.preventDefault()
 
-    const params = new URLSearchParams();
-    if (mainQuery) params.set('q', mainQuery);
-    if (options.from) params.set('fromUser', options.from);
-    if (options.to) params.set('replyToUser', options.to);
-    if (options.since) params.set('sinceDate', options.since);
-    if (options.until) params.set('untilDate', options.until);
+    const { options, words } = parseQuery(query)
+    const mainQuery = words.join(' ').trim()
 
-    router.push(`/search?${params.toString()}`);
-  };
+    const params = new URLSearchParams()
+    if (mainQuery) params.set('q', mainQuery)
+    if (options.from) params.set('fromUser', options.from)
+    if (options.to) params.set('replyToUser', options.to)
+    if (options.since) params.set('sinceDate', options.since)
+    if (options.until) params.set('untilDate', options.until)
 
-  const inputClasses = "w-full rounded border p-2 dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:placeholder-slate-400 focus:ring-blue-500 focus:border-blue-500";
-  const labelClasses = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
+    router.push(`/search?${params.toString()}`)
+  }
+
+  const inputClasses =
+    'w-full rounded border p-2 dark:bg-muted dark:border-border dark:text-foreground dark:placeholder-muted-foreground focus:ring-brand focus:border-brand'
+  const labelClasses = 'block text-sm font-medium text-muted-foreground mb-1'
 
   return (
-    <div className="bg-slate-100 dark:bg-card p-6 md:p-8 rounded-lg">
+    <div className="rounded-lg bg-muted p-6 dark:bg-card md:p-8">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="main-search" className={labelClasses}>Search terms</label>
-        <input
+          <label htmlFor="main-search" className={labelClasses}>
+            Search terms
+          </label>
+          <input
             id="main-search"
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Search tweets (use from:, to:, since:, until: for advanced search)"
             className={inputClasses}
-        />
+          />
         </div>
 
         <Button
           type="button"
           variant="outline"
           onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-          className="w-full justify-between dark:text-white dark:border-slate-600 dark:hover:bg-slate-700"
+          className="w-full justify-between dark:border-border dark:text-foreground dark:hover:bg-accent"
         >
           Filter by User / Date Range
           {showAdvancedOptions ? (
@@ -131,34 +144,35 @@ export default function AdvancedSearchForm() {
         </Button>
 
         {showAdvancedOptions && (
-          <div className="space-y-4 border-t dark:border-slate-700 pt-4">
+          <div className="space-y-4 border-t pt-4 dark:border-border">
             <div>
-              <label htmlFor="from-user" className={labelClasses}>From user</label>
-            <input
+              <label htmlFor="from-user" className={labelClasses}>
+                From user
+              </label>
+              <input
                 id="from-user"
-              type="text"
-              value={from}
-              onChange={(e) => handleFilterChange('from', e.target.value)}
+                type="text"
+                value={from}
+                onChange={(e) => handleFilterChange('from', e.target.value)}
                 placeholder="username (without @)"
                 className={inputClasses}
-            />
+              />
             </div>
             <div>
-              <label htmlFor="to-user" className={labelClasses}>To user (in reply to username)</label>
-            <input
+              <label htmlFor="to-user" className={labelClasses}>
+                To user (in reply to username)
+              </label>
+              <input
                 id="to-user"
-              type="text"
-              value={to}
-              onChange={(e) => handleFilterChange('to', e.target.value)}
+                type="text"
+                value={to}
+                onChange={(e) => handleFilterChange('to', e.target.value)}
                 placeholder="username (without @)"
                 className={inputClasses}
-            />
+              />
             </div>
             <div>
-              <label
-                htmlFor="since-date"
-                className={labelClasses}
-              >
+              <label htmlFor="since-date" className={labelClasses}>
                 From date:
               </label>
               <input
@@ -170,10 +184,7 @@ export default function AdvancedSearchForm() {
               />
             </div>
             <div>
-              <label
-                htmlFor="until-date"
-                className={labelClasses}
-              >
+              <label htmlFor="until-date" className={labelClasses}>
                 To date:
               </label>
               <input
@@ -189,7 +200,7 @@ export default function AdvancedSearchForm() {
 
         <Button
           type="submit"
-          className="w-full rounded bg-blue-600 p-3 text-lg text-white hover:bg-blue-700 dark:bg-blue-400 dark:hover:bg-blue-300 dark:text-blue-950 transition-colors duration-300"
+          className="w-full rounded bg-brand p-3 text-lg text-white transition-colors duration-300 hover:bg-brand/90 dark:bg-brand dark:text-brand-foreground dark:hover:bg-brand/90"
           // disabled={isLoading} // isLoading state is removed
         >
           Search

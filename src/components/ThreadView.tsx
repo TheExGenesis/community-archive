@@ -8,10 +8,10 @@ interface ThreadViewProps {
   className?: string
 }
 
-export const ThreadView: React.FC<ThreadViewProps> = ({ 
-  tree, 
+export const ThreadView: React.FC<ThreadViewProps> = ({
+  tree,
   highlightTweetId,
-  className = "" 
+  className = '',
 }) => {
   // Convert ThreadTweet to TweetData format for TweetComponent
   const convertToTweetData = (tweet: ThreadTweet) => ({
@@ -30,47 +30,58 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
     account_display_name: tweet.account_display_name,
     media: tweet.media || [],
     urls: [],
-    reply_to_username: tweet.reply_to_username || undefined
+    reply_to_username: tweet.reply_to_username || undefined,
   })
 
   // Render tweet with children recursively
-  const renderTweetWithThread = (tweetId: string, depth: number = 0): JSX.Element => {
+  const renderTweetWithThread = (
+    tweetId: string,
+    depth: number = 0,
+  ): JSX.Element => {
     const tweet = tree.tweets[tweetId]
     const children = tree.children[tweetId] || []
     const isHighlighted = highlightTweetId === tweetId
 
     return (
-      <div key={tweetId} className={`thread-tweet-container ${depth > 0 ? 'ml-8 pl-4 border-l-2 border-gray-200 dark:border-gray-700' : ''}`}>
+      <div
+        key={tweetId}
+        className={`thread-tweet-container ${depth > 0 ? 'ml-8 border-l-2 border-border pl-4' : ''}`}
+      >
         {tweet.is_deleted_placeholder ? (
           // Tombstone — deleted from the archive AND syndication couldn't find it.
-          <div className="border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 text-gray-500 dark:text-gray-400 italic p-4 rounded-lg mb-4 text-sm">
+          <div className="mb-4 rounded-lg border border-dashed border-border bg-muted p-4 text-sm italic text-muted-foreground dark:bg-card">
             [Tweet deleted]
           </div>
         ) : (
-          <div className={`
-            ${isHighlighted ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' : tweet.from_external ? 'bg-amber-50/60 dark:bg-amber-900/10 border border-dashed border-amber-300 dark:border-amber-700' : 'bg-background dark:bg-secondary'}
-            p-4 rounded-lg mb-4 relative
-          `}>
+          <div
+            className={`
+            ${isHighlighted ? 'border border-border bg-muted' : tweet.from_external ? 'border border-dashed border-amber-300 bg-amber-50/60 dark:border-amber-700 dark:bg-amber-900/10' : 'bg-background dark:bg-secondary'}
+            relative mb-4 rounded-lg p-4
+          `}
+          >
             {tweet.from_external && (
               // Hydrated at render time from Twitter syndication — not stored in our
               // archive, not returned in search.
-              <span className="absolute right-3 top-3 text-[10px] uppercase tracking-wide text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded">
+              <span className="absolute right-3 top-3 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                 from Twitter · not archived
               </span>
             )}
             <TweetComponent tweet={convertToTweetData(tweet)} />
           </div>
         )}
-        
+
         {children.length > 0 && (
           <div className="thread-children">
             {children
               .sort((a, b) => {
                 const tweetA = tree.tweets[a]
                 const tweetB = tree.tweets[b]
-                return new Date(tweetA.created_at).getTime() - new Date(tweetB.created_at).getTime()
+                return (
+                  new Date(tweetA.created_at).getTime() -
+                  new Date(tweetB.created_at).getTime()
+                )
               })
-              .map(childId => renderTweetWithThread(childId, depth + 1))}
+              .map((childId) => renderTweetWithThread(childId, depth + 1))}
           </div>
         )}
       </div>
@@ -80,14 +91,17 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
   // Render all roots. When some parent tweets in the conversation were deleted, each
   // surviving orphan reply gets a synthesized placeholder parent that becomes its own
   // root, so the tree can have more than one.
-  const allRoots = tree.roots && tree.roots.length > 0
-    ? tree.roots
-    : tree.root ? [tree.root] : []
+  const allRoots =
+    tree.roots && tree.roots.length > 0
+      ? tree.roots
+      : tree.root
+        ? [tree.root]
+        : []
 
   if (allRoots.length === 0) {
     return (
-      <div className={`${className} text-center py-8`}>
-        <p className="text-gray-500 dark:text-gray-400">No thread structure found</p>
+      <div className={`${className} py-8 text-center`}>
+        <p className="text-muted-foreground">No thread structure found</p>
       </div>
     )
   }
@@ -100,7 +114,7 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
   return (
     <div className={`thread-view ${className}`}>
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        <h3 className="mb-2 text-lg font-semibold text-foreground">
           🧵 Thread ({realCount} {realCount === 1 ? 'tweet' : 'tweets'})
         </h3>
       </div>

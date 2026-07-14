@@ -14,7 +14,8 @@ import { createBrowserClient } from '@/utils/supabase'
 import { Users, Puzzle, Upload } from 'lucide-react'
 import { devLog } from '@/lib/devLog'
 
-const CHROME_EXTENSION_URL = 'https://chromewebstore.google.com/detail/community-archive-stream/igclpobjpjlphgllncjcgaookmncegbk'
+const CHROME_EXTENSION_URL =
+  'https://chromewebstore.google.com/detail/community-archive-stream/igclpobjpjlphgllncjcgaookmncegbk'
 
 export default function HeroCTAButtons() {
   const router = useRouter()
@@ -31,13 +32,17 @@ export default function HeroCTAButtons() {
   // Get current user session
   useEffect(() => {
     const getCurrentUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       setUser(session?.user || null)
     }
 
     getCurrentUser()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null)
     })
 
@@ -80,7 +85,7 @@ export default function HeroCTAButtons() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: 'dev@example.com',
-            password: 'devpassword123'
+            password: 'devpassword123',
           }),
         })
 
@@ -137,7 +142,7 @@ export default function HeroCTAButtons() {
           username: twitterUsername.toLowerCase(),
           twitterUserId: twitterUserId || null,
           optedIn: true,
-          termsVersion: 'v1.0'
+          termsVersion: 'v1.0',
         }),
       })
 
@@ -158,39 +163,35 @@ export default function HeroCTAButtons() {
 
   const getOptInButtonText = () => {
     if (isOptInLoading) return 'Processing...'
-    if (isOptedIn) return 'Opted in'
     if (!user) return 'Opt in'
     return 'Opt in'
   }
 
   const getOptInButtonStyle = () => {
-    if (isOptedIn) {
-      return 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 cursor-default'
-    }
     return 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-400 dark:hover:bg-green-300 dark:text-green-950'
   }
 
   return (
     <TooltipProvider delayDuration={150}>
       <div className="flex flex-col items-center gap-4">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:gap-4">
           {/* Opt In Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                onClick={handleOptIn}
-                disabled={isOptInLoading || isOptedIn === true}
-                className={`h-14 px-8 text-lg font-semibold w-full ${getOptInButtonStyle()}`}
-                size="lg"
-              >
-                <Users className="w-5 h-5 mr-2" />
-                {getOptInButtonText()}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {isOptedIn ? 'Your tweets are being archived' : 'Archive your public tweets'}
-            </TooltipContent>
-          </Tooltip>
+          {isOptedIn !== true ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={handleOptIn}
+                  disabled={isOptInLoading}
+                  className={`h-14 w-full px-8 text-lg font-semibold ${getOptInButtonStyle()}`}
+                  size="lg"
+                >
+                  <Users className="mr-2 h-5 w-5" />
+                  {getOptInButtonText()}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Archive your public tweets</TooltipContent>
+            </Tooltip>
+          ) : null}
 
           {/* Install Extension Button */}
           <Tooltip>
@@ -198,11 +199,15 @@ export default function HeroCTAButtons() {
               <Button
                 asChild
                 variant="outline"
-                className="h-14 px-8 text-lg font-semibold border-2 w-full"
+                className="h-14 w-full border-2 px-8 text-lg font-semibold"
                 size="lg"
               >
-                <a href={CHROME_EXTENSION_URL} target="_blank" rel="noopener noreferrer">
-                  <Puzzle className="w-5 h-5 mr-2" />
+                <a
+                  href={CHROME_EXTENSION_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Puzzle className="mr-2 h-5 w-5" />
                   Get extension
                 </a>
               </Button>
@@ -216,11 +221,11 @@ export default function HeroCTAButtons() {
               <Button
                 asChild
                 variant="outline"
-                className="h-14 px-8 text-lg font-semibold border-2 w-full"
+                className="h-14 w-full border-2 px-8 text-lg font-semibold"
                 size="lg"
               >
                 <a href="#upload-archive">
-                  <Upload className="w-5 h-5 mr-2" />
+                  <Upload className="mr-2 h-5 w-5" />
                   Upload archive
                 </a>
               </Button>

@@ -18,7 +18,7 @@ import { FilterCriteria } from '@/lib/queries/tweetQueries'
 import { Archive, Radio } from 'lucide-react'
 
 // Style constants (glows removed)
-const unifiedDeepBlueBase = 'bg-white dark:bg-background'
+const unifiedDeepBlueBase = 'bg-card dark:bg-background'
 const sectionPaddingClasses = 'py-12 md:py-16 lg:py-20'
 const contentWrapperClasses =
   'w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'
@@ -27,9 +27,9 @@ const UserProfile = ({ userData }: { userData: FormattedUser }) => {
   const account = userData
   return (
     // Profile info card - Removed shadow
-    <div className="mb-8 rounded-lg bg-slate-100 p-6 dark:bg-card sm:p-8">
+    <div className="mb-8 rounded-lg bg-muted p-6 dark:bg-card sm:p-8">
       <div className="flex flex-col items-center space-y-4 sm:flex-row sm:items-start sm:space-x-6 sm:space-y-0">
-        <Avatar className="h-24 w-24 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-800 sm:h-28 sm:w-28">
+        <Avatar className="h-24 w-24 ring-2 ring-brand ring-offset-2 dark:ring-offset-background sm:h-28 sm:w-28">
           <AvatarImage
             src={account.avatar_media_url || '/placeholder.jpg'}
             alt={`${account.account_display_name}'s avatar`}
@@ -39,12 +39,10 @@ const UserProfile = ({ userData }: { userData: FormattedUser }) => {
           </AvatarFallback>
         </Avatar>
         <div className="flex-grow text-center sm:text-left">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white sm:text-4xl">
+          <h1 className="text-3xl font-bold text-foreground sm:text-4xl">
             {account.account_display_name}
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
-            @{account.username}
-          </p>
+          <p className="text-lg text-muted-foreground">@{account.username}</p>
           <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
             {account.has_archive && (
               <Badge variant="outline" className="gap-1.5">
@@ -60,11 +58,11 @@ const UserProfile = ({ userData }: { userData: FormattedUser }) => {
             )}
           </div>
           {account.bio && (
-            <p className="mt-3 text-sm text-gray-700 dark:text-gray-300 sm:text-base">
+            <p className="mt-3 text-sm text-muted-foreground sm:text-base">
               {account.bio}
             </p>
           )}
-          <div className="mt-3 space-y-1 text-sm text-gray-500 dark:text-gray-400">
+          <div className="mt-3 space-y-1 text-sm text-muted-foreground">
             {account.location && <p>📍 {account.location}</p>}
             {account.created_at && (
               <p>
@@ -86,27 +84,27 @@ const UserProfile = ({ userData }: { userData: FormattedUser }) => {
           </div>
         </div>
       </div>
-      <div className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-3 border-t border-gray-200 pt-6 text-sm text-gray-700 dark:border-gray-700 dark:text-gray-300 sm:justify-start">
+      <div className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-3 border-t border-border pt-6 text-sm text-muted-foreground dark:border-border dark:text-muted-foreground sm:justify-start">
         <p>
-          <strong className="font-semibold text-gray-800 dark:text-white">
+          <strong className="font-semibold text-foreground">
             {formatNumber(account.num_tweets)}
           </strong>{' '}
           Tweets
         </p>
         <p>
-          <strong className="font-semibold text-gray-800 dark:text-white">
+          <strong className="font-semibold text-foreground">
             {formatNumber(account.num_followers)}
           </strong>{' '}
           Followers
         </p>
         <p>
-          <strong className="font-semibold text-gray-800 dark:text-white">
+          <strong className="font-semibold text-foreground">
             {formatNumber(account.num_following)}
           </strong>{' '}
           Following
         </p>
         <p>
-          <strong className="font-semibold text-gray-800 dark:text-white">
+          <strong className="font-semibold text-foreground">
             {formatNumber(account.num_likes)}
           </strong>{' '}
           Likes
@@ -140,11 +138,11 @@ export default async function User({
       >
         <div className={`${contentWrapperClasses} text-center`}>
           {/* Error card - Removed shadow */}
-          <div className="rounded-lg bg-slate-100 p-8 dark:bg-card">
+          <div className="rounded-lg bg-muted p-8 dark:bg-card">
             <h1 className="text-2xl font-bold text-red-600 dark:text-red-400">
               Error Fetching User Data
             </h1>
-            <p className="mt-2 text-gray-600 dark:text-gray-300">
+            <p className="mt-2 text-muted-foreground">
               Could not retrieve information for this user. Please try again
               later.
             </p>
@@ -188,7 +186,7 @@ export default async function User({
         {/* UserProfile Suspense - Removed shadow from Skeleton */}
         <Suspense
           fallback={
-            <Skeleton className="h-60 w-full rounded-lg bg-slate-100 p-8 dark:bg-card" />
+            <Skeleton className="h-60 w-full rounded-lg bg-muted p-8 dark:bg-card" />
           }
         >
           <UserProfile userData={userData} />
@@ -197,13 +195,13 @@ export default async function User({
         {showingSummaryData ? (
           <>
             {/* Most Mentioned Accounts card - Removed shadow */}
-            <div className="rounded-lg bg-slate-100 p-6 dark:bg-card sm:p-8">
-              <h2 className="mb-4 text-2xl font-semibold text-gray-900 dark:text-white">
+            <div className="rounded-lg bg-muted p-6 dark:bg-card sm:p-8">
+              <h2 className="mb-4 text-2xl font-semibold text-foreground">
                 Most Mentioned Accounts
               </h2>
               <Suspense
                 fallback={
-                  <Skeleton className="h-[20vh] w-full rounded bg-slate-200 dark:bg-slate-700" />
+                  <Skeleton className="h-[20vh] w-full rounded bg-muted" />
                 }
               >
                 <TopMentionedUsers
@@ -214,28 +212,26 @@ export default async function User({
             </div>
 
             {/* Top Tweets card - Removed shadow */}
-            <div className="rounded-lg bg-slate-100 p-6 dark:bg-card sm:p-8">
-              <h2 className="mb-4 text-2xl font-semibold text-gray-900 dark:text-white">
+            <div className="rounded-lg bg-muted p-6 dark:bg-card sm:p-8">
+              <h2 className="mb-4 text-2xl font-semibold text-foreground">
                 Top Tweets
               </h2>
               <Suspense
-                fallback={
-                  <Skeleton className="h-96 w-full rounded bg-slate-200 dark:bg-slate-700" />
-                }
+                fallback={<Skeleton className="h-96 w-full rounded bg-muted" />}
               >
                 <AccountTopTweets userData={userData} />
               </Suspense>
             </div>
           </>
         ) : (
-          <div className="rounded-lg bg-slate-100 p-8 text-center dark:bg-card">
+          <div className="rounded-lg bg-muted p-8 text-center dark:bg-card">
             {/* Activity summary placeholder card - Removed shadow */}
-            <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
+            <h3 className="text-xl font-semibold text-foreground">
               {userData.account_id
                 ? 'Activity summary not yet available.'
                 : 'Activity is not linked yet.'}
             </h3>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            <p className="mt-2 text-sm text-muted-foreground">
               {userData.account_id
                 ? 'Detailed activity data like top tweets and mentions is currently being processed or is not available for this user. Basic profile information is still shown above.'
                 : 'This member has opted in, but their Twitter account ID has not been connected to archived or streamed activity yet.'}
@@ -244,8 +240,8 @@ export default async function User({
         )}
 
         {userData.account_id && (
-          <div className="rounded-lg bg-slate-100 p-6 dark:bg-card sm:p-8">
-            <h2 className="mb-6 text-2xl font-semibold text-gray-900 dark:text-white">
+          <div className="rounded-lg bg-muted p-6 dark:bg-card sm:p-8">
+            <h2 className="mb-6 text-2xl font-semibold text-foreground">
               Recent Tweets
             </h2>
             <TweetList

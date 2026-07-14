@@ -35,7 +35,7 @@ const colorIntensity = (
   isBeforeStart: boolean,
 ) => {
   if (isBeforeStart) return 'bg-transparent'
-  if (count === 0) return 'bg-gray-200 dark:bg-gray-800'
+  if (count === 0) return 'bg-muted'
   const intensity = Math.ceil((count / maxCount) * 10)
   switch (intensity) {
     case 1:
@@ -154,7 +154,7 @@ export function ActivityTracker({ data = {} }: ActivityTrackerProps) {
                             maxCount,
                             isBeforeStart,
                           )} ${
-                            isBeforeStart ? '' : 'border border-gray-300'
+                            isBeforeStart ? '' : 'border border-border'
                           } cursor-pointer`}
                         />
                       </TooltipTrigger>

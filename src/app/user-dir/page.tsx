@@ -146,16 +146,16 @@ export default function UserDirectoryPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white py-12 dark:bg-background md:py-16">
+    <main className="min-h-screen bg-card py-12 dark:bg-background md:py-16">
       <div className="relative mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto mb-10 max-w-2xl text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-950 dark:text-white sm:text-5xl">
+          <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
             User Directory
           </h1>
-          <p className="mt-3 text-base text-gray-600 dark:text-gray-400">
+          <p className="mt-3 text-base text-muted-foreground">
             People preserving and participating in the Community Archive.
           </p>
-          <p className="mt-2 text-sm font-medium text-gray-500 dark:text-gray-500">
+          <p className="mt-2 text-sm font-medium text-muted-foreground">
             {loading && users.length === 0
               ? 'Loading members…'
               : `${users.length} of ${totalCount.toLocaleString()} members`}
@@ -165,23 +165,23 @@ export default function UserDirectoryPage() {
         <div className="relative mx-auto mb-6 max-w-xl">
           <Search
             aria-hidden="true"
-            className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+            className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
           />
           <Input
             aria-label="Search the user directory"
             placeholder="Search by name or username…"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="h-12 rounded-xl border-gray-300 bg-white pl-11 shadow-sm dark:border-gray-700 dark:bg-gray-950"
+            className="h-12 rounded-xl border-border bg-card pl-11 shadow-sm dark:border-border dark:bg-background"
           />
         </div>
 
         <div
-          className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-card"
+          className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm dark:border-border dark:bg-card"
           aria-busy={loading}
         >
           <Table>
-            <TableHeader className="bg-gray-50/80 dark:bg-gray-900/60">
+            <TableHeader className="bg-muted/50 dark:bg-card">
               <TableRow className="hover:bg-transparent">
                 <TableHead
                   className="w-[42%] py-2"
@@ -197,7 +197,7 @@ export default function UserDirectoryPage() {
                     variant="ghost"
                     onClick={() => handleSort('account_display_name')}
                     aria-label="Sort by member name"
-                    className="-ml-3 h-8 px-3 text-xs font-semibold uppercase tracking-wider hover:bg-gray-200/70 dark:hover:bg-gray-800"
+                    className="-ml-3 h-8 px-3 text-xs font-semibold uppercase tracking-wider hover:bg-accent"
                   >
                     Member {renderSortIcon('account_display_name')}
                   </Button>
@@ -219,7 +219,7 @@ export default function UserDirectoryPage() {
                     variant="ghost"
                     onClick={() => handleSort('num_followers')}
                     aria-label="Sort by follower count"
-                    className="-mr-3 h-8 px-3 text-xs font-semibold uppercase tracking-wider hover:bg-gray-200/70 dark:hover:bg-gray-800"
+                    className="-mr-3 h-8 px-3 text-xs font-semibold uppercase tracking-wider hover:bg-accent"
                   >
                     Followers {renderSortIcon('num_followers')}
                   </Button>
@@ -238,7 +238,7 @@ export default function UserDirectoryPage() {
                     variant="ghost"
                     onClick={() => handleSort('joined_at')}
                     aria-label="Sort by join date"
-                    className="-mr-3 h-8 px-3 text-xs font-semibold uppercase tracking-wider hover:bg-gray-200/70 dark:hover:bg-gray-800"
+                    className="-mr-3 h-8 px-3 text-xs font-semibold uppercase tracking-wider hover:bg-accent"
                   >
                     Joined {renderSortIcon('joined_at')}
                   </Button>
@@ -249,7 +249,7 @@ export default function UserDirectoryPage() {
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={4} className="h-40 text-center">
-                    <span className="inline-flex items-center text-sm text-gray-500 dark:text-gray-400">
+                    <span className="inline-flex items-center text-sm text-muted-foreground">
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Loading members…
                     </span>
@@ -268,7 +268,7 @@ export default function UserDirectoryPage() {
                 <TableRow>
                   <TableCell
                     colSpan={4}
-                    className="h-40 text-center text-sm text-gray-500 dark:text-gray-400"
+                    className="h-40 text-center text-sm text-muted-foreground"
                   >
                     No members match “{debouncedSearch}”.
                   </TableCell>
@@ -277,7 +277,7 @@ export default function UserDirectoryPage() {
                 users.map((user) => {
                   const identity = (
                     <div className="flex min-w-0 items-center gap-3">
-                      <Avatar className="h-11 w-11 border border-gray-200 dark:border-gray-700">
+                      <Avatar className="h-11 w-11 border border-border">
                         <AvatarImage
                           src={user.avatar_media_url || '/placeholder.jpg'}
                           alt={`${user.account_display_name}'s avatar`}
@@ -287,10 +287,10 @@ export default function UserDirectoryPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <div className="truncate font-semibold text-gray-950 dark:text-gray-100">
+                        <div className="truncate font-semibold text-foreground">
                           {user.account_display_name}
                         </div>
-                        <div className="truncate text-sm text-gray-500 dark:text-gray-400">
+                        <div className="truncate text-sm text-muted-foreground">
                           @{user.username}
                         </div>
                       </div>
@@ -300,7 +300,7 @@ export default function UserDirectoryPage() {
                   return (
                     <TableRow
                       key={user.directory_id}
-                      className="group border-gray-200 hover:bg-gray-50/80 dark:border-gray-800 dark:hover:bg-gray-900/60"
+                      className="group border-border hover:bg-accent dark:border-border dark:hover:bg-accent"
                     >
                       <TableCell className="py-4">
                         <Link
@@ -316,7 +316,7 @@ export default function UserDirectoryPage() {
                             <Badge
                               variant="outline"
                               title="Contributed a Twitter archive"
-                              className="gap-1.5 border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300"
+                              className="gap-1.5 border-border bg-muted px-2.5 py-1 font-medium text-brand dark:border-border dark:bg-muted dark:text-brand"
                             >
                               <Archive
                                 aria-hidden="true"
@@ -340,12 +340,12 @@ export default function UserDirectoryPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-sm font-medium tabular-nums text-gray-700 dark:text-gray-300">
+                      <TableCell className="whitespace-nowrap text-right text-sm font-medium tabular-nums text-muted-foreground">
                         {user.num_followers == null
                           ? '—'
                           : formatNumber(user.num_followers)}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <TableCell className="whitespace-nowrap text-right text-sm font-medium text-muted-foreground">
                         <time dateTime={user.joined_at || undefined}>
                           {formatJoinedDate(user.joined_at)}
                         </time>

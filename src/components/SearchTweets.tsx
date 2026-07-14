@@ -118,7 +118,7 @@ export default function SearchTweets({
           />
           <button
             onClick={handleSearch}
-            className="rounded bg-blue-500 px-4 py-2 text-white"
+            className="rounded bg-brand px-4 py-2 text-white"
             disabled={isLoading}
           >
             {isLoading ? 'Searching...' : 'Search'}
@@ -127,7 +127,7 @@ export default function SearchTweets({
       </div>
       <ScrollArea className="flex-grow">
         <div className="pr-4">
-          <UnifiedTweetList 
+          <UnifiedTweetList
             tweets={allTweets}
             isLoading={isLoading}
             emptyMessage="No tweets found"

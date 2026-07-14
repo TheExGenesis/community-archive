@@ -140,13 +140,13 @@ export function FileUploadDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={resetDialog}>
-      <DialogContent 
+      <DialogContent
         className="sm:max-w-[425px]"
         onInteractOutside={(event) => {
-          event.preventDefault();
+          event.preventDefault()
         }}
         onEscapeKeyDown={(event) => {
-          event.preventDefault();
+          event.preventDefault()
         }}
       >
         <DialogHeader>
@@ -165,7 +165,7 @@ export function FileUploadDialog({
             <p className="mb-2 text-sm text-red-600">
               Sorry, there was an error:
             </p>
-            <pre className="whitespace-pre-wrap break-words rounded bg-gray-100 p-2 font-mono text-sm text-gray-900 dark:bg-gray-800 dark:text-gray-100">
+            <pre className="whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-sm text-foreground dark:bg-muted dark:text-foreground">
               {state.error}
             </pre>
           </div>
@@ -191,12 +191,16 @@ export function FileUploadDialog({
             </div>
 
             {/* Circle Tweet Warning */}
-            {new Date(archiveStats.earliestTweetDate) < new Date('2023-10-31') && (
-              <div className="my-2 p-3 bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 dark:border-yellow-700 text-yellow-700 dark:text-yellow-200 rounded">
-                <p className="font-bold">Important Notice Regarding Twitter Circle Tweets:</p>
+            {new Date(archiveStats.earliestTweetDate) <
+              new Date('2023-10-31') && (
+              <div className="my-2 rounded border border-yellow-400 bg-yellow-100 p-3 text-yellow-700 dark:border-yellow-700 dark:bg-yellow-900 dark:text-yellow-200">
+                <p className="font-bold">
+                  Important Notice Regarding Twitter Circle Tweets:
+                </p>
                 <p className="text-sm">
-                  Your archive may contain tweets from before October 31, 2023. 
-                  Any Twitter Circle tweets from this period will be treated as public tweets and will be visible to everyone in this archive. 
+                  Your archive may contain tweets from before October 31, 2023.
+                  Any Twitter Circle tweets from this period will be treated as
+                  public tweets and will be visible to everyone in this archive.
                   By proceeding, you acknowledge this.
                 </p>
               </div>
@@ -234,7 +238,7 @@ export function FileUploadDialog({
                           <TooltipTrigger asChild>
                             <Info className="ml-1 h-4 w-4 cursor-pointer text-muted-foreground hover:text-primary" />
                           </TooltipTrigger>
-                          <TooltipContent className="bg-gray-800 text-white">
+                          <TooltipContent>
                             <p>Upload likes and liked tweets.</p>
                           </TooltipContent>
                         </Tooltip>
@@ -257,7 +261,7 @@ export function FileUploadDialog({
                           <TooltipTrigger asChild>
                             <Info className="ml-1 h-4 w-4 cursor-pointer text-muted-foreground hover:text-primary" />
                           </TooltipTrigger>
-                          <TooltipContent className="bg-gray-800 text-white">
+                          <TooltipContent>
                             <p>
                               Select a date range to filter tweets for upload
                             </p>

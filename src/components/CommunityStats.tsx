@@ -13,26 +13,33 @@ interface CommunityStatsProps {
   showGoal?: boolean
 }
 
-const CommunityStats = ({ 
+const CommunityStats = ({
   accountCount,
   tweetCount,
   likedTweetCount,
-  showGoal = false
+  showGoal = false,
 }: CommunityStatsProps) => {
-
-  if (accountCount === null || tweetCount === null || likedTweetCount === null) {
-    return <p className="text-lg sm:text-xl text-center text-gray-700 dark:text-gray-300">Community statistics are currently unavailable.</p>
+  if (
+    accountCount === null ||
+    tweetCount === null ||
+    likedTweetCount === null
+  ) {
+    return (
+      <p className="text-center text-lg text-muted-foreground sm:text-xl">
+        Community statistics are currently unavailable.
+      </p>
+    )
   }
 
   const goal = calculateGoal(accountCount || 0)
 
   return (
-    <p className="text-xl text-gray-800 dark:text-gray-200">
+    <p className="text-xl text-foreground">
       We have <strong>{formatNumber(tweetCount)}</strong> tweets and{' '}
       <strong>{formatNumber(likedTweetCount)}</strong> liked tweets from{' '}
       <strong>{formatNumber(accountCount)}</strong> accounts.
       {showGoal && goal && (
-        <span className="italic ml-1">
+        <span className="ml-1 italic">
           Next milestone: <strong>{formatNumber(goal)}</strong> accounts.
         </span>
       )}

@@ -90,7 +90,7 @@ const AccountTopTweetsClient: React.FC<Props> = ({
           ))}
         </div> */}
         <div>
-          <span className="mr-4 text-sm text-gray-600">
+          <span className="mr-4 text-sm text-muted-foreground">
             Copy all tweets as text
           </span>
           <CopyButton textToCopy={getTweetsAsText()} />
@@ -125,12 +125,16 @@ const AccountTopTweetsClient: React.FC<Props> = ({
                     account_display_name: displayName,
                     media: [],
                     urls: [],
-                    reply_to_username: popularTweet.reply_to_username || undefined,
+                    reply_to_username:
+                      popularTweet.reply_to_username || undefined,
                     mentioned_users: [],
                   }
 
                   return (
-                    <div key={popularTweet.tweet_id} className="bg-background dark:bg-secondary p-4 rounded-lg border border-gray-200 dark:border-gray-700 mb-4">
+                    <div
+                      key={popularTweet.tweet_id}
+                      className="mb-4 rounded-lg border border-border bg-background p-4 dark:bg-secondary"
+                    >
                       <TweetComponent
                         tweet={tweetForTweetComponent} // Pass the constructed object
                       />

@@ -304,7 +304,9 @@ export default function ProfileContent({
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <Label htmlFor="email">Email:</Label>
-              <span className="text-muted-foreground">{user.email}</span>
+              <span className="text-muted-foreground">
+                {user.email || 'Not provided by X'}
+              </span>
             </div>
           </div>
         </CardContent>

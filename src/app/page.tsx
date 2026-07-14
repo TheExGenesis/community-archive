@@ -131,8 +131,8 @@ export default async function Homepage() {
     console.error('Failed to fetch stats for homepage:', error)
     return {
       accountCount: null,
+      optInCount: null,
       tweetCount: null,
-      likedTweetCount: null,
       userMentionsCount: null,
     }
   })
@@ -172,8 +172,8 @@ export default async function Homepage() {
         >
           <CommunityStats
             accountCount={stats.accountCount}
+            optInCount={stats.optInCount}
             tweetCount={stats.tweetCount}
-            likedTweetCount={stats.likedTweetCount}
             showGoal={false}
           />
           {mostFollowed.length > 0 ? (

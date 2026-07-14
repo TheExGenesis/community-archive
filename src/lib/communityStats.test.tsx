@@ -13,8 +13,9 @@ describe('<CommunityStats />', () => {
     )
 
     expect(markup).toContain('<strong>13.6M</strong> tweets')
-    expect(markup).toContain('<strong>337</strong> users who uploaded archives')
-    expect(markup).toContain('<strong>48</strong> users opted in')
+    expect(markup).toContain('<strong>337</strong> uploaded')
+    expect(markup).toContain('<strong>48</strong> opted in')
+    expect(markup).not.toMatch(/users|archives/i)
     expect(markup).not.toMatch(/liked tweets/i)
   })
 })

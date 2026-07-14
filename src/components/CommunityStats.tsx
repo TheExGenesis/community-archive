@@ -29,9 +29,9 @@ const CommunityStats = ({
 
   return (
     <p className="text-xl text-gray-800 dark:text-gray-200">
-      We have <strong>{formatNumber(tweetCount)}</strong> tweets from{' '}
-      <strong>{formatNumber(accountCount)}</strong> users who uploaded archives,
-      and <strong>{formatNumber(optInCount)}</strong> users opted in.
+      We have <strong>{formatNumber(tweetCount)}</strong> tweets,{' '}
+      <strong>{formatNumber(accountCount)}</strong> uploaded, and{' '}
+      <strong>{formatNumber(optInCount)}</strong> opted in.
       {showGoal && goal && (
         <span className="italic ml-1">
           Next milestone: <strong>{formatNumber(goal)}</strong> accounts.

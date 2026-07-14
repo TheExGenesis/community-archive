@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatNumber } from '@/lib/formatNumber'
+import { buildSearchParams } from '@/lib/searchParams'
 
 interface MemberSearchLandingProps {
   tweetCount: number | null
@@ -36,7 +37,8 @@ export default function MemberSearchLanding({
   const search = (expression: string) => {
     const trimmedQuery = expression.trim()
     if (!trimmedQuery) return
-    router.push(`/search?q=${encodeURIComponent(trimmedQuery)}`)
+    const params = buildSearchParams(trimmedQuery)
+    router.push(`/search?${params.toString()}`)
   }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {

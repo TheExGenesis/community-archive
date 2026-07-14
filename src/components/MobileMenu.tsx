@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -18,8 +19,6 @@ const baseNavItems = [
   { href: '/user-dir', label: 'User Directory' },
   { href: '/search', label: 'Advanced Search' },
 ]
-
-const streamingNavItems = [{ href: '/stream-monitor', label: 'Stream Monitor' }]
 
 const userNavItems = [{ href: '/profile', label: 'Profile' }]
 const adminNavItems = [{ href: '/admin', label: 'Admin' }]
@@ -34,7 +33,6 @@ export default function MobileMenu({
 
   const navItems = [
     ...baseNavItems,
-    ...streamingNavItems,
     ...userNavItems,
     ...(isAdmin ? adminNavItems : []),
   ]
@@ -52,6 +50,9 @@ export default function MobileMenu({
           <SheetTitle className="text-left text-lg font-semibold">
             Navigation
           </SheetTitle>
+          <SheetDescription className="sr-only">
+            Browse Community Archive pages.
+          </SheetDescription>
         </SheetHeader>
         <nav className="flex flex-col space-y-2">
           {navItems.map((item) => (

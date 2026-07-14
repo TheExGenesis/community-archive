@@ -3,9 +3,10 @@
 import React from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { FaHeart, FaRetweet, FaExternalLinkAlt, FaReply } from 'react-icons/fa'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { formatNumber } from '@/lib/formatNumber'
 import NextImage from 'next/image'
+import TweetAvatarImage from '@/components/TweetAvatarImage'
 
 export interface TweetMedia {
   media_url: string
@@ -107,7 +108,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
   // Support both interface formats for backwards compatibility
   const originalUsername = tweet.username || tweet.account?.username || 'Unknown'
   const originalDisplayName = tweet.account_display_name || tweet.account?.account_display_name || 'Unknown'
-  const originalProfilePicUrl = tweet.avatar_media_url || tweet.account?.profile?.avatar_media_url || '/placeholder.jpg'
+  const originalProfilePicUrl = tweet.avatar_media_url || tweet.account?.profile?.avatar_media_url
   const replyToUsername = tweet.reply_to_username
 
   const isRetweet = !!tweet.retweeted_tweet_id
@@ -139,13 +140,13 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
         profilePicUrl = mentionedUser.account.profile.avatar_media_url
       } else {
         // For RT tweets, if we don't have the retweeted user's avatar, use placeholder
-        profilePicUrl = '/placeholder.jpg'
+        profilePicUrl = undefined
       }
     } else {
       // If we can't find the mentioned user data, still use extracted username but placeholder avatar
       displayUsername = rtUsername
       displayName = rtUsername // fallback to username as display name
-      profilePicUrl = '/placeholder.jpg'
+      profilePicUrl = undefined
     }
   }
 
@@ -229,7 +230,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
         </div>
       )
     }
-    const quotedProfilePic = quotedTweet.avatar_media_url || '/placeholder.jpg'
+    const quotedProfilePic = quotedTweet.avatar_media_url
     // Border + marker for syndication-hydrated quotes so it's clear the data isn't
     // from this archive.
     const externalClasses = quotedTweet.from_external
@@ -245,9 +246,11 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
         )}
         <div className="flex items-start space-x-3">
           <Avatar className="h-8 w-8 flex-shrink-0">
-            <AvatarImage
+            <TweetAvatarImage
               src={quotedProfilePic}
               alt={`${quotedTweet.account_display_name}'s profile picture`}
+              username={quotedTweet.username}
+              tweetId={quotedTweet.tweet_id}
             />
             <AvatarFallback>{quotedTweet.account_display_name?.charAt(0) || quotedTweet.username?.charAt(0) || 'U'}</AvatarFallback>
           </Avatar>
@@ -328,9 +331,11 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({ tweet, className
 
       <div className="mb-2 flex items-start">
         <Avatar className="mr-3 h-12 w-12">
-          <AvatarImage
+          <TweetAvatarImage
             src={profilePicUrl}
             alt={`${displayName}'s profile picture`}
+            username={displayUsername}
+            tweetId={tweet.retweeted_tweet_id || tweet.tweet_id}
           />
           <AvatarFallback>{displayName?.charAt(0) || displayUsername?.charAt(0) || 'U'}</AvatarFallback>
         </Avatar>

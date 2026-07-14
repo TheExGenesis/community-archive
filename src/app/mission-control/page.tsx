@@ -13,8 +13,7 @@ export default async function MissionControlPage() {
   const stats = await getStats(supabase).catch((error) => {
     console.error('Failed to fetch stats for mission control:', error)
     return {
-      accountCount: null,
-      optInCount: null,
+      userCount: null,
       tweetCount: null,
       userMentionsCount: null, // Ensure all potential fields from getStats are handled
     }
@@ -27,8 +26,7 @@ export default async function MissionControlPage() {
       <h1 className="mb-6 text-3xl font-bold">Mission Control</h1>
 
       <CommunityStats 
-        accountCount={stats.accountCount}
-        optInCount={stats.optInCount}
+        userCount={stats.userCount}
         tweetCount={stats.tweetCount}
       />
 

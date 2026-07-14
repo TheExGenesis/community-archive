@@ -4,30 +4,34 @@ import { SupabaseClient } from '@supabase/supabase-js'
 
 export const getStats = async (supabase: SupabaseClient) => {
   const publicSchema = supabase.schema('public')
-  const [summaryResult, optInResult] = await Promise.all([
+  const [summaryResult, memberResult] = await Promise.all([
     publicSchema
       .from('global_activity_summary')
-      .select('total_accounts, total_tweets, total_user_mentions')
+      .select('total_tweets, total_user_mentions')
       .single(),
     publicSchema
-      .from('optin')
-      .select('*', { count: 'exact', head: true })
-      .eq('opted_in', true),
+      .from('user_directory')
+      .select('directory_id', { count: 'exact', head: true }),
   ])
 
   if (summaryResult.error) {
-    console.error('Error fetching global activity summary:', summaryResult.error)
+    console.error(
+      'Error fetching global activity summary:',
+      summaryResult.error,
+    )
     throw summaryResult.error
   }
 
-  if (optInResult.error) {
-    console.error('Error fetching opted-in user count:', optInResult.error)
-    throw optInResult.error
+  if (memberResult.error) {
+    console.error(
+      'Error fetching participating user count:',
+      memberResult.error,
+    )
+    throw memberResult.error
   }
 
   return {
-    accountCount: summaryResult.data.total_accounts,
-    optInCount: optInResult.count,
+    userCount: memberResult.count,
     tweetCount: summaryResult.data.total_tweets,
     userMentionsCount: summaryResult.data.total_user_mentions,
   }

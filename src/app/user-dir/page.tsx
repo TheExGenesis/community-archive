@@ -13,7 +13,6 @@ import {
 } from 'lucide-react'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -24,6 +23,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { formatNumber } from '@/lib/formatNumber'
 import {
   fetchUsers,
@@ -184,7 +189,7 @@ export default function UserDirectoryPage() {
             <TableHeader className="bg-gray-50/80 dark:bg-gray-900/60">
               <TableRow className="hover:bg-transparent">
                 <TableHead
-                  className="w-[42%] py-2"
+                  className="w-[48%] py-2"
                   aria-sort={
                     sortKey === 'account_display_name'
                       ? sortOrder === 'asc'
@@ -202,11 +207,8 @@ export default function UserDirectoryPage() {
                     Member {renderSortIcon('account_display_name')}
                   </Button>
                 </TableHead>
-                <TableHead className="w-[25%] text-xs font-semibold uppercase tracking-wider">
-                  Participation
-                </TableHead>
                 <TableHead
-                  className="w-[15%] py-2 text-right"
+                  className="w-[20%] py-2 text-right"
                   aria-sort={
                     sortKey === 'num_followers'
                       ? sortOrder === 'asc'
@@ -225,7 +227,7 @@ export default function UserDirectoryPage() {
                   </Button>
                 </TableHead>
                 <TableHead
-                  className="w-[18%] py-2 text-right"
+                  className="w-[22%] py-2 text-right"
                   aria-sort={
                     sortKey === 'joined_at'
                       ? sortOrder === 'asc'
@@ -242,6 +244,9 @@ export default function UserDirectoryPage() {
                   >
                     Joined {renderSortIcon('joined_at')}
                   </Button>
+                </TableHead>
+                <TableHead className="w-[10%]">
+                  <span className="sr-only">Participation</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -310,36 +315,6 @@ export default function UserDirectoryPage() {
                           {identity}
                         </Link>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          {user.has_archive && (
-                            <Badge
-                              variant="outline"
-                              title="Contributed a Twitter archive"
-                              className="gap-1.5 border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-700 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300"
-                            >
-                              <Archive
-                                aria-hidden="true"
-                                className="h-3.5 w-3.5"
-                              />
-                              Archive
-                            </Badge>
-                          )}
-                          {user.is_opted_in && (
-                            <Badge
-                              variant="outline"
-                              title="Opted in to tweet streaming"
-                              className="gap-1.5 border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300"
-                            >
-                              <Radio
-                                aria-hidden="true"
-                                className="h-3.5 w-3.5"
-                              />
-                              Opted in
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
                       <TableCell className="whitespace-nowrap text-right text-sm font-medium tabular-nums text-gray-700 dark:text-gray-300">
                         {user.num_followers == null
                           ? '—'
@@ -349,6 +324,52 @@ export default function UserDirectoryPage() {
                         <time dateTime={user.joined_at || undefined}>
                           {formatJoinedDate(user.joined_at)}
                         </time>
+                      </TableCell>
+                      <TableCell className="pr-4">
+                        <TooltipProvider delayDuration={150}>
+                          <div className="flex justify-end gap-1">
+                            {user.has_archive && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    role="img"
+                                    tabIndex={0}
+                                    aria-label="Archive"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-blue-500 outline-none transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:text-blue-400 dark:hover:bg-blue-950/60 dark:hover:text-blue-300 dark:focus-visible:ring-offset-gray-950"
+                                  >
+                                    <Archive
+                                      aria-hidden="true"
+                                      className="h-4 w-4"
+                                    />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                  Archive
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                            {user.is_opted_in && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    role="img"
+                                    tabIndex={0}
+                                    aria-label="Opted in"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-emerald-500 outline-none transition-colors hover:bg-emerald-50 hover:text-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:text-emerald-400 dark:hover:bg-emerald-950/60 dark:hover:text-emerald-300 dark:focus-visible:ring-offset-gray-950"
+                                  >
+                                    <Radio
+                                      aria-hidden="true"
+                                      className="h-4 w-4"
+                                    />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                  Opted in
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        </TooltipProvider>
                       </TableCell>
                     </TableRow>
                   )

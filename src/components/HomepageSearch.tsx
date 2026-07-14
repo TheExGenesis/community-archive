@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatNumber } from '@/lib/formatNumber'
@@ -39,28 +39,26 @@ export default function HomepageSearch({
     <div className="mx-auto w-full max-w-3xl">
       <form
         onSubmit={handleSubmit}
-        className="flex flex-col gap-2 rounded-xl border border-border bg-card p-2 text-left shadow-lg sm:flex-row"
+        className="relative rounded-xl border border-border bg-card p-2 text-left shadow-lg"
       >
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search tweets, people, and ideas"
-            aria-label="Search Community Archive"
-            className="h-14 border-0 bg-transparent pl-12 pr-4 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-lg"
-            autoComplete="off"
-          />
-        </div>
+        <Input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search tweets, people, and ideas"
+          aria-label="Search Community Archive"
+          className="h-14 border-0 bg-transparent pl-4 pr-14 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-lg"
+          autoComplete="off"
+        />
         <Button
           type="submit"
-          size="lg"
+          size="icon"
+          variant="ghost"
           disabled={!query.trim()}
-          className="h-14 bg-brand px-7 text-brand-foreground hover:bg-brand/90"
+          className="absolute right-3 top-1/2 h-10 w-10 -translate-y-1/2 rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
+          aria-label="Search archive"
         >
-          Search
-          <ArrowRight className="ml-2 h-4 w-4" />
+          <Search className="h-5 w-5" />
         </Button>
       </form>
 

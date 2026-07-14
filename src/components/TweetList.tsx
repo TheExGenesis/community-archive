@@ -3,16 +3,22 @@
 import { useState, useEffect, useCallback } from 'react'
 import UnifiedTweetList from '@/components/UnifiedTweetList'
 import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
 import { createBrowserClient } from '@/utils/supabase'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { TimelineTweet } from '@/lib/types'
 import { FilterCriteria, fetchTweets } from '@/lib/queries/tweetQueries'
+import { AlertCircle } from 'lucide-react'
 
 interface TweetListProps {
   filterCriteria: FilterCriteria
   itemsPerPage?: number
   showCsvExportButton?: boolean
   csvExportFilename?: string
+  resultsHeading?: string
+  resultsDescription?: string
+  collapseLongTweets?: boolean
 }
 
 const DEFAULT_ITEMS_PER_PAGE = 20
@@ -22,6 +28,9 @@ export default function TweetList({
   itemsPerPage = DEFAULT_ITEMS_PER_PAGE,
   showCsvExportButton = true,
   csvExportFilename = 'tweets_export.csv',
+  resultsHeading,
+  resultsDescription,
+  collapseLongTweets = false,
 }: TweetListProps) {
   const [tweets, setTweets] = useState<TimelineTweet[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -103,15 +112,40 @@ export default function TweetList({
 
   if (isLoading) {
     return (
-      <p className="py-10 text-center text-xl text-muted-foreground">
-        Loading tweets...
-      </p>
+      <div className="space-y-4" aria-label="Loading tweets">
+        <div className="flex items-center justify-between border-b border-border pb-5">
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-4 w-64 max-w-full" />
+          </div>
+          <Skeleton className="h-9 w-28" />
+        </div>
+        {[0, 1, 2].map((item) => (
+          <div
+            key={item}
+            className="rounded-xl border border-border bg-card p-5"
+          >
+            <div className="flex gap-3">
+              <Skeleton className="h-11 w-11 rounded-full" />
+              <div className="flex-1 space-y-3">
+                <Skeleton className="h-4 w-48 max-w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-4/5" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     )
   }
 
   if (error && tweets.length === 0) {
     return (
-      <p className="py-10 text-center text-xl text-red-500">Error: {error}</p>
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Search could not be completed</AlertTitle>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
     )
   }
 
@@ -147,21 +181,32 @@ export default function TweetList({
         className="space-y-4"
         showCsvExport={showCsvExportButton}
         csvFilename={csvExportFilename}
+        headerTitle={
+          resultsHeading
+            ? `${resultsHeading} · ${new Intl.NumberFormat().format(
+                totalCount ?? tweets.length,
+              )}${totalCount === null ? ' loaded' : ''}`
+            : undefined
+        }
+        headerDescription={resultsDescription}
+        collapseLongTweets={collapseLongTweets}
       />
 
       {error && tweets.length > 0 && (
-        <p className="mt-6 text-center text-red-500">
-          Error loading more tweets: {error}
-        </p>
+        <Alert variant="destructive">
+          <AlertTitle>More results could not be loaded</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
       {hasMoreTweets && (
-        <div className="mt-8 text-center">
+        <div className="mt-8 flex justify-center">
           <Button
             onClick={handleLoadMore}
             disabled={isLoadingMore}
             variant="outline"
+            className="min-w-36"
           >
-            {isLoadingMore ? 'Loading...' : 'Load More'}
+            {isLoadingMore ? 'Loading…' : 'Load more'}
           </Button>
         </div>
       )}

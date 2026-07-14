@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LogIn, LogOut, UserRound } from 'lucide-react'
+import { LogIn, LogOut, Search, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { createBrowserClient } from '@/utils/supabase'
@@ -69,6 +69,12 @@ export default function MobileMenu() {
 
         {userMetadata ? (
           <>
+            <DropdownMenuItem asChild>
+              <Link href="/explore" className="cursor-pointer gap-3 py-2.5">
+                <Search className="h-4 w-4" />
+                Search archive
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/profile" className="cursor-pointer gap-3 py-2.5">
                 <UserRound className="h-4 w-4" />

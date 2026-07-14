@@ -83,6 +83,7 @@ export interface TweetData {
 interface TweetComponentProps {
   tweet: TweetData
   className?: string
+  collapseLongText?: boolean
 }
 
 // Helper function to decode HTML entities
@@ -107,7 +108,9 @@ const decodeHtmlEntities = (text: string): string => {
 export const TweetComponent: React.FC<TweetComponentProps> = ({
   tweet,
   className = '',
+  collapseLongText = false,
 }) => {
+  const [isTextExpanded, setIsTextExpanded] = React.useState(false)
   // Support both interface formats for backwards compatibility
   const originalUsername =
     tweet.username || tweet.account?.username || 'Unknown'
@@ -121,6 +124,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
 
   const isRetweet = !!tweet.retweeted_tweet_id
   const isQuoteTweet = !!tweet.quote_tweet_id
+  const canCollapseText = collapseLongText && tweet.full_text.length > 700
 
   // Check if this is a retweet that starts with "RT @username"
   const rtMatch = tweet.full_text.match(/^RT @([A-Za-z0-9_]+):/)
@@ -196,7 +200,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
               href={part}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-brand hover:text-brand"
+              className="break-all text-brand underline-offset-2 hover:underline"
             >
               {part}
             </a>
@@ -213,7 +217,9 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
     if (!mediaArray || mediaArray.length === 0) return null
 
     return (
-      <div className="my-2 flex flex-col space-y-2">
+      <div
+        className={`my-3 grid gap-2 ${mediaArray.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
+      >
         {mediaArray
           .filter(
             (m: any) =>
@@ -224,14 +230,14 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
           .map((mediaItem: any, index: number) => (
             <div
               key={index}
-              className="relative overflow-hidden rounded-lg border dark:border-border"
+              className="relative overflow-hidden rounded-lg border border-border bg-muted"
             >
               <NextImage
                 src={mediaItem.media_url}
                 alt={`Tweet image ${index + 1}`}
                 width={mediaItem.width || 600}
                 height={mediaItem.height || 400}
-                className="h-auto max-h-96 w-full object-contain"
+                className="min-h-40 h-full max-h-96 w-full object-cover"
               />
             </div>
           ))}
@@ -282,7 +288,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
-            <div className="mb-1 flex items-center space-x-1">
+            <div className="mb-1 flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
               <span className="text-sm font-bold text-foreground">
                 {quotedTweet.account_display_name}
               </span>
@@ -296,7 +302,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                 })}
               </span>
             </div>
-            <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
+            <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
               {decodeHtmlEntities(quotedTweet.full_text)}
             </p>
             {quotedTweet.media && quotedTweet.media.length > 0 && (
@@ -369,8 +375,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
         </div>
       )}
 
-      <div className="mb-2 flex items-start">
-        <Avatar className="mr-3 h-12 w-12">
+      <div className="mb-3 flex items-start">
+        <Avatar className="mr-3 h-11 w-11 flex-shrink-0">
           <TweetAvatarImage
             src={profilePicUrl}
             alt={`${displayName}'s profile picture`}
@@ -382,12 +388,10 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center">
-            <span className="mr-2 font-bold text-foreground">
-              {displayName}
-            </span>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="font-bold text-foreground">{displayName}</span>
             <span className="text-muted-foreground">@{displayUsername}</span>
-            <span className="ml-2 text-sm text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               •{' '}
               {formatDistanceToNow(new Date(tweet.created_at), {
                 addSuffix: true,
@@ -403,14 +407,28 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
         </div>
       </div>
 
-      <p className="mb-2 whitespace-pre-wrap break-words text-muted-foreground">
+      <p
+        className={`mb-2 whitespace-pre-wrap break-words text-[15px] leading-6 text-foreground ${
+          canCollapseText && !isTextExpanded ? 'line-clamp-[10]' : ''
+        }`}
+      >
         {formatText(tweet.full_text)}
       </p>
+
+      {canCollapseText && (
+        <button
+          type="button"
+          onClick={() => setIsTextExpanded((expanded) => !expanded)}
+          className="mb-2 text-sm font-medium text-brand hover:underline"
+        >
+          {isTextExpanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
 
       {renderMedia()}
       {renderQuotedTweet()}
 
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="mt-4 flex flex-col gap-3 border-t border-border pt-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center space-x-4">
           <span className="flex items-center">
             <FaHeart className="mr-1" /> {formatNumber(tweet.favorite_count)}
@@ -420,23 +438,25 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
             {formatNumber(tweet.retweet_count ?? 0)}
           </span>
         </div>
-        <div className="flex items-center space-x-3 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span>{new Date(tweet.created_at).toLocaleDateString()}</span>
           <a
             href={`/tweets/${tweet.tweet_id}`}
-            className="transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
             title="Permalink"
           >
             <FaExternalLinkAlt className="h-3 w-3" />
+            Archive
           </a>
           <a
             href={`https://twitter.com/${displayUsername}/status/${tweet.tweet_id}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="transition-colors hover:text-foreground"
+            className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
             title="View on Twitter"
           >
             <FaExternalLinkAlt className="h-3 w-3" />
+            Twitter
           </a>
         </div>
       </div>

@@ -3,6 +3,7 @@
 import React from 'react'
 import TweetComponent from './TweetComponent'
 import { Button } from '@/components/ui/button'
+import { Download, SearchX } from 'lucide-react'
 
 interface UnifiedTweetListProps {
   tweets: any[]
@@ -11,6 +12,9 @@ interface UnifiedTweetListProps {
   className?: string
   showCsvExport?: boolean
   csvFilename?: string
+  headerTitle?: string
+  headerDescription?: string
+  collapseLongTweets?: boolean
 }
 
 /**
@@ -25,6 +29,9 @@ export default function UnifiedTweetList({
   className = 'space-y-4',
   showCsvExport = false,
   csvFilename = 'tweets_export.csv',
+  headerTitle,
+  headerDescription,
+  collapseLongTweets = false,
 }: UnifiedTweetListProps) {
   const handleExportCsv = () => {
     if (tweets.length === 0) {
@@ -87,19 +94,45 @@ export default function UnifiedTweetList({
 
   if (!tweets.length) {
     return (
-      <div className="flex items-center justify-center py-10">
-        <div className="text-lg text-muted-foreground">{emptyMessage}</div>
+      <div className="rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
+        <SearchX className="mx-auto h-8 w-8 text-muted-foreground" />
+        <div className="mt-4 text-base font-medium text-foreground">
+          {emptyMessage}
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Try fewer words or remove one of the filters.
+        </p>
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      {showCsvExport && tweets.length > 0 && (
-        <div className="mb-4 flex justify-end">
-          <Button onClick={handleExportCsv} variant="outline">
-            Download CSV
-          </Button>
+      {(headerTitle || headerDescription || showCsvExport) && (
+        <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            {headerTitle && (
+              <h2 className="text-2xl font-semibold text-foreground">
+                {headerTitle}
+              </h2>
+            )}
+            {headerDescription && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {headerDescription}
+              </p>
+            )}
+          </div>
+          {showCsvExport && tweets.length > 0 && (
+            <Button
+              onClick={handleExportCsv}
+              variant="outline"
+              size="sm"
+              className="self-start sm:self-auto"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download CSV
+            </Button>
+          )}
         </div>
       )}
 
@@ -107,9 +140,12 @@ export default function UnifiedTweetList({
         {tweets.map((tweet) => (
           <div
             key={tweet.tweet_id}
-            className="rounded-lg border border-border bg-background p-4 dark:bg-secondary"
+            className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/20 sm:p-5"
           >
-            <TweetComponent tweet={tweet} />
+            <TweetComponent
+              tweet={tweet}
+              collapseLongText={collapseLongTweets}
+            />
           </div>
         ))}
       </div>

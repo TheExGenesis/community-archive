@@ -153,7 +153,7 @@ export default function HeroCTAButtons() {
       }
 
       setIsOptedIn(true)
-      router.refresh()
+      router.push('/explore')
     } catch (err: any) {
       console.error('Opt-in error:', err.message)
     } finally {

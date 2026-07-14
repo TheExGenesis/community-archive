@@ -18,7 +18,11 @@ const STAGING_USERS = [
 
 export default function SignIn() {
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirect')
+  const requestedRedirect = searchParams.get('redirect')
+  const redirectTo =
+    requestedRedirect?.startsWith('/') && !requestedRedirect.startsWith('//')
+      ? requestedRedirect
+      : null
   const { userMetadata } = useAuthAndArchive()
   const isDevLoginEnabled =
     process.env.NODE_ENV === 'development' ||
@@ -79,7 +83,7 @@ export default function SignIn() {
         if (redirectTo) {
           window.location.href = redirectTo
         } else {
-          window.location.href = '/profile'
+          window.location.href = '/explore'
         }
       } catch (error) {
         console.error('Error during dev sign in:', error)
@@ -93,7 +97,7 @@ export default function SignIn() {
       })
       const callbackUrl = redirectTo
         ? `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(redirectTo)}`
-        : `${window.location.origin}/api/auth/callback`
+        : `${window.location.origin}/api/auth/callback?next=${encodeURIComponent('/explore')}`
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'twitter',

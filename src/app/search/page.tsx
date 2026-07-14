@@ -1,14 +1,18 @@
 'use client'
+
 import AdvancedSearchForm from '@/components/AdvancedSearchForm'
 import TweetList from '@/components/TweetList'
 import { FilterCriteria } from '@/lib/queries/tweetQueries'
+import { Search, SlidersHorizontal } from 'lucide-react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
-// Style definitions
-const unifiedDeepBlueBase = 'bg-card dark:bg-background'
-const sectionPaddingClasses = 'py-12 md:py-16 lg:py-20'
-const contentWrapperClasses = 'w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8'
+const starterSearches = [
+  { label: 'Open source', query: 'open source' },
+  { label: 'AI alignment', query: 'AI alignment' },
+  { label: 'Community notes', query: 'community notes' },
+]
 
 // This wrapper is needed because useSearchParams can only be used in Client Components,
 // and Suspense is recommended for pages that use it.
@@ -32,7 +36,6 @@ function SearchPageContent() {
     formattedQuery = words.join(' & ')
   }
 
-  // Construct FilterCriteria from URL search parameters
   const filterCriteria: FilterCriteria = {
     searchQuery: formattedQuery,
     rawSearchQuery: cleanRawText,
@@ -42,39 +45,62 @@ function SearchPageContent() {
     endDate: searchParams.get('untilDate') || undefined,
   }
 
-  // A key for TweetList to force re-render when search params change, ensuring new data is fetched.
-  // This is important because TweetList fetches data in its own useEffect based on initial props.
   const tweetListKey = searchParams.toString()
+  const hasSearch = tweetListKey.length > 0
+  const searchDescription = cleanRawText
+    ? `Matching “${cleanRawText}” and the filters above`
+    : 'Matching the filters above'
 
   return (
-    <main>
-      <section
-        className={`${unifiedDeepBlueBase} ${sectionPaddingClasses} min-h-screen overflow-hidden`}
-      >
-        <div className={`${contentWrapperClasses}`}>
-          <h2 className="mb-8 text-center text-4xl font-bold text-foreground">
-            🔬 Advanced Search
-          </h2>
-          <AdvancedSearchForm />{' '}
-          {/* This will pre-fill itself from URL params */}
-          <div className="mt-12">
-            {/* Render TweetList only if there are actual search parameters present */}
-            {searchParams.toString().length > 0 ? (
-              <div className="rounded-lg bg-muted p-6 dark:bg-card md:p-8">
-                <h3 className="mb-6 text-2xl font-semibold text-foreground">
-                  Search Results
-                </h3>
-                <TweetList
-                  key={tweetListKey} // Force re-mount on new search
-                  filterCriteria={filterCriteria}
-                />
-              </div>
-            ) : (
-              <p className="mt-12 text-center text-muted-foreground">
-                Please enter your search criteria above.
-              </p>
-            )}
+    <main className="min-h-screen bg-background">
+      <section className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+        <div className="mb-8 max-w-2xl">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-brand">
+            <Search className="h-4 w-4" />
+            Archive search
           </div>
+          <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+            Search the archive
+          </h1>
+          <p className="mt-3 text-base leading-7 text-muted-foreground sm:text-lg">
+            Find public conversations by keyword, author, reply, or date.
+          </p>
+        </div>
+
+        <AdvancedSearchForm />
+
+        <div className="mt-10">
+          {hasSearch ? (
+            <TweetList
+              key={tweetListKey}
+              filterCriteria={filterCriteria}
+              resultsHeading="Search results"
+              resultsDescription={searchDescription}
+              collapseLongTweets
+            />
+          ) : (
+            <div className="rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center sm:px-10">
+              <SlidersHorizontal className="mx-auto h-8 w-8 text-muted-foreground" />
+              <h2 className="mt-4 text-2xl font-semibold text-foreground">
+                Start with a topic or phrase
+              </h2>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                Use filters for a specific account or date range, or try one of
+                these searches.
+              </p>
+              <div className="mt-6 flex flex-wrap justify-center gap-2">
+                {starterSearches.map((item) => (
+                  <Link
+                    key={item.query}
+                    href={`/search?q=${encodeURIComponent(item.query)}`}
+                    className="rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
     </main>
@@ -83,8 +109,13 @@ function SearchPageContent() {
 
 export default function SearchTweetsPage() {
   return (
-    // Suspense boundary for useSearchParams
-    <Suspense fallback={<div>Loading search...</div>}>
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-background px-4 py-14 text-center text-muted-foreground">
+          Loading search…
+        </main>
+      }
+    >
       <SearchPageContent />
     </Suspense>
   )

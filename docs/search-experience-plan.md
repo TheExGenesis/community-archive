@@ -1,10 +1,11 @@
 # Search experience plan
 
-This work starts only after the palette and navigation changes are merged. The
-search redesign should ship in separate pull requests so result quality can be
-reviewed before search becomes the primary signed-in experience.
+The search redesign ships in a separate, stacked pull request after the palette
+and navigation work. Its sections should still be reviewed in this order so
+result quality is approved before search becomes the primary signed-in
+experience.
 
-## PR 1: Make search results clear and pleasant
+## Phase 1: Make search results clear and pleasant
 
 Keep the existing search behavior, URL parameters, CSV export, and database
 queries. Limit this PR to the results presentation.
@@ -28,10 +29,9 @@ Acceptance checks:
 - Verify CSV download and tweet permalinks remain available.
 - Check desktop and mobile widths and keyboard focus order.
 
-## PR 2: Simplify the search controls
+## Phase 2: Simplify the search controls
 
-Once the result feed is approved, make the common path feel like a normal
-search rather than an advanced form.
+Make the common path feel like a normal search rather than an advanced form.
 
 - Lead with one prominent search field and a clear submit action.
 - Move user and date filters into an optional filter panel.
@@ -42,10 +42,10 @@ search rather than an advanced form.
   page.
 - Keep advanced operators available without making them required knowledge.
 
-## PR 3: Add the signed-in archive landing page
+## Phase 3: Add the signed-in archive landing page
 
-After PRs 1 and 2 are merged, add a focused landing experience for signed-in,
-opted-in members.
+Add a focused landing experience for signed-in, opted-in members after the
+results and controls are ready for review.
 
 - Create an archive discovery page with a Wikipedia-like centered search field,
   a short explanation, and a few example searches.
@@ -55,9 +55,8 @@ opted-in members.
   competing with the primary search action.
 - Keep the current contribution-oriented homepage for signed-out and not-yet-
   opted-in visitors.
-- Route opted-in members to the discovery page after sign-in. Decide during the
-  PR whether `/` should redirect for those members or whether the new page
-  should become their explicit post-auth destination.
+- Route opted-in members to the discovery page after sign-in while keeping `/`
+  available as the contribution-oriented homepage and Products anchor target.
 
 ## Success signals
 

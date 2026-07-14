@@ -14,8 +14,8 @@ export default async function MissionControlPage() {
     console.error('Failed to fetch stats for mission control:', error)
     return {
       accountCount: null,
+      optInCount: null,
       tweetCount: null,
-      likedTweetCount: null,
       userMentionsCount: null, // Ensure all potential fields from getStats are handled
     }
   });
@@ -28,8 +28,8 @@ export default async function MissionControlPage() {
 
       <CommunityStats 
         accountCount={stats.accountCount}
+        optInCount={stats.optInCount}
         tweetCount={stats.tweetCount}
-        likedTweetCount={stats.likedTweetCount}
       />
 
       <div className="rounded-lg bg-gray-100 p-4 shadow dark:bg-gray-800">

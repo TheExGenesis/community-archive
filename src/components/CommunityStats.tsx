@@ -1,3 +1,4 @@
+import React from 'react'
 import { formatNumber } from '@/lib/formatNumber'
 
 const calculateGoal = (accountCount: number): number => {
@@ -8,19 +9,19 @@ const calculateGoal = (accountCount: number): number => {
 
 interface CommunityStatsProps {
   accountCount: number | null
+  optInCount: number | null
   tweetCount: number | null
-  likedTweetCount: number | null
   showGoal?: boolean
 }
 
 const CommunityStats = ({ 
   accountCount,
+  optInCount,
   tweetCount,
-  likedTweetCount,
   showGoal = false
 }: CommunityStatsProps) => {
 
-  if (accountCount === null || tweetCount === null || likedTweetCount === null) {
+  if (accountCount === null || optInCount === null || tweetCount === null) {
     return <p className="text-lg sm:text-xl text-center text-gray-700 dark:text-gray-300">Community statistics are currently unavailable.</p>
   }
 
@@ -28,9 +29,9 @@ const CommunityStats = ({
 
   return (
     <p className="text-xl text-gray-800 dark:text-gray-200">
-      We have <strong>{formatNumber(tweetCount)}</strong> tweets and{' '}
-      <strong>{formatNumber(likedTweetCount)}</strong> liked tweets from{' '}
-      <strong>{formatNumber(accountCount)}</strong> accounts.
+      We have <strong>{formatNumber(tweetCount)}</strong> tweets from{' '}
+      <strong>{formatNumber(accountCount)}</strong> users who uploaded archives,
+      and <strong>{formatNumber(optInCount)}</strong> users opted in.
       {showGoal && goal && (
         <span className="italic ml-1">
           Next milestone: <strong>{formatNumber(goal)}</strong> accounts.

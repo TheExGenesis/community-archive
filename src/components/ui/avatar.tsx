@@ -2,7 +2,6 @@
 
 import * as React from 'react'
 import * as AvatarPrimitive from '@radix-ui/react-avatar'
-import Image from 'next/image'
 
 import { cn } from '@/utils/tailwind'
 
@@ -29,10 +28,6 @@ const AvatarImage = React.forwardRef<
     ref={ref}
     className={cn('aspect-square h-full w-full', className)}
     {...props}
-    onError={(e) => {
-      const target = e.target as HTMLImageElement
-      target.src = '/placeholder.jpg'
-    }}
   />
 ))
 AvatarImage.displayName = AvatarPrimitive.Image.displayName
@@ -48,14 +43,7 @@ const AvatarFallback = React.forwardRef<
       className,
     )}
     {...props}
-  >
-    <Image
-      src="/placeholder.jpg"
-      alt="Placeholder"
-      layout="fill"
-      objectFit="cover"
-    />
-  </AvatarPrimitive.Fallback>
+  />
 ))
 AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName
 

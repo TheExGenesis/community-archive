@@ -4,7 +4,6 @@ import { cookies } from 'next/headers'
 import AvatarList from '@/components/AvatarList'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { FaGithub, FaDiscord, FaBook, FaHeart, FaDatabase } from 'react-icons/fa'
-import Footer from '@/components/Footer'
 import Link from 'next/link'
 import { getStats } from '@/lib/stats'
 import TieredSupportersDisplay, { Contributor } from '@/components/TieredSupportersDisplay'
@@ -280,8 +279,6 @@ export default async function Homepage() {
           </div>
         </div>
       </section>
-
-      <Footer />
     </main>
   )
 }

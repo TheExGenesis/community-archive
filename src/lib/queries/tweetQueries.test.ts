@@ -199,3 +199,46 @@ describe('fetchTweets — exact phrase search via FTS simple', () => {
     expect(result.error.message).toContain('timed out')
   })
 })
+
+describe('fetchTweets — direct profile embeds', () => {
+  it('preserves an avatar when PostgREST returns profile as an array', async () => {
+    const supabase = buildMockSupabase()
+    supabase._builder.range.mockResolvedValueOnce({
+      data: [
+        {
+          tweet_id: '1',
+          created_at: '2025-01-01T00:00:00Z',
+          full_text: 'Hello',
+          favorite_count: 1,
+          retweet_count: 0,
+          reply_to_tweet_id: null,
+          account: {
+            username: 'mahlnr',
+            account_display_name: 'mahlen',
+            profile: [
+              {
+                avatar_media_url: 'https://example.com/avatar.jpg',
+                archive_upload_id: 42,
+              },
+            ],
+          },
+          media: [],
+        },
+      ],
+      error: null,
+      count: 1,
+    })
+
+    const result = await fetchTweets(
+      supabase,
+      { userId: 'account-1' },
+      1,
+      20,
+    )
+
+    expect(result.error).toBeNull()
+    expect(result.tweets[0].account.profile?.avatar_media_url).toBe(
+      'https://example.com/avatar.jpg',
+    )
+  })
+})

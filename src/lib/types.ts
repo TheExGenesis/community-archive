@@ -202,12 +202,13 @@ export type FormattedUser = {
 // Interfaces for fetching and displaying tweets via Supabase queries
 export interface RawSupabaseProfile {
   avatar_media_url: string | null;
+  archive_upload_id?: number | null;
 }
 
 export interface RawSupabaseAccount {
   username: string;
   account_display_name: string;
-  profile: RawSupabaseProfile | null;
+  profile: RawSupabaseProfile | RawSupabaseProfile[] | null;
 }
 
 export interface RawSupabaseTweet {

@@ -22,17 +22,11 @@ export default function HeaderNavigation({
   const baseNavItems = [
     { href: '/', label: 'Home' },
     { href: '/user-dir', label: 'Directory' },
-    { href: '/search', label: 'Search' },
-  ]
-
-  const streamingNavItems = [
-    { href: '/stream-monitor', label: 'Stream Monitor' },
   ]
 
   const userNavItems = [{ href: '/profile', label: 'Profile' }]
 
-  // Include all navigation items
-  const navItems = [...baseNavItems, ...streamingNavItems, ...userNavItems]
+  const navItems = [...baseNavItems, ...userNavItems]
 
   return (
     <NavigationMenu className="hidden md:flex">

@@ -12,6 +12,7 @@ import dynamic from 'next/dynamic'
 import HeaderNavigation from '@/components/HeaderNavigation'
 import HeaderSearch from '@/components/HeaderSearch'
 import MobileMenu from '@/components/MobileMenu'
+import Footer from '@/components/Footer'
 import { checkIsAdmin } from '@/app/admin/data'
 import { Shield } from 'lucide-react'
 
@@ -109,10 +110,11 @@ export default async function RootLayout({
                 </div>
               </div>
             </header>
-            <main className="flex min-h-[calc(100vh-4rem)] flex-col">
+            <div className="flex min-h-[calc(100vh-4rem)] flex-col">
               {children}
               <Analytics />
-            </main>
+              <Footer />
+            </div>
             <ReactQueryDevtools initialIsOpen={false} />
           </ReactQueryProvider>
         </ThemeProvider>

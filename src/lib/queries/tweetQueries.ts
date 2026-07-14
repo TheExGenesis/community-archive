@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { TimelineTweet, RawSupabaseTweet, RawSupabaseAccount, RawSupabaseProfile } from '@/lib/types';
 import { searchTweets as rpcSearchTweets, searchTweetsExactPhrase as rpcSearchExactPhrase } from '../pgSearch';
 import { type SearchParams } from '../types';
+import { getLatestAvatarMediaUrl } from '@/lib/avatar';
 
 export interface FilterCriteria {
   userId?: string; // For fetching tweets by a specific user
@@ -44,12 +45,13 @@ function transformRawTweetsToTimelineTweets(rawData: any[], isRpcResult: boolean
       // Direct query result has nested account data
       const accountData = rawTweet.account as RawSupabaseAccount | undefined;
       if (accountData && accountData.username) {
-        const profileData = accountData.profile as RawSupabaseProfile | null | undefined;
+        const profileData = accountData.profile as RawSupabaseProfile | RawSupabaseProfile[] | null | undefined;
+        const avatarMediaUrl = getLatestAvatarMediaUrl(profileData);
         timelineAccount = {
           username: accountData.username,
           account_display_name: accountData.account_display_name,
-          profile: profileData?.avatar_media_url
-            ? { avatar_media_url: profileData.avatar_media_url === null ? undefined : profileData.avatar_media_url }
+          profile: avatarMediaUrl
+            ? { avatar_media_url: avatarMediaUrl }
             : undefined,
         };
       } else {
@@ -178,7 +180,8 @@ export async function fetchTweets(
           username,
           account_display_name,
           profile:profile!left (
-            avatar_media_url
+            avatar_media_url,
+            archive_upload_id
           )
         ),
         media:tweet_media (
@@ -244,4 +247,4 @@ export async function fetchTweets(
     const transformedTweets = transformRawTweetsToTimelineTweets(rawData, false);
     return { tweets: transformedTweets, totalCount: count, error: null };
   }
-} 
+}

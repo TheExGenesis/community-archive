@@ -1,14 +1,14 @@
 /**
  * Twitter syndication API client for transient render-time hydration of tweets that
  * have been deleted from our archive but may still be accessible via Twitter's public
- * embed CDN. Used to fill in deleted reply parents and deleted quoted tweets so the
- * thread view shows real content instead of a "[Tweet deleted]" tombstone whenever
- * Twitter still has the original.
+ * embed CDN. Used to fill in deleted reply parents and deleted quoted tweets, and
+ * to recover an avatar transiently when an archived profile image is missing or
+ * stale.
  *
  * Hard rules:
  * - Never persist the response to our DB.
- * - Never include hydrated tweets in search results, profile listings, or any other
- *   query path. Only render-time hydration of explicitly-referenced parent/quoted ids.
+ * - Never include hydrated tweet content in search results, profile listings, or any
+ *   other query path. Avatar recovery is render-only and is never persisted.
  * - Caller decides whether to render with a "(from Twitter)" marker.
  *
  * The endpoint requires a `token` query param derived from the tweet id. This is

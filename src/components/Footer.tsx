@@ -10,6 +10,10 @@ const Footer = () => {
       <Link href="/data-policy" className="hover:underline">
         Data Policy
       </Link>
+      <span className="mx-2">•</span>
+      <Link href="/stream-monitor" className="hover:underline">
+        Stream Monitor
+      </Link>
     </footer>
   )
 }

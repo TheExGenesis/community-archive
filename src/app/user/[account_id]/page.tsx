@@ -192,7 +192,7 @@ export default async function User({
           <UserProfile userData={userData} />
         </Suspense>
 
-        {showingSummaryData ? (
+        {showingSummaryData && (
           <>
             {/* Most Mentioned Accounts card - Removed shadow */}
             <div className="rounded-lg bg-muted p-6 dark:bg-card sm:p-8">
@@ -223,20 +223,6 @@ export default async function User({
               </Suspense>
             </div>
           </>
-        ) : (
-          <div className="rounded-lg bg-muted p-8 text-center dark:bg-card">
-            {/* Activity summary placeholder card - Removed shadow */}
-            <h3 className="text-xl font-semibold text-foreground">
-              {userData.account_id
-                ? 'Activity summary not yet available.'
-                : 'Activity is not linked yet.'}
-            </h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {userData.account_id
-                ? 'Detailed activity data like top tweets and mentions is currently being processed or is not available for this user. Basic profile information is still shown above.'
-                : 'This member has opted in, but their Twitter account ID has not been connected to archived or streamed activity yet.'}
-            </p>
-          </div>
         )}
 
         {userData.account_id && (

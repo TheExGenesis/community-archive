@@ -18,14 +18,9 @@ export default function HeaderNavigation() {
     { href: '/', label: 'Home' },
     { href: '/#products', label: 'Products' },
     { href: '/user-dir', label: 'User Directory' },
-    { href: '/search', label: 'Search' },
   ]
 
-  const streamingNavItems = [
-    { href: '/stream-monitor', label: 'Stream Monitor' },
-  ]
-
-  const navItems = [...baseNavItems, ...streamingNavItems]
+  const navItems = baseNavItems
 
   return (
     <NavigationMenu className="hidden lg:flex">

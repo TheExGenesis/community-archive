@@ -10,7 +10,6 @@ import {
   FaHeart,
   FaDatabase,
 } from 'react-icons/fa'
-import Footer from '@/components/Footer'
 import Link from 'next/link'
 import { getStats } from '@/lib/stats'
 import TieredSupportersDisplay, {
@@ -164,9 +163,8 @@ export default async function Homepage() {
   const stats = await getStats(supabase).catch((error) => {
     console.error('Failed to fetch stats for homepage:', error)
     return {
-      accountCount: null,
+      userCount: null,
       tweetCount: null,
-      likedTweetCount: null,
       userMentionsCount: null,
     }
   })
@@ -204,9 +202,8 @@ export default async function Homepage() {
       <section className="overflow-hidden bg-card dark:bg-background">
         <div className="mx-auto max-w-5xl space-y-4 rounded-none bg-muted p-6 text-center dark:bg-card sm:rounded-xl md:p-8">
           <CommunityStats
-            accountCount={stats.accountCount}
+            userCount={stats.userCount}
             tweetCount={stats.tweetCount}
-            likedTweetCount={stats.likedTweetCount}
             showGoal={false}
           />
           {mostFollowed.length > 0 ? (
@@ -377,8 +374,6 @@ export default async function Homepage() {
           </div>
         </div>
       </section>
-
-      <Footer />
     </main>
   )
 }

@@ -10,6 +10,7 @@ import { createBrowserClient } from '@/utils/supabase'
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -22,14 +23,12 @@ const baseNavItems = [
   { href: '/search', label: 'Search' },
 ]
 
-const streamingNavItems = [{ href: '/stream-monitor', label: 'Stream Monitor' }]
-
 export default function MobileMenu() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const { userMetadata } = useAuthAndArchive()
 
-  const navItems = [...baseNavItems, ...streamingNavItems]
+  const navItems = baseNavItems
 
   const handleSignOut = async () => {
     const supabase = createBrowserClient()
@@ -54,6 +53,9 @@ export default function MobileMenu() {
           <SheetTitle className="text-left text-lg font-semibold">
             Menu
           </SheetTitle>
+          <SheetDescription className="sr-only">
+            Browse Community Archive pages.
+          </SheetDescription>
         </SheetHeader>
         <div className="flex h-[calc(100%-3rem)] flex-col">
           <nav className="flex flex-col space-y-2 lg:hidden">

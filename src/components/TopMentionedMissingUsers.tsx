@@ -17,6 +17,7 @@ import { createBrowserClient } from '@/utils/supabase'
 import { devLog } from '@/lib/devLog'
 import { Label } from '@/components/ui/label'
 import { formatNumber } from '@/lib/formatNumber'
+import { getLatestAvatarMediaUrl } from '@/lib/avatar'
 
 export type MentionedUser = {
   mentioned_user_id: string
@@ -52,6 +53,7 @@ export default function TopMentionedUsers({
         .from('account')
         .select(
           `
+          account_id,
           username,
           account_display_name,
           profile:profile (
@@ -76,11 +78,11 @@ export default function TopMentionedUsers({
         if (!accountData) {
           return { ...user, uploaded: false }
         }
-        const media_url = accountData.profile?.avatar_media_url
-          ? accountData.profile.avatar_media_url
-          : undefined
+        const media_url = getLatestAvatarMediaUrl(accountData.profile)
         return {
           ...user,
+          mentioned_user_id:
+            accountData.account_id || user.mentioned_user_id,
           account_display_name: accountData.account_display_name!,
           avatar_media_url: media_url,
           uploaded: true,

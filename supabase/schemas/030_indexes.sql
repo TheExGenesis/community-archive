@@ -86,6 +86,11 @@ CREATE INDEX IF NOT EXISTS "idx_all_account_username"
   ON "public"."all_account" USING "btree" ("username");
 CREATE INDEX IF NOT EXISTS "idx_all_account_lower_username"
   ON "public"."all_account" USING "btree" ("lower"("username"));
+-- PostgREST's .ilike('username', value) uses the ILIKE operator directly, so
+-- the btree indexes above cannot prevent a full-table scan. Trigrams support
+-- both exact and wildcard ILIKE lookups.
+CREATE INDEX IF NOT EXISTS "idx_all_account_username_trgm"
+  ON "public"."all_account" USING "gin" ("username" "public"."gin_trgm_ops");
 
 -- private.tweet_user: every get_streaming_stats_* function filters on created_at.
 CREATE INDEX IF NOT EXISTS "idx_tweet_user_created_at"

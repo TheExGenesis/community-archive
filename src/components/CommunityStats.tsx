@@ -1,29 +1,24 @@
+import React from 'react'
 import { formatNumber } from '@/lib/formatNumber'
 
-const calculateGoal = (accountCount: number): number => {
+const calculateGoal = (userCount: number): number => {
   const goals = [25, 50, 100, 250, 500, 750, 1000]
-  if (accountCount < 25) return 25
-  return goals.find((goal) => goal > accountCount) || goals[goals.length - 1]
+  if (userCount < 25) return 25
+  return goals.find((goal) => goal > userCount) || goals[goals.length - 1]
 }
 
 interface CommunityStatsProps {
-  accountCount: number | null
+  userCount: number | null
   tweetCount: number | null
-  likedTweetCount: number | null
   showGoal?: boolean
 }
 
 const CommunityStats = ({
-  accountCount,
+  userCount,
   tweetCount,
-  likedTweetCount,
   showGoal = false,
 }: CommunityStatsProps) => {
-  if (
-    accountCount === null ||
-    tweetCount === null ||
-    likedTweetCount === null
-  ) {
+  if (userCount === null || tweetCount === null) {
     return (
       <p className="text-center text-lg text-muted-foreground sm:text-xl">
         Community statistics are currently unavailable.
@@ -31,13 +26,12 @@ const CommunityStats = ({
     )
   }
 
-  const goal = calculateGoal(accountCount || 0)
+  const goal = calculateGoal(userCount || 0)
 
   return (
     <p className="text-xl text-foreground">
-      We have <strong>{formatNumber(tweetCount)}</strong> tweets and{' '}
-      <strong>{formatNumber(likedTweetCount)}</strong> liked tweets from{' '}
-      <strong>{formatNumber(accountCount)}</strong> accounts.
+      We have <strong>{formatNumber(tweetCount)}</strong> tweets from{' '}
+      <strong>{formatNumber(userCount)}</strong> users.
       {showGoal && goal && (
         <span className="ml-1 italic">
           Next milestone: <strong>{formatNumber(goal)}</strong> accounts.

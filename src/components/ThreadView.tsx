@@ -45,7 +45,7 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
     return (
       <div
         key={tweetId}
-        className={`thread-tweet-container ${depth > 0 ? 'ml-8 border-l-2 border-border pl-4' : ''}`}
+        className={`thread-tweet-container ${depth > 0 ? 'ml-3 border-l-2 border-border pl-3 sm:ml-8 sm:pl-4' : ''}`}
       >
         {tweet.is_deleted_placeholder ? (
           // Tombstone — deleted from the archive AND syndication couldn't find it.
@@ -55,8 +55,8 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
         ) : (
           <div
             className={`
-            ${isHighlighted ? 'border border-border bg-muted' : tweet.from_external ? 'border border-dashed border-amber-300 bg-amber-50/60 dark:border-amber-700 dark:bg-amber-900/10' : 'bg-background dark:bg-secondary'}
-            relative mb-4 rounded-lg p-4
+            ${isHighlighted ? 'border-brand/50 bg-card ring-1 ring-brand/20' : tweet.from_external ? 'border-dashed border-amber-300 bg-amber-50/60 dark:border-amber-700 dark:bg-amber-900/10' : 'border-border bg-card'}
+            relative mb-4 rounded-xl border p-4 sm:p-5
           `}
           >
             {tweet.from_external && (
@@ -113,10 +113,11 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
 
   return (
     <div className={`thread-view ${className}`}>
-      <div className="mb-4">
-        <h3 className="mb-2 text-lg font-semibold text-foreground">
-          🧵 Thread ({realCount} {realCount === 1 ? 'tweet' : 'tweets'})
-        </h3>
+      <div className="mb-5 flex items-center justify-between gap-4">
+        <h2 className="text-xl font-semibold text-foreground">Thread</h2>
+        <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+          {realCount} {realCount === 1 ? 'tweet' : 'tweets'}
+        </span>
       </div>
       <div className="thread-container">
         {allRoots.map((rootId) => (

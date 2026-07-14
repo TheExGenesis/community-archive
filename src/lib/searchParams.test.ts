@@ -1,5 +1,6 @@
 import {
   buildSearchExpression,
+  buildSearchHref,
   buildSearchParams,
   parseSearchExpression,
 } from './searchParams'
@@ -32,6 +33,12 @@ describe('search parameter helpers', () => {
     expect(
       buildSearchParams('community from:alice since:2024-01-01').toString(),
     ).toBe('q=community&fromUser=alice&sinceDate=2024-01-01')
+  })
+
+  it('builds a filter-only search URL without treating the operator as text', () => {
+    expect(buildSearchHref('from:a__musingcat')).toBe(
+      '/search?fromUser=a__musingcat',
+    )
   })
 
   it('reconstructs the editable expression from URL parameters', () => {

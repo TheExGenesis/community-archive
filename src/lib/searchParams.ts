@@ -50,6 +50,11 @@ export function buildSearchParams(expression: string): URLSearchParams {
   return params
 }
 
+export function buildSearchHref(expression: string): string {
+  const params = buildSearchParams(expression)
+  return params.size > 0 ? `/search?${params.toString()}` : '/search'
+}
+
 export function buildSearchExpression(searchParams: URLSearchParams): string {
   const parts = [searchParams.get('q') || '']
   const fromUser = searchParams.get('fromUser')

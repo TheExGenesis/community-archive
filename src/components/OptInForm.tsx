@@ -13,10 +13,16 @@ interface OptInFormProps {
   initialOptInStatus: any
 }
 
-export default function OptInForm({ userId, userEmail, initialOptInStatus }: OptInFormProps) {
+export default function OptInForm({
+  userId,
+  userEmail,
+  initialOptInStatus,
+}: OptInFormProps) {
   const router = useRouter()
   const { userMetadata } = useAuthAndArchive()
-  const [isOptedIn, setIsOptedIn] = useState(initialOptInStatus?.opted_in || false)
+  const [isOptedIn, setIsOptedIn] = useState(
+    initialOptInStatus?.opted_in || false,
+  )
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -30,7 +36,9 @@ export default function OptInForm({ userId, userEmail, initialOptInStatus }: Opt
     setSuccess('')
 
     if (!twitterUsername) {
-      setError('Twitter username not found. Please make sure you signed in with Twitter.')
+      setError(
+        'Twitter username not found. Please make sure you signed in with Twitter.',
+      )
       return
     }
 
@@ -47,7 +55,7 @@ export default function OptInForm({ userId, userEmail, initialOptInStatus }: Opt
           username: twitterUsername.toLowerCase(),
           twitterUserId: twitterUserId || null,
           optedIn: !isOptedIn,
-          termsVersion: 'v1.0'
+          termsVersion: 'v1.0',
         }),
       })
 
@@ -59,11 +67,11 @@ export default function OptInForm({ userId, userEmail, initialOptInStatus }: Opt
 
       setIsOptedIn(!isOptedIn)
       setSuccess(
-        !isOptedIn 
-          ? 'Successfully opted in to tweet streaming!' 
-          : 'Successfully opted out of tweet streaming.'
+        !isOptedIn
+          ? 'Successfully opted in to tweet streaming!'
+          : 'Successfully opted out of tweet streaming.',
       )
-      
+
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'An error occurred. Please try again.')
@@ -74,23 +82,28 @@ export default function OptInForm({ userId, userEmail, initialOptInStatus }: Opt
 
   if (!twitterUsername) {
     return (
-      <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
         <p className="text-red-800 dark:text-red-200">
-          No Twitter account found. Please sign in with Twitter to use the opt-in feature.
+          No Twitter account found. Please sign in with Twitter to use the
+          opt-in feature.
         </p>
       </div>
     )
   }
 
   return (
-    <div className="text-center space-y-8">
-
+    <div className="space-y-8 text-center">
       {/* Current status as simple text */}
       <div className="text-center">
-        <p className="text-lg text-gray-700 dark:text-gray-300">
-          Current Status: <span className={`font-semibold ${
-            isOptedIn ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'
-          }`}>
+        <p className="text-lg text-muted-foreground">
+          Current Status:{' '}
+          <span
+            className={`font-semibold ${
+              isOptedIn
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-muted-foreground'
+            }`}
+          >
             {isOptedIn ? 'Opted In' : 'Not Opted In'}
           </span>
         </p>
@@ -98,13 +111,13 @@ export default function OptInForm({ userId, userEmail, initialOptInStatus }: Opt
 
       {/* Error and success messages */}
       {error && (
-        <Alert variant="destructive" className="max-w-md mx-auto">
+        <Alert variant="destructive" className="mx-auto max-w-md">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {success && (
-        <Alert className="border-green-500 bg-green-50 dark:bg-green-900/20 max-w-md mx-auto">
+        <Alert className="mx-auto max-w-md border-green-500 bg-green-50 dark:bg-green-900/20">
           <AlertDescription className="text-green-800 dark:text-green-200">
             {success}
           </AlertDescription>
@@ -118,13 +131,13 @@ export default function OptInForm({ userId, userEmail, initialOptInStatus }: Opt
             onClick={handleSubmit}
             disabled={isLoading}
             size="lg"
-            className="px-12 py-6 text-xl font-semibold min-w-[280px]"
+            className="min-w-[280px] px-12 py-6 text-xl font-semibold"
           >
             {isLoading ? 'Processing...' : 'Opt In to Tweet Streaming'}
           </Button>
         ) : (
           <div className="space-y-4">
-            <p className="text-lg text-green-600 dark:text-green-400 font-semibold">
+            <p className="text-lg font-semibold text-green-600 dark:text-green-400">
               ✓ You&apos;re opted in to tweet streaming!
             </p>
             <Link href="/profile">

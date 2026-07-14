@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Shield } from 'lucide-react'
 import {
   NavigationMenu,
   NavigationMenuList,
@@ -12,24 +11,19 @@ import {
 } from '@/components/ui/navigation-menu'
 import { cn } from '@/utils/tailwind'
 
-export default function HeaderNavigation({
-  isAdmin = false,
-}: {
-  isAdmin?: boolean
-}) {
+export default function HeaderNavigation() {
   const pathname = usePathname()
 
   const baseNavItems = [
     { href: '/', label: 'Home' },
-    { href: '/user-dir', label: 'Directory' },
+    { href: '/#products', label: 'Products' },
+    { href: '/user-dir', label: 'User Directory' },
   ]
 
-  const userNavItems = [{ href: '/profile', label: 'Profile' }]
-
-  const navItems = [...baseNavItems, ...userNavItems]
+  const navItems = baseNavItems
 
   return (
-    <NavigationMenu className="hidden md:flex">
+    <NavigationMenu className="hidden lg:flex">
       <NavigationMenuList>
         {navItems.map((item) => (
           <NavigationMenuItem key={item.href}>
@@ -37,10 +31,8 @@ export default function HeaderNavigation({
               <NavigationMenuLink
                 className={cn(
                   navigationMenuTriggerStyle(),
-                  'transition-colors duration-150 hover:bg-gray-100 dark:hover:bg-gray-800',
-                  pathname === item.href
-                    ? 'bg-gray-100 font-semibold dark:bg-gray-800' // Enhanced active style
-                    : '',
+                  'transition-colors duration-150 hover:bg-accent',
+                  pathname === item.href ? 'bg-muted font-semibold' : '',
                 )}
               >
                 {item.label}
@@ -48,25 +40,6 @@ export default function HeaderNavigation({
             </Link>
           </NavigationMenuItem>
         ))}
-        {isAdmin ? (
-          <NavigationMenuItem>
-            <Link href="/admin" legacyBehavior passHref>
-              <NavigationMenuLink
-                aria-label="Admin dashboard"
-                title="Admin"
-                className={cn(
-                  navigationMenuTriggerStyle(),
-                  'w-10 px-0 hover:bg-gray-100 dark:hover:bg-gray-800',
-                  pathname === '/admin'
-                    ? 'bg-gray-100 font-semibold dark:bg-gray-800'
-                    : '',
-                )}
-              >
-                <Shield className="h-4 w-4" />
-              </NavigationMenuLink>
-            </Link>
-          </NavigationMenuItem>
-        ) : null}
       </NavigationMenuList>
     </NavigationMenu>
   )

@@ -3,7 +3,9 @@ import { createServerAdminClient, createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import ProfileContent from './ProfileContent'
 
-const getTwitterUsername = (user: Awaited<ReturnType<typeof requireAuth>>['user']) =>
+const getTwitterUsername = (
+  user: Awaited<ReturnType<typeof requireAuth>>['user'],
+) =>
   (
     user.user_metadata?.user_name ||
     user.user_metadata?.preferred_username ||
@@ -24,7 +26,8 @@ export default async function ProfilePage() {
   const admin = createServerAdminClient(cookieStore)
 
   // Get the Twitter provider_id from user metadata (this is the account_id in archive_upload)
-  const twitterAccountId = user.user_metadata?.provider_id || user.app_metadata?.provider_id
+  const twitterAccountId =
+    user.user_metadata?.provider_id || user.app_metadata?.provider_id
   const twitterUsername = getTwitterUsername(user)
   const optInQuery = twitterUsername
     ? admin
@@ -42,7 +45,8 @@ export default async function ProfilePage() {
     twitterAccountId
       ? supabase
           .from('archive_upload')
-          .select(`
+          .select(
+            `
             id,
             account_id,
             upload_phase,
@@ -56,15 +60,16 @@ export default async function ProfilePage() {
               num_tweets,
               profile:all_profile(avatar_media_url)
             )
-          `)
+          `,
+          )
           .eq('account_id', twitterAccountId)
           .order('created_at', { ascending: false })
-      : Promise.resolve({ data: [], error: null })
+      : Promise.resolve({ data: [], error: null }),
   ])
 
   return (
-    <main className="min-h-screen bg-white dark:bg-background">
-      <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-card dark:bg-background">
+      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
         <ProfileContent
           user={user}
           initialOptInData={optInResponse.data}

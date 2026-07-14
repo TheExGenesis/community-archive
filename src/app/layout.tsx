@@ -14,6 +14,7 @@ import HeaderSearch from '@/components/HeaderSearch'
 import MobileMenu from '@/components/MobileMenu'
 import Footer from '@/components/Footer'
 import { checkIsAdmin } from '@/app/admin/data'
+import { Shield } from 'lucide-react'
 
 const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
   ssr: false,
@@ -51,10 +52,9 @@ export default async function RootLayout({
     <html
       lang="en"
       className={`${manrope.className} ${petrona.variable} antialiased`}
-      style={{ colorScheme: 'dark' }}
       suppressHydrationWarning={true}
     >
-      <body className="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300">
+      <body className="bg-background text-foreground transition-colors duration-300">
         <NextTopLoader showSpinner={false} height={3} color="#2acf80" />
         <ThemeProvider
           attribute="class"
@@ -63,9 +63,12 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <ReactQueryProvider>
-            <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md">
+            <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
               <div className="container mx-auto flex h-16 max-w-screen-xl items-center justify-between px-4 sm:px-6 lg:px-8">
-                <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
+                <Link
+                  href="/"
+                  className="flex flex-shrink-0 items-center space-x-2"
+                >
                   <Image
                     src="/images/logo.png"
                     alt="Community Archive logo"
@@ -75,22 +78,35 @@ export default async function RootLayout({
                     priority
                   />
                   <span
-                    className="font-bold text-lg text-gray-800 dark:text-gray-200 whitespace-nowrap"
-                    style={{ fontFamily: 'var(--font-petrona), Georgia, "Times New Roman", serif' }}
+                    className="hidden whitespace-nowrap text-lg font-bold text-foreground sm:inline"
+                    style={{
+                      fontFamily:
+                        'var(--font-petrona), Georgia, "Times New Roman", serif',
+                    }}
                   >
                     Community Archive
                   </span>
                 </Link>
-                <HeaderNavigation isAdmin={isAdmin} />
+                <HeaderNavigation />
                 <div className="flex items-center space-x-3">
                   <HeaderSearch />
                 </div>
                 <div className="flex items-center space-x-3">
-                  <ThemeToggle side="bottom" />
                   <div className="text-sm">
                     <DynamicSignIn />
                   </div>
-                  <MobileMenu isAdmin={isAdmin} />
+                  <ThemeToggle side="bottom" />
+                  {isAdmin ? (
+                    <Link
+                      href="/admin"
+                      aria-label="Admin dashboard"
+                      title="Admin dashboard"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-input bg-background transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <Shield className="h-5 w-5" />
+                    </Link>
+                  ) : null}
+                  <MobileMenu />
                 </div>
               </div>
             </header>

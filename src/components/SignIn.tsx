@@ -8,14 +8,18 @@ import { useState } from 'react'
 // Seeded mock users available for staging dev-login bypass.
 // Keep in sync with supabase/seed.sql.
 const STAGING_USERS = [
-  { username: 'alice_dev', providerId: 'mock_alice', displayName: 'Alice Developer' },
-  { username: 'xiq_dev',   providerId: 'mock_xiq',   displayName: 'XIQ Dev' },
+  {
+    username: 'alice_dev',
+    providerId: 'mock_alice',
+    displayName: 'Alice Developer',
+  },
+  { username: 'xiq_dev', providerId: 'mock_xiq', displayName: 'XIQ Dev' },
 ] as const
 
 export default function SignIn() {
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect')
-  const { userMetadata, isArchiveUploaded } = useAuthAndArchive()
+  const { userMetadata } = useAuthAndArchive()
   const isDevLoginEnabled =
     process.env.NODE_ENV === 'development' ||
     process.env.NEXT_PUBLIC_ENABLE_STAGING_DEV_LOGIN === 'true'
@@ -27,9 +31,8 @@ export default function SignIn() {
   const asParam = searchParams.get('as')
   const initialUser =
     STAGING_USERS.find((u) => u.username === asParam) ?? STAGING_USERS[0]
-  const [selectedUser, setSelectedUser] = useState<(typeof STAGING_USERS)[number]>(
-    initialUser,
-  )
+  const [selectedUser, setSelectedUser] =
+    useState<(typeof STAGING_USERS)[number]>(initialUser)
 
   const signIn = async () => {
     const supabase = createBrowserClient()
@@ -106,34 +109,18 @@ export default function SignIn() {
     }
   }
 
-  const handleSignOut = async () => {
-    const supabase = createBrowserClient()
-    const { error } = await supabase.auth.signOut()
-    devLog('sign out', { error })
-    if (!error) {
-      window.location.reload()
-    }
-  }
-
-  return userMetadata ? (
-    <form action={handleSignOut} className="inline-block">
-      <button
-        type="submit"
-        className="whitespace-nowrap rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-      >
-        Sign Out
-      </button>
-    </form>
-  ) : (
+  return userMetadata ? null : (
     <div className="inline-flex items-center gap-2">
       {isStagingLogin && (
         <select
           value={selectedUser.username}
           onChange={(e) => {
-            const next = STAGING_USERS.find((u) => u.username === e.target.value)
+            const next = STAGING_USERS.find(
+              (u) => u.username === e.target.value,
+            )
             if (next) setSelectedUser(next)
           }}
-          className="rounded-md border border-yellow-700 bg-white px-2 py-1.5 text-sm font-medium text-yellow-900 focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:border-yellow-500 dark:bg-gray-800 dark:text-yellow-200"
+          className="rounded-md border border-yellow-700 bg-card px-2 py-1.5 text-sm font-medium text-yellow-900 focus:outline-none focus:ring-2 focus:ring-yellow-500 dark:border-yellow-500 dark:bg-card dark:text-yellow-200"
           aria-label="Pick staging mock user"
         >
           {STAGING_USERS.map((u) => (
@@ -146,21 +133,21 @@ export default function SignIn() {
       <form action={signIn} className="inline-block">
         <button
           type="submit"
-          className={`rounded-[8px] border border-transparent px-4 py-2 text-sm font-medium text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+          className={`rounded-[8px] border border-transparent px-4 py-2 text-sm font-medium text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-background ${
             isDevLoginEnabled
               ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500 dark:bg-yellow-500 dark:hover:bg-yellow-600'
-              : 'bg-green-600 hover:bg-green-700 focus:ring-green-500 dark:bg-green-400 dark:hover:bg-green-300 dark:text-green-950'
+              : 'bg-green-600 hover:bg-green-700 focus:ring-green-500 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300'
           }`}
         >
-          {isStagingLogin
-            ? `Sign in as ${selectedUser.displayName}`
-            : isDevLoginEnabled
-              ? 'Sign in (Dev Mode)'
-              : (
-                <>
-                  Sign in<span className="hidden sm:inline"> with Twitter</span>
-                </>
-              )}
+          {isStagingLogin ? (
+            `Sign in as ${selectedUser.displayName}`
+          ) : isDevLoginEnabled ? (
+            'Sign in (Dev Mode)'
+          ) : (
+            <>
+              Sign in<span className="hidden sm:inline"> with Twitter</span>
+            </>
+          )}
         </button>
       </form>
     </div>

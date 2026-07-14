@@ -14,17 +14,17 @@ export default function Error({
   }, [error])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-background">
-      <div className="max-w-md w-full mx-auto px-4 py-8 text-center">
-        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+    <div className="flex min-h-screen items-center justify-center bg-card dark:bg-background">
+      <div className="mx-auto w-full max-w-md px-4 py-8 text-center">
+        <h2 className="mb-4 text-3xl font-bold text-foreground">
           Something went wrong!
         </h2>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
+        <p className="mb-6 text-muted-foreground">
           An error occurred while loading this page. Please try again.
         </p>
         <button
           onClick={reset}
-          className="bg-blue-500 hover:bg-blue-600 text-white dark:bg-blue-400 dark:hover:bg-blue-300 dark:text-blue-950 font-medium py-2 px-4 rounded-lg transition-colors"
+          className="rounded-lg bg-brand px-4 py-2 font-medium text-white transition-colors hover:bg-brand/90 dark:bg-brand dark:text-brand-foreground dark:hover:bg-brand/90"
         >
           Try again
         </button>

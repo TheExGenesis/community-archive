@@ -4,10 +4,20 @@ import React, { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { createBrowserClient } from '@/utils/supabase'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -50,52 +60,70 @@ const StreamMonitor = () => {
   const [tweetOffset, setTweetOffset] = useState(0)
   const [showBanner, setShowBanner] = useState(true)
   const tweetsPerPage = 20
-  
+
   const supabase = createBrowserClient()
 
   // Query for scraping stats based on view mode and offset
-  const { data: scrapingStats, isLoading: statsLoading, error: statsError } = useQuery({
+  const {
+    data: scrapingStats,
+    isLoading: statsLoading,
+    error: statsError,
+  } = useQuery({
     queryKey: ['scrapingStats', viewMode, timeOffset, showStreamedOnly],
     queryFn: async () => {
       const now = new Date()
       let startDate, endDate, granularity, periods
-      
+
       if (viewMode === '24h') {
         periods = 24
-        startDate = new Date(now.getTime() - (periods + timeOffset * periods) * 60 * 60 * 1000)
-        endDate = new Date(now.getTime() - timeOffset * periods * 60 * 60 * 1000)
+        startDate = new Date(
+          now.getTime() - (periods + timeOffset * periods) * 60 * 60 * 1000,
+        )
+        endDate = new Date(
+          now.getTime() - timeOffset * periods * 60 * 60 * 1000,
+        )
         granularity = 'hour'
       } else if (viewMode === '7d') {
         periods = 7
-        startDate = new Date(now.getTime() - (periods + timeOffset * periods) * 24 * 60 * 60 * 1000)
-        endDate = new Date(now.getTime() - timeOffset * periods * 24 * 60 * 60 * 1000)
+        startDate = new Date(
+          now.getTime() -
+            (periods + timeOffset * periods) * 24 * 60 * 60 * 1000,
+        )
+        endDate = new Date(
+          now.getTime() - timeOffset * periods * 24 * 60 * 60 * 1000,
+        )
         granularity = 'day'
-      } else { // 1y
+      } else {
+        // 1y
         periods = 52 // 52 weeks
-        startDate = new Date(now.getTime() - (periods + timeOffset * periods) * 7 * 24 * 60 * 60 * 1000)
-        endDate = new Date(now.getTime() - timeOffset * periods * 7 * 24 * 60 * 60 * 1000)
+        startDate = new Date(
+          now.getTime() -
+            (periods + timeOffset * periods) * 7 * 24 * 60 * 60 * 1000,
+        )
+        endDate = new Date(
+          now.getTime() - timeOffset * periods * 7 * 24 * 60 * 60 * 1000,
+        )
         granularity = 'week'
       }
-      
+
       // Use the new API with custom date ranges
       const params = new URLSearchParams({
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
         granularity,
-        streamedOnly: showStreamedOnly.toString()
+        streamedOnly: showStreamedOnly.toString(),
       })
-      
+
       const response = await fetch(`/api/scraping-stats?${params}`)
       if (!response.ok) {
         throw new Error('Failed to fetch scraping stats')
       }
-      
+
       return response.json()
     },
     refetchInterval: viewMode === '24h' && timeOffset === 0 ? 300000 : 0, // Only refresh current 24h view
-    staleTime: 60000 // 1 minute stale time
+    staleTime: 60000, // 1 minute stale time
   })
-
 
   // Extract chart data and summary from scraping stats
   const chartData = scrapingStats?.data
@@ -105,14 +133,25 @@ const StreamMonitor = () => {
   const scraperLoading = statsLoading
 
   // Query for latest tweets with pagination
-  const { data: tweetsData, isLoading: tweetsLoading, error: tweetsError, refetch: refetchTweets } = useQuery({
+  const {
+    data: tweetsData,
+    isLoading: tweetsLoading,
+    error: tweetsError,
+    refetch: refetchTweets,
+  } = useQuery({
     queryKey: ['streamMonitorTweets', tweetOffset],
     queryFn: async () => {
-      return await getLatestTweets(supabase, tweetsPerPage, undefined, tweetOffset, {
-        includeEnrichments: false,
-      })
+      return await getLatestTweets(
+        supabase,
+        tweetsPerPage,
+        undefined,
+        tweetOffset,
+        {
+          includeEnrichments: false,
+        },
+      )
     },
-    refetchInterval: tweetOffset === 0 ? 60000 : 0 // Only auto-refresh latest tweets
+    refetchInterval: tweetOffset === 0 ? 60000 : 0, // Only auto-refresh latest tweets
   })
 
   // Update loaded tweets when new data arrives
@@ -123,15 +162,15 @@ const StreamMonitor = () => {
         setLoadedTweets(tweetsData)
       } else {
         // Load more - append to existing tweets
-        setLoadedTweets(prev => [...prev, ...tweetsData])
+        setLoadedTweets((prev) => [...prev, ...tweetsData])
       }
     }
   }, [tweetsData, tweetOffset])
 
   const chartConfig = {
     tweet_count: {
-      label: showStreamedOnly ? "Tweets Streamed" : "Total Tweets",
-      color: "hsl(var(--chart-1))",
+      label: showStreamedOnly ? 'Tweets Streamed' : 'Total Tweets',
+      color: 'hsl(var(--chart-1))',
     },
   }
 
@@ -163,15 +202,15 @@ const StreamMonitor = () => {
     }
     return label
   }
-  
+
   const handlePrevious = () => {
-    setTimeOffset(prev => prev + 1)
+    setTimeOffset((prev) => prev + 1)
   }
-  
+
   const handleNext = () => {
-    setTimeOffset(prev => Math.max(0, prev - 1))
+    setTimeOffset((prev) => Math.max(0, prev - 1))
   }
-  
+
   const getTimeRangeLabel = () => {
     if (viewMode === '24h') {
       if (timeOffset === 0) return 'Last 24 Hours'
@@ -194,7 +233,7 @@ const StreamMonitor = () => {
   }
 
   const loadMoreTweets = () => {
-    setTweetOffset(prev => prev + tweetsPerPage)
+    setTweetOffset((prev) => prev + tweetsPerPage)
   }
 
   const refreshLatestTweets = async () => {
@@ -225,15 +264,16 @@ const StreamMonitor = () => {
   }
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            <h1 className="mb-2 text-3xl font-bold text-foreground">
               Stream Monitor
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Real-time monitoring of tweet {showStreamedOnly ? 'streaming' : 'activity (including archives)'}
+            <p className="text-muted-foreground">
+              Real-time monitoring of tweet{' '}
+              {showStreamedOnly ? 'streaming' : 'activity (including archives)'}
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -252,23 +292,28 @@ const StreamMonitor = () => {
       {/* Compact call-to-action banner */}
       {showBanner && (
         <div className="mb-6">
-          <div className="flex items-center justify-between gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <span className="text-xl flex-shrink-0">📡</span>
-              <p className="text-sm text-blue-800 dark:text-blue-200 truncate">
-                Help grow the archive! Opt in and install the extension to stream tweets.
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted p-4">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <span className="flex-shrink-0 text-xl">📡</span>
+              <p className="truncate text-sm text-brand">
+                Help grow the archive! Opt in and install the extension to
+                stream tweets.
               </p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex flex-shrink-0 items-center gap-2">
               <Link href="/">
-                <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:text-blue-300 dark:hover:bg-blue-800">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-brand text-brand hover:bg-brand/10 dark:border-border dark:text-brand dark:hover:bg-brand/90"
+                >
                   Get Started
                 </Button>
               </Link>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-100"
+                className="h-8 w-8 text-brand hover:text-brand"
                 onClick={handleDismissBanner}
               >
                 <X className="h-4 w-4" />
@@ -279,18 +324,20 @@ const StreamMonitor = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
               {showStreamedOnly ? 'Total Streamed' : 'Total Tweets'}
             </CardTitle>
             <CardDescription>
-              {showStreamedOnly ? 'Streamed in time range' : 'All tweets in time range'}
+              {showStreamedOnly
+                ? 'Streamed in time range'
+                : 'All tweets in time range'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">
+            <div className="text-2xl font-bold text-brand">
               {getTotalTweets().toLocaleString()}
             </div>
           </CardContent>
@@ -314,12 +361,14 @@ const StreamMonitor = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Unique Sources</CardTitle>
             <CardDescription>
-              {showStreamedOnly ? 'Active streaming scrapers' : 'All data sources'}
+              {showStreamedOnly
+                ? 'Active streaming scrapers'
+                : 'All data sources'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {scraperLoading ? '...' : (scraperCount || 0)}
+              {scraperLoading ? '...' : scraperCount || 0}
             </div>
           </CardContent>
         </Card>
@@ -327,21 +376,17 @@ const StreamMonitor = () => {
 
       <Card className="mb-8">
         <CardHeader>
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4 flex items-center justify-between">
             <div>
               <CardTitle>
-                {showStreamedOnly ? 'Tweet Streaming Activity' : 'Tweet Activity (All Sources)'}
+                {showStreamedOnly
+                  ? 'Tweet Streaming Activity'
+                  : 'Tweet Activity (All Sources)'}
               </CardTitle>
-              <CardDescription>
-                {getTimeRangeLabel()}
-              </CardDescription>
+              <CardDescription>{getTimeRangeLabel()}</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePrevious}
-              >
+              <Button variant="outline" size="sm" onClick={handlePrevious}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button
@@ -354,7 +399,13 @@ const StreamMonitor = () => {
               </Button>
             </div>
           </div>
-          <Tabs value={viewMode} onValueChange={(v) => { setViewMode(v as any); setTimeOffset(0); }}>
+          <Tabs
+            value={viewMode}
+            onValueChange={(v) => {
+              setViewMode(v as any)
+              setTimeOffset(0)
+            }}
+          >
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="24h">24 Hours</TabsTrigger>
               <TabsTrigger value="7d">7 Days</TabsTrigger>
@@ -364,19 +415,19 @@ const StreamMonitor = () => {
         </CardHeader>
         <CardContent>
           {chartLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="flex h-64 items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-brand"></div>
             </div>
           ) : chartError ? (
-            <div className="flex items-center justify-center h-64 text-red-600 dark:text-red-400">
+            <div className="flex h-64 items-center justify-center text-red-600 dark:text-red-400">
               Error loading chart data
             </div>
           ) : (
             <ChartContainer config={chartConfig}>
               <BarChart data={Array.isArray(chartData) ? chartData : []}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="period_start" 
+                <XAxis
+                  dataKey="period_start"
                   tickFormatter={formatXAxisLabel}
                   angle={-45}
                   textAnchor="end"
@@ -385,11 +436,13 @@ const StreamMonitor = () => {
                 <YAxis />
                 <ChartTooltip
                   content={<ChartTooltipContent />}
-                  labelFormatter={(label) => formatTooltipLabel(label as string)}
+                  labelFormatter={(label) =>
+                    formatTooltipLabel(label as string)
+                  }
                 />
-                <Bar 
-                  dataKey="tweet_count" 
-                  fill="hsl(var(--foreground))" 
+                <Bar
+                  dataKey="tweet_count"
+                  fill="hsl(var(--foreground))"
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
@@ -402,7 +455,7 @@ const StreamMonitor = () => {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             Latest Tweets
-            <Button 
+            <Button
               onClick={refreshLatestTweets}
               variant="outline"
               size="sm"
@@ -412,13 +465,14 @@ const StreamMonitor = () => {
             </Button>
           </CardTitle>
           <CardDescription>
-            Recently streamed top-level tweets (no replies) - refreshes automatically
+            Recently streamed top-level tweets (no replies) - refreshes
+            automatically
           </CardDescription>
         </CardHeader>
         <CardContent>
           {tweetsLoading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-brand"></div>
             </div>
           ) : tweetsError ? (
             <div className="flex items-center justify-center py-8 text-red-600 dark:text-red-400">
@@ -426,17 +480,17 @@ const StreamMonitor = () => {
             </div>
           ) : (
             <>
-              <UnifiedTweetList 
+              <UnifiedTweetList
                 tweets={loadedTweets}
                 isLoading={false}
                 emptyMessage="No tweets available"
                 showCsvExport={true}
                 csvFilename="stream_monitor_tweets.csv"
               />
-              
+
               {loadedTweets.length > 0 && (
                 <div className="flex justify-center pt-4">
-                  <Button 
+                  <Button
                     onClick={loadMoreTweets}
                     variant="outline"
                     disabled={tweetsLoading}

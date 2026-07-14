@@ -1,15 +1,15 @@
 import CommunityStats from '@/components/CommunityStats'
 import TopMentionedUsers from '@/components/TopMentionedMissingUsers'
 import { getArchiveMostMentionedAccounts } from '@/lib/queries/getMostMentionedAccounts'
-import { getStats } from '@/lib/stats';
-import { createServerClient } from '@/utils/supabase';
-import { cookies } from 'next/headers';
+import { getStats } from '@/lib/stats'
+import { createServerClient } from '@/utils/supabase'
+import { cookies } from 'next/headers'
 
 // export const revalidate = 0; // TODO: Decide on revalidation strategy
 
 export default async function MissionControlPage() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(cookieStore);
+  const cookieStore = await cookies()
+  const supabase = createServerClient(cookieStore)
   const stats = await getStats(supabase).catch((error) => {
     console.error('Failed to fetch stats for mission control:', error)
     return {
@@ -17,7 +17,7 @@ export default async function MissionControlPage() {
       tweetCount: null,
       userMentionsCount: null, // Ensure all potential fields from getStats are handled
     }
-  });
+  })
 
   const topMentionedMissingUsers = await getArchiveMostMentionedAccounts()
 
@@ -25,12 +25,12 @@ export default async function MissionControlPage() {
     <div className="container mx-auto px-4 py-8">
       <h1 className="mb-6 text-3xl font-bold">Mission Control</h1>
 
-      <CommunityStats 
+      <CommunityStats
         userCount={stats.userCount}
         tweetCount={stats.tweetCount}
       />
 
-      <div className="rounded-lg bg-gray-100 p-4 shadow dark:bg-gray-800">
+      <div className="rounded-lg bg-muted p-4 shadow">
         <h2 className="mb-4 text-xl font-semibold">Most Wanted</h2>
         <p className="mb-4">Top mentioned users who are not in the archive</p>
         <TopMentionedUsers

@@ -27,7 +27,7 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
             <a
               key={avatar.username}
               href={`/user/${avatar.account_id}`}
-              className="flex flex-col items-center text-center w-20"
+              className="flex w-20 flex-col items-center text-center"
             >
               <Avatar className="h-12 w-12">
                 <AvatarImage
@@ -38,14 +38,10 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
                   {avatar.username[0].toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <span
-                className="mt-1 text-xs hover:underline break-words"
-              >
+              <span className="mt-1 break-words text-xs hover:underline">
                 {avatar.username}
               </span>
-              <span
-                className="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400"
-              >
+              <span className="mt-0.5 text-[10px] text-muted-foreground">
                 {avatar.num_followers &&
                   `${formatNumber(avatar.num_followers)} followers`}
               </span>

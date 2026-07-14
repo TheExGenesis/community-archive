@@ -25,16 +25,16 @@ export default function HeaderSearch() {
     : '/search'
 
   return (
-    <form onSubmit={handleSubmit} className="hidden sm:flex items-center">
+    <form onSubmit={handleSubmit} className="hidden items-center sm:flex">
       <div className="flex items-center">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
             placeholder="Search tweets..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="h-9 w-40 rounded-r-none border-gray-200 bg-gray-100 py-1.5 pl-8 pr-3 text-sm focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 lg:w-56"
+            className="h-9 w-40 rounded-r-none border-border bg-muted py-1.5 pl-8 pr-3 text-sm focus:ring-brand lg:w-56"
           />
         </div>
         <Button

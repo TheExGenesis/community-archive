@@ -20,7 +20,7 @@ const CommunityStats = ({
 }: CommunityStatsProps) => {
   if (userCount === null || tweetCount === null) {
     return (
-      <p className="text-center text-lg text-gray-700 dark:text-gray-300 sm:text-xl">
+      <p className="text-center text-lg text-muted-foreground sm:text-xl">
         Community statistics are currently unavailable.
       </p>
     )
@@ -29,7 +29,7 @@ const CommunityStats = ({
   const goal = calculateGoal(userCount || 0)
 
   return (
-    <p className="text-xl text-gray-800 dark:text-gray-200">
+    <p className="text-xl text-foreground">
       We have <strong>{formatNumber(tweetCount)}</strong> tweets from{' '}
       <strong>{formatNumber(userCount)}</strong> users.
       {showGoal && goal && (

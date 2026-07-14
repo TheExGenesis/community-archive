@@ -25,13 +25,17 @@ export default function UploadArchiveSection() {
   // Get current user session
   useEffect(() => {
     const getCurrentUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       setUser(session?.user || null)
     }
 
     getCurrentUser()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null)
     })
 
@@ -56,7 +60,7 @@ export default function UploadArchiveSection() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: 'dev@example.com',
-            password: 'devpassword123'
+            password: 'devpassword123',
           }),
         })
 
@@ -98,7 +102,10 @@ export default function UploadArchiveSection() {
     setIsUploadProcessing(true)
 
     try {
-      const uploadedArchive = await handleFileUpload(event, setIsUploadProcessing)
+      const uploadedArchive = await handleFileUpload(
+        event,
+        setIsUploadProcessing,
+      )
       devLog('archive', uploadedArchive)
       setArchive(uploadedArchive)
     } catch (error) {
@@ -116,7 +123,8 @@ export default function UploadArchiveSection() {
     {
       number: '1',
       title: 'Request your data',
-      description: 'Go to X Settings and request your archive. It takes 1-2 days.',
+      description:
+        'Go to X Settings and request your archive. It takes 1-2 days.',
       link: 'https://x.com/settings/download_your_data',
       linkText: 'Request Archive',
     },
@@ -135,36 +143,40 @@ export default function UploadArchiveSection() {
 
   return (
     <div className="w-full">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Upload your tweets</h2>
-        <p className="mt-3 text-base text-gray-600 dark:text-gray-300">
+      <div className="mb-8 text-center">
+        <h2 className="text-3xl font-bold text-foreground">
+          Upload your tweets
+        </h2>
+        <p className="mt-3 text-base text-muted-foreground">
           Contribute to collective intelligence research{' '}
           <br className="hidden sm:block" />
           to build on top of our data and access our tools.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+      <div className="mx-auto grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-3">
         {steps.map((step) => (
           <div
             key={step.number}
-            className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-slate-700 text-center"
+            className="rounded-xl border border-border bg-card p-6 text-center"
           >
-            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 font-bold text-lg flex items-center justify-center mx-auto mb-4">
+            <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-muted text-lg font-bold text-brand">
               {step.number}
             </div>
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{step.title}</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{step.description}</p>
+            <h3 className="mb-2 font-semibold text-foreground">{step.title}</h3>
+            <p className="mb-4 text-sm text-muted-foreground">
+              {step.description}
+            </p>
 
             {step.link && (
               <a
                 href={step.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center text-sm text-blue-600 dark:text-blue-300 hover:underline"
+                className="inline-flex items-center text-sm text-brand hover:underline"
               >
                 {step.linkText}
-                <ExternalLink className="w-3 h-3 ml-1" />
+                <ExternalLink className="ml-1 h-3 w-3" />
               </a>
             )}
 
@@ -173,9 +185,9 @@ export default function UploadArchiveSection() {
                 <Button
                   onClick={handleUploadClick}
                   disabled={isUploadProcessing}
-                  className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-400 dark:hover:bg-blue-300 dark:text-blue-950"
+                  className="bg-brand text-white hover:bg-brand/90 dark:bg-brand dark:text-brand-foreground dark:hover:bg-brand/90"
                 >
-                  <Upload className="w-4 h-4 mr-2" />
+                  <Upload className="mr-2 h-4 w-4" />
                   {isUploadProcessing ? 'Processing...' : 'Upload .zip'}
                 </Button>
                 <input
@@ -193,17 +205,17 @@ export default function UploadArchiveSection() {
         ))}
       </div>
 
-      <p className="text-center mt-6 text-sm text-gray-500 dark:text-gray-400">
+      <p className="mt-6 text-center text-sm text-muted-foreground">
         See{' '}
         <a
           href="https://github.com/TheExGenesis/community-archive/blob/main/docs/archive_data.md"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 dark:text-blue-300 hover:underline"
+          className="text-brand hover:underline"
         >
           what data we use
-        </a>
-        {' '}from your archive
+        </a>{' '}
+        from your archive
       </p>
 
       {/* Upload Dialog */}

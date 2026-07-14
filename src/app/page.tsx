@@ -130,8 +130,7 @@ export default async function Homepage() {
   const stats = await getStats(supabase).catch((error) => {
     console.error('Failed to fetch stats for homepage:', error)
     return {
-      accountCount: null,
-      optInCount: null,
+      userCount: null,
       tweetCount: null,
       userMentionsCount: null,
     }
@@ -171,8 +170,7 @@ export default async function Homepage() {
           className="max-w-5xl mx-auto rounded-none sm:rounded-xl p-6 md:p-8 space-y-4 text-center bg-slate-100 dark:bg-gray-900"
         >
           <CommunityStats
-            accountCount={stats.accountCount}
-            optInCount={stats.optInCount}
+            userCount={stats.userCount}
             tweetCount={stats.tweetCount}
             showGoal={false}
           />

@@ -5,32 +5,7 @@ import {
 import type { User } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
-
-// Derive the session's Twitter username from the OAuth identity entry.
-// SECURITY: only identity_data is trusted — user_metadata is user-mutable via
-// supabase.auth.updateUser({ data: ... }), so reading user_name from there
-// would let a logged-in user spoof their identity and claim an unclaimed
-// opt-in row for any username (combined with the service-role client that
-// bypasses RLS, this would be a real impersonation vector).
-function getSessionTwitterUsername(user: User): string | null {
-  const identity =
-    user.identities?.find((i) => ['twitter', 'x'].includes(i.provider ?? '')) ??
-    null
-  if (!identity) return null
-  const data = (identity.identity_data ?? {}) as Record<string, unknown>
-  for (const k of [
-    'user_name',
-    'preferred_username',
-    'screen_name',
-    'username',
-  ]) {
-    const v = data[k]
-    if (typeof v === 'string' && v.trim()) {
-      return v.trim().toLowerCase().replace(/^@/, '')
-    }
-  }
-  return null
-}
+import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
 
 function getSessionTwitterUserId(user: User): string | null {
   const providerId = user.app_metadata?.provider_id

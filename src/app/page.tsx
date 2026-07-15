@@ -19,6 +19,7 @@ import dynamic from 'next/dynamic'
 import FeaturedAppsSection from '@/components/FeaturedAppsSection'
 import AppGallery from '@/components/AppGallery'
 import HomepageSearch from '@/components/HomepageSearch'
+import { canShowHomepageSearch } from '@/lib/homepageAccess'
 
 export const revalidate = 60 // Cache for 60s to reduce server load from scrapers
 
@@ -140,6 +141,27 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 export default async function Homepage() {
   const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  let optedInStatus: boolean | null = null
+  if (user) {
+    const { data: optInData, error: optInError } = await supabase
+      .from('optin')
+      .select('opted_in')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (optInError) {
+      console.error('Failed to fetch homepage opt-in status:', optInError)
+    }
+
+    optedInStatus = optInData?.opted_in ?? false
+  }
+
+  const isOptedIn = canShowHomepageSearch(user?.id, optedInStatus)
+
   const mostFollowed = (await getMostFollowedAccounts(supabase)).slice(0, 7)
   const financialContributors = await getOpenCollectiveContributors()
 
@@ -174,58 +196,78 @@ export default async function Homepage() {
   const contentWrapperClasses =
     'w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'
 
+  const socialProofSection = (
+    <section
+      className={`overflow-hidden bg-card dark:bg-background ${
+        isOptedIn ? 'py-12 md:py-16' : ''
+      }`}
+    >
+      <div className="mx-auto max-w-5xl space-y-4 rounded-none bg-muted p-6 text-center dark:bg-card sm:rounded-xl md:p-8">
+        <CommunityStats
+          userCount={stats.userCount}
+          tweetCount={stats.tweetCount}
+          showGoal={false}
+        />
+        {mostFollowed.length > 0 ? (
+          <AvatarList initialAvatars={mostFollowed} />
+        ) : (
+          <p className="mt-4 text-center text-muted-foreground">
+            Featured archives are currently unavailable.
+          </p>
+        )}
+      </div>
+    </section>
+  )
+
   return (
     <main>
-      {/* Section 1: Hero with CTAs */}
-      <section className="overflow-hidden bg-card pb-12 pt-16 dark:bg-background md:pb-16 md:pt-24">
+      {/* Section 1: Audience-specific hero */}
+      <section
+        className={`overflow-hidden bg-card dark:bg-background ${
+          isOptedIn
+            ? 'pb-20 pt-20 md:pb-28 md:pt-28'
+            : 'pb-12 pt-16 md:pb-16 md:pt-24'
+        }`}
+      >
         <div className={`${contentWrapperClasses} space-y-10 text-center`}>
           <div className="space-y-4">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
-              Community Archive
+              {isOptedIn ? 'Search the archive' : 'Community Archive'}
             </h1>
             <p className="text-xl leading-8 text-muted-foreground">
-              Search millions of public conversations and help build{' '}
-              <br className="hidden sm:block" />
-              open source public infrastructure.
+              {isOptedIn ? (
+                <>
+                  Find public conversations, people, and ideas across millions
+                  of archived tweets.
+                </>
+              ) : (
+                <>
+                  Join the archive to preserve public conversations for open
+                  research and help build open source public infrastructure.
+                </>
+              )}
             </p>
           </div>
 
-          <HomepageSearch
-            tweetCount={stats.tweetCount}
-            userCount={stats.userCount}
-          />
-
-          <div className="space-y-4 border-t border-border pt-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Help grow the archive
-            </p>
-            <DynamicHeroCTAButtons />
-            <p className="text-sm text-muted-foreground">
-              Backed by Survival and Flourishing Fund and Vitalik Buterin
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 2: Social Proof */}
-      <section className="overflow-hidden bg-card dark:bg-background">
-        <div className="mx-auto max-w-5xl space-y-4 rounded-none bg-muted p-6 text-center dark:bg-card sm:rounded-xl md:p-8">
-          <CommunityStats
-            userCount={stats.userCount}
-            tweetCount={stats.tweetCount}
-            showGoal={false}
-          />
-          {mostFollowed.length > 0 ? (
-            <AvatarList initialAvatars={mostFollowed} />
+          {isOptedIn ? (
+            <HomepageSearch />
           ) : (
-            <p className="mt-4 text-center text-muted-foreground">
-              Featured archives are currently unavailable.
-            </p>
+            <div className="space-y-4 pt-2">
+              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Help grow the archive
+              </p>
+              <DynamicHeroCTAButtons initialIsOptedIn={false} />
+              <p className="text-sm text-muted-foreground">
+                Backed by Survival and Flourishing Fund and Vitalik Buterin
+              </p>
+            </div>
           )}
         </div>
       </section>
 
-      {/* Section 3: Explore the archive - Featured Apps */}
+      {!isOptedIn ? socialProofSection : null}
+
+      {/* Section 2: Explore the archive - Featured Apps */}
       <section
         id="products"
         className={`bg-card dark:bg-background ${sectionPaddingClasses} scroll-mt-16 overflow-hidden`}
@@ -236,7 +278,24 @@ export default async function Homepage() {
         </div>
       </section>
 
-      {/* Section 4: Upload Your Archive */}
+      {isOptedIn ? (
+        <>
+          {socialProofSection}
+          <section className="overflow-hidden bg-card pb-12 dark:bg-background md:pb-16">
+            <div className={`${contentWrapperClasses} space-y-4 text-center`}>
+              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Keep the archive growing
+              </p>
+              <DynamicHeroCTAButtons initialIsOptedIn />
+              <p className="text-sm text-muted-foreground">
+                Backed by Survival and Flourishing Fund and Vitalik Buterin
+              </p>
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      {/* Section 3: Upload Your Archive */}
       <section
         id="upload-archive"
         className={`bg-muted dark:bg-card ${sectionPaddingClasses} scroll-mt-16 overflow-hidden`}

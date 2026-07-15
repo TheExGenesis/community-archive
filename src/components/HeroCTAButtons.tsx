@@ -17,13 +17,19 @@ import { devLog } from '@/lib/devLog'
 const CHROME_EXTENSION_URL =
   'https://chromewebstore.google.com/detail/community-archive-stream/igclpobjpjlphgllncjcgaookmncegbk'
 
-export default function HeroCTAButtons() {
+interface HeroCTAButtonsProps {
+  initialIsOptedIn?: boolean
+}
+
+export default function HeroCTAButtons({
+  initialIsOptedIn = false,
+}: HeroCTAButtonsProps) {
   const router = useRouter()
   const { userMetadata } = useAuthAndArchive()
   const supabase = createBrowserClient()
 
   const [user, setUser] = useState<any>(null)
-  const [isOptedIn, setIsOptedIn] = useState<boolean | null>(null)
+  const [isOptedIn, setIsOptedIn] = useState(initialIsOptedIn)
   const [isOptInLoading, setIsOptInLoading] = useState(false)
 
   const twitterUsername = userMetadata?.user_name

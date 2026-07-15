@@ -5,20 +5,11 @@ import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { formatNumber } from '@/lib/formatNumber'
 import { buildSearchParams } from '@/lib/searchParams'
-
-interface HomepageSearchProps {
-  tweetCount: number | null
-  userCount: number | null
-}
 
 const exampleSearches = ['open source', 'AI alignment', 'from:vitalikbuterin']
 
-export default function HomepageSearch({
-  tweetCount,
-  userCount,
-}: HomepageSearchProps) {
+export default function HomepageSearch() {
   const router = useRouter()
   const [query, setQuery] = useState('')
 
@@ -62,24 +53,18 @@ export default function HomepageSearch({
         </Button>
       </form>
 
-      <div className="mt-4 flex flex-col items-center justify-between gap-3 text-sm text-muted-foreground sm:flex-row">
-        <p>
-          Search {formatNumber(tweetCount)} tweets from{' '}
-          {formatNumber(userCount)} participating members.
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <span>Try:</span>
-          {exampleSearches.map((example) => (
-            <button
-              key={example}
-              type="button"
-              onClick={() => search(example)}
-              className="font-medium text-foreground underline-offset-4 transition-colors hover:text-brand hover:underline"
-            >
-              {example}
-            </button>
-          ))}
-        </div>
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
+        <span>Try:</span>
+        {exampleSearches.map((example) => (
+          <button
+            key={example}
+            type="button"
+            onClick={() => search(example)}
+            className="font-medium text-foreground underline-offset-4 transition-colors hover:text-brand hover:underline"
+          >
+            {example}
+          </button>
+        ))}
       </div>
     </div>
   )

@@ -18,6 +18,7 @@ import TieredSupportersDisplay, {
 import dynamic from 'next/dynamic'
 import FeaturedAppsSection from '@/components/FeaturedAppsSection'
 import AppGallery from '@/components/AppGallery'
+import HomepageSearch from '@/components/HomepageSearch'
 
 export const revalidate = 60 // Cache for 60s to reduce server load from scrapers
 
@@ -177,19 +178,27 @@ export default async function Homepage() {
     <main>
       {/* Section 1: Hero with CTAs */}
       <section className="overflow-hidden bg-card pb-12 pt-16 dark:bg-background md:pb-16 md:pt-24">
-        <div className={`${contentWrapperClasses} space-y-11 text-center`}>
+        <div className={`${contentWrapperClasses} space-y-10 text-center`}>
           <div className="space-y-4">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
               Community Archive
             </h1>
-            <p className="text-xl text-muted-foreground">
-              An open Twitter database. Join the archive to{' '}
+            <p className="text-xl leading-8 text-muted-foreground">
+              Search millions of public conversations and help build{' '}
               <br className="hidden sm:block" />
-              contribute to open source public infrastructure.
+              open source public infrastructure.
             </p>
           </div>
 
-          <div className="space-y-4">
+          <HomepageSearch
+            tweetCount={stats.tweetCount}
+            userCount={stats.userCount}
+          />
+
+          <div className="space-y-4 border-t border-border pt-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Help grow the archive
+            </p>
             <DynamicHeroCTAButtons />
             <p className="text-sm text-muted-foreground">
               Backed by Survival and Flourishing Fund and Vitalik Buterin

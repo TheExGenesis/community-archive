@@ -12,6 +12,7 @@ import dynamic from 'next/dynamic'
 import HeaderNavigation from '@/components/HeaderNavigation'
 import HeaderSearch from '@/components/HeaderSearch'
 import MobileMenu from '@/components/MobileMenu'
+import MobileNavigation from '@/components/MobileNavigation'
 import Footer from '@/components/Footer'
 import { checkIsAdmin } from '@/app/admin/data'
 import { Shield } from 'lucide-react'
@@ -95,6 +96,7 @@ export default async function RootLayout({
                   <div className="text-sm">
                     <DynamicSignIn />
                   </div>
+                  <MobileNavigation />
                   <ThemeToggle side="bottom" />
                   {isAdmin ? (
                     <Link

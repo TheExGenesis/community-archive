@@ -1,96 +1,151 @@
-# API doc
+# API guide
 
-There are two ways to access the Community Archive's data: (1) Download a JSON file with an individual user's data from blob storage (2) query the DB through the Supabase API
+There are three ways to access Community Archive data:
 
-### Raw user data from blob storage
+1. Download the bulk Parquet export for corpus-wide analysis.
+2. Query filtered records through the read-only Supabase REST API.
+3. Download one user's processed archive JSON from public object storage.
 
-Given a username (lowercase), the URL format is: `/storage/v1/object/public/archives/<username>/archive.json`. 
+The website version of this guide is at
+[`community-archive.org/docs`](https://www.community-archive.org/docs). Agents
+should start at
+[`community-archive.org/llms.txt`](https://www.community-archive.org/llms.txt).
 
-For example, the URL for the user `DefenderOfBasic` is:
+## Bulk Parquet export
 
-https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/defenderofbasic/archive.json
+Use the [GitHub data release](https://github.com/TheExGenesis/community-archive/releases/tag/data_export)
+as the canonical page for current export notes and its download link.
 
-The structure of this JSON is:
+Current file:
+[`enriched_tweets.parquet`](https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet)
 
-```js
-{
-  "account": {},// username, accountId, display name, etc..
-  "follower": {}, // list of accountId's of followers
-  "following": {}, // list of accountId's they follow
-  "profile": {}, // bio & URL to profile picture
-  "like": {}, // list of full text of each liked tweet
-  "tweets": {}, // list of tweets
-}
+The dump is the right choice for full-corpus analysis. For example, DuckDB can
+query the remote Parquet file directly:
+
+```sql
+SELECT tweet_id, username, created_at, full_text
+FROM read_parquet('https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet')
+WHERE lower(username) = 'defenderofbasic'
+ORDER BY created_at DESC
+LIMIT 100;
 ```
 
-### Query the DB 
+## REST API
 
 - API URL: `https://fabxmporizzqflnftavs.supabase.co`
-- [API reference docs](https://open-birdsite-db.vercel.app/api/reference)
-- Authorization token (gives you access to all GET routes): `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8`
+- REST URL: `https://fabxmporizzqflnftavs.supabase.co/rest/v1`
+- [Interactive API reference](https://www.community-archive.org/api/reference)
+- [OpenAPI JSON](https://www.community-archive.org/openapi.json)
+- Public anon key:
+  `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8`
 
-Curl example, fetch the profile info of 5 users:
+The anon key is intentionally public. Send it as both the `apikey` header and
+the bearer token. Never expose or request a service-role key.
+
+### Fetch recent tweets for a username with cURL
 
 ```bash
-export NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8
+export CA_API_URL='https://fabxmporizzqflnftavs.supabase.co'
+export CA_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8'
 
-curl 'https://fabxmporizzqflnftavs.supabase.co/rest/v1/profile?limit=5' \
--H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
--H "Authorization: Bearer $NEXT_PUBLIC_SUPABASE_ANON_KEY"
+curl --get "$CA_API_URL/rest/v1/enriched_tweets" \
+  -H "apikey: $CA_ANON_KEY" \
+  -H "Authorization: Bearer $CA_ANON_KEY" \
+  --data-urlencode "select=tweet_id,username,created_at,full_text" \
+  --data-urlencode "username=ilike.defenderofbasic" \
+  --data-urlencode "order=created_at.desc" \
+  --data-urlencode "limit=5"
 ```
 
-Supabase has [client libraries](https://github.com/supabase/supabase#client-libraries) for various languages. JavaScript example:
+`enriched_tweets` is convenient because it joins tweet records with username,
+display name, conversation, quote, and avatar fields.
+
+### JavaScript with `@supabase/supabase-js`
 
 ```js
 import { createClient } from '@supabase/supabase-js'
-const supabaseUrl = 'https://fabxmporizzqflnftavs.supabase.co'
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabase = createClient(supabaseUrl, supabaseKey)
+
+const supabase = createClient(
+  'https://fabxmporizzqflnftavs.supabase.co',
+  process.env.CA_ANON_KEY,
+)
+
 const { data, error } = await supabase
-  .schema('public')
-  .from('profile')
-  .select('*')
+  .from('enriched_tweets')
+  .select('tweet_id, username, created_at, full_text')
+  .ilike('username', 'defenderofbasic')
+  .order('created_at', { ascending: false })
   .limit(5)
+
+if (error) throw error
 console.log(data)
 ```
 
-#### Get all tweets from a specific user
-
-This example uses accountId for user `DefenderOfBasic`. 
-
-With Curl:
-
-```
-curl 'https://fabxmporizzqflnftavs.supabase.co/rest/v1/tweets?account_id=eq.1680757426889342977&limit=1' \
--H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
--H "Authorization: Bearer $NEXT_PUBLIC_SUPABASE_ANON_KEY"
-```
-
-With JavaScript:
+### Look up an account ID
 
 ```js
 const { data, error } = await supabase
-        .schema('public')
-        .from('tweets')
-        .select('*')
-        .eq('account_id', '1680757426889342977') 
-        .limit(1)
-console.log(data)
+  .from('all_account')
+  .select('account_id')
+  .ilike('username', username)
+  .single()
+
+if (error) throw error
+const accountId = data.account_id
 ```
 
-You likely have their twitter handle, and not their accountId, so here is how you get a user's accountId from a twitter handle:
+Twitter IDs must remain strings. JavaScript numbers cannot safely represent
+every Twitter ID.
+
+### Fetch tweets for an account ID
+
 ```js
 const { data, error } = await supabase
-    .from('account')
-    .select('account_id')
-    .eq('username', username)
-    .single()
-const accountId = data
-console.log(accountId)
+  .from('tweets')
+  .select('tweet_id, created_at, full_text, favorite_count, retweet_count')
+  .eq('account_id', accountId)
+  .order('created_at', { ascending: false })
+  .limit(100)
 ```
 
-See [scripts/get_all_tweets_paginated.mts](../scripts/get_all_tweets_paginated.mts) for an example of fetching all tweets with pagination. You can run it from the root directory with:
+## Filters and pagination
 
-```
+The API uses [PostgREST query syntax](https://postgrest.org/en/stable/references/api/tables_views.html):
+
+- Case-insensitive equality: `username=ilike.defenderofbasic`
+- At least: `created_at=gte.2025-01-01`
+- Ordering: `order=created_at.desc`
+- Columns: `select=tweet_id,username,full_text`
+- Page size and offset: `limit=1000&offset=0`
+
+Responses are capped at 1,000 rows. For reliable pagination:
+
+1. Apply a stable order using a unique or indexed column.
+2. Request at most 1,000 rows.
+3. Increment the offset until a page contains fewer rows than requested.
+
+See
+[`scripts/get_all_tweets_paginated.mts`](../scripts/get_all_tweets_paginated.mts)
+for a complete example. Run it from the repository root with:
+
+```bash
 pnpm script scripts/get_all_tweets_paginated.mts
 ```
+
+Use the Parquet dump instead when you need most or all of the corpus.
+
+## Raw user archives
+
+Given a lowercase username, use:
+
+```text
+https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/<username>/archive.json
+```
+
+Example:
+
+<https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/defenderofbasic/archive.json>
+
+The object contains archive-shaped sections such as `account`, `profile`,
+`tweets`, `follower`, `following`, and optionally `like`. See
+[archive_data.md](./archive_data.md) for structure and examples.

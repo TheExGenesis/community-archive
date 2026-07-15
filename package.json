@@ -46,7 +46,7 @@
     "analyze": "ANALYZE=true pnpm build",
     "scratchpad": "ts-node -r tsconfig-paths/register -P ./scratchpad/tsconfig.json",
     "script": "tsx",
-    "gen-api-docs": "curl https://fabxmporizzqflnftavs.supabase.co/rest/v1/ -H \"apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY\" -H \"Accept: application/openapi+json\" > public/openapi.json",
+    "gen-api-docs": "node scripts/generate-api-docs.mjs",
     "docker:build:process-archive": "docker build -f services/process_archive/Dockerfile -t process-archive:latest .",
     "docker:run:process-archive": "docker compose -f services/process_archive/docker-compose.yml run --rm process-archive"
   },

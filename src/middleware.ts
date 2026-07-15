@@ -8,8 +8,7 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-  'Strict-Transport-Security':
-    'max-age=63072000; includeSubDomains; preload',
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
 }
 
 // Known bot/scraper UA substrings (lowercase)
@@ -124,7 +123,9 @@ interface RateLimitData {
   s: number // window start timestamp
 }
 
-function parseCookieRateLimit(cookieValue: string | undefined): RateLimitData | null {
+function parseCookieRateLimit(
+  cookieValue: string | undefined,
+): RateLimitData | null {
   if (!cookieValue) return null
   try {
     const json = Buffer.from(cookieValue, 'base64').toString('utf-8')
@@ -169,7 +170,11 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
   return response
 }
 
-function blocked(status: number, body: string, extraHeaders?: Record<string, string>): NextResponse {
+function blocked(
+  status: number,
+  body: string,
+  extraHeaders?: Record<string, string>,
+): NextResponse {
   const resp = new NextResponse(body, { status, headers: extraHeaders })
   return addSecurityHeaders(resp)
 }
@@ -212,6 +217,21 @@ function isPageRoute(pathname: string): boolean {
   )
 }
 
+/**
+ * Public documentation must remain readable by non-browser clients. The rest
+ * of the site keeps its scraper protections, while agents and API tools can
+ * fetch these entry points without pretending to be a browser.
+ */
+function isPublicDocumentationRoute(pathname: string): boolean {
+  return (
+    pathname === '/llms.txt' ||
+    pathname === '/openapi.json' ||
+    pathname === '/api/reference' ||
+    pathname === '/docs' ||
+    pathname.startsWith('/docs/')
+  )
+}
+
 // ─── Main Middleware ─────────────────────────────────────────────────────────
 
 export async function middleware(request: NextRequest) {
@@ -219,6 +239,7 @@ export async function middleware(request: NextRequest) {
   const ua = request.headers.get('user-agent') || ''
   const pageRoute = isPageRoute(pathname)
   const previewBot = isPreviewBot(ua)
+  const publicDocumentationRoute = isPublicDocumentationRoute(pathname)
   // Server Action POSTs go to the page route URL (e.g. POST /admin) but with
   // `next-action` header and Accept: text/x-component — not text/html. The
   // browser-fingerprint check would otherwise 403 them and the client sees
@@ -227,7 +248,7 @@ export async function middleware(request: NextRequest) {
     request.method === 'POST' && request.headers.has('next-action')
 
   // ── Stage 1: Bot User-Agent Detection (all routes) ──────────────────────
-  if (!previewBot) {
+  if (!previewBot && !publicDocumentationRoute) {
     // Block empty or missing UA
     if (!ua || ua.trim().length === 0) {
       return blocked(403, 'Forbidden')
@@ -245,7 +266,12 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Stage 2: Browser Header Fingerprinting (page navigations only) ──────
-  if (pageRoute && !previewBot && !isServerAction) {
+  if (
+    pageRoute &&
+    !previewBot &&
+    !publicDocumentationRoute &&
+    !isServerAction
+  ) {
     const accept = request.headers.get('accept') || ''
     const acceptLang = request.headers.get('accept-language')
     const acceptEnc = request.headers.get('accept-encoding') || ''
@@ -255,7 +281,8 @@ export async function middleware(request: NextRequest) {
     // Real browsers always send Accept-Language
     const hasLang = !!acceptLang
     // Real browsers support gzip or br
-    const hasCompression = acceptEnc.includes('gzip') || acceptEnc.includes('br')
+    const hasCompression =
+      acceptEnc.includes('gzip') || acceptEnc.includes('br')
 
     if (!hasHtmlAccept || !hasLang || !hasCompression) {
       return blocked(403, 'Forbidden')
@@ -317,10 +344,7 @@ export async function middleware(request: NextRequest) {
   // endpoints don't fight with the cookie/challenge flow. But unprotected
   // /api routes are a cheap DoS target, so apply the in-memory IP bucket
   // (no cookie, no challenge) here. Tighter quota than page routes.
-  if (
-    pathname.startsWith('/api/') &&
-    process.env.NODE_ENV !== 'development'
-  ) {
+  if (pathname.startsWith('/api/') && process.env.NODE_ENV !== 'development') {
     const ip = getIp(request)
     const country = request.headers.get('x-vercel-ip-country') || ''
     const isSG = country === 'SG'
@@ -337,14 +361,14 @@ export async function middleware(request: NextRequest) {
             'Content-Type': 'application/json',
             'Retry-After': '60',
           },
-        }
+        },
       )
       return addSecurityHeaders(resp)
     }
   }
 
   // ── Stage 4: JS Challenge Gate (all page routes, first visit) ───────────
-  if (pageRoute && !previewBot) {
+  if (pageRoute && !previewBot && !publicDocumentationRoute) {
     const challengeCookie = request.cookies.get('__cc')?.value
     if (!isValidChallengeCookie(challengeCookie)) {
       const challengeHtml = buildChallengeHtml(request.url)
@@ -356,7 +380,9 @@ export async function middleware(request: NextRequest) {
         },
       })
       // Still set rate limit cookie on challenge response
-      const newRlData = (request as any).__newRlData as RateLimitData | undefined
+      const newRlData = (request as any).__newRlData as
+        | RateLimitData
+        | undefined
       if (newRlData) {
         resp.cookies.set('__rl', encodeCookieRateLimit(newRlData), {
           path: '/',
@@ -379,7 +405,8 @@ export async function middleware(request: NextRequest) {
 
   if (hasAuthCookies) {
     try {
-      const { supabase, response: supabaseResponse } = createMiddlewareClient(request)
+      const { supabase, response: supabaseResponse } =
+        createMiddlewareClient(request)
       await supabase.auth.getSession()
       response = supabaseResponse
     } catch {

@@ -17,6 +17,7 @@ const navigationItems = [
   { href: '/#products', label: 'Products' },
   { href: '/user-dir', label: 'User Directory' },
   { href: '/search', label: 'Search' },
+  { href: '/docs', label: 'Docs' },
 ]
 
 export default function MobileNavigation() {

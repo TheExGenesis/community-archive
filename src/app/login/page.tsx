@@ -3,7 +3,6 @@ import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import { Suspense } from 'react'
 import LoginContent from './LoginContent'
-import { getOptInStatus } from '@/lib/auth-utils'
 
 export default async function LoginPage({
   searchParams,
@@ -26,8 +25,7 @@ export default async function LoginPage({
 
     if (safeRedirect) redirect(safeRedirect)
 
-    const { data: optInData } = await getOptInStatus(user.id)
-    redirect(optInData?.opted_in ? '/explore' : '/opt-in')
+    redirect('/')
   }
 
   return (

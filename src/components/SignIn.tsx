@@ -83,7 +83,7 @@ export default function SignIn() {
         if (redirectTo) {
           window.location.href = redirectTo
         } else {
-          window.location.href = '/explore'
+          window.location.href = '/'
         }
       } catch (error) {
         console.error('Error during dev sign in:', error)
@@ -97,7 +97,7 @@ export default function SignIn() {
       })
       const callbackUrl = redirectTo
         ? `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(redirectTo)}`
-        : `${window.location.origin}/api/auth/callback?next=${encodeURIComponent('/explore')}`
+        : `${window.location.origin}/api/auth/callback?next=${encodeURIComponent('/')}`
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'twitter',

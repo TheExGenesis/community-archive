@@ -46,10 +46,9 @@ describe('getSessionTwitterUsername', () => {
     ).toBe('real_user')
   })
 
-  it('uses server-set staging metadata on a non-production project', () => {
+  it('uses legacy server-set staging metadata on a non-production project', () => {
     const user = createUser({
       app_metadata: {
-        provider: 'staging',
         user_name: 'Alice_Dev',
       },
     })

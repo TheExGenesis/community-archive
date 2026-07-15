@@ -68,12 +68,6 @@ const getTrustedMockUsername = (
     return null
   }
 
-  const provider = user.app_metadata?.provider
-  const isTrustedProvider =
-    provider === 'staging' ||
-    (environment.nodeEnv === 'development' && provider === 'email')
-  if (!isTrustedProvider) return null
-
   return normalizeUsername(user.app_metadata?.user_name)
 }
 
@@ -81,6 +75,8 @@ const getTrustedMockUsername = (
 // app_metadata is accepted only when the mock login is enabled and the active
 // Supabase project is definitively not production. app_metadata is written by
 // the server-side auth admin client and cannot be changed by regular users.
+// We intentionally do not require a provider marker because staging users
+// created before that field was introduced still have a trusted user_name.
 export const getSessionTwitterUsername = (
   user: User,
   environment: SessionIdentityEnvironment = getDefaultEnvironment(),

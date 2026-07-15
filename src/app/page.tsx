@@ -232,20 +232,12 @@ export default async function Homepage() {
         <div className={`${contentWrapperClasses} space-y-10 text-center`}>
           <div className="space-y-4">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
-              {isOptedIn ? 'Search the archive' : 'Community Archive'}
+              Community Archive
             </h1>
             <p className="text-xl leading-8 text-muted-foreground">
-              {isOptedIn ? (
-                <>
-                  Find public conversations, people, and ideas across millions
-                  of archived tweets.
-                </>
-              ) : (
-                <>
-                  Join the archive to preserve public conversations for open
-                  research and help build open source public infrastructure.
-                </>
-              )}
+              Search millions of public conversations and help build{' '}
+              <br className="hidden sm:block" />
+              open source public infrastructure.
             </p>
           </div>
 

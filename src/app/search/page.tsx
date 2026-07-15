@@ -3,6 +3,7 @@
 import AdvancedSearchForm from '@/components/AdvancedSearchForm'
 import TweetList from '@/components/TweetList'
 import { FilterCriteria } from '@/lib/queries/tweetQueries'
+import { normalizeSearchParams } from '@/lib/searchParams'
 import { Search, SlidersHorizontal } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -18,8 +19,11 @@ const starterSearches = [
 // and Suspense is recommended for pages that use it.
 function SearchPageContent() {
   const searchParams = useSearchParams()
+  const normalizedSearchParams = normalizeSearchParams(
+    new URLSearchParams(searchParams.toString()),
+  )
 
-  const rawQuery = searchParams.get('q')
+  const rawQuery = normalizedSearchParams.get('q')
   let formattedQuery: string | undefined
   // Strip quotes if present, keep the clean text for two-query exact-match-first logic
   let cleanRawText: string | undefined
@@ -39,13 +43,13 @@ function SearchPageContent() {
   const filterCriteria: FilterCriteria = {
     searchQuery: formattedQuery,
     rawSearchQuery: cleanRawText,
-    fromUsername: searchParams.get('fromUser') || undefined,
-    replyToUsername: searchParams.get('replyToUser') || undefined,
-    startDate: searchParams.get('sinceDate') || undefined,
-    endDate: searchParams.get('untilDate') || undefined,
+    fromUsername: normalizedSearchParams.get('fromUser') || undefined,
+    replyToUsername: normalizedSearchParams.get('replyToUser') || undefined,
+    startDate: normalizedSearchParams.get('sinceDate') || undefined,
+    endDate: normalizedSearchParams.get('untilDate') || undefined,
   }
 
-  const tweetListKey = searchParams.toString()
+  const tweetListKey = normalizedSearchParams.toString()
   const hasSearch = tweetListKey.length > 0
   const searchDescription = cleanRawText
     ? `Matching “${cleanRawText}” and the filters above`

@@ -2,6 +2,7 @@ import {
   buildSearchExpression,
   buildSearchHref,
   buildSearchParams,
+  normalizeSearchParams,
   parseSearchExpression,
 } from './searchParams'
 
@@ -51,5 +52,25 @@ describe('search parameter helpers', () => {
         }),
       ),
     ).toBe('community archive to:bob until:2025-01-01')
+  })
+
+  it('normalizes inline and explicit URL filters to the same search', () => {
+    const inlineFilter = normalizeSearchParams(
+      new URLSearchParams('q=from%3Acuriousgustaf+perplexity'),
+    )
+    const explicitFilter = normalizeSearchParams(
+      new URLSearchParams('q=perplexity&fromUser=curiousgustaf'),
+    )
+
+    expect(inlineFilter.toString()).toBe('q=perplexity&fromUser=curiousgustaf')
+    expect(inlineFilter.toString()).toBe(explicitFilter.toString())
+  })
+
+  it('gives explicit URL filters precedence over inline filters', () => {
+    expect(
+      normalizeSearchParams(
+        new URLSearchParams('q=from%3Abob+archive&fromUser=alice'),
+      ).toString(),
+    ).toBe('q=archive&fromUser=alice')
   })
 })

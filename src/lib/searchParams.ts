@@ -69,3 +69,15 @@ export function buildSearchExpression(searchParams: URLSearchParams): string {
 
   return parts.filter(Boolean).join(' ').trim()
 }
+
+/**
+ * Resolve both supported search URL styles to the same parameter shape.
+ *
+ * Filters in explicit URL parameters take precedence over filters embedded in
+ * `q`, so a shared link can override an inline operator without ambiguity.
+ */
+export function normalizeSearchParams(
+  searchParams: URLSearchParams,
+): URLSearchParams {
+  return buildSearchParams(buildSearchExpression(searchParams))
+}

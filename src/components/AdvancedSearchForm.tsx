@@ -16,6 +16,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   buildSearchExpression,
   buildSearchParams,
+  normalizeSearchParams,
   parseSearchExpression,
   SearchFilterKey,
 } from '@/lib/searchParams'
@@ -28,16 +29,17 @@ export default function AdvancedSearchForm() {
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
 
   useEffect(() => {
-    const expression = buildSearchExpression(
+    const normalizedSearchParams = normalizeSearchParams(
       new URLSearchParams(searchParams.toString()),
     )
+    const expression = buildSearchExpression(normalizedSearchParams)
     setQuery(expression)
 
     if (
-      searchParams.has('fromUser') ||
-      searchParams.has('replyToUser') ||
-      searchParams.has('sinceDate') ||
-      searchParams.has('untilDate')
+      normalizedSearchParams.has('fromUser') ||
+      normalizedSearchParams.has('replyToUser') ||
+      normalizedSearchParams.has('sinceDate') ||
+      normalizedSearchParams.has('untilDate')
     ) {
       setShowAdvancedOptions(true)
     }

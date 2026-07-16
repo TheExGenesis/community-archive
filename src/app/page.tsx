@@ -1,4 +1,3 @@
-import CommunityStats from '@/components/CommunityStats'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import AvatarList from '@/components/AvatarList'
@@ -20,6 +19,7 @@ import FeaturedAppsSection from '@/components/FeaturedAppsSection'
 import AppGallery from '@/components/AppGallery'
 import HomepageSearch from '@/components/HomepageSearch'
 import { canShowHomepageSearch } from '@/lib/homepageAccess'
+import { formatNumber } from '@/lib/formatNumber'
 
 export const revalidate = 60 // Cache for 60s to reduce server load from scrapers
 
@@ -200,48 +200,80 @@ export default async function Homepage() {
   const contentWrapperClasses =
     'w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'
 
-  const socialProofSection = (
-    <section
-      className={`overflow-hidden bg-card dark:bg-background ${
-        isOptedIn ? 'py-12 md:py-16' : ''
-      }`}
-    >
-      <div className="mx-auto max-w-5xl space-y-4 rounded-none bg-muted p-6 text-center dark:bg-card sm:rounded-xl md:p-8">
-        <CommunityStats
-          userCount={stats.userCount}
-          tweetCount={stats.tweetCount}
-          showGoal={false}
-        />
-        {mostFollowed.length > 0 ? (
-          <AvatarList initialAvatars={mostFollowed} />
-        ) : (
-          <p className="mt-4 text-center text-muted-foreground">
-            Featured archives are currently unavailable.
-          </p>
-        )}
-      </div>
-    </section>
+  const socialProof = (
+    <div className="mx-auto w-full max-w-3xl space-y-4 border-t border-border/80 pt-6">
+      {mostFollowed.length > 0 ? (
+        <AvatarList initialAvatars={mostFollowed} />
+      ) : (
+        <p className="text-center text-sm text-muted-foreground">
+          Featured archives are currently unavailable.
+        </p>
+      )}
+      <p className="text-sm text-muted-foreground">
+        Backed by{' '}
+        <Link
+          href="https://survivalandflourishing.fund/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-brand hover:underline"
+        >
+          Survival and Flourishing Fund
+        </Link>{' '}
+        and{' '}
+        <Link
+          href="https://x.com/VitalikButerin"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-brand hover:underline"
+        >
+          Vitalik Buterin
+        </Link>
+      </p>
+    </div>
   )
 
   return (
     <main>
       {/* Section 1: Audience-specific hero */}
-      <section
-        className={`overflow-hidden bg-card dark:bg-background ${
-          isOptedIn
-            ? 'pb-20 pt-20 md:pb-28 md:pt-28'
-            : 'pb-12 pt-16 md:pb-16 md:pt-24'
-        }`}
-      >
-        <div className={`${contentWrapperClasses} space-y-10 text-center`}>
+      <section className="overflow-hidden bg-card pb-12 pt-14 dark:bg-background md:pb-16 md:pt-20">
+        <div className={`${contentWrapperClasses} space-y-8 text-center`}>
           <div className="space-y-4">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
               Community Archive
             </h1>
             <p className="text-xl leading-8 text-muted-foreground">
-              Search millions of public conversations and help build{' '}
-              <br className="hidden sm:block" />
-              open source public infrastructure.
+              {stats.tweetCount !== null && stats.userCount !== null ? (
+                isOptedIn ? (
+                  <>
+                    Search{' '}
+                    <strong className="font-semibold text-foreground">
+                      {formatNumber(stats.tweetCount)} public tweets
+                    </strong>{' '}
+                    from{' '}
+                    <strong className="font-semibold text-foreground">
+                      {formatNumber(stats.userCount)} community members
+                    </strong>
+                    .
+                  </>
+                ) : (
+                  <>
+                    Help preserve{' '}
+                    <strong className="font-semibold text-foreground">
+                      {formatNumber(stats.tweetCount)} public tweets
+                    </strong>{' '}
+                    from{' '}
+                    <strong className="font-semibold text-foreground">
+                      {formatNumber(stats.userCount)} community members
+                    </strong>
+                    .
+                  </>
+                )
+              ) : (
+                <>
+                  Search public conversations and help build open source public
+                  infrastructure.
+                </>
+              )}
             </p>
           </div>
 
@@ -253,15 +285,31 @@ export default async function Homepage() {
                 Help grow the archive
               </p>
               <DynamicHeroCTAButtons initialIsOptedIn={false} />
-              <p className="text-sm text-muted-foreground">
-                Backed by Survival and Flourishing Fund and Vitalik Buterin
-              </p>
             </div>
           )}
+
+          {socialProof}
         </div>
       </section>
 
-      {!isOptedIn ? socialProofSection : null}
+      {isOptedIn ? (
+        <section className="overflow-hidden bg-muted py-12 dark:bg-card md:py-16">
+          <div className={`${contentWrapperClasses} text-center`}>
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-brand">
+              Keep the archive growing
+            </p>
+            <h2 className="mt-3 text-3xl font-bold text-foreground md:text-4xl">
+              Fill the gaps in the public record
+            </h2>
+            <p className="mx-auto mb-8 mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
+              We refresh recent tweets every day. Upload your X archive to
+              backfill older posts, then use the extension to contribute new
+              tweets in real time while you browse.
+            </p>
+            <DynamicHeroCTAButtons initialIsOptedIn />
+          </div>
+        </section>
+      ) : null}
 
       {/* Section 2: Explore the archive - Featured Apps */}
       <section
@@ -273,23 +321,6 @@ export default async function Homepage() {
           <AppGallery />
         </div>
       </section>
-
-      {isOptedIn ? (
-        <>
-          {socialProofSection}
-          <section className="overflow-hidden bg-card pb-12 dark:bg-background md:pb-16">
-            <div className={`${contentWrapperClasses} space-y-4 text-center`}>
-              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Keep the archive growing
-              </p>
-              <DynamicHeroCTAButtons initialIsOptedIn />
-              <p className="text-sm text-muted-foreground">
-                Backed by Survival and Flourishing Fund and Vitalik Buterin
-              </p>
-            </div>
-          </section>
-        </>
-      ) : null}
 
       {/* Section 3: Upload Your Archive */}
       <section

@@ -57,7 +57,7 @@ export default function UserDirectoryPage() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [sortKey, setSortKey] = useState<SortKey>('joined_at')
+  const [sortKey, setSortKey] = useState<SortKey>('num_followers')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [totalCount, setTotalCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
@@ -93,7 +93,7 @@ export default function UserDirectoryPage() {
         setUsers(fetchedUsers)
       } catch (err) {
         if (!isCurrentRequest) return
-        setError('We could not load the directory. Please try again.')
+        setError('We could not load the Library. Please try again.')
         console.error('Error fetching users:', err)
       } finally {
         if (isCurrentRequest) setLoading(false)
@@ -155,10 +155,11 @@ export default function UserDirectoryPage() {
       <div className="relative mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto mb-10 max-w-2xl text-center">
           <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-            User Directory
+            Library
           </h1>
           <p className="mt-3 text-base text-muted-foreground">
-            People preserving and participating in the Community Archive.
+            Browse the archive by contributor. More ways to explore the
+            collection are coming.
           </p>
           <p className="mt-2 text-sm font-medium text-muted-foreground">
             {loading && users.length === 0
@@ -173,7 +174,7 @@ export default function UserDirectoryPage() {
             className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
           />
           <Input
-            aria-label="Search the user directory"
+            aria-label="Search the Library"
             placeholder="Search by name or username…"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}

@@ -109,7 +109,7 @@ export default function AdvancedSearchForm() {
         <Button
           type="submit"
           size="lg"
-          className="h-12 bg-brand px-7 text-brand-foreground hover:bg-brand/90"
+          className="h-12 bg-green-600 px-7 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
         >
           <Search className="mr-2 h-4 w-4" />
           Search

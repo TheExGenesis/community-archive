@@ -67,7 +67,7 @@ const TieredSupportersDisplay: React.FC<TieredSupportersDisplayProps> = ({
         {/* Column 1: Money Raised */}
         <div className="order-1 flex h-full flex-col items-center justify-center text-center">
           <div>
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400 lg:text-3xl">
+            <p className="text-2xl font-bold text-brand lg:text-3xl">
               ${formatNumber(totalAmountRaised)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">Raised</p>

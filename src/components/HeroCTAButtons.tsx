@@ -200,6 +200,25 @@ export default function HeroCTAButtons({
             </Tooltip>
           ) : null}
 
+          {/* Upload Archive Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                asChild
+                className="h-14 w-full bg-green-600 px-8 text-lg font-semibold text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
+                size="lg"
+              >
+                <a href="#upload-archive">
+                  <Upload className="mr-2 h-5 w-5" />
+                  Upload archive
+                </a>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              Backfill older tweets by importing your full X archive
+            </TooltipContent>
+          </Tooltip>
+
           {/* Install Extension Button */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -219,25 +238,9 @@ export default function HeroCTAButtons({
                 </a>
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Archive as you browse</TooltipContent>
-          </Tooltip>
-
-          {/* Upload Archive Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                asChild
-                variant="outline"
-                className="h-14 w-full border-2 px-8 text-lg font-semibold"
-                size="lg"
-              >
-                <a href="#upload-archive">
-                  <Upload className="mr-2 h-5 w-5" />
-                  Upload archive
-                </a>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Import your X data export</TooltipContent>
+            <TooltipContent>
+              Contribute tweets in real time while you browse
+            </TooltipContent>
           </Tooltip>
         </div>
       </div>

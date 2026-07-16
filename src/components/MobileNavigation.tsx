@@ -15,7 +15,7 @@ import {
 const navigationItems = [
   { href: '/', label: 'Home' },
   { href: '/#products', label: 'Products' },
-  { href: '/user-dir', label: 'User Directory' },
+  { href: '/user-dir', label: 'Library' },
   { href: '/search', label: 'Search' },
   { href: '/docs', label: 'Docs' },
 ]

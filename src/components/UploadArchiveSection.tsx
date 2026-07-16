@@ -185,7 +185,7 @@ export default function UploadArchiveSection() {
                 <Button
                   onClick={handleUploadClick}
                   disabled={isUploadProcessing}
-                  className="bg-brand text-white hover:bg-brand/90 dark:bg-brand dark:text-brand-foreground dark:hover:bg-brand/90"
+                  className="bg-green-600 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
                 >
                   <Upload className="mr-2 h-4 w-4" />
                   {isUploadProcessing ? 'Processing...' : 'Upload .zip'}

@@ -30,7 +30,7 @@ export default function HomepageSearch() {
     <div className="mx-auto w-full max-w-3xl">
       <form
         onSubmit={handleSubmit}
-        className="relative rounded-xl border border-border bg-card p-2 text-left shadow-lg"
+        className="relative rounded-xl border border-border bg-card p-2 text-left shadow-lg transition-[border-color,box-shadow] focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500/25 dark:focus-within:border-green-400 dark:focus-within:ring-green-400/20"
       >
         <Input
           type="search"
@@ -39,14 +39,13 @@ export default function HomepageSearch() {
           placeholder="Search tweets, people, and ideas"
           aria-label="Search Community Archive"
           className="h-14 border-0 bg-transparent pl-4 pr-14 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-lg"
+          autoFocus
           autoComplete="off"
         />
         <Button
           type="submit"
           size="icon"
-          variant="ghost"
-          disabled={!query.trim()}
-          className="absolute right-3 top-1/2 h-10 w-10 -translate-y-1/2 rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="absolute right-3 top-1/2 h-10 w-10 -translate-y-1/2 rounded-full bg-green-600 text-white shadow-sm hover:bg-green-700 focus-visible:ring-green-600 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300 dark:focus-visible:ring-green-400"
           aria-label="Search archive"
         >
           <Search className="h-5 w-5" />

@@ -27,7 +27,7 @@ export const fetchUsers = async (
   const {
     limit,
     offset = 0,
-    sortBy = 'joined_at',
+    sortBy = 'num_followers',
     sortOrder = 'desc',
     search,
   } = options || {}

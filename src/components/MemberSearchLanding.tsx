@@ -70,7 +70,7 @@ export default function MemberSearchLanding({
 
         <form
           onSubmit={handleSubmit}
-          className="mt-10 flex w-full max-w-3xl flex-col gap-3 rounded-xl border border-border bg-card p-2 shadow-lg sm:flex-row"
+          className="mt-10 flex w-full max-w-3xl flex-col gap-3 rounded-xl border border-border bg-card p-2 shadow-lg transition-[border-color,box-shadow] focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500/25 dark:focus-within:border-green-400 dark:focus-within:ring-green-400/20 sm:flex-row"
         >
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -89,7 +89,7 @@ export default function MemberSearchLanding({
             type="submit"
             size="lg"
             disabled={!query.trim()}
-            className="h-14 bg-brand px-7 text-brand-foreground hover:bg-brand/90"
+            className="h-14 bg-green-600 px-7 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
           >
             Search
             <ArrowRight className="ml-2 h-4 w-4" />
@@ -129,10 +129,10 @@ export default function MemberSearchLanding({
           >
             <Users className="h-5 w-5 text-brand" />
             <h2 className="mt-4 text-base font-semibold text-foreground">
-              User Directory
+              Library
             </h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              Browse participating accounts.
+              Browse the archive by contributor.
             </p>
           </Link>
           <Link

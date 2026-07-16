@@ -17,7 +17,7 @@ export default function HeaderNavigation() {
   const baseNavItems = [
     { href: '/', label: 'Home' },
     { href: '/#products', label: 'Products' },
-    { href: '/user-dir', label: 'User Directory' },
+    { href: '/user-dir', label: 'Library' },
     { href: '/docs', label: 'Docs' },
   ]
 

@@ -70,7 +70,7 @@ export default function MemberSearchLanding({
 
         <form
           onSubmit={handleSubmit}
-          className="mt-10 flex w-full max-w-3xl flex-col gap-3 rounded-xl border border-border bg-card p-2 shadow-lg transition-[border-color,box-shadow] focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500/25 dark:focus-within:border-green-400 dark:focus-within:ring-green-400/20 sm:flex-row"
+          className="mt-10 flex w-full max-w-3xl flex-col gap-3 rounded-xl border border-border bg-card p-2 shadow-lg sm:flex-row"
         >
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />

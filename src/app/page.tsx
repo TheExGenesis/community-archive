@@ -201,7 +201,9 @@ export default async function Homepage() {
     'w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'
 
   const socialProof = (
-    <div className="mx-auto w-full max-w-3xl">
+    <div
+      className={`mx-auto w-full max-w-3xl ${isOptedIn ? 'pt-8 md:pt-10' : ''}`}
+    >
       {mostFollowed.length > 0 ? (
         <AvatarList initialAvatars={mostFollowed} compact />
       ) : (
@@ -273,6 +275,17 @@ export default async function Homepage() {
         </div>
       </section>
 
+      {/* Section 2: Explore the archive - Featured Apps */}
+      <section
+        id="products"
+        className={`bg-card dark:bg-background ${sectionPaddingClasses} scroll-mt-16 overflow-hidden`}
+      >
+        <div className={contentWrapperClasses}>
+          <FeaturedAppsSection />
+          <AppGallery />
+        </div>
+      </section>
+
       {isOptedIn ? (
         <section className="overflow-hidden bg-muted py-12 dark:bg-card md:py-16">
           <div className={`${contentWrapperClasses} text-center`}>
@@ -288,17 +301,6 @@ export default async function Homepage() {
           </div>
         </section>
       ) : null}
-
-      {/* Section 2: Explore the archive - Featured Apps */}
-      <section
-        id="products"
-        className={`bg-card dark:bg-background ${sectionPaddingClasses} scroll-mt-16 overflow-hidden`}
-      >
-        <div className={contentWrapperClasses}>
-          <FeaturedAppsSection />
-          <AppGallery />
-        </div>
-      </section>
 
       {/* Section 3: Upload Your Archive */}
       <section

@@ -215,7 +215,11 @@ export default async function Homepage() {
   return (
     <main>
       {/* Section 1: Audience-specific hero */}
-      <section className="overflow-hidden bg-card pb-12 pt-14 dark:bg-background md:pb-16 md:pt-20">
+      <section
+        className={`overflow-hidden bg-card pb-12 pt-14 dark:bg-background md:pb-16 md:pt-20 ${
+          isOptedIn ? 'md:flex md:min-h-[66vh] md:items-center' : ''
+        }`}
+      >
         <div className={`${contentWrapperClasses} space-y-7 text-center`}>
           <div className="space-y-3">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
@@ -267,8 +271,8 @@ export default async function Homepage() {
             <HomepageSearch />
           ) : (
             <>
-              <div className="py-4 md:py-5">{socialProof}</div>
               <DynamicHeroCTAButtons initialIsOptedIn={false} />
+              <div className="pt-8 md:pt-10">{socialProof}</div>
             </>
           )}
         </div>

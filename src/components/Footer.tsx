@@ -7,6 +7,10 @@ const Footer = () => {
         About
       </Link>
       <span className="mx-2">•</span>
+      <Link href="/docs" className="hover:underline">
+        Docs
+      </Link>
+      <span className="mx-2">•</span>
       <Link href="/data-policy" className="hover:underline">
         Data Policy
       </Link>

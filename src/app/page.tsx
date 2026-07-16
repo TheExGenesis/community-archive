@@ -123,20 +123,24 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
   title,
   description,
   href,
-}) => (
-  <Link
-    href={href}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-accent"
-  >
-    <div className="flex-shrink-0 text-2xl text-brand">{icon}</div>
-    <div className="min-w-0 flex-1">
-      <h3 className="font-semibold text-foreground">{title}</h3>
-      <p className="text-sm text-muted-foreground">{description}</p>
-    </div>
-  </Link>
-)
+}) => {
+  const isExternal = href.startsWith('http')
+
+  return (
+    <Link
+      href={href}
+      target={isExternal ? '_blank' : undefined}
+      rel={isExternal ? 'noopener noreferrer' : undefined}
+      className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-accent"
+    >
+      <div className="flex-shrink-0 text-2xl text-brand">{icon}</div>
+      <div className="min-w-0 flex-1">
+        <h3 className="font-semibold text-foreground">{title}</h3>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+    </Link>
+  )
+}
 
 export default async function Homepage() {
   const cookieStore = await cookies()
@@ -327,7 +331,7 @@ export default async function Homepage() {
               icon={<FaBook />}
               title="Documentation"
               description="API docs and examples"
-              href="https://github.com/TheExGenesis/community-archive/tree/main/docs"
+              href="/docs"
             />
             <InfoPanel
               icon={<FaDatabase />}

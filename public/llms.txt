@@ -1,0 +1,92 @@
+# Community Archive
+
+> Community Archive is a public, searchable collection of Twitter/X archives. Use this file as the canonical starting point for agents, researchers, and developers.
+
+Canonical site: https://www.community-archive.org
+Source repository: https://github.com/TheExGenesis/community-archive
+
+## Start here
+
+- [Docs and access guide](https://www.community-archive.org/docs): Human-readable overview of the bulk dump, API, and raw archives.
+- [Agent and schema guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/agents.md): Tables, relationships, fields, and common query patterns.
+- [API guide](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/api-doc.md): REST and JavaScript examples, filters, and pagination.
+- [Interactive API reference](https://www.community-archive.org/api/reference): Browse the PostgREST API.
+- [OpenAPI specification](https://www.community-archive.org/openapi.json): Machine-readable API schema.
+- [Examples](https://github.com/TheExGenesis/community-archive/tree/main/docs/examples): Python examples and a canonical notebook.
+
+## Choose the right data access method
+
+1. Bulk or corpus-wide analysis: use the Parquet dump. Do not page through millions of API rows.
+2. Filtered or application queries: use the Supabase REST API.
+3. One user's original processed archive: fetch that user's public `archive.json`.
+
+## Bulk dump
+
+Canonical release page: https://github.com/TheExGenesis/community-archive/releases/tag/data_export
+Current Parquet file: https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet
+
+The GitHub release page is the canonical location for current export notes and the download link. The export contains enriched tweet records, including tweet and account IDs, username, display name, timestamp, text, engagement counts, reply fields, quoted tweet ID, conversation ID, avatar URL, and archive upload ID.
+
+DuckDB example:
+
+```sql
+SELECT tweet_id, username, created_at, full_text
+FROM read_parquet('https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet')
+WHERE lower(username) = 'defenderofbasic'
+ORDER BY created_at DESC
+LIMIT 100;
+```
+
+## API
+
+API base URL: https://fabxmporizzqflnftavs.supabase.co
+REST base URL: https://fabxmporizzqflnftavs.supabase.co/rest/v1
+Public anon key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8
+
+The anon key is intentionally public. Send it as both `apikey` and `Authorization: Bearer <key>`. Never expose or request a service-role key.
+
+cURL example:
+
+```bash
+export CA_API_URL='https://fabxmporizzqflnftavs.supabase.co'
+export CA_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8'
+
+curl --get "$CA_API_URL/rest/v1/enriched_tweets" \
+  -H "apikey: $CA_ANON_KEY" \
+  -H "Authorization: Bearer $CA_ANON_KEY" \
+  --data-urlencode "select=tweet_id,username,created_at,full_text" \
+  --data-urlencode "username=ilike.defenderofbasic" \
+  --data-urlencode "order=created_at.desc" \
+  --data-urlencode "limit=5"
+```
+
+Useful public resources:
+
+- `enriched_tweets`: tweets joined with username, display name, conversation, quote, and avatar fields.
+- `tweets`: core tweet records.
+- `all_account`: account IDs, usernames, display names, and counts.
+- `all_profile`: bios, websites, locations, and profile media.
+- `user_directory`: directory-ready account and profile data.
+- `followers`, `following`, `likes`, `liked_tweets`, `tweet_media`, `tweet_urls`, `user_mentions`, `mentioned_users`, `retweets`, `quote_tweets`, `conversations`: relationship and supporting tables.
+
+Important API rules:
+
+- API username casing is preserved. Use a case-insensitive `ilike` filter when the original casing is unknown. Raw archive storage paths use lowercase usernames.
+- Treat Twitter IDs as strings; JavaScript numbers cannot safely represent every Twitter ID.
+- Use PostgREST filters such as `username=eq.name`, `created_at=gte.2025-01-01`, and `order=created_at.desc`.
+- Select only needed columns.
+- Responses are capped at 1,000 rows. Paginate with `limit` and `offset` or HTTP Range headers, using a stable order.
+- Use the Parquet dump instead of the API for full-corpus analysis.
+
+## Individual raw archives
+
+URL template: https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/<lowercase-username>/archive.json
+
+Raw archive structure: https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/archive_data.md
+
+## Optional deeper context
+
+- [Docs index](https://github.com/TheExGenesis/community-archive/tree/main/docs)
+- [Database types](https://github.com/TheExGenesis/community-archive/blob/main/src/database-types.ts)
+- [Declarative database schemas](https://github.com/TheExGenesis/community-archive/tree/main/supabase/schemas)
+- [Project README](https://raw.githubusercontent.com/TheExGenesis/community-archive/main/README.md)

@@ -215,8 +215,10 @@ export default async function Homepage() {
   return (
     <main>
       {/* Section 1: Audience-specific hero */}
-      <section className="overflow-hidden bg-card pb-12 pt-14 dark:bg-background md:min-h-[66vh] md:pb-16 md:pt-20">
-        <div className={`${contentWrapperClasses} space-y-7 text-center`}>
+      <section className="overflow-hidden bg-card pb-12 pt-14 dark:bg-background md:flex md:min-h-[66vh] md:pb-16 md:pt-20">
+        <div
+          className={`${contentWrapperClasses} space-y-7 text-center md:flex md:flex-1 md:flex-col md:justify-evenly md:space-y-0`}
+        >
           <div className="space-y-3">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
               Community Archive
@@ -268,7 +270,7 @@ export default async function Homepage() {
           ) : (
             <>
               <DynamicHeroCTAButtons initialIsOptedIn={false} />
-              <div className="pt-8 md:pt-10">
+              <div className="pt-8 md:pt-0">
                 <p className="mb-5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground/80">
                   With archives from
                 </p>

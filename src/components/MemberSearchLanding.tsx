@@ -141,7 +141,7 @@ export default function MemberSearchLanding({
           >
             <Boxes className="h-5 w-5 text-brand" />
             <h2 className="mt-4 text-base font-semibold text-foreground">
-              Products
+              Tools
             </h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
               Explore tools built on the archive.

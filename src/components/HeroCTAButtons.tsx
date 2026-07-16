@@ -205,7 +205,12 @@ export default function HeroCTAButtons({
             <TooltipTrigger asChild>
               <Button
                 asChild
-                className="h-14 w-full bg-green-600 px-8 text-lg font-semibold text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
+                variant={isOptedIn ? 'default' : 'outline'}
+                className={`h-14 w-full px-8 text-lg font-semibold ${
+                  isOptedIn
+                    ? 'bg-green-600 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300'
+                    : 'border-2'
+                }`}
                 size="lg"
               >
                 <a href="#upload-archive">

@@ -8,8 +8,13 @@ import { formatNumber } from '@/lib/formatNumber'
 type AvatarListProps = {
   initialAvatars: AvatarType[]
   title?: string
+  compact?: boolean
 }
-const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
+const AvatarList = ({
+  initialAvatars,
+  title = 'Avatars',
+  compact = false,
+}: AvatarListProps) => {
   const [avatars, setAvatars] = useState(initialAvatars)
 
   useEffect(() => {
@@ -22,14 +27,20 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
   return (
     <div>
       <div className="w-full">
-        <div className="flex flex-wrap justify-center gap-x-4 gap-y-6 pb-2">
+        <div
+          className={`flex flex-wrap justify-center pb-2 ${
+            compact ? 'gap-x-3 gap-y-4' : 'gap-x-4 gap-y-6'
+          }`}
+        >
           {avatars.map((avatar) => (
             <a
               key={avatar.username}
               href={`/user/${avatar.account_id}`}
-              className="flex w-20 flex-col items-center text-center"
+              className={`flex flex-col items-center text-center ${
+                compact ? 'w-16' : 'w-20'
+              }`}
             >
-              <Avatar className="h-12 w-12">
+              <Avatar className={compact ? 'h-10 w-10' : 'h-12 w-12'}>
                 <AvatarImage
                   src={avatar.avatar_media_url}
                   alt={`${avatar.username}'s avatar`}
@@ -38,10 +49,18 @@ const AvatarList = ({ initialAvatars, title = 'Avatars' }: AvatarListProps) => {
                   {avatar.username[0].toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <span className="mt-1 break-words text-xs hover:underline">
+              <span
+                className={`mt-1 break-words hover:underline ${
+                  compact ? 'text-[11px]' : 'text-xs'
+                }`}
+              >
                 {avatar.username}
               </span>
-              <span className="mt-0.5 text-[10px] text-muted-foreground">
+              <span
+                className={`mt-0.5 text-muted-foreground ${
+                  compact ? 'text-[9px]' : 'text-[10px]'
+                }`}
+              >
                 {avatar.num_followers &&
                   `${formatNumber(avatar.num_followers)} followers`}
               </span>

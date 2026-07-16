@@ -201,104 +201,99 @@ export default async function Homepage() {
     'w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'
 
   const socialProof = (
-    <div className="mx-auto w-full max-w-3xl space-y-4 border-t border-border/80 pt-6">
+    <div className="mx-auto w-full max-w-3xl">
       {mostFollowed.length > 0 ? (
-        <AvatarList initialAvatars={mostFollowed} />
+        <AvatarList initialAvatars={mostFollowed} compact />
       ) : (
         <p className="text-center text-sm text-muted-foreground">
           Featured archives are currently unavailable.
         </p>
       )}
-      <p className="text-sm text-muted-foreground">
-        Backed by{' '}
-        <Link
-          href="https://survivalandflourishing.fund/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-medium text-brand hover:underline"
-        >
-          Survival and Flourishing Fund
-        </Link>{' '}
-        and{' '}
-        <Link
-          href="https://x.com/VitalikButerin"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-medium text-brand hover:underline"
-        >
-          Vitalik Buterin
-        </Link>
-      </p>
     </div>
   )
 
   return (
     <main>
       {/* Section 1: Audience-specific hero */}
-      <section className="overflow-hidden bg-card pb-12 pt-14 dark:bg-background md:pb-16 md:pt-20">
-        <div className={`${contentWrapperClasses} space-y-8 text-center`}>
-          <div className="space-y-4">
+      <section className="overflow-hidden bg-card pb-12 pt-14 dark:bg-background md:min-h-[66vh] md:pb-16 md:pt-20">
+        <div className={`${contentWrapperClasses} space-y-7 text-center`}>
+          <div className="space-y-3">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
               Community Archive
             </h1>
             <p className="text-xl leading-8 text-muted-foreground">
               {stats.tweetCount !== null && stats.userCount !== null ? (
-                isOptedIn ? (
-                  <>
-                    Search{' '}
-                    <strong className="font-semibold text-foreground">
-                      {formatNumber(stats.tweetCount)} public tweets
-                    </strong>{' '}
-                    from{' '}
-                    <strong className="font-semibold text-foreground">
-                      {formatNumber(stats.userCount)} community members
-                    </strong>
-                    .
-                  </>
-                ) : (
-                  <>
-                    Help preserve{' '}
-                    <strong className="font-semibold text-foreground">
-                      {formatNumber(stats.tweetCount)} public tweets
-                    </strong>{' '}
-                    from{' '}
-                    <strong className="font-semibold text-foreground">
-                      {formatNumber(stats.userCount)} community members
-                    </strong>
-                    .
-                  </>
-                )
+                <>
+                  We preserve{' '}
+                  <strong className="font-semibold text-foreground">
+                    {formatNumber(stats.tweetCount)} public tweets
+                  </strong>{' '}
+                  from{' '}
+                  <strong className="font-semibold text-foreground">
+                    {formatNumber(stats.userCount)} community members
+                  </strong>
+                  .
+                </>
               ) : (
                 <>
-                  Search public conversations and help build open source public
+                  We preserve public conversations as open source public
                   infrastructure.
                 </>
               )}
+            </p>
+            <p className="text-xs text-muted-foreground/80">
+              Backed by{' '}
+              <Link
+                href="https://survivalandflourishing.fund/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-muted-foreground transition-colors hover:text-brand hover:underline"
+              >
+                Survival and Flourishing Fund
+              </Link>{' '}
+              and{' '}
+              <Link
+                href="https://x.com/VitalikButerin"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-muted-foreground transition-colors hover:text-brand hover:underline"
+              >
+                Vitalik Buterin
+              </Link>
             </p>
           </div>
 
           {isOptedIn ? (
             <HomepageSearch />
           ) : (
-            <div className="space-y-4 pt-2">
-              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Help grow the archive
-              </p>
+            <>
               <DynamicHeroCTAButtons initialIsOptedIn={false} />
-            </div>
+              <div className="pt-8 md:pt-10">
+                <p className="mb-5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground/80">
+                  With archives from
+                </p>
+                {socialProof}
+              </div>
+            </>
           )}
+        </div>
+      </section>
 
-          {socialProof}
+      {/* Section 2: Explore the archive - Featured Apps */}
+      <section
+        id="products"
+        className={`bg-muted dark:bg-card ${sectionPaddingClasses} scroll-mt-16 overflow-hidden`}
+      >
+        <div className={contentWrapperClasses}>
+          <FeaturedAppsSection />
+          <AppGallery />
         </div>
       </section>
 
       {isOptedIn ? (
-        <section className="overflow-hidden bg-muted py-12 dark:bg-card md:py-16">
+        <section className="overflow-hidden bg-card py-12 dark:bg-background md:py-16">
           <div className={`${contentWrapperClasses} text-center`}>
-            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-brand">
-              Keep the archive growing
-            </p>
-            <h2 className="mt-3 text-3xl font-bold text-foreground md:text-4xl">
+            <h2 className="text-3xl font-bold text-foreground md:text-4xl">
               Fill the gaps in the public record
             </h2>
             <p className="mx-auto mb-8 mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
@@ -307,20 +302,10 @@ export default async function Homepage() {
               tweets in real time while you browse.
             </p>
             <DynamicHeroCTAButtons initialIsOptedIn />
+            <div className="mt-10 md:mt-12">{socialProof}</div>
           </div>
         </section>
       ) : null}
-
-      {/* Section 2: Explore the archive - Featured Apps */}
-      <section
-        id="products"
-        className={`bg-card dark:bg-background ${sectionPaddingClasses} scroll-mt-16 overflow-hidden`}
-      >
-        <div className={contentWrapperClasses}>
-          <FeaturedAppsSection />
-          <AppGallery />
-        </div>
-      </section>
 
       {/* Section 3: Upload Your Archive */}
       <section

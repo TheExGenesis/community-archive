@@ -201,9 +201,7 @@ export default async function Homepage() {
     'w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'
 
   const socialProof = (
-    <div
-      className={`mx-auto w-full max-w-3xl ${isOptedIn ? 'pt-8 md:pt-10' : ''}`}
-    >
+    <div className="mx-auto w-full max-w-3xl">
       {mostFollowed.length > 0 ? (
         <AvatarList initialAvatars={mostFollowed} compact />
       ) : (
@@ -268,17 +266,18 @@ export default async function Homepage() {
           {isOptedIn ? (
             <HomepageSearch />
           ) : (
-            <DynamicHeroCTAButtons initialIsOptedIn={false} />
+            <>
+              <div className="py-4 md:py-5">{socialProof}</div>
+              <DynamicHeroCTAButtons initialIsOptedIn={false} />
+            </>
           )}
-
-          {socialProof}
         </div>
       </section>
 
       {/* Section 2: Explore the archive - Featured Apps */}
       <section
         id="products"
-        className={`bg-card dark:bg-background ${sectionPaddingClasses} scroll-mt-16 overflow-hidden`}
+        className={`bg-muted dark:bg-card ${sectionPaddingClasses} scroll-mt-16 overflow-hidden`}
       >
         <div className={contentWrapperClasses}>
           <FeaturedAppsSection />
@@ -287,7 +286,7 @@ export default async function Homepage() {
       </section>
 
       {isOptedIn ? (
-        <section className="overflow-hidden bg-muted py-12 dark:bg-card md:py-16">
+        <section className="overflow-hidden bg-card py-12 dark:bg-background md:py-16">
           <div className={`${contentWrapperClasses} text-center`}>
             <h2 className="text-3xl font-bold text-foreground md:text-4xl">
               Fill the gaps in the public record
@@ -298,6 +297,7 @@ export default async function Homepage() {
               tweets in real time while you browse.
             </p>
             <DynamicHeroCTAButtons initialIsOptedIn />
+            <div className="mt-10 md:mt-12">{socialProof}</div>
           </div>
         </section>
       ) : null}

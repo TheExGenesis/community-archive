@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ListFilter, Search } from 'lucide-react'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import UserSearchInput from '@/components/UserSearchInput'
 import { buildSearchHref } from '@/lib/searchParams'
 
 export default function HeaderSearch() {
@@ -23,12 +23,13 @@ export default function HeaderSearch() {
       <div className="flex items-center">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
+          <UserSearchInput
             placeholder="Search tweets..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onValueChange={setQuery}
             className="h-9 w-40 rounded-r-none border-border bg-muted py-1.5 pl-8 pr-3 text-sm focus:ring-brand lg:w-56"
+            aria-label="Search Community Archive"
+            autoComplete="off"
           />
         </div>
         <Button

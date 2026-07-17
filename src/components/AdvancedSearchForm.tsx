@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import UserSearchInput from '@/components/UserSearchInput'
 import {
   ChevronDown,
   ChevronUp,
@@ -96,11 +97,10 @@ export default function AdvancedSearchForm() {
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-          <Input
+          <UserSearchInput
             id="main-search"
-            type="search"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onValueChange={setQuery}
             placeholder="Search words, phrases, or from:username"
             className="h-12 rounded-lg bg-background pl-12 pr-4 text-base"
             autoComplete="off"

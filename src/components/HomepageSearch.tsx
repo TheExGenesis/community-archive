@@ -4,7 +4,7 @@ import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import UserSearchInput from '@/components/UserSearchInput'
 import { buildSearchParams } from '@/lib/searchParams'
 
 const exampleSearches = ['open source', 'AI alignment', 'from:vitalikbuterin']
@@ -32,10 +32,9 @@ export default function HomepageSearch() {
         onSubmit={handleSubmit}
         className="relative rounded-xl border border-border bg-card p-2 text-left shadow-lg"
       >
-        <Input
-          type="search"
+        <UserSearchInput
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onValueChange={setQuery}
           placeholder="Search tweets, people, and ideas"
           aria-label="Search Community Archive"
           className="h-14 border-0 bg-transparent pl-4 pr-14 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-lg"

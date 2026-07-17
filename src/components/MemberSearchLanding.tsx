@@ -12,7 +12,7 @@ import {
   Users,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import UserSearchInput from '@/components/UserSearchInput'
 import { formatNumber } from '@/lib/formatNumber'
 import { buildSearchParams } from '@/lib/searchParams'
 
@@ -74,10 +74,9 @@ export default function MemberSearchLanding({
         >
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
+            <UserSearchInput
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onValueChange={setQuery}
               placeholder="Search the Community Archive"
               aria-label="Search the Community Archive"
               className="h-14 border-0 bg-transparent pl-12 pr-4 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-lg"

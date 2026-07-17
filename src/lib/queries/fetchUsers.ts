@@ -1,6 +1,8 @@
 import { DirectoryUser, FormattedUser, SortKey } from '@/lib/types'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { devLog } from '@/lib/devLog'
+import { rankUserSuggestions } from '@/lib/searchSuggestions'
+import type { UserSuggestion } from '@/lib/searchSuggestions'
 
 export interface FetchUsersOptions {
   limit?: number
@@ -89,6 +91,37 @@ export const fetchUsersCount = async (
 
   if (error) throw error
   return count || 0
+}
+
+export const fetchUserSuggestions = async (
+  supabase: SupabaseClient,
+  fragment: string,
+  limit = 6,
+): Promise<UserSuggestion[]> => {
+  const normalizedFragment = fragment
+    .trim()
+    .replace(/^@/, '')
+    .toLocaleLowerCase()
+  if (!/^[a-z0-9_]{2,15}$/.test(normalizedFragment)) return []
+
+  const escapedFragment = normalizedFragment.replace(/[\\%_]/g, '\\$&')
+  const { data, error } = await supabase
+    .schema('public')
+    .from('user_directory')
+    .select(
+      'directory_id, username, account_display_name, avatar_media_url, num_followers',
+    )
+    .ilike('username', `%${escapedFragment}%`)
+    .order('num_followers', { ascending: false, nullsFirst: false })
+    .limit(Math.max(limit * 5, 30))
+
+  if (error) throw error
+
+  return rankUserSuggestions(
+    (data as UserSuggestion[]) || [],
+    normalizedFragment,
+    limit,
+  )
 }
 
 export const getUserData = async (

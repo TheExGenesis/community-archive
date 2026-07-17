@@ -132,7 +132,9 @@ export default function UserDirectoryPage() {
       setSortOrder((current) => (current === 'asc' ? 'desc' : 'asc'))
     } else {
       setSortKey(key)
-      setSortOrder(key === 'num_followers' ? 'desc' : 'asc')
+      setSortOrder(
+        key === 'num_followers' || key === 'joined_at' ? 'desc' : 'asc',
+      )
     }
   }
 
@@ -328,7 +330,7 @@ export default function UserDirectoryPage() {
                       </TableCell>
                       <TableCell className="pr-4">
                         <TooltipProvider delayDuration={150}>
-                          <div className="flex justify-end gap-1">
+                          <div className="flex justify-end gap-0.5">
                             {user.has_archive && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -336,11 +338,11 @@ export default function UserDirectoryPage() {
                                     role="img"
                                     tabIndex={0}
                                     aria-label="Archive"
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-brand outline-none transition-colors hover:bg-brand/10 hover:text-brand focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 dark:focus-visible:ring-offset-background"
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-brand/60 outline-none transition-colors hover:bg-brand/5 hover:text-brand focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 dark:focus-visible:ring-offset-background"
                                   >
                                     <Archive
                                       aria-hidden="true"
-                                      className="h-4 w-4"
+                                      className="h-3.5 w-3.5"
                                     />
                                   </span>
                                 </TooltipTrigger>
@@ -349,18 +351,18 @@ export default function UserDirectoryPage() {
                                 </TooltipContent>
                               </Tooltip>
                             )}
-                            {user.is_opted_in && (
+                            {!user.has_archive && user.is_opted_in && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <span
                                     role="img"
                                     tabIndex={0}
                                     aria-label="Opted in"
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-emerald-500 outline-none transition-colors hover:bg-emerald-50 hover:text-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:text-emerald-400 dark:hover:bg-emerald-950/60 dark:hover:text-emerald-300 dark:focus-visible:ring-offset-background"
+                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-brand/60 outline-none transition-colors hover:bg-brand/5 hover:text-brand focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 dark:focus-visible:ring-offset-background"
                                   >
                                     <Radio
                                       aria-hidden="true"
-                                      className="h-4 w-4"
+                                      className="h-3.5 w-3.5"
                                     />
                                   </span>
                                 </TooltipTrigger>

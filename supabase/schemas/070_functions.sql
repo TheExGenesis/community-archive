@@ -2909,3 +2909,43 @@ BEGIN
 END;
 $$;
 ALTER FUNCTION public.admin_enqueue_delete_with_export(text, text, text, uuid) OWNER TO postgres;
+
+-- admin_list_recent_delete_jobs: service-role-only read bridge for the
+-- dashboard. private.admin_jobs remains outside PostgREST's exposed schemas.
+CREATE OR REPLACE FUNCTION public.admin_list_recent_delete_jobs(
+  p_limit integer DEFAULT 20
+) RETURNS TABLE (
+  job_key uuid,
+  status text,
+  account_id text,
+  username text,
+  reason text,
+  created_at timestamptz,
+  updated_at timestamptz,
+  error text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT
+    j.key AS job_key,
+    j.status,
+    j.args->>'account_id' AS account_id,
+    j.args->>'username' AS username,
+    j.args->>'reason' AS reason,
+    j.created_at,
+    j.updated_at,
+    j.args->>'error' AS error
+  FROM private.admin_jobs AS j
+  WHERE j.job_name = 'admin_delete_with_export'
+  ORDER BY j.updated_at DESC, j.created_at DESC
+  LIMIT LEAST(GREATEST(COALESCE(p_limit, 20), 1), 100);
+$$;
+ALTER FUNCTION public.admin_list_recent_delete_jobs(integer) OWNER TO postgres;
+
+REVOKE ALL ON FUNCTION public.admin_list_recent_delete_jobs(integer)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_list_recent_delete_jobs(integer)
+  TO service_role;

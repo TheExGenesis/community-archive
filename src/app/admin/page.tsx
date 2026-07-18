@@ -7,6 +7,8 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { AdminTable } from './AdminTable'
+import { RecentPrivacyActivity } from './RecentPrivacyActivity'
+import { loadRecentPrivacyActivity } from './activity'
 import {
   ADMIN_USERNAME,
   getDisplayUsername,
@@ -31,7 +33,10 @@ export default async function AdminPage({
 }) {
   const { user } = await requireAdmin()
   const search = normalizeUsername(searchParams?.q)
-  const data = await loadInitialAccounts(search)
+  const [data, recentPrivacyActivity] = await Promise.all([
+    loadInitialAccounts(search),
+    loadRecentPrivacyActivity(),
+  ])
   const twitterUsername = getDisplayUsername(user)
 
   return (
@@ -60,6 +65,8 @@ export default async function AdminPage({
             </div>
           ) : null}
         </section>
+
+        <RecentPrivacyActivity activity={recentPrivacyActivity} />
 
         <Card>
           <CardHeader>

@@ -1263,6 +1263,21 @@ export type Database = {
         }
         Returns: string[]
       }
+      admin_list_recent_delete_jobs: {
+        Args: {
+          p_limit?: number
+        }
+        Returns: {
+          account_id: string
+          created_at: string
+          error: string
+          job_key: string
+          reason: string
+          status: string
+          updated_at: string
+          username: string
+        }[]
+      }
       admin_set_scrape_block: {
         Args: {
           p_account_id: string
@@ -2124,4 +2139,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-

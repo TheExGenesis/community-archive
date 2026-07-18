@@ -1268,14 +1268,14 @@ export type Database = {
           p_limit?: number
         }
         Returns: {
-          account_id: string
-          created_at: string
-          error: string
           job_key: string
-          reason: string
           status: string
-          updated_at: string
+          account_id: string
           username: string
+          reason: string
+          created_at: string
+          updated_at: string
+          error: string
         }[]
       }
       admin_set_scrape_block: {
@@ -2139,3 +2139,4 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+

@@ -309,7 +309,7 @@ export default function ClickHouseLabClient() {
                         {number(String(value), true)}
                       </strong>
                       <span className="text-xs text-muted-foreground">
-                        {number(String(value))} exact-ish
+                        {number(String(value))} computed snapshot
                       </span>
                     </CardContent>
                   </Card>

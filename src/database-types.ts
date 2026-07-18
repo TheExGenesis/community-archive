@@ -1263,6 +1263,21 @@ export type Database = {
         }
         Returns: string[]
       }
+      admin_list_recent_delete_jobs: {
+        Args: {
+          p_limit?: number
+        }
+        Returns: {
+          job_key: string
+          status: string
+          account_id: string
+          username: string
+          reason: string
+          created_at: string
+          updated_at: string
+          error: string
+        }[]
+      }
       admin_set_scrape_block: {
         Args: {
           p_account_id: string

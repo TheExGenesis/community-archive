@@ -1,12 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import {
   DateRangeValidation,
   getStatsRangeLimitMs,
   validateDateRange,
 } from '@/lib/apiInputValidation'
+import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
+
+export const dynamic = 'force-dynamic'
+export const maxDuration = 30
 
 const MAX_HOURS_BACK = 720
+const SUPPORTED_GRANULARITIES = new Set(['hour', 'day', 'week'])
+
+type StreamStatsResponse = {
+  data: Array<{
+    period_start: string
+    period_end: string
+    tweet_count: number
+    source_messages: number
+    source_count: number
+    latest_observed_at: string | null
+  }>
+  summary: {
+    totalTweets: number
+    sourceMessages: number
+    sourceCount: number
+    avgTweetsPerPeriod: number
+    periodsIncluded: number
+    latestObservedAt: string | null
+    scope: 'firehose' | 'all'
+    countMode: 'unique_tweets_observed'
+  }
+  timing: {
+    wallMs: number
+    clickhouseMs: number
+    rowsRead: number
+    bytesRead: number
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,172 +46,93 @@ export async function GET(request: NextRequest) {
     const granularity = searchParams.get('granularity') || 'hour'
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
-    const streamedOnly = searchParams.get('streamedOnly') !== 'false' // Default to true
+    const streamedOnly = searchParams.get('streamedOnly') !== 'false'
 
-    // Validate input
-    if (!Number.isInteger(hoursBack) || hoursBack < 1 || hoursBack > MAX_HOURS_BACK) { // Max 30 days
+    if (
+      !Number.isInteger(hoursBack) ||
+      hoursBack < 1 ||
+      hoursBack > MAX_HOURS_BACK
+    ) {
       return NextResponse.json(
         { error: 'Invalid hoursBack parameter. Must be between 1 and 720.' },
-        { status: 400 }
+        { status: 400 },
+      )
+    }
+    if (!SUPPORTED_GRANULARITIES.has(granularity)) {
+      return NextResponse.json(
+        { error: 'Invalid granularity. Must be one of: hour, day, week.' },
+        { status: 400 },
       )
     }
 
     const maxRangeMs = getStatsRangeLimitMs(granularity)
     if (maxRangeMs === null) {
       return NextResponse.json(
-        { error: 'Invalid granularity. Must be one of: minute, hour, day, week, month.' },
-        { status: 400 }
+        { error: 'Invalid granularity.' },
+        { status: 400 },
       )
     }
 
-    if (hoursBack * 60 * 60 * 1000 > maxRangeMs) {
-      return NextResponse.json(
-        { error: `Date range too large for ${granularity} granularity.` },
-        { status: 400 }
-      )
-    }
-
-    // Validate custom date range up front so we can reject before we waste
-    // a service-role RPC call. An attacker could otherwise request a 10-year
-    // minute-granularity report and exhaust DB resources.
-    let customRange: Extract<DateRangeValidation, { ok: true }> | null = null
+    let range: Extract<DateRangeValidation, { ok: true }>
     if (startDate || endDate) {
       if (!startDate || !endDate) {
         return NextResponse.json(
           { error: 'Both startDate and endDate are required for custom range.' },
-          { status: 400 }
+          { status: 400 },
         )
       }
-      const range = validateDateRange(startDate, endDate, maxRangeMs)
-      if (!range.ok && range.error === 'invalid') {
+      const customRange = validateDateRange(startDate, endDate, maxRangeMs)
+      if (!customRange.ok && customRange.error === 'invalid') {
         return NextResponse.json(
           { error: 'Invalid date format. Use ISO 8601 timestamps.' },
-          { status: 400 }
+          { status: 400 },
         )
       }
-      if (!range.ok && range.error === 'order') {
+      if (!customRange.ok && customRange.error === 'order') {
         return NextResponse.json(
           { error: 'startDate must be before endDate' },
-          { status: 400 }
+          { status: 400 },
         )
       }
-      if (!range.ok) {
+      if (!customRange.ok) {
         return NextResponse.json(
           { error: `Date range too large for ${granularity} granularity.` },
-          { status: 400 }
+          { status: 400 },
         )
       }
-      customRange = range
+      range = customRange
+    } else {
+      const end = new Date()
+      const start = new Date(end.getTime() - hoursBack * 60 * 60 * 1000)
+      range = { ok: true, start, end }
     }
 
-    // Create service role client to access private schema functions
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE || process.env.SUPABASE_SERVICE_ROLE_KEY!
-    
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
+    const upstreamParams = new URLSearchParams({
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+      granularity,
+      scope: streamedOnly ? 'firehose' : 'all',
     })
-    
-    // Handle different time ranges
-    if (!customRange) {
-      // Simple hour-based query
-      const now = new Date()
-      const start = new Date(now.getTime() - hoursBack * 60 * 60 * 1000)
-      
-      const { data, error } = await supabase
-        .rpc('get_streaming_stats', {
-          p_start_date: start.toISOString(),
-          p_end_date: now.toISOString(),
-          p_granularity: granularity,
-          p_streamed_only: streamedOnly
-        })
-
-      if (error) {
-        console.error('Error fetching streaming stats:', error)
-        throw new Error('Failed to fetch streaming stats: ' + error.message)
-      }
-
-      // Calculate totals
-      const totalTweets = data?.reduce((sum: number, item: any) => sum + (item.tweet_count || 0), 0) || 0
-      const maxUniqueScrapers = data?.reduce((max: number, item: any) => Math.max(max, item.unique_scrapers || 0), 0) || 0
-      const avgTweetsPerPeriod = data?.length ? Math.round(totalTweets / data.length) : 0
-
-      const response = {
-        data,
-        summary: {
-          totalTweets,
-          uniqueScrapers: maxUniqueScrapers,
-          avgTweetsPerPeriod,
-          periodsIncluded: data?.length || 0
-        }
-      }
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        // Cache for 5 minutes for current data
-        'Cache-Control': 's-maxage=300, stale-while-revalidate=600'
-      }
-
-      return NextResponse.json(response, { headers })
-    }
-    
-    // Handle custom date ranges
-    if (customRange) {
-      const { data, error } = await supabase
-        .rpc('get_streaming_stats', {
-          p_start_date: customRange.start.toISOString(),
-          p_end_date: customRange.end.toISOString(),
-          p_granularity: granularity,
-          p_streamed_only: streamedOnly
-        })
-
-      if (error) {
-        console.error('Error fetching streaming stats:', error)
-        throw new Error('Failed to fetch streaming stats: ' + error.message)
-      }
-
-      // Calculate totals
-      const totalTweets = data?.reduce((sum: number, item: any) => sum + (item.tweet_count || 0), 0) || 0
-      const maxUniqueScrapers = data?.reduce((max: number, item: any) => Math.max(max, item.unique_scrapers || 0), 0) || 0
-      const avgTweetsPerPeriod = data?.length ? Math.round(totalTweets / data.length) : 0
-
-      const response = {
-        data,
-        summary: {
-          totalTweets,
-          uniqueScrapers: maxUniqueScrapers,
-          avgTweetsPerPeriod,
-          periodsIncluded: data?.length || 0
-        }
-      }
-
-      // Cache headers
-      const now = new Date()
-      const end = customRange.end
-      const isCurrentPeriod = end > new Date(now.getTime() - 60 * 60 * 1000) // Within last hour
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Cache-Control': isCurrentPeriod ? 
-          's-maxage=300, stale-while-revalidate=600' : // 5 min for current
-          's-maxage=3600, stale-while-revalidate=7200'  // 1 hour for historical
-      }
-
-      return NextResponse.json(response, { headers })
-    }
-    
-    return NextResponse.json(
-      { error: 'Please provide either hoursBack parameter or both startDate and endDate' },
-      { status: 400 }
+    const response = await fetchAnalyticsGatewayJson<StreamStatsResponse>(
+      ['stream-stats'],
+      upstreamParams,
+      { timeoutMs: 25_000 },
     )
+
+    const currentPeriod =
+      range.end > new Date(Date.now() - 60 * 60 * 1000)
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': currentPeriod
+          ? 's-maxage=300, stale-while-revalidate=600'
+          : 's-maxage=3600, stale-while-revalidate=7200',
+      },
+    })
   } catch (error) {
-    console.error('Error in scraping-stats API:', error)
+    console.error('ClickHouse stream-stats request failed:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch scraping stats' },
-      { status: 500 }
+      { error: 'Streaming statistics are temporarily unavailable' },
+      { status: 502 },
     )
   }
 }

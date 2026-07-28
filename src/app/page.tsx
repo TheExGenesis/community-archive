@@ -217,7 +217,7 @@ export default async function Homepage() {
       {/* Section 1: Audience-specific hero */}
       <section className="overflow-hidden bg-card pb-12 pt-14 dark:bg-background md:flex md:min-h-[66vh] md:pb-16 md:pt-20">
         <div
-          className={`${contentWrapperClasses} space-y-7 text-center md:flex md:flex-1 md:flex-col md:justify-evenly md:space-y-0`}
+          className={`${contentWrapperClasses} space-y-11 text-center md:flex md:flex-1 md:flex-col md:justify-evenly md:space-y-0`}
         >
           <div className="space-y-3">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">

@@ -14,6 +14,7 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
   'top-quotes': new Set([
     'limit',
     'exclude_self',
+    'target_ca_users_only',
     'include_usernames',
     'exclude_usernames',
   ]),
@@ -43,6 +44,18 @@ export function analyticsGatewayRequestUrl(
     /^[A-Za-z0-9_@]{1,80}$/.test(cleanPath[1])
   ) {
     allowedParams = new Set(['limit'])
+  } else if (
+    cleanPath.length === 2 &&
+    cleanPath[0] === 'quote-posts' &&
+    /^\d{1,20}$/.test(cleanPath[1])
+  ) {
+    allowedParams = new Set([
+      'limit',
+      'offset',
+      'exclude_self',
+      'include_usernames',
+      'exclude_usernames',
+    ])
   }
 
   if (!allowedParams)

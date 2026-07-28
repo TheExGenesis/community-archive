@@ -32,10 +32,10 @@ ALLOW_STAGING_ADMIN_ON_PROD_SUPABASE=false
 # Staging-only ClickHouse analytics lab (server-side secrets)
 ENABLE_CLICKHOUSE_LAB=true
 CLICKHOUSE_ANALYTICS_API_URL=https://stream.community-archive.org:3000/analytics
-CLICKHOUSE_SEARCH_API_URL=https://stream.community-archive.org:3001/analytics
+CLICKHOUSE_SEARCH_API_URL=https://analytics.community-archive.org
 CLICKHOUSE_ANALYTICS_API_TOKEN=<shared-staging-gateway-token>
 
-# Opt-in application reads. Leave false until /analytics/search is deployed.
+# Opt-in application reads. Leave false until the dedicated /search endpoint is deployed.
 ENABLE_CLICKHOUSE_READS=false
 NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH=false
 ```

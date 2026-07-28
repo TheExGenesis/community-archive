@@ -52,7 +52,6 @@ export default async function ProfilePage() {
             upload_phase,
             created_at,
             archive_at,
-            keep_private,
             accounts:all_account!left(
               account_id,
               username,

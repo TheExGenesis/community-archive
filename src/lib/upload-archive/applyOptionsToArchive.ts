@@ -38,12 +38,12 @@ export const applyOptionsToArchive = (
       options.endDate.toISOString(),
     )
   }
-  if (options.keepPrivate) {
-    console.log('Keeping tweets private')
-  }
   if (!options.uploadLikes) {
     console.log('Emptying likes list')
     archive = emptyLikesList(archive)
   }
-  return { 'upload-options': options, ...archive }
+  return {
+    'upload-options': { ...options, keepPrivate: false },
+    ...archive,
+  }
 }

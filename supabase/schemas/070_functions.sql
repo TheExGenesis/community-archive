@@ -81,6 +81,44 @@ $$;
 ALTER FUNCTION "public"."update_optin_updated_at"() OWNER TO "postgres";
 
 
+-- Explicit opt-outs are a hard scrape deny. Resolve username-only legacy rows
+-- when possible, and never remove a block automatically because the same table
+-- also contains administrator-managed blocks.
+CREATE OR REPLACE FUNCTION "public"."propagate_explicit_optout_scrape_block"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+    v_account_id text;
+BEGIN
+    IF NEW.explicit_optout IS NOT TRUE THEN
+        RETURN NEW;
+    END IF;
+
+    v_account_id := NULLIF(BTRIM(NEW.twitter_user_id), '');
+
+    IF v_account_id IS NULL AND NULLIF(BTRIM(NEW.username), '') IS NOT NULL THEN
+        SELECT a.account_id
+        INTO v_account_id
+        FROM public.all_account AS a
+        WHERE LOWER(a.username) = LOWER(BTRIM(NEW.username))
+        ORDER BY a.updated_at DESC NULLS LAST
+        LIMIT 1;
+    END IF;
+
+    IF v_account_id IS NOT NULL THEN
+        INSERT INTO tes.blocked_scraping_users (account_id)
+        VALUES (v_account_id)
+        ON CONFLICT (account_id) DO NOTHING;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION "public"."propagate_explicit_optout_scrape_block"() OWNER TO "postgres";
+
+
 -- Generic updated_at column maintainer
 CREATE OR REPLACE FUNCTION "public"."update_updated_at_column"() RETURNS "trigger"
     LANGUAGE "plpgsql"

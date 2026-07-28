@@ -33,6 +33,10 @@ ALLOW_STAGING_ADMIN_ON_PROD_SUPABASE=false
 ENABLE_CLICKHOUSE_LAB=true
 CLICKHOUSE_ANALYTICS_API_URL=https://stream.community-archive.org:3000/analytics
 CLICKHOUSE_ANALYTICS_API_TOKEN=<shared-staging-gateway-token>
+
+# Opt-in application reads. Leave false until /analytics/search is deployed.
+ENABLE_CLICKHOUSE_READS=false
+NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH=false
 ```
 
 The default staging login identity is configured via env:
@@ -126,6 +130,9 @@ For PR-created Vercel Preview deployments, add the values from `.env.staging.gen
 - `ENABLE_CLICKHOUSE_LAB=true`
 - `CLICKHOUSE_ANALYTICS_API_URL`
 - `CLICKHOUSE_ANALYTICS_API_TOKEN`
+- `ENABLE_CLICKHOUSE_READS=false` (set true when testing homepage/search reads)
+- `NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH=false` (set true in the same build that
+  should try ClickHouse text search)
 
 After updating Preview env vars, redeploy the PR preview so the new values are picked up.
 

@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { canAccessClickHouseLab } from '@/lib/clickhouseLab'
-import { analyticsGatewayRequestUrl } from '@/lib/clickhouseGateway'
+import {
+  analyticsGatewayRequestUrl,
+  isClickHouseReadsEnabled,
+} from '@/lib/clickhouseGateway'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 30
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { path: string[] } },
-) {
-  if (!(await canAccessClickHouseLab())) {
+export async function GET(request: NextRequest) {
+  if (!isClickHouseReadsEnabled()) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
@@ -17,7 +16,7 @@ export async function GET(
   if (!token) {
     console.error('CLICKHOUSE_ANALYTICS_API_TOKEN is not configured')
     return NextResponse.json(
-      { error: 'ClickHouse analytics is not configured' },
+      { error: 'Tweet search is not configured' },
       { status: 503 },
     )
   }
@@ -25,7 +24,7 @@ export async function GET(
   let target: URL
   try {
     target = analyticsGatewayRequestUrl(
-      params.path,
+      ['search'],
       new URL(request.url).searchParams,
     )
   } catch (error) {
@@ -37,7 +36,7 @@ export async function GET(
     const response = await fetch(target, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
-      signal: AbortSignal.timeout(55_000),
+      signal: AbortSignal.timeout(25_000),
     })
     const body = await response.text()
     return new NextResponse(body, {
@@ -49,9 +48,9 @@ export async function GET(
       },
     })
   } catch (error) {
-    console.error('ClickHouse analytics gateway request failed:', error)
+    console.error('ClickHouse tweet search request failed:', error)
     return NextResponse.json(
-      { error: 'ClickHouse analytics gateway is unavailable' },
+      { error: 'Tweet search is temporarily unavailable' },
       { status: 502 },
     )
   }

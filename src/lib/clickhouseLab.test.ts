@@ -36,4 +36,17 @@ describe('ClickHouse staging lab guard', () => {
       ),
     ).toThrow('Unsupported ClickHouse analytics endpoint')
   })
+
+  test('allows only bounded tweet-search parameters', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['search'],
+      new URLSearchParams(
+        'q=open+source&mode=phrase&from_user=alice&limit=20&offset=40&raw_sql=DROP',
+      ),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/search?q=open+source&mode=phrase&from_user=alice&limit=20&offset=40',
+    )
+  })
 })

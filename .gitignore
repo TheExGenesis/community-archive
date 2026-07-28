@@ -9,6 +9,7 @@
 # nested services have their own node_modules (admin-delete-worker, etc.)
 services/*/node_modules
 services/*/package-lock.json
+!services/process_archive/package-lock.json
 
 # testing
 /coverage

@@ -4,9 +4,11 @@ import postgres from 'postgres'
 import { logger } from './logger.ts'
 import { exportAndDelete } from './exporter.ts'
 import { makeRunRecorder } from './runRecorder.ts'
+import { purgeExpiredExports } from './retention.ts'
 
 const WORKER_NAME = 'admin_delete_with_export'
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS ?? 10_000)
+const RETENTION_SWEEP_INTERVAL_MS = 15 * 60_000
 
 function requireEnv(name: string): string {
   const v = process.env[name]
@@ -37,7 +39,10 @@ async function main() {
   let stopping = false
   for (const sig of ['SIGTERM', 'SIGINT'] as const) {
     process.on(sig, () => {
-      logger.info({ sig }, 'shutdown signal received; finishing current loop then exiting')
+      logger.info(
+        { sig },
+        'shutdown signal received; finishing current loop then exiting',
+      )
       stopping = true
     })
   }
@@ -47,8 +52,13 @@ async function main() {
     'worker started; polling private.admin_jobs',
   )
 
+  let nextRetentionSweepAt = 0
   while (!stopping) {
     try {
+      if (Date.now() >= nextRetentionSweepAt) {
+        await purgeExpiredExports(storage, sql)
+        nextRetentionSweepAt = Date.now() + RETENTION_SWEEP_INTERVAL_MS
+      }
       const did = await drainOnce(sql, storage, recorder)
       if (!did) {
         // Nothing to do — sleep until next poll. (If we DID do something
@@ -59,7 +69,10 @@ async function main() {
       // Top-level catch is for *infrastructure* errors (DB went away,
       // etc.) — per-job errors are handled inside drainOnce. Log loudly,
       // back off, and keep polling.
-      logger.error({ err: serializeError(e) }, 'top-level loop error; backing off')
+      logger.error(
+        { err: serializeError(e) },
+        'top-level loop error; backing off',
+      )
       await sleep(POLL_INTERVAL_MS * 3, () => stopping)
     }
   }
@@ -125,7 +138,10 @@ async function drainOnce(
   if (claimed.length === 0) return false
 
   const job = claimed[0]
-  const jobLogger = logger.child({ job_key: job.key, account_id: job.args.account_id })
+  const jobLogger = logger.child({
+    job_key: job.key,
+    account_id: job.args.account_id,
+  })
   jobLogger.info({ args: job.args }, 'claimed job')
 
   const runId = await recorder.start({

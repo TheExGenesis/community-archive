@@ -170,9 +170,14 @@ structured fields above are queryable — no parsing needed.
 
 Every successful job writes
 `admin-deleted-user-data/<timestamp>-<account_id>/manifest.json` last.
-Its presence means the entire export succeeded; its absence means
-the export aborted partway. Open the bucket in Supabase Studio →
-Storage to browse.
+
+The worker sweeps completed and failed exports every 15 minutes. Export
+objects are deleted after 24 hours, including partial exports from failed
+jobs; the job row retains only the deletion timestamp and row-count metadata.
+During the 24-hour recovery window, its presence means the entire export
+succeeded; its absence can mean either the export aborted partway or its
+retention window expired. Open the bucket in Supabase Studio → Storage to
+browse.
 
 ## Local development
 

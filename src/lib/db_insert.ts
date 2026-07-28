@@ -118,7 +118,7 @@ const insertAccountAndUploadRow = async (
       .update({ 
         username: username,
         archive_at: latestTweetDate,
-        keep_private: uploadOptions.keepPrivate,
+        keep_private: false,
         upload_likes: uploadOptions.uploadLikes,
         start_date: uploadOptions.startDate,
         end_date: uploadOptions.endDate,
@@ -136,7 +136,7 @@ const insertAccountAndUploadRow = async (
           account_id: accountId,
           username: username,
           archive_at: latestTweetDate,
-          keep_private: uploadOptions.keepPrivate,
+          keep_private: false,
           upload_likes: uploadOptions.uploadLikes,
           start_date: uploadOptions.startDate,
           end_date: uploadOptions.endDate,

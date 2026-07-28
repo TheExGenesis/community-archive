@@ -16,7 +16,8 @@ import MobileNavigation from '@/components/MobileNavigation'
 import Footer from '@/components/Footer'
 import HashScrollHandler from '@/components/HashScrollHandler'
 import { checkIsAdmin } from '@/app/admin/data'
-import { Shield } from 'lucide-react'
+import { DatabaseZap, Shield } from 'lucide-react'
+import { isClickHouseLabEnvironmentEnabled } from '@/lib/clickhouseLab'
 
 const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
   ssr: false,
@@ -50,6 +51,7 @@ export default async function RootLayout({
   children: React.ReactNode
 }) {
   const isAdmin = await checkIsAdmin()
+  const showClickHouseLab = isAdmin && isClickHouseLabEnvironmentEnabled()
   return (
     <html
       lang="en"
@@ -108,6 +110,16 @@ export default async function RootLayout({
                       className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-input bg-background transition-colors hover:bg-accent hover:text-accent-foreground"
                     >
                       <Shield className="h-5 w-5" />
+                    </Link>
+                  ) : null}
+                  {showClickHouseLab ? (
+                    <Link
+                      href="/clickhouse"
+                      aria-label="ClickHouse staging lab"
+                      title="ClickHouse staging lab"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-input bg-background text-brand transition-colors hover:bg-accent"
+                    >
+                      <DatabaseZap className="h-5 w-5" />
                     </Link>
                   ) : null}
                   <MobileMenu />

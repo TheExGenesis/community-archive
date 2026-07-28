@@ -3,9 +3,13 @@ import { buildAndTsQuery, fetchTweets, FilterCriteria } from './tweetQueries'
 // Mock both RPC search functions
 const mockRpcSearch = jest.fn()
 const mockRpcExactPhrase = jest.fn()
+const mockClickHouseSearch = jest.fn()
 jest.mock('../pgSearch', () => ({
   searchTweets: (...args: any[]) => mockRpcSearch(...args),
   searchTweetsExactPhrase: (...args: any[]) => mockRpcExactPhrase(...args),
+}))
+jest.mock('../clickhouseSearch', () => ({
+  searchTweetsWithClickHouse: (...args: any[]) => mockClickHouseSearch(...args),
 }))
 
 // Helper to create a fake RPC result row (flat shape from RPC)
@@ -71,6 +75,62 @@ describe('fetchTweets — exact phrase search via FTS simple', () => {
   beforeEach(() => {
     mockRpcSearch.mockReset()
     mockRpcExactPhrase.mockReset()
+    mockClickHouseSearch.mockReset()
+    delete process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH
+  })
+
+  it('uses ClickHouse when text-search reads are enabled', async () => {
+    process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH = 'true'
+    mockClickHouseSearch.mockResolvedValueOnce([
+      {
+        tweet_id: 'ch-1',
+        created_at: '2025-01-01T00:00:00Z',
+        full_text: 'open source',
+        favorite_count: 1,
+        retweet_count: 0,
+        reply_to_tweet_id: null,
+        account: {
+          username: 'alice',
+          account_display_name: 'Alice',
+        },
+        media: [],
+      },
+    ])
+
+    const result = await fetchTweets(
+      buildMockSupabase(),
+      {
+        searchQuery: 'open & source',
+        rawSearchQuery: 'open source',
+      },
+      1,
+      20,
+    )
+
+    expect(mockClickHouseSearch).toHaveBeenCalledTimes(1)
+    expect(mockRpcSearch).not.toHaveBeenCalled()
+    expect(mockRpcExactPhrase).not.toHaveBeenCalled()
+    expect(result.tweets[0].tweet_id).toBe('ch-1')
+  })
+
+  it('falls back to the existing RPC when ClickHouse is unavailable', async () => {
+    process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH = 'true'
+    mockClickHouseSearch.mockRejectedValueOnce(new Error('gateway down'))
+    mockRpcSearch.mockResolvedValueOnce([makeRpcTweet('pg-1')])
+
+    const result = await fetchTweets(
+      buildMockSupabase(),
+      {
+        searchQuery: 'hello',
+        rawSearchQuery: 'hello',
+      },
+      1,
+      20,
+    )
+
+    expect(mockClickHouseSearch).toHaveBeenCalledTimes(1)
+    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
+    expect(result.tweets[0].tweet_id).toBe('pg-1')
   })
 
   it('returns exact phrase matches for multi-word queries', async () => {

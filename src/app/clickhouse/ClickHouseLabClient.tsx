@@ -84,6 +84,7 @@ type QuotesResponse = {
     limit: number
     excludeSelf: boolean
     targetCommunityUsersOnly: boolean
+    quoteCommunityUsersOnly: boolean
     includeUsernames: string[]
     excludeUsernames: string[]
     unresolvedIncludeUsernames: string[]
@@ -115,6 +116,7 @@ type QuotePostsResponse = {
     offset: number
     total: string
     excludeSelf: boolean
+    quoteCommunityUsersOnly: boolean
     includeUsernames: string[]
     excludeUsernames: string[]
     unresolvedIncludeUsernames: string[]
@@ -215,8 +217,8 @@ export default function ClickHouseLabClient() {
   const [quotesError, setQuotesError] = useState<string | null>(null)
   const [quoteLimit, setQuoteLimit] = useState('25')
   const [excludeSelfQuotes, setExcludeSelfQuotes] = useState(true)
-  const [targetCommunityUsersOnly, setTargetCommunityUsersOnly] =
-    useState(false)
+  const [targetCommunityUsersOnly, setTargetCommunityUsersOnly] = useState(true)
+  const [quoteCommunityUsersOnly, setQuoteCommunityUsersOnly] = useState(true)
   const [includeQuoteUsernames, setIncludeQuoteUsernames] = useState('')
   const [excludeQuoteUsernames, setExcludeQuoteUsernames] = useState('')
   const [expandedQuoteTweetId, setExpandedQuoteTweetId] = useState<
@@ -250,7 +252,9 @@ export default function ClickHouseLabClient() {
             error instanceof Error ? error.message : 'Unable to load analytics',
           )
       })
-    request<QuotesResponse>('top-quotes?limit=25&exclude_self=true')
+    request<QuotesResponse>(
+      'top-quotes?limit=25&exclude_self=true&target_ca_users_only=true&quote_ca_users_only=true',
+    )
       .then((quotesResponse) => {
         if (!cancelled) setQuotes(quotesResponse)
       })
@@ -312,6 +316,7 @@ export default function ClickHouseLabClient() {
       limit: quoteLimit,
       exclude_self: String(excludeSelfQuotes),
       target_ca_users_only: String(targetCommunityUsersOnly),
+      quote_ca_users_only: String(quoteCommunityUsersOnly),
     })
     if (includeQuoteUsernames.trim()) {
       params.set('include_usernames', includeQuoteUsernames)
@@ -340,6 +345,9 @@ export default function ClickHouseLabClient() {
       limit: '25',
       offset: String(offset),
       exclude_self: String(quotes?.query.excludeSelf !== false),
+      quote_ca_users_only: String(
+        quotes?.query.quoteCommunityUsersOnly !== false,
+      ),
     })
     if (quotes?.query.includeUsernames.length) {
       params.set('include_usernames', quotes.query.includeUsernames.join(','))
@@ -758,7 +766,7 @@ export default function ClickHouseLabClient() {
               onSubmit={runQuotes}
               className="border-b bg-muted/20 p-4 sm:p-5"
             >
-              <div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[minmax(230px,1fr)_minmax(230px,1fr)_120px_auto]">
+              <div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[minmax(210px,1fr)_minmax(210px,1fr)_minmax(230px,1fr)_120px_auto]">
                 <div>
                   <span className="text-xs font-medium text-muted-foreground">
                     Target authors
@@ -780,6 +788,24 @@ export default function ClickHouseLabClient() {
                 <div>
                   <span className="text-xs font-medium text-muted-foreground">
                     Quote authors
+                  </span>
+                  <div className="mt-2 flex h-10 items-center gap-3 rounded-md border bg-background px-3">
+                    <Switch
+                      id="quote-ca-users-only"
+                      checked={quoteCommunityUsersOnly}
+                      onCheckedChange={setQuoteCommunityUsersOnly}
+                    />
+                    <label
+                      htmlFor="quote-ca-users-only"
+                      className="text-sm font-medium"
+                    >
+                      Only quotes by CA users
+                    </label>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Source-author rule
                   </span>
                   <div className="mt-2 flex h-10 items-center gap-3 rounded-md border bg-background px-3">
                     <Switch
@@ -869,6 +895,12 @@ export default function ClickHouseLabClient() {
                     {quotes.query.targetCommunityUsersOnly
                       ? 'Target tweets by CA users only'
                       : 'Target tweets by any archived account'}
+                  </span>
+                  <span>
+                    ·{' '}
+                    {quotes.query.quoteCommunityUsersOnly
+                      ? 'Quote posts by CA users only'
+                      : 'Quote posts by any archived account'}
                   </span>
                   <span>
                     ·{' '}

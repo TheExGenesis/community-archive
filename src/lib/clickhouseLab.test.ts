@@ -54,12 +54,12 @@ describe('ClickHouse staging lab guard', () => {
     const target = analyticsGatewayRequestUrl(
       ['top-quotes'],
       new URLSearchParams(
-        'limit=25&exclude_self=true&target_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot&raw_sql=DROP',
+        'limit=25&exclude_self=true&target_ca_users_only=true&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot&raw_sql=DROP',
       ),
       'https://stream.example/analytics',
     )
     expect(target.toString()).toBe(
-      'https://stream.example/analytics/top-quotes?limit=25&exclude_self=true&target_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot',
+      'https://stream.example/analytics/top-quotes?limit=25&exclude_self=true&target_ca_users_only=true&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot',
     )
   })
 
@@ -67,12 +67,12 @@ describe('ClickHouse staging lab guard', () => {
     const target = analyticsGatewayRequestUrl(
       ['quote-posts', '18446744073709551615'],
       new URLSearchParams(
-        'limit=25&offset=50&exclude_self=true&include_usernames=alice&raw_sql=DROP',
+        'limit=25&offset=50&exclude_self=true&quote_ca_users_only=true&include_usernames=alice&raw_sql=DROP',
       ),
       'https://stream.example/analytics',
     )
     expect(target.toString()).toBe(
-      'https://stream.example/analytics/quote-posts/18446744073709551615?limit=25&offset=50&exclude_self=true&include_usernames=alice',
+      'https://stream.example/analytics/quote-posts/18446744073709551615?limit=25&offset=50&exclude_self=true&quote_ca_users_only=true&include_usernames=alice',
     )
     expect(() =>
       analyticsGatewayRequestUrl(

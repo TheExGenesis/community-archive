@@ -15,6 +15,7 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'limit',
     'exclude_self',
     'target_ca_users_only',
+    'quote_ca_users_only',
     'include_usernames',
     'exclude_usernames',
   ]),
@@ -53,6 +54,7 @@ export function analyticsGatewayRequestUrl(
       'limit',
       'offset',
       'exclude_self',
+      'quote_ca_users_only',
       'include_usernames',
       'exclude_usernames',
     ])

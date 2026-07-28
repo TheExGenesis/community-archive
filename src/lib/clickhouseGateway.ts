@@ -31,6 +31,13 @@ export function isClickHouseReadsEnabled(
   return enabled === 'true'
 }
 
+export function clickHouseSearchGatewayBaseUrl(
+  searchUrl = process.env.CLICKHOUSE_SEARCH_API_URL,
+  analyticsUrl = process.env.CLICKHOUSE_ANALYTICS_API_URL,
+): string | undefined {
+  return searchUrl || analyticsUrl
+}
+
 export function analyticsGatewayRequestUrl(
   path: string[],
   incomingSearchParams: URLSearchParams,

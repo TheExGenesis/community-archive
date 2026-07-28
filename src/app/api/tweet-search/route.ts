@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
   analyticsGatewayRequestUrl,
+  clickHouseSearchGatewayBaseUrl,
   isClickHouseReadsEnabled,
 } from '@/lib/clickhouseGateway'
 
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
     target = analyticsGatewayRequestUrl(
       ['search'],
       new URL(request.url).searchParams,
+      clickHouseSearchGatewayBaseUrl(),
     )
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Invalid request'

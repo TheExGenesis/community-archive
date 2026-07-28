@@ -2,6 +2,7 @@ import {
   analyticsGatewayRequestUrl,
   isClickHouseLabEnvironmentEnabled,
 } from './clickhouseLab'
+import { clickHouseSearchGatewayBaseUrl } from './clickhouseGateway'
 
 describe('ClickHouse staging lab guard', () => {
   test('requires the flag and refuses the production Supabase project', () => {
@@ -48,6 +49,21 @@ describe('ClickHouse staging lab guard', () => {
     expect(target.toString()).toBe(
       'https://stream.example/analytics/search?q=open+source&mode=phrase&from_user=alice&limit=20&offset=40',
     )
+  })
+
+  test('routes public search to its dedicated ClickHouse gateway', () => {
+    expect(
+      clickHouseSearchGatewayBaseUrl(
+        'https://stream.example:3001/analytics',
+        'https://stream.example:3000/analytics',
+      ),
+    ).toBe('https://stream.example:3001/analytics')
+    expect(
+      clickHouseSearchGatewayBaseUrl(
+        undefined,
+        'https://stream.example:3000/analytics',
+      ),
+    ).toBe('https://stream.example:3000/analytics')
   })
 
   test('allows quote filters without forwarding unknown parameters', () => {

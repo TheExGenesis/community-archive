@@ -30,28 +30,27 @@ export default function HomepageSearch() {
     <div className="mx-auto w-full max-w-3xl">
       <form
         onSubmit={handleSubmit}
-        className="relative rounded-xl border border-border bg-card p-2 text-left shadow-lg"
+        className="relative rounded-2xl border border-border bg-card p-1.5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.10)] sm:p-2"
       >
         <UserSearchInput
           value={query}
           onValueChange={setQuery}
-          placeholder="Search tweets, people, and ideas"
+          placeholder="Search tweets, people, ideas"
           aria-label="Search Community Archive"
-          className="h-14 border-0 bg-transparent pl-4 pr-14 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-lg"
-          autoFocus
+          className="h-14 border-0 bg-transparent pl-3 pr-16 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-[360px]:text-base sm:pl-4 sm:text-lg"
           autoComplete="off"
         />
         <Button
           type="submit"
           size="icon"
-          className="absolute right-3 top-1/2 h-10 w-10 -translate-y-1/2 rounded-full bg-green-600 text-white shadow-sm hover:bg-green-700 focus-visible:ring-green-600 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300 dark:focus-visible:ring-green-400"
+          className="absolute right-2.5 top-1/2 h-11 w-11 -translate-y-1/2 rounded-full bg-green-600 text-white shadow-sm hover:bg-green-700 focus-visible:ring-green-600 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300 dark:focus-visible:ring-green-400 sm:right-3"
           aria-label="Search archive"
         >
           <Search className="h-5 w-5" />
         </Button>
       </form>
 
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[13px] text-muted-foreground sm:text-sm">
         <span>Try:</span>
         {exampleSearches.map((example) => (
           <button

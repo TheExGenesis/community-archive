@@ -2,12 +2,16 @@
   "name": "process-archive",
   "private": true,
   "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "set NODE_OPTIONS=--expose-gc && tsx --env-file=.env process.ts",
-    "start": "set NODE_OPTIONS=--expose-gc && tsx --env-file=.env process_archive_upload.ts",
+    "start": "node --expose-gc --import tsx process_archive_upload.ts",
     "start:original": "set NODE_OPTIONS=--expose-gc && tsx --env-file=.env process.ts",
     "start:stream": "set NODE_OPTIONS=--expose-gc && tsx --env-file=.env process_stream.ts",
-    "start:copy": "set NODE_OPTIONS=--expose-gc && tsx --env-file=.env process_archive_upload.ts",
+    "start:copy": "npm run start",
+    "smoke:runtime": "node --expose-gc runtime_smoke_test.cjs",
     "run": "set NODE_OPTIONS=--expose-gc && tsx --env-file=.env process.ts",
     "docker:build": "cd ../../ && docker build -f services/process_archive/Dockerfile -t process-archive .",
     "docker:run": "docker compose run --rm process-archive",
@@ -19,12 +23,11 @@
     "@supabase/supabase-js": "^2.57.2",
     "dotenv": "^16.4.5",
     "postgres": "^3.4.4",
+    "tsx": "^4.19.1",
     "winston": "^3.17.0"
   },
   "devDependencies": {
-    "tsx": "^4.19.1",
     "typescript": "^5.1.3"
   }
 }
-
 

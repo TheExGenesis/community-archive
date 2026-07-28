@@ -28,7 +28,6 @@ import { calculateArchiveStats } from '@/lib/upload-archive/calculateArchiveStat
 import { applyOptionsToArchive } from '@/lib/upload-archive/applyOptionsToArchive'
 
 interface FileUploadDialogState {
-  keepPrivate: boolean
   showAdvancedOptions: boolean
   uploadLikes: boolean
   uploadStatus: 'not_started' | 'uploading' | 'completed'
@@ -42,7 +41,6 @@ interface FileUploadDialogState {
 }
 
 const initialState: FileUploadDialogState = {
-  keepPrivate: false,
   showAdvancedOptions: false,
   uploadLikes: true,
   uploadStatus: 'not_started',
@@ -96,7 +94,7 @@ export function FileUploadDialog({
   const handleUpload = async () => {
     setState((prev) => ({ ...prev, uploadStatus: 'uploading', error: null }))
     const options: UploadOptions = {
-      keepPrivate: state.keepPrivate,
+      keepPrivate: false,
       uploadLikes: state.uploadLikes,
       startDate: dateRange.start,
       endDate: dateRange.end,

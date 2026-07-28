@@ -191,7 +191,8 @@ export default function ProfileContent({
     })
   }
 
-  // Confirmed from the opt-out modal: delete all data first, then add to opt-out list.
+  // Confirmed from the opt-out modal: persist the hard opt-out before deletion
+  // so a partial deletion failure can never leave scraping enabled.
   const confirmOptOutAndDelete = async () => {
     if (!userMetadata?.provider_id) {
       setError('Unable to identify user account')
@@ -202,19 +203,26 @@ export default function ProfileContent({
     setError(null)
     setSuccess(null)
 
+    let optOutSaved = false
     try {
-      await deleteArchive(supabase, userMetadata.provider_id)
-      await deleteStorageFiles(userMetadata.provider_id)
       await persistOptOut(true)
-
+      optOutSaved = true
       setExplicitOptOut(true)
       setOptInStatus(false)
+
+      await deleteArchive(supabase, userMetadata.provider_id)
+      await deleteStorageFiles(userMetadata.provider_id)
+
       setShowOptOutDialog(false)
       setSuccess('Data deleted and added to explicit opt-out list')
       await logUserAction('opt_out_and_delete')
       router.refresh()
     } catch (err: any) {
-      setError(err.message || 'Failed to opt out and delete data')
+      setError(
+        optOutSaved
+          ? `Opt-out saved and scraping blocked, but data deletion failed: ${err.message || 'unknown error'}`
+          : err.message || 'Failed to opt out and delete data',
+      )
     } finally {
       setDeletingArchive(null)
     }
@@ -449,7 +457,7 @@ export default function ProfileContent({
                               })}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {archive.keep_private ? '🔒 Private' : '🌐 Public'}
+                              🌐 Public
                             </p>
                           </div>
                         </div>

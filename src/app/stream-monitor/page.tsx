@@ -129,8 +129,10 @@ const StreamMonitor = () => {
   const chartData = scrapingStats?.data
   const chartLoading = statsLoading
   const chartError = statsError
-  const scraperCount = scrapingStats?.summary?.uniqueScrapers || 0
-  const scraperLoading = statsLoading
+  const sourceMetric = showStreamedOnly
+    ? scrapingStats?.summary?.sourceMessages || 0
+    : scrapingStats?.summary?.sourceCount || 0
+  const sourceMetricLoading = statsLoading
 
   // Query for latest tweets with pagination
   const {
@@ -169,7 +171,9 @@ const StreamMonitor = () => {
 
   const chartConfig = {
     tweet_count: {
-      label: showStreamedOnly ? 'Tweets Streamed' : 'Total Tweets',
+      label: showStreamedOnly
+        ? 'Unique Tweets Streamed'
+        : 'Unique Tweets Observed',
       color: 'hsl(var(--chart-1))',
     },
   }
@@ -328,12 +332,14 @@ const StreamMonitor = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
-              {showStreamedOnly ? 'Total Streamed' : 'Total Tweets'}
+              {showStreamedOnly
+                ? 'Unique Tweets Streamed'
+                : 'Unique Tweets Observed'}
             </CardTitle>
             <CardDescription>
               {showStreamedOnly
-                ? 'Streamed in time range'
-                : 'All tweets in time range'}
+                ? 'Persisted to ClickHouse in time range'
+                : 'Across all ClickHouse producers'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -359,16 +365,18 @@ const StreamMonitor = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Unique Sources</CardTitle>
+            <CardTitle className="text-base">
+              {showStreamedOnly ? 'Firehose Batches' : 'Data Producers'}
+            </CardTitle>
             <CardDescription>
               {showStreamedOnly
-                ? 'Active streaming scrapers'
-                : 'All data sources'}
+                ? 'Accepted source messages represented'
+                : 'Distinct ClickHouse source labels'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {scraperLoading ? '...' : scraperCount || 0}
+              {sourceMetricLoading ? '...' : sourceMetric}
             </div>
           </CardContent>
         </Card>

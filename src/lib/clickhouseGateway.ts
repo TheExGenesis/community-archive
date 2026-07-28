@@ -11,6 +11,7 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'offset',
   ]),
   'word-trend': new Set(['q', 'bucket', 'match', 'from', 'to']),
+  'stream-stats': new Set(['start', 'end', 'granularity', 'scope']),
   'top-quotes': new Set([
     'limit',
     'exclude_self',

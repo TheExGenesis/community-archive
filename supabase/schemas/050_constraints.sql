@@ -76,6 +76,8 @@ ALTER TABLE ONLY "public"."all_profile"
 ALTER TABLE ONLY "public"."archive_upload"
     ADD CONSTRAINT "archive_upload_account_id_archive_at_key" UNIQUE ("account_id", "archive_at");
 ALTER TABLE ONLY "public"."archive_upload"
+    ADD CONSTRAINT "archive_upload_public_only" CHECK ("keep_private" IS NOT TRUE);
+ALTER TABLE ONLY "public"."archive_upload"
     ADD CONSTRAINT "archive_upload_pkey" PRIMARY KEY ("id");
 
 ALTER TABLE ONLY "public"."conversations"

@@ -82,4 +82,17 @@ describe('ClickHouse staging lab guard', () => {
       ),
     ).toThrow('Unsupported ClickHouse analytics endpoint')
   })
+
+  test('allows bounded stream-stat parameters without forwarding raw SQL', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['stream-stats'],
+      new URLSearchParams(
+        'start=2026-07-20T00%3A00%3A00.000Z&end=2026-07-27T00%3A00%3A00.000Z&granularity=day&scope=firehose&raw_sql=DROP',
+      ),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/stream-stats?start=2026-07-20T00%3A00%3A00.000Z&end=2026-07-27T00%3A00%3A00.000Z&granularity=day&scope=firehose',
+    )
+  })
 })

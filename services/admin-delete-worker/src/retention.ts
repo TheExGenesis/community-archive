@@ -52,7 +52,7 @@ export async function purgeExpiredExports(
         SET args = COALESCE(args, '{}'::jsonb)
           || jsonb_build_object(
             'export_deleted_at', now(),
-            'export_retention_hours', ${RETENTION_HOURS}
+            'export_retention_hours', ${RETENTION_HOURS}::integer
           ),
           updated_at = now()
         WHERE key = ${job.key}

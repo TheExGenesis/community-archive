@@ -11,7 +11,12 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'offset',
   ]),
   'word-trend': new Set(['q', 'bucket', 'match', 'from', 'to']),
-  'top-quotes': new Set(['limit']),
+  'top-quotes': new Set([
+    'limit',
+    'exclude_self',
+    'include_usernames',
+    'exclude_usernames',
+  ]),
 }
 
 export function isClickHouseReadsEnabled(

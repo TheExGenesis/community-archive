@@ -11,6 +11,7 @@ import {
   Heart,
   Quote,
   Search,
+  SlidersHorizontal,
   Sparkles,
   Timer,
   Users,
@@ -28,6 +29,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 
 type Timing = {
   wallMs: number
@@ -65,6 +67,8 @@ type SummaryResponse = {
 type QuoteRow = {
   tweetId: string
   quoteCount: string
+  quotingAccounts: string | null
+  selfQuotesRemoved: string
   accountId: string | null
   username: string | null
   displayName: string | null
@@ -74,7 +78,21 @@ type QuoteRow = {
   retweetCount: string
 }
 
-type QuotesResponse = { data: QuoteRow[]; timing: Timing }
+type QuotesResponse = {
+  data: QuoteRow[]
+  query: {
+    limit: number
+    excludeSelf: boolean
+    includeUsernames: string[]
+    excludeUsernames: string[]
+    unresolvedIncludeUsernames: string[]
+    unresolvedExcludeUsernames: string[]
+    selfQuotesRemoved: string
+    unresolvedTargetAuthors?: number
+    candidateRankingTruncated: boolean
+  }
+  timing: Timing
+}
 
 type TrendRow = {
   bucket: string
@@ -156,6 +174,12 @@ export default function ClickHouseLabClient() {
   const [summary, setSummary] = useState<SummaryResponse | null>(null)
   const [quotes, setQuotes] = useState<QuotesResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [quotesLoading, setQuotesLoading] = useState(true)
+  const [quotesError, setQuotesError] = useState<string | null>(null)
+  const [quoteLimit, setQuoteLimit] = useState('25')
+  const [excludeSelfQuotes, setExcludeSelfQuotes] = useState(true)
+  const [includeQuoteUsernames, setIncludeQuoteUsernames] = useState('')
+  const [excludeQuoteUsernames, setExcludeQuoteUsernames] = useState('')
   const [identifier, setIdentifier] = useState('')
   const [wordQuery, setWordQuery] = useState('')
   const [bucket, setBucket] = useState('month')
@@ -171,20 +195,30 @@ export default function ClickHouseLabClient() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([
-      request<SummaryResponse>('summary'),
-      request<QuotesResponse>('top-quotes?limit=25'),
-    ])
-      .then(([summaryResponse, quotesResponse]) => {
-        if (cancelled) return
-        setSummary(summaryResponse)
-        setQuotes(quotesResponse)
+    request<SummaryResponse>('summary')
+      .then((summaryResponse) => {
+        if (!cancelled) setSummary(summaryResponse)
       })
       .catch((error) => {
         if (!cancelled)
           setLoadError(
             error instanceof Error ? error.message : 'Unable to load analytics',
           )
+      })
+    request<QuotesResponse>('top-quotes?limit=25&exclude_self=true')
+      .then((quotesResponse) => {
+        if (!cancelled) setQuotes(quotesResponse)
+      })
+      .catch((error) => {
+        if (!cancelled)
+          setQuotesError(
+            error instanceof Error
+              ? error.message
+              : 'Unable to count quote targets',
+          )
+      })
+      .finally(() => {
+        if (!cancelled) setQuotesLoading(false)
       })
     return () => {
       cancelled = true
@@ -222,6 +256,33 @@ export default function ClickHouseLabClient() {
       )
     } finally {
       setTrendLoading(false)
+    }
+  }
+
+  async function runQuotes(event: FormEvent) {
+    event.preventDefault()
+    setQuotesLoading(true)
+    setQuotesError(null)
+    const params = new URLSearchParams({
+      limit: quoteLimit,
+      exclude_self: String(excludeSelfQuotes),
+    })
+    if (includeQuoteUsernames.trim()) {
+      params.set('include_usernames', includeQuoteUsernames)
+    }
+    if (excludeQuoteUsernames.trim()) {
+      params.set('exclude_usernames', excludeQuoteUsernames)
+    }
+    try {
+      setQuotes(await request<QuotesResponse>(`top-quotes?${params}`))
+    } catch (error) {
+      setQuotesError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to count quote targets',
+      )
+    } finally {
+      setQuotesLoading(false)
     }
   }
 
@@ -569,61 +630,210 @@ export default function ClickHouseLabClient() {
               </p>
               <h2 className="mt-1 text-2xl font-semibold">Most quoted posts</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Unique archived quote posts grouped by their target tweet.
+                Unique archived quote posts grouped by target, with optional
+                quoting-account filters.
               </p>
             </div>
             <TimingBadge timing={quotes?.timing} />
           </div>
-          {quotes ? (
-            <Card>
-              <CardContent className="divide-y p-0">
-                {quotes.data.map((row, index) => (
-                  <article
-                    key={row.tweetId}
-                    className="grid gap-3 p-5 sm:grid-cols-[42px_90px_minmax(0,1fr)_auto] sm:items-start"
-                  >
-                    <span className="text-sm tabular-nums text-muted-foreground">
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
-                    <div>
-                      <strong className="block text-xl tabular-nums">
-                        {number(row.quoteCount)}
-                      </strong>
-                      <span className="text-xs text-muted-foreground">
-                        quote posts
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="line-clamp-3 text-sm leading-6">
-                        {row.fullText ||
-                          'Target tweet is not present in the current corpus.'}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                        <span>@{row.username || 'unknown'}</span>
-                        <span>{date(row.createdAt)}</span>
-                        <span>♥ {number(row.favoriteCount, true)}</span>
-                        <span>↻ {number(row.retweetCount, true)}</span>
-                      </div>
-                    </div>
-                    <a
-                      href={
-                        row.username
-                          ? `https://x.com/${encodeURIComponent(row.username)}/status/${row.tweetId}`
-                          : `https://x.com/i/status/${row.tweetId}`
-                      }
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center text-xs font-medium text-brand hover:underline"
+          <Card>
+            <form
+              onSubmit={runQuotes}
+              className="border-b bg-muted/20 p-4 sm:p-5"
+            >
+              <div className="grid items-end gap-4 md:grid-cols-[minmax(240px,1fr)_120px_auto]">
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Quote authors
+                  </span>
+                  <div className="mt-2 flex h-10 items-center gap-3 rounded-md border bg-background px-3">
+                    <Switch
+                      id="exclude-self-quotes"
+                      checked={excludeSelfQuotes}
+                      onCheckedChange={setExcludeSelfQuotes}
+                    />
+                    <label
+                      htmlFor="exclude-self-quotes"
+                      className="text-sm font-medium"
                     >
-                      Open <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
-                    </a>
-                  </article>
-                ))}
-              </CardContent>
-            </Card>
-          ) : (
-            <LoadingPanel label="Counting quote targets" />
-          )}
+                      Exclude the source-post author
+                    </label>
+                  </div>
+                </div>
+                <label className="grid gap-2 text-xs font-medium text-muted-foreground">
+                  Top
+                  <select
+                    value={quoteLimit}
+                    onChange={(event) => setQuoteLimit(event.target.value)}
+                    className="h-10 rounded-md border bg-background px-3 text-sm text-foreground"
+                  >
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                  </select>
+                </label>
+                <Button type="submit" disabled={quotesLoading}>
+                  {quotesLoading ? 'Counting…' : 'Rank quotes'}
+                </Button>
+              </div>
+              <details className="group mt-4 rounded-md border bg-background">
+                <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                  <SlidersHorizontal className="h-4 w-4 text-brand" />
+                  Advanced username filters
+                  <span className="text-xs font-normal text-muted-foreground">
+                    optional include / exclude lists
+                  </span>
+                  <span className="ml-auto text-muted-foreground group-open:rotate-45">
+                    +
+                  </span>
+                </summary>
+                <div className="grid gap-4 border-t p-3 md:grid-cols-2">
+                  <label className="grid gap-2 text-xs font-medium text-muted-foreground">
+                    Only count quote posts by
+                    <textarea
+                      value={includeQuoteUsernames}
+                      onChange={(event) =>
+                        setIncludeQuoteUsernames(event.target.value)
+                      }
+                      rows={3}
+                      placeholder="exgenesis, wereness, …"
+                      className="min-h-20 w-full resize-y rounded-md border bg-background px-3 py-2 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <span className="font-normal">
+                      Comma or space separated · up to 100 usernames
+                    </span>
+                  </label>
+                  <label className="grid gap-2 text-xs font-medium text-muted-foreground">
+                    Do not count quote posts by
+                    <textarea
+                      value={excludeQuoteUsernames}
+                      onChange={(event) =>
+                        setExcludeQuoteUsernames(event.target.value)
+                      }
+                      rows={3}
+                      placeholder="spamaccount, botaccount, …"
+                      className="min-h-20 w-full resize-y rounded-md border bg-background px-3 py-2 text-sm text-foreground outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <span className="font-normal">
+                      Exclusions override the include list
+                    </span>
+                  </label>
+                </div>
+              </details>
+            </form>
+            {quotesError ? (
+              <p className="border-b px-5 py-3 text-sm text-red-500">
+                {quotesError}
+              </p>
+            ) : null}
+            {quotes ? (
+              <>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 border-b px-5 py-3 text-xs text-muted-foreground">
+                  <span>
+                    {quotes.query.excludeSelf
+                      ? 'Source-author quotes excluded'
+                      : 'Source-author quotes included'}
+                  </span>
+                  {quotes.query.includeUsernames.length ? (
+                    <span>
+                      · {quotes.query.includeUsernames.length} included username
+                      {quotes.query.includeUsernames.length === 1 ? '' : 's'}
+                    </span>
+                  ) : null}
+                  {quotes.query.excludeUsernames.length ? (
+                    <span>
+                      · {quotes.query.excludeUsernames.length} excluded username
+                      {quotes.query.excludeUsernames.length === 1 ? '' : 's'}
+                    </span>
+                  ) : null}
+                  {quotes.query.unresolvedIncludeUsernames.length ||
+                  quotes.query.unresolvedExcludeUsernames.length ? (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      ·{' '}
+                      {quotes.query.unresolvedIncludeUsernames.length +
+                        quotes.query.unresolvedExcludeUsernames.length}{' '}
+                      username
+                      {quotes.query.unresolvedIncludeUsernames.length +
+                        quotes.query.unresolvedExcludeUsernames.length ===
+                      1
+                        ? ''
+                        : 's'}{' '}
+                      not found
+                    </span>
+                  ) : null}
+                </div>
+                {quotes.query.candidateRankingTruncated ? (
+                  <p className="border-b bg-amber-50 px-5 py-3 text-xs text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                    The candidate cap may have truncated this filtered ranking.
+                  </p>
+                ) : null}
+                <CardContent className="divide-y p-0">
+                  {quotes.data.map((row, index) => (
+                    <article
+                      key={row.tweetId}
+                      className="grid gap-3 p-5 sm:grid-cols-[42px_90px_minmax(0,1fr)_auto] sm:items-start"
+                    >
+                      <span className="text-sm tabular-nums text-muted-foreground">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                      <div>
+                        <strong className="block text-xl tabular-nums">
+                          {number(row.quoteCount)}
+                        </strong>
+                        <span className="text-xs text-muted-foreground">
+                          quote posts
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="line-clamp-3 text-sm leading-6">
+                          {row.fullText ||
+                            'Target tweet is not present in the current corpus.'}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          <span>@{row.username || 'unknown'}</span>
+                          <span>{date(row.createdAt)}</span>
+                          <span>♥ {number(row.favoriteCount, true)}</span>
+                          <span>↻ {number(row.retweetCount, true)}</span>
+                          {row.quotingAccounts ? (
+                            <span>
+                              {number(row.quotingAccounts)} quoting accounts
+                            </span>
+                          ) : null}
+                          {Number(row.selfQuotesRemoved) ? (
+                            <span>
+                              −{number(row.selfQuotesRemoved)} source-author
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <a
+                        href={
+                          row.username
+                            ? `https://x.com/${encodeURIComponent(row.username)}/status/${row.tweetId}`
+                            : `https://x.com/i/status/${row.tweetId}`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center text-xs font-medium text-brand hover:underline"
+                      >
+                        Open <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                      </a>
+                    </article>
+                  ))}
+                  {!quotes.data.length ? (
+                    <div className="p-10 text-center text-sm text-muted-foreground">
+                      No quoted posts match this account set.
+                    </div>
+                  ) : null}
+                </CardContent>
+              </>
+            ) : (
+              <div className="p-5">
+                <LoadingPanel label="Counting quote targets" />
+              </div>
+            )}
+          </Card>
         </section>
       </div>
     </main>

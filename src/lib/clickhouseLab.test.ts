@@ -49,4 +49,17 @@ describe('ClickHouse staging lab guard', () => {
       'https://stream.example/analytics/search?q=open+source&mode=phrase&from_user=alice&limit=20&offset=40',
     )
   })
+
+  test('allows quote filters without forwarding unknown parameters', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['top-quotes'],
+      new URLSearchParams(
+        'limit=25&exclude_self=true&include_usernames=alice%2C+bob&exclude_usernames=bot&raw_sql=DROP',
+      ),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/top-quotes?limit=25&exclude_self=true&include_usernames=alice%2C+bob&exclude_usernames=bot',
+    )
+  })
 })

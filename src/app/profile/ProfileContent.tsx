@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { AlertCircle, Archive, Trash2, UserX, CheckCircle, Upload } from 'lucide-react'
+import { AlertCircle, Archive, Trash2, UserX, CheckCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@/utils/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -16,6 +16,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { formatDistanceToNow } from 'date-fns'
 import { deleteArchive, deleteSingleArchive } from '@/lib/db_insert'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
+import { ArchiveUploadButton } from '@/components/ArchiveUploadButton'
 
 interface ProfileContentProps {
   user: User
@@ -402,15 +403,13 @@ export default function ProfileContent({
                 </CardDescription>
               </div>
               {archives?.length > 0 && (
-                <Button
+                <ArchiveUploadButton
                   variant="outline"
                   size="sm"
-                  onClick={() => router.push('/#upload-archive')}
                   className="gap-2"
                 >
-                  <Upload className="h-4 w-4" />
                   New Upload
-                </Button>
+                </ArchiveUploadButton>
               )}
             </CardHeader>
             <CardContent>
@@ -418,13 +417,12 @@ export default function ProfileContent({
                 <div className="text-center py-8 text-muted-foreground">
                   <Archive className="h-12 w-12 mx-auto mb-3 opacity-50" />
                   <p>You haven&apos;t uploaded any archives yet</p>
-                  <Button
+                  <ArchiveUploadButton
                     variant="outline"
-                    className="mt-4"
-                    onClick={() => router.push('/#upload-archive')}
+                    className="mt-4 gap-2"
                   >
                     Upload Archive
-                  </Button>
+                  </ArchiveUploadButton>
                 </div>
               ) : (
                 <div className="space-y-4">

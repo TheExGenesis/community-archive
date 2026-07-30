@@ -41,14 +41,24 @@ export function ArchiveUploadButton({
 
   return (
     <>
-      <Button
-        {...buttonProps}
-        onClick={() => fileInputRef.current?.click()}
-        disabled={isProcessing}
-      >
-        <Upload className="h-4 w-4" />
-        {isProcessing ? 'Processing...' : children}
-      </Button>
+      <div className="inline-flex flex-col items-center gap-1">
+        <Button
+          {...buttonProps}
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isProcessing}
+        >
+          <Upload className="h-4 w-4" />
+          {isProcessing ? 'Processing...' : children}
+        </Button>
+        <a
+          href="https://x.com/settings/download_your_data"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-muted-foreground hover:underline"
+        >
+          Request your archive from X
+        </a>
+      </div>
       <input
         ref={fileInputRef}
         type="file"

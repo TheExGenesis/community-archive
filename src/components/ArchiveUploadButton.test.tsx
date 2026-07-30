@@ -46,6 +46,15 @@ describe('ArchiveUploadButton', () => {
     await user.click(screen.getByRole('button', { name: 'Upload Archive' }))
     expect(clickSpy).toHaveBeenCalledTimes(1)
 
+    const requestLink = screen.getByRole('link', {
+      name: 'Request your archive from X',
+    })
+    expect(requestLink).toHaveAttribute(
+      'href',
+      'https://x.com/settings/download_your_data',
+    )
+    expect(requestLink).toHaveAttribute('target', '_blank')
+
     const file = new File(['archive'], 'twitter-archive.zip', {
       type: 'application/zip',
     })

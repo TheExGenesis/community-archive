@@ -23,6 +23,11 @@ ARCHIVE_PATH=<path_to_archive_folder>
 
 Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` can be found in [your Supabase project's API settings](https://app.supabase.com/project/_/settings/api)
 
+PostHog monitoring is optional. To enable page views, client error tracking,
+session replay, and Web Vitals, set `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` to the
+project token from PostHog and set `NEXT_PUBLIC_POSTHOG_HOST` to the matching US
+or EU ingestion host. Leave the token unset to disable monitoring locally.
+
 1. Install [node](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) and optionally [pnpm](https://pnpm.io/installation#using-npm)
 
 2. Install dependencies

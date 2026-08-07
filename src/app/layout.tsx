@@ -18,6 +18,7 @@ import HashScrollHandler from '@/components/HashScrollHandler'
 import { checkIsAdmin } from '@/app/admin/data'
 import { DatabaseZap, Shield } from 'lucide-react'
 import { isClickHouseLabEnvironmentEnabled } from '@/lib/clickhouseLab'
+import PostHogMonitoring from '@/providers/PostHogMonitoring'
 
 const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
   ssr: false,
@@ -59,6 +60,7 @@ export default async function RootLayout({
       suppressHydrationWarning={true}
     >
       <body className="bg-background text-foreground transition-colors duration-300">
+        <PostHogMonitoring />
         <NextTopLoader showSpinner={false} height={3} color="#2acf80" />
         <ThemeProvider
           attribute="class"

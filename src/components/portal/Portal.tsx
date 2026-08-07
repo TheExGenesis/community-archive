@@ -237,7 +237,7 @@ export default function Portal({
   }, [stats.generatedAt])
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
       {/* ------------------------------------------------ Home ---------- */}
       {view === 'home' && (
         <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">

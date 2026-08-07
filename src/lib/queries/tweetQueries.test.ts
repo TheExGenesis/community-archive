@@ -1,4 +1,9 @@
-import { buildAndTsQuery, fetchTweets, FilterCriteria } from './tweetQueries'
+import {
+  buildAndTsQuery,
+  fetchTweets,
+  FilterCriteria,
+  isRetweetText,
+} from './tweetQueries'
 
 // Mock both RPC search functions
 const mockRpcSearch = jest.fn()
@@ -39,6 +44,7 @@ function buildMockSupabase() {
     gte: jest.fn().mockReturnThis(),
     lte: jest.fn().mockReturnThis(),
     is: jest.fn().mockReturnThis(),
+    not: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
     range: jest.fn().mockResolvedValue({ data: [], error: null }),
   }
@@ -68,6 +74,90 @@ describe('buildAndTsQuery', () => {
 
   it('handles empty string', () => {
     expect(buildAndTsQuery('')).toBe('')
+  })
+})
+
+describe('retweet filtering', () => {
+  beforeEach(() => {
+    mockRpcSearch.mockReset()
+    mockRpcExactPhrase.mockReset()
+    mockClickHouseSearch.mockReset()
+    delete process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH
+  })
+
+  it('recognizes archive-native RT text', () => {
+    expect(isRetweetText('RT @alice: hello')).toBe(true)
+    expect(isRetweetText('RT @alice hello')).toBe(true)
+    expect(isRetweetText('Talking about RT @alice')).toBe(false)
+  })
+
+  it('removes retweets from Supabase RPC results as a deployment-safe fallback', async () => {
+    mockRpcSearch.mockResolvedValueOnce([
+      makeRpcTweet('rt', 'RT @alice: hello'),
+      makeRpcTweet('original', 'hello from me'),
+    ])
+
+    const result = await fetchTweets(
+      buildMockSupabase(),
+      {
+        searchQuery: 'hello',
+        rawSearchQuery: 'hello',
+        excludeRetweets: true,
+      },
+      1,
+      20,
+    )
+
+    expect(result.tweets.map((tweet) => tweet.tweet_id)).toEqual(['original'])
+  })
+
+  it('tops up filtered ClickHouse pages with original tweets', async () => {
+    process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH = 'true'
+    const clickHouseTweet = (id: string, fullText: string) => ({
+      tweet_id: id,
+      account_id: 'acc_1',
+      created_at: '2025-01-01T00:00:00Z',
+      full_text: fullText,
+      favorite_count: 0,
+      retweet_count: 0,
+      reply_to_tweet_id: null,
+      account: {
+        username: 'testuser',
+        account_display_name: 'Test User',
+      },
+      media: [],
+    })
+    mockClickHouseSearch
+      .mockResolvedValueOnce([
+        ...Array.from({ length: 35 }, (_, index) =>
+          clickHouseTweet(`rt-${index}`, `RT @alice: result ${index}`),
+        ),
+        ...Array.from({ length: 15 }, (_, index) =>
+          clickHouseTweet(`original-${index}`, `Original result ${index}`),
+        ),
+      ])
+      .mockResolvedValueOnce(
+        Array.from({ length: 20 }, (_, index) =>
+          clickHouseTweet(`more-${index}`, `More original ${index}`),
+        ),
+      )
+
+    const result = await fetchTweets(
+      buildMockSupabase(),
+      {
+        searchQuery: 'result',
+        rawSearchQuery: 'result',
+        excludeRetweets: true,
+      },
+      1,
+      20,
+    )
+
+    expect(mockClickHouseSearch).toHaveBeenCalledTimes(2)
+    expect(result.tweets).toHaveLength(20)
+    expect(
+      result.tweets.every((tweet) => !isRetweetText(tweet.full_text)),
+    ).toBe(true)
   })
 })
 
@@ -147,7 +237,9 @@ describe('fetchTweets — exact phrase search via FTS simple', () => {
     const result = await fetchTweets(supabase, criteria, 1, 5)
 
     expect(mockRpcExactPhrase).toHaveBeenCalledTimes(1)
-    expect(mockRpcExactPhrase.mock.calls[0][1].exact_phrase).toBe('cool project')
+    expect(mockRpcExactPhrase.mock.calls[0][1].exact_phrase).toBe(
+      'cool project',
+    )
     // Only exact phrase RPC is called, no FTS fallback
     expect(mockRpcSearch).not.toHaveBeenCalled()
     expect(result.tweets).toHaveLength(2)
@@ -289,12 +381,7 @@ describe('fetchTweets — direct profile embeds', () => {
       count: 1,
     })
 
-    const result = await fetchTweets(
-      supabase,
-      { userId: 'account-1' },
-      1,
-      20,
-    )
+    const result = await fetchTweets(supabase, { userId: 'account-1' }, 1, 20)
 
     expect(result.error).toBeNull()
     expect(result.tweets[0].account.profile?.avatar_media_url).toBe(

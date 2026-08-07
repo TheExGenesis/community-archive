@@ -36,6 +36,6 @@ export async function getMissingAccounts(): Promise<MissingAccountsResponse> {
   return fetchAnalyticsGatewayJson<MissingAccountsResponse>(
     ['missing-accounts'],
     new URLSearchParams({ limit: '100' }),
-    { revalidate: 10 * 60, timeoutMs: 30_000 },
+    { timeoutMs: 30_000, revalidate: 60 },
   )
 }

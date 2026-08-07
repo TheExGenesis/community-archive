@@ -94,40 +94,39 @@ export default function AdvancedSearchForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6"
+      className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4"
     >
       <Label htmlFor="main-search" className="sr-only">
         Search the archive
       </Label>
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col gap-2.5 sm:flex-row">
         <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <UserSearchInput
             id="main-search"
             value={query}
             onValueChange={setQuery}
             placeholder="Search words, phrases, or from:username"
-            className="h-12 rounded-lg bg-background pl-12 pr-4 text-base"
+            className="h-10 rounded-lg bg-background pl-10 pr-4 text-sm"
             autoComplete="off"
           />
         </div>
         <Button
           type="submit"
-          size="lg"
-          className="h-12 bg-green-600 px-7 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
+          className="h-10 bg-green-600 px-6 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
         >
           <Search className="mr-2 h-4 w-4" />
           Search
         </Button>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-          className="-ml-3 text-muted-foreground hover:text-foreground"
+          className="-ml-2 h-8 text-muted-foreground hover:text-foreground"
           aria-expanded={showAdvancedOptions}
         >
           <SlidersHorizontal className="mr-2 h-4 w-4" />
@@ -163,7 +162,7 @@ export default function AdvancedSearchForm() {
       </div>
 
       {showAdvancedOptions && (
-        <div className="mt-4 grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
+        <div className="mt-3 grid gap-3 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-2">
             <Label htmlFor="from-user">From user</Label>
             <Input

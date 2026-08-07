@@ -47,6 +47,8 @@ function SearchPageContent() {
     replyToUsername: normalizedSearchParams.get('replyToUser') || undefined,
     startDate: normalizedSearchParams.get('sinceDate') || undefined,
     endDate: normalizedSearchParams.get('untilDate') || undefined,
+    excludeRetweets: true,
+    includeQuoteTweets: true,
   }
 
   const tweetListKey = normalizedSearchParams.toString()
@@ -57,23 +59,37 @@ function SearchPageContent() {
 
   return (
     <main className="min-h-screen bg-background">
-      <section className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-        <div className="mb-8 max-w-2xl">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-brand">
+      <section className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <div className={hasSearch ? 'mb-4' : 'mb-8 max-w-2xl'}>
+          <div
+            className={`flex items-center gap-2 font-semibold uppercase tracking-[0.16em] text-brand ${
+              hasSearch ? 'mb-1 text-xs' : 'mb-3 text-sm'
+            }`}
+          >
             <Search className="h-4 w-4" />
             Archive search
           </div>
-          <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+          <h1
+            className={`font-bold tracking-tight text-foreground ${
+              hasSearch ? 'text-2xl sm:text-3xl' : 'text-4xl sm:text-5xl'
+            }`}
+          >
             Search the archive
           </h1>
-          <p className="mt-3 text-base leading-7 text-muted-foreground sm:text-lg">
+          <p
+            className={`text-muted-foreground ${
+              hasSearch
+                ? 'mt-1 text-sm leading-5'
+                : 'mt-3 text-base leading-7 sm:text-lg'
+            }`}
+          >
             Find public conversations by keyword, author, reply, or date.
           </p>
         </div>
 
         <AdvancedSearchForm />
 
-        <div className="mt-10">
+        <div className={hasSearch ? 'mt-5' : 'mt-10'}>
           {hasSearch ? (
             <TweetList
               key={tweetListKey}
@@ -81,6 +97,7 @@ function SearchPageContent() {
               resultsHeading="Search results"
               resultsDescription={searchDescription}
               collapseLongTweets
+              compact
             />
           ) : (
             <div className="rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center sm:px-10">

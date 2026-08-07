@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { FaExternalLinkAlt } from 'react-icons/fa'
-import { PortalData, PortalTweet, TermWeek } from '@/lib/portal/types'
+import {
+  PortalData,
+  PortalTweet,
+  TermWeek,
+  RESEARCH_SOURCE,
+} from '@/lib/portal/types'
 import { PORTAL_ARTICLES } from './articles'
 import { PORTAL_TOOLS } from './tools'
 import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
@@ -312,30 +317,82 @@ export default function Portal({
               </div>
             </div>
 
-            <div className={CARD}>
-              <PanelHeader
-                title="Field notes"
-                action={{ label: 'All notes', href: '/notes' }}
-              />
-              <div className="flex flex-col">
-                {PORTAL_ARTICLES.map((a) => (
-                  <Link
-                    key={a.id}
-                    href={`/notes?article=${a.id}`}
-                    className="border-b border-zinc-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
-                  >
-                    <div className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-brand">
-                      {a.tag}
-                    </div>
-                    <div
-                      className="text-[15.5px] font-semibold leading-snug"
-                      style={SERIF}
+            <div className="flex flex-col gap-4">
+              <div className={CARD}>
+                <PanelHeader
+                  title="Research"
+                  action={{ label: 'All research', href: '/research' }}
+                />
+                <div className="flex flex-col">
+                  {data.research.slice(0, 3).map((post) => (
+                    <a
+                      key={post.url}
+                      href={post.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
                     >
-                      {a.title}
-                    </div>
-                    <div className={`mt-1 text-[12px] ${MUTED}`}>{a.meta}</div>
-                  </Link>
-                ))}
+                      <div
+                        className="flex items-baseline gap-1.5 text-[15.5px] font-semibold leading-snug"
+                        style={SERIF}
+                      >
+                        {post.title}
+                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
+                      </div>
+                      {post.excerpt && (
+                        <div
+                          className={`mt-1 line-clamp-2 text-[12.5px] leading-normal ${MUTED}`}
+                        >
+                          {post.excerpt}
+                        </div>
+                      )}
+                      <div className={`mt-1 text-[12px] ${MUTED}`}>
+                        {RESEARCH_SOURCE.name}
+                        {post.date &&
+                          ` · ${new Date(post.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                      </div>
+                    </a>
+                  ))}
+                  {data.research.length === 0 && (
+                    <a
+                      href={RESEARCH_SOURCE.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`px-4 py-6 text-center text-[13px] ${MUTED} hover:text-brand`}
+                    >
+                      Read the latest research at {RESEARCH_SOURCE.name} →
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div className={CARD}>
+                <PanelHeader
+                  title="Field notes"
+                  action={{ label: 'All notes', href: '/notes' }}
+                />
+                <div className="flex flex-col">
+                  {PORTAL_ARTICLES.map((a) => (
+                    <Link
+                      key={a.id}
+                      href={`/notes?article=${a.id}`}
+                      className="border-b border-zinc-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
+                    >
+                      <div className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-brand">
+                        {a.tag}
+                      </div>
+                      <div
+                        className="text-[15.5px] font-semibold leading-snug"
+                        style={SERIF}
+                      >
+                        {a.title}
+                      </div>
+                      <div className={`mt-1 text-[12px] ${MUTED}`}>
+                        {a.meta}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

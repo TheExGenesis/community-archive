@@ -41,8 +41,24 @@ export interface PortalTrends {
   computedAt: string
 }
 
+/** Source of the research feed shown on the portal Home and /research. */
+export const RESEARCH_SOURCE = {
+  name: 'epistemic garden',
+  url: 'https://xiqo.substack.com',
+}
+
+export interface ResearchPost {
+  title: string
+  url: string
+  date: string
+  excerpt: string
+  image: string | null
+  author: string | null
+}
+
 export interface PortalData {
   stats: PortalStats
   trends: PortalTrends
   initialStream: PortalTweet[]
+  research: ResearchPost[]
 }

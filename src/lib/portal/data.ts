@@ -10,6 +10,7 @@ import {
   TermSeries,
   TermWeek,
 } from './types'
+import { getResearchPosts } from './research'
 
 const FIRST_TREND_YEAR = 2019
 
@@ -336,9 +337,10 @@ const getCachedInitialStream = unstable_cache(
 
 export async function getPortalData(): Promise<PortalData> {
   const agg = await getDailyAggregates()
-  const [stats, initialStream] = await Promise.all([
+  const [stats, initialStream, research] = await Promise.all([
     getCachedStats(agg.firstYear),
     getCachedInitialStream(),
+    getResearchPosts(),
   ])
-  return { stats, trends: agg.trends, initialStream }
+  return { stats, trends: agg.trends, initialStream, research }
 }

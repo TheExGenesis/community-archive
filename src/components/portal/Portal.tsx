@@ -127,14 +127,12 @@ export default function Portal({
     ticks: 0,
   }))
   const { visible, ticks } = stream
-  const [paused, setPaused] = useState(false)
   const [streamFilter, setStreamFilter] = useState('all')
   const seenIds = useRef<Set<string>>(
     new Set(data.initialStream.map((t) => t.id)),
   )
 
   useEffect(() => {
-    if (paused) return
     const interval = setInterval(
       () => {
         setStream((s) => {
@@ -150,7 +148,7 @@ export default function Portal({
       Math.max(800, 60_000 / STREAM_PER_MIN),
     )
     return () => clearInterval(interval)
-  }, [paused])
+  }, [])
 
   useEffect(() => {
     const poll = setInterval(async () => {
@@ -525,16 +523,11 @@ export default function Portal({
         <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
           <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1.5fr_1fr]">
             <div>
-              <div className="mb-1.5 flex items-center justify-between">
+              <div className="mb-1.5 flex items-baseline gap-3">
                 <h1 className="text-[26px] font-semibold" style={SERIF}>
                   Live stream
                 </h1>
-                <span className="flex items-center gap-3">
-                  <LiveCounter count={liveCount} />
-                  <Chip active={paused} onClick={() => setPaused((p) => !p)}>
-                    {paused ? '▶ Resume' : '❚❚ Pause'}
-                  </Chip>
-                </span>
+                <LiveCounter count={liveCount} />
               </div>
               <div className={`mb-3.5 text-[13px] ${MUTED}`}>
                 Tweets arriving from the browser-extension firehose, as

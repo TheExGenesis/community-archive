@@ -31,7 +31,7 @@ export default function ToolsPage() {
                   src={tool.image}
                   alt={`${tool.name} preview`}
                   loading="lazy"
-                  className="h-36 w-full border-b border-zinc-200 object-cover dark:border-[#26262a]"
+                  className="h-44 w-full border-b border-zinc-200 object-cover dark:border-[#26262a]"
                 />
               )}
               <div className="flex items-start gap-3.5 p-[18px]">

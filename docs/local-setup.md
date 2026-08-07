@@ -23,6 +23,12 @@ ARCHIVE_PATH=<path_to_archive_folder>
 
 Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` can be found in [your Supabase project's API settings](https://app.supabase.com/project/_/settings/api)
 
+PostHog product analytics is optional. Set `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`
+and `NEXT_PUBLIC_POSTHOG_HOST` to enable the manually instrumented events. The
+integration does not send page URLs, search text, archive contents, or email
+addresses. Signed-in events use the account ID and public username; leave either
+variable unset to disable PostHog locally.
+
 1. Install [node](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) and optionally [pnpm](https://pnpm.io/installation#using-npm)
 
 2. Install dependencies

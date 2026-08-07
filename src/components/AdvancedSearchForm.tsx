@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { capturePostHogEvent } from '@/lib/posthog'
 import {
   buildSearchExpression,
   buildSearchParams,
@@ -73,9 +74,13 @@ export default function AdvancedSearchForm() {
     setQuery(newQuery.trim().replace(/\s+/g, ' '))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const params = buildSearchParams(query)
+    capturePostHogEvent('archive_search_submitted', {
+      has_query: Boolean(query.trim()),
+      active_filter_count: activeFilters.length,
+    })
     router.push(params.size > 0 ? `/search?${params.toString()}` : '/search')
   }
 

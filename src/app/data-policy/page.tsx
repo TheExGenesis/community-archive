@@ -99,6 +99,33 @@ export default function DataPolicyPage() {
         </a>
       </p>
 
+      <h2 className="mb-4 mt-8 text-2xl font-semibold">Website Analytics</h2>
+
+      <p className="mb-4">
+        We use PostHog to measure aggregate use of website features. We send
+        only manually defined events with counts, booleans, and mode flags. We
+        do not send page URLs, search text, archive contents, email addresses,
+        or private profile fields to PostHog.
+      </p>
+
+      <p className="mb-4">
+        This analytics integration does not use automatic interaction capture,
+        automatic error capture, session replay, or persistent browser storage.
+        When you are signed in, these events are linked to your Community
+        Archive account ID and public username so we can understand feature use
+        and support account-specific issues. It also respects your
+        browser&apos;s Do Not Track setting. PostHog necessarily receives
+        network metadata to accept an event, but we disable IP geolocation
+        enrichment.
+      </p>
+
+      <p className="mb-4">
+        Analytics records are separate from the public archive. Deleting an
+        archive or opting out of tweet streaming does not automatically delete
+        prior analytics records; contact us below if you want those records
+        removed.
+      </p>
+
       <h2 className="mb-4 mt-8 text-2xl font-semibold">
         Important Considerations
       </h2>

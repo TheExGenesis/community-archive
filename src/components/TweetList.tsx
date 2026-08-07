@@ -19,6 +19,7 @@ interface TweetListProps {
   resultsHeading?: string
   resultsDescription?: string
   collapseLongTweets?: boolean
+  compact?: boolean
 }
 
 const DEFAULT_ITEMS_PER_PAGE = 20
@@ -31,6 +32,7 @@ export default function TweetList({
   resultsHeading,
   resultsDescription,
   collapseLongTweets = false,
+  compact = false,
 }: TweetListProps) {
   const [tweets, setTweets] = useState<TimelineTweet[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -173,7 +175,7 @@ export default function TweetList({
   }))
 
   return (
-    <div className="space-y-8">
+    <div className={compact ? 'space-y-5' : 'space-y-8'}>
       <UnifiedTweetList
         tweets={rawTweets}
         isLoading={isLoading}
@@ -190,6 +192,7 @@ export default function TweetList({
         }
         headerDescription={resultsDescription}
         collapseLongTweets={collapseLongTweets}
+        compact={compact}
       />
 
       {error && tweets.length > 0 && (

@@ -84,7 +84,11 @@ interface TweetComponentProps {
   tweet: TweetData
   className?: string
   collapseLongText?: boolean
+  compact?: boolean
 }
+
+export const compactTweetGridClass =
+  'grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-3 py-3 sm:px-4 md:grid-cols-[minmax(190px,0.95fr)_minmax(300px,2.6fr)_6.5rem_6rem_4.5rem] md:gap-x-4'
 
 // Helper function to decode HTML entities
 const decodeHtmlEntities = (text: string): string => {
@@ -109,6 +113,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
   tweet,
   className = '',
   collapseLongText = false,
+  compact = false,
 }) => {
   const [isTextExpanded, setIsTextExpanded] = React.useState(false)
   // Support both interface formats for backwards compatibility
@@ -124,7 +129,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
 
   const isRetweet = !!tweet.retweeted_tweet_id
   const isQuoteTweet = !!tweet.quote_tweet_id
-  const canCollapseText = collapseLongText && tweet.full_text.length > 700
+  const canCollapseText =
+    collapseLongText && tweet.full_text.length > (compact ? 180 : 700)
 
   // Check if this is a retweet that starts with "RT @username"
   const rtMatch = tweet.full_text.match(/^RT @([A-Za-z0-9_]+):/)
@@ -361,6 +367,176 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (compact) {
+    const mediaCount = tweet.media?.length ?? 0
+    const createdAt = new Date(tweet.created_at)
+    const formattedDate = createdAt.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+
+    return (
+      <div className={`${compactTweetGridClass} ${className}`}>
+        <div
+          role="cell"
+          className="col-span-2 flex min-w-0 items-center gap-2.5 md:col-span-1"
+        >
+          <Avatar className="h-8 w-8 flex-shrink-0">
+            <TweetAvatarImage
+              src={profilePicUrl}
+              alt={`${displayName}'s profile picture`}
+              username={displayUsername}
+              tweetId={tweet.retweeted_tweet_id || tweet.tweet_id}
+            />
+            <AvatarFallback className="text-xs">
+              {displayName?.charAt(0) || displayUsername?.charAt(0) || 'U'}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 leading-tight">
+            <div className="truncate text-sm font-semibold text-foreground">
+              {displayName}
+            </div>
+            <div className="truncate text-xs text-muted-foreground">
+              @{displayUsername}
+            </div>
+            {(isRetweet || isRtFormat) && (
+              <div className="mt-1 flex items-center truncate text-[11px] text-muted-foreground">
+                <FaRetweet className="mr-1 flex-shrink-0" />@{originalUsername}{' '}
+                retweeted
+              </div>
+            )}
+            {replyToUsername && (
+              <div className="mt-1 flex items-center truncate text-[11px] text-muted-foreground">
+                <FaReply className="mr-1 flex-shrink-0" />
+                Replying to @{replyToUsername}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div role="cell" className="col-span-2 min-w-0 md:col-span-1">
+          <p
+            className={`whitespace-pre-wrap break-words text-sm leading-5 text-foreground ${
+              canCollapseText && !isTextExpanded ? 'line-clamp-2' : ''
+            }`}
+          >
+            {formatText(tweet.full_text)}
+          </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            {canCollapseText && (
+              <button
+                type="button"
+                onClick={() => setIsTextExpanded((expanded) => !expanded)}
+                className="text-xs font-medium text-brand hover:underline"
+              >
+                {isTextExpanded ? 'Show less' : 'Show more'}
+              </button>
+            )}
+            {mediaCount > 0 && (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                {mediaCount} {mediaCount === 1 ? 'media item' : 'media items'}
+              </span>
+            )}
+            {isQuoteTweet && (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                Quoted tweet
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div
+          role="cell"
+          className="col-span-2 flex items-center justify-between text-xs text-muted-foreground md:hidden"
+          title={createdAt.toLocaleString()}
+        >
+          <span>{formatDistanceToNow(createdAt, { addSuffix: true })}</span>
+          <span className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1">
+              <FaHeart aria-hidden="true" />
+              {formatNumber(tweet.favorite_count)}
+              <span className="sr-only">likes</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <FaRetweet aria-hidden="true" />
+              {formatNumber(tweet.retweet_count ?? 0)}
+              <span className="sr-only">reposts</span>
+            </span>
+          </span>
+          <span className="flex items-center gap-3 text-muted-foreground">
+            <a
+              href={`/tweets/${tweet.tweet_id}`}
+              className="rounded p-1 transition-colors hover:bg-accent hover:text-foreground"
+              title="Open archived tweet"
+            >
+              <FaExternalLinkAlt className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="sr-only">Open archived tweet</span>
+            </a>
+            <a
+              href={`https://twitter.com/${displayUsername}/status/${tweet.tweet_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded p-1 transition-colors hover:bg-accent hover:text-foreground"
+              title="Open tweet on Twitter"
+            >
+              <FaExternalLinkAlt className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="sr-only">Open tweet on Twitter</span>
+            </a>
+          </span>
+        </div>
+
+        <div
+          role="cell"
+          className="hidden self-center text-xs text-muted-foreground md:block"
+          title={createdAt.toLocaleString()}
+        >
+          {formattedDate}
+        </div>
+
+        <div
+          role="cell"
+          className="hidden items-center gap-3 self-center text-xs text-muted-foreground md:flex"
+        >
+          <span className="inline-flex items-center gap-1">
+            <FaHeart aria-hidden="true" />
+            {formatNumber(tweet.favorite_count)}
+            <span className="sr-only">likes</span>
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <FaRetweet aria-hidden="true" />
+            {formatNumber(tweet.retweet_count ?? 0)}
+            <span className="sr-only">reposts</span>
+          </span>
+        </div>
+
+        <div
+          role="cell"
+          className="hidden items-center justify-end gap-3 self-center text-muted-foreground md:flex"
+        >
+          <a
+            href={`/tweets/${tweet.tweet_id}`}
+            className="rounded p-1 transition-colors hover:bg-accent hover:text-foreground"
+            title="Open archived tweet"
+          >
+            <FaExternalLinkAlt className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="sr-only">Open archived tweet</span>
+          </a>
+          <a
+            href={`https://twitter.com/${displayUsername}/status/${tweet.tweet_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded p-1 transition-colors hover:bg-accent hover:text-foreground"
+            title="Open tweet on Twitter"
+          >
+            <FaExternalLinkAlt className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="sr-only">Open tweet on Twitter</span>
+          </a>
         </div>
       </div>
     )

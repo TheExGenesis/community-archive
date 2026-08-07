@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import TweetComponent from './TweetComponent'
+import TweetComponent, { compactTweetGridClass } from './TweetComponent'
 import { Button } from '@/components/ui/button'
 import { Download, SearchX } from 'lucide-react'
 
@@ -15,6 +15,7 @@ interface UnifiedTweetListProps {
   headerTitle?: string
   headerDescription?: string
   collapseLongTweets?: boolean
+  compact?: boolean
 }
 
 /**
@@ -32,6 +33,7 @@ export default function UnifiedTweetList({
   headerTitle,
   headerDescription,
   collapseLongTweets = false,
+  compact = false,
 }: UnifiedTweetListProps) {
   const handleExportCsv = () => {
     if (tweets.length === 0) {
@@ -107,12 +109,18 @@ export default function UnifiedTweetList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className={compact ? 'space-y-3' : 'space-y-4'}>
       {(headerTitle || headerDescription || showCsvExport) && (
-        <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div
+          className={`flex flex-col gap-3 border-b border-border sm:flex-row sm:items-end sm:justify-between ${
+            compact ? 'pb-3' : 'pb-5'
+          }`}
+        >
           <div>
             {headerTitle && (
-              <h2 className="text-2xl font-semibold text-foreground">
+              <h2
+                className={`${compact ? 'text-lg' : 'text-2xl'} font-semibold text-foreground`}
+              >
                 {headerTitle}
               </h2>
             )}
@@ -136,19 +144,57 @@ export default function UnifiedTweetList({
         </div>
       )}
 
-      <div className={className}>
-        {tweets.map((tweet) => (
-          <div
-            key={tweet.tweet_id}
-            className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/20 sm:p-5"
-          >
-            <TweetComponent
-              tweet={tweet}
-              collapseLongText={collapseLongTweets}
-            />
+      {compact ? (
+        <div
+          role="table"
+          aria-label={headerTitle || 'Tweets'}
+          className="overflow-hidden rounded-lg border border-border bg-card"
+        >
+          <div role="rowgroup" className="hidden bg-muted/60 md:block">
+            <div
+              role="row"
+              className={`${compactTweetGridClass} py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground`}
+            >
+              <div role="columnheader">Author</div>
+              <div role="columnheader">Tweet</div>
+              <div role="columnheader">Date</div>
+              <div role="columnheader">Engagement</div>
+              <div role="columnheader" className="text-right">
+                Links
+              </div>
+            </div>
           </div>
-        ))}
-      </div>
+          <div role="rowgroup" className="divide-y divide-border">
+            {tweets.map((tweet) => (
+              <div
+                key={tweet.tweet_id}
+                role="row"
+                className="hover:bg-muted/35 transition-colors"
+              >
+                <TweetComponent
+                  tweet={tweet}
+                  collapseLongText={collapseLongTweets}
+                  compact
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className={className}>
+          {tweets.map((tweet) => (
+            <div
+              key={tweet.tweet_id}
+              className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/20 sm:p-5"
+            >
+              <TweetComponent
+                tweet={tweet}
+                collapseLongText={collapseLongTweets}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -98,15 +98,9 @@ export default async function RootLayout({
                   <HeaderNavigation items={primaryNav} />
                 </div>
                 <div className="flex flex-shrink-0 items-center space-x-3">
-                  {utilityNav.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className="hidden rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:inline-block"
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
+                  {utilityNav.length > 0 && (
+                    <HeaderNavigation items={utilityNav} />
+                  )}
                   <HeaderSearch />
                   <div className="text-sm">
                     <DynamicSignIn />

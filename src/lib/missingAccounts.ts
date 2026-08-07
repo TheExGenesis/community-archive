@@ -18,7 +18,7 @@ export type MissingAccountsResponse = {
   }
   query: {
     limit: number
-    countMode: 'unique_referencing_tweets'
+    countMode: 'unique_reply_tweets'
     includesMentions: boolean
     includesReplies: boolean
   }

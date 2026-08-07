@@ -208,24 +208,24 @@ export default function Portal({ data }: { data: PortalData }) {
 
   return (
     <div className="min-h-screen">
-      {/* Mobile: horizontal tabs under the top nav */}
-      <div className="sticky top-16 z-40 border-b border-zinc-200 bg-background/90 backdrop-blur-md dark:border-[#26262a] lg:hidden">
-        <div className="flex h-12 items-center gap-5 px-4 sm:px-6">
-          <div className="flex flex-1 gap-0.5 overflow-x-auto">
+      {/* Secondary navigation: underline tabs beneath the top nav */}
+      <div className="sticky top-16 z-40 border-b border-zinc-200 bg-background/95 backdrop-blur-md dark:border-[#26262a]">
+        <div className="flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <nav className="flex gap-1 overflow-x-auto">
             {NAV.map(([id, label]) => (
               <button
                 key={id}
                 onClick={() => go(id)}
-                className={`whitespace-nowrap rounded px-3 py-[7px] text-[13px] transition-colors ${
+                className={`-mb-px whitespace-nowrap border-b-2 px-3 pb-[11px] pt-[13px] text-[13px] transition-colors ${
                   view === id
-                    ? 'bg-zinc-200/70 font-bold text-foreground dark:bg-[#26262a]'
-                    : `font-semibold ${MUTED} hover:text-foreground`
+                    ? 'border-brand font-bold text-foreground'
+                    : `border-transparent font-semibold ${MUTED} hover:border-zinc-300 hover:text-foreground dark:hover:border-[#3f3f46]`
                 }`}
               >
                 {label}
               </button>
             ))}
-          </div>
+          </nav>
           <div
             className={`hidden flex-shrink-0 items-center gap-[7px] text-[12px] sm:flex ${MUTED}`}
           >
@@ -235,306 +235,275 @@ export default function Portal({ data }: { data: PortalData }) {
         </div>
       </div>
 
-      <div className="flex">
-        {/* Desktop: left panel */}
-        <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-52 flex-shrink-0 flex-col justify-between border-r border-zinc-200 dark:border-[#26262a] lg:flex">
-          <nav className="flex flex-col gap-0.5 p-3">
-            {NAV.map(([id, label]) => (
-              <button
-                key={id}
-                onClick={() => go(id)}
-                className={`w-full rounded px-3 py-2 text-left text-[13px] transition-colors ${
-                  view === id
-                    ? 'bg-zinc-200/70 font-bold text-foreground dark:bg-[#26262a]'
-                    : `font-semibold ${MUTED} hover:bg-zinc-100 hover:text-foreground dark:hover:bg-[#1b1b1e]`
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
-          <div className="border-t border-zinc-200 p-4 dark:border-[#26262a]">
-            <div className={`flex items-center gap-[7px] text-[12px] ${MUTED}`}>
-              <span className="h-[7px] w-[7px] flex-shrink-0 animate-pulse rounded-full bg-[#2acf80]" />
-              <span className="tabular-nums">{liveCount} tweets</span>
+      <main>
+        {/* ------------------------------------------------ Overview ------ */}
+        {view === 'overview' && (
+          <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
+            <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-2">
+              <h1 className="text-[26px] font-semibold" style={SERIF}>
+                The archive today
+              </h1>
+              <span className={`text-[12.5px] ${MUTED}`}>{generatedDate}</span>
+            </div>
+
+            <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                label="Tweets archived"
+                value={stats.totalTweets.toLocaleString('en-US')}
+                note={`+${stats.streamedToday.toLocaleString('en-US')} streamed today`}
+                noteClass="text-[#16a34a] dark:text-[#2acf80]"
+              />
+              <StatCard
+                label="Contributing accounts"
+                value={stats.accountCount.toLocaleString('en-US')}
+                note={
+                  stats.joinedThisWeek > 0
+                    ? `${stats.joinedThisWeek} upload${stats.joinedThisWeek === 1 ? '' : 's'} this week`
+                    : 'volunteered archives'
+                }
+              />
+              <StatCard
+                label="Liked tweets"
+                value={compact(stats.totalLikes)}
+                note="across the corpus"
+              />
+              <StatCard
+                label="Corpus span"
+                value={`${stats.firstYear}–${stats.currentYear}`}
+                note={`${stats.currentYear - stats.firstYear} years of discourse`}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.45fr_1fr]">
+              <div className="flex flex-col gap-4">
+                <div className={CARD}>
+                  <PanelHeader
+                    title="Live stream"
+                    live
+                    action={{
+                      label: 'Open firehose',
+                      onClick: () => go('stream'),
+                    }}
+                  />
+                  <div className="flex flex-col">
+                    {visible.slice(0, 5).map((t, i) => (
+                      <TweetRow
+                        key={t.id}
+                        tweet={t}
+                        compact
+                        animate={i === 0}
+                      />
+                    ))}
+                    {visible.length === 0 && (
+                      <div
+                        className={`px-4 py-8 text-center text-[13px] ${MUTED}`}
+                      >
+                        Waiting for the firehose…
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className={CARD}>
+                  <PanelHeader
+                    title="Trending terms · 7 days"
+                    action={{
+                      label: 'Trends explorer',
+                      onClick: () => go('trends'),
+                    }}
+                  />
+                  <div className="flex flex-col px-4 pb-3 pt-2">
+                    {weeklyBars.map((b) => (
+                      <div
+                        key={b.term}
+                        className="flex items-center gap-3 py-[5px]"
+                      >
+                        <span className="w-[130px] truncate text-[13px] font-semibold">
+                          {b.term}
+                        </span>
+                        <div className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]">
+                          <div
+                            className={`h-full rounded ${
+                              (b.deltaPct ?? 0) >= 0
+                                ? 'bg-brand'
+                                : 'bg-zinc-400 dark:bg-[#52525c]'
+                            }`}
+                            style={{
+                              width: `${(b.last7 / maxWeekly) * 100}%`,
+                            }}
+                          />
+                        </div>
+                        <span
+                          className={`w-[52px] text-right text-[12px] font-bold tabular-nums ${
+                            (b.deltaPct ?? 0) >= 0
+                              ? 'text-[#16a34a] dark:text-[#2acf80]'
+                              : 'text-[#dc2626] dark:text-[#f87171]'
+                          }`}
+                        >
+                          {fmtDelta(b.deltaPct)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                <div className={`${CARD} p-4`}>
+                  <div className="mb-2.5 flex items-center justify-between">
+                    <span className="text-[13px] font-bold">
+                      Memetic weather
+                    </span>
+                    <button
+                      onClick={() => go('weather')}
+                      className="text-[12.5px] font-semibold text-brand hover:underline"
+                    >
+                      Full report →
+                    </button>
+                  </div>
+                  <div
+                    className="mb-2 text-[18px] font-semibold leading-snug"
+                    style={SERIF}
+                  >
+                    {weather.headline}
+                  </div>
+                  <div className={`text-[13px] leading-relaxed ${MUTED}`}>
+                    {weather.summary}
+                  </div>
+                  <div className="mt-3.5 grid grid-cols-2 gap-2">
+                    {weather.gauges.map((g) => (
+                      <div
+                        key={g.key}
+                        className="rounded border border-zinc-200 bg-zinc-50 px-2.5 py-2 dark:border-[#26262a] dark:bg-[#121214]"
+                      >
+                        <div
+                          className={`text-[10.5px] font-bold uppercase tracking-wider ${MUTED}`}
+                        >
+                          {g.label}
+                        </div>
+                        <div className="mt-0.5 flex items-baseline gap-1.5">
+                          <span className="text-[17px] font-extrabold tabular-nums">
+                            {g.value}
+                          </span>
+                          <span
+                            className="text-[10.5px] font-extrabold uppercase tracking-wide"
+                            style={{ color: g.color }}
+                          >
+                            {g.tag}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={CARD}>
+                  <PanelHeader title="Field notes" />
+                  <div className="flex flex-col">
+                    {PORTAL_ARTICLES.slice(0, 3).map((a) => (
+                      <button
+                        key={a.id}
+                        onClick={() => {
+                          setView('notes')
+                          setArticleId(a.id)
+                          window.scrollTo({ top: 0 })
+                        }}
+                        className="border-b border-zinc-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
+                      >
+                        <div className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-brand">
+                          {a.tag}
+                        </div>
+                        <div
+                          className="text-[15.5px] font-semibold leading-snug"
+                          style={SERIF}
+                        >
+                          {a.title}
+                        </div>
+                        <div className={`mt-1 text-[12px] ${MUTED}`}>
+                          {a.meta}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </aside>
+        )}
 
-        {/* Main workspace */}
-        <main className="min-w-0 flex-1">
-          {/* ------------------------------------------------ Overview ------ */}
-          {view === 'overview' && (
-            <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
-              <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-2">
-                <h1 className="text-[26px] font-semibold" style={SERIF}>
-                  The archive today
-                </h1>
-                <span className={`text-[12.5px] ${MUTED}`}>
-                  {generatedDate}
-                </span>
-              </div>
-
-              <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard
-                  label="Tweets archived"
-                  value={stats.totalTweets.toLocaleString('en-US')}
-                  note={`+${stats.streamedToday.toLocaleString('en-US')} streamed today`}
-                  noteClass="text-[#16a34a] dark:text-[#2acf80]"
-                />
-                <StatCard
-                  label="Contributing accounts"
-                  value={stats.accountCount.toLocaleString('en-US')}
-                  note={
-                    stats.joinedThisWeek > 0
-                      ? `${stats.joinedThisWeek} upload${stats.joinedThisWeek === 1 ? '' : 's'} this week`
-                      : 'volunteered archives'
-                  }
-                />
-                <StatCard
-                  label="Liked tweets"
-                  value={compact(stats.totalLikes)}
-                  note="across the corpus"
-                />
-                <StatCard
-                  label="Corpus span"
-                  value={`${stats.firstYear}–${stats.currentYear}`}
-                  note={`${stats.currentYear - stats.firstYear} years of discourse`}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.45fr_1fr]">
-                <div className="flex flex-col gap-4">
-                  <div className={CARD}>
-                    <PanelHeader
-                      title="Live stream"
-                      live
-                      action={{
-                        label: 'Open firehose',
-                        onClick: () => go('stream'),
-                      }}
-                    />
-                    <div className="flex flex-col">
-                      {visible.slice(0, 5).map((t, i) => (
-                        <TweetRow
-                          key={t.id}
-                          tweet={t}
-                          compact
-                          animate={i === 0}
-                        />
-                      ))}
-                      {visible.length === 0 && (
-                        <div
-                          className={`px-4 py-8 text-center text-[13px] ${MUTED}`}
-                        >
-                          Waiting for the firehose…
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className={CARD}>
-                    <PanelHeader
-                      title="Trending terms · 7 days"
-                      action={{
-                        label: 'Trends explorer',
-                        onClick: () => go('trends'),
-                      }}
-                    />
-                    <div className="flex flex-col px-4 pb-3 pt-2">
-                      {weeklyBars.map((b) => (
-                        <div
-                          key={b.term}
-                          className="flex items-center gap-3 py-[5px]"
-                        >
-                          <span className="w-[130px] truncate text-[13px] font-semibold">
-                            {b.term}
-                          </span>
-                          <div className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]">
-                            <div
-                              className={`h-full rounded ${
-                                (b.deltaPct ?? 0) >= 0
-                                  ? 'bg-brand'
-                                  : 'bg-zinc-400 dark:bg-[#52525c]'
-                              }`}
-                              style={{
-                                width: `${(b.last7 / maxWeekly) * 100}%`,
-                              }}
-                            />
-                          </div>
-                          <span
-                            className={`w-[52px] text-right text-[12px] font-bold tabular-nums ${
-                              (b.deltaPct ?? 0) >= 0
-                                ? 'text-[#16a34a] dark:text-[#2acf80]'
-                                : 'text-[#dc2626] dark:text-[#f87171]'
-                            }`}
-                          >
-                            {fmtDelta(b.deltaPct)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-4">
-                  <div className={`${CARD} p-4`}>
-                    <div className="mb-2.5 flex items-center justify-between">
-                      <span className="text-[13px] font-bold">
-                        Memetic weather
-                      </span>
-                      <button
-                        onClick={() => go('weather')}
-                        className="text-[12.5px] font-semibold text-brand hover:underline"
-                      >
-                        Full report →
-                      </button>
-                    </div>
-                    <div
-                      className="mb-2 text-[18px] font-semibold leading-snug"
-                      style={SERIF}
-                    >
-                      {weather.headline}
-                    </div>
-                    <div className={`text-[13px] leading-relaxed ${MUTED}`}>
-                      {weather.summary}
-                    </div>
-                    <div className="mt-3.5 grid grid-cols-2 gap-2">
-                      {weather.gauges.map((g) => (
-                        <div
-                          key={g.key}
-                          className="rounded border border-zinc-200 bg-zinc-50 px-2.5 py-2 dark:border-[#26262a] dark:bg-[#121214]"
-                        >
-                          <div
-                            className={`text-[10.5px] font-bold uppercase tracking-wider ${MUTED}`}
-                          >
-                            {g.label}
-                          </div>
-                          <div className="mt-0.5 flex items-baseline gap-1.5">
-                            <span className="text-[17px] font-extrabold tabular-nums">
-                              {g.value}
-                            </span>
-                            <span
-                              className="text-[10.5px] font-extrabold uppercase tracking-wide"
-                              style={{ color: g.color }}
-                            >
-                              {g.tag}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className={CARD}>
-                    <PanelHeader title="Field notes" />
-                    <div className="flex flex-col">
-                      {PORTAL_ARTICLES.slice(0, 3).map((a) => (
-                        <button
-                          key={a.id}
-                          onClick={() => {
-                            setView('notes')
-                            setArticleId(a.id)
-                            window.scrollTo({ top: 0 })
-                          }}
-                          className="border-b border-zinc-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
-                        >
-                          <div className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-brand">
-                            {a.tag}
-                          </div>
-                          <div
-                            className="text-[15.5px] font-semibold leading-snug"
-                            style={SERIF}
-                          >
-                            {a.title}
-                          </div>
-                          <div className={`mt-1 text-[12px] ${MUTED}`}>
-                            {a.meta}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
+        {/* ------------------------------------------------ Stream -------- */}
+        {view === 'stream' && (
+          <div className="mx-auto max-w-[820px] px-4 py-6 sm:px-6">
+            <div className="mb-1.5 flex items-center justify-between">
+              <h1 className="text-[26px] font-semibold" style={SERIF}>
+                Live stream
+              </h1>
+              <Chip active={paused} onClick={() => setPaused((p) => !p)}>
+                {paused ? '▶ Resume' : '❚❚ Pause'}
+              </Chip>
             </div>
-          )}
-
-          {/* ------------------------------------------------ Stream -------- */}
-          {view === 'stream' && (
-            <div className="mx-auto max-w-[820px] px-4 py-6 sm:px-6">
-              <div className="mb-1.5 flex items-center justify-between">
-                <h1 className="text-[26px] font-semibold" style={SERIF}>
-                  Live stream
-                </h1>
-                <Chip active={paused} onClick={() => setPaused((p) => !p)}>
-                  {paused ? '▶ Resume' : '❚❚ Pause'}
+            <div className={`mb-3.5 text-[13px] ${MUTED}`}>
+              Tweets arriving from the browser-extension firehose, as
+              contributors read their timelines.
+            </div>
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              {[
+                'all',
+                ...Array.from(new Set(visible.map((t) => t.username))).slice(
+                  0,
+                  5,
+                ),
+              ].map((h) => (
+                <Chip
+                  key={h}
+                  active={streamFilter === h}
+                  onClick={() => setStreamFilter(h)}
+                >
+                  {h === 'all' ? 'All accounts' : `@${h}`}
                 </Chip>
-              </div>
-              <div className={`mb-3.5 text-[13px] ${MUTED}`}>
-                Tweets arriving from the browser-extension firehose, as
-                contributors read their timelines.
-              </div>
-              <div className="mb-4 flex flex-wrap gap-1.5">
-                {[
-                  'all',
-                  ...Array.from(new Set(visible.map((t) => t.username))).slice(
-                    0,
-                    5,
-                  ),
-                ].map((h) => (
-                  <Chip
-                    key={h}
-                    active={streamFilter === h}
-                    onClick={() => setStreamFilter(h)}
-                  >
-                    {h === 'all' ? 'All accounts' : `@${h}`}
-                  </Chip>
-                ))}
-              </div>
-              <div className={`${CARD} overflow-hidden`}>
-                {visible
-                  .filter(
-                    (t) =>
-                      streamFilter === 'all' || t.username === streamFilter,
-                  )
-                  .slice(0, 14)
-                  .map((t, i) => (
-                    <TweetRow
-                      key={t.id}
-                      tweet={t}
-                      animate={streamFilter === 'all' && i === 0}
-                      showArchivedBadge
-                    />
-                  ))}
-              </div>
+              ))}
             </div>
-          )}
+            <div className={`${CARD} overflow-hidden`}>
+              {visible
+                .filter(
+                  (t) => streamFilter === 'all' || t.username === streamFilter,
+                )
+                .slice(0, 14)
+                .map((t, i) => (
+                  <TweetRow
+                    key={t.id}
+                    tweet={t}
+                    animate={streamFilter === 'all' && i === 0}
+                    showArchivedBadge
+                  />
+                ))}
+            </div>
+          </div>
+        )}
 
-          {/* ------------------------------------------------ Search -------- */}
-          {view === 'search' && <SearchView totalTweets={stats.totalTweets} />}
+        {/* ------------------------------------------------ Search -------- */}
+        {view === 'search' && <SearchView totalTweets={stats.totalTweets} />}
 
-          {/* ------------------------------------------------ Trends -------- */}
-          {view === 'trends' && (
-            <TrendsView trends={trends} risers={risers} fallers={fallers} />
-          )}
+        {/* ------------------------------------------------ Trends -------- */}
+        {view === 'trends' && (
+          <TrendsView trends={trends} risers={risers} fallers={fallers} />
+        )}
 
-          {/* ------------------------------------------------ Weather ------- */}
-          {view === 'weather' && <WeatherView data={data} />}
+        {/* ------------------------------------------------ Weather ------- */}
+        {view === 'weather' && <WeatherView data={data} />}
 
-          {/* ------------------------------------------------ Notes --------- */}
-          {view === 'notes' && (
-            <NotesView
-              articleId={articleId}
-              openArticle={(id) => {
-                setArticleId(id)
-                window.scrollTo({ top: 0 })
-              }}
-              close={() => setArticleId(null)}
-            />
-          )}
-        </main>
-      </div>
+        {/* ------------------------------------------------ Notes --------- */}
+        {view === 'notes' && (
+          <NotesView
+            articleId={articleId}
+            openArticle={(id) => {
+              setArticleId(id)
+              window.scrollTo({ top: 0 })
+            }}
+            close={() => setArticleId(null)}
+          />
+        )}
+      </main>
     </div>
   )
 }

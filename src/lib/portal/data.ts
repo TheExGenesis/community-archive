@@ -105,12 +105,15 @@ async function runBatched<T>(
 ): Promise<T[]> {
   const results: T[] = new Array(jobs.length)
   let next = 0
-  const workers = Array.from({ length: Math.min(concurrency, jobs.length) }, async () => {
-    while (next < jobs.length) {
-      const i = next++
-      results[i] = await jobs[i]()
-    }
-  })
+  const workers = Array.from(
+    { length: Math.min(concurrency, jobs.length) },
+    async () => {
+      while (next < jobs.length) {
+        const i = next++
+        results[i] = await jobs[i]()
+      }
+    },
+  )
   await Promise.all(workers)
   return results
 }
@@ -135,24 +138,26 @@ async function computeDailyAggregates(): Promise<DailyAggregates> {
 
   // Yearly totals (planned counts: fast, accurate enough for normalization).
   const yearlyTotals = await runBatched(
-    years.map((y) => () =>
-      countTweets(supabase, {
-        from: `${y}-01-01`,
-        to: `${y + 1}-01-01`,
-        countMode: 'planned',
-      }),
+    years.map(
+      (y) => () =>
+        countTweets(supabase, {
+          from: `${y}-01-01`,
+          to: `${y + 1}-01-01`,
+          countMode: 'planned',
+        }),
     ),
   )
 
   // Per-term yearly counts, normalized per 100k tweets.
   const seriesCounts = await runBatched(
     CHART_TERMS.flatMap(({ term }) =>
-      years.map((y) => () =>
-        countTweets(supabase, {
-          term,
-          from: `${y}-01-01`,
-          to: `${y + 1}-01-01`,
-        }),
+      years.map(
+        (y) => () =>
+          countTweets(supabase, {
+            term,
+            from: `${y}-01-01`,
+            to: `${y + 1}-01-01`,
+          }),
       ),
     ),
   )
@@ -186,18 +191,22 @@ async function computeDailyAggregates(): Promise<DailyAggregates> {
   })
 
   // Weather instrument inputs.
-  const [last7Total, ironyCount, canonCount, ...dailyStream] = await runBatched([
-    () => countTweets(supabase, { from: from7 }),
-    () => countTweets(supabase, { term: 'lol', from: from7 }),
-    () => countTweets(supabase, { from: from7, minFavorites: 100 }),
-    ...Array.from({ length: 14 }, (_, i) => () =>
-      countTweets(supabase, {
-        from: isoDaysAgo(i + 1).slice(0, 10),
-        to: isoDaysAgo(i).slice(0, 10),
-        streamedOnly: true,
-      }),
-    ),
-  ])
+  const [last7Total, ironyCount, canonCount, ...dailyStream] = await runBatched(
+    [
+      () => countTweets(supabase, { from: from7 }),
+      () => countTweets(supabase, { term: 'lol', from: from7 }),
+      () => countTweets(supabase, { from: from7, minFavorites: 100 }),
+      ...Array.from(
+        { length: 14 },
+        (_, i) => () =>
+          countTweets(supabase, {
+            from: isoDaysAgo(i + 1).slice(0, 10),
+            to: isoDaysAgo(i).slice(0, 10),
+            streamedOnly: true,
+          }),
+      ),
+    ],
+  )
   const safeTotal = Math.max(last7Total, 1)
 
   // First year with a meaningful number of tweets (skip junk timestamps).
@@ -318,7 +327,9 @@ function deriveWeather(
         : ['Slow', '#a7a7b4']
 
   const fmtDelta = (d: number | null | undefined) =>
-    d === null || d === undefined ? '±0%' : `${d >= 0 ? '+' : '−'}${Math.abs(d)}%`
+    d === null || d === undefined
+      ? '±0%'
+      : `${d >= 0 ? '+' : '−'}${Math.abs(d)}%`
 
   const gauges = [
     {
@@ -410,18 +421,28 @@ function deriveWeather(
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   const conditions: [string, (t: string) => string][] = [
     ['⛈', (t) => `Heavy ${t} discourse; QT swells likely`],
-    ['🌧', () => `Discourse pressure easing; scattered sincerity in the morning`],
-    ['🌫', (t) => `${t[0].toUpperCase() + t.slice(1)} front makes landfall; visibility on object-level claims poor`],
+    [
+      '🌧',
+      () => `Discourse pressure easing; scattered sincerity in the morning`,
+    ],
+    [
+      '🌫',
+      (t) =>
+        `${t[0].toUpperCase() + t.slice(1)} front makes landfall; visibility on object-level claims poor`,
+    ],
     ['⛅', () => `Clearing; conditions favorable for longform and field notes`],
     ['☀', () => `Quiet timeline; good day to upload an archive`],
   ]
   const rand = daySeeded(3)
   const outlook = Array.from({ length: 5 }, (_, i) => {
     const date = new Date(Date.now() + (i + 1) * 86400_000)
-    const bias = i === 0 && pressure >= 55 ? 0 : Math.floor(rand() * conditions.length)
+    const bias =
+      i === 0 && pressure >= 55 ? 0 : Math.floor(rand() * conditions.length)
     const [icon, textFn] = conditions[bias]
     const term =
-      (i % 2 === 0 ? topTerm?.term : topRiser?.term) ?? topTerm?.term ?? 'ambient'
+      (i % 2 === 0 ? topTerm?.term : topRiser?.term) ??
+      topTerm?.term ??
+      'ambient'
     return { day: days[date.getUTCDay()], icon, text: textFn(term) }
   })
 
@@ -557,11 +578,24 @@ async function getPortalStats(
   }
 }
 
+// The homepage renders dynamically (auth cookies), so cache the lighter
+// queries here: stats for 5 minutes, the initial stream for 1 minute.
+const getCachedStats = unstable_cache(
+  (firstYear: number) => getPortalStats(firstYear),
+  ['portal-stats-v1'],
+  { revalidate: 300 },
+)
+const getCachedInitialStream = unstable_cache(
+  () => getPortalStream(30),
+  ['portal-initial-stream-v1'],
+  { revalidate: 60 },
+)
+
 export async function getPortalData(): Promise<PortalData> {
   const agg = await getDailyAggregates()
   const [statsWithWindow, initialStream] = await Promise.all([
-    getPortalStats(agg.firstYear),
-    getPortalStream(30),
+    getCachedStats(agg.firstYear),
+    getCachedInitialStream(),
   ])
   const { streamedLast24h, ...stats } = statsWithWindow
   const weather = deriveWeather(agg, stats.streamedToday, streamedLast24h)

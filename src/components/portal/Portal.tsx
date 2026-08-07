@@ -200,6 +200,9 @@ export default function Portal({
     [withDelta],
   )
 
+  const atlas = PORTAL_TOOLS.find((t) => t.name === 'Strand Atlas')
+  const bangers = PORTAL_TOOLS.find((t) => t.name === 'Bangers')
+
   const generatedDate = useMemo(() => {
     const d = new Date(stats.generatedAt)
     return `${d.toLocaleDateString('en-GB', {
@@ -294,11 +297,7 @@ export default function Portal({
                       </span>
                       <div className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]">
                         <div
-                          className={`h-full rounded ${
-                            (b.deltaPct ?? 0) >= 0
-                              ? 'bg-brand'
-                              : 'bg-zinc-400 dark:bg-[#52525c]'
-                          }`}
+                          className="h-full rounded bg-brand"
                           style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
                         />
                       </div>
@@ -318,6 +317,38 @@ export default function Portal({
             </div>
 
             <div className="flex flex-col gap-4">
+              {atlas && (
+                <a
+                  href={atlas.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${CARD} group overflow-hidden transition-colors hover:border-brand/60`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={atlas.image}
+                    alt={`${atlas.name} preview`}
+                    loading="lazy"
+                    className="aspect-[3/1] w-full border-b border-zinc-200 object-cover dark:border-[#26262a]"
+                  />
+                  <div className="flex items-start gap-2.5 px-4 py-3">
+                    <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
+                      {atlas.icon}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-[13.5px] font-bold">
+                        {atlas.name}
+                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
+                      </span>
+                      <span
+                        className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
+                      >
+                        {atlas.description}
+                      </span>
+                    </span>
+                  </div>
+                </a>
+              )}
               <div className={CARD}>
                 <PanelHeader
                   title="Research"
@@ -415,41 +446,39 @@ export default function Portal({
               action={{ label: 'All tools', href: '/tools' }}
               divider={false}
             />
-            <div className="grid grid-cols-1 gap-2.5 px-4 pt-1 sm:grid-cols-2">
-              {PORTAL_TOOLS.filter((t) => t.image).map((tool) => (
+            {bangers && (
+              <div className="px-4 pt-1">
                 <a
-                  key={tool.name}
-                  href={tool.link}
+                  href={bangers.link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group overflow-hidden rounded-[4px] border border-zinc-200 bg-zinc-50 transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#121214]"
+                  className="group flex overflow-hidden rounded-[4px] border border-zinc-200 bg-zinc-50 transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#121214]"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={tool.image}
-                    alt={`${tool.name} preview`}
+                    src={bangers.image}
+                    alt={`${bangers.name} preview`}
                     loading="lazy"
-                    className="aspect-[4/3] w-full border-b border-zinc-200 object-cover dark:border-[#26262a]"
+                    className="h-28 w-44 flex-shrink-0 border-r border-zinc-200 object-cover dark:border-[#26262a] sm:w-64"
                   />
-                  <div className="flex items-start gap-2.5 px-3 py-2.5">
-                    <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
-                      {tool.icon}
+                  <div className="flex min-w-0 flex-col justify-center gap-1 px-4 py-3">
+                    <span className="flex items-center gap-1.5 text-[13.5px] font-bold">
+                      <span className="text-[15px] text-brand">
+                        {bangers.icon}
+                      </span>
+                      {bangers.name}
+                      <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
                     </span>
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-[13px] font-bold">
-                        {tool.name}
-                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
-                      </span>
-                      <span
-                        className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
-                      >
-                        {tool.description}
-                      </span>
+                    <span className={`text-[12.5px] leading-snug ${MUTED}`}>
+                      {bangers.description}
+                    </span>
+                    <span className="text-[12.5px] font-semibold text-brand">
+                      Open Bangers →
                     </span>
                   </div>
                 </a>
-              ))}
-            </div>
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 lg:grid-cols-4">
               {PORTAL_TOOLS.filter((t) => !t.image).map((tool) => (
                 <a

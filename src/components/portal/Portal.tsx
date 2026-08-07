@@ -523,7 +523,7 @@ export default function Portal({
       {/* ------------------------------------------------ Stream -------- */}
       {view === 'stream' && (
         <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
-          <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[1.5fr_1fr]">
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1.5fr_1fr]">
             <div>
               <div className="mb-1.5 flex items-center justify-between">
                 <h1 className="text-[26px] font-semibold" style={SERIF}>
@@ -648,33 +648,9 @@ function TrendsView({
 
   return (
     <div>
-      <h2 className="mb-1.5 text-[26px] font-semibold" style={SERIF}>
+      <h2 className="mb-3 text-[18px] font-semibold" style={SERIF}>
         Trends in ideas
       </h2>
-      <div className={`mb-4 text-[13px] ${MUTED}`}>
-        Term frequency per 100k tweets, {trends.years[0]}–
-        {trends.years[trends.years.length - 1]}. An ngram viewer for the
-        vocabulary of one corner of the internet. Recomputed daily from the full
-        corpus.
-      </div>
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {trends.series.map((s) => (
-          <Chip
-            key={s.term}
-            active={!!enabled[s.term]}
-            onClick={() => setEnabled((e) => ({ ...e, [s.term]: !e[s.term] }))}
-          >
-            <span
-              className="h-[9px] w-[9px] rounded-full"
-              style={{
-                background: s.color,
-                opacity: enabled[s.term] ? 1 : 0.35,
-              }}
-            />
-            {s.term}
-          </Chip>
-        ))}
-      </div>
       <div className={`${CARD} mb-4 p-4`}>
         <svg viewBox={`0 0 ${W} ${H}`} className="block w-full">
           {gridVals.map((v) => (
@@ -724,6 +700,30 @@ function TrendsView({
             />
           ))}
         </svg>
+      </div>
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {trends.series.map((s) => (
+          <Chip
+            key={s.term}
+            active={!!enabled[s.term]}
+            onClick={() => setEnabled((e) => ({ ...e, [s.term]: !e[s.term] }))}
+          >
+            <span
+              className="h-[9px] w-[9px] rounded-full"
+              style={{
+                background: s.color,
+                opacity: enabled[s.term] ? 1 : 0.35,
+              }}
+            />
+            {s.term}
+          </Chip>
+        ))}
+      </div>
+      <div className={`mb-4 text-[13px] leading-normal ${BODY}`}>
+        Term frequency per 100k tweets, {trends.years[0]}–
+        {trends.years[trends.years.length - 1]}. An ngram viewer for the
+        vocabulary of one corner of the internet. Recomputed daily from the full
+        corpus.
       </div>
       <div className="grid grid-cols-1 gap-4">
         <DeltaPanel title="Rising this week" items={risers} positive />

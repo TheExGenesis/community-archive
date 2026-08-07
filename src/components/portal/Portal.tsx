@@ -372,7 +372,7 @@ export default function Portal({
                   action={{ label: 'All notes', href: '/notes' }}
                 />
                 <div className="flex flex-col">
-                  {PORTAL_ARTICLES.map((a) => (
+                  {PORTAL_ARTICLES.slice(0, 3).map((a) => (
                     <Link
                       key={a.id}
                       href={`/notes?article=${a.id}`}

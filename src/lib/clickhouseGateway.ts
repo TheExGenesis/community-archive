@@ -12,10 +12,13 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
   ]),
   'word-trend': new Set(['q', 'bucket', 'match', 'from', 'to']),
   'stream-stats': new Set(['start', 'end', 'granularity', 'scope']),
+  'recent-bangers': new Set(['limit', 'hours']),
   'missing-accounts': new Set(['limit']),
   'top-quotes': new Set([
     'limit',
     'exclude_self',
+    'target_ca_users_only',
+    'quote_ca_users_only',
     'include_usernames',
     'exclude_usernames',
   ]),
@@ -34,10 +37,19 @@ export function clickHouseSearchGatewayBaseUrl(
   return searchUrl || analyticsUrl
 }
 
+export function clickHouseAnalyticsGatewayBaseUrl(
+  analyticsUrl = process.env.CLICKHOUSE_ANALYTICS_API_URL,
+  searchUrl = process.env.CLICKHOUSE_SEARCH_API_URL,
+): string | undefined {
+  if (analyticsUrl) return analyticsUrl
+  if (!searchUrl) return undefined
+  return `${searchUrl.replace(/\/$/, '')}/analytics`
+}
+
 export function analyticsGatewayRequestUrl(
   path: string[],
   incomingSearchParams: URLSearchParams,
-  baseUrl = process.env.CLICKHOUSE_ANALYTICS_API_URL,
+  baseUrl = clickHouseAnalyticsGatewayBaseUrl(),
 ): URL {
   if (!baseUrl)
     throw new Error('CLICKHOUSE_ANALYTICS_API_URL is not configured')
@@ -90,7 +102,11 @@ export async function fetchAnalyticsGatewayJson<T>(
   if (!token)
     throw new Error('CLICKHOUSE_ANALYTICS_API_TOKEN is not configured')
 
-  const target = analyticsGatewayRequestUrl(path, searchParams, options.baseUrl)
+  const target = analyticsGatewayRequestUrl(
+    path,
+    searchParams,
+    options.baseUrl ?? clickHouseAnalyticsGatewayBaseUrl(),
+  )
   const fetchImpl = options.fetchImpl ?? fetch
   const init: NextFetchInit = {
     headers: { Authorization: `Bearer ${token}` },

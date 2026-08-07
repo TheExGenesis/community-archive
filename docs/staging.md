@@ -40,6 +40,23 @@ ENABLE_CLICKHOUSE_READS=false
 NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH=false
 ```
 
+### Testing the portal with production public data
+
+The portal's totals, trends, and observed-stream counts come from the
+server-side ClickHouse analytics gateway. Its recent tweet and banger rows can
+optionally use a separate read-only Supabase source:
+
+```env
+PORTAL_READ_SUPABASE_URL=<production-supabase-url>
+PORTAL_READ_SUPABASE_ANON_KEY=<production-anon-key>
+```
+
+Scope these overrides to the portal PR/staging branch. Keep
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
+`SUPABASE_SERVICE_ROLE` pointed at staging so login, uploads, admin tools, and
+all writes remain isolated. `PORTAL_READ_SUPABASE_ANON_KEY` is server-only and
+must be the public anonymous key, never the production service-role key.
+
 The default staging login identity is configured via env:
 
 - Email: value of `STAGING_DEV_LOGIN_EMAIL`

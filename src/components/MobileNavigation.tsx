@@ -12,15 +12,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-const navigationItems = [
-  { href: '/', label: 'Home' },
-  { href: '/#products', label: 'Tools' },
-  { href: '/user-dir', label: 'Library' },
-  { href: '/search', label: 'Search' },
-  { href: '/docs', label: 'Docs' },
-]
+import { NavItem } from '@/lib/navigation'
 
-export default function MobileNavigation() {
+export default function MobileNavigation({ items }: { items: NavItem[] }) {
   const pathname = usePathname()
 
   return (
@@ -39,12 +33,11 @@ export default function MobileNavigation() {
         <DropdownMenuLabel className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Navigation
         </DropdownMenuLabel>
-        {navigationItems.map((item) => {
-          const isActive =
-            item.href === '/#products'
-              ? false
-              : pathname === item.href ||
-                (item.href !== '/' && pathname.startsWith(`${item.href}/`))
+        {items.map((item) => {
+          const isActive = item.href.includes('#')
+            ? false
+            : pathname === item.href ||
+              (item.href !== '/' && pathname.startsWith(`${item.href}/`))
 
           return (
             <DropdownMenuItem key={item.href} asChild>

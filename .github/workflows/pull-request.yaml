@@ -53,10 +53,7 @@ jobs:
       - name: Run type check
         run: pnpm type-check
 
-      # Tests intentionally not enforced here: schema-validation and
-      # db-insertion suites require NEXT_PUBLIC_SUPABASE_URL +
-      # SUPABASE_SERVICE_ROLE pointing at a real Supabase project, which
-      # this workflow does not provide. Several client suites also need a
-      # working DB setup. They've never actually run in CI (same reason as
-      # prettier — broken yaml). Run `pnpm test:ci` locally with `.env`
-      # populated to validate.
+      # Keep database integration suites separate: they require a provisioned
+      # Supabase project. Server unit and route-contract tests are hermetic.
+      - name: Run server unit tests
+        run: pnpm exec jest --selectProjects server --testPathPattern=src/lib --ci --runInBand

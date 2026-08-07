@@ -72,3 +72,18 @@
     font-family: var(--font-petrona), Georgia, 'Times New Roman', serif;
   }
 }
+
+/* Portal homepage: new-tweet slide-in */
+@keyframes portal-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.portal-slide-in {
+  animation: portal-slide-in 0.35s ease-out;
+}

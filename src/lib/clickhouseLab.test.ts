@@ -2,7 +2,10 @@ import {
   analyticsGatewayRequestUrl,
   isClickHouseLabEnvironmentEnabled,
 } from './clickhouseLab'
-import { clickHouseSearchGatewayBaseUrl } from './clickhouseGateway'
+import {
+  clickHouseAnalyticsGatewayBaseUrl,
+  clickHouseSearchGatewayBaseUrl,
+} from './clickhouseGateway'
 
 describe('ClickHouse staging lab guard', () => {
   test('requires the flag and refuses the production Supabase project', () => {
@@ -66,16 +69,31 @@ describe('ClickHouse staging lab guard', () => {
     ).toBe('https://stream.example:3000/analytics')
   })
 
+  test('derives the analytics path from the public gateway when needed', () => {
+    expect(
+      clickHouseAnalyticsGatewayBaseUrl(
+        undefined,
+        'https://analytics.example/',
+      ),
+    ).toBe('https://analytics.example/analytics')
+    expect(
+      clickHouseAnalyticsGatewayBaseUrl(
+        'https://stream.example/analytics',
+        'https://analytics.example',
+      ),
+    ).toBe('https://stream.example/analytics')
+  })
+
   test('allows quote filters without forwarding unknown parameters', () => {
     const target = analyticsGatewayRequestUrl(
       ['top-quotes'],
       new URLSearchParams(
-        'limit=25&exclude_self=true&include_usernames=alice%2C+bob&exclude_usernames=bot&raw_sql=DROP',
+        'limit=25&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot&raw_sql=DROP',
       ),
       'https://stream.example/analytics',
     )
     expect(target.toString()).toBe(
-      'https://stream.example/analytics/top-quotes?limit=25&exclude_self=true&include_usernames=alice%2C+bob&exclude_usernames=bot',
+      'https://stream.example/analytics/top-quotes?limit=25&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot',
     )
   })
 
@@ -100,6 +118,17 @@ describe('ClickHouse staging lab guard', () => {
     )
     expect(target.toString()).toBe(
       'https://stream.example/analytics/missing-accounts?limit=100',
+    )
+  })
+
+  test('allows only bounded recent-banger inputs', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['recent-bangers'],
+      new URLSearchParams('limit=50&hours=48&raw_sql=DROP'),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/recent-bangers?limit=50&hours=48',
     )
   })
 })

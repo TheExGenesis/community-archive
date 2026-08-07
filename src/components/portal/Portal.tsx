@@ -256,7 +256,7 @@ export default function Portal({
             />
           </div>
 
-          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.45fr_1fr]">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.45fr_1fr]">
             <div className="flex flex-col gap-4">
               <div className={CARD}>
                 <PanelHeader
@@ -278,12 +278,12 @@ export default function Portal({
                 </div>
               </div>
 
-              <div className={CARD}>
+              <div className={`${CARD} flex flex-1 flex-col`}>
                 <PanelHeader
                   title="Trending terms · 7 days"
                   action={{ label: 'Trends explorer', href: '/trends' }}
                 />
-                <div className="flex flex-col px-4 pb-3 pt-2">
+                <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
                   {weeklyBars.map((b) => (
                     <div
                       key={b.term}
@@ -377,17 +377,17 @@ export default function Portal({
                 </div>
               </div>
 
-              <div className={CARD}>
+              <div className={`${CARD} flex flex-1 flex-col`}>
                 <PanelHeader
                   title="Field notes"
                   action={{ label: 'All notes', href: '/notes' }}
                 />
-                <div className="flex flex-col">
+                <div className="flex flex-1 flex-col">
                   {PORTAL_ARTICLES.slice(0, 3).map((a) => (
                     <Link
                       key={a.id}
                       href={`/notes?article=${a.id}`}
-                      className="border-b border-zinc-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
+                      className="flex flex-1 flex-col justify-center border-b border-zinc-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
                     >
                       <div className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-brand">
                         {a.tag}
@@ -415,8 +415,43 @@ export default function Portal({
               action={{ label: 'All tools', href: '/tools' }}
               divider={false}
             />
+            <div className="grid grid-cols-1 gap-2.5 px-4 pt-1 sm:grid-cols-2">
+              {PORTAL_TOOLS.filter((t) => t.image).map((tool) => (
+                <a
+                  key={tool.name}
+                  href={tool.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group overflow-hidden rounded-[4px] border border-zinc-200 bg-zinc-50 transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#121214]"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={tool.image}
+                    alt={`${tool.name} preview`}
+                    loading="lazy"
+                    className="aspect-[4/3] w-full border-b border-zinc-200 object-cover dark:border-[#26262a]"
+                  />
+                  <div className="flex items-start gap-2.5 px-3 py-2.5">
+                    <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
+                      {tool.icon}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-[13px] font-bold">
+                        {tool.name}
+                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
+                      </span>
+                      <span
+                        className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
+                      >
+                        {tool.description}
+                      </span>
+                    </span>
+                  </div>
+                </a>
+              ))}
+            </div>
             <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 lg:grid-cols-4">
-              {PORTAL_TOOLS.map((tool) => (
+              {PORTAL_TOOLS.filter((t) => !t.image).map((tool) => (
                 <a
                   key={tool.name}
                   href={tool.link}

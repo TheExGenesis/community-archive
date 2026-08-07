@@ -14,6 +14,8 @@ export interface PortalTool {
   description: string
   link: string
   icon: React.ReactNode
+  /** Preview image; featured tools render as larger image cards. */
+  image?: string
 }
 
 /** Tools and projects built on the archive. Shown on the member Home panel
@@ -24,12 +26,14 @@ export const PORTAL_TOOLS: PortalTool[] = [
     description: 'Explore the best conversation threads',
     link: 'https://bangers.community-archive.org/detailed-strand-atlas',
     icon: <FaProjectDiagram />,
+    image: '/images/featured/strand-atlas.png',
   },
   {
     name: 'Bangers',
     description: 'Browse the most impactful tweets',
     link: 'https://bangers.community-archive.org',
     icon: <FaFire />,
+    image: '/images/featured/bangers.png',
   },
   {
     name: 'Archive Trends',

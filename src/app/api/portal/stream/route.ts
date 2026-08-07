@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPortalStream, type PortalStreamCursor } from '@/lib/portal/data'
+import {
+  getPortalStreamPage,
+  getPortalStreamUpdates,
+  type PortalStreamPageCursor,
+  type PortalStreamUpdateCursor,
+} from '@/lib/portal/data'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
-function parseCursor(searchParams: URLSearchParams): PortalStreamCursor | null {
+function parseUpdateCursor(
+  searchParams: URLSearchParams,
+): PortalStreamUpdateCursor | null {
   const after = searchParams.get('after')
   const afterId = searchParams.get('afterId')
   if (!after && !afterId) return null
@@ -18,10 +25,30 @@ function parseCursor(searchParams: URLSearchParams): PortalStreamCursor | null {
   return { observedAt: observedAt.toISOString(), id: afterId }
 }
 
+function parsePageCursor(
+  searchParams: URLSearchParams,
+): PortalStreamPageCursor | null {
+  const before = searchParams.get('before')
+  const beforeId = searchParams.get('beforeId')
+  if (!before && !beforeId) return null
+  if (!before || !beforeId || !/^\d{1,32}$/.test(beforeId)) {
+    throw new Error('Invalid stream cursor')
+  }
+  const createdAt = new Date(before)
+  if (Number.isNaN(createdAt.getTime())) {
+    throw new Error('Invalid stream cursor')
+  }
+  return { createdAt: createdAt.toISOString(), id: beforeId }
+}
+
 export async function GET(request: NextRequest) {
-  let cursor: PortalStreamCursor | null
+  let updateCursor: PortalStreamUpdateCursor | null
+  let pageCursor: PortalStreamPageCursor | null
   try {
-    cursor = parseCursor(new URL(request.url).searchParams)
+    const searchParams = new URL(request.url).searchParams
+    updateCursor = parseUpdateCursor(searchParams)
+    pageCursor = parsePageCursor(searchParams)
+    if (updateCursor && pageCursor) throw new Error('Invalid stream cursor')
   } catch {
     return NextResponse.json(
       { error: 'Invalid stream cursor' },
@@ -30,13 +57,38 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const tweets = await getPortalStream(cursor ? 100 : 30, cursor ?? undefined)
-    const edge = cursor ? tweets[tweets.length - 1] : tweets[0]
-    const nextCursor = edge
-      ? { observedAt: edge.observedAt, id: edge.id }
-      : null
+    if (updateCursor) {
+      const tweets = await getPortalStreamUpdates(100, updateCursor)
+      const edge = tweets[tweets.length - 1]
+      return NextResponse.json(
+        {
+          tweets,
+          updateCursor: edge
+            ? { observedAt: edge.observedAt, id: edge.id }
+            : null,
+        },
+        {
+          headers: {
+            'Cache-Control': 'private, no-store',
+          },
+        },
+      )
+    }
+
+    const pageSize = 30
+    const rows = await getPortalStreamPage(
+      pageSize + 1,
+      pageCursor ?? undefined,
+    )
+    const hasMore = rows.length > pageSize
+    const tweets = rows.slice(0, pageSize)
+    const edge = tweets[tweets.length - 1]
     return NextResponse.json(
-      { tweets, nextCursor },
+      {
+        tweets,
+        nextCursor: edge ? { createdAt: edge.createdAt, id: edge.id } : null,
+        hasMore,
+      },
       {
         headers: {
           'Cache-Control': 'public, s-maxage=15, stale-while-revalidate=30',

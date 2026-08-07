@@ -1,7 +1,12 @@
 import 'server-only'
 import { unstable_cache } from 'next/cache'
 import { clickHouseAnalyticsGatewayBaseUrl } from '@/lib/clickhouseGateway'
-import { fetchPortalLiveAnalytics, fetchPortalTrends } from './analytics'
+import {
+  fetchPortalHistoricalBangers,
+  fetchPortalLiveAnalytics,
+  fetchPortalRecentBangers,
+  fetchPortalTrends,
+} from './analytics'
 import type { PortalLiveAnalytics } from './analytics'
 import { getResearchPosts } from './research'
 import type {
@@ -17,8 +22,13 @@ interface PortalReadConfig {
   sourceId: string
 }
 
-export interface PortalStreamCursor {
+export interface PortalStreamUpdateCursor {
   observedAt: string
+  id: string
+}
+
+export interface PortalStreamPageCursor {
+  createdAt: string
   id: string
 }
 
@@ -176,7 +186,9 @@ function isoDaysAgo(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString()
 }
 
-function validatedCursor(cursor: PortalStreamCursor): PortalStreamCursor {
+function validatedUpdateCursor(
+  cursor: PortalStreamUpdateCursor,
+): PortalStreamUpdateCursor {
   const observedAt = new Date(cursor.observedAt)
   if (Number.isNaN(observedAt.getTime()) || !/^\d{1,32}$/.test(cursor.id)) {
     throw new Error('Invalid portal stream cursor')
@@ -184,21 +196,58 @@ function validatedCursor(cursor: PortalStreamCursor): PortalStreamCursor {
   return { observedAt: observedAt.toISOString(), id: cursor.id }
 }
 
-export async function getPortalStream(
-  limit = 30,
-  cursor?: PortalStreamCursor,
-): Promise<PortalTweet[]> {
-  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100)
-  const after = cursor ? validatedCursor(cursor) : null
-  const params = new URLSearchParams({
+function validatedPageCursor(
+  cursor: PortalStreamPageCursor,
+): PortalStreamPageCursor {
+  const createdAt = new Date(cursor.createdAt)
+  if (Number.isNaN(createdAt.getTime()) || !/^\d{1,32}$/.test(cursor.id)) {
+    throw new Error('Invalid portal stream cursor')
+  }
+  return { createdAt: createdAt.toISOString(), id: cursor.id }
+}
+
+function portalStreamParams(limit: number): URLSearchParams {
+  return new URLSearchParams({
     select:
       'tweet_id,account_id,created_at,updated_at,full_text,retweet_count,favorite_count,account:all_account!inner(username,account_display_name)',
     archive_upload_id: 'is.null',
     reply_to_tweet_id: 'is.null',
     full_text: 'not.ilike.RT @%',
-    order: `${after ? 'updated_at.asc' : 'updated_at.desc'},${after ? 'tweet_id.asc' : 'tweet_id.desc'}`,
-    limit: String(safeLimit),
+    limit: String(Math.min(Math.max(Math.trunc(limit), 1), 100)),
   })
+}
+
+/** A page of firehose tweets ordered by authored time, newest first. */
+export async function getPortalStreamPage(
+  limit = 30,
+  cursor?: PortalStreamPageCursor,
+): Promise<PortalTweet[]> {
+  const before = cursor ? validatedPageCursor(cursor) : null
+  const params = portalStreamParams(limit)
+  params.set('order', 'created_at.desc,tweet_id.desc')
+
+  if (before) {
+    params.set(
+      'or',
+      `(created_at.lt.${before.createdAt},and(created_at.eq.${before.createdAt},tweet_id.lt.${before.id}))`,
+    )
+  }
+
+  const data = await portalRestRows<any>('tweets', params)
+  return toPortalTweets(data)
+}
+
+/** Rows newly observed by the firehose, used to refresh an open stream. */
+export async function getPortalStreamUpdates(
+  limit = 100,
+  cursor?: PortalStreamUpdateCursor,
+): Promise<PortalTweet[]> {
+  const after = cursor ? validatedUpdateCursor(cursor) : null
+  const params = portalStreamParams(limit)
+  params.set(
+    'order',
+    `${after ? 'updated_at.asc' : 'updated_at.desc'},${after ? 'tweet_id.asc' : 'tweet_id.desc'}`,
+  )
 
   if (after) {
     params.set(
@@ -295,7 +344,10 @@ export function selectDailyBangers(
         calendarDayDistance(new Date(left.createdAt), now) -
         calendarDayDistance(new Date(right.createdAt), now)
       return (
-        distance || right.likes - left.likes || left.id.localeCompare(right.id)
+        distance ||
+        (right.quoteCount ?? 0) - (left.quoteCount ?? 0) ||
+        right.likes - left.likes ||
+        left.id.localeCompare(right.id)
       )
     })
     .slice(0, Math.max(1, poolSize))
@@ -305,48 +357,6 @@ export function selectDailyBangers(
   const selectedIndex = stableHash(day) % candidates.length
   const selected = candidates[selectedIndex]
   return [selected, ...candidates.filter((_, index) => index !== selectedIndex)]
-}
-
-/** Calendar-matched bangers from members' own production archives. */
-async function fetchDailyBangers(now = new Date()): Promise<PortalTweet[]> {
-  const data = await portalRestRows<any>(
-    'tweets',
-    new URLSearchParams({
-      select:
-        'tweet_id,account_id,created_at,updated_at,full_text,retweet_count,favorite_count,account:all_account!inner(username,account_display_name)',
-      archive_upload_id: 'not.is.null',
-      reply_to_tweet_id: 'is.null',
-      full_text: 'not.ilike.RT @%',
-      order: 'favorite_count.desc',
-      limit: '500',
-    }),
-  )
-  const textful = data.filter((tweet: any) => {
-    const text = (tweet.full_text ?? '').replace(/https?:\/\/\S+/g, '').trim()
-    return text.length >= 30
-  })
-  const ranked = selectDailyBangers(
-    textful.map(
-      (tweet: any): PortalTweet => ({
-        id: tweet.tweet_id,
-        username: '',
-        name: '',
-        avatar: null,
-        text: tweet.full_text ?? '',
-        observedAt: tweet.updated_at ?? tweet.created_at,
-        createdAt: tweet.created_at,
-        likes: tweet.favorite_count ?? 0,
-        rts: tweet.retweet_count ?? 0,
-      }),
-    ),
-    now,
-  )
-  const rowsById = new Map(data.map((tweet: any) => [tweet.tweet_id, tweet]))
-  return toPortalTweets(
-    ranked
-      .map((tweet) => rowsById.get(tweet.id))
-      .filter((tweet): tweet is any => Boolean(tweet)),
-  )
 }
 
 async function fetchCorpusRange(): Promise<{
@@ -423,28 +433,49 @@ const getCachedStatsSnapshot = unstable_cache(
   { revalidate: 300 },
 )
 const getCachedInitialStream = unstable_cache(
-  async (_sourceKey: string) => getPortalStream(30),
-  ['portal-initial-stream-v3'],
+  async (_sourceKey: string) => getPortalStreamPage(30),
+  ['portal-initial-stream-v4'],
   { revalidate: 60 },
 )
-const getCachedBangers = unstable_cache(
-  async (_sourceKey: string, day: string) =>
-    fetchDailyBangers(new Date(`${day}T12:00:00.000Z`)),
-  ['portal-bangers-v4'],
+const getCachedHistoricalBangers = unstable_cache(
+  async (_sourceKey: string, day: string) => {
+    const ranked = await fetchPortalHistoricalBangers(100)
+    return selectDailyBangers(ranked, new Date(`${day}T12:00:00.000Z`))
+  },
+  ['portal-bangers-v5'],
   { revalidate: 86_400 },
 )
+const getCachedRecentBangers = unstable_cache(
+  async (_sourceKey: string) => fetchPortalRecentBangers(50, 48),
+  ['portal-recent-bangers-v1'],
+  { revalidate: 1_800 },
+)
+
+export async function getPortalBangers(): Promise<PortalTweet[]> {
+  return getCachedRecentBangers(portalDataSourceKey())
+}
 
 export async function getPortalData(
   view: 'home' | 'stream' = 'home',
 ): Promise<PortalData> {
   const sourceKey = portalDataSourceKey()
   const today = new Date().toISOString().slice(0, 10)
-  const [corpus, live, initialStream, research, bangers] = await Promise.all([
+  const [
+    corpus,
+    live,
+    initialStream,
+    research,
+    recentBangers,
+    historicalBangers,
+  ] = await Promise.all([
     getCachedCorpusSnapshot(sourceKey),
     getCachedStatsSnapshot(sourceKey),
     getCachedInitialStream(sourceKey),
     view === 'home' ? getResearchPosts() : Promise.resolve([]),
-    view === 'home' ? getCachedBangers(sourceKey, today) : Promise.resolve([]),
+    view === 'home' ? getCachedRecentBangers(sourceKey) : Promise.resolve([]),
+    view === 'home'
+      ? getCachedHistoricalBangers(sourceKey, today)
+      : Promise.resolve([]),
   ])
   const stats: PortalStats = {
     totalTweets: live.totalTweets,
@@ -460,6 +491,7 @@ export async function getPortalData(
     trends: corpus.trends,
     initialStream,
     research,
-    bangers,
+    recentBangers,
+    historicalBangers,
   }
 }

@@ -1,4 +1,9 @@
-import { fetchPortalLiveAnalytics, fetchPortalTrends } from './analytics'
+import {
+  fetchPortalLiveAnalytics,
+  fetchPortalHistoricalBangers,
+  fetchPortalRecentBangers,
+  fetchPortalTrends,
+} from './analytics'
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 
 type AnalyticsFetcher = typeof fetchAnalyticsGatewayJson
@@ -154,5 +159,81 @@ describe('ClickHouse-backed portal analytics', () => {
     await expect(
       fetchPortalLiveAnalytics(new Date('2026-08-07T12:00:00.000Z'), fetcher),
     ).rejects.toThrow('invalid tweet count')
+  })
+
+  test('maps recent member bangers and requests the 30-minute cache window', async () => {
+    const fetcher = jest.fn(async () => ({
+      data: [
+        {
+          tweetId: '2085365448686866863',
+          accountId: '14816854',
+          createdAt: '2026-08-06 14:00:41.000',
+          fullText: 'A recent banger',
+          favoriteCount: '5188',
+          retweetCount: '448',
+          latestObservedAt: '2026-08-07 03:00:01.000',
+          quoteCount: '7',
+          username: 'katiebakes',
+          accountDisplayName: 'Katie',
+          avatarMediaUrl: 'https://pbs.twimg.com/katie.jpg',
+        },
+      ],
+    })) as unknown as AnalyticsFetcher
+
+    await expect(fetchPortalRecentBangers(500, 500, fetcher)).resolves.toEqual([
+      {
+        id: '2085365448686866863',
+        username: 'katiebakes',
+        name: 'Katie',
+        avatar: 'https://pbs.twimg.com/katie.jpg',
+        text: 'A recent banger',
+        observedAt: '2026-08-07T03:00:01.000Z',
+        createdAt: '2026-08-06T14:00:41.000Z',
+        likes: 5188,
+        rts: 448,
+        quoteCount: 7,
+      },
+    ])
+    expect(fetcher).toHaveBeenCalledWith(
+      ['recent-bangers'],
+      new URLSearchParams({ limit: '50', hours: '168' }),
+      { timeoutMs: 30_000, revalidate: 1_800 },
+    )
+  })
+
+  test('maps the canonical historical community-quote ranking', async () => {
+    const fetcher = jest.fn(async () => ({
+      data: [
+        {
+          tweetId: '123',
+          quoteCount: '42',
+          accountId: '99',
+          username: 'alice',
+          displayName: 'Alice',
+          createdAt: '2024-08-07 12:00:00.000',
+          fullText: 'A historical banger',
+          favoriteCount: '500',
+          retweetCount: '25',
+        },
+      ],
+    })) as unknown as AnalyticsFetcher
+
+    await expect(fetchPortalHistoricalBangers(500, fetcher)).resolves.toEqual([
+      expect.objectContaining({
+        id: '123',
+        quoteCount: 42,
+        createdAt: '2024-08-07T12:00:00.000Z',
+      }),
+    ])
+    expect(fetcher).toHaveBeenCalledWith(
+      ['top-quotes'],
+      new URLSearchParams({
+        limit: '100',
+        exclude_self: 'true',
+        target_ca_users_only: 'false',
+        quote_ca_users_only: 'true',
+      }),
+      { timeoutMs: 30_000, revalidate: 86_400 },
+    )
   })
 })

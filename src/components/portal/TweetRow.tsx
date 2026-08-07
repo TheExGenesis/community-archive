@@ -119,6 +119,11 @@ export function TweetRow({
         </div>
         {!compact && (
           <div className="mt-1.5 flex gap-4 text-[12px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
+            {tweet.quoteCount !== undefined && (
+              <span className="font-semibold text-brand">
+                ✦ {formatCount(tweet.quoteCount)} archive quotes
+              </span>
+            )}
             <span>♥ {formatCount(tweet.likes)}</span>
             <span>⇄ {formatCount(tweet.rts)}</span>
             {showArchivedBadge && <span className="text-brand">archived</span>}

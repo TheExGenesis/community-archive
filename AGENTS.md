@@ -213,6 +213,20 @@ Both `lodash` and `fp-ts` are dependencies. Should pick one FP utility approach.
 
 ---
 
+## Analytics data-source policy
+
+- Use ClickHouse for corpus-scale read analytics when a supported gateway
+  endpoint exists, including summaries, trends, stream analytics, and banger
+  discovery. Cache expensive snapshots at an interval appropriate to the UI.
+- Keep Supabase as the source of truth for authentication, writes, canonical
+  membership, and records that are not represented in ClickHouse. In
+  particular, do not use ClickHouse `memberAccounts` as the live uploader plus
+  opt-in count while its canonical summary is refreshed only daily.
+- Develop and verify analytics changes locally first. For production-backed
+  ClickHouse QA, retrieve the query-gateway bearer token from its authoritative
+  host at command runtime without printing or persisting it; use preview builds
+  only for final staging verification.
+
 ## Supabase gotchas
 
 **PostgREST silently caps SELECTs at 1,000 rows.** A `.select()` against
@@ -374,4 +388,3 @@ pnpm docker:run:process-archive
 - `POSTGRES_CONNECTION_STRING` - For archive processor
 - `SUPABASE_SERVICE_ROLE` - Admin operations
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Client access
-

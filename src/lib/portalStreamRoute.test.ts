@@ -1,22 +1,26 @@
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/portal/stream/route'
-import { getPortalStream } from '@/lib/portal/data'
+import { getPortalStreamPage, getPortalStreamUpdates } from '@/lib/portal/data'
 
 jest.mock('@/lib/portal/data', () => ({
-  getPortalStream: jest.fn(),
+  getPortalStreamPage: jest.fn(),
+  getPortalStreamUpdates: jest.fn(),
 }))
 
-const getPortalStreamMock = getPortalStream as jest.MockedFunction<
-  typeof getPortalStream
+const getPortalStreamPageMock = getPortalStreamPage as jest.MockedFunction<
+  typeof getPortalStreamPage
 >
+const getPortalStreamUpdatesMock =
+  getPortalStreamUpdates as jest.MockedFunction<typeof getPortalStreamUpdates>
 
 describe('portal stream route', () => {
   beforeEach(() => {
-    getPortalStreamMock.mockReset()
+    getPortalStreamPageMock.mockReset()
+    getPortalStreamUpdatesMock.mockReset()
   })
 
   test('forwards a validated composite observation cursor', async () => {
-    getPortalStreamMock.mockResolvedValue([
+    getPortalStreamUpdatesMock.mockResolvedValue([
       {
         id: '123',
         username: 'alice',
@@ -37,18 +41,52 @@ describe('portal stream route', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(getPortalStreamMock).toHaveBeenCalledWith(100, {
+    expect(getPortalStreamUpdatesMock).toHaveBeenCalledWith(100, {
       observedAt: '2026-08-07T12:00:00.000Z',
       id: '100',
     })
     await expect(response.json()).resolves.toEqual(
       expect.objectContaining({
-        nextCursor: {
+        updateCursor: {
           observedAt: '2026-08-07T12:01:00.000Z',
           id: '123',
         },
       }),
     )
+  })
+
+  test('returns an older authored-time page and its continuation cursor', async () => {
+    const tweets = Array.from({ length: 31 }, (_, index) => ({
+      id: String(200 - index),
+      username: 'alice',
+      name: 'Alice',
+      avatar: null,
+      text: `tweet ${index}`,
+      observedAt: '2026-08-07T12:01:00.000Z',
+      createdAt: new Date(Date.UTC(2026, 7, 7, 11, 59 - index)).toISOString(),
+      likes: 1,
+      rts: 0,
+    }))
+    getPortalStreamPageMock.mockResolvedValue(tweets)
+
+    const response = await GET(
+      new NextRequest(
+        'https://community-archive.org/api/portal/stream?before=2026-08-07T12%3A00%3A00.000Z&beforeId=201',
+      ),
+    )
+
+    expect(getPortalStreamPageMock).toHaveBeenCalledWith(31, {
+      createdAt: '2026-08-07T12:00:00.000Z',
+      id: '201',
+    })
+    await expect(response.json()).resolves.toMatchObject({
+      tweets: expect.arrayContaining([expect.objectContaining({ id: '200' })]),
+      nextCursor: {
+        createdAt: tweets[29].createdAt,
+        id: tweets[29].id,
+      },
+      hasMore: true,
+    })
   })
 
   test('rejects malformed cursors before reading data', async () => {
@@ -59,11 +97,12 @@ describe('portal stream route', () => {
     )
 
     expect(response.status).toBe(400)
-    expect(getPortalStreamMock).not.toHaveBeenCalled()
+    expect(getPortalStreamPageMock).not.toHaveBeenCalled()
+    expect(getPortalStreamUpdatesMock).not.toHaveBeenCalled()
   })
 
   test('returns an uncached gateway error instead of an empty success', async () => {
-    getPortalStreamMock.mockRejectedValue(new Error('database unavailable'))
+    getPortalStreamPageMock.mockRejectedValue(new Error('database unavailable'))
     const consoleError = jest
       .spyOn(console, 'error')
       .mockImplementation(() => undefined)

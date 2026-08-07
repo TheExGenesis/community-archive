@@ -5,7 +5,8 @@ jest.mock('next/cache', () => ({
 
 import {
   fetchPortalMemberCount,
-  getPortalStream,
+  getPortalStreamPage,
+  getPortalStreamUpdates,
   portalDataSourceKey,
   resolvePortalReadConfig,
   selectDailyBangers,
@@ -109,7 +110,7 @@ describe('portal REST reads', () => {
         ],
       } as Response)
 
-    await expect(getPortalStream(30)).resolves.toEqual([
+    await expect(getPortalStreamPage(30)).resolves.toEqual([
       {
         id: '42',
         username: 'archive_member',
@@ -132,7 +133,7 @@ describe('portal REST reads', () => {
     ).toBe(true)
     const query = new URL(String(tweetsUrl)).searchParams
     expect(query.get('archive_upload_id')).toBe('is.null')
-    expect(query.get('order')).toBe('updated_at.desc,tweet_id.desc')
+    expect(query.get('order')).toBe('created_at.desc,tweet_id.desc')
     expect(tweetsInit).toMatchObject({
       cache: 'no-store',
       headers: {
@@ -151,7 +152,7 @@ describe('portal REST reads', () => {
       json: async () => [],
     } as Response)
 
-    await getPortalStream(100, {
+    await getPortalStreamUpdates(100, {
       observedAt: '2026-08-07T20:00:00.000Z',
       id: '42',
     })
@@ -160,6 +161,26 @@ describe('portal REST reads', () => {
     expect(query.get('order')).toBe('updated_at.asc,tweet_id.asc')
     expect(query.get('or')).toBe(
       '(updated_at.gt.2026-08-07T20:00:00.000Z,and(updated_at.eq.2026-08-07T20:00:00.000Z,tweet_id.gt.42))',
+    )
+  })
+
+  test('encodes an authored-time cursor for older chronological pages', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    } as Response)
+
+    await getPortalStreamPage(31, {
+      createdAt: '2026-08-07T19:00:00.000Z',
+      id: '42',
+    })
+
+    const query = new URL(String(fetchMock.mock.calls[0][0])).searchParams
+    expect(query.get('limit')).toBe('31')
+    expect(query.get('order')).toBe('created_at.desc,tweet_id.desc')
+    expect(query.get('or')).toBe(
+      '(created_at.lt.2026-08-07T19:00:00.000Z,and(created_at.eq.2026-08-07T19:00:00.000Z,tweet_id.lt.42))',
     )
   })
 

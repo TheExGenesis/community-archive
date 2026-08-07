@@ -1,5 +1,5 @@
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
-import type { PortalTrends, TermSeries, TermWeek } from './types'
+import type { PortalTrends, PortalTweet, TermSeries, TermWeek } from './types'
 
 export const FIRST_TREND_YEAR = 2019
 
@@ -58,6 +58,40 @@ interface ClickHouseTrendRow {
 
 interface ClickHouseTrendResponse {
   data: ClickHouseTrendRow[]
+}
+
+interface ClickHouseRecentBanger {
+  tweetId: string
+  accountId: string
+  createdAt: string
+  fullText: string
+  favoriteCount: string | number
+  retweetCount: string | number
+  latestObservedAt: string
+  quoteCount: string | number
+  username: string | null
+  accountDisplayName: string | null
+  avatarMediaUrl: string | null
+}
+
+interface ClickHouseRecentBangersResponse {
+  data: ClickHouseRecentBanger[]
+}
+
+interface ClickHouseTopQuote {
+  tweetId: string
+  quoteCount: string | number
+  accountId: string | null
+  username: string | null
+  displayName: string | null
+  createdAt: string | null
+  fullText: string | null
+  favoriteCount: string | number
+  retweetCount: string | number
+}
+
+interface ClickHouseTopQuotesResponse {
+  data: ClickHouseTopQuote[]
 }
 
 export interface PortalLiveAnalytics {
@@ -199,6 +233,103 @@ export async function fetchPortalLiveAnalytics(
       ? safeTimestamp(stream.summary.latestObservedAt, 'observation timestamp')
       : null,
   }
+}
+
+/** Recent original posts from current archive uploaders and opted-in members. */
+export async function fetchPortalRecentBangers(
+  limit = 50,
+  hours = 48,
+  fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+): Promise<PortalTweet[]> {
+  const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
+  const safeHours = Math.max(1, Math.min(168, Math.trunc(hours)))
+  const response = await fetcher<ClickHouseRecentBangersResponse>(
+    ['recent-bangers'],
+    new URLSearchParams({
+      limit: String(safeLimit),
+      hours: String(safeHours),
+    }),
+    { timeoutMs: 30_000, revalidate: 1_800 },
+  )
+  if (!Array.isArray(response.data)) {
+    throw new Error('ClickHouse recent-bangers returned an invalid response')
+  }
+
+  return response.data.map((row) => {
+    if (
+      !/^\d{1,32}$/.test(row.tweetId) ||
+      !/^\d{1,32}$/.test(row.accountId) ||
+      typeof row.fullText !== 'string'
+    ) {
+      throw new Error('ClickHouse recent-bangers returned an invalid tweet')
+    }
+    const username = row.username || 'unknown'
+    return {
+      id: row.tweetId,
+      username,
+      name: row.accountDisplayName || username,
+      avatar: row.avatarMediaUrl || null,
+      text: row.fullText,
+      observedAt: safeTimestamp(
+        row.latestObservedAt,
+        'banger observation timestamp',
+      ),
+      createdAt: safeTimestamp(row.createdAt, 'banger authored timestamp'),
+      likes: safeCount(row.favoriteCount, 'banger favorite count'),
+      rts: safeCount(row.retweetCount, 'banger repost count'),
+      quoteCount: safeCount(row.quoteCount, 'banger quote count'),
+    }
+  })
+}
+
+/** Canonical all-time banger ranking used for the historical daily choice. */
+export async function fetchPortalHistoricalBangers(
+  limit = 100,
+  fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+): Promise<PortalTweet[]> {
+  const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)))
+  const response = await fetcher<ClickHouseTopQuotesResponse>(
+    ['top-quotes'],
+    new URLSearchParams({
+      limit: String(safeLimit),
+      exclude_self: 'true',
+      target_ca_users_only: 'false',
+      quote_ca_users_only: 'true',
+    }),
+    { timeoutMs: 30_000, revalidate: 86_400 },
+  )
+  if (!Array.isArray(response.data)) {
+    throw new Error('ClickHouse top-quotes returned an invalid response')
+  }
+
+  return response.data.map((row) => {
+    if (
+      !/^\d{1,32}$/.test(row.tweetId) ||
+      !row.accountId ||
+      !/^\d{1,32}$/.test(row.accountId) ||
+      !row.createdAt ||
+      typeof row.fullText !== 'string'
+    ) {
+      throw new Error('ClickHouse top-quotes returned an invalid tweet')
+    }
+    const username = row.username || 'unknown'
+    const createdAt = safeTimestamp(
+      row.createdAt,
+      'historical banger timestamp',
+    )
+    return {
+      id: row.tweetId,
+      username,
+      name: row.displayName || username,
+      avatar: null,
+      text: row.fullText,
+      observedAt: createdAt,
+      createdAt,
+      likes: safeCount(row.favoriteCount, 'historical banger favorite count'),
+      rts: safeCount(row.retweetCount, 'historical banger repost count'),
+      quoteCount: safeCount(row.quoteCount, 'historical banger quote count'),
+    }
+  })
 }
 
 export async function fetchPortalTrends(

@@ -10,6 +10,8 @@ export interface PortalTweet {
   createdAt: string
   likes: number
   rts: number
+  /** Distinct non-self quote tweets from archive uploaders and opt-ins. */
+  quoteCount?: number
 }
 
 export interface PortalStats {
@@ -64,6 +66,8 @@ export interface PortalData {
   trends: PortalTrends
   initialStream: PortalTweet[]
   research: ResearchPost[]
-  /** Calendar-matched tweets from members' own archives, refreshed daily. */
-  bangers: PortalTweet[]
+  /** Fresh ClickHouse-ranked posts from current members, refreshed every 30m. */
+  recentBangers: PortalTweet[]
+  /** Calendar-matched canonical bangers, refreshed daily. */
+  historicalBangers: PortalTweet[]
 }

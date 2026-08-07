@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { FaExternalLinkAlt } from 'react-icons/fa'
 import {
@@ -42,6 +42,18 @@ function newestCursor(tweets: PortalTweet[]) {
       return latest
     },
     null,
+  )
+}
+
+function oldestPageCursor(tweets: PortalTweet[]) {
+  const oldest = [...tweets].sort(compareTweetChronology).at(-1)
+  return oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null
+}
+
+function compareTweetChronology(left: PortalTweet, right: PortalTweet) {
+  return (
+    new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime() ||
+    right.id.localeCompare(left.id)
   )
 }
 
@@ -137,26 +149,76 @@ export default function Portal({
   const seenIds = useRef<Set<string>>(
     new Set(data.initialStream.map((t) => t.id)),
   )
-  const cursor = useRef(newestCursor(data.initialStream))
+  const updateCursor = useRef(newestCursor(data.initialStream))
+  const pageCursor = useRef(oldestPageCursor(data.initialStream))
+  const loadingMoreRef = useRef(false)
+  const loadMoreTarget = useRef<HTMLDivElement>(null)
+  const [hasMore, setHasMore] = useState(data.initialStream.length >= 30)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+
+  const loadMore = useCallback(async () => {
+    if (
+      view !== 'stream' ||
+      !hasMore ||
+      loadingMoreRef.current ||
+      !pageCursor.current
+    ) {
+      return
+    }
+    loadingMoreRef.current = true
+    setIsLoadingMore(true)
+    try {
+      const params = new URLSearchParams({
+        before: pageCursor.current.createdAt,
+        beforeId: pageCursor.current.id,
+      })
+      const res = await fetch(`/api/portal/stream?${params.toString()}`)
+      if (!res.ok) return
+      const {
+        tweets,
+        nextCursor,
+        hasMore: nextHasMore,
+      } = (await res.json()) as {
+        tweets: PortalTweet[]
+        nextCursor: { createdAt: string; id: string } | null
+        hasMore: boolean
+      }
+      const older = tweets.filter((tweet) => !seenIds.current.has(tweet.id))
+      older.forEach((tweet) => seenIds.current.add(tweet.id))
+      if (older.length > 0) {
+        setVisible((current) =>
+          [...current, ...older].sort(compareTweetChronology),
+        )
+      }
+      pageCursor.current = nextCursor
+      setHasMore(nextHasMore && nextCursor !== null)
+    } catch {
+      // Keep the sentinel active so scrolling can retry after a network hiccup.
+    } finally {
+      loadingMoreRef.current = false
+      setIsLoadingMore(false)
+    }
+  }, [hasMore, view])
 
   useEffect(() => {
     const controller = new AbortController()
     const poll = setInterval(async () => {
       try {
         const params = new URLSearchParams()
-        if (cursor.current) {
-          params.set('after', cursor.current.observedAt)
-          params.set('afterId', cursor.current.id)
+        if (updateCursor.current) {
+          params.set('after', updateCursor.current.observedAt)
+          params.set('afterId', updateCursor.current.id)
         }
         const res = await fetch(`/api/portal/stream?${params.toString()}`, {
           signal: controller.signal,
         })
         if (!res.ok) return
-        const { tweets, nextCursor } = (await res.json()) as {
-          tweets: PortalTweet[]
-          nextCursor: { observedAt: string; id: string } | null
-        }
-        if (nextCursor) cursor.current = nextCursor
+        const { tweets, updateCursor: nextUpdateCursor } =
+          (await res.json()) as {
+            tweets: PortalTweet[]
+            updateCursor: { observedAt: string; id: string } | null
+          }
+        if (nextUpdateCursor) updateCursor.current = nextUpdateCursor
         const fresh = tweets
           .filter((t) => !seenIds.current.has(t.id))
           .sort(
@@ -167,7 +229,7 @@ export default function Portal({
         if (fresh.length > 0) {
           fresh.forEach((t) => seenIds.current.add(t.id))
           setVisible((current) =>
-            [...fresh.slice().reverse(), ...current].slice(0, 40),
+            [...fresh, ...current].sort(compareTweetChronology),
           )
         }
       } catch {
@@ -179,6 +241,20 @@ export default function Portal({
       clearInterval(poll)
     }
   }, [])
+
+  useEffect(() => {
+    if (view !== 'stream' || !hasMore) return
+    const target = loadMoreTarget.current
+    if (!target) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) void loadMore()
+      },
+      { rootMargin: '600px 0px' },
+    )
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [hasMore, loadMore, view])
 
   const liveCount = stats.totalTweets.toLocaleString('en-US')
 
@@ -219,8 +295,8 @@ export default function Portal({
   )
 
   const bestStrands = PORTAL_TOOLS.find((t) => t.name === 'Best Strands')
-  const bangers = PORTAL_TOOLS.find((t) => t.name === 'Bangers')
-  const banger = data.bangers[0] ?? null
+  const recentBanger = data.recentBangers[0] ?? null
+  const historicalBanger = data.historicalBangers[0] ?? null
 
   const generatedDate = useMemo(() => {
     const d = new Date(stats.generatedAt)
@@ -380,21 +456,20 @@ export default function Portal({
                 </div>
               </div>
 
-              {banger && (
+              {recentBanger && (
                 <div className={CARD}>
                   <PanelHeader
                     title="Banger of the moment"
-                    action={
-                      bangers
-                        ? {
-                            label: 'More bangers',
-                            href: bangers.link,
-                            external: true,
-                          }
-                        : undefined
-                    }
+                    action={{ label: 'More bangers', href: '/bangers' }}
                   />
-                  <TweetRow tweet={banger} showDate />
+                  <TweetRow tweet={recentBanger} />
+                </div>
+              )}
+
+              {historicalBanger && (
+                <div className={CARD}>
+                  <PanelHeader title="Historical banger · near this day" />
+                  <TweetRow tweet={historicalBanger} showDate />
                 </div>
               )}
             </div>
@@ -541,6 +616,12 @@ export default function Portal({
         <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
           <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1.5fr_1fr]">
             <div>
+              <Link
+                href="/"
+                className={`mb-2 inline-flex items-center text-[12.5px] font-semibold ${MUTED} hover:text-brand`}
+              >
+                ← Dashboard
+              </Link>
               <div className="mb-1.5 flex items-baseline gap-3">
                 <h1 className="text-[26px] font-semibold" style={SERIF}>
                   Live stream
@@ -552,7 +633,7 @@ export default function Portal({
                 contributors read their timelines.
               </div>
               <div className={`${CARD} overflow-hidden`}>
-                {visible.slice(0, 14).map((t, i) => (
+                {visible.map((t, i) => (
                   <TweetRow
                     key={t.id}
                     tweet={t}
@@ -560,6 +641,24 @@ export default function Portal({
                     showArchivedBadge
                   />
                 ))}
+                {visible.length === 0 && (
+                  <div className={`px-4 py-8 text-center text-[13px] ${MUTED}`}>
+                    Waiting for the firehose…
+                  </div>
+                )}
+              </div>
+              <div
+                ref={loadMoreTarget}
+                aria-live="polite"
+                className={`py-5 text-center text-[12.5px] ${MUTED}`}
+              >
+                {isLoadingMore
+                  ? 'Loading older tweets…'
+                  : hasMore
+                    ? 'Scroll for older tweets'
+                    : visible.length > 0
+                      ? 'You’ve reached the end.'
+                      : ''}
               </div>
             </div>
             <div id="trends" className="scroll-mt-32">

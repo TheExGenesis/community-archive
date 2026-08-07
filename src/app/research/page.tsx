@@ -10,7 +10,7 @@ export const revalidate = 3600
 
 // Public: research built on the archive is useful to visitors and members.
 export default async function ResearchPage() {
-  const posts = await getResearchPosts()
+  const posts = await getResearchPosts(24)
 
   return (
     <main className="mx-auto min-h-screen max-w-[900px] px-4 py-6 sm:px-6">

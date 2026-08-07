@@ -49,13 +49,19 @@ function PanelHeader({
   title,
   action,
   live,
+  divider = true,
 }: {
   title: string
   action?: { label: string; href: string }
   live?: boolean
+  divider?: boolean
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-[#26262a]">
+    <div
+      className={`flex items-center justify-between px-4 py-3 ${
+        divider ? 'border-b border-zinc-200 dark:border-[#26262a]' : ''
+      }`}
+    >
       <div className="flex items-center gap-2">
         {live && (
           <span className="h-[7px] w-[7px] animate-pulse rounded-full bg-[#2acf80]" />
@@ -339,6 +345,7 @@ export default function Portal({
             <PanelHeader
               title="Explore the archive"
               action={{ label: 'All tools', href: '/tools' }}
+              divider={false}
             />
             <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 lg:grid-cols-4">
               {PORTAL_TOOLS.map((tool) => (
@@ -347,7 +354,7 @@ export default function Portal({
                   href={tool.link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group rounded border border-zinc-200 bg-zinc-50 px-3 py-2.5 transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#121214] dark:hover:border-brand/60"
+                  className="group rounded-[4px] border border-zinc-200 bg-zinc-50 px-3 py-2.5 transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#121214] dark:hover:border-brand/60"
                 >
                   <div className="flex items-start gap-2.5">
                     <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
@@ -356,7 +363,7 @@ export default function Portal({
                     <span className="min-w-0">
                       <span className="flex items-center gap-1.5 text-[13px] font-bold">
                         {tool.name}
-                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
                       </span>
                       <span
                         className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}

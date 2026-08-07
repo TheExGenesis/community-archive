@@ -1,6 +1,6 @@
 import { FaExternalLinkAlt } from 'react-icons/fa'
 import { PORTAL_TOOLS } from '@/components/portal/tools'
-import { CARD, MUTED, SERIF } from '@/components/portal/styles'
+import { MUTED, SERIF } from '@/components/portal/styles'
 
 export const metadata = { title: 'Tools · Community Archive' }
 
@@ -22,7 +22,7 @@ export default function ToolsPage() {
             href={tool.link}
             target="_blank"
             rel="noopener noreferrer"
-            className={`${CARD} group p-[18px] transition-colors hover:border-brand/60`}
+            className="group rounded-[4px] border border-zinc-200 bg-white p-[18px] transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#1b1b1e]"
           >
             <div className="flex items-start gap-3.5">
               <span className="mt-1 flex-shrink-0 text-[22px] text-brand">
@@ -34,7 +34,7 @@ export default function ToolsPage() {
                   style={SERIF}
                 >
                   {tool.name}
-                  <FaExternalLinkAlt className="h-3 w-3 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+                  <FaExternalLinkAlt className="h-3 w-3 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
                 </span>
                 <span
                   className={`mt-1 block text-[13px] leading-normal ${MUTED}`}

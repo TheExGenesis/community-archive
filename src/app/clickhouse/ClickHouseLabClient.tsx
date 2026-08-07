@@ -30,7 +30,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import posthog from 'posthog-js'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 type Timing = {
   wallMs: number
@@ -249,7 +249,7 @@ export default function ClickHouseLabClient() {
     const params = new URLSearchParams({ q: wordQuery, bucket, match })
     if (from) params.set('from', from)
     if (to) params.set('to', to)
-    posthog.capture('word_trend_requested', {
+    capturePostHogEvent('word_trend_requested', {
       bucket,
       match,
       has_start_date: Boolean(from),
@@ -280,7 +280,7 @@ export default function ClickHouseLabClient() {
     if (excludeQuoteUsernames.trim()) {
       params.set('exclude_usernames', excludeQuoteUsernames)
     }
-    posthog.capture('quote_ranking_requested', {
+    capturePostHogEvent('quote_ranking_requested', {
       limit: Number(quoteLimit),
       excludes_self_quotes: excludeSelfQuotes,
       has_include_filter: Boolean(includeQuoteUsernames.trim()),

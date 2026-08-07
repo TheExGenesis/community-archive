@@ -26,7 +26,7 @@ import { ArchiveStats, FileUploadDialogProps, UploadOptions } from '@/lib/types'
 import { uploadArchive } from '@/lib/upload-archive/uploadArchive'
 import { calculateArchiveStats } from '@/lib/upload-archive/calculateArchiveStats'
 import { applyOptionsToArchive } from '@/lib/upload-archive/applyOptionsToArchive'
-import posthog from 'posthog-js'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 interface FileUploadDialogState {
   showAdvancedOptions: boolean
@@ -103,7 +103,7 @@ export function FileUploadDialog({
 
     const archiveWithOptions = applyOptionsToArchive(archive, options)
 
-    posthog.capture('archive_upload_started', {
+    capturePostHogEvent('archive_upload_started', {
       includes_likes: options.uploadLikes,
       date_filter_applied:
         dateInputs.start !== format(new Date(archiveStats.earliestTweetDate), 'yyyy-MM-dd') ||
@@ -128,7 +128,7 @@ export function FileUploadDialog({
         uploadedStats: stats,
         uploadStatus: 'completed',
       }))
-      posthog.capture('archive_upload_completed', {
+      capturePostHogEvent('archive_upload_completed', {
         uploaded_tweet_count: stats.uploadedTweets,
         uploaded_like_count: stats.uploadedLikes,
         includes_likes: options.uploadLikes,

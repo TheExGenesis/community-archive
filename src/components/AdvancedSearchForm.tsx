@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import posthog from 'posthog-js'
+import { capturePostHogEvent } from '@/lib/posthog'
 import {
   buildSearchExpression,
   buildSearchParams,
@@ -77,7 +77,7 @@ export default function AdvancedSearchForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const params = buildSearchParams(query)
-    posthog.capture('archive_search_submitted', {
+    capturePostHogEvent('archive_search_submitted', {
       has_query: Boolean(query.trim()),
       active_filter_count: activeFilters.length,
     })

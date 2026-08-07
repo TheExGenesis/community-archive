@@ -17,7 +17,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { deleteArchive, deleteSingleArchive } from '@/lib/db_insert'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { ArchiveUploadButton } from '@/components/ArchiveUploadButton'
-import posthog from 'posthog-js'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 interface ProfileContentProps {
   user: User
@@ -85,7 +85,7 @@ export default function ProfileContent({
         setOptInStatus(checked)
         setExplicitOptOut(false)
         setSuccess(checked ? 'Successfully opted in to tweet streaming' : 'Successfully opted out from tweet streaming')
-        posthog.capture('tweet_streaming_preference_updated', {
+        capturePostHogEvent('tweet_streaming_preference_updated', {
           opted_in: checked,
         })
 
@@ -188,7 +188,7 @@ export default function ProfileContent({
         setOptInStatus(false)
         setShowOptOutDialog(false)
         setSuccess('Added to explicit opt-out list')
-        posthog.capture('explicit_opt_out_confirmed', {
+        capturePostHogEvent('explicit_opt_out_confirmed', {
           delete_archives: false,
         })
         await logUserAction('opt_out_only')
@@ -223,7 +223,7 @@ export default function ProfileContent({
 
       setShowOptOutDialog(false)
       setSuccess('Data deleted and added to explicit opt-out list')
-      posthog.capture('explicit_opt_out_confirmed', {
+      capturePostHogEvent('explicit_opt_out_confirmed', {
         delete_archives: true,
       })
       await logUserAction('opt_out_and_delete')
@@ -276,7 +276,7 @@ export default function ProfileContent({
       await deleteSingleArchive(supabase, userMetadata.provider_id, archiveId)
 
       setSuccess('Archive deleted successfully')
-      posthog.capture('archive_deleted')
+      capturePostHogEvent('archive_deleted')
       await logUserAction('delete_archive', { archive_upload_id: archiveId })
       router.refresh()
     } catch (err: any) {
@@ -302,7 +302,7 @@ export default function ProfileContent({
 
       setShowDeleteAllDialog(false)
       setSuccess('All data deleted successfully')
-      posthog.capture('all_archives_deleted')
+      capturePostHogEvent('all_archives_deleted')
       await logUserAction('delete_all_archives')
       router.refresh()
     } catch (err: any) {

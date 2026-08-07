@@ -243,7 +243,7 @@ export default function Portal({
           {/* Hero: same gist as the logged-out homepage */}
           <div className="mx-auto mb-40 mt-36 w-full max-w-[48rem] space-y-3 text-center">
             <h1
-              className="text-5xl font-bold tracking-tight text-foreground"
+              className="text-6xl font-bold tracking-tight text-foreground"
               style={SERIF}
             >
               Community Archive

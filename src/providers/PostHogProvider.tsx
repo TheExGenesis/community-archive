@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import {
+  disablePostHogAfterIdentityFailure,
   initializePostHog,
   markPostHogIdentityReady,
   syncPostHogIdentity,
@@ -19,11 +20,18 @@ export default function PostHogProvider({
     let unsubscribe: (() => void) | undefined
 
     const connectIdentity = async () => {
-      if (!(await initializePostHog()) || !isActive) return
-
       const { createBrowserClient } = await import('@/utils/supabase')
       if (!isActive) return
       const supabase = createBrowserClient()
+      const {
+        data: { session: initialSession },
+      } = await supabase.auth.getSession()
+      if (!isActive) return
+
+      const initialization = await initializePostHog(initialSession)
+      if (!isActive || !initialization.enabled) return
+      identifiedUserId.current = initialization.identifiedUserId
+
       const {
         data: { subscription },
       } = supabase.auth.onAuthStateChange((event, session) => {
@@ -45,6 +53,8 @@ export default function PostHogProvider({
     }
 
     void connectIdentity().catch((error) => {
+      if (!isActive) return
+      disablePostHogAfterIdentityFailure()
       if (process.env.NODE_ENV === 'development') {
         console.warn('PostHog identity setup failed', error)
       }

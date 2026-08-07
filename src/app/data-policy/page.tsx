@@ -56,9 +56,11 @@ export default function DataPolicyPage() {
       </p>
 
       <h3 className="mb-3 mt-6 text-xl font-semibold">
-        What We Do Not Collect
+        What Tweet Collection Does Not Include
       </h3>
-      <p className="mb-4">Regardless of the method, we never access:</p>
+      <p className="mb-4">
+        Archive upload and browser-extension tweet collection never access:
+      </p>
 
       <ul className="my-5 list-inside list-disc space-y-2 pl-4">
         <li>Direct messages</li>
@@ -102,21 +104,30 @@ export default function DataPolicyPage() {
       <h2 className="mb-4 mt-8 text-2xl font-semibold">Website Analytics</h2>
 
       <p className="mb-4">
-        We use PostHog to measure aggregate use of website features. We send
-        only manually defined events with counts, booleans, and mode flags. We
-        do not send page URLs, search text, archive contents, email addresses,
-        or private profile fields to PostHog.
+        We use PostHog to understand website use and reliability. PostHog
+        records page views (including URLs, search parameters, referrers, and
+        campaign parameters), clicks and other page interactions, manually
+        defined product events, browser and device context, Web Vitals, network
+        timing, and unhandled browser errors with diagnostic context.
       </p>
 
       <p className="mb-4">
-        This analytics integration does not use automatic interaction capture,
-        automatic error capture, session replay, or persistent browser storage.
-        When you are signed in, these events are linked to your Community
-        Archive account ID and public username so we can understand feature use
-        and support account-specific issues. It also respects your
-        browser&apos;s Do Not Track setting. PostHog necessarily receives
-        network metadata to accept an event, but we disable IP geolocation
-        enrichment.
+        PostHog session replay records the rendered page and your interactions,
+        including non-password form values. Password values remain masked, and
+        we do not enable recording of console logs or network request and
+        response bodies. The archive ZIP selected for upload is processed
+        locally by the application; PostHog does not receive the file&apos;s
+        contents through session replay.
+      </p>
+
+      <p className="mb-4">
+        When you are signed in, PostHog links activity to your Community Archive
+        account ID, email address, public username, and public display name so
+        we can understand feature use and support account-specific issues.
+        PostHog uses cookies and local storage to maintain device and session
+        identity. The integration respects your browser&apos;s Do Not Track
+        setting. PostHog necessarily receives network metadata to accept an
+        event, but we disable IP geolocation enrichment.
       </p>
 
       <p className="mb-4">

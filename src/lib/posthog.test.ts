@@ -1,9 +1,14 @@
 import type { Session } from '@supabase/supabase-js'
-import type { CaptureResult, PostHog } from 'posthog-js/dist/module.slim'
+import type {
+  CaptureResult,
+  PostHog,
+  PostHogConfig,
+} from 'posthog-js/dist/module.slim'
 import {
   capturePostHogEventWhenReady,
   capturePostHogEventWithClient,
   createPostHogConfig,
+  getPostHogPersonProperties,
   initializePostHogClient,
   sanitizePostHogEvent,
   syncPostHogIdentity,
@@ -11,12 +16,13 @@ import {
 
 type TestPostHogClient = Pick<
   PostHog,
-  'capture' | 'identify' | 'init' | 'reset'
+  'capture' | 'get_property' | 'identify' | 'init' | 'reset'
 >
 
 function createClient(): jest.Mocked<TestPostHogClient> {
   return {
     capture: jest.fn(),
+    get_property: jest.fn(),
     identify: jest.fn(),
     init: jest.fn(),
     reset: jest.fn(),
@@ -46,7 +52,10 @@ function sessionFor(userId: string): Session {
       identities: [
         {
           provider: 'twitter',
-          identity_data: { user_name: 'archive_user' },
+          identity_data: {
+            user_name: 'archive_user',
+            full_name: 'Archive User',
+          },
         },
       ],
     },
@@ -54,7 +63,7 @@ function sessionFor(userId: string): Session {
 }
 
 describe('sanitizePostHogEvent', () => {
-  it('keeps only required SDK and event-specific aggregate properties', () => {
+  it('keeps page context while rejecting unexpected custom properties', () => {
     const event = captureResult('archive_search_submitted', {
       token: 'project-token',
       distinct_id: 'user-123',
@@ -62,6 +71,7 @@ describe('sanitizePostHogEvent', () => {
       active_filter_count: 2,
       $current_url: 'https://example.com/search?q=private-words',
       $session_entry_url: 'https://example.com/search?q=private-words',
+      utm_campaign: 'archive-launch',
       query: 'private-words',
       email: 'private@example.com',
     })
@@ -70,12 +80,15 @@ describe('sanitizePostHogEvent', () => {
       $geoip_disable: true,
       token: 'project-token',
       distinct_id: 'user-123',
+      $current_url: 'https://example.com/search?q=private-words',
+      $session_entry_url: 'https://example.com/search?q=private-words',
+      utm_campaign: 'archive-launch',
       has_query: true,
       active_filter_count: 2,
     })
   })
 
-  it('keeps only the public username on identify events', () => {
+  it('keeps the supported signed-in identity properties', () => {
     const event = {
       ...captureResult('$identify', {
         token: 'project-token',
@@ -85,7 +98,9 @@ describe('sanitizePostHogEvent', () => {
       }),
       $set: {
         username: 'archive_user',
-        email: 'private@example.com',
+        email: 'archive@example.com',
+        name: 'Archive User',
+        secret: 'not-a-person-property',
       },
       $set_once: {
         $initial_current_url: 'https://example.com/search?q=private-words',
@@ -99,9 +114,15 @@ describe('sanitizePostHogEvent', () => {
         distinct_id: 'user-123',
         $anon_distinct_id: 'anonymous-123',
       },
-      $set: { username: 'archive_user' },
+      $set: {
+        username: 'archive_user',
+        email: 'archive@example.com',
+        name: 'Archive User',
+      },
+      $set_once: {
+        $initial_current_url: 'https://example.com/search?q=private-words',
+      },
     })
-    expect(sanitizePostHogEvent(event)?.$set_once).toBeUndefined()
   })
 
   it('rejects out-of-schema values', () => {
@@ -120,47 +141,94 @@ describe('sanitizePostHogEvent', () => {
     expect(sanitizePostHogEvent(event)).toBeNull()
   })
 
-  it('drops an invalid identify username', () => {
+  it('drops invalid identify properties', () => {
     const event = {
       ...captureResult('$identify', {
         token: 'project-token',
         distinct_id: 'user-123',
       }),
-      $set: { username: 'not a valid X username' },
+      $set: {
+        username: 'not a valid X username',
+        email: 'not-an-email',
+        name: ' '.repeat(101),
+      },
     }
 
     expect(sanitizePostHogEvent(event)?.$set).toBeUndefined()
   })
 
-  it('rejects SDK-generated events that are not explicitly allowed', () => {
-    expect(sanitizePostHogEvent(captureResult('$pageview', {}))).toBeNull()
+  it('allows SDK-generated monitoring events and preserves their context', () => {
+    const pageview = captureResult('$pageview', {
+      $current_url: 'https://example.com/search?q=public-query',
+      $referrer: 'https://example.org/',
+    })
+
+    expect(sanitizePostHogEvent(pageview)?.properties).toEqual({
+      $current_url: 'https://example.com/search?q=public-query',
+      $referrer: 'https://example.org/',
+      $geoip_disable: true,
+    })
+  })
+
+  it('still rejects unknown custom product events', () => {
+    expect(sanitizePostHogEvent(captureResult('archive_text', {}))).toBeNull()
   })
 })
 
 describe('createPostHogConfig', () => {
-  it('disables passive collection, persistence, and remote features', () => {
+  it('enables full browser monitoring while retaining explicit safeguards', () => {
     expect(createPostHogConfig('https://analytics.example.com')).toMatchObject({
       api_host: 'https://analytics.example.com',
-      advanced_disable_flags: true,
-      autocapture: false,
-      capture_pageview: false,
-      capture_pageleave: false,
+      advanced_disable_flags: false,
+      advanced_disable_feature_flags: true,
+      autocapture: true,
+      capture_pageview: 'history_change',
+      capture_pageleave: 'if_capture_pageview',
       capture_dead_clicks: false,
-      capture_exceptions: false,
+      capture_exceptions: true,
       capture_heatmaps: false,
-      capture_performance: false,
+      capture_performance: {
+        network_timing: true,
+        web_vitals: true,
+        web_vitals_attribution: false,
+      },
       disable_conversations: true,
       disable_external_dependency_loading: true,
-      disable_persistence: true,
+      disable_persistence: false,
       disable_product_tours: true,
-      disable_session_recording: true,
+      disable_session_recording: false,
       disable_surveys: true,
       disable_web_experiments: true,
+      enable_recording_console_log: false,
       opt_in_site_apps: false,
+      persistence: 'localStorage+cookie',
       person_profiles: 'identified_only',
       respect_dnt: true,
-      save_campaign_params: false,
-      save_referrer: false,
+      save_campaign_params: true,
+      save_referrer: true,
+      session_recording: {
+        maskAllInputs: false,
+        maskInputOptions: { password: true },
+        recordBody: false,
+        recordHeaders: false,
+      },
+    })
+  })
+
+  it('passes selectively bundled extensions and the identity bootstrap hook', () => {
+    const extensionClasses = {} as NonNullable<
+      PostHogConfig['__extensionClasses']
+    >
+    const loaded = jest.fn()
+
+    expect(
+      createPostHogConfig('https://analytics.example.com', {
+        extensionClasses,
+        loaded,
+      }),
+    ).toMatchObject({
+      __extensionClasses: extensionClasses,
+      loaded,
     })
   })
 })
@@ -173,7 +241,7 @@ describe('initializePostHogClient', () => {
     expect(client.init).not.toHaveBeenCalled()
   })
 
-  it('initializes a configured client with the privacy-safe config', () => {
+  it('initializes a configured client with the full monitoring config', () => {
     const client = createClient()
 
     expect(
@@ -187,7 +255,8 @@ describe('initializePostHogClient', () => {
       'project-token',
       expect.objectContaining({
         api_host: 'https://analytics.example.com',
-        disable_persistence: true,
+        disable_persistence: false,
+        disable_session_recording: false,
       }),
     )
   })
@@ -215,10 +284,12 @@ describe('capturePostHogEventWithClient', () => {
     expect(
       capturePostHogEventWithClient(client, 'archive_search_submitted', {
         has_query: true,
+        active_filter_count: 0,
       }),
     ).toBe(true)
     expect(client.capture).toHaveBeenCalledWith('archive_search_submitted', {
       has_query: true,
+      active_filter_count: 0,
     })
   })
 
@@ -244,7 +315,12 @@ describe('capturePostHogEventWhenReady', () => {
       () => clientPromise,
       () => Promise.resolve(),
       'word_trend_requested',
-      { bucket: 'month' },
+      {
+        bucket: 'month',
+        match: 'all',
+        has_start_date: false,
+        has_end_date: false,
+      },
     )
     expect(client.capture).not.toHaveBeenCalled()
 
@@ -253,22 +329,27 @@ describe('capturePostHogEventWhenReady', () => {
     await expect(capturePromise).resolves.toBe(true)
     expect(client.capture).toHaveBeenCalledWith('word_trend_requested', {
       bucket: 'month',
+      match: 'all',
+      has_start_date: false,
+      has_end_date: false,
     })
   })
 
   it('waits for auth identity before sending a linked event', async () => {
     const client = createClient()
+    const loadClient = jest.fn(() => Promise.resolve(client))
     let resolveIdentity: () => void = () => undefined
     const identityPromise = new Promise<void>((resolve) => {
       resolveIdentity = resolve
     })
 
     const capturePromise = capturePostHogEventWhenReady(
-      () => Promise.resolve(client),
+      loadClient,
       () => identityPromise,
       'archive_deleted',
     )
     await Promise.resolve()
+    expect(loadClient).not.toHaveBeenCalled()
     expect(client.capture).not.toHaveBeenCalled()
 
     resolveIdentity()
@@ -281,14 +362,16 @@ describe('capturePostHogEventWhenReady', () => {
 describe('syncPostHogIdentity', () => {
   const identify = jest.fn()
   const reset = jest.fn()
-  const actions = { identify, reset }
+  const getPersistedUserId = jest.fn<ReturnType<() => string | null>, []>()
+  const actions = { identify, reset, getPersistedUserId }
 
   beforeEach(() => {
     identify.mockReset()
     reset.mockReset()
+    getPersistedUserId.mockReset().mockReturnValue(null)
   })
 
-  it('identifies an initial signed-in user by ID and public username', () => {
+  it('identifies an initial signed-in user with useful account context', () => {
     expect(
       syncPostHogIdentity(
         'INITIAL_SESSION',
@@ -297,8 +380,10 @@ describe('syncPostHogIdentity', () => {
         actions,
       ),
     ).toBe('user-123')
-    expect(reset).toHaveBeenCalledTimes(1)
+    expect(reset).not.toHaveBeenCalled()
     expect(identify).toHaveBeenCalledWith('user-123', {
+      email: 'user-123@example.com',
+      name: 'Archive User',
       username: 'archive_user',
     })
   })
@@ -315,6 +400,34 @@ describe('syncPostHogIdentity', () => {
     expect(reset).toHaveBeenCalledTimes(1)
   })
 
+  it('does not reset a matching persisted signed-in identity', () => {
+    getPersistedUserId.mockReturnValue('user-123')
+
+    expect(
+      syncPostHogIdentity(
+        'INITIAL_SESSION',
+        sessionFor('user-123'),
+        null,
+        actions,
+      ),
+    ).toBe('user-123')
+    expect(reset).not.toHaveBeenCalled()
+  })
+
+  it('resets a different persisted signed-in identity', () => {
+    getPersistedUserId.mockReturnValue('previous-user')
+
+    expect(
+      syncPostHogIdentity(
+        'INITIAL_SESSION',
+        sessionFor('user-123'),
+        null,
+        actions,
+      ),
+    ).toBe('user-123')
+    expect(reset).toHaveBeenCalledTimes(1)
+  })
+
   it('resets identity on sign-out', () => {
     expect(
       syncPostHogIdentity('SIGNED_OUT', null, 'user-123', actions),
@@ -328,5 +441,41 @@ describe('syncPostHogIdentity', () => {
     ).toBeNull()
     expect(reset).toHaveBeenCalledTimes(1)
     expect(identify).not.toHaveBeenCalled()
+  })
+
+  it('preserves an anonymous identity on an initial signed-out session', () => {
+    expect(
+      syncPostHogIdentity('INITIAL_SESSION', null, null, actions),
+    ).toBeNull()
+    expect(reset).not.toHaveBeenCalled()
+    expect(identify).not.toHaveBeenCalled()
+  })
+
+  it('clears a stale persisted signed-in identity', () => {
+    getPersistedUserId.mockReturnValue('previous-user')
+
+    expect(
+      syncPostHogIdentity('INITIAL_SESSION', null, null, actions),
+    ).toBeNull()
+    expect(reset).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('getPostHogPersonProperties', () => {
+  it('uses the authenticated email and trusted Twitter identity', () => {
+    expect(getPostHogPersonProperties(sessionFor('user-123').user)).toEqual({
+      email: 'user-123@example.com',
+      name: 'Archive User',
+      username: 'archive_user',
+    })
+  })
+
+  it('does not use mutable user metadata for identity', () => {
+    const session = sessionFor('user-123')
+    session.user.identities = []
+
+    expect(getPostHogPersonProperties(session.user)).toEqual({
+      email: 'user-123@example.com',
+    })
   })
 })

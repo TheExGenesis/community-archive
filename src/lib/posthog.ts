@@ -1,6 +1,6 @@
 'use client'
 
-import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import type {
   CaptureResult,
   PostHog,
@@ -9,7 +9,15 @@ import type {
 } from 'posthog-js/dist/module.slim'
 import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
 
-type PostHogClient = Pick<PostHog, 'capture' | 'identify' | 'init' | 'reset'>
+type PostHogClient = Pick<
+  PostHog,
+  'capture' | 'get_property' | 'identify' | 'init' | 'reset'
+>
+type PostHogExtensionClasses = NonNullable<PostHogConfig['__extensionClasses']>
+type PostHogInitializationOptions = {
+  extensionClasses?: PostHogExtensionClasses
+  loaded?: () => void
+}
 
 type SafeProperty = string | number | boolean
 type PropertyValidator = (value: unknown) => value is SafeProperty
@@ -65,7 +73,6 @@ const allowedEventProperties: Record<
     has_include_filter: isBoolean,
     has_exclude_filter: isBoolean,
   },
-  $identify: {},
 }
 
 const safeSdkProperties = new Set([
@@ -84,22 +91,7 @@ const safeSdkProperties = new Set([
   '$process_person_profile',
 ])
 
-const blockedAutoProperties = [
-  '$current_url',
-  '$pathname',
-  '$host',
-  '$referrer',
-  '$referring_domain',
-  '$session_entry_url',
-  '$session_entry_pathname',
-  '$session_entry_host',
-  '$session_entry_referrer',
-  '$session_entry_referring_domain',
-  '$initial_current_url',
-  '$initial_pathname',
-  '$initial_host',
-  '$initial_referrer',
-  '$initial_referring_domain',
+const campaignProperties = new Set([
   'utm_source',
   'utm_medium',
   'utm_campaign',
@@ -124,12 +116,23 @@ const blockedAutoProperties = [
   'sccid',
   'irclid',
   '_kx',
-]
+])
 
 const publicUsernamePattern = /^[A-Za-z0-9_]{1,15}$/
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const isDisplayName = (value: unknown): value is string =>
+  typeof value === 'string' &&
+  value.trim().length > 0 &&
+  value.trim().length <= 100
+
+const isEmail = (value: unknown): value is string =>
+  typeof value === 'string' && value.length <= 320 && emailPattern.test(value)
 
 let posthogClient: PostHogClient | null = null
 let initializationPromise: Promise<PostHogClient | null> | null = null
+let postHogIdentifiedUserId: string | null = null
+let isPostHogBootstrapEnabled = true
 let isIdentityReady = false
 let resolveIdentityReady: () => void = () => undefined
 const identityReadyPromise = new Promise<void>((resolve) => {
@@ -142,21 +145,31 @@ export function sanitizePostHogEvent(
   if (!event) return null
 
   const eventProperties = allowedEventProperties[event.event]
-  if (!eventProperties) return null
+  const isSdkEvent = event.event.startsWith('$')
+  if (!eventProperties && !isSdkEvent) return null
 
-  for (const [key, validator] of Object.entries(eventProperties)) {
-    if (!validator(event.properties[key])) return null
+  if (eventProperties) {
+    for (const [key, validator] of Object.entries(eventProperties)) {
+      if (!validator(event.properties[key])) return null
+    }
   }
 
-  const properties: Properties = { $geoip_disable: true }
-  for (const [key, value] of Object.entries(event.properties)) {
-    const validator = eventProperties[key]
-    if (
-      (safeSdkProperties.has(key) && isSafeProperty(value)) ||
-      validator?.(value)
-    ) {
-      properties[key] = value
+  let properties: Properties
+  if (eventProperties) {
+    properties = { $geoip_disable: true }
+    for (const [key, value] of Object.entries(event.properties)) {
+      const validator = eventProperties[key]
+      if (
+        key.startsWith('$') ||
+        campaignProperties.has(key) ||
+        (safeSdkProperties.has(key) && isSafeProperty(value)) ||
+        validator?.(value)
+      ) {
+        properties[key] = value
+      }
     }
+  } else {
+    properties = { ...event.properties, $geoip_disable: true }
   }
 
   const sanitizedEvent: CaptureResult = {
@@ -164,60 +177,92 @@ export function sanitizePostHogEvent(
     properties,
   }
 
-  delete sanitizedEvent.$set_once
-  delete sanitizedEvent.$unset
-
   if (event.event === '$identify') {
+    const personProperties: Properties = {}
     const username = event.$set?.username
-    sanitizedEvent.$set =
-      typeof username === 'string' && publicUsernamePattern.test(username)
-        ? { username }
-        : undefined
-  } else {
-    delete sanitizedEvent.$set
+    const email = event.$set?.email
+    const name = event.$set?.name
+
+    if (typeof username === 'string' && publicUsernamePattern.test(username)) {
+      personProperties.username = username
+    }
+    if (isEmail(email)) personProperties.email = email
+    if (isDisplayName(name)) personProperties.name = name.trim()
+
+    sanitizedEvent.$set = Object.keys(personProperties).length
+      ? personProperties
+      : undefined
   }
 
   return sanitizedEvent
 }
 
-export function createPostHogConfig(apiHost: string): Partial<PostHogConfig> {
-  return {
+export function createPostHogConfig(
+  apiHost: string,
+  options: PostHogInitializationOptions = {},
+): Partial<PostHogConfig> {
+  const config: Partial<PostHogConfig> = {
     api_host: apiHost,
-    advanced_disable_flags: true,
-    autocapture: false,
+    defaults: '2026-06-25',
+    // Replay needs the remote recording configuration from /flags. Keep the
+    // configuration request while skipping actual feature-flag evaluation.
+    advanced_disable_flags: false,
+    advanced_disable_feature_flags: true,
+    autocapture: true,
     before_send: sanitizePostHogEvent,
-    capture_pageview: false,
-    capture_pageleave: false,
+    capture_pageview: 'history_change',
+    capture_pageleave: 'if_capture_pageview',
     capture_dead_clicks: false,
-    capture_exceptions: false,
+    capture_exceptions: true,
     capture_heatmaps: false,
-    capture_performance: false,
+    capture_performance: {
+      network_timing: true,
+      web_vitals: true,
+      web_vitals_attribution: false,
+    },
     disable_conversations: true,
     disable_external_dependency_loading: true,
-    disable_persistence: true,
+    disable_persistence: false,
     disable_product_tours: true,
-    disable_session_recording: true,
+    disable_session_recording: false,
     disable_surveys: true,
     disable_web_experiments: true,
+    enable_recording_console_log: false,
+    mask_all_element_attributes: false,
+    mask_all_text: false,
     opt_in_site_apps: false,
+    persistence: 'localStorage+cookie',
     person_profiles: 'identified_only',
-    property_denylist: blockedAutoProperties,
     respect_dnt: true,
-    save_campaign_params: false,
-    save_referrer: false,
+    save_campaign_params: true,
+    save_referrer: true,
+    session_recording: {
+      maskAllInputs: false,
+      maskInputOptions: { password: true },
+      recordBody: false,
+      recordHeaders: false,
+    },
     debug: process.env.NODE_ENV === 'development',
   }
+
+  if (options.extensionClasses) {
+    config.__extensionClasses = options.extensionClasses
+  }
+  if (options.loaded) config.loaded = options.loaded
+
+  return config
 }
 
 export function initializePostHogClient(
   client: PostHogClient,
   projectToken: string | undefined,
   posthogHost: string | undefined,
+  options: PostHogInitializationOptions = {},
 ): boolean {
   if (!projectToken || !posthogHost) return false
 
   try {
-    client.init(projectToken, createPostHogConfig(posthogHost))
+    client.init(projectToken, createPostHogConfig(posthogHost, options))
     return true
   } catch (error) {
     logPostHogError('initialization', error)
@@ -225,11 +270,21 @@ export function initializePostHogClient(
   }
 }
 
-export async function initializePostHog(): Promise<boolean> {
-  return Boolean(await loadPostHogClient())
+export async function initializePostHog(
+  initialSession: Session | null,
+): Promise<{ enabled: boolean; identifiedUserId: string | null }> {
+  const client = await loadPostHogClient(initialSession)
+  markPostHogIdentityReady()
+  return {
+    enabled: Boolean(client),
+    identifiedUserId: postHogIdentifiedUserId,
+  }
 }
 
-async function loadPostHogClient(): Promise<PostHogClient | null> {
+async function loadPostHogClient(
+  initialSession: Session | null = null,
+): Promise<PostHogClient | null> {
+  if (!isPostHogBootstrapEnabled) return null
   if (posthogClient) return posthogClient
 
   const projectToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN
@@ -237,9 +292,34 @@ async function loadPostHogClient(): Promise<PostHogClient | null> {
   if (!projectToken || !posthogHost) return null
 
   if (!initializationPromise) {
-    initializationPromise = import('posthog-js/dist/module.slim')
-      .then(({ default: client }) => {
-        if (!initializePostHogClient(client, projectToken, posthogHost)) {
+    initializationPromise = import('@/lib/posthogRuntime')
+      .then(({ default: client, postHogMonitoringExtensions }) => {
+        const identityActions: PostHogIdentityActions = {
+          identify: (userId, properties) => client.identify(userId, properties),
+          reset: () => client.reset(),
+          getPersistedUserId: () => {
+            const userId = client.get_property('$user_id')
+            return typeof userId === 'string' ? userId : null
+          },
+        }
+        const initialized = initializePostHogClient(
+          client,
+          projectToken,
+          posthogHost,
+          {
+            extensionClasses: postHogMonitoringExtensions,
+            loaded: () => {
+              postHogIdentifiedUserId = syncPostHogIdentity(
+                'INITIAL_SESSION',
+                initialSession,
+                postHogIdentifiedUserId,
+                identityActions,
+              )
+              markPostHogIdentityReady()
+            },
+          },
+        )
+        if (!initialized) {
           return null
         }
 
@@ -273,9 +353,9 @@ export async function capturePostHogEventWhenReady(
   eventName: string,
   properties?: Record<string, unknown>,
 ): Promise<boolean> {
+  await waitUntilIdentityReady()
   const client = await loadClient()
   if (!client) return false
-  await waitUntilIdentityReady()
   return capturePostHogEventWithClient(client, eventName, properties)
 }
 
@@ -283,6 +363,11 @@ export function markPostHogIdentityReady() {
   if (isIdentityReady) return
   isIdentityReady = true
   resolveIdentityReady()
+}
+
+export function disablePostHogAfterIdentityFailure() {
+  isPostHogBootstrapEnabled = false
+  markPostHogIdentityReady()
 }
 
 export function capturePostHogEventWithClient(
@@ -302,6 +387,7 @@ export function capturePostHogEventWithClient(
 type PostHogIdentityActions = {
   identify: (userId: string, properties: Record<string, unknown>) => void
   reset: () => void
+  getPersistedUserId?: () => string | null
 }
 
 const postHogIdentityActions: PostHogIdentityActions = {
@@ -321,6 +407,10 @@ const postHogIdentityActions: PostHogIdentityActions = {
       logPostHogError('identity reset', error)
     }
   },
+  getPersistedUserId: () => {
+    const userId = posthogClient?.get_property('$user_id')
+    return typeof userId === 'string' ? userId : null
+  },
 }
 
 export function syncPostHogIdentity(
@@ -330,9 +420,15 @@ export function syncPostHogIdentity(
   actions: PostHogIdentityActions = postHogIdentityActions,
 ): string | null {
   const user = session?.user
+  const persistedUserId = actions.getPersistedUserId?.() ?? identifiedUserId
 
-  if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !user)) {
+  if (event === 'SIGNED_OUT') {
     actions.reset()
+    return null
+  }
+
+  if (event === 'INITIAL_SESSION' && !user) {
+    if (persistedUserId) actions.reset()
     return null
   }
 
@@ -340,14 +436,42 @@ export function syncPostHogIdentity(
     return identifiedUserId
   }
 
-  if (event === 'INITIAL_SESSION' || identifiedUserId !== user.id) {
+  if (persistedUserId && persistedUserId !== user.id) {
     actions.reset()
   }
 
-  const username = getSessionTwitterUsername(user) ?? undefined
-
-  actions.identify(user.id, { username })
+  actions.identify(user.id, getPostHogPersonProperties(user))
   return user.id
+}
+
+export function getPostHogPersonProperties(user: User): Record<string, string> {
+  const properties: Record<string, string> = {}
+  const username = getSessionTwitterUsername(user)
+  const displayName = getTwitterDisplayName(user)
+
+  if (username) properties.username = username
+  if (isEmail(user.email)) properties.email = user.email
+  if (displayName) properties.name = displayName
+
+  return properties
+}
+
+function getTwitterDisplayName(user: User): string | null {
+  const identity =
+    user.identities?.find((item) =>
+      ['twitter', 'x'].includes(item.provider ?? ''),
+    ) ?? null
+  const identityData = (identity?.identity_data ?? {}) as Record<
+    string,
+    unknown
+  >
+
+  for (const key of ['full_name', 'name']) {
+    const value = identityData[key]
+    if (isDisplayName(value)) return value.trim()
+  }
+
+  return null
 }
 
 function logPostHogError(action: string, error: unknown) {

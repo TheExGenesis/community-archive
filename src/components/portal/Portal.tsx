@@ -485,7 +485,11 @@ export default function Portal({
               divider={false}
             />
             <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 lg:grid-cols-4">
-              {PORTAL_TOOLS.filter((t) => !t.image).map((tool) => (
+              {PORTAL_TOOLS.filter(
+                (t) =>
+                  !t.image &&
+                  !['Banger Bot', 'Highlights Bot'].includes(t.name),
+              ).map((tool) => (
                 <a
                   key={tool.name}
                   href={tool.link}

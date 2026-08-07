@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -84,6 +84,8 @@ type QuotesResponse = {
   query: {
     limit: number
     excludeSelf: boolean
+    targetCommunityUsersOnly: boolean
+    quoteCommunityUsersOnly: boolean
     includeUsernames: string[]
     excludeUsernames: string[]
     unresolvedIncludeUsernames: string[]
@@ -93,6 +95,43 @@ type QuotesResponse = {
     candidateRankingTruncated: boolean
   }
   timing: Timing
+}
+
+type QuotePostRow = {
+  tweetId: string
+  accountId: string
+  username: string | null
+  displayName: string | null
+  avatarUrl: string | null
+  createdAt: string
+  fullText: string
+  favoriteCount: string
+  retweetCount: string
+}
+
+type QuotePostsResponse = {
+  data: QuotePostRow[]
+  query: {
+    tweetId: string
+    limit: number
+    offset: number
+    total: string
+    excludeSelf: boolean
+    quoteCommunityUsersOnly: boolean
+    includeUsernames: string[]
+    excludeUsernames: string[]
+    unresolvedIncludeUsernames: string[]
+    unresolvedExcludeUsernames: string[]
+  }
+  timing: Timing
+}
+
+type QuoteEvidenceState = {
+  data: QuotePostRow[]
+  query?: QuotePostsResponse['query']
+  timing?: Timing
+  loading: boolean
+  error: string | null
 }
 
 type TrendRow = {
@@ -172,6 +211,8 @@ function LoadingPanel({ label }: { label: string }) {
 
 export default function ClickHouseLabClient() {
   const router = useRouter()
+  const quoteEvidenceGeneration = useRef(0)
+  const activeQuoteEvidenceRequests = useRef(new Set<string>())
   const [summary, setSummary] = useState<SummaryResponse | null>(null)
   const [quotes, setQuotes] = useState<QuotesResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -179,8 +220,16 @@ export default function ClickHouseLabClient() {
   const [quotesError, setQuotesError] = useState<string | null>(null)
   const [quoteLimit, setQuoteLimit] = useState('25')
   const [excludeSelfQuotes, setExcludeSelfQuotes] = useState(true)
+  const [targetCommunityUsersOnly, setTargetCommunityUsersOnly] = useState(true)
+  const [quoteCommunityUsersOnly, setQuoteCommunityUsersOnly] = useState(true)
   const [includeQuoteUsernames, setIncludeQuoteUsernames] = useState('')
   const [excludeQuoteUsernames, setExcludeQuoteUsernames] = useState('')
+  const [expandedQuoteTweetId, setExpandedQuoteTweetId] = useState<
+    string | null
+  >(null)
+  const [quoteEvidence, setQuoteEvidence] = useState<
+    Record<string, QuoteEvidenceState>
+  >({})
   const [identifier, setIdentifier] = useState('')
   const [wordQuery, setWordQuery] = useState('')
   const [bucket, setBucket] = useState('month')
@@ -206,7 +255,9 @@ export default function ClickHouseLabClient() {
             error instanceof Error ? error.message : 'Unable to load analytics',
           )
       })
-    request<QuotesResponse>('top-quotes?limit=25&exclude_self=true')
+    request<QuotesResponse>(
+      'top-quotes?limit=25&exclude_self=true&target_ca_users_only=true&quote_ca_users_only=true',
+    )
       .then((quotesResponse) => {
         if (!cancelled) setQuotes(quotesResponse)
       })
@@ -273,6 +324,8 @@ export default function ClickHouseLabClient() {
     const params = new URLSearchParams({
       limit: quoteLimit,
       exclude_self: String(excludeSelfQuotes),
+      target_ca_users_only: String(targetCommunityUsersOnly),
+      quote_ca_users_only: String(quoteCommunityUsersOnly),
     })
     if (includeQuoteUsernames.trim()) {
       params.set('include_usernames', includeQuoteUsernames)
@@ -287,7 +340,12 @@ export default function ClickHouseLabClient() {
       has_exclude_filter: Boolean(excludeQuoteUsernames.trim()),
     })
     try {
-      setQuotes(await request<QuotesResponse>(`top-quotes?${params}`))
+      const response = await request<QuotesResponse>(`top-quotes?${params}`)
+      quoteEvidenceGeneration.current += 1
+      activeQuoteEvidenceRequests.current.clear()
+      setQuotes(response)
+      setExpandedQuoteTweetId(null)
+      setQuoteEvidence({})
     } catch (error) {
       setQuotesError(
         error instanceof Error
@@ -297,6 +355,92 @@ export default function ClickHouseLabClient() {
     } finally {
       setQuotesLoading(false)
     }
+  }
+
+  function quoteEvidenceParams(offset: number) {
+    const params = new URLSearchParams({
+      limit: '25',
+      offset: String(offset),
+      exclude_self: String(quotes?.query.excludeSelf !== false),
+      quote_ca_users_only: String(
+        quotes?.query.quoteCommunityUsersOnly !== false,
+      ),
+    })
+    if (quotes?.query.includeUsernames.length) {
+      params.set('include_usernames', quotes.query.includeUsernames.join(','))
+    }
+    if (quotes?.query.excludeUsernames.length) {
+      params.set('exclude_usernames', quotes.query.excludeUsernames.join(','))
+    }
+    return params
+  }
+
+  async function loadQuoteEvidence(tweetId: string, offset = 0) {
+    const generation = quoteEvidenceGeneration.current
+    const requestKey = `${generation}:${tweetId}:${offset}`
+    if (activeQuoteEvidenceRequests.current.has(requestKey)) return
+    activeQuoteEvidenceRequests.current.add(requestKey)
+
+    setQuoteEvidence((current) => ({
+      ...current,
+      [tweetId]: {
+        data: offset ? current[tweetId]?.data || [] : [],
+        query: current[tweetId]?.query,
+        timing: current[tweetId]?.timing,
+        loading: true,
+        error: null,
+      },
+    }))
+    try {
+      const response = await request<QuotePostsResponse>(
+        `quote-posts/${encodeURIComponent(tweetId)}?${quoteEvidenceParams(offset)}`,
+      )
+      setQuoteEvidence((current) =>
+        quoteEvidenceGeneration.current === generation
+          ? {
+              ...current,
+              [tweetId]: {
+                data: offset
+                  ? [...(current[tweetId]?.data || []), ...response.data]
+                  : response.data,
+                query: response.query,
+                timing: response.timing,
+                loading: false,
+                error: null,
+              },
+            }
+          : current,
+      )
+    } catch (error) {
+      setQuoteEvidence((current) =>
+        quoteEvidenceGeneration.current === generation
+          ? {
+              ...current,
+              [tweetId]: {
+                data: current[tweetId]?.data || [],
+                query: current[tweetId]?.query,
+                timing: current[tweetId]?.timing,
+                loading: false,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : 'Unable to load quote posts',
+              },
+            }
+          : current,
+      )
+    } finally {
+      activeQuoteEvidenceRequests.current.delete(requestKey)
+    }
+  }
+
+  function toggleQuoteEvidence(tweetId: string) {
+    if (expandedQuoteTweetId === tweetId) {
+      setExpandedQuoteTweetId(null)
+      return
+    }
+    setExpandedQuoteTweetId(tweetId)
+    if (!quoteEvidence[tweetId]) void loadQuoteEvidence(tweetId)
   }
 
   return (
@@ -654,10 +798,46 @@ export default function ClickHouseLabClient() {
               onSubmit={runQuotes}
               className="border-b bg-muted/20 p-4 sm:p-5"
             >
-              <div className="grid items-end gap-4 md:grid-cols-[minmax(240px,1fr)_120px_auto]">
+              <div className="grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[minmax(210px,1fr)_minmax(210px,1fr)_minmax(230px,1fr)_120px_auto]">
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Target authors
+                  </span>
+                  <div className="mt-2 flex h-10 items-center gap-3 rounded-md border bg-background px-3">
+                    <Switch
+                      id="target-ca-users-only"
+                      checked={targetCommunityUsersOnly}
+                      onCheckedChange={setTargetCommunityUsersOnly}
+                    />
+                    <label
+                      htmlFor="target-ca-users-only"
+                      className="text-sm font-medium"
+                    >
+                      Only tweets by CA users
+                    </label>
+                  </div>
+                </div>
                 <div>
                   <span className="text-xs font-medium text-muted-foreground">
                     Quote authors
+                  </span>
+                  <div className="mt-2 flex h-10 items-center gap-3 rounded-md border bg-background px-3">
+                    <Switch
+                      id="quote-ca-users-only"
+                      checked={quoteCommunityUsersOnly}
+                      onCheckedChange={setQuoteCommunityUsersOnly}
+                    />
+                    <label
+                      htmlFor="quote-ca-users-only"
+                      className="text-sm font-medium"
+                    >
+                      Only quotes by CA users
+                    </label>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Source-author rule
                   </span>
                   <div className="mt-2 flex h-10 items-center gap-3 rounded-md border bg-background px-3">
                     <Switch
@@ -744,6 +924,18 @@ export default function ClickHouseLabClient() {
               <>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 border-b px-5 py-3 text-xs text-muted-foreground">
                   <span>
+                    {quotes.query.targetCommunityUsersOnly
+                      ? 'Target tweets by CA users only'
+                      : 'Target tweets by any archived account'}
+                  </span>
+                  <span>
+                    ·{' '}
+                    {quotes.query.quoteCommunityUsersOnly
+                      ? 'Quote posts by CA users only'
+                      : 'Quote posts by any archived account'}
+                  </span>
+                  <span>
+                    ·{' '}
                     {quotes.query.excludeSelf
                       ? 'Source-author quotes excluded'
                       : 'Source-author quotes included'}
@@ -782,58 +974,190 @@ export default function ClickHouseLabClient() {
                   </p>
                 ) : null}
                 <CardContent className="divide-y p-0">
-                  {quotes.data.map((row, index) => (
-                    <article
-                      key={row.tweetId}
-                      className="grid gap-3 p-5 sm:grid-cols-[42px_90px_minmax(0,1fr)_auto] sm:items-start"
-                    >
-                      <span className="text-sm tabular-nums text-muted-foreground">
-                        {String(index + 1).padStart(2, '0')}
-                      </span>
-                      <div>
-                        <strong className="block text-xl tabular-nums">
-                          {number(row.quoteCount)}
-                        </strong>
-                        <span className="text-xs text-muted-foreground">
-                          quote posts
-                        </span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="line-clamp-3 text-sm leading-6">
-                          {row.fullText ||
-                            'Target tweet is not present in the current corpus.'}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                          <span>@{row.username || 'unknown'}</span>
-                          <span>{date(row.createdAt)}</span>
-                          <span>♥ {number(row.favoriteCount, true)}</span>
-                          <span>↻ {number(row.retweetCount, true)}</span>
-                          {row.quotingAccounts ? (
-                            <span>
-                              {number(row.quotingAccounts)} quoting accounts
+                  {quotes.data.map((row, index) => {
+                    const evidence = quoteEvidence[row.tweetId]
+                    const expanded = expandedQuoteTweetId === row.tweetId
+                    const evidenceTotal = Number(evidence?.query?.total || 0)
+                    return (
+                      <div key={row.tweetId}>
+                        <article className="grid gap-3 p-5 sm:grid-cols-[42px_90px_minmax(0,1fr)_auto] sm:items-start">
+                          <span className="text-sm tabular-nums text-muted-foreground">
+                            {String(index + 1).padStart(2, '0')}
+                          </span>
+                          <div>
+                            <strong className="block text-xl tabular-nums">
+                              {number(row.quoteCount)}
+                            </strong>
+                            <span className="text-xs text-muted-foreground">
+                              quote posts
                             </span>
-                          ) : null}
-                          {Number(row.selfQuotesRemoved) ? (
-                            <span>
-                              −{number(row.selfQuotesRemoved)} source-author
-                            </span>
-                          ) : null}
-                        </div>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="line-clamp-3 text-sm leading-6">
+                              {row.fullText ||
+                                'Target tweet is not present in the current corpus.'}
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              <span>@{row.username || 'unknown'}</span>
+                              <span>{date(row.createdAt)}</span>
+                              <span>♥ {number(row.favoriteCount, true)}</span>
+                              <span>↻ {number(row.retweetCount, true)}</span>
+                              {row.quotingAccounts ? (
+                                <span>
+                                  {number(row.quotingAccounts)} quoting accounts
+                                </span>
+                              ) : null}
+                              {Number(row.selfQuotesRemoved) ? (
+                                <span>
+                                  −{number(row.selfQuotesRemoved)} source-author
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 sm:flex-col sm:items-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => toggleQuoteEvidence(row.tweetId)}
+                              aria-expanded={expanded}
+                              aria-controls={`quote-evidence-${row.tweetId}`}
+                            >
+                              <Quote className="mr-1.5 h-3.5 w-3.5" />
+                              {expanded ? 'Hide quotes' : 'Show quotes'}
+                            </Button>
+                            <a
+                              href={
+                                row.username
+                                  ? `https://x.com/${encodeURIComponent(row.username)}/status/${row.tweetId}`
+                                  : `https://x.com/i/status/${row.tweetId}`
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center text-xs font-medium text-brand hover:underline"
+                            >
+                              Open <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+                            </a>
+                          </div>
+                        </article>
+                        {expanded ? (
+                          <section
+                            id={`quote-evidence-${row.tweetId}`}
+                            aria-label={`Quote posts for tweet ${row.tweetId}`}
+                            className="border-t bg-muted/20 px-5 py-5 sm:pl-[174px]"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <h3 className="text-sm font-semibold">
+                                  Archived quote posts
+                                </h3>
+                                {evidence?.query ? (
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    Showing {number(evidence.data.length)} of{' '}
+                                    {number(evidence.query.total)} matching
+                                    posts
+                                  </p>
+                                ) : null}
+                              </div>
+                              <TimingBadge timing={evidence?.timing} />
+                            </div>
+                            {evidence?.error ? (
+                              <p className="mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-950 dark:border-red-800 dark:bg-red-950/30 dark:text-red-100">
+                                {evidence.error}
+                              </p>
+                            ) : null}
+                            {evidence?.query ? (
+                              <p
+                                className={`mt-4 rounded-md border px-3 py-2 text-xs ${
+                                  evidenceTotal === Number(row.quoteCount)
+                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200'
+                                    : 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200'
+                                }`}
+                              >
+                                {evidenceTotal === Number(row.quoteCount)
+                                  ? `Verified: the evidence query found the same ${number(evidence.query.total)} unique quote posts.`
+                                  : `The evidence query currently finds ${number(evidence.query.total)} posts versus ${number(row.quoteCount)} in the cached ranking. Re-run the ranking if the archive changed.`}
+                              </p>
+                            ) : null}
+                            {evidence?.data.length ? (
+                              <div className="mt-4 divide-y rounded-md border bg-background">
+                                {evidence.data.map((quotePost) => (
+                                  <article
+                                    key={quotePost.tweetId}
+                                    className="flex items-start justify-between gap-4 p-4"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="whitespace-pre-wrap text-sm leading-6">
+                                        {quotePost.fullText ||
+                                          'Archived quote post has no text.'}
+                                      </p>
+                                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                        <span>
+                                          @{quotePost.username || 'unknown'}
+                                        </span>
+                                        <span>{date(quotePost.createdAt)}</span>
+                                        <span>
+                                          ♥{' '}
+                                          {number(
+                                            quotePost.favoriteCount,
+                                            true,
+                                          )}
+                                        </span>
+                                        <span>
+                                          ↻{' '}
+                                          {number(quotePost.retweetCount, true)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <a
+                                      href={
+                                        quotePost.username
+                                          ? `https://x.com/${encodeURIComponent(quotePost.username)}/status/${quotePost.tweetId}`
+                                          : `https://x.com/i/status/${quotePost.tweetId}`
+                                      }
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="shrink-0 text-xs font-medium text-brand hover:underline"
+                                    >
+                                      Open{' '}
+                                      <ArrowUpRight className="ml-1 inline h-3.5 w-3.5" />
+                                    </a>
+                                  </article>
+                                ))}
+                              </div>
+                            ) : evidence?.query && !evidence.loading ? (
+                              <p className="mt-4 rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                No archived quote posts match these filters.
+                              </p>
+                            ) : null}
+                            {evidence?.loading && !evidence.data.length ? (
+                              <div className="mt-4">
+                                <LoadingPanel label="Loading quote posts" />
+                              </div>
+                            ) : null}
+                            {evidence?.query &&
+                            evidence.data.length < evidenceTotal ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="mt-4"
+                                disabled={evidence.loading}
+                                onClick={() =>
+                                  void loadQuoteEvidence(
+                                    row.tweetId,
+                                    evidence.data.length,
+                                  )
+                                }
+                              >
+                                {evidence.loading ? 'Loading…' : 'Load 25 more'}
+                              </Button>
+                            ) : null}
+                          </section>
+                        ) : null}
                       </div>
-                      <a
-                        href={
-                          row.username
-                            ? `https://x.com/${encodeURIComponent(row.username)}/status/${row.tweetId}`
-                            : `https://x.com/i/status/${row.tweetId}`
-                        }
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center text-xs font-medium text-brand hover:underline"
-                      >
-                        Open <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
-                      </a>
-                    </article>
-                  ))}
+                    )
+                  })}
                   {!quotes.data.length ? (
                     <div className="p-10 text-center text-sm text-muted-foreground">
                       No quoted posts match this account set.

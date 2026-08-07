@@ -65,34 +65,34 @@ export default async function RootLayout({
         >
           <ReactQueryProvider>
             <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
-              <div className="container mx-auto flex h-16 max-w-screen-xl items-center justify-between px-4 sm:px-6 lg:px-8">
-                <Link
-                  href="/"
-                  className="flex flex-shrink-0 items-center space-x-2"
-                >
-                  <Image
-                    src="/images/logo.png"
-                    alt="Community Archive logo"
-                    width={28}
-                    height={28}
-                    className="h-7 w-7 flex-shrink-0"
-                    priority
-                  />
-                  <span
-                    className="hidden whitespace-nowrap text-lg font-bold text-foreground sm:inline"
-                    style={{
-                      fontFamily:
-                        'var(--font-petrona), Georgia, "Times New Roman", serif',
-                    }}
+              <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+                <div className="flex min-w-0 items-center gap-6">
+                  <Link
+                    href="/"
+                    className="flex flex-shrink-0 items-center space-x-2"
                   >
-                    Community Archive
-                  </span>
-                </Link>
-                <HeaderNavigation />
-                <div className="flex items-center space-x-3">
-                  <HeaderSearch />
+                    <Image
+                      src="/images/logo.png"
+                      alt="Community Archive logo"
+                      width={28}
+                      height={28}
+                      className="h-7 w-7 flex-shrink-0"
+                      priority
+                    />
+                    <span
+                      className="hidden whitespace-nowrap text-lg font-bold text-foreground sm:inline"
+                      style={{
+                        fontFamily:
+                          'var(--font-petrona), Georgia, "Times New Roman", serif',
+                      }}
+                    >
+                      Community Archive
+                    </span>
+                  </Link>
+                  <HeaderNavigation />
                 </div>
-                <div className="flex items-center space-x-3">
+                <div className="flex flex-shrink-0 items-center space-x-3">
+                  <HeaderSearch />
                   <div className="text-sm">
                     <DynamicSignIn />
                   </div>

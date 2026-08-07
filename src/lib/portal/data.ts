@@ -1,7 +1,5 @@
 import 'server-only'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
-import type { Database } from '@/database-types'
 import { clickHouseAnalyticsGatewayBaseUrl } from '@/lib/clickhouseGateway'
 import { fetchPortalLiveAnalytics, fetchPortalTrends } from './analytics'
 import type { PortalLiveAnalytics } from './analytics'
@@ -29,6 +27,8 @@ interface PortalCorpusSnapshot {
   firstYear: number
   currentYear: number
 }
+
+const PORTAL_READ_TIMEOUT_MS = 10_000
 
 type PortalStatsSnapshot = PortalLiveAnalytics & {
   joinedThisWeek: number
@@ -101,11 +101,54 @@ export function portalDataSourceKey(
   return `portal-v3:${environment}:${analyticsSource}:${portalRead.sourceId}`
 }
 
-const getPortalClient = (): SupabaseClient<Database> => {
+interface PortalRestOptions {
+  method?: 'GET' | 'HEAD'
+  prefer?: string
+}
+
+async function portalRestRequest(
+  table: string,
+  params: URLSearchParams,
+  options: PortalRestOptions = {},
+): Promise<Response> {
   const { url, anonKey } = resolvePortalReadConfig()
-  return createClient<Database>(url, anonKey, {
-    auth: { persistSession: false },
-  })
+  const response = await fetch(
+    `${url.replace(/\/$/, '')}/rest/v1/${table}?${params.toString()}`,
+    {
+      method: options.method ?? 'GET',
+      headers: {
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+        'Accept-Profile': 'public',
+        ...(options.prefer ? { Prefer: options.prefer } : {}),
+      },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(PORTAL_READ_TIMEOUT_MS),
+    },
+  )
+
+  if (!response.ok) {
+    const detail =
+      options.method === 'HEAD'
+        ? ''
+        : `: ${(await response.text()).slice(0, 500)}`
+    throw new Error(
+      `Portal ${table} query failed (${response.status})${detail}`,
+    )
+  }
+  return response
+}
+
+async function portalRestRows<T>(
+  table: string,
+  params: URLSearchParams,
+): Promise<T[]> {
+  const response = await portalRestRequest(table, params)
+  const data: unknown = await response.json()
+  if (!Array.isArray(data)) {
+    throw new Error(`Portal ${table} query returned an invalid response`)
+  }
+  return data as T[]
 }
 
 function isoDaysAgo(days: number): string {
@@ -124,53 +167,31 @@ export async function getPortalStream(
   limit = 30,
   cursor?: PortalStreamCursor,
 ): Promise<PortalTweet[]> {
-  const supabase = getPortalClient()
   const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100)
   const after = cursor ? validatedCursor(cursor) : null
-  let query = supabase
-    .from('tweets')
-    .select(
-      `
-      tweet_id,
-      account_id,
-      created_at,
-      updated_at,
-      full_text,
-      retweet_count,
-      favorite_count,
-      account:all_account!inner (
-        username,
-        account_display_name
-      )
-    `,
-    )
-    .is('archive_upload_id', null)
-    .is('reply_to_tweet_id', null)
-    .not('full_text', 'ilike', 'RT @%')
+  const params = new URLSearchParams({
+    select:
+      'tweet_id,account_id,created_at,updated_at,full_text,retweet_count,favorite_count,account:all_account!inner(username,account_display_name)',
+    archive_upload_id: 'is.null',
+    reply_to_tweet_id: 'is.null',
+    full_text: 'not.ilike.RT @%',
+    order: `${after ? 'updated_at.asc' : 'updated_at.desc'},${after ? 'tweet_id.asc' : 'tweet_id.desc'}`,
+    limit: String(safeLimit),
+  })
 
   if (after) {
-    query = query.or(
-      `updated_at.gt.${after.observedAt},and(updated_at.eq.${after.observedAt},tweet_id.gt.${after.id})`,
+    params.set(
+      'or',
+      `(updated_at.gt.${after.observedAt},and(updated_at.eq.${after.observedAt},tweet_id.gt.${after.id}))`,
     )
   }
 
-  const { data, error } = await query
-    .order('updated_at', {
-      ascending: Boolean(after),
-      nullsFirst: false,
-    })
-    .order('tweet_id', { ascending: Boolean(after) })
-    .limit(safeLimit)
-
-  if (error) throw new Error(`Portal stream query failed: ${error.message}`)
-  return toPortalTweets(supabase, data ?? [])
+  const data = await portalRestRows<any>('tweets', params)
+  return toPortalTweets(data)
 }
 
 /** Map raw tweet rows to portal tweets and attach the newest known avatar. */
-async function toPortalTweets(
-  supabase: SupabaseClient<Database>,
-  tweets: any[],
-): Promise<PortalTweet[]> {
+async function toPortalTweets(tweets: any[]): Promise<PortalTweet[]> {
   const accountOf = (tweet: any) =>
     Array.isArray(tweet.account) ? tweet.account[0] : tweet.account
   const accountIds = Array.from(
@@ -179,19 +200,22 @@ async function toPortalTweets(
   const avatarMap = new Map<string, string>()
 
   if (accountIds.length > 0) {
-    const { data: profiles, error } = await supabase
-      .from('all_profile')
-      .select('account_id, avatar_media_url')
-      .in('account_id', accountIds)
-      .order('archive_upload_id', { ascending: false })
-    if (error) {
-      console.error('Portal avatar query failed:', error)
-    } else {
-      profiles?.forEach((profile: any) => {
+    try {
+      const profiles = await portalRestRows<any>(
+        'all_profile',
+        new URLSearchParams({
+          select: 'account_id,avatar_media_url',
+          account_id: `in.(${accountIds.join(',')})`,
+          order: 'archive_upload_id.desc',
+        }),
+      )
+      profiles.forEach((profile: any) => {
         if (profile.avatar_media_url && !avatarMap.has(profile.account_id)) {
           avatarMap.set(profile.account_id, profile.avatar_media_url)
         }
       })
+    } catch (error) {
+      console.error('Portal avatar query failed:', error)
     }
   }
 
@@ -213,36 +237,23 @@ async function toPortalTweets(
 
 /** Top-liked original tweets from members' own production archives. */
 async function fetchTopBangers(limit = 30): Promise<PortalTweet[]> {
-  const supabase = getPortalClient()
-  const { data, error } = await supabase
-    .from('tweets')
-    .select(
-      `
-      tweet_id,
-      account_id,
-      created_at,
-      updated_at,
-      full_text,
-      retweet_count,
-      favorite_count,
-      account:all_account!inner (
-        username,
-        account_display_name
-      )
-    `,
-    )
-    .not('archive_upload_id', 'is', null)
-    .is('reply_to_tweet_id', null)
-    .not('full_text', 'ilike', 'RT @%')
-    .order('favorite_count', { ascending: false })
-    .limit(80)
-
-  if (error) throw new Error(`Portal bangers query failed: ${error.message}`)
-  const textful = (data ?? []).filter((tweet: any) => {
+  const data = await portalRestRows<any>(
+    'tweets',
+    new URLSearchParams({
+      select:
+        'tweet_id,account_id,created_at,updated_at,full_text,retweet_count,favorite_count,account:all_account!inner(username,account_display_name)',
+      archive_upload_id: 'not.is.null',
+      reply_to_tweet_id: 'is.null',
+      full_text: 'not.ilike.RT @%',
+      order: 'favorite_count.desc',
+      limit: '80',
+    }),
+  )
+  const textful = data.filter((tweet: any) => {
     const text = (tweet.full_text ?? '').replace(/https?:\/\/\S+/g, '').trim()
     return text.length >= 30
   })
-  const mapped = await toPortalTweets(supabase, textful)
+  const mapped = await toPortalTweets(textful)
   return mapped.slice(0, limit)
 }
 
@@ -250,29 +261,28 @@ async function fetchCorpusRange(): Promise<{
   firstYear: number
   currentYear: number
 }> {
-  const supabase = getPortalClient()
-  const base = () =>
-    supabase
-      .from('tweets')
-      .select('created_at')
-      .gte('created_at', '2006-01-01')
-      .limit(1)
   const [firstResult, latestResult] = await Promise.all([
-    base().order('created_at', { ascending: true }),
-    base().order('created_at', { ascending: false }),
+    portalRestRows<{ created_at: string }>(
+      'tweets',
+      new URLSearchParams({
+        select: 'created_at',
+        created_at: 'gte.2006-01-01',
+        order: 'created_at.asc',
+        limit: '1',
+      }),
+    ),
+    portalRestRows<{ created_at: string }>(
+      'tweets',
+      new URLSearchParams({
+        select: 'created_at',
+        created_at: 'gte.2006-01-01',
+        order: 'created_at.desc',
+        limit: '1',
+      }),
+    ),
   ])
-  if (firstResult.error) {
-    throw new Error(
-      `Portal corpus start query failed: ${firstResult.error.message}`,
-    )
-  }
-  if (latestResult.error) {
-    throw new Error(
-      `Portal corpus end query failed: ${latestResult.error.message}`,
-    )
-  }
-  const first = firstResult.data?.[0]?.created_at
-  const latest = latestResult.data?.[0]?.created_at
+  const first = firstResult[0]?.created_at
+  const latest = latestResult[0]?.created_at
   if (!first || !latest) throw new Error('Portal corpus is empty')
   return {
     firstYear: new Date(first).getUTCFullYear(),
@@ -289,20 +299,24 @@ async function computePortalCorpusSnapshot(): Promise<PortalCorpusSnapshot> {
 }
 
 async function computePortalStatsSnapshot(): Promise<PortalStatsSnapshot> {
-  const supabase = getPortalClient()
-  const [analytics, joinedThisWeek] = await Promise.all([
+  const [analytics, joinedThisWeekResponse] = await Promise.all([
     fetchPortalLiveAnalytics(),
-    supabase
-      .from('archive_upload')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', isoDaysAgo(7)),
+    portalRestRequest(
+      'archive_upload',
+      new URLSearchParams({
+        select: 'id',
+        created_at: `gte.${isoDaysAgo(7)}`,
+      }),
+      { method: 'HEAD', prefer: 'count=exact' },
+    ),
   ])
-  if (joinedThisWeek.error) {
-    throw new Error(
-      `Portal upload count failed: ${joinedThisWeek.error.message}`,
-    )
+  const contentRange = joinedThisWeekResponse.headers.get('content-range')
+  const countText = contentRange?.split('/').at(-1)
+  const joinedThisWeek = countText ? Number(countText) : Number.NaN
+  if (!Number.isSafeInteger(joinedThisWeek) || joinedThisWeek < 0) {
+    throw new Error('Portal upload count returned an invalid response')
   }
-  return { ...analytics, joinedThisWeek: joinedThisWeek.count ?? 0 }
+  return { ...analytics, joinedThisWeek }
 }
 
 // Arguments participate in the cache key, keeping staging/prod sources and

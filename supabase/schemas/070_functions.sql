@@ -54,26 +54,52 @@ ALTER FUNCTION "private"."queue_update_conversation_ids"() OWNER TO "postgres";
 -- Update updated_at and track opt-in/out timestamps on optin table
 CREATE OR REPLACE FUNCTION "public"."update_optin_updated_at"() RETURNS "trigger"
     LANGUAGE "plpgsql"
+    SET "search_path" TO ''
     AS $$
 BEGIN
     NEW.updated_at = NOW();
-    
-    -- Track opt-in/opt-out timestamps
-    IF OLD.opted_in = false AND NEW.opted_in = true THEN
+
+    -- Inserts have no OLD row, so initialize state timestamps explicitly.
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.explicit_optout IS TRUE THEN
+            NEW.opted_in = false;
+            NEW.opted_out_at = NOW();
+        ELSIF NEW.opted_in IS TRUE THEN
+            NEW.opted_in_at = NOW();
+            NEW.opted_out_at = NULL;
+            NEW.explicit_optout = false;
+            NEW.opt_out_reason = NULL;
+        END IF;
+
+        RETURN NEW;
+    END IF;
+
+    -- State timestamps are server-owned. Ignore caller-supplied rewrites unless
+    -- the opt-in state actually changes below.
+    NEW.opted_in_at = OLD.opted_in_at;
+    NEW.opted_out_at = OLD.opted_out_at;
+
+    -- Explicit opt-outs always override opt-in state.
+    IF NEW.explicit_optout IS TRUE THEN
+        NEW.opted_in = false;
+        IF OLD.explicit_optout IS DISTINCT FROM TRUE
+           OR OLD.opted_in IS TRUE
+           OR NEW.opted_out_at IS NULL THEN
+            NEW.opted_out_at = NOW();
+        END IF;
+    -- Track opt-in/opt-out timestamps.
+    ELSIF OLD.opted_in IS FALSE AND NEW.opted_in IS TRUE THEN
         NEW.opted_in_at = NOW();
         NEW.opted_out_at = NULL;
         NEW.explicit_optout = false; -- Clear explicit opt-out when opting in
         NEW.opt_out_reason = NULL;
-    ELSIF OLD.opted_in = true AND NEW.opted_in = false THEN
+    ELSIF OLD.opted_in IS TRUE AND NEW.opted_in IS FALSE THEN
         NEW.opted_out_at = NOW();
+    ELSIF NEW.opted_in IS TRUE AND NEW.opted_in_at IS NULL THEN
+        -- Repair legacy opted-in rows the next time they are updated.
+        NEW.opted_in_at = COALESCE(OLD.opted_in_at, OLD.created_at, OLD.updated_at, NOW());
     END IF;
-    
-    -- Handle explicit opt-out
-    IF OLD.explicit_optout = false AND NEW.explicit_optout = true THEN
-        NEW.opted_in = false;
-        NEW.opted_out_at = NOW();
-    END IF;
-    
+
     RETURN NEW;
 END;
 $$;

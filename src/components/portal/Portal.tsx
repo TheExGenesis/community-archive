@@ -317,38 +317,6 @@ export default function Portal({
             </div>
 
             <div className="flex flex-col gap-4">
-              {atlas && (
-                <a
-                  href={atlas.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`${CARD} group overflow-hidden transition-colors hover:border-brand/60`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={atlas.image}
-                    alt={`${atlas.name} preview`}
-                    loading="lazy"
-                    className="aspect-[3/1] w-full border-b border-zinc-200 object-cover dark:border-[#26262a]"
-                  />
-                  <div className="flex items-start gap-2.5 px-4 py-3">
-                    <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
-                      {atlas.icon}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-[13.5px] font-bold">
-                        {atlas.name}
-                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
-                      </span>
-                      <span
-                        className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
-                      >
-                        {atlas.description}
-                      </span>
-                    </span>
-                  </div>
-                </a>
-              )}
               <div className={CARD}>
                 <PanelHeader
                   title="Research"
@@ -407,6 +375,38 @@ export default function Portal({
                   )}
                 </div>
               </div>
+              {atlas && (
+                <a
+                  href={atlas.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${CARD} group overflow-hidden transition-colors hover:border-brand/60`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={atlas.image}
+                    alt={`${atlas.name} preview`}
+                    loading="lazy"
+                    className="aspect-[2/1] w-full border-b border-zinc-200 object-cover dark:border-[#26262a]"
+                  />
+                  <div className="flex items-start gap-2.5 px-4 py-3">
+                    <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
+                      {atlas.icon}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-[13.5px] font-bold">
+                        {atlas.name}
+                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
+                      </span>
+                      <span
+                        className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
+                      >
+                        {atlas.description}
+                      </span>
+                    </span>
+                  </div>
+                </a>
+              )}
 
               <div className={`${CARD} flex flex-1 flex-col`}>
                 <PanelHeader

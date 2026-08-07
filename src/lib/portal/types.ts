@@ -4,6 +4,9 @@ export interface PortalTweet {
   name: string
   avatar: string | null
   text: string
+  /** When the archive observed or last refreshed this tweet. */
+  observedAt: string
+  /** When the tweet was authored on Twitter/X. */
   createdAt: string
   likes: number
   rts: number
@@ -25,6 +28,7 @@ export interface TermWeek {
   last7: number
   prev7: number
   deltaPct: number | null
+  status: 'comparable' | 'new' | 'inactive'
 }
 
 export interface TermSeries {

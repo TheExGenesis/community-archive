@@ -15,9 +15,7 @@ import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
 import { TweetRow } from './TweetRow'
 import HomepageSearch from '@/components/HomepageSearch'
 
-export type PortalView = 'home' | 'stream' | 'notes'
-
-const STREAM_PER_MIN = 22
+export type PortalView = 'home' | 'stream'
 
 const compact = (n: number) =>
   new Intl.NumberFormat('en', {
@@ -25,8 +23,27 @@ const compact = (n: number) =>
     maximumFractionDigits: 1,
   }).format(n)
 
-const fmtDelta = (d: number | null) =>
-  d === null ? 'new' : `${d >= 0 ? '+' : '−'}${Math.abs(d)}%`
+const fmtDelta = (term: TermWeek) => {
+  if (term.status === 'new') return 'new'
+  if (term.status === 'inactive' || term.deltaPct === null) return '—'
+  return `${term.deltaPct >= 0 ? '+' : '−'}${Math.abs(term.deltaPct)}%`
+}
+
+function newestCursor(tweets: PortalTweet[]) {
+  return tweets.reduce<{ observedAt: string; id: string } | null>(
+    (latest, tweet) => {
+      if (!latest) return { observedAt: tweet.observedAt, id: tweet.id }
+      const timeDiff =
+        new Date(tweet.observedAt).getTime() -
+        new Date(latest.observedAt).getTime()
+      if (timeDiff > 0 || (timeDiff === 0 && tweet.id > latest.id)) {
+        return { observedAt: tweet.observedAt, id: tweet.id }
+      }
+      return latest
+    },
+    null,
+  )
+}
 
 function Chip({
   active,
@@ -40,6 +57,7 @@ function Chip({
   return (
     <button
       onClick={onClick}
+      aria-pressed={active}
       className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-[5px] text-[12.5px] font-semibold transition-colors ${
         active
           ? 'bg-brand/15 border-brand text-blue-600 dark:text-blue-300'
@@ -108,77 +126,69 @@ function LiveCounter({ count }: { count: string }) {
 export default function Portal({
   data,
   view,
-  initialArticleId,
 }: {
   data: PortalData
   view: PortalView
-  initialArticleId?: string
 }) {
   const { stats, trends } = data
 
   // ---- live stream state -------------------------------------------------
-  const holdBack = Math.min(8, data.initialStream.length)
-  const [stream, setStream] = useState<{
-    visible: PortalTweet[]
-    queue: PortalTweet[]
-    ticks: number
-  }>(() => ({
-    visible: data.initialStream.slice(holdBack),
-    queue: data.initialStream.slice(0, holdBack).reverse(),
-    ticks: 0,
-  }))
-  const { visible, ticks } = stream
+  const [visible, setVisible] = useState<PortalTweet[]>(data.initialStream)
   const [streamFilter, setStreamFilter] = useState('all')
   const seenIds = useRef<Set<string>>(
     new Set(data.initialStream.map((t) => t.id)),
   )
+  const cursor = useRef(newestCursor(data.initialStream))
 
   useEffect(() => {
-    const interval = setInterval(
-      () => {
-        setStream((s) => {
-          if (s.queue.length === 0) return s
-          const [next, ...rest] = s.queue
-          return {
-            visible: [next, ...s.visible].slice(0, 40),
-            queue: rest,
-            ticks: s.ticks + 1,
-          }
-        })
-      },
-      Math.max(800, 60_000 / STREAM_PER_MIN),
-    )
-    return () => clearInterval(interval)
-  }, [])
-
-  useEffect(() => {
+    const controller = new AbortController()
     const poll = setInterval(async () => {
       try {
-        const res = await fetch('/api/portal/stream')
+        const params = new URLSearchParams()
+        if (cursor.current) {
+          params.set('after', cursor.current.observedAt)
+          params.set('afterId', cursor.current.id)
+        }
+        const res = await fetch(`/api/portal/stream?${params.toString()}`, {
+          signal: controller.signal,
+        })
         if (!res.ok) return
-        const { tweets } = (await res.json()) as { tweets: PortalTweet[] }
+        const { tweets, nextCursor } = (await res.json()) as {
+          tweets: PortalTweet[]
+          nextCursor: { observedAt: string; id: string } | null
+        }
+        if (nextCursor) cursor.current = nextCursor
         const fresh = tweets
           .filter((t) => !seenIds.current.has(t.id))
           .sort(
             (a, b) =>
-              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+              new Date(a.observedAt).getTime() -
+                new Date(b.observedAt).getTime() || a.id.localeCompare(b.id),
           )
         if (fresh.length > 0) {
           fresh.forEach((t) => seenIds.current.add(t.id))
-          setStream((s) => ({ ...s, queue: [...s.queue, ...fresh] }))
+          setVisible((current) =>
+            [...fresh.slice().reverse(), ...current].slice(0, 40),
+          )
         }
       } catch {
         // network hiccup; try again next poll
       }
     }, 45_000)
-    return () => clearInterval(poll)
+    return () => {
+      controller.abort()
+      clearInterval(poll)
+    }
   }, [])
 
-  const liveCount = (stats.totalTweets + ticks).toLocaleString('en-US')
+  const liveCount = stats.totalTweets.toLocaleString('en-US')
 
   // ---- derived trend views ----------------------------------------------
   const weeklyRanked = useMemo(
-    () => [...trends.weekly].sort((a, b) => b.last7 - a.last7),
+    () =>
+      trends.weekly
+        .filter((term) => term.last7 > 0)
+        .sort((a, b) => b.last7 - a.last7),
     [trends.weekly],
   )
   const weeklyBars = weeklyRanked.slice(0, 6)
@@ -302,7 +312,7 @@ export default function Portal({
               noteClass="text-[#16a34a] dark:text-[#2acf80]"
             />
             <StatCard
-              label="Contributing accounts"
+              label="Community members"
               value={stats.accountCount.toLocaleString('en-US')}
               note={
                 stats.joinedThisWeek > 0
@@ -366,15 +376,22 @@ export default function Portal({
                       </div>
                       <span
                         className={`w-[52px] text-right text-[12px] font-bold tabular-nums ${
-                          (b.deltaPct ?? 0) >= 0
-                            ? 'text-[#16a34a] dark:text-[#2acf80]'
-                            : 'text-[#dc2626] dark:text-[#f87171]'
+                          b.status === 'inactive'
+                            ? MUTED
+                            : (b.deltaPct ?? 0) >= 0
+                              ? 'text-[#16a34a] dark:text-[#2acf80]'
+                              : 'text-[#dc2626] dark:text-[#f87171]'
                         }`}
                       >
-                        {fmtDelta(b.deltaPct)}
+                        {fmtDelta(b)}
                       </span>
                     </div>
                   ))}
+                  {weeklyBars.length === 0 && (
+                    <div className={`py-8 text-center text-[13px] ${MUTED}`}>
+                      No watchlist activity in the last seven days.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -618,9 +635,6 @@ export default function Portal({
           </div>
         </div>
       )}
-
-      {/* ------------------------------------------------ Notes --------- */}
-      {view === 'notes' && <NotesView initialArticleId={initialArticleId} />}
     </main>
   )
 }
@@ -801,7 +815,7 @@ function DeltaPanel({
                 : 'text-[#dc2626] dark:text-[#f87171]'
             }`}
           >
-            {fmtDelta(m.deltaPct)}
+            {fmtDelta(m)}
           </span>
         </div>
       ))}
@@ -813,7 +827,11 @@ function DeltaPanel({
 // Field notes view
 // ---------------------------------------------------------------------------
 
-function NotesView({ initialArticleId }: { initialArticleId?: string }) {
+export function PortalNotes({
+  initialArticleId,
+}: {
+  initialArticleId?: string
+}) {
   const [articleId, setArticleId] = useState<string | null>(
     initialArticleId ?? null,
   )

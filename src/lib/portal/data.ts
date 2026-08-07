@@ -1,233 +1,140 @@
 import 'server-only'
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
-import { Database } from '@/database-types'
-import {
+import type { Database } from '@/database-types'
+import { clickHouseAnalyticsGatewayBaseUrl } from '@/lib/clickhouseGateway'
+import { fetchPortalLiveAnalytics, fetchPortalTrends } from './analytics'
+import type { PortalLiveAnalytics } from './analytics'
+import { getResearchPosts } from './research'
+import type {
   PortalData,
   PortalStats,
   PortalTrends,
   PortalTweet,
-  TermSeries,
-  TermWeek,
 } from './types'
-import { getResearchPosts } from './research'
 
-const FIRST_TREND_YEAR = 2019
+interface PortalReadConfig {
+  url: string
+  anonKey: string
+  sourceId: string
+}
 
-/** Terms plotted in the trends explorer chart. */
-export const CHART_TERMS: { term: string; color: string }[] = [
-  { term: 'tpot', color: '#3b82f6' },
-  { term: 'postrat', color: '#f59e0b' },
-  { term: 'egregore', color: '#a78bfa' },
-  { term: 'moloch', color: '#f87171' },
-  { term: 'vibecamp', color: '#2acf80' },
-  { term: 'sensemaking', color: '#38bdf8' },
-  { term: 'ai agents', color: '#e879f9' },
-]
+export interface PortalStreamCursor {
+  observedAt: string
+  id: string
+}
 
-/** Wider watchlist used for the weekly rising/cooling panels. */
-const WATCHLIST = [
-  'ai agents',
-  'claude',
-  'jhana',
-  'egregore',
-  'tpot',
-  'vibecamp',
-  'sensemaking',
-  'moloch',
-  'meditation',
-  'alignment',
-  'psyop',
-  'wordcel',
-]
+interface PortalCorpusSnapshot {
+  trends: PortalTrends
+  firstYear: number
+  currentYear: number
+}
+
+type PortalStatsSnapshot = PortalLiveAnalytics & {
+  joinedThisWeek: number
+}
+
+function required(value: string | undefined, name: string): string {
+  if (!value) throw new Error(`${name} is not configured`)
+  return value
+}
+
+export function resolvePortalReadConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): PortalReadConfig {
+  const explicitUrl = env.PORTAL_READ_SUPABASE_URL
+  const explicitAnonKey = env.PORTAL_READ_SUPABASE_ANON_KEY
+  if (Boolean(explicitUrl) !== Boolean(explicitAnonKey)) {
+    throw new Error(
+      'PORTAL_READ_SUPABASE_URL and PORTAL_READ_SUPABASE_ANON_KEY must be configured together',
+    )
+  }
+
+  const useLocal =
+    env.NODE_ENV === 'development' &&
+    env.NEXT_PUBLIC_USE_REMOTE_DEV_DB !== 'true' &&
+    !explicitUrl
+  const url = required(
+    explicitUrl ||
+      (useLocal
+        ? env.NEXT_PUBLIC_LOCAL_SUPABASE_URL
+        : env.NEXT_PUBLIC_SUPABASE_URL),
+    explicitUrl ? 'PORTAL_READ_SUPABASE_URL' : 'NEXT_PUBLIC_SUPABASE_URL',
+  )
+  const anonKey = required(
+    explicitAnonKey ||
+      (useLocal
+        ? env.NEXT_PUBLIC_LOCAL_ANON_KEY
+        : env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    explicitAnonKey
+      ? 'PORTAL_READ_SUPABASE_ANON_KEY'
+      : 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  )
+
+  let sourceId: string
+  try {
+    sourceId = new URL(url).hostname
+  } catch {
+    throw new Error('Portal read Supabase URL is invalid')
+  }
+  return { url, anonKey, sourceId }
+}
+
+export function portalDataSourceKey(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const portalRead = resolvePortalReadConfig(env)
+  const analyticsUrl = required(
+    clickHouseAnalyticsGatewayBaseUrl(
+      env.CLICKHOUSE_ANALYTICS_API_URL ?? '',
+      env.CLICKHOUSE_SEARCH_API_URL ?? '',
+    ),
+    'CLICKHOUSE_ANALYTICS_API_URL',
+  )
+  let analyticsSource: string
+  try {
+    analyticsSource = new URL(analyticsUrl).hostname
+  } catch {
+    throw new Error('ClickHouse analytics URL is invalid')
+  }
+  const environment = env.VERCEL_ENV || env.NODE_ENV || 'unknown'
+  return `portal-v3:${environment}:${analyticsSource}:${portalRead.sourceId}`
+}
 
 const getPortalClient = (): SupabaseClient<Database> => {
-  const isDevelopment = process.env.NODE_ENV === 'development'
-  const useRemoteDevDb = process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true'
-  const url =
-    isDevelopment && !useRemoteDevDb
-      ? process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL!
-      : process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const anonKey =
-    isDevelopment && !useRemoteDevDb
-      ? process.env.NEXT_PUBLIC_LOCAL_ANON_KEY!
-      : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const { url, anonKey } = resolvePortalReadConfig()
   return createClient<Database>(url, anonKey, {
     auth: { persistSession: false },
   })
 }
 
-const isoDaysAgo = (days: number) =>
-  new Date(Date.now() - days * 86400_000).toISOString()
-
-const startOfTodayUTC = () => {
-  const now = new Date()
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  ).toISOString()
+function isoDaysAgo(days: number): string {
+  return new Date(Date.now() - days * 86_400_000).toISOString()
 }
 
-/** Exact count of tweets matching an optional FTS term within a date range. */
-async function countTweets(
-  supabase: SupabaseClient<Database>,
-  opts: {
-    term?: string
-    from?: string
-    to?: string
-    streamedOnly?: boolean
-    minFavorites?: number
-    countMode?: 'exact' | 'planned'
-  },
-): Promise<number> {
+function validatedCursor(cursor: PortalStreamCursor): PortalStreamCursor {
+  const observedAt = new Date(cursor.observedAt)
+  if (Number.isNaN(observedAt.getTime()) || !/^\d{1,32}$/.test(cursor.id)) {
+    throw new Error('Invalid portal stream cursor')
+  }
+  return { observedAt: observedAt.toISOString(), id: cursor.id }
+}
+
+export async function getPortalStream(
+  limit = 30,
+  cursor?: PortalStreamCursor,
+): Promise<PortalTweet[]> {
+  const supabase = getPortalClient()
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100)
+  const after = cursor ? validatedCursor(cursor) : null
   let query = supabase
-    .from('tweets')
-    .select('tweet_id', { count: opts.countMode ?? 'exact', head: true })
-  if (opts.term) {
-    const type = opts.term.includes(' ') ? 'phrase' : 'plain'
-    query = query.textSearch('fts', opts.term, { type })
-  }
-  if (opts.from) query = query.gte('created_at', opts.from)
-  if (opts.to) query = query.lt('created_at', opts.to)
-  if (opts.streamedOnly) query = query.is('archive_upload_id', null)
-  if (opts.minFavorites) query = query.gte('favorite_count', opts.minFavorites)
-  const { count, error } = await query
-  if (error) {
-    console.error('Portal count query failed:', opts, error)
-    return 0
-  }
-  return count ?? 0
-}
-
-/** Run count jobs with limited concurrency so we don't hammer the DB. */
-async function runBatched<T>(
-  jobs: (() => Promise<T>)[],
-  concurrency = 6,
-): Promise<T[]> {
-  const results: T[] = new Array(jobs.length)
-  let next = 0
-  const workers = Array.from(
-    { length: Math.min(concurrency, jobs.length) },
-    async () => {
-      while (next < jobs.length) {
-        const i = next++
-        results[i] = await jobs[i]()
-      }
-    },
-  )
-  await Promise.all(workers)
-  return results
-}
-
-// ---------------------------------------------------------------------------
-// Daily-cached heavy aggregates (trends + weather inputs)
-// ---------------------------------------------------------------------------
-
-interface DailyAggregates {
-  trends: PortalTrends
-  firstYear: number
-}
-
-async function computeDailyAggregates(): Promise<DailyAggregates> {
-  const supabase = getPortalClient()
-  const currentYear = new Date().getUTCFullYear()
-  const years: number[] = []
-  for (let y = FIRST_TREND_YEAR; y <= currentYear; y++) years.push(y)
-
-  // Yearly totals (planned counts: fast, accurate enough for normalization).
-  const yearlyTotals = await runBatched(
-    years.map(
-      (y) => () =>
-        countTweets(supabase, {
-          from: `${y}-01-01`,
-          to: `${y + 1}-01-01`,
-          countMode: 'planned',
-        }),
-    ),
-  )
-
-  // Per-term yearly counts, normalized per 100k tweets.
-  const seriesCounts = await runBatched(
-    CHART_TERMS.flatMap(({ term }) =>
-      years.map(
-        (y) => () =>
-          countTweets(supabase, {
-            term,
-            from: `${y}-01-01`,
-            to: `${y + 1}-01-01`,
-          }),
-      ),
-    ),
-  )
-  const series: TermSeries[] = CHART_TERMS.map(({ term, color }, ti) => ({
-    term,
-    color,
-    perYear: years.map((_, yi) => {
-      const total = yearlyTotals[yi] || 1
-      return (seriesCounts[ti * years.length + yi] / total) * 100_000
-    }),
-  }))
-
-  // Weekly deltas for the watchlist.
-  const from14 = isoDaysAgo(14)
-  const from7 = isoDaysAgo(7)
-  const weeklyCounts = await runBatched(
-    WATCHLIST.flatMap((term) => [
-      () => countTweets(supabase, { term, from: from7 }),
-      () => countTweets(supabase, { term, from: from14, to: from7 }),
-    ]),
-  )
-  const weekly: TermWeek[] = WATCHLIST.map((term, i) => {
-    const last7 = weeklyCounts[i * 2]
-    const prev7 = weeklyCounts[i * 2 + 1]
-    return {
-      term,
-      last7,
-      prev7,
-      deltaPct: prev7 > 0 ? Math.round(((last7 - prev7) / prev7) * 100) : null,
-    }
-  })
-
-  // First year with a meaningful number of tweets (skip junk timestamps).
-  const { data: firstRows } = await supabase
-    .from('tweets')
-    .select('created_at')
-    .gte('created_at', '2006-01-01')
-    .order('created_at', { ascending: true })
-    .limit(1)
-  const firstYear = firstRows?.[0]?.created_at
-    ? new Date(firstRows[0].created_at).getUTCFullYear()
-    : 2008
-
-  return {
-    trends: {
-      years,
-      series,
-      weekly,
-      computedAt: new Date().toISOString(),
-    },
-    firstYear,
-  }
-}
-
-const getDailyAggregates = unstable_cache(
-  computeDailyAggregates,
-  ['portal-daily-aggregates-v1'],
-  { revalidate: 86400 },
-)
-
-// ---------------------------------------------------------------------------
-// Live-ish stats + stream (cached at the page level, minutes not days)
-// ---------------------------------------------------------------------------
-
-export async function getPortalStream(limit = 30): Promise<PortalTweet[]> {
-  const supabase = getPortalClient()
-  const { data, error } = await supabase
     .from('tweets')
     .select(
       `
       tweet_id,
       account_id,
       created_at,
+      updated_at,
       full_text,
       retweet_count,
       favorite_count,
@@ -240,61 +147,71 @@ export async function getPortalStream(limit = 30): Promise<PortalTweet[]> {
     .is('archive_upload_id', null)
     .is('reply_to_tweet_id', null)
     .not('full_text', 'ilike', 'RT @%')
-    .order('created_at', { ascending: false })
-    .limit(limit)
 
-  if (error) {
-    console.error('Portal stream query failed:', error)
-    return []
+  if (after) {
+    query = query.or(
+      `updated_at.gt.${after.observedAt},and(updated_at.eq.${after.observedAt},tweet_id.gt.${after.id})`,
+    )
   }
 
+  const { data, error } = await query
+    .order('updated_at', {
+      ascending: Boolean(after),
+      nullsFirst: false,
+    })
+    .order('tweet_id', { ascending: Boolean(after) })
+    .limit(safeLimit)
+
+  if (error) throw new Error(`Portal stream query failed: ${error.message}`)
   return toPortalTweets(supabase, data ?? [])
 }
 
-/** Map raw tweet rows (with joined account) to PortalTweets, attaching
- *  avatars in one extra round-trip. */
+/** Map raw tweet rows to portal tweets and attach the newest known avatar. */
 async function toPortalTweets(
   supabase: SupabaseClient<Database>,
   tweets: any[],
 ): Promise<PortalTweet[]> {
-  const accountOf = (t: any) =>
-    Array.isArray(t.account) ? t.account[0] : t.account
-
+  const accountOf = (tweet: any) =>
+    Array.isArray(tweet.account) ? tweet.account[0] : tweet.account
   const accountIds = Array.from(
-    new Set(tweets.map((t: any) => t.account_id).filter(Boolean)),
+    new Set(tweets.map((tweet: any) => tweet.account_id).filter(Boolean)),
   )
   const avatarMap = new Map<string, string>()
+
   if (accountIds.length > 0) {
-    const { data: profiles } = await supabase
+    const { data: profiles, error } = await supabase
       .from('all_profile')
       .select('account_id, avatar_media_url')
       .in('account_id', accountIds)
       .order('archive_upload_id', { ascending: false })
-    profiles?.forEach((p: any) => {
-      if (p.avatar_media_url && !avatarMap.has(p.account_id)) {
-        avatarMap.set(p.account_id, p.avatar_media_url)
-      }
-    })
+    if (error) {
+      console.error('Portal avatar query failed:', error)
+    } else {
+      profiles?.forEach((profile: any) => {
+        if (profile.avatar_media_url && !avatarMap.has(profile.account_id)) {
+          avatarMap.set(profile.account_id, profile.avatar_media_url)
+        }
+      })
+    }
   }
 
-  return tweets.map((t: any) => {
-    const account = accountOf(t)
+  return tweets.map((tweet: any) => {
+    const account = accountOf(tweet)
     return {
-      id: t.tweet_id,
+      id: tweet.tweet_id,
       username: account?.username ?? 'unknown',
       name: account?.account_display_name ?? account?.username ?? 'Unknown',
-      avatar: avatarMap.get(t.account_id) ?? null,
-      text: t.full_text ?? '',
-      createdAt: t.created_at,
-      likes: t.favorite_count ?? 0,
-      rts: t.retweet_count ?? 0,
+      avatar: avatarMap.get(tweet.account_id) ?? null,
+      text: tweet.full_text ?? '',
+      observedAt: tweet.updated_at ?? tweet.created_at,
+      createdAt: tweet.created_at,
+      likes: tweet.favorite_count ?? 0,
+      rts: tweet.retweet_count ?? 0,
     }
   })
 }
 
-/** Top-liked original tweets from members' own archives — the community's
- *  bangers. Media-only tweets (bare links) are skipped since they render
- *  as naked URLs. */
+/** Top-liked original tweets from members' own production archives. */
 async function fetchTopBangers(limit = 30): Promise<PortalTweet[]> {
   const supabase = getPortalClient()
   const { data, error } = await supabase
@@ -304,6 +221,7 @@ async function fetchTopBangers(limit = 30): Promise<PortalTweet[]> {
       tweet_id,
       account_id,
       created_at,
+      updated_at,
       full_text,
       retweet_count,
       favorite_count,
@@ -319,81 +237,123 @@ async function fetchTopBangers(limit = 30): Promise<PortalTweet[]> {
     .order('favorite_count', { ascending: false })
     .limit(80)
 
-  if (error) {
-    console.error('Portal bangers query failed:', error)
-    return []
-  }
-
-  const textful = (data ?? []).filter((t: any) => {
-    const text = (t.full_text ?? '').replace(/https?:\/\/\S+/g, '').trim()
+  if (error) throw new Error(`Portal bangers query failed: ${error.message}`)
+  const textful = (data ?? []).filter((tweet: any) => {
+    const text = (tweet.full_text ?? '').replace(/https?:\/\/\S+/g, '').trim()
     return text.length >= 30
   })
   const mapped = await toPortalTweets(supabase, textful)
   return mapped.slice(0, limit)
 }
 
-async function getPortalStats(firstYear: number): Promise<PortalStats> {
+async function fetchCorpusRange(): Promise<{
+  firstYear: number
+  currentYear: number
+}> {
   const supabase = getPortalClient()
-  const [summaryResult, directoryResult, streamedToday, joinedThisWeek] =
-    await Promise.all([
-      supabase
-        .from('global_activity_summary')
-        .select('total_tweets, total_likes')
-        .single(),
-      supabase
-        .from('user_directory')
-        .select('directory_id', { count: 'exact', head: true }),
-      countTweets(getPortalClient(), {
-        from: startOfTodayUTC(),
-        streamedOnly: true,
-      }),
-      supabase
-        .from('archive_upload')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', isoDaysAgo(7)),
-    ])
-
-  if (summaryResult.error) {
-    console.error('Portal stats summary failed:', summaryResult.error)
+  const base = () =>
+    supabase
+      .from('tweets')
+      .select('created_at')
+      .gte('created_at', '2006-01-01')
+      .limit(1)
+  const [firstResult, latestResult] = await Promise.all([
+    base().order('created_at', { ascending: true }),
+    base().order('created_at', { ascending: false }),
+  ])
+  if (firstResult.error) {
+    throw new Error(
+      `Portal corpus start query failed: ${firstResult.error.message}`,
+    )
   }
-
+  if (latestResult.error) {
+    throw new Error(
+      `Portal corpus end query failed: ${latestResult.error.message}`,
+    )
+  }
+  const first = firstResult.data?.[0]?.created_at
+  const latest = latestResult.data?.[0]?.created_at
+  if (!first || !latest) throw new Error('Portal corpus is empty')
   return {
-    totalTweets: summaryResult.data?.total_tweets ?? 0,
-    totalLikes: summaryResult.data?.total_likes ?? 0,
-    accountCount: directoryResult.count ?? 0,
-    streamedToday,
-    joinedThisWeek: joinedThisWeek.count ?? 0,
-    firstYear,
-    currentYear: new Date().getUTCFullYear(),
-    generatedAt: new Date().toISOString(),
+    firstYear: new Date(first).getUTCFullYear(),
+    currentYear: new Date(latest).getUTCFullYear(),
   }
 }
 
-// The homepage renders dynamically (auth cookies), so cache the lighter
-// queries here: stats for 5 minutes, the initial stream for 1 minute.
-const getCachedStats = unstable_cache(
-  (firstYear: number) => getPortalStats(firstYear),
-  ['portal-stats-v1'],
+async function computePortalCorpusSnapshot(): Promise<PortalCorpusSnapshot> {
+  const [trends, range] = await Promise.all([
+    fetchPortalTrends(),
+    fetchCorpusRange(),
+  ])
+  return { trends, ...range }
+}
+
+async function computePortalStatsSnapshot(): Promise<PortalStatsSnapshot> {
+  const supabase = getPortalClient()
+  const [analytics, joinedThisWeek] = await Promise.all([
+    fetchPortalLiveAnalytics(),
+    supabase
+      .from('archive_upload')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', isoDaysAgo(7)),
+  ])
+  if (joinedThisWeek.error) {
+    throw new Error(
+      `Portal upload count failed: ${joinedThisWeek.error.message}`,
+    )
+  }
+  return { ...analytics, joinedThisWeek: joinedThisWeek.count ?? 0 }
+}
+
+// Arguments participate in the cache key, keeping staging/prod sources and
+// deployment environments isolated even when the Data Cache survives deploys.
+const getCachedCorpusSnapshot = unstable_cache(
+  async (_sourceKey: string) => computePortalCorpusSnapshot(),
+  ['portal-corpus-snapshot-v3'],
+  { revalidate: 86_400 },
+)
+const getCachedStatsSnapshot = unstable_cache(
+  async (_sourceKey: string) => computePortalStatsSnapshot(),
+  ['portal-stats-snapshot-v3'],
   { revalidate: 300 },
 )
 const getCachedInitialStream = unstable_cache(
-  () => getPortalStream(30),
-  ['portal-initial-stream-v1'],
+  async (_sourceKey: string) => getPortalStream(30),
+  ['portal-initial-stream-v3'],
   { revalidate: 60 },
 )
 const getCachedBangers = unstable_cache(
-  () => fetchTopBangers(30),
-  ['portal-bangers-v1'],
-  { revalidate: 86400 },
+  async (_sourceKey: string) => fetchTopBangers(30),
+  ['portal-bangers-v3'],
+  { revalidate: 86_400 },
 )
 
-export async function getPortalData(): Promise<PortalData> {
-  const agg = await getDailyAggregates()
-  const [stats, initialStream, research, bangers] = await Promise.all([
-    getCachedStats(agg.firstYear),
-    getCachedInitialStream(),
-    getResearchPosts(),
-    getCachedBangers(),
+export async function getPortalData(
+  view: 'home' | 'stream' = 'home',
+): Promise<PortalData> {
+  const sourceKey = portalDataSourceKey()
+  const [corpus, live, initialStream, research, bangers] = await Promise.all([
+    getCachedCorpusSnapshot(sourceKey),
+    getCachedStatsSnapshot(sourceKey),
+    getCachedInitialStream(sourceKey),
+    view === 'home' ? getResearchPosts() : Promise.resolve([]),
+    view === 'home' ? getCachedBangers(sourceKey) : Promise.resolve([]),
   ])
-  return { stats, trends: agg.trends, initialStream, research, bangers }
+  const stats: PortalStats = {
+    totalTweets: live.totalTweets,
+    totalLikes: live.totalLikes,
+    accountCount: live.accountCount,
+    streamedToday: live.streamedToday,
+    joinedThisWeek: live.joinedThisWeek,
+    firstYear: corpus.firstYear,
+    currentYear: corpus.currentYear,
+    generatedAt: live.generatedAt,
+  }
+  return {
+    stats,
+    trends: corpus.trends,
+    initialStream,
+    research,
+    bangers,
+  }
 }

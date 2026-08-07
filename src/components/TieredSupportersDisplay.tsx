@@ -65,7 +65,7 @@ const TieredSupportersDisplay: React.FC<TieredSupportersDisplayProps> = ({
       {/* Top Row: Money, Icons, Count */}
       <div className="grid w-full max-w-3xl grid-cols-1 items-center gap-x-6 gap-y-4 md:grid-cols-3">
         {/* Column 1: Money Raised */}
-        <div className="order-1 flex h-full flex-col items-center justify-center text-center">
+        <div className="order-1 flex flex-col items-center justify-center text-center">
           <div>
             <p className="text-2xl font-bold text-brand lg:text-3xl">
               ${formatNumber(totalAmountRaised)}
@@ -75,7 +75,7 @@ const TieredSupportersDisplay: React.FC<TieredSupportersDisplayProps> = ({
         </div>
 
         {/* Column 2: Image Stack (Centered) */}
-        <div className="order-3 mt-4 flex h-full flex-col items-center justify-center md:order-2 md:mt-0">
+        <div className="order-3 mt-4 flex flex-col items-center justify-center md:order-2 md:mt-0">
           {imageStack.length > 0 && (
             <div className="relative h-24 w-full min-w-[240px] md:h-28">
               {imageStack.map((contributor, index) => {
@@ -125,7 +125,7 @@ const TieredSupportersDisplay: React.FC<TieredSupportersDisplayProps> = ({
         </div>
 
         {/* Column 3: Supporter Count */}
-        <div className="order-2 flex h-full flex-col items-center justify-center text-center md:order-3">
+        <div className="order-2 flex flex-col items-center justify-center text-center md:order-3">
           <div>
             <p className="text-2xl font-bold text-brand lg:text-3xl">
               {formatNumber(totalSupportersCount)}

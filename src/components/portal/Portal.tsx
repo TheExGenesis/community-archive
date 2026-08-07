@@ -240,8 +240,8 @@ export default function Portal({
       {view === 'home' && (
         <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
           <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-2">
-            <h1 className="text-[26px] font-semibold" style={SERIF}>
-              The archive today
+            <h1 className="text-[30px] font-semibold" style={SERIF}>
+              Today on the timeline
             </h1>
             <span className="flex items-baseline gap-3">
               <LiveCounter count={liveCount} />

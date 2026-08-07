@@ -456,20 +456,24 @@ export default function Portal({
                 </div>
               </div>
 
-              {recentBanger && (
-                <div className={CARD}>
-                  <PanelHeader
-                    title="Banger of the moment"
-                    action={{ label: 'More bangers', href: '/bangers' }}
-                  />
-                  <TweetRow tweet={recentBanger} />
-                </div>
-              )}
+              {(recentBanger || historicalBanger) && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {recentBanger && (
+                    <div className={`${CARD} min-w-0 overflow-hidden`}>
+                      <PanelHeader
+                        title="Banger of the moment"
+                        action={{ label: 'More bangers', href: '/bangers' }}
+                      />
+                      <TweetRow tweet={recentBanger} collapsible />
+                    </div>
+                  )}
 
-              {historicalBanger && (
-                <div className={CARD}>
-                  <PanelHeader title="Historical banger · near this day" />
-                  <TweetRow tweet={historicalBanger} showDate />
+                  {historicalBanger && (
+                    <div className={`${CARD} min-w-0 overflow-hidden`}>
+                      <PanelHeader title="Historical banger · near this day" />
+                      <TweetRow tweet={historicalBanger} collapsible showDate />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

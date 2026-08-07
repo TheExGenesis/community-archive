@@ -66,7 +66,8 @@ export default async function RootLayout({
           <ReactQueryProvider>
             <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
               <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-                <div className="flex min-w-0 items-center gap-6">
+                <div className="flex min-w-0 items-center gap-3">
+                  <MobileNavigation />
                   <Link
                     href="/"
                     className="flex flex-shrink-0 items-center space-x-2"
@@ -96,7 +97,6 @@ export default async function RootLayout({
                   <div className="text-sm">
                     <DynamicSignIn />
                   </div>
-                  <MobileNavigation />
                   <ThemeToggle side="bottom" />
                   {isAdmin ? (
                     <Link

@@ -7,7 +7,6 @@ import {
   PortalStats,
   PortalTrends,
   PortalTweet,
-  PortalWeather,
   TermSeries,
   TermWeek,
 } from './types'
@@ -124,9 +123,6 @@ async function runBatched<T>(
 
 interface DailyAggregates {
   trends: PortalTrends
-  ironyPer1k: number
-  canonPer1k: number
-  dailyStreamAvg14: number
   firstYear: number
 }
 
@@ -190,25 +186,6 @@ async function computeDailyAggregates(): Promise<DailyAggregates> {
     }
   })
 
-  // Weather instrument inputs.
-  const [last7Total, ironyCount, canonCount, ...dailyStream] = await runBatched(
-    [
-      () => countTweets(supabase, { from: from7 }),
-      () => countTweets(supabase, { term: 'lol', from: from7 }),
-      () => countTweets(supabase, { from: from7, minFavorites: 100 }),
-      ...Array.from(
-        { length: 14 },
-        (_, i) => () =>
-          countTweets(supabase, {
-            from: isoDaysAgo(i + 1).slice(0, 10),
-            to: isoDaysAgo(i).slice(0, 10),
-            streamedOnly: true,
-          }),
-      ),
-    ],
-  )
-  const safeTotal = Math.max(last7Total, 1)
-
   // First year with a meaningful number of tweets (skip junk timestamps).
   const { data: firstRows } = await supabase
     .from('tweets')
@@ -227,10 +204,6 @@ async function computeDailyAggregates(): Promise<DailyAggregates> {
       weekly,
       computedAt: new Date().toISOString(),
     },
-    ironyPer1k: (ironyCount / safeTotal) * 1000,
-    canonPer1k: (canonCount / safeTotal) * 1000,
-    dailyStreamAvg14:
-      dailyStream.reduce((a, b) => a + b, 0) / Math.max(dailyStream.length, 1),
     firstYear,
   }
 }
@@ -240,224 +213,6 @@ const getDailyAggregates = unstable_cache(
   ['portal-daily-aggregates-v1'],
   { revalidate: 86400 },
 )
-
-// ---------------------------------------------------------------------------
-// Weather derivation (deterministic per day, driven by real metrics)
-// ---------------------------------------------------------------------------
-
-/** Small deterministic PRNG seeded by the UTC date, so the report only changes daily. */
-const daySeeded = (offset = 0) => {
-  const d = new Date()
-  let seed =
-    d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate()
-  seed = (seed + offset * 137) % 2147483647
-  let x = seed
-  return () => {
-    x = (x * 48271) % 2147483647
-    return x / 2147483647
-  }
-}
-
-const clamp = (v: number, lo: number, hi: number) =>
-  Math.min(hi, Math.max(lo, Math.round(v)))
-
-function deriveWeather(
-  agg: DailyAggregates,
-  streamedToday: number,
-  streamedLast24h: number,
-): PortalWeather {
-  const weekly = agg.trends.weekly
-  const byVolume = [...weekly].sort((a, b) => b.last7 - a.last7)
-  const withDelta = weekly.filter((w) => w.deltaPct !== null && w.prev7 >= 5)
-  const risers = [...withDelta].sort((a, b) => b.deltaPct! - a.deltaPct!)
-  const fallers = [...withDelta].sort((a, b) => a.deltaPct! - b.deltaPct!)
-  const topTerm = byVolume[0]
-  const topRiser = risers[0]
-  const topFaller = fallers[0]
-
-  // "Gusts": peak-ish hourly rate for the loudest term (2× its weekly average).
-  const mentionsPerHour = Math.max(
-    1,
-    Math.round(topTerm ? (topTerm.last7 / (7 * 24)) * 2 : 1),
-  )
-
-  // Discourse pressure: rolling 24h streamed volume vs the 14-day daily average.
-  const pressureRatio =
-    agg.dailyStreamAvg14 > 0 ? streamedLast24h / agg.dailyStreamAvg14 : 1
-  const pressure = clamp(pressureRatio * 50, 5, 98)
-  const pressureTag =
-    pressure >= 75
-      ? ['Extreme', '#f87171']
-      : pressure >= 55
-        ? ['High', '#f87171']
-        : pressure >= 40
-          ? ['Moderate', '#fbbf24']
-          : ['Calm', '#3b82f6']
-
-  // Irony saturation: share of the week's tweets carrying irony markers.
-  const irony = clamp(agg.ironyPer1k * 4, 5, 98)
-  const ironyTag =
-    irony >= 60
-      ? ['Elevated', '#fbbf24']
-      : irony >= 35
-        ? ['Moderate', '#3b82f6']
-        : ['Low', '#a7a7b4']
-
-  // Novelty inflow: how many watchlist terms are moving up sharply.
-  const sharpRisers = withDelta.filter((w) => (w.deltaPct ?? 0) >= 25).length
-  const novelty = clamp(
-    sharpRisers * 14 + Math.min(topRiser?.deltaPct ?? 0, 100) / 5,
-    5,
-    98,
-  )
-  const noveltyTag =
-    novelty >= 60
-      ? ['Surging', '#2acf80']
-      : novelty >= 35
-        ? ['Moderate', '#3b82f6']
-        : ['Slow', '#a7a7b4']
-
-  // Canon formation: share of the week's tweets clearing 100 likes.
-  const canon = clamp(agg.canonPer1k * 0.8, 3, 98)
-  const canonTag =
-    canon >= 60
-      ? ['Active', '#2acf80']
-      : canon >= 30
-        ? ['Steady', '#3b82f6']
-        : ['Slow', '#a7a7b4']
-
-  const fmtDelta = (d: number | null | undefined) =>
-    d === null || d === undefined
-      ? '±0%'
-      : `${d >= 0 ? '+' : '−'}${Math.abs(d)}%`
-
-  const gauges = [
-    {
-      key: 'pressure',
-      label: 'Discourse pressure',
-      value: pressure,
-      tag: pressureTag[0],
-      color: pressureTag[1],
-      note: `${streamedLast24h.toLocaleString('en-US')} tweets streamed in the last 24h vs a ${Math.round(agg.dailyStreamAvg14).toLocaleString('en-US')}/day two-week norm.`,
-    },
-    {
-      key: 'irony',
-      label: 'Irony saturation',
-      value: irony,
-      tag: ironyTag[0],
-      color: ironyTag[1],
-      note: `${agg.ironyPer1k.toFixed(1)} per 1k tweets this week carry irony markers.`,
-    },
-    {
-      key: 'novelty',
-      label: 'Novelty inflow',
-      value: novelty,
-      tag: noveltyTag[0],
-      color: noveltyTag[1],
-      note: topRiser
-        ? `${sharpRisers} tracked term${sharpRisers === 1 ? '' : 's'} rising sharply; “${topRiser.term}” leads at ${fmtDelta(topRiser.deltaPct)} w/w.`
-        : 'No tracked terms moving sharply this week.',
-    },
-    {
-      key: 'canon',
-      label: 'Canon formation',
-      value: canon,
-      tag: canonTag[0],
-      color: canonTag[1],
-      note: `${agg.canonPer1k.toFixed(1)} per 1k tweets this week cleared 100 likes — candidates for the canon.`,
-    },
-  ]
-
-  const headline = topTerm
-    ? `${pressure >= 55 ? 'Heavy' : pressure >= 40 ? 'Steady' : 'Light'} ${topTerm.term} discourse, gusts to ${mentionsPerHour} mentions/hr`
-    : 'Quiet timeline, light variable posting'
-
-  const summary = `Irony saturation at ${irony}%. ${
-    topRiser
-      ? `A front of ${topRiser.term}-posting is building (${fmtDelta(topRiser.deltaPct)} week over week).`
-      : 'No major fronts approaching.'
-  }`
-
-  const synopsis = `${
-    topTerm
-      ? `“${topTerm.term}” remains the dominant system on the timeline with ${topTerm.last7.toLocaleString('en-US')} mentions over seven days. `
-      : ''
-  }Streaming volume is running at ${Math.round(pressureRatio * 100)}% of the two-week norm, with ${streamedToday.toLocaleString('en-US')} tweets archived so far today. Irony saturation holds at ${irony}% — expect takes to arrive pre-hedged.`
-
-  const outlookText = `${
-    topRiser
-      ? `A slow-moving front of ${topRiser.term} talk should strengthen through the week (${fmtDelta(topRiser.deltaPct)} w/w). `
-      : ''
-  }${
-    topFaller && (topFaller.deltaPct ?? 0) < 0
-      ? `${topFaller.term[0].toUpperCase() + topFaller.term.slice(1)} mentions keep falling (${fmtDelta(topFaller.deltaPct)}); its earlier highs now read as a historical climate event rather than weather.`
-      : 'No tracked systems are dissipating at speed.'
-  }`
-
-  const advisoriesText = `Canon-formation rate is ${canon >= 30 ? 'steady' : 'slow'} (${canon}/100) — ${
-    canon >= 30
-      ? 'several tweets posted this week are on track to be remembered.'
-      : 'few tweets posted this week are expected to be remembered.'
-  }`
-
-  const advisories = [
-    topTerm && {
-      title: `Quote-tweet swell — ${topTerm.term}`,
-      body: `Highest-volume system this week at ${topTerm.last7.toLocaleString('en-US')} mentions. QT layers of 3–5 expected nearby; new accounts advised to stay in replies.`,
-    },
-    topRiser && {
-      title: `Ratio watch — takes about ${topRiser.term}`,
-      body: `Mentions up ${fmtDelta(topRiser.deltaPct)} week over week. Elevated ratio risk for skeptical takes; hedge or delay.`,
-    },
-    topFaller && (topFaller.deltaPct ?? 0) < 0
-      ? {
-          title: `Semantic drift — “${topFaller.term}”`,
-          body: `Mentions down ${fmtDelta(topFaller.deltaPct)} this week. Term may be entering its nostalgic phase; meaning no longer guaranteed.`,
-        }
-      : null,
-  ].filter(Boolean) as { title: string; body: string }[]
-
-  // Deterministic 5-day outlook, seeded by the date and shaped by real metrics.
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const conditions: [string, (t: string) => string][] = [
-    ['⛈', (t) => `Heavy ${t} discourse; QT swells likely`],
-    [
-      '🌧',
-      () => `Discourse pressure easing; scattered sincerity in the morning`,
-    ],
-    [
-      '🌫',
-      (t) =>
-        `${t[0].toUpperCase() + t.slice(1)} front makes landfall; visibility on object-level claims poor`,
-    ],
-    ['⛅', () => `Clearing; conditions favorable for longform and field notes`],
-    ['☀', () => `Quiet timeline; good day to upload an archive`],
-  ]
-  const rand = daySeeded(3)
-  const outlook = Array.from({ length: 5 }, (_, i) => {
-    const date = new Date(Date.now() + (i + 1) * 86400_000)
-    const bias =
-      i === 0 && pressure >= 55 ? 0 : Math.floor(rand() * conditions.length)
-    const [icon, textFn] = conditions[bias]
-    const term =
-      (i % 2 === 0 ? topTerm?.term : topRiser?.term) ??
-      topTerm?.term ??
-      'ambient'
-    return { day: days[date.getUTCDay()], icon, text: textFn(term) }
-  })
-
-  return {
-    headline,
-    summary,
-    synopsis,
-    outlookText,
-    advisoriesText,
-    gauges,
-    advisories,
-    outlook,
-    issuedAt: new Date().toISOString(),
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Live-ish stats + stream (cached at the page level, minutes not days)
@@ -529,37 +284,26 @@ export async function getPortalStream(limit = 30): Promise<PortalTweet[]> {
   })
 }
 
-async function getPortalStats(
-  firstYear: number,
-): Promise<PortalStats & { streamedLast24h: number }> {
+async function getPortalStats(firstYear: number): Promise<PortalStats> {
   const supabase = getPortalClient()
-  const [
-    summaryResult,
-    directoryResult,
-    streamedToday,
-    streamedLast24h,
-    joinedThisWeek,
-  ] = await Promise.all([
-    supabase
-      .from('global_activity_summary')
-      .select('total_tweets, total_likes')
-      .single(),
-    supabase
-      .from('user_directory')
-      .select('directory_id', { count: 'exact', head: true }),
-    countTweets(getPortalClient(), {
-      from: startOfTodayUTC(),
-      streamedOnly: true,
-    }),
-    countTweets(getPortalClient(), {
-      from: isoDaysAgo(1),
-      streamedOnly: true,
-    }),
-    supabase
-      .from('archive_upload')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', isoDaysAgo(7)),
-  ])
+  const [summaryResult, directoryResult, streamedToday, joinedThisWeek] =
+    await Promise.all([
+      supabase
+        .from('global_activity_summary')
+        .select('total_tweets, total_likes')
+        .single(),
+      supabase
+        .from('user_directory')
+        .select('directory_id', { count: 'exact', head: true }),
+      countTweets(getPortalClient(), {
+        from: startOfTodayUTC(),
+        streamedOnly: true,
+      }),
+      supabase
+        .from('archive_upload')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', isoDaysAgo(7)),
+    ])
 
   if (summaryResult.error) {
     console.error('Portal stats summary failed:', summaryResult.error)
@@ -570,7 +314,6 @@ async function getPortalStats(
     totalLikes: summaryResult.data?.total_likes ?? 0,
     accountCount: directoryResult.count ?? 0,
     streamedToday,
-    streamedLast24h,
     joinedThisWeek: joinedThisWeek.count ?? 0,
     firstYear,
     currentYear: new Date().getUTCFullYear(),
@@ -593,11 +336,9 @@ const getCachedInitialStream = unstable_cache(
 
 export async function getPortalData(): Promise<PortalData> {
   const agg = await getDailyAggregates()
-  const [statsWithWindow, initialStream] = await Promise.all([
+  const [stats, initialStream] = await Promise.all([
     getCachedStats(agg.firstYear),
     getCachedInitialStream(),
   ])
-  const { streamedLast24h, ...stats } = statsWithWindow
-  const weather = deriveWeather(agg, stats.streamedToday, streamedLast24h)
-  return { stats, trends: agg.trends, weather, initialStream }
+  return { stats, trends: agg.trends, initialStream }
 }

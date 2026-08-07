@@ -16,6 +16,8 @@ import MobileNavigation from '@/components/MobileNavigation'
 import Footer from '@/components/Footer'
 import { checkIsAdmin } from '@/app/admin/data'
 import { Shield } from 'lucide-react'
+import { getIsMember } from '@/lib/portal/auth'
+import { getPrimaryNav, getUtilityNav, getMobileNav } from '@/lib/navigation'
 
 const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
   ssr: false,
@@ -48,7 +50,10 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const isAdmin = await checkIsAdmin()
+  const [isAdmin, isMember] = await Promise.all([checkIsAdmin(), getIsMember()])
+  const primaryNav = getPrimaryNav(isMember)
+  const utilityNav = getUtilityNav(isMember)
+  const mobileNav = getMobileNav(isMember)
   return (
     <html
       lang="en"
@@ -67,7 +72,7 @@ export default async function RootLayout({
             <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
               <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
                 <div className="flex min-w-0 items-center gap-3">
-                  <MobileNavigation />
+                  <MobileNavigation items={mobileNav} />
                   <Link
                     href="/"
                     className="flex flex-shrink-0 items-center space-x-2"
@@ -90,9 +95,18 @@ export default async function RootLayout({
                       Community Archive
                     </span>
                   </Link>
-                  <HeaderNavigation />
+                  <HeaderNavigation items={primaryNav} />
                 </div>
                 <div className="flex flex-shrink-0 items-center space-x-3">
+                  {utilityNav.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className="hidden rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:inline-block"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
                   <HeaderSearch />
                   <div className="text-sm">
                     <DynamicSignIn />

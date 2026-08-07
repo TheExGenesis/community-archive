@@ -1,99 +1,17 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  FaExternalLinkAlt,
-  FaFire,
-  FaHistory,
-  FaPoll,
-  FaProjectDiagram,
-  FaRobot,
-  FaSearchPlus,
-  FaUsers,
-  FaWrench,
-} from 'react-icons/fa'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { FaExternalLinkAlt } from 'react-icons/fa'
 import { PortalData, PortalTweet, TermWeek } from '@/lib/portal/types'
 import { PORTAL_ARTICLES } from './articles'
-import { TweetRow, formatCount } from './TweetRow'
+import { PORTAL_TOOLS } from './tools'
+import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
+import { TweetRow } from './TweetRow'
 
-type ViewId = 'overview' | 'stream' | 'search' | 'trends' | 'weather' | 'notes'
-
-const NAV: [ViewId, string][] = [
-  ['overview', 'Overview'],
-  ['stream', 'Stream'],
-  ['search', 'Search'],
-  ['trends', 'Trends'],
-  ['weather', 'Weather'],
-  ['notes', 'Field Notes'],
-]
-
-/** Tools built on the archive, shown at the bottom of the Overview view.
- *  Mirrors the classic homepage's FeaturedAppsSection + AppGallery lists. */
-const PORTAL_TOOLS: {
-  name: string
-  description: string
-  link: string
-  icon: React.ReactNode
-}[] = [
-  {
-    name: 'Strand Atlas',
-    description: 'Explore the best conversation threads',
-    link: 'https://bangers.community-archive.org/detailed-strand-atlas',
-    icon: <FaProjectDiagram />,
-  },
-  {
-    name: 'Bangers',
-    description: 'Browse the most impactful tweets',
-    link: 'https://bangers.community-archive.org',
-    icon: <FaFire />,
-  },
-  {
-    name: 'Archive Trends',
-    description: 'Keyword trends like Google Trends',
-    link: 'https://labs-community-archive.streamlit.app/',
-    icon: <FaPoll />,
-  },
-  {
-    name: 'Archive Toolkit',
-    description: 'Chronological thread viewer',
-    link: 'https://github.com/DefenderOfBasic/twitter-archive-toolkit',
-    icon: <FaWrench />,
-  },
-  {
-    name: 'Semantic Search',
-    description: 'Search archives by meaning',
-    link: 'https://github.com/DefenderOfBasic/twitter-semantic-search',
-    icon: <FaSearchPlus />,
-  },
-  {
-    name: 'Banger Bot',
-    description: 'AI tweets from top content',
-    link: 'https://theexgenesis--text-rag-ui-run.modal.run/',
-    icon: <FaRobot />,
-  },
-  {
-    name: 'Highlights Bot',
-    description: 'Daily historical highlights',
-    link: 'https://www.val.town/v/exgenesis/ca_highlights',
-    icon: <FaHistory />,
-  },
-  {
-    name: 'Community Builds',
-    description: 'More projects from the community',
-    link: 'https://x.com/exgenesis/status/1835411943735140798',
-    icon: <FaUsers />,
-  },
-]
+export type PortalView = 'home' | 'stream' | 'trends' | 'notes'
 
 const STREAM_PER_MIN = 22
-const CARD =
-  'rounded-md border border-zinc-200 bg-white dark:border-[#26262a] dark:bg-[#1b1b1e]'
-const MUTED = 'text-zinc-500 dark:text-[#a7a7b4]'
-const FAINT = 'text-zinc-400 dark:text-[#6d6d78]'
-const BODY = 'text-zinc-700 dark:text-[#d9d9de]'
-const SERIF = {
-  fontFamily: 'var(--font-petrona), Georgia, serif',
-} as const
 
 const compact = (n: number) =>
   new Intl.NumberFormat('en', {
@@ -133,7 +51,7 @@ function PanelHeader({
   live,
 }: {
   title: string
-  action?: { label: string; onClick: () => void }
+  action?: { label: string; href: string }
   live?: boolean
 }) {
   return (
@@ -145,21 +63,36 @@ function PanelHeader({
         <span className="text-[13px] font-bold">{title}</span>
       </div>
       {action && (
-        <button
-          onClick={action.onClick}
+        <Link
+          href={action.href}
           className="text-[12.5px] font-semibold text-brand hover:underline"
         >
           {action.label} →
-        </button>
+        </Link>
       )}
     </div>
   )
 }
 
-export default function Portal({ data }: { data: PortalData }) {
-  const { stats, trends, weather } = data
-  const [view, setView] = useState<ViewId>('overview')
-  const [articleId, setArticleId] = useState<string | null>(null)
+function LiveCounter({ count }: { count: string }) {
+  return (
+    <span className={`inline-flex items-center gap-[7px] text-[12px] ${MUTED}`}>
+      <span className="h-[7px] w-[7px] animate-pulse rounded-full bg-[#2acf80]" />
+      <span className="tabular-nums">{count} tweets</span>
+    </span>
+  )
+}
+
+export default function Portal({
+  data,
+  view,
+  initialArticleId,
+}: {
+  data: PortalData
+  view: PortalView
+  initialArticleId?: string
+}) {
+  const { stats, trends } = data
 
   // ---- live stream state -------------------------------------------------
   const holdBack = Math.min(8, data.initialStream.length)
@@ -223,12 +156,6 @@ export default function Portal({ data }: { data: PortalData }) {
 
   const liveCount = (stats.totalTweets + ticks).toLocaleString('en-US')
 
-  const go = useCallback((v: ViewId) => {
-    setView(v)
-    setArticleId(null)
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0 })
-  }, [])
-
   // ---- derived trend views ----------------------------------------------
   const weeklyRanked = useMemo(
     () => [...trends.weekly].sort((a, b) => b.last7 - a.last7),
@@ -276,344 +203,236 @@ export default function Portal({ data }: { data: PortalData }) {
   }, [stats.generatedAt])
 
   return (
-    <div className="min-h-screen">
-      {/* Secondary navigation: underline tabs beneath the top nav */}
-      <div className="sticky top-16 z-40 border-b border-zinc-200 bg-background/95 backdrop-blur-md dark:border-[#26262a]">
-        <div className="flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <nav className="flex gap-1 overflow-x-auto">
-            {NAV.map(([id, label]) => (
-              <button
-                key={id}
-                onClick={() => go(id)}
-                className={`-mb-px whitespace-nowrap border-b-2 px-3 pb-[11px] pt-[13px] text-[13px] transition-colors ${
-                  view === id
-                    ? 'border-brand font-bold text-foreground'
-                    : `border-transparent font-semibold ${MUTED} hover:border-zinc-300 hover:text-foreground dark:hover:border-[#3f3f46]`
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
-          <div
-            className={`hidden flex-shrink-0 items-center gap-[7px] text-[12px] sm:flex ${MUTED}`}
-          >
-            <span className="h-[7px] w-[7px] animate-pulse rounded-full bg-[#2acf80]" />
-            <span className="tabular-nums">{liveCount} tweets</span>
-          </div>
-        </div>
-      </div>
-
-      <main>
-        {/* ------------------------------------------------ Overview ------ */}
-        {view === 'overview' && (
-          <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
-            <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-2">
-              <h1 className="text-[26px] font-semibold" style={SERIF}>
-                The archive today
-              </h1>
+    <main className="min-h-screen">
+      {/* ------------------------------------------------ Home ---------- */}
+      {view === 'home' && (
+        <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
+          <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-2">
+            <h1 className="text-[26px] font-semibold" style={SERIF}>
+              The archive today
+            </h1>
+            <span className="flex items-baseline gap-3">
+              <LiveCounter count={liveCount} />
               <span className={`text-[12.5px] ${MUTED}`}>{generatedDate}</span>
-            </div>
+            </span>
+          </div>
 
-            <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard
-                label="Tweets archived"
-                value={stats.totalTweets.toLocaleString('en-US')}
-                note={`+${stats.streamedToday.toLocaleString('en-US')} streamed today`}
-                noteClass="text-[#16a34a] dark:text-[#2acf80]"
-              />
-              <StatCard
-                label="Contributing accounts"
-                value={stats.accountCount.toLocaleString('en-US')}
-                note={
-                  stats.joinedThisWeek > 0
-                    ? `${stats.joinedThisWeek} upload${stats.joinedThisWeek === 1 ? '' : 's'} this week`
-                    : 'volunteered archives'
-                }
-              />
-              <StatCard
-                label="Liked tweets"
-                value={compact(stats.totalLikes)}
-                note="across the corpus"
-              />
-              <StatCard
-                label="Corpus span"
-                value={`${stats.firstYear}–${stats.currentYear}`}
-                note={`${stats.currentYear - stats.firstYear} years of discourse`}
-              />
-            </div>
+          <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              label="Tweets archived"
+              value={stats.totalTweets.toLocaleString('en-US')}
+              note={`+${stats.streamedToday.toLocaleString('en-US')} streamed today`}
+              noteClass="text-[#16a34a] dark:text-[#2acf80]"
+            />
+            <StatCard
+              label="Contributing accounts"
+              value={stats.accountCount.toLocaleString('en-US')}
+              note={
+                stats.joinedThisWeek > 0
+                  ? `${stats.joinedThisWeek} upload${stats.joinedThisWeek === 1 ? '' : 's'} this week`
+                  : 'volunteered archives'
+              }
+            />
+            <StatCard
+              label="Liked tweets"
+              value={compact(stats.totalLikes)}
+              note="across the corpus"
+            />
+            <StatCard
+              label="Corpus span"
+              value={`${stats.firstYear}–${stats.currentYear}`}
+              note={`${stats.currentYear - stats.firstYear} years of discourse`}
+            />
+          </div>
 
-            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.45fr_1fr]">
-              <div className="flex flex-col gap-4">
-                <div className={CARD}>
-                  <PanelHeader
-                    title="Live stream"
-                    live
-                    action={{
-                      label: 'Open firehose',
-                      onClick: () => go('stream'),
-                    }}
-                  />
-                  <div className="flex flex-col">
-                    {visible.slice(0, 5).map((t, i) => (
-                      <TweetRow
-                        key={t.id}
-                        tweet={t}
-                        compact
-                        animate={i === 0}
-                      />
-                    ))}
-                    {visible.length === 0 && (
-                      <div
-                        className={`px-4 py-8 text-center text-[13px] ${MUTED}`}
-                      >
-                        Waiting for the firehose…
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className={CARD}>
-                  <PanelHeader
-                    title="Trending terms · 7 days"
-                    action={{
-                      label: 'Trends explorer',
-                      onClick: () => go('trends'),
-                    }}
-                  />
-                  <div className="flex flex-col px-4 pb-3 pt-2">
-                    {weeklyBars.map((b) => (
-                      <div
-                        key={b.term}
-                        className="flex items-center gap-3 py-[5px]"
-                      >
-                        <span className="w-[130px] truncate text-[13px] font-semibold">
-                          {b.term}
-                        </span>
-                        <div className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]">
-                          <div
-                            className={`h-full rounded ${
-                              (b.deltaPct ?? 0) >= 0
-                                ? 'bg-brand'
-                                : 'bg-zinc-400 dark:bg-[#52525c]'
-                            }`}
-                            style={{
-                              width: `${(b.last7 / maxWeekly) * 100}%`,
-                            }}
-                          />
-                        </div>
-                        <span
-                          className={`w-[52px] text-right text-[12px] font-bold tabular-nums ${
-                            (b.deltaPct ?? 0) >= 0
-                              ? 'text-[#16a34a] dark:text-[#2acf80]'
-                              : 'text-[#dc2626] dark:text-[#f87171]'
-                          }`}
-                        >
-                          {fmtDelta(b.deltaPct)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-4">
-                <div className={`${CARD} p-4`}>
-                  <div className="mb-2.5 flex items-center justify-between">
-                    <span className="text-[13px] font-bold">
-                      Memetic weather
-                    </span>
-                    <button
-                      onClick={() => go('weather')}
-                      className="text-[12.5px] font-semibold text-brand hover:underline"
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.45fr_1fr]">
+            <div className="flex flex-col gap-4">
+              <div className={CARD}>
+                <PanelHeader
+                  title="Live stream"
+                  live
+                  action={{ label: 'Open firehose', href: '/stream' }}
+                />
+                <div className="flex flex-col">
+                  {visible.slice(0, 5).map((t, i) => (
+                    <TweetRow key={t.id} tweet={t} compact animate={i === 0} />
+                  ))}
+                  {visible.length === 0 && (
+                    <div
+                      className={`px-4 py-8 text-center text-[13px] ${MUTED}`}
                     >
-                      Full report →
-                    </button>
-                  </div>
-                  <div
-                    className="mb-2 text-[18px] font-semibold leading-snug"
-                    style={SERIF}
-                  >
-                    {weather.headline}
-                  </div>
-                  <div className={`text-[13px] leading-relaxed ${MUTED}`}>
-                    {weather.summary}
-                  </div>
-                  <div className="mt-3.5 grid grid-cols-2 gap-2">
-                    {weather.gauges.map((g) => (
-                      <div
-                        key={g.key}
-                        className="rounded border border-zinc-200 bg-zinc-50 px-2.5 py-2 dark:border-[#26262a] dark:bg-[#121214]"
-                      >
-                        <div
-                          className={`text-[10.5px] font-bold uppercase tracking-wider ${MUTED}`}
-                        >
-                          {g.label}
-                        </div>
-                        <div className="mt-0.5 flex items-baseline gap-1.5">
-                          <span className="text-[17px] font-extrabold tabular-nums">
-                            {g.value}
-                          </span>
-                          <span
-                            className="text-[10.5px] font-extrabold uppercase tracking-wide"
-                            style={{ color: g.color }}
-                          >
-                            {g.tag}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className={CARD}>
-                  <PanelHeader title="Field notes" />
-                  <div className="flex flex-col">
-                    {PORTAL_ARTICLES.slice(0, 3).map((a) => (
-                      <button
-                        key={a.id}
-                        onClick={() => {
-                          setView('notes')
-                          setArticleId(a.id)
-                          window.scrollTo({ top: 0 })
-                        }}
-                        className="border-b border-zinc-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
-                      >
-                        <div className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-brand">
-                          {a.tag}
-                        </div>
-                        <div
-                          className="text-[15.5px] font-semibold leading-snug"
-                          style={SERIF}
-                        >
-                          {a.title}
-                        </div>
-                        <div className={`mt-1 text-[12px] ${MUTED}`}>
-                          {a.meta}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                      Waiting for the firehose…
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
 
-            {/* Tools */}
-            <div id="products" className={`${CARD} mt-4 scroll-mt-32`}>
-              <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-[#26262a]">
-                <span className="text-[13px] font-bold">
-                  Explore the archive
-                </span>
-                <span className={`hidden text-[12px] sm:inline ${MUTED}`}>
-                  Tools and projects built on the corpus
-                </span>
-              </div>
-              <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 lg:grid-cols-4">
-                {PORTAL_TOOLS.map((tool) => (
-                  <a
-                    key={tool.name}
-                    href={tool.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group rounded border border-zinc-200 bg-zinc-50 px-3 py-2.5 transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#121214] dark:hover:border-brand/60"
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
-                        {tool.icon}
+              <div className={CARD}>
+                <PanelHeader
+                  title="Trending terms · 7 days"
+                  action={{ label: 'Trends explorer', href: '/trends' }}
+                />
+                <div className="flex flex-col px-4 pb-3 pt-2">
+                  {weeklyBars.map((b) => (
+                    <div
+                      key={b.term}
+                      className="flex items-center gap-3 py-[5px]"
+                    >
+                      <span className="w-[130px] truncate text-[13px] font-semibold">
+                        {b.term}
                       </span>
-                      <span className="min-w-0">
-                        <span className="flex items-center gap-1.5 text-[13px] font-bold">
-                          {tool.name}
-                          <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-                        </span>
-                        <span
-                          className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
-                        >
-                          {tool.description}
-                        </span>
+                      <div className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]">
+                        <div
+                          className={`h-full rounded ${
+                            (b.deltaPct ?? 0) >= 0
+                              ? 'bg-brand'
+                              : 'bg-zinc-400 dark:bg-[#52525c]'
+                          }`}
+                          style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
+                        />
+                      </div>
+                      <span
+                        className={`w-[52px] text-right text-[12px] font-bold tabular-nums ${
+                          (b.deltaPct ?? 0) >= 0
+                            ? 'text-[#16a34a] dark:text-[#2acf80]'
+                            : 'text-[#dc2626] dark:text-[#f87171]'
+                        }`}
+                      >
+                        {fmtDelta(b.deltaPct)}
                       </span>
                     </div>
-                  </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className={CARD}>
+              <PanelHeader
+                title="Field notes"
+                action={{ label: 'All notes', href: '/notes' }}
+              />
+              <div className="flex flex-col">
+                {PORTAL_ARTICLES.map((a) => (
+                  <Link
+                    key={a.id}
+                    href={`/notes?article=${a.id}`}
+                    className="border-b border-zinc-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
+                  >
+                    <div className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-brand">
+                      {a.tag}
+                    </div>
+                    <div
+                      className="text-[15.5px] font-semibold leading-snug"
+                      style={SERIF}
+                    >
+                      {a.title}
+                    </div>
+                    <div className={`mt-1 text-[12px] ${MUTED}`}>{a.meta}</div>
+                  </Link>
                 ))}
               </div>
             </div>
           </div>
-        )}
 
-        {/* ------------------------------------------------ Stream -------- */}
-        {view === 'stream' && (
-          <div className="mx-auto max-w-[820px] px-4 py-6 sm:px-6">
-            <div className="mb-1.5 flex items-center justify-between">
-              <h1 className="text-[26px] font-semibold" style={SERIF}>
-                Live stream
-              </h1>
+          {/* Tools */}
+          <div id="products" className={`${CARD} mt-4 scroll-mt-32`}>
+            <PanelHeader
+              title="Explore the archive"
+              action={{ label: 'All tools', href: '/tools' }}
+            />
+            <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 lg:grid-cols-4">
+              {PORTAL_TOOLS.map((tool) => (
+                <a
+                  key={tool.name}
+                  href={tool.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group rounded border border-zinc-200 bg-zinc-50 px-3 py-2.5 transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#121214] dark:hover:border-brand/60"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
+                      {tool.icon}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-[13px] font-bold">
+                        {tool.name}
+                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+                      </span>
+                      <span
+                        className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
+                      >
+                        {tool.description}
+                      </span>
+                    </span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------ Stream -------- */}
+      {view === 'stream' && (
+        <div className="mx-auto max-w-[820px] px-4 py-6 sm:px-6">
+          <div className="mb-1.5 flex items-center justify-between">
+            <h1 className="text-[26px] font-semibold" style={SERIF}>
+              Live stream
+            </h1>
+            <span className="flex items-center gap-3">
+              <LiveCounter count={liveCount} />
               <Chip active={paused} onClick={() => setPaused((p) => !p)}>
                 {paused ? '▶ Resume' : '❚❚ Pause'}
               </Chip>
-            </div>
-            <div className={`mb-3.5 text-[13px] ${MUTED}`}>
-              Tweets arriving from the browser-extension firehose, as
-              contributors read their timelines.
-            </div>
-            <div className="mb-4 flex flex-wrap gap-1.5">
-              {[
-                'all',
-                ...Array.from(new Set(visible.map((t) => t.username))).slice(
-                  0,
-                  5,
-                ),
-              ].map((h) => (
-                <Chip
-                  key={h}
-                  active={streamFilter === h}
-                  onClick={() => setStreamFilter(h)}
-                >
-                  {h === 'all' ? 'All accounts' : `@${h}`}
-                </Chip>
-              ))}
-            </div>
-            <div className={`${CARD} overflow-hidden`}>
-              {visible
-                .filter(
-                  (t) => streamFilter === 'all' || t.username === streamFilter,
-                )
-                .slice(0, 14)
-                .map((t, i) => (
-                  <TweetRow
-                    key={t.id}
-                    tweet={t}
-                    animate={streamFilter === 'all' && i === 0}
-                    showArchivedBadge
-                  />
-                ))}
-            </div>
+            </span>
           </div>
-        )}
+          <div className={`mb-3.5 text-[13px] ${MUTED}`}>
+            Tweets arriving from the browser-extension firehose, as contributors
+            read their timelines.
+          </div>
+          <div className="mb-4 flex flex-wrap gap-1.5">
+            {[
+              'all',
+              ...Array.from(new Set(visible.map((t) => t.username))).slice(
+                0,
+                5,
+              ),
+            ].map((h) => (
+              <Chip
+                key={h}
+                active={streamFilter === h}
+                onClick={() => setStreamFilter(h)}
+              >
+                {h === 'all' ? 'All accounts' : `@${h}`}
+              </Chip>
+            ))}
+          </div>
+          <div className={`${CARD} overflow-hidden`}>
+            {visible
+              .filter(
+                (t) => streamFilter === 'all' || t.username === streamFilter,
+              )
+              .slice(0, 14)
+              .map((t, i) => (
+                <TweetRow
+                  key={t.id}
+                  tweet={t}
+                  animate={streamFilter === 'all' && i === 0}
+                  showArchivedBadge
+                />
+              ))}
+          </div>
+        </div>
+      )}
 
-        {/* ------------------------------------------------ Search -------- */}
-        {view === 'search' && <SearchView totalTweets={stats.totalTweets} />}
+      {/* ------------------------------------------------ Trends -------- */}
+      {view === 'trends' && (
+        <TrendsView trends={trends} risers={risers} fallers={fallers} />
+      )}
 
-        {/* ------------------------------------------------ Trends -------- */}
-        {view === 'trends' && (
-          <TrendsView trends={trends} risers={risers} fallers={fallers} />
-        )}
-
-        {/* ------------------------------------------------ Weather ------- */}
-        {view === 'weather' && <WeatherView data={data} />}
-
-        {/* ------------------------------------------------ Notes --------- */}
-        {view === 'notes' && (
-          <NotesView
-            articleId={articleId}
-            openArticle={(id) => {
-              setArticleId(id)
-              window.scrollTo({ top: 0 })
-            }}
-            close={() => setArticleId(null)}
-          />
-        )}
-      </main>
-    </div>
+      {/* ------------------------------------------------ Notes --------- */}
+      {view === 'notes' && <NotesView initialArticleId={initialArticleId} />}
+    </main>
   )
 }
 
@@ -639,126 +458,6 @@ function StatCard({
         {value}
       </div>
       <div className={`mt-0.5 text-[12px] ${noteClass ?? MUTED}`}>{note}</div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Search view
-// ---------------------------------------------------------------------------
-
-function SearchView({ totalTweets }: { totalTweets: number }) {
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<PortalTweet[]>([])
-  const [loading, setLoading] = useState(false)
-  const [searched, setSearched] = useState(false)
-  const [sort, setSort] = useState<'top' | 'new' | 'old'>('top')
-
-  useEffect(() => {
-    const q = query.trim()
-    if (!q) {
-      setResults([])
-      setSearched(false)
-      return
-    }
-    setLoading(true)
-    const controller = new AbortController()
-    const timeout = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `/api/portal/search?q=${encodeURIComponent(q)}`,
-          {
-            signal: controller.signal,
-          },
-        )
-        const { tweets } = (await res.json()) as { tweets: PortalTweet[] }
-        setResults(tweets)
-        setSearched(true)
-      } catch {
-        // aborted or failed; keep prior results
-      } finally {
-        setLoading(false)
-      }
-    }, 450)
-    return () => {
-      controller.abort()
-      clearTimeout(timeout)
-    }
-  }, [query])
-
-  const sorted = useMemo(() => {
-    const r = [...results]
-    if (sort === 'top') r.sort((a, b) => b.likes - a.likes)
-    if (sort === 'new')
-      r.sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      )
-    if (sort === 'old')
-      r.sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-      )
-    return r
-  }, [results, sort])
-
-  const countLabel = loading
-    ? 'searching…'
-    : searched
-      ? `${results.length}${results.length === 20 ? '+' : ''} matches`
-      : `search ${compact(totalTweets)} tweets`
-
-  return (
-    <div className="mx-auto max-w-[820px] px-4 py-6 sm:px-6">
-      <h1 className="mb-1.5 text-[26px] font-semibold" style={SERIF}>
-        Search the corpus
-      </h1>
-      <div className={`mb-4 text-[13px] ${MUTED}`}>
-        Full-text search over {compact(totalTweets)} tweets from volunteered
-        archives.
-      </div>
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search tweets, e.g. “egregore”, “touch grass”, “ai agents”…"
-        className={`w-full rounded-md border border-zinc-300 bg-white px-4 py-3 text-[15px] outline-none transition-colors focus:border-brand dark:border-[#2c2c30] dark:bg-[#1b1b1e]`}
-      />
-      <div className="my-3.5 flex items-center justify-between">
-        <div className="flex gap-1.5">
-          {(
-            [
-              ['top', 'Top'],
-              ['new', 'Newest'],
-              ['old', 'Oldest'],
-            ] as const
-          ).map(([id, label]) => (
-            <Chip key={id} active={sort === id} onClick={() => setSort(id)}>
-              {label}
-            </Chip>
-          ))}
-        </div>
-        <span className={`text-[12.5px] tabular-nums ${MUTED}`}>
-          {countLabel}
-        </span>
-      </div>
-      <div className="flex flex-col gap-2.5">
-        {sorted.map((t) => (
-          <div key={t.id} className={`${CARD} overflow-hidden`}>
-            <TweetRow tweet={t} showDate />
-          </div>
-        ))}
-      </div>
-      {searched && !loading && results.length === 0 && (
-        <div className={`py-10 text-center text-[14px] ${MUTED}`}>
-          No tweets match “{query.trim()}” in the archive.
-        </div>
-      )}
-      {!searched && !loading && (
-        <div className={`py-10 text-center text-[14px] ${FAINT}`}>
-          Results appear as you type. Try “egregore”, “vibecamp”, or “touch
-          grass”.
-        </div>
-      )}
     </div>
   )
 }
@@ -922,151 +621,20 @@ function DeltaPanel({
 }
 
 // ---------------------------------------------------------------------------
-// Weather view
-// ---------------------------------------------------------------------------
-
-function WeatherView({ data }: { data: PortalData }) {
-  const { weather } = data
-  const issued = new Date(weather.issuedAt)
-  const issuedLabel = `${issued.toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  })}, ${String(issued.getUTCHours()).padStart(2, '0')}:${String(
-    issued.getUTCMinutes(),
-  ).padStart(2, '0')} UTC`
-
-  return (
-    <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
-      <h1 className="mb-1.5 text-[26px] font-semibold" style={SERIF}>
-        Memetic weather report
-      </h1>
-      <div className={`mb-4 text-[13px] ${MUTED}`}>
-        Issued {issuedLabel} · derived daily from the live corpus
-      </div>
-
-      <div className={`${CARD} mb-4 px-7 py-6`}>
-        <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.1em] text-brand">
-          Bulletin
-        </div>
-        <div
-          className="mb-4 text-[21px] font-semibold leading-normal"
-          style={SERIF}
-        >
-          {weather.headline}.
-        </div>
-        <div
-          className={`flex flex-col gap-3 text-[14.5px] leading-[1.7] ${BODY}`}
-        >
-          <p>
-            <strong className="text-foreground">Synopsis.</strong>{' '}
-            {weather.synopsis}
-          </p>
-          <p>
-            <strong className="text-foreground">Outlook.</strong>{' '}
-            {weather.outlookText}
-          </p>
-          <p>
-            <strong className="text-foreground">Advisories.</strong>{' '}
-            {weather.advisoriesText}
-          </p>
-        </div>
-      </div>
-
-      <div className={`${CARD} mb-4 p-5`}>
-        <div className="mb-3.5 text-[11px] font-bold uppercase tracking-[0.1em] text-brand">
-          Instruments
-        </div>
-        <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
-          {weather.gauges.map((g) => (
-            <div key={g.key}>
-              <div className="mb-1.5 flex items-baseline justify-between">
-                <span className="text-[13px] font-bold">{g.label}</span>
-                <span className="flex items-baseline gap-1.5">
-                  <span className="text-[16px] font-extrabold tabular-nums">
-                    {g.value}
-                  </span>
-                  <span
-                    className="text-[10.5px] font-extrabold uppercase tracking-wide"
-                    style={{ color: g.color }}
-                  >
-                    {g.tag}
-                  </span>
-                </span>
-              </div>
-              <div className="h-[9px] overflow-hidden rounded-[5px] bg-zinc-100 dark:bg-[#26262a]">
-                <div
-                  className="h-full rounded-[5px]"
-                  style={{ width: `${g.value}%`, background: g.color }}
-                />
-              </div>
-              <div className={`mt-1 text-[12px] leading-snug ${MUTED}`}>
-                {g.note}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className={CARD}>
-          <PanelHeader title="⚠ Active advisories" />
-          {weather.advisories.map((a) => (
-            <div
-              key={a.title}
-              className="border-b border-zinc-100 px-4 py-2.5 last:border-b-0 dark:border-[#202023]"
-            >
-              <div className="text-[13px] font-bold text-[#b45309] dark:text-[#fbbf24]">
-                {a.title}
-              </div>
-              <div className={`mt-0.5 text-[12.5px] leading-normal ${MUTED}`}>
-                {a.body}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className={CARD}>
-          <PanelHeader title="5-day discourse outlook" />
-          {weather.outlook.map((d, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-3 border-b border-zinc-100 px-4 py-2 last:border-b-0 dark:border-[#202023]"
-            >
-              <span className={`w-9 text-[12px] font-bold ${MUTED}`}>
-                {d.day}
-              </span>
-              <span className="text-[16px]">{d.icon}</span>
-              <span className={`flex-1 text-[13px] ${BODY}`}>{d.text}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Field notes view
 // ---------------------------------------------------------------------------
 
-function NotesView({
-  articleId,
-  openArticle,
-  close,
-}: {
-  articleId: string | null
-  openArticle: (id: string) => void
-  close: () => void
-}) {
+function NotesView({ initialArticleId }: { initialArticleId?: string }) {
+  const [articleId, setArticleId] = useState<string | null>(
+    initialArticleId ?? null,
+  )
   const article = PORTAL_ARTICLES.find((a) => a.id === articleId)
 
   if (article) {
     return (
       <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
         <button
-          onClick={close}
+          onClick={() => setArticleId(null)}
           className="mb-4 text-[13px] font-semibold text-brand hover:underline"
         >
           ← All field notes
@@ -1107,7 +675,7 @@ function NotesView({
         {PORTAL_ARTICLES.map((a) => (
           <button
             key={a.id}
-            onClick={() => openArticle(a.id)}
+            onClick={() => setArticleId(a.id)}
             className={`${CARD} p-[18px] text-left transition-colors hover:border-zinc-300 hover:bg-zinc-50 dark:hover:border-[#3f3f46] dark:hover:bg-[#1f1f23]`}
           >
             <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-brand">

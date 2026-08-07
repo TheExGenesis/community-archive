@@ -430,6 +430,18 @@ export async function middleware(request: NextRequest) {
     })
   }
 
+  // Dev-only member preview: visiting any page with ?as=member sets a cookie
+  // so the whole app (nav included) renders the signed-in experience without
+  // an account; ?as=guest clears it. Inert outside development.
+  if (process.env.NODE_ENV === 'development') {
+    const as = request.nextUrl.searchParams.get('as')
+    if (as === 'member') {
+      response.cookies.set('dev_as_member', '1', { path: '/', sameSite: 'lax' })
+    } else if (as === 'guest') {
+      response.cookies.delete('dev_as_member')
+    }
+  }
+
   return response
 }
 

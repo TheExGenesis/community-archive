@@ -105,7 +105,9 @@ export function TweetRow({
           </span>
           <span className="flex-shrink-0 text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
             @{tweet.username} ·{' '}
-            {showDate ? shortDate(tweet.createdAt) : relativeTime(tweet.createdAt)}
+            {showDate
+              ? shortDate(tweet.createdAt)
+              : relativeTime(tweet.createdAt)}
           </span>
         </div>
         <div

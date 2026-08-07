@@ -41,30 +41,8 @@ export interface PortalTrends {
   computedAt: string
 }
 
-export interface PortalGauge {
-  key: string
-  label: string
-  value: number
-  tag: string
-  color: string
-  note: string
-}
-
-export interface PortalWeather {
-  headline: string
-  summary: string
-  synopsis: string
-  outlookText: string
-  advisoriesText: string
-  gauges: PortalGauge[]
-  advisories: { title: string; body: string }[]
-  outlook: { day: string; icon: string; text: string }[]
-  issuedAt: string
-}
-
 export interface PortalData {
   stats: PortalStats
   trends: PortalTrends
-  weather: PortalWeather
   initialStream: PortalTweet[]
 }

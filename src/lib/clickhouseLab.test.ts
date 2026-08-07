@@ -91,4 +91,15 @@ describe('ClickHouse staging lab guard', () => {
       'https://stream.example/analytics/stream-stats?start=2026-07-20T00%3A00%3A00.000Z&end=2026-07-27T00%3A00%3A00.000Z&granularity=day&scope=firehose',
     )
   })
+
+  test('allows only the missing-account result limit', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['missing-accounts'],
+      new URLSearchParams('limit=100&raw_sql=DROP'),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/missing-accounts?limit=100',
+    )
+  })
 })

@@ -23,9 +23,18 @@ export default function ToolsPage() {
               href={tool.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="group rounded-[4px] border border-zinc-200 bg-white p-[18px] transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#1b1b1e]"
+              className="group overflow-hidden rounded-[4px] border border-zinc-200 bg-white transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#1b1b1e]"
             >
-              <div className="flex items-start gap-3.5">
+              {tool.image && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={tool.image}
+                  alt={`${tool.name} preview`}
+                  loading="lazy"
+                  className="h-36 w-full border-b border-zinc-200 object-cover dark:border-[#26262a]"
+                />
+              )}
+              <div className="flex items-start gap-3.5 p-[18px]">
                 <span className="mt-1 flex-shrink-0 text-[22px] text-brand">
                   {tool.icon}
                 </span>

@@ -522,56 +522,61 @@ export default function Portal({
 
       {/* ------------------------------------------------ Stream -------- */}
       {view === 'stream' && (
-        <div className="mx-auto max-w-[820px] px-4 py-6 sm:px-6">
-          <div className="mb-1.5 flex items-center justify-between">
-            <h1 className="text-[26px] font-semibold" style={SERIF}>
-              Live stream
-            </h1>
-            <span className="flex items-center gap-3">
-              <LiveCounter count={liveCount} />
-              <Chip active={paused} onClick={() => setPaused((p) => !p)}>
-                {paused ? '▶ Resume' : '❚❚ Pause'}
-              </Chip>
-            </span>
-          </div>
-          <div className={`mb-3.5 text-[13px] ${MUTED}`}>
-            Tweets arriving from the browser-extension firehose, as contributors
-            read their timelines.
-          </div>
-          <div className="mb-4 flex flex-wrap gap-1.5">
-            {[
-              'all',
-              ...Array.from(new Set(visible.map((t) => t.username))).slice(
-                0,
-                5,
-              ),
-            ].map((h) => (
-              <Chip
-                key={h}
-                active={streamFilter === h}
-                onClick={() => setStreamFilter(h)}
-              >
-                {h === 'all' ? 'All accounts' : `@${h}`}
-              </Chip>
-            ))}
-          </div>
-          <div className={`${CARD} overflow-hidden`}>
-            {visible
-              .filter(
-                (t) => streamFilter === 'all' || t.username === streamFilter,
-              )
-              .slice(0, 14)
-              .map((t, i) => (
-                <TweetRow
-                  key={t.id}
-                  tweet={t}
-                  animate={streamFilter === 'all' && i === 0}
-                  showArchivedBadge
-                />
-              ))}
-          </div>
-          <div id="trends" className="scroll-mt-32">
-            <TrendsView trends={trends} risers={risers} fallers={fallers} />
+        <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
+          <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[1.5fr_1fr]">
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <h1 className="text-[26px] font-semibold" style={SERIF}>
+                  Live stream
+                </h1>
+                <span className="flex items-center gap-3">
+                  <LiveCounter count={liveCount} />
+                  <Chip active={paused} onClick={() => setPaused((p) => !p)}>
+                    {paused ? '▶ Resume' : '❚❚ Pause'}
+                  </Chip>
+                </span>
+              </div>
+              <div className={`mb-3.5 text-[13px] ${MUTED}`}>
+                Tweets arriving from the browser-extension firehose, as
+                contributors read their timelines.
+              </div>
+              <div className="mb-4 flex flex-wrap gap-1.5">
+                {[
+                  'all',
+                  ...Array.from(new Set(visible.map((t) => t.username))).slice(
+                    0,
+                    5,
+                  ),
+                ].map((h) => (
+                  <Chip
+                    key={h}
+                    active={streamFilter === h}
+                    onClick={() => setStreamFilter(h)}
+                  >
+                    {h === 'all' ? 'All accounts' : `@${h}`}
+                  </Chip>
+                ))}
+              </div>
+              <div className={`${CARD} overflow-hidden`}>
+                {visible
+                  .filter(
+                    (t) =>
+                      streamFilter === 'all' || t.username === streamFilter,
+                  )
+                  .slice(0, 14)
+                  .map((t, i) => (
+                    <TweetRow
+                      key={t.id}
+                      tweet={t}
+                      animate={streamFilter === 'all' && i === 0}
+                      showArchivedBadge
+                    />
+                  ))}
+              </div>
+            </div>
+            <div id="trends" className="scroll-mt-32">
+              <TrendsView trends={trends} risers={risers} fallers={fallers} />
+            </div>
           </div>
         </div>
       )}
@@ -629,10 +634,10 @@ function TrendsView({
   const maxVal = Math.max(5, ...activeSeries.flatMap((s) => s.perYear))
   const niceMax = Math.ceil(maxVal / 3) * 3
 
-  const W = 800
+  const W = 480
   const H = 270
   const X0 = 44
-  const X1 = 760
+  const X1 = 448
   const Y0 = 244
   const Y1 = 24
   const xs = trends.years.map(
@@ -642,7 +647,7 @@ function TrendsView({
   const gridVals = [0, niceMax / 3, (2 * niceMax) / 3, niceMax]
 
   return (
-    <div className="pt-10">
+    <div>
       <h2 className="mb-1.5 text-[26px] font-semibold" style={SERIF}>
         Trends in ideas
       </h2>
@@ -720,7 +725,7 @@ function TrendsView({
           ))}
         </svg>
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4">
         <DeltaPanel title="Rising this week" items={risers} positive />
         <DeltaPanel title="Cooling this week" items={fallers} />
       </div>

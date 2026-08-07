@@ -1,6 +1,17 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  FaExternalLinkAlt,
+  FaFire,
+  FaHistory,
+  FaPoll,
+  FaProjectDiagram,
+  FaRobot,
+  FaSearchPlus,
+  FaUsers,
+  FaWrench,
+} from 'react-icons/fa'
 import { PortalData, PortalTweet, TermWeek } from '@/lib/portal/types'
 import { PORTAL_ARTICLES } from './articles'
 import { TweetRow, formatCount } from './TweetRow'
@@ -14,6 +25,64 @@ const NAV: [ViewId, string][] = [
   ['trends', 'Trends'],
   ['weather', 'Weather'],
   ['notes', 'Field Notes'],
+]
+
+/** Tools built on the archive, shown at the bottom of the Overview view.
+ *  Mirrors the classic homepage's FeaturedAppsSection + AppGallery lists. */
+const PORTAL_TOOLS: {
+  name: string
+  description: string
+  link: string
+  icon: React.ReactNode
+}[] = [
+  {
+    name: 'Strand Atlas',
+    description: 'Explore the best conversation threads',
+    link: 'https://bangers.community-archive.org/detailed-strand-atlas',
+    icon: <FaProjectDiagram />,
+  },
+  {
+    name: 'Bangers',
+    description: 'Browse the most impactful tweets',
+    link: 'https://bangers.community-archive.org',
+    icon: <FaFire />,
+  },
+  {
+    name: 'Archive Trends',
+    description: 'Keyword trends like Google Trends',
+    link: 'https://labs-community-archive.streamlit.app/',
+    icon: <FaPoll />,
+  },
+  {
+    name: 'Archive Toolkit',
+    description: 'Chronological thread viewer',
+    link: 'https://github.com/DefenderOfBasic/twitter-archive-toolkit',
+    icon: <FaWrench />,
+  },
+  {
+    name: 'Semantic Search',
+    description: 'Search archives by meaning',
+    link: 'https://github.com/DefenderOfBasic/twitter-semantic-search',
+    icon: <FaSearchPlus />,
+  },
+  {
+    name: 'Banger Bot',
+    description: 'AI tweets from top content',
+    link: 'https://theexgenesis--text-rag-ui-run.modal.run/',
+    icon: <FaRobot />,
+  },
+  {
+    name: 'Highlights Bot',
+    description: 'Daily historical highlights',
+    link: 'https://www.val.town/v/exgenesis/ca_highlights',
+    icon: <FaHistory />,
+  },
+  {
+    name: 'Community Builds',
+    description: 'More projects from the community',
+    link: 'https://x.com/exgenesis/status/1835411943735140798',
+    icon: <FaUsers />,
+  },
 ]
 
 const STREAM_PER_MIN = 22
@@ -426,6 +495,46 @@ export default function Portal({ data }: { data: PortalData }) {
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Tools */}
+            <div id="products" className={`${CARD} mt-4 scroll-mt-32`}>
+              <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-[#26262a]">
+                <span className="text-[13px] font-bold">
+                  Explore the archive
+                </span>
+                <span className={`hidden text-[12px] sm:inline ${MUTED}`}>
+                  Tools and projects built on the corpus
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                {PORTAL_TOOLS.map((tool) => (
+                  <a
+                    key={tool.name}
+                    href={tool.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group rounded border border-zinc-200 bg-zinc-50 px-3 py-2.5 transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#121214] dark:hover:border-brand/60"
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
+                        {tool.icon}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-1.5 text-[13px] font-bold">
+                          {tool.name}
+                          <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+                        </span>
+                        <span
+                          className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
+                        >
+                          {tool.description}
+                        </span>
+                      </span>
+                    </div>
+                  </a>
+                ))}
               </div>
             </div>
           </div>

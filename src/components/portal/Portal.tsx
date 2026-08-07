@@ -241,7 +241,7 @@ export default function Portal({
       {view === 'home' && (
         <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
           {/* Hero: same gist as the logged-out homepage */}
-          <div className="mx-auto mb-40 mt-24 w-full max-w-[48rem] space-y-3 text-center">
+          <div className="mx-auto mb-40 mt-36 w-full max-w-[48rem] space-y-3 text-center">
             <h1
               className="text-5xl font-bold tracking-tight text-foreground"
               style={SERIF}

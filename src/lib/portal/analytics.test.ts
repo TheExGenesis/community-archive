@@ -110,6 +110,10 @@ describe('ClickHouse-backed portal analytics', () => {
     )
 
     expect(fetcher).toHaveBeenCalledTimes(19)
+    for (const [, params] of (fetcher as jest.Mock).mock.calls) {
+      expect(params.get('from')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(params.get('to')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    }
     expect(trends.years).toEqual([
       2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026,
     ])

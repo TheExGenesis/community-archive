@@ -102,6 +102,10 @@ function daysBefore(date: Date, days: number): Date {
   return new Date(date.getTime() - days * 86_400_000)
 }
 
+function utcDateParam(date: Date): string {
+  return date.toISOString().slice(0, 10)
+}
+
 async function runBatched<T>(
   jobs: Array<() => Promise<T>>,
   concurrency = 6,
@@ -212,8 +216,10 @@ export async function fetchPortalTrends(
     { length: currentYear - FIRST_TREND_YEAR + 1 },
     (_, index) => FIRST_TREND_YEAR + index,
   )
-  const yearlyFrom = `${FIRST_TREND_YEAR}-01-01T00:00:00.000Z`
-  const yearlyTo = `${currentYear + 1}-01-01T00:00:00.000Z`
+  // word-trend accepts date inputs (the same YYYY-MM-DD values used by the
+  // ClickHouse lab UI), rather than full ISO timestamps.
+  const yearlyFrom = `${FIRST_TREND_YEAR}-01-01`
+  const yearlyTo = `${currentYear + 1}-01-01`
   const today = startOfUtcDay(now)
   const from14 = daysBefore(today, 13)
   const from7 = daysBefore(today, 6)
@@ -230,8 +236,8 @@ export async function fetchPortalTrends(
         fetchTrend(
           term,
           'day',
-          from14.toISOString(),
-          weeklyTo.toISOString(),
+          utcDateParam(from14),
+          utcDateParam(weeklyTo),
           fetcher,
         ),
     ),

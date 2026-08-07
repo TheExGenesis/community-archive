@@ -2,7 +2,14 @@
 
 import React from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { FaHeart, FaRetweet, FaExternalLinkAlt, FaReply } from 'react-icons/fa'
+import {
+  FaHeart,
+  FaRetweet,
+  FaExternalLinkAlt,
+  FaReply,
+  FaTwitter,
+} from 'react-icons/fa'
+import { Archive } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { formatNumber } from '@/lib/formatNumber'
 import NextImage from 'next/image'
@@ -84,7 +91,14 @@ interface TweetComponentProps {
   tweet: TweetData
   className?: string
   collapseLongText?: boolean
+  compact?: boolean
 }
+
+export const compactTweetGridClass =
+  'grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-3 py-3 sm:px-4 md:grid-cols-[minmax(190px,0.95fr)_minmax(300px,2.6fr)_6.5rem_6rem_10rem] md:gap-x-4'
+
+const compactActionClass =
+  'inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
 
 // Helper function to decode HTML entities
 const decodeHtmlEntities = (text: string): string => {
@@ -109,6 +123,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
   tweet,
   className = '',
   collapseLongText = false,
+  compact = false,
 }) => {
   const [isTextExpanded, setIsTextExpanded] = React.useState(false)
   // Support both interface formats for backwards compatibility
@@ -124,7 +139,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
 
   const isRetweet = !!tweet.retweeted_tweet_id
   const isQuoteTweet = !!tweet.quote_tweet_id
-  const canCollapseText = collapseLongText && tweet.full_text.length > 700
+  const canCollapseText =
+    collapseLongText && tweet.full_text.length > (compact ? 180 : 700)
 
   // Check if this is a retweet that starts with "RT @username"
   const rtMatch = tweet.full_text.match(/^RT @([A-Za-z0-9_]+):/)
@@ -216,31 +232,58 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
     const mediaArray = tweet.media || (tweet as any).media || []
     if (!mediaArray || mediaArray.length === 0) return null
 
-    return (
-      <div
-        className={`my-3 grid gap-2 ${mediaArray.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
-      >
-        {mediaArray
-          .filter(
-            (m: any) =>
-              m.media_type === 'photo' ||
-              m.media_type.startsWith('image/') ||
-              m.media_type === 'video',
-          )
-          .map((mediaItem: any, index: number) => (
+    const renderableMedia = mediaArray.filter(
+      (mediaItem: any) =>
+        mediaItem.media_type === 'photo' ||
+        mediaItem.media_type.startsWith('image/') ||
+        mediaItem.media_type === 'video',
+    )
+    if (renderableMedia.length === 0) return null
+
+    if (compact) {
+      return (
+        <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+          {renderableMedia.slice(0, 4).map((mediaItem: any, index: number) => (
             <div
               key={index}
-              className="relative overflow-hidden rounded-lg border border-border bg-muted"
+              className="relative h-20 w-28 flex-none overflow-hidden rounded-md border border-border bg-muted sm:h-24 sm:w-36"
             >
               <NextImage
                 src={mediaItem.media_url}
                 alt={`Tweet image ${index + 1}`}
-                width={mediaItem.width || 600}
-                height={mediaItem.height || 400}
-                className="min-h-40 h-full max-h-96 w-full object-cover"
+                width={mediaItem.width || 240}
+                height={mediaItem.height || 160}
+                className="h-full w-full object-cover"
               />
             </div>
           ))}
+          {renderableMedia.length > 4 && (
+            <div className="flex h-20 w-20 flex-none items-center justify-center rounded-md border border-border bg-muted text-xs text-muted-foreground sm:h-24">
+              +{renderableMedia.length - 4} more
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <div
+        className={`my-3 grid gap-2 ${mediaArray.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
+      >
+        {renderableMedia.map((mediaItem: any, index: number) => (
+          <div
+            key={index}
+            className="relative overflow-hidden rounded-lg border border-border bg-muted"
+          >
+            <NextImage
+              src={mediaItem.media_url}
+              alt={`Tweet image ${index + 1}`}
+              width={mediaItem.width || 600}
+              height={mediaItem.height || 400}
+              className="min-h-40 h-full max-h-96 w-full object-cover"
+            />
+          </div>
+        ))}
       </div>
     )
   }
@@ -254,7 +297,9 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
     // show an empty card.
     if (quotedTweet.is_deleted) {
       return (
-        <div className="mt-3 rounded-lg border border-dashed border-border bg-muted p-3 text-sm italic text-muted-foreground dark:bg-card">
+        <div
+          className={`${compact ? 'mt-2 p-2 text-xs' : 'mt-3 p-3 text-sm'} rounded-lg border border-dashed border-border bg-muted italic text-muted-foreground dark:bg-card`}
+        >
           [Quoted tweet deleted]
         </div>
       )
@@ -267,14 +312,20 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       : 'border-border bg-muted dark:bg-card'
 
     return (
-      <div className={`relative mt-3 rounded-lg border p-3 ${externalClasses}`}>
+      <div
+        className={`relative rounded-lg border ${compact ? 'mt-2 p-2' : 'mt-3 p-3'} ${externalClasses}`}
+      >
         {quotedTweet.from_external && (
           <span className="absolute right-2 top-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
             from Twitter · not archived
           </span>
         )}
-        <div className="flex items-start space-x-3">
-          <Avatar className="h-8 w-8 flex-shrink-0">
+        <div
+          className={`flex items-start ${compact ? 'space-x-2' : 'space-x-3'}`}
+        >
+          <Avatar
+            className={`${compact ? 'h-6 w-6' : 'h-8 w-8'} flex-shrink-0`}
+          >
             <TweetAvatarImage
               src={quotedProfilePic}
               alt={`${quotedTweet.account_display_name}'s profile picture`}
@@ -302,11 +353,21 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                 })}
               </span>
             </div>
-            <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
+            <p
+              className={`whitespace-pre-wrap break-words text-foreground ${
+                compact ? 'line-clamp-3 text-xs leading-4' : 'text-sm leading-6'
+              }`}
+            >
               {decodeHtmlEntities(quotedTweet.full_text)}
             </p>
             {quotedTweet.media && quotedTweet.media.length > 0 && (
-              <div className="mt-2 flex flex-col space-y-1">
+              <div
+                className={
+                  compact
+                    ? 'mt-2 flex gap-1.5 overflow-x-auto'
+                    : 'mt-2 flex flex-col space-y-1'
+                }
+              >
                 {quotedTweet.media
                   .filter(
                     (m: any) =>
@@ -314,17 +375,24 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                       m.media_type.startsWith('image/') ||
                       m.media_type === 'video',
                   )
+                  .slice(0, compact ? 3 : undefined)
                   .map((mediaItem: any, index: number) => (
                     <div
                       key={index}
-                      className="relative overflow-hidden rounded-md border dark:border-border"
+                      className={`relative overflow-hidden rounded-md border dark:border-border ${
+                        compact ? 'h-16 w-24 flex-none' : ''
+                      }`}
                     >
                       <NextImage
                         src={mediaItem.media_url}
                         alt={`Quoted tweet image ${index + 1}`}
                         width={300}
                         height={200}
-                        className="h-auto max-h-48 w-full object-contain"
+                        className={
+                          compact
+                            ? 'h-full w-full object-cover'
+                            : 'h-auto max-h-48 w-full object-contain'
+                        }
                       />
                     </div>
                   ))}
@@ -361,6 +429,160 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  const renderCompactActions = () => (
+    <div
+      className="inline-flex items-center gap-1.5"
+      role="group"
+      aria-label="Tweet links"
+    >
+      <a
+        href={`/tweets/${tweet.tweet_id}`}
+        className={`${compactActionClass} border-brand/30 bg-brand/10 text-brand hover:bg-brand/20`}
+        aria-label="View tweet in Community Archive"
+        title="View tweet in Community Archive"
+      >
+        <Archive className="h-3.5 w-3.5" aria-hidden="true" />
+        Archive
+      </a>
+      <a
+        href={`https://twitter.com/${displayUsername}/status/${tweet.tweet_id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`${compactActionClass} border-sky-300/70 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-950/70`}
+        aria-label="View original tweet on Twitter"
+        title="View original tweet on Twitter"
+      >
+        <FaTwitter className="h-3.5 w-3.5" aria-hidden="true" />
+        Twitter
+      </a>
+    </div>
+  )
+
+  if (compact) {
+    const createdAt = new Date(tweet.created_at)
+    const formattedDate = createdAt.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+
+    return (
+      <div className={`${compactTweetGridClass} ${className}`}>
+        <div
+          role="cell"
+          className="col-span-2 flex min-w-0 items-center gap-2.5 md:col-span-1"
+        >
+          <Avatar className="h-8 w-8 flex-shrink-0">
+            <TweetAvatarImage
+              src={profilePicUrl}
+              alt={`${displayName}'s profile picture`}
+              username={displayUsername}
+              tweetId={tweet.retweeted_tweet_id || tweet.tweet_id}
+            />
+            <AvatarFallback className="text-xs">
+              {displayName?.charAt(0) || displayUsername?.charAt(0) || 'U'}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 leading-tight">
+            <div className="truncate text-sm font-semibold text-foreground">
+              {displayName}
+            </div>
+            <div className="truncate text-xs text-muted-foreground">
+              @{displayUsername}
+            </div>
+            {(isRetweet || isRtFormat) && (
+              <div className="mt-1 flex items-center truncate text-[11px] text-muted-foreground">
+                <FaRetweet className="mr-1 flex-shrink-0" />@{originalUsername}{' '}
+                retweeted
+              </div>
+            )}
+            {replyToUsername && (
+              <div className="mt-1 flex items-center truncate text-[11px] text-muted-foreground">
+                <FaReply className="mr-1 flex-shrink-0" />
+                Replying to @{replyToUsername}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div role="cell" className="col-span-2 min-w-0 md:col-span-1">
+          <p
+            className={`whitespace-pre-wrap break-words text-sm leading-5 text-foreground ${
+              canCollapseText && !isTextExpanded ? 'line-clamp-2' : ''
+            }`}
+          >
+            {formatText(tweet.full_text)}
+          </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            {canCollapseText && (
+              <button
+                type="button"
+                onClick={() => setIsTextExpanded((expanded) => !expanded)}
+                className="text-xs font-medium text-brand hover:underline"
+              >
+                {isTextExpanded ? 'Show less' : 'Show more'}
+              </button>
+            )}
+          </div>
+          {renderMedia()}
+          {renderQuotedTweet()}
+        </div>
+
+        <div
+          role="cell"
+          className="col-span-2 flex items-center justify-between text-xs text-muted-foreground md:hidden"
+          title={createdAt.toLocaleString()}
+        >
+          <span>{formatDistanceToNow(createdAt, { addSuffix: true })}</span>
+          <span className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1">
+              <FaHeart aria-hidden="true" />
+              {formatNumber(tweet.favorite_count)}
+              <span className="sr-only">likes</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <FaRetweet aria-hidden="true" />
+              {formatNumber(tweet.retweet_count ?? 0)}
+              <span className="sr-only">reposts</span>
+            </span>
+          </span>
+          {renderCompactActions()}
+        </div>
+
+        <div
+          role="cell"
+          className="hidden self-center text-xs text-muted-foreground md:block"
+          title={createdAt.toLocaleString()}
+        >
+          {formattedDate}
+        </div>
+
+        <div
+          role="cell"
+          className="hidden items-center gap-3 self-center text-xs text-muted-foreground md:flex"
+        >
+          <span className="inline-flex items-center gap-1">
+            <FaHeart aria-hidden="true" />
+            {formatNumber(tweet.favorite_count)}
+            <span className="sr-only">likes</span>
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <FaRetweet aria-hidden="true" />
+            {formatNumber(tweet.retweet_count ?? 0)}
+            <span className="sr-only">reposts</span>
+          </span>
+        </div>
+
+        <div
+          role="cell"
+          className="hidden items-center justify-end self-center md:flex"
+        >
+          {renderCompactActions()}
         </div>
       </div>
     )

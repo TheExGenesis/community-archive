@@ -229,6 +229,7 @@ export interface RawSupabaseTweet {
 
 export interface TimelineTweet {
   tweet_id: string;
+  account_id?: string;
   created_at: string;
   full_text: string;
   favorite_count: number;
@@ -242,6 +243,20 @@ export interface TimelineTweet {
     };
   };
   media?: Array<TweetMediaItem>;
+  quote_tweet_id?: string | null;
+  quoted_tweet?: {
+    tweet_id: string;
+    account_id: string;
+    created_at: string;
+    full_text: string;
+    retweet_count: number | null;
+    favorite_count: number;
+    avatar_media_url?: string;
+    username: string;
+    account_display_name: string;
+    media?: Array<TweetMediaItem>;
+    is_deleted?: boolean;
+  };
 }
 
 export interface TweetMediaItem {

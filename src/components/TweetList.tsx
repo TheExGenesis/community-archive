@@ -19,6 +19,7 @@ interface TweetListProps {
   resultsHeading?: string
   resultsDescription?: string
   collapseLongTweets?: boolean
+  compact?: boolean
 }
 
 const DEFAULT_ITEMS_PER_PAGE = 20
@@ -31,6 +32,7 @@ export default function TweetList({
   resultsHeading,
   resultsDescription,
   collapseLongTweets = false,
+  compact = false,
 }: TweetListProps) {
   const [tweets, setTweets] = useState<TimelineTweet[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -152,12 +154,18 @@ export default function TweetList({
   // Convert TimelineTweet to raw tweet format for consistency
   const rawTweets = tweets.map((tweet) => ({
     tweet_id: tweet.tweet_id,
-    account_id: '', // TimelineTweet doesn't have this
+    account_id: tweet.account_id || '',
     created_at: tweet.created_at,
     full_text: tweet.full_text,
     retweet_count: tweet.retweet_count,
     favorite_count: tweet.favorite_count,
     reply_to_tweet_id: tweet.reply_to_tweet_id,
+    quote_tweet_id: tweet.quote_tweet_id || null,
+    quoted_tweet: tweet.quoted_tweet,
+    retweeted_tweet_id: null,
+    avatar_media_url: tweet.account.profile?.avatar_media_url || null,
+    username: tweet.account.username,
+    account_display_name: tweet.account.account_display_name,
     // Use raw format for account data
     account: {
       username: tweet.account.username,
@@ -169,11 +177,12 @@ export default function TweetList({
         : undefined,
     },
     media: tweet.media || [],
+    urls: [],
     mentioned_users: [], // TimelineTweet doesn't have this
   }))
 
   return (
-    <div className="space-y-8">
+    <div className={compact ? 'space-y-5' : 'space-y-8'}>
       <UnifiedTweetList
         tweets={rawTweets}
         isLoading={isLoading}
@@ -190,6 +199,7 @@ export default function TweetList({
         }
         headerDescription={resultsDescription}
         collapseLongTweets={collapseLongTweets}
+        compact={compact}
       />
 
       {error && tweets.length > 0 && (

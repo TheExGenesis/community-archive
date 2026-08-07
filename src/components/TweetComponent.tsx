@@ -2,7 +2,14 @@
 
 import React from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { FaHeart, FaRetweet, FaExternalLinkAlt, FaReply } from 'react-icons/fa'
+import {
+  FaHeart,
+  FaRetweet,
+  FaExternalLinkAlt,
+  FaReply,
+  FaTwitter,
+} from 'react-icons/fa'
+import { Archive } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { formatNumber } from '@/lib/formatNumber'
 import NextImage from 'next/image'
@@ -88,7 +95,10 @@ interface TweetComponentProps {
 }
 
 export const compactTweetGridClass =
-  'grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-3 py-3 sm:px-4 md:grid-cols-[minmax(190px,0.95fr)_minmax(300px,2.6fr)_6.5rem_6rem_4.5rem] md:gap-x-4'
+  'grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-3 py-3 sm:px-4 md:grid-cols-[minmax(190px,0.95fr)_minmax(300px,2.6fr)_6.5rem_6rem_10rem] md:gap-x-4'
+
+const compactActionClass =
+  'inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
 
 // Helper function to decode HTML entities
 const decodeHtmlEntities = (text: string): string => {
@@ -424,6 +434,35 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
     )
   }
 
+  const renderCompactActions = () => (
+    <div
+      className="inline-flex items-center gap-1.5"
+      role="group"
+      aria-label="Tweet links"
+    >
+      <a
+        href={`/tweets/${tweet.tweet_id}`}
+        className={`${compactActionClass} border-brand/30 bg-brand/10 text-brand hover:bg-brand/20`}
+        aria-label="View tweet in Community Archive"
+        title="View tweet in Community Archive"
+      >
+        <Archive className="h-3.5 w-3.5" aria-hidden="true" />
+        Archive
+      </a>
+      <a
+        href={`https://twitter.com/${displayUsername}/status/${tweet.tweet_id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`${compactActionClass} border-sky-300/70 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:bg-sky-950/70`}
+        aria-label="View original tweet on Twitter"
+        title="View original tweet on Twitter"
+      >
+        <FaTwitter className="h-3.5 w-3.5" aria-hidden="true" />
+        Twitter
+      </a>
+    </div>
+  )
+
   if (compact) {
     const createdAt = new Date(tweet.created_at)
     const formattedDate = createdAt.toLocaleDateString(undefined, {
@@ -512,26 +551,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
               <span className="sr-only">reposts</span>
             </span>
           </span>
-          <span className="flex items-center gap-3 text-muted-foreground">
-            <a
-              href={`/tweets/${tweet.tweet_id}`}
-              className="rounded p-1 transition-colors hover:bg-accent hover:text-foreground"
-              title="Open archived tweet"
-            >
-              <FaExternalLinkAlt className="h-3.5 w-3.5" aria-hidden="true" />
-              <span className="sr-only">Open archived tweet</span>
-            </a>
-            <a
-              href={`https://twitter.com/${displayUsername}/status/${tweet.tweet_id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded p-1 transition-colors hover:bg-accent hover:text-foreground"
-              title="Open tweet on Twitter"
-            >
-              <FaExternalLinkAlt className="h-3.5 w-3.5" aria-hidden="true" />
-              <span className="sr-only">Open tweet on Twitter</span>
-            </a>
-          </span>
+          {renderCompactActions()}
         </div>
 
         <div
@@ -560,26 +580,9 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
 
         <div
           role="cell"
-          className="hidden items-center justify-end gap-3 self-center text-muted-foreground md:flex"
+          className="hidden items-center justify-end self-center md:flex"
         >
-          <a
-            href={`/tweets/${tweet.tweet_id}`}
-            className="rounded p-1 transition-colors hover:bg-accent hover:text-foreground"
-            title="Open archived tweet"
-          >
-            <FaExternalLinkAlt className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="sr-only">Open archived tweet</span>
-          </a>
-          <a
-            href={`https://twitter.com/${displayUsername}/status/${tweet.tweet_id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded p-1 transition-colors hover:bg-accent hover:text-foreground"
-            title="Open tweet on Twitter"
-          >
-            <FaExternalLinkAlt className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="sr-only">Open tweet on Twitter</span>
-          </a>
+          {renderCompactActions()}
         </div>
       </div>
     )

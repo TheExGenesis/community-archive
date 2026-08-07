@@ -72,9 +72,19 @@ describe('UnifiedTweetList compact view', () => {
     ).toBeInTheDocument()
     expect(
       screen
-        .getAllByRole('link', { name: 'Open archived tweet' })
+        .getAllByRole('link', { name: 'View tweet in Community Archive' })
         .every(
           (link) => link.getAttribute('href') === '/tweets/2085447310574793145',
+        ),
+    ).toBe(true)
+    expect(
+      screen
+        .getAllByRole('link', { name: 'View original tweet on Twitter' })
+        .every(
+          (link) =>
+            link.getAttribute('href') ===
+              'https://twitter.com/archive_user/status/2085447310574793145' &&
+            link.getAttribute('target') === '_blank',
         ),
     ).toBe(true)
 

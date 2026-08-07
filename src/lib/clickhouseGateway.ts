@@ -12,6 +12,7 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
   ]),
   'word-trend': new Set(['q', 'bucket', 'match', 'from', 'to']),
   'stream-stats': new Set(['start', 'end', 'granularity', 'scope']),
+  'missing-accounts': new Set(['limit']),
   'top-quotes': new Set([
     'limit',
     'exclude_self',
@@ -26,6 +27,13 @@ export function isClickHouseReadsEnabled(
   enabled = process.env.ENABLE_CLICKHOUSE_READS,
 ): boolean {
   return enabled === 'true'
+}
+
+export function clickHouseSearchGatewayBaseUrl(
+  searchUrl = process.env.CLICKHOUSE_SEARCH_API_URL,
+  analyticsUrl = process.env.CLICKHOUSE_ANALYTICS_API_URL,
+): string | undefined {
+  return searchUrl || analyticsUrl
 }
 
 export function analyticsGatewayRequestUrl(

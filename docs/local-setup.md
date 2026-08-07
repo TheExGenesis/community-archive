@@ -23,6 +23,16 @@ ARCHIVE_PATH=<path_to_archive_folder>
 
 Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` can be found in [your Supabase project's API settings](https://app.supabase.com/project/_/settings/api)
 
+PostHog monitoring is optional. Set `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` and
+`NEXT_PUBLIC_POSTHOG_HOST` to enable pageviews, autocapture, session replay,
+browser exception capture, Web Vitals, network timing, and the manually
+instrumented product events. Signed-in activity uses the account ID, email,
+trusted public username, and public display name. Replay captures rendered page
+content and non-password inputs, but not console logs, network bodies, or the
+contents of a locally selected archive ZIP. PostHog uses cookies and local
+storage for device and session continuity. Leave either variable unset to
+disable PostHog locally.
+
 1. Install [node](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) and optionally [pnpm](https://pnpm.io/installation#using-npm)
 
 2. Install dependencies

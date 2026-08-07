@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 type Timing = {
   wallMs: number
@@ -210,6 +211,8 @@ function LoadingPanel({ label }: { label: string }) {
 
 export default function ClickHouseLabClient() {
   const router = useRouter()
+  const quoteEvidenceGeneration = useRef(0)
+  const activeQuoteEvidenceRequests = useRef(new Set<string>())
   const [summary, setSummary] = useState<SummaryResponse | null>(null)
   const [quotes, setQuotes] = useState<QuotesResponse | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -297,6 +300,12 @@ export default function ClickHouseLabClient() {
     const params = new URLSearchParams({ q: wordQuery, bucket, match })
     if (from) params.set('from', from)
     if (to) params.set('to', to)
+    capturePostHogEvent('word_trend_requested', {
+      bucket,
+      match,
+      has_start_date: Boolean(from),
+      has_end_date: Boolean(to),
+    })
     try {
       setTrend(await request<TrendResponse>(`word-trend?${params}`))
     } catch (error) {
@@ -324,8 +333,16 @@ export default function ClickHouseLabClient() {
     if (excludeQuoteUsernames.trim()) {
       params.set('exclude_usernames', excludeQuoteUsernames)
     }
+    capturePostHogEvent('quote_ranking_requested', {
+      limit: Number(quoteLimit),
+      excludes_self_quotes: excludeSelfQuotes,
+      has_include_filter: Boolean(includeQuoteUsernames.trim()),
+      has_exclude_filter: Boolean(excludeQuoteUsernames.trim()),
+    })
     try {
       const response = await request<QuotesResponse>(`top-quotes?${params}`)
+      quoteEvidenceGeneration.current += 1
+      activeQuoteEvidenceRequests.current.clear()
       setQuotes(response)
       setExpandedQuoteTweetId(null)
       setQuoteEvidence({})
@@ -359,6 +376,11 @@ export default function ClickHouseLabClient() {
   }
 
   async function loadQuoteEvidence(tweetId: string, offset = 0) {
+    const generation = quoteEvidenceGeneration.current
+    const requestKey = `${generation}:${tweetId}:${offset}`
+    if (activeQuoteEvidenceRequests.current.has(requestKey)) return
+    activeQuoteEvidenceRequests.current.add(requestKey)
+
     setQuoteEvidence((current) => ({
       ...current,
       [tweetId]: {
@@ -373,32 +395,42 @@ export default function ClickHouseLabClient() {
       const response = await request<QuotePostsResponse>(
         `quote-posts/${encodeURIComponent(tweetId)}?${quoteEvidenceParams(offset)}`,
       )
-      setQuoteEvidence((current) => ({
-        ...current,
-        [tweetId]: {
-          data: offset
-            ? [...(current[tweetId]?.data || []), ...response.data]
-            : response.data,
-          query: response.query,
-          timing: response.timing,
-          loading: false,
-          error: null,
-        },
-      }))
+      setQuoteEvidence((current) =>
+        quoteEvidenceGeneration.current === generation
+          ? {
+              ...current,
+              [tweetId]: {
+                data: offset
+                  ? [...(current[tweetId]?.data || []), ...response.data]
+                  : response.data,
+                query: response.query,
+                timing: response.timing,
+                loading: false,
+                error: null,
+              },
+            }
+          : current,
+      )
     } catch (error) {
-      setQuoteEvidence((current) => ({
-        ...current,
-        [tweetId]: {
-          data: current[tweetId]?.data || [],
-          query: current[tweetId]?.query,
-          timing: current[tweetId]?.timing,
-          loading: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : 'Unable to load quote posts',
-        },
-      }))
+      setQuoteEvidence((current) =>
+        quoteEvidenceGeneration.current === generation
+          ? {
+              ...current,
+              [tweetId]: {
+                data: current[tweetId]?.data || [],
+                query: current[tweetId]?.query,
+                timing: current[tweetId]?.timing,
+                loading: false,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : 'Unable to load quote posts',
+              },
+            }
+          : current,
+      )
+    } finally {
+      activeQuoteEvidenceRequests.current.delete(requestKey)
     }
   }
 

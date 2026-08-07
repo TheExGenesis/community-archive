@@ -20,6 +20,7 @@ import AppGallery from '@/components/AppGallery'
 import HomepageSearch from '@/components/HomepageSearch'
 import { canShowHomepageSearch } from '@/lib/homepageAccess'
 import { formatNumber } from '@/lib/formatNumber'
+import { getTopFollowedAccounts } from '@/lib/clickhouseAnalytics'
 
 export const revalidate = 60 // Cache for 60s to reduce server load from scrapers
 
@@ -48,7 +49,7 @@ const DynamicUploadArchiveSection = dynamic(
   },
 )
 
-const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
+const getLegacyMostFollowedAccounts = async (supabase: SupabaseClient) => {
   let { data, error } = await supabase
     .from('global_activity_summary')
     .select('top_accounts_with_followers')
@@ -59,6 +60,18 @@ const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
     return []
   }
   return data?.top_accounts_with_followers || []
+}
+
+const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
+  try {
+    return await getTopFollowedAccounts(7)
+  } catch (error) {
+    console.error(
+      'Failed to fetch top accounts from ClickHouse; using the legacy summary:',
+      error,
+    )
+    return getLegacyMostFollowedAccounts(supabase)
+  }
 }
 
 async function getOpenCollectiveContributors(): Promise<Contributor[]> {
@@ -145,9 +158,26 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 export default async function Homepage() {
   const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const [
+    {
+      data: { user },
+    },
+    mostFollowedAccounts,
+    financialContributors,
+    stats,
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    getMostFollowedAccounts(supabase),
+    getOpenCollectiveContributors(),
+    getStats(supabase).catch((error) => {
+      console.error('Failed to fetch stats for homepage:', error)
+      return {
+        userCount: null,
+        tweetCount: null,
+        userMentionsCount: null,
+      }
+    }),
+  ])
 
   let optedInStatus: boolean | null = null
   if (user) {
@@ -165,9 +195,7 @@ export default async function Homepage() {
   }
 
   const isOptedIn = canShowHomepageSearch(user?.id, optedInStatus)
-
-  const mostFollowed = (await getMostFollowedAccounts(supabase)).slice(0, 7)
-  const financialContributors = await getOpenCollectiveContributors()
+  const mostFollowed = mostFollowedAccounts.slice(0, 7)
 
   const totalAmountRaised = financialContributors.reduce(
     (sum, contributor) => sum + contributor.totalAmountDonated,
@@ -186,15 +214,6 @@ export default async function Homepage() {
     0,
     financialContributors.length - topTenNames.length,
   )
-
-  const stats = await getStats(supabase).catch((error) => {
-    console.error('Failed to fetch stats for homepage:', error)
-    return {
-      userCount: null,
-      tweetCount: null,
-      userMentionsCount: null,
-    }
-  })
 
   const sectionPaddingClasses = 'py-12 md:py-16 lg:py-20'
   const contentWrapperClasses =

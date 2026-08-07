@@ -15,8 +15,7 @@ export const getPrimaryNav = (isMember: boolean): NavItem[] =>
     ? [
         { href: '/', label: 'Home' },
         { href: '/stream', label: 'Stream' },
-        { href: '/trends', label: 'Trends' },
-        { href: '/notes', label: 'Field Notes' },
+        { href: '/research', label: 'Research' },
         { href: '/tools', label: 'Tools' },
       ]
     : [

@@ -14,7 +14,7 @@ import { PORTAL_TOOLS } from './tools'
 import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
 import { TweetRow } from './TweetRow'
 
-export type PortalView = 'home' | 'stream' | 'trends' | 'notes'
+export type PortalView = 'home' | 'stream' | 'notes'
 
 const STREAM_PER_MIN = 22
 
@@ -304,7 +304,7 @@ export default function Portal({
               <div className={`${CARD} flex flex-1 flex-col`}>
                 <PanelHeader
                   title="Trending terms · 7 days"
-                  action={{ label: 'Trends explorer', href: '/trends' }}
+                  action={{ label: 'Trends explorer', href: '/stream#trends' }}
                 />
                 <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
                   {weeklyBars.map((b) => (
@@ -448,7 +448,7 @@ export default function Portal({
 
               <div className={`${CARD} flex flex-1 flex-col`}>
                 <PanelHeader
-                  title="Field notes"
+                  title="AI field notes"
                   action={{ label: 'All notes', href: '/notes' }}
                 />
                 <div className="flex flex-1 flex-col">
@@ -570,12 +570,10 @@ export default function Portal({
                 />
               ))}
           </div>
+          <div id="trends" className="scroll-mt-32">
+            <TrendsView trends={trends} risers={risers} fallers={fallers} />
+          </div>
         </div>
-      )}
-
-      {/* ------------------------------------------------ Trends -------- */}
-      {view === 'trends' && (
-        <TrendsView trends={trends} risers={risers} fallers={fallers} />
       )}
 
       {/* ------------------------------------------------ Notes --------- */}
@@ -644,10 +642,10 @@ function TrendsView({
   const gridVals = [0, niceMax / 3, (2 * niceMax) / 3, niceMax]
 
   return (
-    <div className="mx-auto max-w-[1000px] px-4 py-6 sm:px-6">
-      <h1 className="mb-1.5 text-[26px] font-semibold" style={SERIF}>
+    <div className="pt-10">
+      <h2 className="mb-1.5 text-[26px] font-semibold" style={SERIF}>
         Trends in ideas
-      </h1>
+      </h2>
       <div className={`mb-4 text-[13px] ${MUTED}`}>
         Term frequency per 100k tweets, {trends.years[0]}–
         {trends.years[trends.years.length - 1]}. An ngram viewer for the
@@ -813,7 +811,7 @@ function NotesView({ initialArticleId }: { initialArticleId?: string }) {
   return (
     <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
       <h1 className="mb-1.5 text-[26px] font-semibold" style={SERIF}>
-        Field notes
+        AI field notes
       </h1>
       <div className={`mb-[18px] text-[13px] ${MUTED}`}>
         Short essays from inside the archive: how ideas enter the canon, mutate,

@@ -3,7 +3,7 @@ import Portal from '@/components/portal/Portal'
 import { getIsMember } from '@/lib/portal/auth'
 import { getPortalData } from '@/lib/portal/data'
 
-export const metadata = { title: 'Field Notes · Community Archive' }
+export const metadata = { title: 'AI Field Notes · Community Archive' }
 
 export default async function NotesPage({
   searchParams,

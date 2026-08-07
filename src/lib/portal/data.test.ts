@@ -4,7 +4,7 @@ jest.mock('next/cache', () => ({
 }))
 
 import {
-  fetchPortalProductionTotals,
+  fetchPortalMemberCount,
   getPortalStream,
   portalDataSourceKey,
   resolvePortalReadConfig,
@@ -48,7 +48,7 @@ describe('portal read source', () => {
     })
 
     expect(key).toBe(
-      'portal-v4:preview:analytics.example:prod-project.supabase.co',
+      'portal-v5:preview:analytics.example:prod-project.supabase.co',
     )
   })
 })
@@ -163,24 +163,14 @@ describe('portal REST reads', () => {
     )
   })
 
-  test('uses production membership and liked-tweet summaries', async () => {
-    const fetchMock = jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: new Headers({ 'content-range': '0-0/633' }),
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => [{ total_likes: 13_631_027 }],
-      } as Response)
+  test('uses the production uploader and opt-in membership count', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-range': '0-0/633' }),
+    } as Response)
 
-    await expect(fetchPortalProductionTotals()).resolves.toEqual({
-      accountCount: 633,
-      totalLikes: 13_631_027,
-    })
+    await expect(fetchPortalMemberCount()).resolves.toBe(633)
 
     const memberQuery = new URL(String(fetchMock.mock.calls[0][0])).searchParams
     expect(memberQuery.get('select')).toBe('directory_id')
@@ -188,9 +178,7 @@ describe('portal REST reads', () => {
       method: 'HEAD',
       headers: { Prefer: 'count=exact' },
     })
-    expect(String(fetchMock.mock.calls[1][0])).toContain(
-      '/rest/v1/global_activity_summary?',
-    )
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
 

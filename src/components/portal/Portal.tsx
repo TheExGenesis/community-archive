@@ -294,7 +294,7 @@ export default function Portal({
             </span>
           </div>
 
-          <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
             <StatCard
               label="Tweets archived"
               value={stats.totalTweets.toLocaleString('en-US')}
@@ -309,11 +309,6 @@ export default function Portal({
                   ? `${stats.joinedThisWeek} upload${stats.joinedThisWeek === 1 ? '' : 's'} this week`
                   : 'volunteered archives'
               }
-            />
-            <StatCard
-              label="Liked tweets"
-              value={compact(stats.totalLikes)}
-              note="across the corpus"
             />
             <StatCard
               label="Corpus span"

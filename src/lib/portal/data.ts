@@ -31,7 +31,6 @@ interface PortalCorpusSnapshot {
 const PORTAL_READ_TIMEOUT_MS = 10_000
 
 type PortalStatsSnapshot = PortalLiveAnalytics & {
-  totalLikes: number
   accountCount: number
   joinedThisWeek: number
 }
@@ -100,7 +99,7 @@ export function portalDataSourceKey(
     throw new Error('ClickHouse analytics URL is invalid')
   }
   const environment = env.VERCEL_ENV || env.NODE_ENV || 'unknown'
-  return `portal-v4:${environment}:${analyticsSource}:${portalRead.sourceId}`
+  return `portal-v5:${environment}:${analyticsSource}:${portalRead.sourceId}`
 }
 
 interface PortalRestOptions {
@@ -163,30 +162,14 @@ function exactCount(response: Response, label: string): number {
   return count
 }
 
-/** Membership and liked-tweet totals whose canonical source is production. */
-export async function fetchPortalProductionTotals(): Promise<{
-  accountCount: number
-  totalLikes: number
-}> {
-  const [membersResponse, summaryRows] = await Promise.all([
-    portalRestRequest(
-      'user_directory',
-      new URLSearchParams({ select: 'directory_id' }),
-      { method: 'HEAD', prefer: 'count=exact' },
-    ),
-    portalRestRows<{ total_likes: number }>(
-      'global_activity_summary',
-      new URLSearchParams({ select: 'total_likes', limit: '1' }),
-    ),
-  ])
-  const totalLikes = Number(summaryRows[0]?.total_likes)
-  if (!Number.isSafeInteger(totalLikes) || totalLikes < 0) {
-    throw new Error('Portal liked-tweet total returned an invalid response')
-  }
-  return {
-    accountCount: exactCount(membersResponse, 'member'),
-    totalLikes,
-  }
+/** Archive uploaders plus opted-in members, deduplicated by production. */
+export async function fetchPortalMemberCount(): Promise<number> {
+  const membersResponse = await portalRestRequest(
+    'user_directory',
+    new URLSearchParams({ select: 'directory_id' }),
+    { method: 'HEAD', prefer: 'count=exact' },
+  )
+  return exactCount(membersResponse, 'member')
 }
 
 function isoDaysAgo(days: number): string {
@@ -408,22 +391,21 @@ async function computePortalCorpusSnapshot(): Promise<PortalCorpusSnapshot> {
 }
 
 async function computePortalStatsSnapshot(): Promise<PortalStatsSnapshot> {
-  const [analytics, productionTotals, joinedThisWeekResponse] =
-    await Promise.all([
-      fetchPortalLiveAnalytics(),
-      fetchPortalProductionTotals(),
-      portalRestRequest(
-        'archive_upload',
-        new URLSearchParams({
-          select: 'id',
-          created_at: `gte.${isoDaysAgo(7)}`,
-        }),
-        { method: 'HEAD', prefer: 'count=exact' },
-      ),
-    ])
+  const [analytics, accountCount, joinedThisWeekResponse] = await Promise.all([
+    fetchPortalLiveAnalytics(),
+    fetchPortalMemberCount(),
+    portalRestRequest(
+      'archive_upload',
+      new URLSearchParams({
+        select: 'id',
+        created_at: `gte.${isoDaysAgo(7)}`,
+      }),
+      { method: 'HEAD', prefer: 'count=exact' },
+    ),
+  ])
   return {
     ...analytics,
-    ...productionTotals,
+    accountCount,
     joinedThisWeek: exactCount(joinedThisWeekResponse, 'upload'),
   }
 }
@@ -437,7 +419,7 @@ const getCachedCorpusSnapshot = unstable_cache(
 )
 const getCachedStatsSnapshot = unstable_cache(
   async (_sourceKey: string) => computePortalStatsSnapshot(),
-  ['portal-stats-snapshot-v4'],
+  ['portal-stats-snapshot-v5'],
   { revalidate: 300 },
 )
 const getCachedInitialStream = unstable_cache(
@@ -466,7 +448,6 @@ export async function getPortalData(
   ])
   const stats: PortalStats = {
     totalTweets: live.totalTweets,
-    totalLikes: live.totalLikes,
     accountCount: live.accountCount,
     streamedToday: live.streamedToday,
     joinedThisWeek: live.joinedThisWeek,

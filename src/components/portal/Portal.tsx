@@ -13,6 +13,7 @@ import { PORTAL_ARTICLES } from './articles'
 import { PORTAL_TOOLS } from './tools'
 import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
 import { TweetRow } from './TweetRow'
+import HomepageSearch from '@/components/HomepageSearch'
 
 export type PortalView = 'home' | 'stream' | 'notes'
 
@@ -239,6 +240,10 @@ export default function Portal({
       {/* ------------------------------------------------ Home ---------- */}
       {view === 'home' && (
         <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
+          <div className="mx-auto mb-10 mt-4 w-full max-w-[48rem]">
+            <HomepageSearch />
+          </div>
+
           <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-2">
             <h1 className="text-[30px] font-semibold" style={SERIF}>
               Today on the archive

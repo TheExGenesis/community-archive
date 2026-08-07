@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/react'
 import './globals.css'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import ReactQueryProvider from '@/providers/ReactQueryProvider'
+import PostHogProvider from '@/providers/PostHogProvider'
 import Link from 'next/link'
 import Image from 'next/image'
 import ThemeToggle from '@/components/ThemeToggle'
@@ -60,13 +61,14 @@ export default async function RootLayout({
     >
       <body className="bg-background text-foreground transition-colors duration-300">
         <NextTopLoader showSpinner={false} height={3} color="#2acf80" />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <ReactQueryProvider>
+        <PostHogProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <ReactQueryProvider>
             <HashScrollHandler />
             <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
               <div className="container mx-auto flex h-16 max-w-screen-xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -132,8 +134,9 @@ export default async function RootLayout({
               <Footer />
             </div>
             <ReactQueryDevtools initialIsOpen={false} />
-          </ReactQueryProvider>
-        </ThemeProvider>
+            </ReactQueryProvider>
+          </ThemeProvider>
+        </PostHogProvider>
       </body>
     </html>
   )

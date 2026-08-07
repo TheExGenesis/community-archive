@@ -330,27 +330,38 @@ export default function Portal({
                       href={post.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
+                      className="group flex items-start gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
                     >
-                      <div
-                        className="flex items-baseline gap-1.5 text-[15.5px] font-semibold leading-snug"
-                        style={SERIF}
-                      >
-                        {post.title}
-                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
-                      </div>
-                      {post.excerpt && (
+                      <div className="min-w-0 flex-1">
                         <div
-                          className={`mt-1 line-clamp-2 text-[12.5px] leading-normal ${MUTED}`}
+                          className="flex items-baseline gap-1.5 text-[15.5px] font-semibold leading-snug"
+                          style={SERIF}
                         >
-                          {post.excerpt}
+                          {post.title}
+                          <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
                         </div>
-                      )}
-                      <div className={`mt-1 text-[12px] ${MUTED}`}>
-                        {RESEARCH_SOURCE.name}
-                        {post.date &&
-                          ` · ${new Date(post.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                        {post.excerpt && (
+                          <div
+                            className={`mt-1 line-clamp-2 text-[12.5px] leading-normal ${MUTED}`}
+                          >
+                            {post.excerpt}
+                          </div>
+                        )}
+                        <div className={`mt-1 text-[12px] ${MUTED}`}>
+                          {RESEARCH_SOURCE.name}
+                          {post.date &&
+                            ` · ${new Date(post.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                        </div>
                       </div>
+                      {post.image && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={post.image}
+                          alt=""
+                          loading="lazy"
+                          className="mt-0.5 h-14 w-20 flex-shrink-0 rounded-[4px] border border-zinc-200 object-cover dark:border-[#26262a]"
+                        />
+                      )}
                     </a>
                   ))}
                   {data.research.length === 0 && (

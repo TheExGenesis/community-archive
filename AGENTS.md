@@ -9,6 +9,10 @@ code and configuration take precedence over dated documentation.
 Community Archive preserves Twitter/X archive exports in a searchable public
 dataset and exposes the data for applications and research.
 
+A Community Archive user is an account that has either uploaded an archive or
+explicitly opted in. Do not infer Community Archive membership from archive
+presence alone; opted-in users may not have uploaded an archive yet.
+
 - Web app: Next.js 14 App Router, React 18, Tailwind CSS, and shadcn/ui.
 - Backend: Supabase PostgreSQL, Auth, and Storage.
 - Server state: TanStack Query.

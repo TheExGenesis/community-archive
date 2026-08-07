@@ -134,7 +134,6 @@ export default function Portal({
 
   // ---- live stream state -------------------------------------------------
   const [visible, setVisible] = useState<PortalTweet[]>(data.initialStream)
-  const [streamFilter, setStreamFilter] = useState('all')
   const seenIds = useRef<Set<string>>(
     new Set(data.initialStream.map((t) => t.id)),
   )
@@ -219,18 +218,9 @@ export default function Portal({
     [withDelta],
   )
 
-  const atlas = PORTAL_TOOLS.find((t) => t.name === 'Strand Atlas')
+  const bestStrands = PORTAL_TOOLS.find((t) => t.name === 'Best Strands')
   const bangers = PORTAL_TOOLS.find((t) => t.name === 'Bangers')
-
-  // Random top banger. Rendered with index 0 first, then re-picked on mount
-  // so server and client HTML agree (no hydration mismatch).
-  const [bangerIdx, setBangerIdx] = useState(0)
-  useEffect(() => {
-    if (data.bangers.length > 1) {
-      setBangerIdx(Math.floor(Math.random() * data.bangers.length))
-    }
-  }, [data.bangers.length])
-  const banger = data.bangers[bangerIdx] ?? null
+  const banger = data.bangers[0] ?? null
 
   const generatedDate = useMemo(() => {
     const d = new Date(stats.generatedAt)
@@ -473,67 +463,38 @@ export default function Portal({
                   )}
                 </div>
               </div>
-              {atlas && (
+              {bestStrands && (
                 <a
-                  href={atlas.link}
+                  href={bestStrands.link}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`${CARD} group overflow-hidden transition-colors hover:border-brand/60`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={atlas.image}
-                    alt={`${atlas.name} preview`}
+                    src={bestStrands.image}
+                    alt={`${bestStrands.name} preview`}
                     loading="lazy"
                     className="aspect-[2/1] w-full border-b border-zinc-200 object-cover dark:border-[#26262a]"
                   />
                   <div className="flex items-start gap-2.5 px-4 py-3">
                     <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
-                      {atlas.icon}
+                      {bestStrands.icon}
                     </span>
                     <span className="min-w-0">
                       <span className="flex items-center gap-1.5 text-[13.5px] font-bold">
-                        {atlas.name}
+                        {bestStrands.name}
                         <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
                       </span>
                       <span
                         className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
                       >
-                        {atlas.description}
+                        {bestStrands.description}
                       </span>
                     </span>
                   </div>
                 </a>
               )}
-
-              <div className={`${CARD} flex flex-1 flex-col`}>
-                <PanelHeader
-                  title="AI field notes"
-                  action={{ label: 'All notes', href: '/notes' }}
-                />
-                <div className="flex flex-1 flex-col">
-                  {PORTAL_ARTICLES.slice(0, 3).map((a) => (
-                    <Link
-                      key={a.id}
-                      href={`/notes?article=${a.id}`}
-                      className="flex flex-1 flex-col justify-center border-b border-zinc-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
-                    >
-                      <div className="mb-0.5 text-[11px] font-bold uppercase tracking-wide text-brand">
-                        {a.tag}
-                      </div>
-                      <div
-                        className="text-[15.5px] font-semibold leading-snug"
-                        style={SERIF}
-                      >
-                        {a.title}
-                      </div>
-                      <div className={`mt-1 text-[12px] ${MUTED}`}>
-                        {a.meta}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
 
@@ -595,38 +556,15 @@ export default function Portal({
                 Tweets arriving from the browser-extension firehose, as
                 contributors read their timelines.
               </div>
-              <div className="mb-4 flex flex-wrap gap-1.5">
-                {[
-                  'all',
-                  ...Array.from(new Set(visible.map((t) => t.username))).slice(
-                    0,
-                    5,
-                  ),
-                ].map((h) => (
-                  <Chip
-                    key={h}
-                    active={streamFilter === h}
-                    onClick={() => setStreamFilter(h)}
-                  >
-                    {h === 'all' ? 'All accounts' : `@${h}`}
-                  </Chip>
-                ))}
-              </div>
               <div className={`${CARD} overflow-hidden`}>
-                {visible
-                  .filter(
-                    (t) =>
-                      streamFilter === 'all' || t.username === streamFilter,
-                  )
-                  .slice(0, 14)
-                  .map((t, i) => (
-                    <TweetRow
-                      key={t.id}
-                      tweet={t}
-                      animate={streamFilter === 'all' && i === 0}
-                      showArchivedBadge
-                    />
-                  ))}
+                {visible.slice(0, 14).map((t, i) => (
+                  <TweetRow
+                    key={t.id}
+                    tweet={t}
+                    animate={i === 0}
+                    showArchivedBadge
+                  />
+                ))}
               </div>
             </div>
             <div id="trends" className="scroll-mt-32">

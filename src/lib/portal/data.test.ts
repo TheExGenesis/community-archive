@@ -4,10 +4,13 @@ jest.mock('next/cache', () => ({
 }))
 
 import {
+  fetchPortalProductionTotals,
   getPortalStream,
   portalDataSourceKey,
   resolvePortalReadConfig,
+  selectDailyBangers,
 } from './data'
+import type { PortalTweet } from './types'
 
 describe('portal read source', () => {
   test('uses an explicit server-only row source without changing app Supabase', () => {
@@ -45,7 +48,7 @@ describe('portal read source', () => {
     })
 
     expect(key).toBe(
-      'portal-v3:preview:analytics.example:prod-project.supabase.co',
+      'portal-v4:preview:analytics.example:prod-project.supabase.co',
     )
   })
 })
@@ -158,5 +161,75 @@ describe('portal REST reads', () => {
     expect(query.get('or')).toBe(
       '(updated_at.gt.2026-08-07T20:00:00.000Z,and(updated_at.eq.2026-08-07T20:00:00.000Z,tweet_id.gt.42))',
     )
+  })
+
+  test('uses production membership and liked-tweet summaries', async () => {
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-range': '0-0/633' }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ total_likes: 13_631_027 }],
+      } as Response)
+
+    await expect(fetchPortalProductionTotals()).resolves.toEqual({
+      accountCount: 633,
+      totalLikes: 13_631_027,
+    })
+
+    const memberQuery = new URL(String(fetchMock.mock.calls[0][0])).searchParams
+    expect(memberQuery.get('select')).toBe('directory_id')
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      method: 'HEAD',
+      headers: { Prefer: 'count=exact' },
+    })
+    expect(String(fetchMock.mock.calls[1][0])).toContain(
+      '/rest/v1/global_activity_summary?',
+    )
+  })
+})
+
+describe('daily banger selection', () => {
+  const tweet = (
+    id: string,
+    createdAt: string,
+    likes: number,
+  ): PortalTweet => ({
+    id,
+    createdAt,
+    observedAt: createdAt,
+    likes,
+    rts: 0,
+    username: 'member',
+    name: 'Member',
+    avatar: null,
+    text: `Banger ${id}`,
+  })
+
+  test('chooses deterministically from the ten closest prior-year dates', () => {
+    const candidates = Array.from({ length: 12 }, (_, offset) =>
+      tweet(
+        String(offset),
+        `2024-08-${String(7 + offset).padStart(2, '0')}T12:00:00.000Z`,
+        1_000 - offset,
+      ),
+    )
+    candidates.push(tweet('current', '2026-08-07T12:00:00.000Z', 1_000_000))
+    const now = new Date('2026-08-07T12:00:00.000Z')
+
+    const selected = selectDailyBangers(candidates, now)
+    const selectedAgain = selectDailyBangers(candidates, now)
+
+    expect(selected).toHaveLength(10)
+    expect(selectedAgain[0].id).toBe(selected[0].id)
+    expect(new Set(selected.map(({ id }) => id))).toEqual(
+      new Set(Array.from({ length: 10 }, (_, index) => String(index))),
+    )
+    expect(selected.some(({ id }) => id === 'current')).toBe(false)
   })
 })

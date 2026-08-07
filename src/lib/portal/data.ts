@@ -31,6 +31,8 @@ interface PortalCorpusSnapshot {
 const PORTAL_READ_TIMEOUT_MS = 10_000
 
 type PortalStatsSnapshot = PortalLiveAnalytics & {
+  totalLikes: number
+  accountCount: number
   joinedThisWeek: number
 }
 
@@ -98,7 +100,7 @@ export function portalDataSourceKey(
     throw new Error('ClickHouse analytics URL is invalid')
   }
   const environment = env.VERCEL_ENV || env.NODE_ENV || 'unknown'
-  return `portal-v3:${environment}:${analyticsSource}:${portalRead.sourceId}`
+  return `portal-v4:${environment}:${analyticsSource}:${portalRead.sourceId}`
 }
 
 interface PortalRestOptions {
@@ -149,6 +151,42 @@ async function portalRestRows<T>(
     throw new Error(`Portal ${table} query returned an invalid response`)
   }
   return data as T[]
+}
+
+function exactCount(response: Response, label: string): number {
+  const contentRange = response.headers.get('content-range')
+  const countText = contentRange?.split('/').at(-1)
+  const count = countText ? Number(countText) : Number.NaN
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new Error(`Portal ${label} count returned an invalid response`)
+  }
+  return count
+}
+
+/** Membership and liked-tweet totals whose canonical source is production. */
+export async function fetchPortalProductionTotals(): Promise<{
+  accountCount: number
+  totalLikes: number
+}> {
+  const [membersResponse, summaryRows] = await Promise.all([
+    portalRestRequest(
+      'user_directory',
+      new URLSearchParams({ select: 'directory_id' }),
+      { method: 'HEAD', prefer: 'count=exact' },
+    ),
+    portalRestRows<{ total_likes: number }>(
+      'global_activity_summary',
+      new URLSearchParams({ select: 'total_likes', limit: '1' }),
+    ),
+  ])
+  const totalLikes = Number(summaryRows[0]?.total_likes)
+  if (!Number.isSafeInteger(totalLikes) || totalLikes < 0) {
+    throw new Error('Portal liked-tweet total returned an invalid response')
+  }
+  return {
+    accountCount: exactCount(membersResponse, 'member'),
+    totalLikes,
+  }
 }
 
 function isoDaysAgo(days: number): string {
@@ -235,8 +273,59 @@ async function toPortalTweets(tweets: any[]): Promise<PortalTweet[]> {
   })
 }
 
-/** Top-liked original tweets from members' own production archives. */
-async function fetchTopBangers(limit = 30): Promise<PortalTweet[]> {
+function calendarDayDistance(left: Date, right: Date): number {
+  const anchorYear = 2000
+  const leftDay = Date.UTC(anchorYear, left.getUTCMonth(), left.getUTCDate())
+  const rightDay = Date.UTC(anchorYear, right.getUTCMonth(), right.getUTCDate())
+  const distance = Math.abs(leftDay - rightDay) / 86_400_000
+  return Math.min(distance, 366 - distance)
+}
+
+function stableHash(value: string): number {
+  let hash = 2_166_136_261
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16_777_619)
+  }
+  return hash >>> 0
+}
+
+/**
+ * Put one deterministic daily choice first, selected from the ten strongest
+ * bangers closest to today's calendar date in previous years.
+ */
+export function selectDailyBangers(
+  tweets: PortalTweet[],
+  now = new Date(),
+  poolSize = 10,
+): PortalTweet[] {
+  const candidates = tweets
+    .filter((tweet) => {
+      const createdAt = new Date(tweet.createdAt)
+      return (
+        !Number.isNaN(createdAt.getTime()) &&
+        createdAt.getUTCFullYear() < now.getUTCFullYear()
+      )
+    })
+    .sort((left, right) => {
+      const distance =
+        calendarDayDistance(new Date(left.createdAt), now) -
+        calendarDayDistance(new Date(right.createdAt), now)
+      return (
+        distance || right.likes - left.likes || left.id.localeCompare(right.id)
+      )
+    })
+    .slice(0, Math.max(1, poolSize))
+
+  if (candidates.length < 2) return candidates
+  const day = now.toISOString().slice(0, 10)
+  const selectedIndex = stableHash(day) % candidates.length
+  const selected = candidates[selectedIndex]
+  return [selected, ...candidates.filter((_, index) => index !== selectedIndex)]
+}
+
+/** Calendar-matched bangers from members' own production archives. */
+async function fetchDailyBangers(now = new Date()): Promise<PortalTweet[]> {
   const data = await portalRestRows<any>(
     'tweets',
     new URLSearchParams({
@@ -246,15 +335,35 @@ async function fetchTopBangers(limit = 30): Promise<PortalTweet[]> {
       reply_to_tweet_id: 'is.null',
       full_text: 'not.ilike.RT @%',
       order: 'favorite_count.desc',
-      limit: '80',
+      limit: '500',
     }),
   )
   const textful = data.filter((tweet: any) => {
     const text = (tweet.full_text ?? '').replace(/https?:\/\/\S+/g, '').trim()
     return text.length >= 30
   })
-  const mapped = await toPortalTweets(textful)
-  return mapped.slice(0, limit)
+  const ranked = selectDailyBangers(
+    textful.map(
+      (tweet: any): PortalTweet => ({
+        id: tweet.tweet_id,
+        username: '',
+        name: '',
+        avatar: null,
+        text: tweet.full_text ?? '',
+        observedAt: tweet.updated_at ?? tweet.created_at,
+        createdAt: tweet.created_at,
+        likes: tweet.favorite_count ?? 0,
+        rts: tweet.retweet_count ?? 0,
+      }),
+    ),
+    now,
+  )
+  const rowsById = new Map(data.map((tweet: any) => [tweet.tweet_id, tweet]))
+  return toPortalTweets(
+    ranked
+      .map((tweet) => rowsById.get(tweet.id))
+      .filter((tweet): tweet is any => Boolean(tweet)),
+  )
 }
 
 async function fetchCorpusRange(): Promise<{
@@ -299,24 +408,24 @@ async function computePortalCorpusSnapshot(): Promise<PortalCorpusSnapshot> {
 }
 
 async function computePortalStatsSnapshot(): Promise<PortalStatsSnapshot> {
-  const [analytics, joinedThisWeekResponse] = await Promise.all([
-    fetchPortalLiveAnalytics(),
-    portalRestRequest(
-      'archive_upload',
-      new URLSearchParams({
-        select: 'id',
-        created_at: `gte.${isoDaysAgo(7)}`,
-      }),
-      { method: 'HEAD', prefer: 'count=exact' },
-    ),
-  ])
-  const contentRange = joinedThisWeekResponse.headers.get('content-range')
-  const countText = contentRange?.split('/').at(-1)
-  const joinedThisWeek = countText ? Number(countText) : Number.NaN
-  if (!Number.isSafeInteger(joinedThisWeek) || joinedThisWeek < 0) {
-    throw new Error('Portal upload count returned an invalid response')
+  const [analytics, productionTotals, joinedThisWeekResponse] =
+    await Promise.all([
+      fetchPortalLiveAnalytics(),
+      fetchPortalProductionTotals(),
+      portalRestRequest(
+        'archive_upload',
+        new URLSearchParams({
+          select: 'id',
+          created_at: `gte.${isoDaysAgo(7)}`,
+        }),
+        { method: 'HEAD', prefer: 'count=exact' },
+      ),
+    ])
+  return {
+    ...analytics,
+    ...productionTotals,
+    joinedThisWeek: exactCount(joinedThisWeekResponse, 'upload'),
   }
-  return { ...analytics, joinedThisWeek }
 }
 
 // Arguments participate in the cache key, keeping staging/prod sources and
@@ -328,7 +437,7 @@ const getCachedCorpusSnapshot = unstable_cache(
 )
 const getCachedStatsSnapshot = unstable_cache(
   async (_sourceKey: string) => computePortalStatsSnapshot(),
-  ['portal-stats-snapshot-v3'],
+  ['portal-stats-snapshot-v4'],
   { revalidate: 300 },
 )
 const getCachedInitialStream = unstable_cache(
@@ -337,8 +446,9 @@ const getCachedInitialStream = unstable_cache(
   { revalidate: 60 },
 )
 const getCachedBangers = unstable_cache(
-  async (_sourceKey: string) => fetchTopBangers(30),
-  ['portal-bangers-v3'],
+  async (_sourceKey: string, day: string) =>
+    fetchDailyBangers(new Date(`${day}T12:00:00.000Z`)),
+  ['portal-bangers-v4'],
   { revalidate: 86_400 },
 )
 
@@ -346,12 +456,13 @@ export async function getPortalData(
   view: 'home' | 'stream' = 'home',
 ): Promise<PortalData> {
   const sourceKey = portalDataSourceKey()
+  const today = new Date().toISOString().slice(0, 10)
   const [corpus, live, initialStream, research, bangers] = await Promise.all([
     getCachedCorpusSnapshot(sourceKey),
     getCachedStatsSnapshot(sourceKey),
     getCachedInitialStream(sourceKey),
     view === 'home' ? getResearchPosts() : Promise.resolve([]),
-    view === 'home' ? getCachedBangers(sourceKey) : Promise.resolve([]),
+    view === 'home' ? getCachedBangers(sourceKey, today) : Promise.resolve([]),
   ])
   const stats: PortalStats = {
     totalTweets: live.totalTweets,

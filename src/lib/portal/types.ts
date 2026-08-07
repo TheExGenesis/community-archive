@@ -65,6 +65,6 @@ export interface PortalData {
   trends: PortalTrends
   initialStream: PortalTweet[]
   research: ResearchPost[]
-  /** Top-liked tweets from members' own archives, refreshed daily. */
+  /** Calendar-matched tweets from members' own archives, refreshed daily. */
   bangers: PortalTweet[]
 }

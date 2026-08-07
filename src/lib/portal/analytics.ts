@@ -34,9 +34,7 @@ type AnalyticsFetcher = typeof fetchAnalyticsGatewayJson
 
 interface ClickHouseSummaryResponse {
   data: {
-    memberAccounts: string | number
     totalTweets: string | number
-    totalLikes: string | number
     sourceUpdatedAt: string
     collectedAt: string
   }
@@ -64,8 +62,6 @@ interface ClickHouseTrendResponse {
 
 export interface PortalLiveAnalytics {
   totalTweets: number
-  totalLikes: number
-  accountCount: number
   streamedToday: number
   generatedAt: string
   latestObservedAt: string | null
@@ -194,8 +190,6 @@ export async function fetchPortalLiveAnalytics(
 
   return {
     totalTweets: safeCount(summary.data.totalTweets, 'tweet count'),
-    totalLikes: safeCount(summary.data.totalLikes, 'like count'),
-    accountCount: safeCount(summary.data.memberAccounts, 'member count'),
     streamedToday: safeCount(
       stream.summary.totalTweets,
       'streamed-today count',

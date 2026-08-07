@@ -9,9 +9,7 @@ describe('ClickHouse-backed portal analytics', () => {
       if (path[0] === 'summary') {
         return {
           data: {
-            memberAccounts: '592',
             totalTweets: '14800000',
-            totalLikes: '3200000',
             sourceUpdatedAt: '2026-08-07 11:55:00.000',
             collectedAt: '2026-08-07 12:00:00.000',
           },
@@ -31,8 +29,6 @@ describe('ClickHouse-backed portal analytics', () => {
       fetchPortalLiveAnalytics(new Date('2026-08-07T12:00:00.000Z'), fetcher),
     ).resolves.toEqual({
       totalTweets: 14_800_000,
-      totalLikes: 3_200_000,
-      accountCount: 592,
       streamedToday: 1234,
       generatedAt: '2026-08-07T12:00:00.000Z',
       latestObservedAt: '2026-08-07T11:59:00.000Z',
@@ -140,9 +136,7 @@ describe('ClickHouse-backed portal analytics', () => {
       path[0] === 'summary'
         ? {
             data: {
-              memberAccounts: '592',
               totalTweets: 'not-a-count',
-              totalLikes: '3',
               sourceUpdatedAt: '2026-08-07T12:00:00.000Z',
               collectedAt: '2026-08-07T12:00:00.000Z',
             },

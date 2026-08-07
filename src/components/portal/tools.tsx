@@ -22,9 +22,9 @@ export interface PortalTool {
  *  and the /tools page; mirrors the classic homepage's featured apps lists. */
 export const PORTAL_TOOLS: PortalTool[] = [
   {
-    name: 'Strand Atlas',
-    description: 'Explore the best conversation threads',
-    link: 'https://bangers.community-archive.org/detailed-strand-atlas',
+    name: 'Best Strands',
+    description: 'Explore the archive’s best conversation strands',
+    link: 'https://bangers.community-archive.org/best-strands',
     icon: <FaProjectDiagram />,
     image: '/images/featured/strand-atlas.png',
   },

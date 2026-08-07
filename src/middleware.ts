@@ -430,10 +430,15 @@ export async function middleware(request: NextRequest) {
     })
   }
 
-  // Dev-only member preview: visiting any page with ?as=member sets a cookie
-  // so the whole app (nav included) renders the signed-in experience without
-  // an account; ?as=guest clears it. Inert outside development.
-  if (process.env.NODE_ENV === 'development') {
+  // Member preview: visiting any page with ?as=member sets a cookie so the
+  // whole app (nav included) renders the signed-in experience without an
+  // account; ?as=guest clears it. Enabled in development, and on deployments
+  // that opt in via NEXT_PUBLIC_ENABLE_MEMBER_PREVIEW (e.g. staging previews
+  // where X sign-in isn't wired up). Keep the flag unset in production.
+  if (
+    process.env.NODE_ENV === 'development' ||
+    process.env.NEXT_PUBLIC_ENABLE_MEMBER_PREVIEW === 'true'
+  ) {
     const as = request.nextUrl.searchParams.get('as')
     if (as === 'member') {
       response.cookies.set('dev_as_member', '1', { path: '/', sameSite: 'lax' })

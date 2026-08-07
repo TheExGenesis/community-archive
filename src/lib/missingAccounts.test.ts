@@ -36,6 +36,6 @@ describe('getMissingAccounts', () => {
       fetchAnalyticsGatewayJsonMock.mock.calls[0]!
     expect(path).toEqual(['missing-accounts'])
     expect(searchParams?.toString()).toBe('limit=100')
-    expect(options).toEqual({ revalidate: 600, timeoutMs: 30_000 })
+    expect(options).toEqual({ timeoutMs: 30_000, revalidate: 60 })
   })
 })

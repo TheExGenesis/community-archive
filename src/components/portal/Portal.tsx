@@ -240,14 +240,54 @@ export default function Portal({
       {/* ------------------------------------------------ Home ---------- */}
       {view === 'home' && (
         <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
-          <div className="mx-auto mb-10 mt-4 w-full max-w-[48rem]">
-            <HomepageSearch />
+          {/* Hero: same gist as the logged-out homepage */}
+          <div className="mx-auto mb-14 mt-8 w-full max-w-[48rem] space-y-3 text-center">
+            <h1
+              className="text-5xl font-bold tracking-tight text-foreground"
+              style={SERIF}
+            >
+              Community Archive
+            </h1>
+            <p className="text-xl leading-8 text-zinc-500 dark:text-[#a7a7b4]">
+              We preserve{' '}
+              <strong className="font-semibold text-foreground">
+                {compact(stats.totalTweets)} public tweets
+              </strong>{' '}
+              from{' '}
+              <strong className="font-semibold text-foreground">
+                {stats.accountCount.toLocaleString('en-US')} community members
+              </strong>
+              .
+            </p>
+            <p className={`text-xs ${FAINT}`}>
+              Backed by{' '}
+              <a
+                href="https://survivalandflourishing.fund/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`font-medium ${MUTED} transition-colors hover:text-brand hover:underline`}
+              >
+                Survival and Flourishing Fund
+              </a>{' '}
+              and{' '}
+              <a
+                href="https://x.com/VitalikButerin"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`font-medium ${MUTED} transition-colors hover:text-brand hover:underline`}
+              >
+                Vitalik Buterin
+              </a>
+            </p>
+            <div className="pt-4">
+              <HomepageSearch />
+            </div>
           </div>
 
           <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-2">
-            <h1 className="text-[30px] font-semibold" style={SERIF}>
+            <h2 className="text-[30px] font-semibold" style={SERIF}>
               Today on the archive
-            </h1>
+            </h2>
             <span className="flex items-baseline gap-3">
               <LiveCounter count={liveCount} />
               <span className={`text-[12.5px] ${MUTED}`}>{generatedDate}</span>

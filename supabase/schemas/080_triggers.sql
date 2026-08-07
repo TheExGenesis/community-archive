@@ -16,6 +16,8 @@ CREATE OR REPLACE TRIGGER "update_likes_updated_at" BEFORE UPDATE ON "public"."l
 
 CREATE OR REPLACE TRIGGER "update_optin_timestamp" BEFORE UPDATE ON "public"."optin" FOR EACH ROW EXECUTE FUNCTION "public"."update_optin_updated_at"();
 
+CREATE OR REPLACE TRIGGER "propagate_explicit_optout_scrape_block" AFTER INSERT OR UPDATE OF "explicit_optout", "twitter_user_id", "username" ON "public"."optin" FOR EACH ROW EXECUTE FUNCTION "public"."propagate_explicit_optout_scrape_block"();
+
 CREATE OR REPLACE TRIGGER "update_tweet_media_updated_at" BEFORE UPDATE ON "public"."tweet_media" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 CREATE OR REPLACE TRIGGER "update_tweet_urls_updated_at" BEFORE UPDATE ON "public"."tweet_urls" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();

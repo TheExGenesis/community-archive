@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/react'
 import './globals.css'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import ReactQueryProvider from '@/providers/ReactQueryProvider'
+import PostHogProvider from '@/providers/PostHogProvider'
 import Link from 'next/link'
 import Image from 'next/image'
 import ThemeToggle from '@/components/ThemeToggle'
@@ -14,8 +15,10 @@ import HeaderSearch from '@/components/HeaderSearch'
 import MobileMenu from '@/components/MobileMenu'
 import MobileNavigation from '@/components/MobileNavigation'
 import Footer from '@/components/Footer'
+import HashScrollHandler from '@/components/HashScrollHandler'
 import { checkIsAdmin } from '@/app/admin/data'
-import { Shield } from 'lucide-react'
+import { DatabaseZap, Shield } from 'lucide-react'
+import { isClickHouseLabEnvironmentEnabled } from '@/lib/clickhouseLab'
 import { getIsMember } from '@/lib/portal/auth'
 import { getPrimaryNav, getUtilityNav, getMobileNav } from '@/lib/navigation'
 
@@ -51,6 +54,7 @@ export default async function RootLayout({
   children: React.ReactNode
 }) {
   const [isAdmin, isMember] = await Promise.all([checkIsAdmin(), getIsMember()])
+  const showClickHouseLab = isAdmin && isClickHouseLabEnvironmentEnabled()
   const primaryNav = getPrimaryNav(isMember)
   const utilityNav = getUtilityNav(isMember)
   const mobileNav = getMobileNav(isMember)
@@ -62,72 +66,85 @@ export default async function RootLayout({
     >
       <body className="bg-background text-foreground transition-colors duration-300">
         <NextTopLoader showSpinner={false} height={3} color="#2acf80" />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <ReactQueryProvider>
-            <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
-              <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-                <div className="flex min-w-0 items-center gap-3">
-                  <MobileNavigation items={mobileNav} />
-                  <Link
-                    href="/"
-                    className="flex flex-shrink-0 items-center space-x-2"
-                  >
-                    <Image
-                      src="/images/logo.png"
-                      alt="Community Archive logo"
-                      width={28}
-                      height={28}
-                      className="h-7 w-7 flex-shrink-0"
-                      priority
-                    />
-                    <span
-                      className="hidden whitespace-nowrap text-lg font-bold text-foreground sm:inline"
-                      style={{
-                        fontFamily:
-                          'var(--font-petrona), Georgia, "Times New Roman", serif',
-                      }}
-                    >
-                      Community Archive
-                    </span>
-                  </Link>
-                  <HeaderNavigation items={primaryNav} />
-                </div>
-                <div className="flex flex-shrink-0 items-center space-x-3">
-                  {utilityNav.length > 0 && (
-                    <HeaderNavigation items={utilityNav} />
-                  )}
-                  <HeaderSearch />
-                  <div className="text-sm">
-                    <DynamicSignIn />
-                  </div>
-                  <ThemeToggle side="bottom" />
-                  {isAdmin ? (
+        <PostHogProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <ReactQueryProvider>
+              <HashScrollHandler />
+              <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
+                <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <MobileNavigation items={mobileNav} />
                     <Link
-                      href="/admin"
-                      aria-label="Admin dashboard"
-                      title="Admin dashboard"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-input bg-background transition-colors hover:bg-accent hover:text-accent-foreground"
+                      href="/"
+                      className="flex flex-shrink-0 items-center space-x-2"
                     >
-                      <Shield className="h-5 w-5" />
+                      <Image
+                        src="/images/logo.png"
+                        alt="Community Archive logo"
+                        width={28}
+                        height={28}
+                        className="h-7 w-7 flex-shrink-0"
+                        priority
+                      />
+                      <span
+                        className="hidden whitespace-nowrap text-lg font-bold text-foreground sm:inline"
+                        style={{
+                          fontFamily:
+                            'var(--font-petrona), Georgia, "Times New Roman", serif',
+                        }}
+                      >
+                        Community Archive
+                      </span>
                     </Link>
-                  ) : null}
-                  <MobileMenu />
+                    <HeaderNavigation items={primaryNav} />
+                  </div>
+                  <div className="flex flex-shrink-0 items-center space-x-3">
+                    {utilityNav.length > 0 && (
+                      <HeaderNavigation items={utilityNav} />
+                    )}
+                    <HeaderSearch />
+                    <div className="text-sm">
+                      <DynamicSignIn />
+                    </div>
+                    <ThemeToggle side="bottom" />
+                    {isAdmin ? (
+                      <Link
+                        href="/admin"
+                        aria-label="Admin dashboard"
+                        title="Admin dashboard"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-input bg-background transition-colors hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <Shield className="h-5 w-5" />
+                      </Link>
+                    ) : null}
+                    {showClickHouseLab ? (
+                      <Link
+                        href="/clickhouse"
+                        aria-label="ClickHouse staging lab"
+                        title="ClickHouse staging lab"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-input bg-background text-brand transition-colors hover:bg-accent"
+                      >
+                        <DatabaseZap className="h-5 w-5" />
+                      </Link>
+                    ) : null}
+                    <MobileMenu />
+                  </div>
                 </div>
+              </header>
+              <div className="flex min-h-[calc(100vh-4rem)] flex-col">
+                {children}
+                <Analytics />
+                <Footer />
               </div>
-            </header>
-            <div className="flex min-h-[calc(100vh-4rem)] flex-col">
-              {children}
-              <Analytics />
-              <Footer />
-            </div>
-            <ReactQueryDevtools initialIsOpen={false} />
-          </ReactQueryProvider>
-        </ThemeProvider>
+              <ReactQueryDevtools initialIsOpen={false} />
+            </ReactQueryProvider>
+          </ThemeProvider>
+        </PostHogProvider>
       </body>
     </html>
   )

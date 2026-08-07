@@ -1,5 +1,7 @@
-# Use Node.js 20 LTS with Alpine for better performance and --env-file support
-FROM node:20-alpine
+# Supabase Realtime requires either a WebSocket transport or Node.js 22+.
+# The archive worker only uses Supabase Storage, but createClient still
+# initializes Realtime, so keep the runtime on a release with native WebSocket.
+FROM node:22-alpine
 
 # Install necessary system dependencies
 RUN apk add --no-cache \
@@ -11,10 +13,17 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Copy package files first for better layer caching
-COPY services/process_archive/package.json ./
+COPY services/process_archive/package.json services/process_archive/package-lock.json ./
 
-# Install dependencies for this service only
-RUN npm install
+# Install the exact dependency graph committed for this service. A floating
+# npm install previously pulled a Supabase version incompatible with Node 20
+# and stopped every archive before its Storage download.
+RUN npm ci --omit=dev
+
+# Fail the image build if the runtime can no longer construct the Supabase
+# client or expose garbage collection as expected by the worker.
+COPY services/process_archive/runtime_smoke_test.cjs ./
+RUN npm run smoke:runtime
 
 # Copy root package.json for reference (but don't install from it)
 COPY package.json ./root-package.json

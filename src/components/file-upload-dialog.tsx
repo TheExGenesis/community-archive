@@ -26,9 +26,9 @@ import { ArchiveStats, FileUploadDialogProps, UploadOptions } from '@/lib/types'
 import { uploadArchive } from '@/lib/upload-archive/uploadArchive'
 import { calculateArchiveStats } from '@/lib/upload-archive/calculateArchiveStats'
 import { applyOptionsToArchive } from '@/lib/upload-archive/applyOptionsToArchive'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 interface FileUploadDialogState {
-  keepPrivate: boolean
   showAdvancedOptions: boolean
   uploadLikes: boolean
   uploadStatus: 'not_started' | 'uploading' | 'completed'
@@ -42,7 +42,6 @@ interface FileUploadDialogState {
 }
 
 const initialState: FileUploadDialogState = {
-  keepPrivate: false,
   showAdvancedOptions: false,
   uploadLikes: true,
   uploadStatus: 'not_started',
@@ -96,13 +95,20 @@ export function FileUploadDialog({
   const handleUpload = async () => {
     setState((prev) => ({ ...prev, uploadStatus: 'uploading', error: null }))
     const options: UploadOptions = {
-      keepPrivate: state.keepPrivate,
+      keepPrivate: false,
       uploadLikes: state.uploadLikes,
       startDate: dateRange.start,
       endDate: dateRange.end,
     }
 
     const archiveWithOptions = applyOptionsToArchive(archive, options)
+
+    capturePostHogEvent('archive_upload_started', {
+      includes_likes: options.uploadLikes,
+      date_filter_applied:
+        dateInputs.start !== format(new Date(archiveStats.earliestTweetDate), 'yyyy-MM-dd') ||
+        dateInputs.end !== format(new Date(archiveStats.latestTweetDate), 'yyyy-MM-dd'),
+    })
 
     try {
       const filteredStats = calculateArchiveStats(archiveWithOptions)
@@ -122,6 +128,11 @@ export function FileUploadDialog({
         uploadedStats: stats,
         uploadStatus: 'completed',
       }))
+      capturePostHogEvent('archive_upload_completed', {
+        uploaded_tweet_count: stats.uploadedTweets,
+        uploaded_like_count: stats.uploadedLikes,
+        includes_likes: options.uploadLikes,
+      })
       console.log('Upload successful')
     } catch (error) {
       console.error('Upload failed:', error)

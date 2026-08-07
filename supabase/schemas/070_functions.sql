@@ -81,6 +81,44 @@ $$;
 ALTER FUNCTION "public"."update_optin_updated_at"() OWNER TO "postgres";
 
 
+-- Explicit opt-outs are a hard scrape deny. Resolve username-only legacy rows
+-- when possible, and never remove a block automatically because the same table
+-- also contains administrator-managed blocks.
+CREATE OR REPLACE FUNCTION "public"."propagate_explicit_optout_scrape_block"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+    v_account_id text;
+BEGIN
+    IF NEW.explicit_optout IS NOT TRUE THEN
+        RETURN NEW;
+    END IF;
+
+    v_account_id := NULLIF(BTRIM(NEW.twitter_user_id), '');
+
+    IF v_account_id IS NULL AND NULLIF(BTRIM(NEW.username), '') IS NOT NULL THEN
+        SELECT a.account_id
+        INTO v_account_id
+        FROM public.all_account AS a
+        WHERE LOWER(a.username) = LOWER(BTRIM(NEW.username))
+        ORDER BY a.updated_at DESC NULLS LAST
+        LIMIT 1;
+    END IF;
+
+    IF v_account_id IS NOT NULL THEN
+        INSERT INTO tes.blocked_scraping_users (account_id)
+        VALUES (v_account_id)
+        ON CONFLICT (account_id) DO NOTHING;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION "public"."propagate_explicit_optout_scrape_block"() OWNER TO "postgres";
+
+
 -- Generic updated_at column maintainer
 CREATE OR REPLACE FUNCTION "public"."update_updated_at_column"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -2909,3 +2947,43 @@ BEGIN
 END;
 $$;
 ALTER FUNCTION public.admin_enqueue_delete_with_export(text, text, text, uuid) OWNER TO postgres;
+
+-- admin_list_recent_delete_jobs: service-role-only read bridge for the
+-- dashboard. private.admin_jobs remains outside PostgREST's exposed schemas.
+CREATE OR REPLACE FUNCTION public.admin_list_recent_delete_jobs(
+  p_limit integer DEFAULT 20
+) RETURNS TABLE (
+  job_key uuid,
+  status text,
+  account_id text,
+  username text,
+  reason text,
+  created_at timestamptz,
+  updated_at timestamptz,
+  error text
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT
+    j.key AS job_key,
+    j.status,
+    j.args->>'account_id' AS account_id,
+    j.args->>'username' AS username,
+    j.args->>'reason' AS reason,
+    j.created_at,
+    j.updated_at,
+    j.args->>'error' AS error
+  FROM private.admin_jobs AS j
+  WHERE j.job_name = 'admin_delete_with_export'
+  ORDER BY j.updated_at DESC, j.created_at DESC
+  LIMIT LEAST(GREATEST(COALESCE(p_limit, 20), 1), 100);
+$$;
+ALTER FUNCTION public.admin_list_recent_delete_jobs(integer) OWNER TO postgres;
+
+REVOKE ALL ON FUNCTION public.admin_list_recent_delete_jobs(integer)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_list_recent_delete_jobs(integer)
+  TO service_role;

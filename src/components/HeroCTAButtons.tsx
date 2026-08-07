@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -25,8 +25,10 @@ export default function HeroCTAButtons({
   initialIsOptedIn = false,
 }: HeroCTAButtonsProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { userMetadata } = useAuthAndArchive()
-  const supabase = createBrowserClient()
+  const supabase = useMemo(() => createBrowserClient(), [])
+  const autoOptInStarted = useRef(false)
 
   const [user, setUser] = useState<any>(null)
   const [isOptedIn, setIsOptedIn] = useState(initialIsOptedIn)
@@ -34,6 +36,7 @@ export default function HeroCTAButtons({
 
   const twitterUsername = userMetadata?.user_name
   const twitterUserId = userMetadata?.provider_id
+  const shouldAutoOptIn = searchParams.get('action') === 'optin'
 
   // Get current user session
   useEffect(() => {
@@ -122,20 +125,8 @@ export default function HeroCTAButtons({
     }
   }
 
-  const handleOptIn = async () => {
-    if (!user) {
-      await signIn('optin')
-      return
-    }
-
-    if (!twitterUsername) {
-      console.error('No Twitter username found')
-      return
-    }
-
-    if (isOptedIn) {
-      return
-    }
+  const completeOptIn = useCallback(async () => {
+    if (!user?.id || !twitterUsername || isOptedIn) return false
 
     setIsOptInLoading(true)
 
@@ -161,11 +152,54 @@ export default function HeroCTAButtons({
       setIsOptedIn(true)
       router.replace('/')
       router.refresh()
+      return true
     } catch (err: any) {
       console.error('Opt-in error:', err.message)
+      return false
     } finally {
       setIsOptInLoading(false)
     }
+  }, [isOptedIn, router, twitterUserId, twitterUsername, user?.id])
+
+  // Clicking Opt in before authentication records the intent in the OAuth
+  // callback URL. Complete that intent as soon as the returning session and
+  // Twitter metadata are available, so the user does not have to click twice.
+  useEffect(() => {
+    if (!shouldAutoOptIn || autoOptInStarted.current) {
+      return
+    }
+
+    if (isOptedIn) {
+      autoOptInStarted.current = true
+      router.replace('/')
+      return
+    }
+
+    if (!user?.id || !twitterUsername) return
+
+    autoOptInStarted.current = true
+    void completeOptIn()
+  }, [
+    completeOptIn,
+    isOptedIn,
+    router,
+    shouldAutoOptIn,
+    twitterUsername,
+    user?.id,
+  ])
+
+  const handleOptIn = async () => {
+    if (!user) {
+      await signIn('optin')
+      return
+    }
+
+    if (!twitterUsername) {
+      console.error('No Twitter username found')
+      return
+    }
+
+    await completeOptIn()
   }
 
   const getOptInButtonText = () => {

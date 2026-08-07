@@ -20,6 +20,7 @@ import AppGallery from '@/components/AppGallery'
 import HomepageSearch from '@/components/HomepageSearch'
 import { canShowHomepageSearch } from '@/lib/homepageAccess'
 import { formatNumber } from '@/lib/formatNumber'
+import { getTopFollowedAccounts } from '@/lib/clickhouseAnalytics'
 
 // Dynamically import client components with ssr disabled
 const DynamicHeroCTAButtons = dynamic(
@@ -46,7 +47,7 @@ const DynamicUploadArchiveSection = dynamic(
   },
 )
 
-const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
+const getLegacyMostFollowedAccounts = async (supabase: SupabaseClient) => {
   let { data, error } = await supabase
     .from('global_activity_summary')
     .select('top_accounts_with_followers')
@@ -57,6 +58,18 @@ const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
     return []
   }
   return data?.top_accounts_with_followers || []
+}
+
+const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
+  try {
+    return await getTopFollowedAccounts(7)
+  } catch (error) {
+    console.error(
+      'Failed to fetch top accounts from ClickHouse; using the legacy summary:',
+      error,
+    )
+    return getLegacyMostFollowedAccounts(supabase)
+  }
 }
 
 async function getOpenCollectiveContributors(): Promise<Contributor[]> {
@@ -143,9 +156,26 @@ const InfoPanel: React.FC<InfoPanelProps> = ({
 export default async function ClassicHomepage() {
   const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const [
+    {
+      data: { user },
+    },
+    mostFollowedAccounts,
+    financialContributors,
+    stats,
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    getMostFollowedAccounts(supabase),
+    getOpenCollectiveContributors(),
+    getStats(supabase).catch((error) => {
+      console.error('Failed to fetch stats for homepage:', error)
+      return {
+        userCount: null,
+        tweetCount: null,
+        userMentionsCount: null,
+      }
+    }),
+  ])
 
   let optedInStatus: boolean | null = null
   if (user) {
@@ -163,9 +193,7 @@ export default async function ClassicHomepage() {
   }
 
   const isOptedIn = canShowHomepageSearch(user?.id, optedInStatus)
-
-  const mostFollowed = (await getMostFollowedAccounts(supabase)).slice(0, 7)
-  const financialContributors = await getOpenCollectiveContributors()
+  const mostFollowed = mostFollowedAccounts.slice(0, 7)
 
   const totalAmountRaised = financialContributors.reduce(
     (sum, contributor) => sum + contributor.totalAmountDonated,
@@ -184,15 +212,6 @@ export default async function ClassicHomepage() {
     0,
     financialContributors.length - topTenNames.length,
   )
-
-  const stats = await getStats(supabase).catch((error) => {
-    console.error('Failed to fetch stats for homepage:', error)
-    return {
-      userCount: null,
-      tweetCount: null,
-      userMentionsCount: null,
-    }
-  })
 
   const sectionPaddingClasses = 'py-12 md:py-16 lg:py-20'
   const contentWrapperClasses =
@@ -215,7 +234,7 @@ export default async function ClassicHomepage() {
       {/* Section 1: Audience-specific hero */}
       <section className="overflow-hidden bg-card pb-12 pt-14 dark:bg-background md:flex md:min-h-[66vh] md:pb-16 md:pt-20">
         <div
-          className={`${contentWrapperClasses} space-y-7 text-center md:flex md:flex-1 md:flex-col md:justify-evenly md:space-y-0`}
+          className={`${contentWrapperClasses} space-y-11 text-center md:flex md:flex-1 md:flex-col md:justify-evenly md:space-y-0`}
         >
           <div className="space-y-3">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">

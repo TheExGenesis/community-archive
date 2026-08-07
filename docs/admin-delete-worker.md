@@ -173,8 +173,8 @@ into the worker host.
 | Where | What | Retention |
 |-------|------|-----------|
 | **stdout (Docker logs)** | Structured JSON, one line per event. Goes to journald or Docker log driver on Hetzner. | Whatever the host's log rotation does (~30d default). |
-| **`admin-deleted-user-data/<prefix>/worker.log`** | The same structured log, but specific to that job, uploaded at the end of processing (success OR failure). | Forever (until admin manually clears the bucket). |
-| **`manifest.json`** | Summary: who/when/what counts, phase timings, final status. Per-job, alongside `worker.log`. | Forever. |
+| **`admin-deleted-user-data/<prefix>/worker.log`** | The same structured log, but specific to that job, uploaded at the end of processing (success OR failure). | 24 hours. |
+| **`manifest.json`** | Summary: who/when/what counts, phase timings, final status. Per-job, alongside `worker.log`. | 24 hours. |
 | **`private.admin_jobs.args`** | Status transitions + final error message (truncated to ~1KB) for `gh / SQL editor` triage. | Until the row is purged. |
 | **Sentry (optional)** | Worker crashes + per-job exceptions, with the job's `key` as the tag for grouping. | Whatever Sentry retention is. |
 
@@ -344,5 +344,5 @@ delete the inline path.
 4. **Retry policy?** v1: no automatic retry, admin re-clicks. v2:
    maybe exponential backoff for transient failures (timeouts,
    network blips) but not for logical errors (account not found).
-5. **`admin-deleted-user-data` bucket lifecycle?** Currently no
-   auto-deletion. Decide later (audit retention vs storage cost).
+5. **`admin-deleted-user-data` retention:** 24 hours. The worker sweeps
+   successful and partial failed exports every 15 minutes.

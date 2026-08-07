@@ -3,6 +3,7 @@ import { TimelineTweet, RawSupabaseTweet, RawSupabaseAccount, RawSupabaseProfile
 import { searchTweets as rpcSearchTweets, searchTweetsExactPhrase as rpcSearchExactPhrase } from '../pgSearch';
 import { type SearchParams } from '../types';
 import { getLatestAvatarMediaUrl } from '@/lib/avatar';
+import { searchTweetsWithClickHouse } from '../clickhouseSearch';
 
 export interface FilterCriteria {
   userId?: string; // For fetching tweets by a specific user
@@ -134,6 +135,29 @@ export async function fetchTweets(
     try {
       const offset = (page - 1) * pageSize;
       const rawText = criteria.rawSearchQuery;
+
+      if (
+        rawText &&
+        process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH === 'true'
+      ) {
+        try {
+          const clickHouseTweets = await searchTweetsWithClickHouse(
+            criteria,
+            page,
+            pageSize,
+          );
+          return {
+            tweets: clickHouseTweets,
+            totalCount: clickHouseTweets.length === 0 ? 0 : null,
+            error: null,
+          };
+        } catch (error) {
+          console.warn(
+            'ClickHouse tweet search failed; falling back to Supabase:',
+            error,
+          );
+        }
+      }
 
       // Multi-word phrase search: use FTS 'simple' config via RPC.
       // The 'simple' config doesn't drop stop words, so phraseto_tsquery

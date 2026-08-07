@@ -18,6 +18,10 @@ const Footer = () => {
       <Link href="/stream-monitor" className="hover:underline">
         Stream Monitor
       </Link>
+      <span className="mx-2">•</span>
+      <Link href="/missing-accounts" className="hover:underline">
+        Missing Accounts
+      </Link>
     </footer>
   )
 }

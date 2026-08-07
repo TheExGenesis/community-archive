@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'Missing accounts | Community Archive',
   description:
-    'The most-replied-to accounts that still need to opt in or upload their Twitter archive.',
+    'See the accounts mentioned most often in the Community Archive that have not opted in or uploaded their archive yet.',
 }
 
 type View = 'opt-in' | 'archive'
@@ -115,7 +115,7 @@ function AccountRanking({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[520px] border-collapse text-left">
           <caption className="sr-only">
-            Accounts ranked by unique archived tweets that reply to them
+            Accounts ordered by how often archived posts reply to them
           </caption>
           <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
@@ -209,11 +209,16 @@ export default async function MissingAccountsPage({
   }
 
   const accounts = view === 'archive' ? needsArchive : needsOptIn
-  const title = view === 'archive' ? 'Needs an archive' : 'Needs to opt in'
+  const title =
+    view === 'archive' ? 'Opted in, no archive yet' : 'Not opted in yet'
+  const introduction =
+    view === 'archive'
+      ? 'These are the opted-in accounts mentioned most often in the Community Archive that haven’t uploaded an archive yet.'
+      : 'These are the accounts mentioned most often in the Community Archive that haven’t opted in yet.'
   const description =
     view === 'archive'
-      ? 'These accounts opted into live collection, but their older posts are still missing. Uploading an X archive fills in the years before they opted in.'
-      : 'These accounts have neither opted into live collection nor uploaded an archive. Opting in is the first step toward preserving their posts.'
+      ? 'Uploading their X archive would bring in the older posts from before they opted in.'
+      : 'Opting in would let the community start preserving their new public posts.'
 
   return (
     <main className="min-h-screen bg-background py-12 md:py-16">
@@ -227,8 +232,7 @@ export default async function MissingAccountsPage({
             Who should join next?
           </h1>
           <p className="mt-4 text-base leading-7 text-muted-foreground sm:text-lg">
-            The accounts most often replied to by posts already in the Community
-            Archive. Help close the biggest gaps first.
+            {introduction}
           </p>
         </div>
 
@@ -240,14 +244,14 @@ export default async function MissingAccountsPage({
             href="/missing-accounts"
             active={view === 'opt-in'}
             icon={<Radio aria-hidden="true" className="h-4 w-4" />}
-            label="Needs opt-in"
+            label="Not opted in"
             count={needsOptIn.length}
           />
           <ViewTab
             href="/missing-accounts?view=archive"
             active={view === 'archive'}
             icon={<Archive aria-hidden="true" className="h-4 w-4" />}
-            label="Needs archive"
+            label="No archive yet"
             count={needsArchive.length}
           />
         </nav>
@@ -267,7 +271,7 @@ export default async function MissingAccountsPage({
             </div>
             <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
               <MessageCircle aria-hidden="true" className="h-4 w-4" />
-              Ranked by unique reply posts
+              Most replied to first
             </div>
           </div>
 

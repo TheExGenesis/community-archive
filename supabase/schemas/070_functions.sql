@@ -2484,6 +2484,7 @@ BEGIN
         FROM public.tweets t
         LEFT JOIN public.archive_upload au ON t.archive_upload_id = au.id
         WHERE (search_query = '' OR search_query IS NULL OR t.fts @@ to_tsquery('english', search_query))
+          AND t.full_text NOT LIKE 'RT @%'
           AND (from_account_id IS NULL OR t.account_id = from_account_id)
           AND (to_account_id IS NULL OR t.reply_to_user_id = to_account_id)
           AND (since_date IS NULL OR t.created_at >= since_date)
@@ -2582,6 +2583,7 @@ BEGIN
         FROM public.tweets t
         LEFT JOIN public.archive_upload au ON t.archive_upload_id = au.id
         WHERE to_tsvector('simple'::regconfig, t.full_text) @@ phraseto_tsquery('simple'::regconfig, exact_phrase)
+          AND t.full_text NOT LIKE 'RT @%'
           AND (from_account_id IS NULL OR t.account_id = from_account_id)
           AND (to_account_id IS NULL OR t.reply_to_user_id = to_account_id)
           AND (since_date IS NULL OR t.created_at >= since_date)

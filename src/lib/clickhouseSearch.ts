@@ -3,6 +3,7 @@ import type { FilterCriteria } from './queries/tweetQueries'
 
 interface ClickHouseSearchTweet {
   tweetId: string
+  accountId: string
   createdAt: string
   fullText: string
   replyToTweetId: string | null
@@ -72,6 +73,7 @@ export async function searchTweetsWithClickHouse(
 
   return result.data.tweets.map((tweet) => ({
     tweet_id: tweet.tweetId,
+    account_id: tweet.accountId,
     created_at: tweet.createdAt,
     full_text: tweet.fullText,
     favorite_count: Number(tweet.favoriteCount || 0),

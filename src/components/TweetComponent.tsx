@@ -222,31 +222,58 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
     const mediaArray = tweet.media || (tweet as any).media || []
     if (!mediaArray || mediaArray.length === 0) return null
 
-    return (
-      <div
-        className={`my-3 grid gap-2 ${mediaArray.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
-      >
-        {mediaArray
-          .filter(
-            (m: any) =>
-              m.media_type === 'photo' ||
-              m.media_type.startsWith('image/') ||
-              m.media_type === 'video',
-          )
-          .map((mediaItem: any, index: number) => (
+    const renderableMedia = mediaArray.filter(
+      (mediaItem: any) =>
+        mediaItem.media_type === 'photo' ||
+        mediaItem.media_type.startsWith('image/') ||
+        mediaItem.media_type === 'video',
+    )
+    if (renderableMedia.length === 0) return null
+
+    if (compact) {
+      return (
+        <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+          {renderableMedia.slice(0, 4).map((mediaItem: any, index: number) => (
             <div
               key={index}
-              className="relative overflow-hidden rounded-lg border border-border bg-muted"
+              className="relative h-20 w-28 flex-none overflow-hidden rounded-md border border-border bg-muted sm:h-24 sm:w-36"
             >
               <NextImage
                 src={mediaItem.media_url}
                 alt={`Tweet image ${index + 1}`}
-                width={mediaItem.width || 600}
-                height={mediaItem.height || 400}
-                className="min-h-40 h-full max-h-96 w-full object-cover"
+                width={mediaItem.width || 240}
+                height={mediaItem.height || 160}
+                className="h-full w-full object-cover"
               />
             </div>
           ))}
+          {renderableMedia.length > 4 && (
+            <div className="flex h-20 w-20 flex-none items-center justify-center rounded-md border border-border bg-muted text-xs text-muted-foreground sm:h-24">
+              +{renderableMedia.length - 4} more
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <div
+        className={`my-3 grid gap-2 ${mediaArray.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
+      >
+        {renderableMedia.map((mediaItem: any, index: number) => (
+          <div
+            key={index}
+            className="relative overflow-hidden rounded-lg border border-border bg-muted"
+          >
+            <NextImage
+              src={mediaItem.media_url}
+              alt={`Tweet image ${index + 1}`}
+              width={mediaItem.width || 600}
+              height={mediaItem.height || 400}
+              className="min-h-40 h-full max-h-96 w-full object-cover"
+            />
+          </div>
+        ))}
       </div>
     )
   }
@@ -260,7 +287,9 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
     // show an empty card.
     if (quotedTweet.is_deleted) {
       return (
-        <div className="mt-3 rounded-lg border border-dashed border-border bg-muted p-3 text-sm italic text-muted-foreground dark:bg-card">
+        <div
+          className={`${compact ? 'mt-2 p-2 text-xs' : 'mt-3 p-3 text-sm'} rounded-lg border border-dashed border-border bg-muted italic text-muted-foreground dark:bg-card`}
+        >
           [Quoted tweet deleted]
         </div>
       )
@@ -273,14 +302,20 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       : 'border-border bg-muted dark:bg-card'
 
     return (
-      <div className={`relative mt-3 rounded-lg border p-3 ${externalClasses}`}>
+      <div
+        className={`relative rounded-lg border ${compact ? 'mt-2 p-2' : 'mt-3 p-3'} ${externalClasses}`}
+      >
         {quotedTweet.from_external && (
           <span className="absolute right-2 top-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
             from Twitter · not archived
           </span>
         )}
-        <div className="flex items-start space-x-3">
-          <Avatar className="h-8 w-8 flex-shrink-0">
+        <div
+          className={`flex items-start ${compact ? 'space-x-2' : 'space-x-3'}`}
+        >
+          <Avatar
+            className={`${compact ? 'h-6 w-6' : 'h-8 w-8'} flex-shrink-0`}
+          >
             <TweetAvatarImage
               src={quotedProfilePic}
               alt={`${quotedTweet.account_display_name}'s profile picture`}
@@ -308,11 +343,21 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                 })}
               </span>
             </div>
-            <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
+            <p
+              className={`whitespace-pre-wrap break-words text-foreground ${
+                compact ? 'line-clamp-3 text-xs leading-4' : 'text-sm leading-6'
+              }`}
+            >
               {decodeHtmlEntities(quotedTweet.full_text)}
             </p>
             {quotedTweet.media && quotedTweet.media.length > 0 && (
-              <div className="mt-2 flex flex-col space-y-1">
+              <div
+                className={
+                  compact
+                    ? 'mt-2 flex gap-1.5 overflow-x-auto'
+                    : 'mt-2 flex flex-col space-y-1'
+                }
+              >
                 {quotedTweet.media
                   .filter(
                     (m: any) =>
@@ -320,17 +365,24 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                       m.media_type.startsWith('image/') ||
                       m.media_type === 'video',
                   )
+                  .slice(0, compact ? 3 : undefined)
                   .map((mediaItem: any, index: number) => (
                     <div
                       key={index}
-                      className="relative overflow-hidden rounded-md border dark:border-border"
+                      className={`relative overflow-hidden rounded-md border dark:border-border ${
+                        compact ? 'h-16 w-24 flex-none' : ''
+                      }`}
                     >
                       <NextImage
                         src={mediaItem.media_url}
                         alt={`Quoted tweet image ${index + 1}`}
                         width={300}
                         height={200}
-                        className="h-auto max-h-48 w-full object-contain"
+                        className={
+                          compact
+                            ? 'h-full w-full object-cover'
+                            : 'h-auto max-h-48 w-full object-contain'
+                        }
                       />
                     </div>
                   ))}
@@ -373,7 +425,6 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
   }
 
   if (compact) {
-    const mediaCount = tweet.media?.length ?? 0
     const createdAt = new Date(tweet.created_at)
     const formattedDate = createdAt.toLocaleDateString(undefined, {
       month: 'short',
@@ -438,17 +489,9 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                 {isTextExpanded ? 'Show less' : 'Show more'}
               </button>
             )}
-            {mediaCount > 0 && (
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
-                {mediaCount} {mediaCount === 1 ? 'media item' : 'media items'}
-              </span>
-            )}
-            {isQuoteTweet && (
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
-                Quoted tweet
-              </span>
-            )}
           </div>
+          {renderMedia()}
+          {renderQuotedTweet()}
         </div>
 
         <div

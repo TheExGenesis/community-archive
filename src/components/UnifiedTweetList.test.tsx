@@ -17,13 +17,32 @@ const tweet = {
   retweet_count: 12,
   favorite_count: 34,
   reply_to_tweet_id: null,
-  quote_tweet_id: null,
+  quote_tweet_id: 'quoted-1',
   retweeted_tweet_id: null,
   avatar_media_url: 'https://example.com/avatar.jpg',
   username: 'archive_user',
   account_display_name: 'Archive User',
-  media: [],
+  media: [
+    {
+      media_url: 'https://example.com/photo.jpg',
+      media_type: 'photo',
+      width: 800,
+      height: 600,
+    },
+  ],
   urls: [],
+  quoted_tweet: {
+    tweet_id: 'quoted-1',
+    account_id: '456',
+    created_at: '2026-08-05T12:00:00.000Z',
+    full_text: 'The quoted tweet is visible in compact search results.',
+    retweet_count: 2,
+    favorite_count: 8,
+    avatar_media_url: 'https://example.com/quoted-avatar.jpg',
+    username: 'quoted_user',
+    account_display_name: 'Quoted User',
+    media: [],
+  },
 }
 
 describe('UnifiedTweetList compact view', () => {
@@ -44,6 +63,13 @@ describe('UnifiedTweetList compact view', () => {
       screen.getAllByRole('columnheader').map((header) => header.textContent),
     ).toEqual(['Author', 'Tweet', 'Date', 'Engagement', 'Links'])
     expect(screen.getByText('Archive User')).toBeInTheDocument()
+    expect(screen.getByAltText('Tweet image 1')).toBeInTheDocument()
+    expect(screen.getByText('Quoted User')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'The quoted tweet is visible in compact search results.',
+      ),
+    ).toBeInTheDocument()
     expect(
       screen
         .getAllByRole('link', { name: 'Open archived tweet' })

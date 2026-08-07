@@ -47,6 +47,8 @@ function SearchPageContent() {
     replyToUsername: normalizedSearchParams.get('replyToUser') || undefined,
     startDate: normalizedSearchParams.get('sinceDate') || undefined,
     endDate: normalizedSearchParams.get('untilDate') || undefined,
+    excludeRetweets: true,
+    includeQuoteTweets: true,
   }
 
   const tweetListKey = normalizedSearchParams.toString()

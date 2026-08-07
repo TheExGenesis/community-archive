@@ -57,7 +57,7 @@ function PanelHeader({
   divider = true,
 }: {
   title: string
-  action?: { label: string; href: string }
+  action?: { label: string; href: string; external?: boolean }
   live?: boolean
   divider?: boolean
 }) {
@@ -73,14 +73,24 @@ function PanelHeader({
         )}
         <span className="text-[13px] font-bold">{title}</span>
       </div>
-      {action && (
-        <Link
-          href={action.href}
-          className="text-[12.5px] font-semibold text-brand hover:underline"
-        >
-          {action.label} →
-        </Link>
-      )}
+      {action &&
+        (action.external ? (
+          <a
+            href={action.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[12.5px] font-semibold text-brand hover:underline"
+          >
+            {action.label} →
+          </a>
+        ) : (
+          <Link
+            href={action.href}
+            className="text-[12.5px] font-semibold text-brand hover:underline"
+          >
+            {action.label} →
+          </Link>
+        ))}
     </div>
   )
 }
@@ -203,6 +213,16 @@ export default function Portal({
   const atlas = PORTAL_TOOLS.find((t) => t.name === 'Strand Atlas')
   const bangers = PORTAL_TOOLS.find((t) => t.name === 'Bangers')
 
+  // Random top banger. Rendered with index 0 first, then re-picked on mount
+  // so server and client HTML agree (no hydration mismatch).
+  const [bangerIdx, setBangerIdx] = useState(0)
+  useEffect(() => {
+    if (data.bangers.length > 1) {
+      setBangerIdx(Math.floor(Math.random() * data.bangers.length))
+    }
+  }, [data.bangers.length])
+  const banger = data.bangers[bangerIdx] ?? null
+
   const generatedDate = useMemo(() => {
     const d = new Date(stats.generatedAt)
     return `${d.toLocaleDateString('en-GB', {
@@ -314,6 +334,24 @@ export default function Portal({
                   ))}
                 </div>
               </div>
+
+              {banger && (
+                <div className={CARD}>
+                  <PanelHeader
+                    title="Banger of the moment"
+                    action={
+                      bangers
+                        ? {
+                            label: 'More bangers',
+                            href: bangers.link,
+                            external: true,
+                          }
+                        : undefined
+                    }
+                  />
+                  <TweetRow tweet={banger} showDate />
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col gap-4">
@@ -446,39 +484,6 @@ export default function Portal({
               action={{ label: 'All tools', href: '/tools' }}
               divider={false}
             />
-            {bangers && (
-              <div className="px-4 pt-1">
-                <a
-                  href={bangers.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex overflow-hidden rounded-[4px] border border-zinc-200 bg-zinc-50 transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#121214]"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={bangers.image}
-                    alt={`${bangers.name} preview`}
-                    loading="lazy"
-                    className="h-28 w-44 flex-shrink-0 border-r border-zinc-200 object-cover dark:border-[#26262a] sm:w-64"
-                  />
-                  <div className="flex min-w-0 flex-col justify-center gap-1 px-4 py-3">
-                    <span className="flex items-center gap-1.5 text-[13.5px] font-bold">
-                      <span className="text-[15px] text-brand">
-                        {bangers.icon}
-                      </span>
-                      {bangers.name}
-                      <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
-                    </span>
-                    <span className={`text-[12.5px] leading-snug ${MUTED}`}>
-                      {bangers.description}
-                    </span>
-                    <span className="text-[12.5px] font-semibold text-brand">
-                      Open Bangers →
-                    </span>
-                  </div>
-                </a>
-              </div>
-            )}
             <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 lg:grid-cols-4">
               {PORTAL_TOOLS.filter((t) => !t.image).map((tool) => (
                 <a

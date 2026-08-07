@@ -248,11 +248,18 @@ export async function getPortalStream(limit = 30): Promise<PortalTweet[]> {
     return []
   }
 
-  const tweets = data ?? []
+  return toPortalTweets(supabase, data ?? [])
+}
+
+/** Map raw tweet rows (with joined account) to PortalTweets, attaching
+ *  avatars in one extra round-trip. */
+async function toPortalTweets(
+  supabase: SupabaseClient<Database>,
+  tweets: any[],
+): Promise<PortalTweet[]> {
   const accountOf = (t: any) =>
     Array.isArray(t.account) ? t.account[0] : t.account
 
-  // Avatars in one extra round-trip.
   const accountIds = Array.from(
     new Set(tweets.map((t: any) => t.account_id).filter(Boolean)),
   )
@@ -283,6 +290,46 @@ export async function getPortalStream(limit = 30): Promise<PortalTweet[]> {
       rts: t.retweet_count ?? 0,
     }
   })
+}
+
+/** Top-liked original tweets from members' own archives — the community's
+ *  bangers. Media-only tweets (bare links) are skipped since they render
+ *  as naked URLs. */
+async function fetchTopBangers(limit = 30): Promise<PortalTweet[]> {
+  const supabase = getPortalClient()
+  const { data, error } = await supabase
+    .from('tweets')
+    .select(
+      `
+      tweet_id,
+      account_id,
+      created_at,
+      full_text,
+      retweet_count,
+      favorite_count,
+      account:all_account!inner (
+        username,
+        account_display_name
+      )
+    `,
+    )
+    .not('archive_upload_id', 'is', null)
+    .is('reply_to_tweet_id', null)
+    .not('full_text', 'ilike', 'RT @%')
+    .order('favorite_count', { ascending: false })
+    .limit(80)
+
+  if (error) {
+    console.error('Portal bangers query failed:', error)
+    return []
+  }
+
+  const textful = (data ?? []).filter((t: any) => {
+    const text = (t.full_text ?? '').replace(/https?:\/\/\S+/g, '').trim()
+    return text.length >= 30
+  })
+  const mapped = await toPortalTweets(supabase, textful)
+  return mapped.slice(0, limit)
 }
 
 async function getPortalStats(firstYear: number): Promise<PortalStats> {
@@ -334,13 +381,19 @@ const getCachedInitialStream = unstable_cache(
   ['portal-initial-stream-v1'],
   { revalidate: 60 },
 )
+const getCachedBangers = unstable_cache(
+  () => fetchTopBangers(30),
+  ['portal-bangers-v1'],
+  { revalidate: 86400 },
+)
 
 export async function getPortalData(): Promise<PortalData> {
   const agg = await getDailyAggregates()
-  const [stats, initialStream, research] = await Promise.all([
+  const [stats, initialStream, research, bangers] = await Promise.all([
     getCachedStats(agg.firstYear),
     getCachedInitialStream(),
     getResearchPosts(),
+    getCachedBangers(),
   ])
-  return { stats, trends: agg.trends, initialStream, research }
+  return { stats, trends: agg.trends, initialStream, research, bangers }
 }

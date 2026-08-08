@@ -10,7 +10,7 @@ const commonConfig = {
   watchPathIgnorePatterns: ['<rootDir>/.claude/worktrees/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^server-only$': '<rootDir>/jest.server-only-stub.js',
+    '^server-only$': '<rootDir>/jest.server-only.js',
   },
   transform: {
     '^.+\\.(t|j)sx?$': [

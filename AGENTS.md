@@ -107,6 +107,12 @@ Staging synchronization is automatic; production synchronization is not:
   gateway lacks a required portal corpus endpoint, add a narrow endpoint rather
   than a production Supabase read fallback. Cache expensive snapshots at an
   interval appropriate to the UI.
+- The control-plane query gateway permits only one authenticated `/search` or
+  `/analytics/search` request at a time and returns `503` with `Retry-After: 1`
+  for overlap. Serialize multi-search fan-out in server callers; this limit does
+  not apply to `/analytics/word-trend`. The source of truth is
+  `TheExGenesis/community-archive-control-panel` under
+  `ops/clickhouse-query-gateway/server.mjs` and `docs/clickhouse-operations.md`.
 - Keep Supabase authoritative for authentication, writes, canonical membership,
   consent/policy state, editorial application data, and records not represented
   in ClickHouse. Do not use the daily ClickHouse `memberAccounts` summary as the

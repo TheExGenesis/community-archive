@@ -146,9 +146,14 @@ pnpm test:db             # Requires the database test environment
 pnpm build
 ```
 
-After local schema changes, use `pnpm dev:gen-types`. `pnpm gen-types` targets
-the configured remote Supabase project and therefore requires the appropriate
-credentials and authorization.
+Every Husky pre-commit run regenerates database types through
+`scripts/pre-commit.sh`, including commits without schema changes. In the
+default local mode, start Docker and local Supabase with `supabase start`, and
+define `SUPABASE_AUTH_TWITTER_CLIENT_ID` and `SUPABASE_AUTH_TWITTER_SECRET` in
+`.env` so the Supabase CLI can parse `supabase/config.toml`. When
+`NEXT_PUBLIC_USE_REMOTE_DEV_DB=true` is set in `.env`, the hook instead runs
+`pnpm gen-types` against the configured remote project and requires
+`SUPABASE_ACCESS_TOKEN`.
 
 For archive-worker commands and environment requirements, use
 `services/process_archive/README_DOCKER.md` rather than copying deployment

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { FaExternalLinkAlt } from 'react-icons/fa'
+import { FaDatabase, FaExternalLinkAlt } from 'react-icons/fa'
 import {
   PortalData,
   PortalTweet,
@@ -32,6 +32,8 @@ import {
 export type PortalView = 'home' | 'stream'
 
 const HOME_LIVE_STREAM_LIMIT = 12
+const ARCHIVE_EXPORT_URL =
+  'https://github.com/TheExGenesis/community-archive/releases/tag/data_export'
 
 const compact = (n: number) =>
   new Intl.NumberFormat('en', {
@@ -567,8 +569,10 @@ export default function Portal({
           <ArchiveOverview stats={stats} generatedDate={generatedDate} />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.45fr_1fr]">
-            <div className="flex flex-col gap-4">
-              <div className={CARD}>
+            <div className="flex h-full min-h-0 flex-col gap-4 lg:overflow-hidden">
+              <div
+                className={`${CARD} flex min-h-[420px] flex-col lg:min-h-[240px] lg:flex-1 lg:overflow-hidden lg:[contain:size]`}
+              >
                 <PanelHeader
                   title="Live stream"
                   live
@@ -578,7 +582,7 @@ export default function Portal({
                   role="region"
                   aria-label="Live tweet stream"
                   tabIndex={0}
-                  className="flex max-h-[420px] flex-col overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60 [&::-webkit-scrollbar]:hidden"
+                  className="flex max-h-[420px] flex-col overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60 lg:max-h-none lg:min-h-0 lg:flex-1 [&::-webkit-scrollbar]:hidden"
                 >
                   {visible.slice(0, HOME_LIVE_STREAM_LIMIT).map((t, i) => (
                     <TweetRow key={t.id} tweet={t} compact animate={i === 0} />
@@ -593,7 +597,7 @@ export default function Portal({
                 </div>
               </div>
 
-              <div className={`${CARD} flex flex-1 flex-col`}>
+              <div className={`${CARD} flex flex-col`}>
                 <PanelHeader
                   title="Trending terms · 7 days"
                   action={{ label: 'Trends explorer', href: '/trends' }}
@@ -656,33 +660,45 @@ export default function Portal({
               {(recentBanger || historicalBanger) && (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {recentBanger && (
-                    <div className={`${CARD} min-w-0 overflow-hidden`}>
-                      <PanelHeader
-                        title="Banger of the moment"
-                        action={{ label: 'More bangers', href: '/bangers' }}
-                      />
-                      <TweetRow tweet={recentBanger} collapsible />
+                    <div
+                      className={`${CARD} flex min-w-0 flex-col overflow-hidden lg:min-h-[320px]`}
+                    >
+                      <PanelHeader title="Banger of the moment" />
+                      <div className="flex flex-1 flex-col [&>article]:flex-1">
+                        <TweetRow tweet={recentBanger} collapsible />
+                      </div>
                     </div>
                   )}
 
                   {historicalBanger && (
-                    <div className={`${CARD} min-w-0 overflow-hidden`}>
-                      <PanelHeader title="Historical banger · near this day" />
-                      <TweetRow tweet={historicalBanger} collapsible showDate />
+                    <div
+                      className={`${CARD} flex min-w-0 flex-col overflow-hidden lg:min-h-[320px]`}
+                    >
+                      <PanelHeader
+                        title="Historical Banger"
+                        action={{ label: 'More bangers', href: '/bangers' }}
+                      />
+                      <div className="flex flex-1 flex-col [&>article]:flex-1">
+                        <TweetRow
+                          tweet={historicalBanger}
+                          collapsible
+                          showDate
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
               )}
             </div>
 
-            <div className="flex flex-col gap-4 lg:justify-between">
+            <div className="flex flex-col gap-4">
               <div className={CARD}>
                 <PanelHeader
-                  title="Research"
+                  title="Featured research"
                   action={{ label: 'All research', href: '/research' }}
                 />
                 <div className="flex flex-col">
-                  {data.research.slice(0, 5).map((post) => (
+                  {data.research.slice(0, 4).map((post) => (
                     <a
                       key={post.url}
                       href={post.url}
@@ -766,6 +782,29 @@ export default function Portal({
                   </div>
                 </a>
               )}
+              <a
+                href={ARCHIVE_EXPORT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${CARD} group flex items-center gap-3 px-4 py-4 transition-colors hover:border-brand/60`}
+              >
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[4px] border border-zinc-200 bg-zinc-50 text-brand dark:border-[#2a2a2e] dark:bg-[#121214]">
+                  <FaDatabase className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13.5px] font-bold">
+                    Export the archive
+                  </span>
+                  <span
+                    className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
+                  >
+                    Download the latest public Parquet release
+                  </span>
+                </span>
+                <span className="flex-shrink-0 text-[12px] font-semibold text-brand">
+                  Download →
+                </span>
+              </a>
             </div>
           </div>
 

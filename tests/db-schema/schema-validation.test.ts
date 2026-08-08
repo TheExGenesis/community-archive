@@ -115,6 +115,8 @@ describe('Database Schema Validation', () => {
       expect(result).toHaveProperty('conversation_media')
       expect(result).toHaveProperty('mentioned_users')
       expect(result).toHaveProperty('quoted_tweets')
+      expect(result).toHaveProperty('quoting_tweet_count')
+      expect(result).toHaveProperty('quoting_tweets')
 
       // tweet should have core fields
       if (result.tweet) {

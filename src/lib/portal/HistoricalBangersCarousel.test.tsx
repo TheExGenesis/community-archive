@@ -76,4 +76,26 @@ describe('HistoricalBangersCarousel', () => {
 
     expect(screen.getByText('Historical banger 2')).toBeVisible()
   })
+
+  test('pins overlay controls around a fixed-height, scrollable tweet viewport', () => {
+    render(<HistoricalBangersCarousel tweets={[tweet('1'), tweet('2')]} />)
+
+    const carousel = screen.getByRole('region', {
+      name: 'Historical bangers',
+    })
+    const tweetArticle = screen
+      .getByText('Historical banger 1')
+      .closest('article')
+    const previous = screen.getByRole('button', {
+      name: 'Previous historical banger',
+    })
+    const next = screen.getByRole('button', {
+      name: 'Next historical banger',
+    })
+
+    expect(carousel).toHaveClass('relative', 'flex', 'h-[22rem]')
+    expect(tweetArticle?.parentElement).toHaveClass('h-full', 'overflow-y-auto')
+    expect(previous).toHaveClass('absolute', 'left-3', 'top-1/2')
+    expect(next).toHaveClass('absolute', 'right-3', 'top-1/2')
+  })
 })

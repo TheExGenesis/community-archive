@@ -7,6 +7,9 @@ import type { PortalTweet } from '@/lib/portal/types'
 import { CARD, MUTED } from './styles'
 import { TweetRow } from './TweetRow'
 
+const CAROUSEL_CONTROL =
+  'absolute top-1/2 z-10 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-300 bg-white/90 text-zinc-600 shadow-md backdrop-blur-sm transition-colors hover:border-zinc-400 hover:bg-white hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-[#3a3a40] dark:bg-[#1b1b1e]/90 dark:text-[#c4c4cc] dark:hover:border-[#55555e] dark:hover:bg-[#242428] dark:hover:text-white'
+
 export function HistoricalBangersCarousel({
   tweets,
 }: {
@@ -32,7 +35,7 @@ export function HistoricalBangersCarousel({
     <section
       aria-label="Historical bangers"
       aria-roledescription="carousel"
-      className={`${CARD} min-w-0 overflow-hidden`}
+      className={`${CARD} relative flex h-[22rem] min-w-0 flex-col overflow-hidden`}
       tabIndex={hasMultipleTweets ? 0 : undefined}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return
@@ -46,7 +49,7 @@ export function HistoricalBangersCarousel({
         }
       }}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-[#26262a]">
+      <div className="flex flex-none items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-[#26262a]">
         <h3 className="min-w-0 truncate text-[13px] font-bold">
           Historical banger · near this day
         </h3>
@@ -58,26 +61,30 @@ export function HistoricalBangersCarousel({
         </Link>
       </div>
 
-      <div aria-live="polite" aria-atomic="true">
-        <TweetRow
-          key={currentTweet.id}
-          tweet={currentTweet}
-          collapsible
-          showDate
-        />
-      </div>
+      <div className="relative min-h-0 flex-1">
+        <div className="h-full overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
+          <TweetRow
+            key={currentTweet.id}
+            tweet={currentTweet}
+            collapsible
+            showDate
+          />
+        </div>
 
-      {hasMultipleTweets && (
-        <div className="flex items-center justify-between border-t border-zinc-100 px-4 py-2 dark:border-[#202023]">
-          <span className={`text-[11.5px] tabular-nums ${MUTED}`}>
-            {visibleIndex + 1} of {tweets.length}
-          </span>
-          <div className="flex items-center gap-1.5">
+        {hasMultipleTweets && (
+          <>
+            <span
+              aria-live="polite"
+              aria-atomic="true"
+              className={`pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-zinc-200 bg-white/90 px-2.5 py-1 text-[11.5px] tabular-nums shadow-sm backdrop-blur-sm dark:border-[#303036] dark:bg-[#1b1b1e]/90 ${MUTED}`}
+            >
+              {visibleIndex + 1} of {tweets.length}
+            </span>
             <button
               type="button"
               onClick={showPrevious}
               aria-label="Previous historical banger"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-[#303036] dark:text-[#a7a7b4] dark:hover:border-[#45454c] dark:hover:bg-[#242428] dark:hover:text-white"
+              className={`${CAROUSEL_CONTROL} left-3`}
             >
               <ChevronLeft aria-hidden="true" className="h-4 w-4" />
             </button>
@@ -85,13 +92,13 @@ export function HistoricalBangersCarousel({
               type="button"
               onClick={showNext}
               aria-label="Next historical banger"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 transition-colors hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-[#303036] dark:text-[#a7a7b4] dark:hover:border-[#45454c] dark:hover:bg-[#242428] dark:hover:text-white"
+              className={`${CAROUSEL_CONTROL} right-3`}
             >
               <ChevronRight aria-hidden="true" className="h-4 w-4" />
             </button>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </section>
   )
 }

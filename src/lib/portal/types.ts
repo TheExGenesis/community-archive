@@ -38,6 +38,24 @@ export interface PortalTweet {
   quoteCount?: number
 }
 
+export type PortalBangersScope = 'all' | 'members'
+export type PortalBangersSort = 'quotes' | 'recent'
+
+export interface PortalBangersPagination {
+  limit: number
+  offset: number
+  nextOffset: number | null
+  totalAvailable: number
+  snapshotSize: number
+  yearCounts: Array<{ year: number; count: number }>
+  candidateRankingTruncated: boolean
+}
+
+export interface PortalBangersPage {
+  tweets: PortalTweet[]
+  pagination: PortalBangersPagination
+}
+
 export interface PortalStats {
   totalTweets: number
   accountCount: number

@@ -21,6 +21,10 @@ jest.mock('@/lib/portal/analytics', () => ({
 }))
 jest.mock('@/lib/portal/auth', () => ({ getIsMember: jest.fn() }))
 
+jest.mock('@/lib/portal/data', () => ({
+  enrichPortalTweets: jest.fn(async (tweets: unknown[]) => tweets),
+}))
+
 const fetchPortalTrendEvidenceMock =
   fetchPortalTrendEvidence as jest.MockedFunction<
     typeof fetchPortalTrendEvidence

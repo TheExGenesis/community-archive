@@ -5,6 +5,7 @@ import {
   fetchAnalyticsGatewayJson,
 } from '@/lib/clickhouseGateway'
 import {
+  fetchPortalBangersPage,
   fetchPortalHistoricalBangers,
   fetchPortalLiveAnalytics,
   fetchPortalRecentBangers,
@@ -14,6 +15,9 @@ import type { PortalLiveAnalytics } from './analytics'
 import { getResearchPosts, selectFeaturedResearchPosts } from './research'
 import { selectHomepageStream } from './stream'
 import type {
+  PortalBangersPage,
+  PortalBangersScope,
+  PortalBangersSort,
   PortalData,
   PortalMedia,
   PortalQuotedTweet,
@@ -675,7 +679,6 @@ const getCachedRecentBangers = unstable_cache(
   ['portal-recent-bangers-v2'],
   { revalidate: 1_800 },
 )
-
 export async function loadOptionalPortalData<T>(
   section: string,
   loader: () => Promise<T>,
@@ -704,8 +707,21 @@ export async function loadPortalComponentData<T>(
   }
 }
 
-export async function getPortalBangers(): Promise<PortalTweet[]> {
-  return getCachedRecentBangers(portalDataSourceKey())
+export async function getPortalBangersPage(
+  options: {
+    limit?: number
+    offset?: number
+    sort?: PortalBangersSort
+    scope?: PortalBangersScope
+    year?: number
+    query?: string
+  } = {},
+): Promise<PortalBangersPage> {
+  const page = await fetchPortalBangersPage(options)
+  return {
+    ...page,
+    tweets: await enrichPortalTweets(page.tweets),
+  }
 }
 
 /** Cached corpus-wide seed series for the authenticated trends explorer. */

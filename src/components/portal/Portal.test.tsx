@@ -32,13 +32,17 @@ const freshTweet: PortalTweet = {
 }
 
 const previewTweets = Array.from(
-  { length: 5 },
+  { length: 13 },
   (_, index): PortalTweet => ({
     ...seedTweet,
     id: String(200 + index),
     text: `preview tweet ${index + 1}`,
-    observedAt: `2026-08-07T12:0${index}:00.000Z`,
-    createdAt: `2026-08-07T11:5${index}:00.000Z`,
+    observedAt: new Date(
+      Date.parse('2026-08-07T12:00:00.000Z') + index * 60_000,
+    ).toISOString(),
+    createdAt: new Date(
+      Date.parse('2026-08-07T11:45:00.000Z') + index * 60_000,
+    ).toISOString(),
   }),
 )
 
@@ -144,7 +148,7 @@ describe.each<PortalView>(['home', 'stream'])(
       unmount()
     })
 
-    test('keeps the dashboard preview shorter than the full stream', async () => {
+    test('keeps the dashboard preview in a scrollable viewport', async () => {
       jest.spyOn(global, 'fetch').mockResolvedValue({
         ok: true,
         json: async () => ({ tweets: [], updateCursor: null }),
@@ -160,12 +164,19 @@ describe.each<PortalView>(['home', 'stream'])(
 
       expect(screen.getByText('preview tweet 1')).toBeInTheDocument()
       expect(screen.getByText('preview tweet 3')).toBeInTheDocument()
+      expect(screen.getByText('preview tweet 4')).toBeInTheDocument()
+      expect(screen.getByText('preview tweet 5')).toBeInTheDocument()
+      expect(screen.getByText('preview tweet 12')).toBeInTheDocument()
       if (view === 'home') {
-        expect(screen.queryByText('preview tweet 4')).not.toBeInTheDocument()
-        expect(screen.queryByText('preview tweet 5')).not.toBeInTheDocument()
+        expect(
+          screen.getByRole('region', { name: 'Live tweet stream' }),
+        ).toHaveClass('max-h-[420px]', 'overflow-y-auto')
+        expect(screen.queryByText('preview tweet 13')).not.toBeInTheDocument()
       } else {
-        expect(screen.getByText('preview tweet 4')).toBeInTheDocument()
-        expect(screen.getByText('preview tweet 5')).toBeInTheDocument()
+        expect(
+          screen.queryByRole('region', { name: 'Live tweet stream' }),
+        ).not.toBeInTheDocument()
+        expect(screen.getByText('preview tweet 13')).toBeInTheDocument()
       }
 
       unmount()

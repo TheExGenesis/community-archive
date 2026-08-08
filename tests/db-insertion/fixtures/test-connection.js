@@ -7,30 +7,68 @@
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: '.env.local' });
 
+const PRODUCTION_SUPABASE_PROJECT_REF = 'fabxmporizzqflnftavs';
+
+const isLocalHostname = (hostname) =>
+  hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+
+const getSupabaseProjectRef = (url) => {
+  const apiMatch = url.hostname.match(/^([a-z0-9-]+)\.supabase\.co$/i);
+  if (apiMatch) return apiMatch[1];
+
+  const databaseMatch = url.hostname.match(/^db\.([a-z0-9-]+)\.supabase\.co$/i);
+  if (databaseMatch) return databaseMatch[1];
+
+  return decodeURIComponent(url.username).match(/^postgres\.([a-z0-9-]+)$/i)?.[1];
+};
+
+const assertSafeTestDatabaseConfig = (supabaseUrl, postgresConnectionString) => {
+  if (
+    supabaseUrl.includes(PRODUCTION_SUPABASE_PROJECT_REF) ||
+    postgresConnectionString.includes(PRODUCTION_SUPABASE_PROJECT_REF)
+  ) {
+    throw new Error('Refusing to connect to the production Supabase project');
+  }
+
+  const apiUrl = new URL(supabaseUrl);
+  const databaseUrl = new URL(postgresConnectionString);
+  const apiIsLocal = isLocalHostname(apiUrl.hostname);
+  const databaseIsLocal = isLocalHostname(databaseUrl.hostname);
+
+  if (apiIsLocal !== databaseIsLocal) {
+    throw new Error('The Supabase and Postgres test URLs target different databases');
+  }
+
+  if (!apiIsLocal) {
+    const apiProjectRef = getSupabaseProjectRef(apiUrl);
+    const databaseProjectRef = getSupabaseProjectRef(databaseUrl);
+
+    if (!apiProjectRef || !databaseProjectRef || apiProjectRef !== databaseProjectRef) {
+      throw new Error('Remote test URLs must identify the same non-production Supabase project');
+    }
+  }
+};
+
 async function testConnection() {
   console.log('🔍 Testing database connection...\n');
   
-  // Get configuration
-  const useRemoteDb = process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true';
-  console.log(`Using ${useRemoteDb ? 'REMOTE' : 'LOCAL'} database\n`);
+  const url = process.env.TESTS_SUPABASE_URL;
+  const serviceRole = process.env.TESTS_SUPABASE_SERVICE_ROLE;
+  const postgresConnectionString = process.env.TESTS_POSTGRES_CONNECTION_STRING;
   
-  const url = useRemoteDb 
-    ? process.env.NEXT_PUBLIC_SUPABASE_URL
-    : process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL;
-    
-  const serviceRole = useRemoteDb
-    ? process.env.SUPABASE_SERVICE_ROLE
-    : process.env.NEXT_PUBLIC_LOCAL_SERVICE_ROLE;
-  
-  if (!url || !serviceRole) {
+  if (!url || !serviceRole || !postgresConnectionString) {
     console.error('❌ Missing required environment variables');
-    console.log('URL:', url ? '✅' : '❌');
-    console.log('Service Role:', serviceRole ? '✅' : '❌');
+    console.log('TESTS_SUPABASE_URL:', url ? '✅' : '❌');
+    console.log('TESTS_SUPABASE_SERVICE_ROLE:', serviceRole ? '✅' : '❌');
+    console.log('TESTS_POSTGRES_CONNECTION_STRING:', postgresConnectionString ? '✅' : '❌');
+    process.exitCode = 1;
     return;
   }
+
+  assertSafeTestDatabaseConfig(url, postgresConnectionString);
   
   console.log('URL:', url);
-  console.log('Service Role:', serviceRole.substring(0, 20) + '...');
+  console.log('Service Role: configured');
   
   // Create client
   const supabase = createClient(url, serviceRole);
@@ -105,4 +143,7 @@ async function testConnection() {
   console.log('Test connection script complete');
 }
 
-testConnection().catch(console.error);
+testConnection().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

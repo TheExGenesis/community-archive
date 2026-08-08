@@ -26,9 +26,6 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ],
-      "msw/node": [
-        "./node_modules/msw/node"
       ]
     },
     "types": [

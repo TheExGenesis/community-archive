@@ -161,6 +161,20 @@ CMD ["npm", "run", "start:stream"]
 CMD ["npm", "run", "start:copy"]
 ```
 
+## Ingestion Sink Boundary
+
+The default processor normalizes archive sections in
+`archive_normalizer.ts`, then sends those typed row batches to the
+`PostgresArchiveSink` inside the existing single-archive transaction. This is
+an internal separation point for a future ClickHouse shadow sink; PostgreSQL is
+still the only configured or executed sink, and the claim/completed/failed
+state machine is unchanged.
+
+Do not enable a second sink in the production cron until immutable per-upload
+object keys, replay fixtures, outage recovery, and PostgreSQL/ClickHouse parity
+checks are in place. Cutover and retirement of the existing processor are
+separate production actions.
+
 ## Logging System
 
 The service provides **three types of logs** without requiring code changes:

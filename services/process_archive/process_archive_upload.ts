@@ -10,6 +10,15 @@ import postgres from 'postgres'
 type Sql = postgres.Sql
 
 import { createClient } from '@supabase/supabase-js'
+import {
+  type NormalizedRemainingRows,
+  type NormalizedTweetRows,
+  type NormalizedUserRows,
+  normalizeRemainingRows,
+  normalizeTweetRows,
+  normalizeUserRows,
+  removeProblematicCharacters,
+} from './archive_normalizer'
 
 // Configuration
 const CONFIG = {
@@ -167,11 +176,6 @@ const TABLE_CONFIGS: Record<string, TableConfig> = {
 }
 
 // Utility functions
-function removeProblematicCharacters(value: string | null | undefined): string | null {
-  if (!value || value === 'NULL') return null
-  return value.replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
-}
-
 function getMemoryUsageMB(): number {
   const usage = process.memoryUsage()
   return Math.round(usage.heapUsed / 1024 / 1024)
@@ -284,6 +288,91 @@ async function optimizedBatchInsert<T>({
   }
 }
 
+export interface ArchiveSink {
+  writeUserRows(rows: NormalizedUserRows): Promise<void>
+  writeTweetRows(rows: NormalizedTweetRows): Promise<void>
+  writeRemainingRows(rows: NormalizedRemainingRows): Promise<void>
+}
+
+export class PostgresArchiveSink implements ArchiveSink {
+  constructor(private readonly sql: Sql) {}
+
+  async writeUserRows(rows: NormalizedUserRows): Promise<void> {
+    await this.insertIfNotEmpty('all_account', rows.accounts, (account) => [
+      account.account_id, account.created_via, account.username,
+      account.created_at, account.account_display_name, account.num_tweets,
+      account.num_following, account.num_followers, account.num_likes
+    ])
+    await this.insertIfNotEmpty('all_profile', rows.profiles, (profile) => [
+      profile.account_id, profile.avatar_media_url, profile.header_media_url,
+      profile.bio, profile.location, profile.website, profile.archive_upload_id
+    ])
+  }
+
+  async writeTweetRows(rows: NormalizedTweetRows): Promise<void> {
+    await this.insertIfNotEmpty('tweets', rows.tweets, (tweet) => [
+      tweet.tweet_id, tweet.account_id, tweet.created_at, tweet.full_text,
+      tweet.favorite_count, tweet.retweet_count, tweet.reply_to_tweet_id,
+      tweet.reply_to_user_id, tweet.reply_to_username, tweet.archive_upload_id
+    ])
+    await this.insertIfNotEmpty('mentioned_users', rows.mentionedUsers, (mention) =>
+      [mention.user_id, mention.name, mention.screen_name])
+    await this.insertIfNotEmpty('user_mentions', rows.userMentions, (mention) =>
+      [mention.tweet_id, mention.mentioned_user_id])
+    await this.insertIfNotEmpty('tweet_urls', rows.tweetUrls, (url) =>
+      [url.tweet_id, url.url, url.expanded_url, url.display_url])
+    await this.insertIfNotEmpty('tweet_media', rows.tweetMedia, (media) =>
+      [media.tweet_id, media.media_id, media.media_url, media.media_type,
+        media.width, media.height, media.archive_upload_id])
+    await this.insertIfNotEmpty('quote_tweets', rows.quoteTweets, (quote) =>
+      [quote.tweet_id, quote.quoted_tweet_id])
+    await this.insertIfNotEmpty('retweets', rows.retweets, (retweet) =>
+      [retweet.tweet_id, retweet.retweeted_tweet_id])
+  }
+
+  async writeRemainingRows(rows: NormalizedRemainingRows): Promise<void> {
+    await this.insertIfNotEmpty('liked_tweets', rows.likedTweets, (tweet) =>
+      [tweet.tweet_id, tweet.full_text])
+    await this.insertIfNotEmpty('likes', rows.likes, (like) =>
+      [like.account_id, like.liked_tweet_id, like.archive_upload_id])
+    await this.insertIfNotEmpty('following', rows.following, (follow) =>
+      [follow.account_id, follow.following_account_id, follow.archive_upload_id])
+    await this.insertIfNotEmpty('followers', rows.followers, (follower) =>
+      [follower.account_id, follower.follower_account_id, follower.archive_upload_id])
+  }
+
+  private async insertIfNotEmpty<T>(
+    tableName: string,
+    data: T[],
+    mapFn: (item: T) => any[]
+  ): Promise<void> {
+    try {
+      if (data.length > 0) {
+        const config = TABLE_CONFIGS[tableName]
+        await bulkInsertWithCopy({
+          sql: this.sql,
+          tableName,
+          columns: config.columns,
+          conflictTarget: config.conflict,
+          updateColumns: config.updates,
+          data,
+          mapFn
+        })
+      }
+    } catch (error) {
+      const errorData = {
+        tableName,
+        error: error instanceof Error ? error.message : String(error),
+        records: data.length
+      }
+      logger.error(`Error in insertIfNotEmpty ${JSON.stringify(errorData)}`)
+      // This sink runs inside the existing archive transaction. Rethrow so the
+      // transaction rolls back and main() marks the upload failed.
+      throw error
+    }
+  }
+}
+
 // Memory-efficient JSON processor with optimized batch inserts
 // We could potentially optimize it more by streaming the data in chunks instead of processing the JSON in one go.
 export class ArchiveUploadProcessor {
@@ -306,8 +395,10 @@ export class ArchiveUploadProcessor {
     
     // Process everything in a single transaction
     await this.sql.begin(async (trx: Sql) => {
+      const sink: ArchiveSink = new PostgresArchiveSink(trx)
+
       // Process small data first (account, profile, etc.)
-      await this.processUserData(trx, archive)
+      await sink.writeUserRows(normalizeUserRows(archive, this.archiveUploadId))
       
       // Process tweets in streaming chunks to avoid memory issues
       const tweets = archive.tweets || []
@@ -317,7 +408,12 @@ export class ArchiveUploadProcessor {
       // Process tweets in memory-efficient batches
       for (let i = 0; i < tweets.length; i += CONFIG.MEMORY_BATCH_SIZE) {
         const chunk = tweets.slice(i, i + CONFIG.MEMORY_BATCH_SIZE)
-        await this.processTweetChunk(trx, chunk, archive.account?.[0]?.account)
+        const rows = normalizeTweetRows(
+          chunk,
+          archive.account?.[0]?.account,
+          this.archiveUploadId
+        )
+        await sink.writeTweetRows(rows)
         
         this.processedTweets += chunk.length
         logger.info(`Processed ${this.processedTweets}/${this.totalTweets} tweets (${getMemoryUsageMB()}MB memory)`)
@@ -331,284 +427,12 @@ export class ArchiveUploadProcessor {
       }
 
       // Process remaining data that depends on all tweets being processed
-      await this.processRemainingData(trx, archive)
+      await sink.writeRemainingRows(
+        normalizeRemainingRows(archive, this.archiveUploadId)
+      )
     })
   }
 
-  private async processUserData(trx: Sql, archive: any): Promise<void> {
-    const accountObj = archive.account?.[0]?.account;
-    const profileObj = archive.profile?.[0]?.profile
-
-    // Process account
-    if (accountObj) {
-      const account = [{
-        account_id: accountObj.accountId,
-        created_via: accountObj.createdVia || 'twitter_archive',
-        username: accountObj.username,
-        created_at: accountObj.createdAt,
-        account_display_name: accountObj.accountDisplayName,
-        num_tweets: archive.tweets?.length || 0,
-        num_following: archive.following?.length || 0,
-        num_followers: archive.follower?.length || 0,
-        num_likes: archive.like?.length || 0
-      }]
-
-      await bulkInsertWithCopy({
-        sql: trx,
-        tableName: 'all_account',
-        columns: TABLE_CONFIGS.all_account.columns,
-        conflictTarget: TABLE_CONFIGS.all_account.conflict,
-        updateColumns: TABLE_CONFIGS.all_account.updates,
-        data: account,
-        mapFn: (acc: any) => [acc.account_id, acc.created_via, acc.username, acc.created_at, acc.account_display_name, acc.num_tweets, acc.num_following, acc.num_followers, acc.num_likes]
-      })
-    }
-
-    // Process profile
-    if (profileObj && accountObj) {
-      const profile = [{
-        account_id: accountObj.accountId,
-        avatar_media_url: removeProblematicCharacters(profileObj.avatarMediaUrl),
-        header_media_url: removeProblematicCharacters(profileObj.headerMediaUrl),
-        bio: profileObj.description?.bio || null,
-        location: profileObj.description?.location || null,
-        website: profileObj.description?.website || null,
-        archive_upload_id: this.archiveUploadId
-      }]
-
-      await bulkInsertWithCopy({
-        sql: trx,
-        tableName: 'all_profile',
-        columns: TABLE_CONFIGS.all_profile.columns,
-        conflictTarget: TABLE_CONFIGS.all_profile.conflict,
-        updateColumns: TABLE_CONFIGS.all_profile.updates,
-        data: profile,
-        mapFn: (p: any) => [p.account_id, p.avatar_media_url, p.header_media_url, p.bio, p.location, p.website, p.archive_upload_id]
-      })
-    }
-  }
-
-  private async processTweetChunk(trx: Sql, tweetChunk: any[], accountObj: any): Promise<void> {
-    if (!accountObj) return
-
-    const tweets: any[] = []
-    const userMentions: any[] = []
-    const mentionedUsersMap = new Map<string, any>()
-    const urls: any[] = []
-    const media: any[] = []
-    const quotes: any[] = []
-    const retweets: any[] = []
-
-    // Process each tweet in the chunk
-    for (const tweetData of tweetChunk) {
-      const tweet = tweetData.tweet
-      const tweetId = tweet.id_str || tweet.id
-
-      // Process tweet
-      tweets.push({
-        tweet_id: tweetId,
-        account_id: accountObj.accountId,
-        created_at: tweet.created_at,
-        full_text: removeProblematicCharacters(tweet.full_text) || '',
-        favorite_count: tweet.favorite_count || 0,
-        retweet_count: tweet.retweet_count || 0,
-        reply_to_tweet_id: removeProblematicCharacters(tweet.in_reply_to_status_id_str),
-        reply_to_user_id: removeProblematicCharacters(tweet.in_reply_to_user_id_str),
-        reply_to_username: removeProblematicCharacters(tweet.in_reply_to_screen_name),
-        archive_upload_id: this.archiveUploadId
-      })
-
-      // Process mentions
-      for (const mention of tweet.entities?.user_mentions || []) {
-        const userId = mention.id_str
-        
-        if (!mentionedUsersMap.has(userId)) {
-          mentionedUsersMap.set(userId, {
-            user_id: userId,
-            name: removeProblematicCharacters(mention.name) || '',
-            screen_name: removeProblematicCharacters(mention.screen_name) || ''
-          })
-        }
-        
-        userMentions.push({ tweet_id: tweetId, mentioned_user_id: userId })
-      }
-
-      // Process URLs and quotes
-      for (const url of tweet.entities?.urls || []) {
-        urls.push({
-          tweet_id: tweetId,
-          url: url.url,
-          expanded_url: url.expanded_url || '',
-          display_url: url.display_url || ''
-        })
-
-        const isQuoteTweet = (url.expanded_url?.includes('twitter.com/') || 
-                            url.expanded_url?.includes('x.com/')) && 
-                           url.expanded_url?.includes('/status/')
-        
-        if (isQuoteTweet) {
-          const quotedTweetId = url.expanded_url?.split('/status/')[1]
-          if (quotedTweetId) {
-            quotes.push({ tweet_id: tweetId, quoted_tweet_id: quotedTweetId })
-          }
-        }
-      }
-
-      // Process media
-      for (const mediaItem of tweet.entities?.media || []) {
-        media.push({
-          tweet_id: tweetId,
-          media_id: mediaItem.id_str,
-          media_url: mediaItem.media_url_https || mediaItem.media_url,
-          media_type: mediaItem.type,
-          width: mediaItem.sizes?.large?.w || 0,
-          height: mediaItem.sizes?.large?.h || 0,
-          archive_upload_id: this.archiveUploadId
-        })
-      }
-
-      // Process retweets
-      const retweetMatch = tweet.full_text?.match(/^RT @\w+: /)
-      if (retweetMatch) {
-        retweets.push({ tweet_id: tweetId, retweeted_tweet_id: null })
-      }
-    }
-
-    // Insert tweets first
-    await this.insertIfNotEmpty(trx, 'tweets', tweets, (t: any) => 
-      [t.tweet_id, t.account_id, t.created_at, t.full_text, t.favorite_count, t.retweet_count, t.reply_to_tweet_id, t.reply_to_user_id, t.reply_to_username, t.archive_upload_id])
-
-    await this.insertIfNotEmpty(trx, 'mentioned_users', Array.from(mentionedUsersMap.values()), (m: any) => [m.user_id, m.name, m.screen_name]);
-    
-
-    // Insert chunk data in parallel using COPY
-    const promisesToWork=[    
-      () => this.insertIfNotEmpty(trx, 'user_mentions', userMentions, (um: any) => 
-        [um.tweet_id, um.mentioned_user_id]),
-      
-      () => this.insertIfNotEmpty(trx, 'tweet_urls', this.dedupeByConflict(urls, TABLE_CONFIGS.tweet_urls.conflict), (u: any) => 
-        [u.tweet_id, u.url, u.expanded_url, u.display_url]),
-      
-      () => this.insertIfNotEmpty(trx, 'tweet_media', this.dedupeByConflict(media, TABLE_CONFIGS.tweet_media.conflict), (m: any) => 
-        [m.tweet_id, m.media_id, m.media_url, m.media_type, m.width, m.height, m.archive_upload_id]),
-      
-      () => this.insertIfNotEmpty(trx, 'quote_tweets', quotes, (qt: any) => 
-        [qt.tweet_id, qt.quoted_tweet_id]),
-      
-      () => this.insertIfNotEmpty(trx, 'retweets', retweets, (rt: any) => 
-        [rt.tweet_id, rt.retweeted_tweet_id])
-    ];
-
-    for(const promiseCreator of promisesToWork){
-      await promiseCreator();
-    }
-
-    // Clear references to help GC
-    tweets.length = 0
-    userMentions.length = 0
-    urls.length = 0
-    media.length = 0
-    quotes.length = 0
-    retweets.length = 0
-  }
-
-  private async processRemainingData(trx: Sql, archive: any): Promise<void> {
-    const accountObj = archive.account?.[0]?.account
-    if (!accountObj) return
-
-
-    // Process likes, following, followers (these are typically smaller)
-    const operations = [
-      {
-        table: 'liked_tweets',
-        data: (archive.like || []).map((like: any) => ({
-          tweet_id: like.like.tweetId,
-          full_text: like.like.fullText || ''
-        })),
-        mapFn: (lt: any) => [lt.tweet_id, lt.full_text]
-      },
-      {
-        table: 'likes',
-        data: (archive.like || []).map((like: any) => ({
-          account_id: accountObj.accountId,
-          liked_tweet_id: like.like.tweetId,
-          archive_upload_id: this.archiveUploadId
-        })),
-        mapFn: (l: any) => [l.account_id, l.liked_tweet_id, l.archive_upload_id]
-      },
-      {
-        table: 'following',
-        data: (archive.following || []).map((follow: any) => ({
-          account_id: accountObj.accountId,
-          following_account_id: follow.following.accountId,
-          archive_upload_id: this.archiveUploadId
-        })),
-        mapFn: (f: any) => [f.account_id, f.following_account_id, f.archive_upload_id]
-      },
-      {
-        table: 'followers',
-        data: (archive.follower || []).map((follower: any) => ({
-          account_id: accountObj.accountId,
-          follower_account_id: follower.follower.accountId,
-          archive_upload_id: this.archiveUploadId
-        })),
-        mapFn: (f: any) => [f.account_id, f.follower_account_id, f.archive_upload_id]
-      }
-    ]
-
-    for (const operation of operations) {
-      await this.insertIfNotEmpty(trx, operation.table, operation.data, operation.mapFn)
-    }
-  }
-
-  private async insertIfNotEmpty(trx: Sql, tableName: string, data: any[], mapFn: (item: any) => any[]): Promise<void> {
-    try{
-      if (data.length > 0) {
-        const config = TABLE_CONFIGS[tableName]
-        await bulkInsertWithCopy({
-          sql: trx,
-          tableName,
-          columns: config.columns,
-          conflictTarget: config.conflict,
-          updateColumns: config.updates,
-          data,
-          mapFn
-        })
-      }
-    } catch (error) {
-      const errorData = {
-        tableName,
-        error: error instanceof Error ? error.message : String(error),
-        records: data.length
-      }
-      logger.error(`Error in insertIfNotEmpty ${JSON.stringify(errorData)}`)
-      // Rethrow: these inserts run inside a single transaction (sql.begin). A failed
-      // statement aborts the whole transaction, so swallowing the error here let the
-      // archive be marked 'completed' while every row was rolled back (silent data
-      // loss). Propagating it lets main()'s catch mark the upload 'failed' instead.
-      throw error
-    }
-  }
-
-  private dedupeByConflict<T extends Record<string, any>>(
-    items: T[], 
-    conflict: string | string[] | null
-  ): T[] {
-    if (!items?.length || !conflict) return items
-
-    const keys = Array.isArray(conflict) ? conflict : [conflict]
-    const makeKey = (item: T) => keys.map(k => `${item[k] ?? ''}`).join('||')
-    const uniqueItems = new Map<string, T>()
-
-    for (const item of items) {
-      const key = makeKey(item)
-      if (!uniqueItems.has(key)) {
-        uniqueItems.set(key, item)
-      }
-    }
-
-    return Array.from(uniqueItems.values())
-  }
 }
 
 // Twitter handle rules: 1-15 chars, alphanumerics and underscore only.

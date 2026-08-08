@@ -451,6 +451,26 @@ const getCachedRecentBangers = unstable_cache(
   { revalidate: 1_800 },
 )
 
+export async function loadOptionalPortalData<T>(
+  section: string,
+  loader: () => Promise<T>,
+  fallback: T,
+): Promise<T> {
+  try {
+    return await loader()
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        message: 'Optional portal data failed',
+        section,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    )
+    return fallback
+  }
+}
+
 export async function getPortalBangers(): Promise<PortalTweet[]> {
   return getCachedRecentBangers(portalDataSourceKey())
 }
@@ -471,10 +491,22 @@ export async function getPortalData(
     getCachedCorpusSnapshot(sourceKey),
     getCachedStatsSnapshot(sourceKey),
     getCachedInitialStream(sourceKey),
-    view === 'home' ? getResearchPosts() : Promise.resolve([]),
-    view === 'home' ? getCachedRecentBangers(sourceKey) : Promise.resolve([]),
     view === 'home'
-      ? getCachedHistoricalBangers(sourceKey, today)
+      ? loadOptionalPortalData('research', getResearchPosts, [])
+      : Promise.resolve([]),
+    view === 'home'
+      ? loadOptionalPortalData(
+          'recent-bangers',
+          () => getCachedRecentBangers(sourceKey),
+          [],
+        )
+      : Promise.resolve([]),
+    view === 'home'
+      ? loadOptionalPortalData(
+          'historical-bangers',
+          () => getCachedHistoricalBangers(sourceKey, today),
+          [],
+        )
       : Promise.resolve([]),
   ])
   const stats: PortalStats = {

@@ -1,20 +1,20 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { isProductionSupabaseUrl } from '@/lib/isProductionSupabaseUrl'
 
 // Use untyped client for schema tests - we're testing functions that may
 // not be in the generated types yet (like new RPC functions)
 export const createSchemaTestClient = (): SupabaseClient => {
-  const useRemoteDevDb = process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true'
-
-  const url = useRemoteDevDb
-    ? process.env.NEXT_PUBLIC_SUPABASE_URL!
-    : process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL!
-
-  const serviceRole = useRemoteDevDb
-    ? process.env.SUPABASE_SERVICE_ROLE!
-    : process.env.NEXT_PUBLIC_LOCAL_SERVICE_ROLE!
+  const url = process.env.TESTS_SUPABASE_URL
+  const serviceRole = process.env.TESTS_SUPABASE_SERVICE_ROLE
 
   if (!url || !serviceRole) {
-    throw new Error('Missing required environment variables for schema test client')
+    throw new Error(
+      'Database schema tests require TESTS_SUPABASE_URL and TESTS_SUPABASE_SERVICE_ROLE'
+    )
+  }
+
+  if (isProductionSupabaseUrl(url)) {
+    throw new Error('Database schema tests refuse to run against the production Supabase project')
   }
 
   return createClient(url, serviceRole)

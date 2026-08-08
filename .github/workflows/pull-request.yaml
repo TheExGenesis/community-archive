@@ -53,7 +53,7 @@ jobs:
       - name: Run type check
         run: pnpm type-check
 
-      # Keep database integration suites separate: they require a provisioned
-      # Supabase project. Server unit and route-contract tests are hermetic.
-      - name: Run server unit tests
-        run: pnpm exec jest --selectProjects server --testPathPattern=src/lib --ci --runInBand
+      # Database integration suites are separate projects and require a
+      # provisioned test Supabase project. The default CI command is hermetic.
+      - name: Run unit and component tests
+        run: pnpm test:ci

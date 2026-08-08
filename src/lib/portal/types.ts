@@ -30,6 +30,8 @@ export interface PortalTweet {
   createdAt: string
   likes: number
   rts: number
+  /** Latest ClickHouse follower observation, used only for homepage ranking. */
+  followers?: number
   media?: PortalMedia[]
   quotedTweet?: PortalQuotedTweet
   /** Distinct non-self quote tweets from archive uploaders and opt-ins. */
@@ -57,7 +59,7 @@ export interface PortalBangersPage {
 export interface PortalStats {
   totalTweets: number
   accountCount: number
-  streamedToday: number
+  streamedLast24Hours: number
   joinedThisWeek: number
   firstYear: number
   currentYear: number

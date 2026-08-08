@@ -12,7 +12,7 @@ import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 type AnalyticsFetcher = typeof fetchAnalyticsGatewayJson
 
 describe('ClickHouse-backed portal analytics', () => {
-  test('maps canonical summary and observation-time daily stats', async () => {
+  test('maps the canonical summary and rolling 24-hour stream stats', async () => {
     const fetcher = jest.fn(async (path: string[]) => {
       if (path[0] === 'summary') {
         return {
@@ -37,7 +37,7 @@ describe('ClickHouse-backed portal analytics', () => {
       fetchPortalLiveAnalytics(new Date('2026-08-07T12:00:00.000Z'), fetcher),
     ).resolves.toEqual({
       totalTweets: 14_800_000,
-      streamedToday: 1234,
+      streamedLast24Hours: 1234,
       generatedAt: '2026-08-07T12:00:00.000Z',
       latestObservedAt: '2026-08-07T11:59:00.000Z',
     })
@@ -47,7 +47,7 @@ describe('ClickHouse-backed portal analytics', () => {
       ([path]) => path[0] === 'stream-stats',
     )
     expect(streamCall?.[1].toString()).toBe(
-      'start=2026-08-07T00%3A00%3A00.000Z&end=2026-08-07T12%3A00%3A00.000Z&granularity=hour&scope=firehose',
+      'start=2026-08-06T12%3A00%3A00.000Z&end=2026-08-07T12%3A00%3A00.000Z&granularity=hour&scope=firehose',
     )
   })
 

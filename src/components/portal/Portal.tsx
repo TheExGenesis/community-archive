@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { FaExternalLinkAlt } from 'react-icons/fa'
+import { FaDatabase, FaExternalLinkAlt } from 'react-icons/fa'
 import {
   PortalData,
   PortalTweet,
@@ -13,9 +13,27 @@ import { PORTAL_ARTICLES } from './articles'
 import { PORTAL_TOOLS } from './tools'
 import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
 import { TweetRow } from './TweetRow'
+import {
+  estimateLiveTweetGain,
+  interpolateLiveTweetCount,
+  liveCounterBurstDelay,
+  LIVE_COUNTER_CATCH_UP_BURST_BASE_MS,
+  LIVE_COUNTER_CATCH_UP_DURATION_MS,
+  liveTweetCatchUpRange,
+  liveCounterRefreshInterval,
+  PORTAL_STREAM_POLL_INTERVAL_MS,
+} from './live'
 import HomepageSearch from '@/components/HomepageSearch'
+import {
+  comparePortalTweetChronology,
+  selectHomepageStream,
+} from '@/lib/portal/stream'
 
 export type PortalView = 'home' | 'stream'
+
+const HOME_LIVE_STREAM_LIMIT = 12
+const ARCHIVE_EXPORT_URL =
+  'https://github.com/TheExGenesis/community-archive/releases/tag/data_export'
 
 const compact = (n: number) =>
   new Intl.NumberFormat('en', {
@@ -29,6 +47,10 @@ const fmtDelta = (term: TermWeek) => {
   return `${term.deltaPct >= 0 ? '+' : '−'}${Math.abs(term.deltaPct)}%`
 }
 
+function compareTweetIds(left: string, right: string): number {
+  return left.length - right.length || left.localeCompare(right)
+}
+
 function newestCursor(tweets: PortalTweet[]) {
   return tweets.reduce<{ observedAt: string; id: string } | null>(
     (latest, tweet) => {
@@ -36,7 +58,10 @@ function newestCursor(tweets: PortalTweet[]) {
       const timeDiff =
         new Date(tweet.observedAt).getTime() -
         new Date(latest.observedAt).getTime()
-      if (timeDiff > 0 || (timeDiff === 0 && tweet.id > latest.id)) {
+      if (
+        timeDiff > 0 ||
+        (timeDiff === 0 && compareTweetIds(tweet.id, latest.id) > 0)
+      ) {
         return { observedAt: tweet.observedAt, id: tweet.id }
       }
       return latest
@@ -46,15 +71,8 @@ function newestCursor(tweets: PortalTweet[]) {
 }
 
 function oldestPageCursor(tweets: PortalTweet[]) {
-  const oldest = [...tweets].sort(compareTweetChronology).at(-1)
+  const oldest = [...tweets].sort(comparePortalTweetChronology).at(-1)
   return oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null
-}
-
-function compareTweetChronology(left: PortalTweet, right: PortalTweet) {
-  return (
-    new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime() ||
-    right.id.localeCompare(left.id)
-  )
 }
 
 function Chip({
@@ -126,12 +144,188 @@ function PanelHeader({
   )
 }
 
-function LiveCounter({ count }: { count: string }) {
+function useLiveTweetCount({
+  count,
+  gain,
+  generatedAt,
+}: {
+  count: number
+  gain: number
+  generatedAt: string
+}): number {
+  // Keep the server and first client render identical, then begin projecting
+  // from the analytics snapshot after hydration.
+  const [displayCount, setDisplayCount] = useState(count)
+  const displayCountRef = useRef(count)
+
+  useEffect(() => {
+    let timer: number | null = null
+    let cancelled = false
+    let animationBurstIndex = 0
+    let liveBurstIndex = 0
+    const animationStartedAt = Date.now()
+    const catchUp = liveTweetCatchUpRange({
+      totalTweets: count,
+      streamedLast24Hours: gain,
+      generatedAt,
+      now: animationStartedAt,
+    })
+    const startCount = Math.max(catchUp.startCount, displayCountRef.current)
+    const targetCount = Math.max(catchUp.targetCount, startCount)
+
+    const updateDisplayCount = (nextCount: number) => {
+      const monotonicCount = Math.max(displayCountRef.current, nextCount)
+      if (monotonicCount === displayCountRef.current) return
+      displayCountRef.current = monotonicCount
+      setDisplayCount(monotonicCount)
+    }
+
+    const startLiveUpdates = () => {
+      const intervalMs = liveCounterRefreshInterval(gain)
+      if (intervalMs === null) return
+      const liveStartedAt = Date.now()
+      const liveStartCount = displayCountRef.current
+      const tick = () => {
+        if (cancelled) return
+        updateDisplayCount(
+          liveStartCount +
+            estimateLiveTweetGain(gain, Date.now() - liveStartedAt),
+        )
+        timer = window.setTimeout(
+          tick,
+          liveCounterBurstDelay(intervalMs, liveBurstIndex++),
+        )
+      }
+      timer = window.setTimeout(
+        tick,
+        liveCounterBurstDelay(intervalMs, liveBurstIndex++),
+      )
+    }
+
+    const prefersReducedMotion =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    updateDisplayCount(startCount)
+    if (prefersReducedMotion || targetCount <= startCount) {
+      updateDisplayCount(targetCount)
+      startLiveUpdates()
+    } else {
+      const animate = () => {
+        const elapsedMs = Date.now() - animationStartedAt
+        updateDisplayCount(
+          interpolateLiveTweetCount({
+            startCount,
+            targetCount,
+            elapsedMs,
+          }),
+        )
+        if (elapsedMs >= LIVE_COUNTER_CATCH_UP_DURATION_MS) {
+          startLiveUpdates()
+          return
+        }
+        const baseDelay = Math.min(
+          LIVE_COUNTER_CATCH_UP_BURST_BASE_MS,
+          liveCounterRefreshInterval(gain) ??
+            LIVE_COUNTER_CATCH_UP_BURST_BASE_MS,
+        )
+        const remainingMs = LIVE_COUNTER_CATCH_UP_DURATION_MS - elapsedMs
+        timer = window.setTimeout(
+          animate,
+          Math.min(
+            remainingMs,
+            liveCounterBurstDelay(baseDelay, animationBurstIndex++),
+          ),
+        )
+      }
+      animate()
+    }
+
+    return () => {
+      cancelled = true
+      if (timer !== null) window.clearTimeout(timer)
+    }
+  }, [count, gain, generatedAt])
+
+  return displayCount
+}
+
+function LiveCounter({ count, gain }: { count: number; gain: number }) {
   return (
-    <span className={`inline-flex items-center gap-[7px] text-[12px] ${MUTED}`}>
+    <span
+      className={`inline-flex items-center gap-[7px] text-[12px] ${MUTED}`}
+      title={`Estimated live total, paced by ${gain.toLocaleString('en-US')} tweets streamed in the last 24 hours`}
+    >
       <span className="h-[7px] w-[7px] animate-pulse rounded-full bg-[#2acf80]" />
-      <span className="tabular-nums">{count} tweets</span>
+      <span className="tabular-nums">
+        {count.toLocaleString('en-US')} tweets
+      </span>
     </span>
+  )
+}
+
+function ArchiveOverview({
+  stats,
+  generatedDate,
+}: {
+  stats: PortalData['stats']
+  generatedDate: string
+}) {
+  const count = useLiveTweetCount({
+    count: stats.totalTweets,
+    gain: stats.streamedLast24Hours,
+    generatedAt: stats.generatedAt,
+  })
+
+  return (
+    <>
+      <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-[30px] font-semibold" style={SERIF}>
+          Today on the archive
+        </h2>
+        <span className="flex items-baseline gap-3">
+          <LiveCounter count={count} gain={stats.streamedLast24Hours} />
+          <span className={`text-[12.5px] ${MUTED}`}>{generatedDate}</span>
+        </span>
+      </div>
+
+      <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard
+          label="Tweets archived"
+          value={count.toLocaleString('en-US')}
+          note={`+${stats.streamedLast24Hours.toLocaleString('en-US')} streamed in the last 24h`}
+          noteClass="text-[#16a34a] dark:text-[#2acf80]"
+        />
+        <StatCard
+          label="Community members"
+          value={stats.accountCount.toLocaleString('en-US')}
+          note={
+            stats.joinedThisWeek > 0
+              ? `${stats.joinedThisWeek} upload${stats.joinedThisWeek === 1 ? '' : 's'} this week`
+              : 'volunteered archives'
+          }
+        />
+        <StatCard
+          label="Corpus span"
+          value={`${stats.firstYear}–${stats.currentYear}`}
+          note={`${stats.currentYear - stats.firstYear} years of discourse`}
+        />
+      </div>
+    </>
+  )
+}
+
+function LiveStreamHeading({ stats }: { stats: PortalData['stats'] }) {
+  const count = useLiveTweetCount({
+    count: stats.totalTweets,
+    gain: stats.streamedLast24Hours,
+    generatedAt: stats.generatedAt,
+  })
+  return (
+    <div className="mb-1.5 flex items-baseline gap-3">
+      <h1 className="text-[26px] font-semibold" style={SERIF}>
+        Live stream
+      </h1>
+      <LiveCounter count={count} gain={stats.streamedLast24Hours} />
+    </div>
   )
 }
 
@@ -187,7 +381,7 @@ export default function Portal({
       older.forEach((tweet) => seenIds.current.add(tweet.id))
       if (older.length > 0) {
         setVisible((current) =>
-          [...current, ...older].sort(compareTweetChronology),
+          [...current, ...older].sort(comparePortalTweetChronology),
         )
       }
       pageCursor.current = nextCursor
@@ -202,7 +396,10 @@ export default function Portal({
 
   useEffect(() => {
     const controller = new AbortController()
-    const poll = setInterval(async () => {
+    let polling = false
+    const poll = async () => {
+      if (polling) return
+      polling = true
       try {
         const params = new URLSearchParams()
         if (updateCursor.current) {
@@ -211,36 +408,47 @@ export default function Portal({
         }
         const res = await fetch(`/api/portal/stream?${params.toString()}`, {
           signal: controller.signal,
+          cache: 'no-store',
         })
         if (!res.ok) return
         const { tweets, updateCursor: nextUpdateCursor } =
           (await res.json()) as {
             tweets: PortalTweet[]
-            updateCursor: { observedAt: string; id: string } | null
+            updateCursor?: { observedAt: string; id: string } | null
           }
-        if (nextUpdateCursor) updateCursor.current = nextUpdateCursor
+        const responseCursor = nextUpdateCursor ?? newestCursor(tweets)
+        if (responseCursor) updateCursor.current = responseCursor
         const fresh = tweets
           .filter((t) => !seenIds.current.has(t.id))
           .sort(
             (a, b) =>
               new Date(a.observedAt).getTime() -
-                new Date(b.observedAt).getTime() || a.id.localeCompare(b.id),
+                new Date(b.observedAt).getTime() || compareTweetIds(a.id, b.id),
           )
         if (fresh.length > 0) {
           fresh.forEach((t) => seenIds.current.add(t.id))
           setVisible((current) =>
-            [...fresh, ...current].sort(compareTweetChronology),
+            view === 'home'
+              ? selectHomepageStream([...fresh, ...current], 30)
+              : [...fresh, ...current].sort(comparePortalTweetChronology),
           )
         }
       } catch {
         // network hiccup; try again next poll
+      } finally {
+        polling = false
       }
-    }, 45_000)
+    }
+    void poll()
+    const interval = window.setInterval(
+      () => void poll(),
+      PORTAL_STREAM_POLL_INTERVAL_MS,
+    )
     return () => {
       controller.abort()
-      clearInterval(poll)
+      window.clearInterval(interval)
     }
-  }, [])
+  }, [view])
 
   useEffect(() => {
     if (view !== 'stream' || !hasMore) return
@@ -255,8 +463,6 @@ export default function Portal({
     observer.observe(target)
     return () => observer.disconnect()
   }, [hasMore, loadMore, view])
-
-  const liveCount = stats.totalTweets.toLocaleString('en-US')
 
   // ---- derived trend views ----------------------------------------------
   const weeklyRanked = useMemo(
@@ -360,49 +566,25 @@ export default function Portal({
             </div>
           </div>
 
-          <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-[30px] font-semibold" style={SERIF}>
-              Today on the archive
-            </h2>
-            <span className="flex items-baseline gap-3">
-              <LiveCounter count={liveCount} />
-              <span className={`text-[12.5px] ${MUTED}`}>{generatedDate}</span>
-            </span>
-          </div>
-
-          <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-            <StatCard
-              label="Tweets archived"
-              value={stats.totalTweets.toLocaleString('en-US')}
-              note={`+${stats.streamedToday.toLocaleString('en-US')} streamed today`}
-              noteClass="text-[#16a34a] dark:text-[#2acf80]"
-            />
-            <StatCard
-              label="Community members"
-              value={stats.accountCount.toLocaleString('en-US')}
-              note={
-                stats.joinedThisWeek > 0
-                  ? `${stats.joinedThisWeek} upload${stats.joinedThisWeek === 1 ? '' : 's'} this week`
-                  : 'volunteered archives'
-              }
-            />
-            <StatCard
-              label="Corpus span"
-              value={`${stats.firstYear}–${stats.currentYear}`}
-              note={`${stats.currentYear - stats.firstYear} years of discourse`}
-            />
-          </div>
+          <ArchiveOverview stats={stats} generatedDate={generatedDate} />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.45fr_1fr]">
-            <div className="flex flex-col gap-4">
-              <div className={CARD}>
+            <div className="flex h-full min-h-0 flex-col gap-4 lg:overflow-hidden">
+              <div
+                className={`${CARD} flex min-h-[420px] flex-col lg:min-h-[240px] lg:flex-1 lg:overflow-hidden lg:[contain:size]`}
+              >
                 <PanelHeader
                   title="Live stream"
                   live
                   action={{ label: 'Open firehose', href: '/stream' }}
                 />
-                <div className="flex flex-col">
-                  {visible.slice(0, 5).map((t, i) => (
+                <div
+                  role="region"
+                  aria-label="Live tweet stream"
+                  tabIndex={0}
+                  className="flex max-h-[420px] flex-col overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60 lg:max-h-none lg:min-h-0 lg:flex-1 [&::-webkit-scrollbar]:hidden"
+                >
+                  {visible.slice(0, HOME_LIVE_STREAM_LIMIT).map((t, i) => (
                     <TweetRow key={t.id} tweet={t} compact animate={i === 0} />
                   ))}
                   {visible.length === 0 && (
@@ -415,7 +597,7 @@ export default function Portal({
                 </div>
               </div>
 
-              <div className={`${CARD} flex flex-1 flex-col`}>
+              <div className={`${CARD} flex flex-col`}>
                 <PanelHeader
                   title="Trending terms · 7 days"
                   action={{ label: 'Trends explorer', href: '/trends' }}
@@ -478,22 +660,31 @@ export default function Portal({
               {(recentBanger || historicalBanger) && (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {recentBanger && (
-                    <div className={`${CARD} min-w-0 overflow-hidden`}>
-                      <PanelHeader
-                        title="Banger of the moment"
-                        action={{ label: 'More bangers', href: '/bangers' }}
-                      />
-                      <TweetRow tweet={recentBanger} collapsible />
+                    <div
+                      className={`${CARD} flex min-w-0 flex-col overflow-hidden lg:min-h-[320px]`}
+                    >
+                      <PanelHeader title="Banger of the moment" />
+                      <div className="flex flex-1 flex-col [&>article]:flex-1">
+                        <TweetRow tweet={recentBanger} collapsible />
+                      </div>
                     </div>
                   )}
 
                   {historicalBanger && (
-                    <div className={`${CARD} min-w-0 overflow-hidden`}>
+                    <div
+                      className={`${CARD} flex min-w-0 flex-col overflow-hidden lg:min-h-[320px]`}
+                    >
                       <PanelHeader
-                        title="Historical banger · near this day"
+                        title="Historical Banger"
                         action={{ label: 'More bangers', href: '/bangers' }}
                       />
-                      <TweetRow tweet={historicalBanger} collapsible showDate />
+                      <div className="flex flex-1 flex-col [&>article]:flex-1">
+                        <TweetRow
+                          tweet={historicalBanger}
+                          collapsible
+                          showDate
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -503,11 +694,11 @@ export default function Portal({
             <div className="flex flex-col gap-4">
               <div className={CARD}>
                 <PanelHeader
-                  title="Research"
+                  title="Featured research"
                   action={{ label: 'All research', href: '/research' }}
                 />
                 <div className="flex flex-col">
-                  {data.research.slice(0, 3).map((post) => (
+                  {data.research.slice(0, 4).map((post) => (
                     <a
                       key={post.url}
                       href={post.url}
@@ -591,6 +782,29 @@ export default function Portal({
                   </div>
                 </a>
               )}
+              <a
+                href={ARCHIVE_EXPORT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${CARD} group flex items-center gap-3 px-4 py-4 transition-colors hover:border-brand/60`}
+              >
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[4px] border border-zinc-200 bg-zinc-50 text-brand dark:border-[#2a2a2e] dark:bg-[#121214]">
+                  <FaDatabase className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13.5px] font-bold">
+                    Export the archive
+                  </span>
+                  <span
+                    className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
+                  >
+                    Download the latest public Parquet release
+                  </span>
+                </span>
+                <span className="flex-shrink-0 text-[12px] font-semibold text-brand">
+                  Download →
+                </span>
+              </a>
             </div>
           </div>
 
@@ -648,12 +862,7 @@ export default function Portal({
               >
                 ← Dashboard
               </Link>
-              <div className="mb-1.5 flex items-baseline gap-3">
-                <h1 className="text-[26px] font-semibold" style={SERIF}>
-                  Live stream
-                </h1>
-                <LiveCounter count={liveCount} />
-              </div>
+              <LiveStreamHeading stats={stats} />
               <div className={`mb-3.5 text-[13px] ${MUTED}`}>
                 Tweets arriving from the browser-extension firehose, as
                 contributors read their timelines.

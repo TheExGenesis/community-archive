@@ -1,6 +1,9 @@
 import 'server-only'
 import { unstable_cache } from 'next/cache'
-import { clickHouseAnalyticsGatewayBaseUrl } from '@/lib/clickhouseGateway'
+import {
+  clickHouseAnalyticsGatewayBaseUrl,
+  fetchAnalyticsGatewayJson,
+} from '@/lib/clickhouseGateway'
 import {
   fetchPortalBangersPage,
   fetchPortalHistoricalBangers,
@@ -9,7 +12,8 @@ import {
   fetchPortalTrends,
 } from './analytics'
 import type { PortalLiveAnalytics } from './analytics'
-import { getResearchPosts } from './research'
+import { getResearchPosts, selectFeaturedResearchPosts } from './research'
+import { selectHomepageStream } from './stream'
 import type {
   PortalBangersPage,
   PortalBangersScope,
@@ -233,15 +237,118 @@ function validatedPageCursor(
   return { createdAt: createdAt.toISOString(), id: cursor.id }
 }
 
-function portalStreamParams(limit: number): URLSearchParams {
-  return new URLSearchParams({
-    select:
-      'tweet_id,account_id,created_at,updated_at,full_text,retweet_count,favorite_count,account:all_account!inner(username,account_display_name)',
-    archive_upload_id: 'is.null',
-    reply_to_tweet_id: 'is.null',
-    full_text: 'not.ilike.RT @%',
+interface ClickHousePortalStreamTweet {
+  tweetId: string
+  accountId: string
+  createdAt: string
+  latestObservedAt: string
+  fullText: string
+  favoriteCount: string | number
+  retweetCount: string | number
+  followerCount: string | number
+  username: string | null
+  accountDisplayName: string | null
+  avatarMediaUrl: string | null
+  media: Array<{
+    mediaUrl: string
+    mediaType: string
+    width: number | null
+    height: number | null
+  }>
+}
+
+interface ClickHousePortalStreamResponse {
+  data: {
+    tweets: ClickHousePortalStreamTweet[]
+    updateCursor: { observedAt: string; tweetId: string } | null
+  }
+}
+
+function clickHousePortalCount(value: string | number, field: string): number {
+  const count = Number(value)
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new Error(`ClickHouse portal stream returned an invalid ${field}`)
+  }
+  return count
+}
+
+function clickHousePortalTimestamp(value: string, field: string): string {
+  const normalized = /[zZ]$|[+-]\d\d:\d\d$/.test(value)
+    ? value
+    : `${value.replace(' ', 'T')}Z`
+  const timestamp = new Date(normalized)
+  if (Number.isNaN(timestamp.getTime())) {
+    throw new Error(`ClickHouse portal stream returned an invalid ${field}`)
+  }
+  return timestamp.toISOString()
+}
+
+function mapClickHousePortalStreamTweet(
+  row: ClickHousePortalStreamTweet,
+): PortalTweet {
+  if (
+    !/^\d{1,32}$/.test(row.tweetId) ||
+    !/^\d{1,32}$/.test(row.accountId) ||
+    typeof row.fullText !== 'string'
+  ) {
+    throw new Error('ClickHouse portal stream returned an invalid tweet')
+  }
+  const username = row.username || 'unknown'
+  return {
+    id: row.tweetId,
+    username,
+    name: row.accountDisplayName || username,
+    avatar: row.avatarMediaUrl || null,
+    text: row.fullText,
+    observedAt: clickHousePortalTimestamp(
+      row.latestObservedAt,
+      'observation timestamp',
+    ),
+    createdAt: clickHousePortalTimestamp(row.createdAt, 'authored timestamp'),
+    likes: clickHousePortalCount(row.favoriteCount, 'favorite count'),
+    rts: clickHousePortalCount(row.retweetCount, 'repost count'),
+    followers: clickHousePortalCount(row.followerCount, 'follower count'),
+    media: (row.media || []).flatMap((item): PortalMedia[] => {
+      if (!item.mediaUrl || !item.mediaType) return []
+      return [
+        {
+          url: item.mediaUrl,
+          type: item.mediaType,
+          ...(item.width && item.width > 0 ? { width: item.width } : {}),
+          ...(item.height && item.height > 0 ? { height: item.height } : {}),
+        },
+      ]
+    }),
+  }
+}
+
+async function fetchClickHousePortalStream(
+  limit: number,
+  cursor?: PortalStreamPageCursor | PortalStreamUpdateCursor,
+): Promise<PortalTweet[]> {
+  const params = new URLSearchParams({
     limit: String(Math.min(Math.max(Math.trunc(limit), 1), 100)),
   })
+  if (cursor && 'createdAt' in cursor) {
+    const before = validatedPageCursor(cursor)
+    params.set('before', before.createdAt)
+    params.set('before_id', before.id)
+  } else if (cursor) {
+    const after = validatedUpdateCursor(cursor)
+    params.set('after', after.observedAt)
+    params.set('after_id', after.id)
+  }
+
+  const response =
+    await fetchAnalyticsGatewayJson<ClickHousePortalStreamResponse>(
+      ['portal-stream'],
+      params,
+      { timeoutMs: 20_000 },
+    )
+  if (!Array.isArray(response.data?.tweets)) {
+    throw new Error('ClickHouse portal-stream returned an invalid response')
+  }
+  return response.data.tweets.map(mapClickHousePortalStreamTweet)
 }
 
 /** A page of firehose tweets ordered by authored time, newest first. */
@@ -249,19 +356,7 @@ export async function getPortalStreamPage(
   limit = 30,
   cursor?: PortalStreamPageCursor,
 ): Promise<PortalTweet[]> {
-  const before = cursor ? validatedPageCursor(cursor) : null
-  const params = portalStreamParams(limit)
-  params.set('order', 'created_at.desc,tweet_id.desc')
-
-  if (before) {
-    params.set(
-      'or',
-      `(created_at.lt.${before.createdAt},and(created_at.eq.${before.createdAt},tweet_id.lt.${before.id}))`,
-    )
-  }
-
-  const data = await portalRestRows<any>('tweets', params)
-  return toPortalTweets(data)
+  return fetchClickHousePortalStream(limit, cursor)
 }
 
 /** Rows newly observed by the firehose, used to refresh an open stream. */
@@ -269,74 +364,7 @@ export async function getPortalStreamUpdates(
   limit = 100,
   cursor?: PortalStreamUpdateCursor,
 ): Promise<PortalTweet[]> {
-  const after = cursor ? validatedUpdateCursor(cursor) : null
-  const params = portalStreamParams(limit)
-  params.set(
-    'order',
-    `${after ? 'updated_at.asc' : 'updated_at.desc'},${after ? 'tweet_id.asc' : 'tweet_id.desc'}`,
-  )
-
-  if (after) {
-    params.set(
-      'or',
-      `(updated_at.gt.${after.observedAt},and(updated_at.eq.${after.observedAt},tweet_id.gt.${after.id}))`,
-    )
-  }
-
-  const data = await portalRestRows<any>('tweets', params)
-  return toPortalTweets(data)
-}
-
-/** Map raw tweet rows to portal tweets and attach the newest known avatar. */
-async function toPortalTweets(tweets: any[]): Promise<PortalTweet[]> {
-  const accountOf = (tweet: any) =>
-    Array.isArray(tweet.account) ? tweet.account[0] : tweet.account
-  const accountIds = Array.from(
-    new Set(tweets.map((tweet: any) => tweet.account_id).filter(Boolean)),
-  )
-  const profilesPromise =
-    accountIds.length > 0
-      ? optionalPortalRestRows<any>(
-          'all_profile',
-          new URLSearchParams({
-            select: 'account_id,avatar_media_url',
-            account_id: `in.(${accountIds.join(',')})`,
-            order: 'archive_upload_id.desc',
-          }),
-          'avatar',
-        )
-      : Promise.resolve([])
-
-  const portalTweets = tweets.map((tweet: any): PortalTweet => {
-    const account = accountOf(tweet)
-    return {
-      id: tweet.tweet_id,
-      username: account?.username ?? 'unknown',
-      name: account?.account_display_name ?? account?.username ?? 'Unknown',
-      avatar: null,
-      text: tweet.full_text ?? '',
-      observedAt: tweet.updated_at ?? tweet.created_at,
-      createdAt: tweet.created_at,
-      likes: tweet.favorite_count ?? 0,
-      rts: tweet.retweet_count ?? 0,
-    }
-  })
-
-  const [profiles, enrichedTweets] = await Promise.all([
-    profilesPromise,
-    enrichPortalTweets(portalTweets),
-  ])
-  const avatarMap = new Map<string, string>()
-  profiles.forEach((profile: any) => {
-    if (profile.avatar_media_url && !avatarMap.has(profile.account_id)) {
-      avatarMap.set(profile.account_id, profile.avatar_media_url)
-    }
-  })
-
-  return enrichedTweets.map((tweet, index) => ({
-    ...tweet,
-    avatar: avatarMap.get(tweets[index]?.account_id) ?? null,
-  }))
+  return fetchClickHousePortalStream(limit, cursor)
 }
 
 interface PortalMediaRow {
@@ -622,12 +650,17 @@ const getCachedCorpusSnapshot = unstable_cache(
 )
 const getCachedStatsSnapshot = unstable_cache(
   async (_sourceKey: string) => computePortalStatsSnapshot(),
-  ['portal-stats-snapshot-v5'],
+  ['portal-stats-snapshot-v6'],
   { revalidate: 300 },
 )
 const getCachedInitialStream = unstable_cache(
   async (_sourceKey: string) => getPortalStreamPage(30),
-  ['portal-initial-stream-v5'],
+  ['portal-initial-stream-v6'],
+  { revalidate: 60 },
+)
+const getCachedHomepageStreamCandidates = unstable_cache(
+  async (_sourceKey: string) => getPortalStreamPage(100),
+  ['portal-home-stream-candidates-v1'],
   { revalidate: 60 },
 )
 const getCachedHistoricalBangers = unstable_cache(
@@ -711,9 +744,15 @@ export async function getPortalData(
   ] = await Promise.all([
     getCachedCorpusSnapshot(sourceKey),
     getCachedStatsSnapshot(sourceKey),
-    getCachedInitialStream(sourceKey),
     view === 'home'
-      ? loadOptionalPortalData('research', getResearchPosts, [])
+      ? getCachedHomepageStreamCandidates(sourceKey)
+      : getCachedInitialStream(sourceKey),
+    view === 'home'
+      ? loadOptionalPortalData(
+          'research',
+          async () => selectFeaturedResearchPosts(await getResearchPosts(24)),
+          [],
+        )
       : Promise.resolve([]),
     view === 'home'
       ? loadOptionalPortalData(
@@ -733,16 +772,24 @@ export async function getPortalData(
   const stats: PortalStats = {
     totalTweets: live.totalTweets,
     accountCount: live.accountCount,
-    streamedToday: live.streamedToday,
+    streamedLast24Hours: live.streamedLast24Hours,
     joinedThisWeek: live.joinedThisWeek,
     firstYear: corpus.firstYear,
     currentYear: corpus.currentYear,
     generatedAt: live.generatedAt,
   }
+  const selectedStream =
+    view === 'home'
+      ? selectHomepageStream(
+          [...initialStream, ...recentBangers],
+          30,
+          new Date(live.generatedAt),
+        )
+      : initialStream
   return {
     stats,
     trends: corpus.trends,
-    initialStream,
+    initialStream: selectedStream,
     research,
     recentBangers,
     historicalBangers,

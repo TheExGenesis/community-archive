@@ -8,23 +8,32 @@
  * you don't want to deal with this.
  */
 
-const { TextDecoder, TextEncoder, ReadableStream } = require('node:util')
+const { TextDecoder, TextEncoder } = require('node:util')
+const { BroadcastChannel } = require('node:worker_threads')
+const {
+  ReadableStream,
+  TransformStream,
+  WritableStream,
+} = require('node:stream/web')
 
 Object.defineProperties(globalThis, {
   TextDecoder: { value: TextDecoder },
   TextEncoder: { value: TextEncoder },
+  BroadcastChannel: { value: BroadcastChannel },
   ReadableStream: { value: ReadableStream },
+  TransformStream: { value: TransformStream },
+  WritableStream: { value: WritableStream },
 })
 
 const { Blob, File } = require('node:buffer')
 const { fetch, Headers, FormData, Request, Response } = require('undici')
 
 Object.defineProperties(globalThis, {
-  fetch: { value: fetch, writable: true },
-  Blob: { value: Blob },
-  File: { value: File },
-  Headers: { value: Headers },
-  FormData: { value: FormData },
-  Request: { value: Request },
-  Response: { value: Response },
+  fetch: { value: fetch, writable: true, configurable: true },
+  Blob: { value: Blob, configurable: true },
+  File: { value: File, configurable: true },
+  Headers: { value: Headers, configurable: true },
+  FormData: { value: FormData, configurable: true },
+  Request: { value: Request, configurable: true },
+  Response: { value: Response, configurable: true },
 })

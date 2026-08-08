@@ -11,6 +11,8 @@ import type { PortalLiveAnalytics } from './analytics'
 import { getResearchPosts } from './research'
 import type {
   PortalData,
+  PortalMedia,
+  PortalQuotedTweet,
   PortalStats,
   PortalTrends,
   PortalTweet,
@@ -162,6 +164,27 @@ async function portalRestRows<T>(
   return data as T[]
 }
 
+async function optionalPortalRestRows<T>(
+  table: string,
+  params: URLSearchParams,
+  label: string,
+): Promise<T[]> {
+  return (await optionalPortalRestResult<T>(table, params, label)).rows
+}
+
+async function optionalPortalRestResult<T>(
+  table: string,
+  params: URLSearchParams,
+  label: string,
+): Promise<{ rows: T[]; failed: boolean }> {
+  try {
+    return { rows: await portalRestRows<T>(table, params), failed: false }
+  } catch (error) {
+    console.error(`Portal ${label} query failed:`, error)
+    return { rows: [], failed: true }
+  }
+}
+
 function exactCount(response: Response, label: string): number {
   const contentRange = response.headers.get('content-range')
   const countText = contentRange?.split('/').at(-1)
@@ -267,40 +290,206 @@ async function toPortalTweets(tweets: any[]): Promise<PortalTweet[]> {
   const accountIds = Array.from(
     new Set(tweets.map((tweet: any) => tweet.account_id).filter(Boolean)),
   )
-  const avatarMap = new Map<string, string>()
+  const profilesPromise =
+    accountIds.length > 0
+      ? optionalPortalRestRows<any>(
+          'all_profile',
+          new URLSearchParams({
+            select: 'account_id,avatar_media_url',
+            account_id: `in.(${accountIds.join(',')})`,
+            order: 'archive_upload_id.desc',
+          }),
+          'avatar',
+        )
+      : Promise.resolve([])
 
-  if (accountIds.length > 0) {
-    try {
-      const profiles = await portalRestRows<any>(
-        'all_profile',
-        new URLSearchParams({
-          select: 'account_id,avatar_media_url',
-          account_id: `in.(${accountIds.join(',')})`,
-          order: 'archive_upload_id.desc',
-        }),
-      )
-      profiles.forEach((profile: any) => {
-        if (profile.avatar_media_url && !avatarMap.has(profile.account_id)) {
-          avatarMap.set(profile.account_id, profile.avatar_media_url)
-        }
-      })
-    } catch (error) {
-      console.error('Portal avatar query failed:', error)
-    }
-  }
-
-  return tweets.map((tweet: any) => {
+  const portalTweets = tweets.map((tweet: any): PortalTweet => {
     const account = accountOf(tweet)
     return {
       id: tweet.tweet_id,
       username: account?.username ?? 'unknown',
       name: account?.account_display_name ?? account?.username ?? 'Unknown',
-      avatar: avatarMap.get(tweet.account_id) ?? null,
+      avatar: null,
       text: tweet.full_text ?? '',
       observedAt: tweet.updated_at ?? tweet.created_at,
       createdAt: tweet.created_at,
       likes: tweet.favorite_count ?? 0,
       rts: tweet.retweet_count ?? 0,
+    }
+  })
+
+  const [profiles, enrichedTweets] = await Promise.all([
+    profilesPromise,
+    enrichPortalTweets(portalTweets),
+  ])
+  const avatarMap = new Map<string, string>()
+  profiles.forEach((profile: any) => {
+    if (profile.avatar_media_url && !avatarMap.has(profile.account_id)) {
+      avatarMap.set(profile.account_id, profile.avatar_media_url)
+    }
+  })
+
+  return enrichedTweets.map((tweet, index) => ({
+    ...tweet,
+    avatar: avatarMap.get(tweets[index]?.account_id) ?? null,
+  }))
+}
+
+interface PortalMediaRow {
+  tweet_id: string
+  media_url: string
+  media_type: string
+  width: number | null
+  height: number | null
+}
+
+interface PortalQuoteRelationRow {
+  tweet_id: string
+  quoted_tweet_id: string
+}
+
+interface PortalQuotedTweetRow {
+  tweet_id: string
+  created_at: string
+  full_text: string
+  retweet_count: number | null
+  favorite_count: number | null
+  username: string | null
+  account_display_name: string | null
+  avatar_media_url: string | null
+}
+
+function portalIdFilter(ids: string[]): string | null {
+  const safeIds = Array.from(new Set(ids.filter((id) => /^\d{1,32}$/.test(id))))
+  return safeIds.length > 0 ? `in.(${safeIds.join(',')})` : null
+}
+
+function portalCount(value: number | null): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : 0
+}
+
+function mediaByTweet(rows: PortalMediaRow[]): Map<string, PortalMedia[]> {
+  const grouped = new Map<string, PortalMedia[]>()
+  for (const row of rows) {
+    if (!row.media_url || !row.media_type) continue
+    const media = grouped.get(row.tweet_id) ?? []
+    media.push({
+      url: row.media_url,
+      type: row.media_type,
+      ...(row.width && row.width > 0 ? { width: row.width } : {}),
+      ...(row.height && row.height > 0 ? { height: row.height } : {}),
+    })
+    grouped.set(row.tweet_id, media)
+  }
+  return grouped
+}
+
+/** Attach image and quoted-tweet data to portal rows in bounded batch reads. */
+export async function enrichPortalTweets(
+  tweets: PortalTweet[],
+): Promise<PortalTweet[]> {
+  const tweetIdFilter = portalIdFilter(tweets.map(({ id }) => id))
+  if (!tweetIdFilter) return tweets
+
+  const [mediaRows, quoteRelations] = await Promise.all([
+    optionalPortalRestRows<PortalMediaRow>(
+      'tweet_media',
+      new URLSearchParams({
+        select: 'tweet_id,media_url,media_type,width,height',
+        tweet_id: tweetIdFilter,
+        order: 'media_id.asc',
+      }),
+      'media',
+    ),
+    optionalPortalRestRows<PortalQuoteRelationRow>(
+      'quote_tweets',
+      new URLSearchParams({
+        select: 'tweet_id,quoted_tweet_id',
+        tweet_id: tweetIdFilter,
+      }),
+      'quote relationship',
+    ),
+  ])
+
+  const quoteByTweetId = new Map(
+    quoteRelations.map((row) => [row.tweet_id, row.quoted_tweet_id]),
+  )
+  const quotedTweetIdFilter = portalIdFilter(
+    quoteRelations.map(({ quoted_tweet_id }) => quoted_tweet_id),
+  )
+  const ownMediaByTweetId = mediaByTweet(mediaRows)
+
+  if (!quotedTweetIdFilter) {
+    return tweets.map((tweet) => ({
+      ...tweet,
+      media: ownMediaByTweetId.get(tweet.id) ?? tweet.media ?? [],
+    }))
+  }
+
+  const [quotedResult, quotedMediaRows] = await Promise.all([
+    optionalPortalRestResult<PortalQuotedTweetRow>(
+      'enriched_tweets',
+      new URLSearchParams({
+        select:
+          'tweet_id,created_at,full_text,retweet_count,favorite_count,username,account_display_name,avatar_media_url',
+        tweet_id: quotedTweetIdFilter,
+      }),
+      'quoted tweet',
+    ),
+    optionalPortalRestRows<PortalMediaRow>(
+      'tweet_media',
+      new URLSearchParams({
+        select: 'tweet_id,media_url,media_type,width,height',
+        tweet_id: quotedTweetIdFilter,
+        order: 'media_id.asc',
+      }),
+      'quoted tweet media',
+    ),
+  ])
+
+  const quotedMediaByTweetId = mediaByTweet(quotedMediaRows)
+  const quotedTweets = new Map<string, PortalQuotedTweet>()
+  for (const row of quotedResult.rows) {
+    const username = row.username || 'unknown'
+    quotedTweets.set(row.tweet_id, {
+      id: row.tweet_id,
+      username,
+      name: row.account_display_name || username,
+      avatar: row.avatar_media_url,
+      text: row.full_text || '',
+      createdAt: row.created_at,
+      likes: portalCount(row.favorite_count),
+      rts: portalCount(row.retweet_count),
+      media: quotedMediaByTweetId.get(row.tweet_id) ?? [],
+    })
+  }
+
+  return tweets.map((tweet) => {
+    const quotedTweetId = quoteByTweetId.get(tweet.id)
+    const quotedTweet = quotedTweetId
+      ? (quotedTweets.get(quotedTweetId) ??
+        (quotedResult.failed
+          ? undefined
+          : {
+              id: quotedTweetId,
+              username: 'unknown',
+              name: 'Unknown',
+              avatar: null,
+              text: '',
+              createdAt: tweet.createdAt,
+              likes: 0,
+              rts: 0,
+              media: [],
+              isDeleted: true,
+            }))
+      : undefined
+
+    return {
+      ...tweet,
+      media: ownMediaByTweetId.get(tweet.id) ?? tweet.media ?? [],
+      ...(quotedTweet ? { quotedTweet } : {}),
     }
   })
 }
@@ -434,20 +623,23 @@ const getCachedStatsSnapshot = unstable_cache(
 )
 const getCachedInitialStream = unstable_cache(
   async (_sourceKey: string) => getPortalStreamPage(30),
-  ['portal-initial-stream-v4'],
+  ['portal-initial-stream-v5'],
   { revalidate: 60 },
 )
 const getCachedHistoricalBangers = unstable_cache(
   async (_sourceKey: string, day: string) => {
     const ranked = await fetchPortalHistoricalBangers(100)
-    return selectDailyBangers(ranked, new Date(`${day}T12:00:00.000Z`))
+    return enrichPortalTweets(
+      selectDailyBangers(ranked, new Date(`${day}T12:00:00.000Z`)),
+    )
   },
-  ['portal-bangers-v5'],
+  ['portal-bangers-v6'],
   { revalidate: 86_400 },
 )
 const getCachedRecentBangers = unstable_cache(
-  async (_sourceKey: string) => fetchPortalRecentBangers(50, 48),
-  ['portal-recent-bangers-v1'],
+  async (_sourceKey: string) =>
+    enrichPortalTweets(await fetchPortalRecentBangers(50, 48)),
+  ['portal-recent-bangers-v2'],
   { revalidate: 1_800 },
 )
 

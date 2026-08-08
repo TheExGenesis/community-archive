@@ -10,7 +10,10 @@ const commonConfig = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   transform: {
-    '^.+\\.(t|j)sx?$': '@swc/jest',
+    '^.+\\.(t|j)sx?$': [
+      '@swc/jest',
+      { jsc: { transform: { react: { runtime: 'automatic' } } } },
+    ],
   },
 }
 
@@ -22,7 +25,7 @@ const customJestConfig = {
       testEnvironment: 'node',
       testMatch: [
         '<rootDir>/src/lib/**/*.test.{js,jsx,ts,tsx}',
-        '<rootDir>/tests/**/*.test.{js,jsx,ts,tsx}'
+        '<rootDir>/tests/**/*.test.{js,jsx,ts,tsx}',
       ],
       setupFilesAfterEnv: ['<rootDir>/jest.setup.server.ts'],
     },
@@ -30,10 +33,13 @@ const customJestConfig = {
       ...commonConfig,
       displayName: 'client',
       testEnvironment: 'jsdom',
-      testMatch: [
-        '<rootDir>/src/**/*.test.{js,jsx,ts,tsx}',
-        '!<rootDir>/src/lib/**/*.test.{js,jsx,ts,tsx}',
-      ],
+      // Client tests use jsdom, but the shared MSW lifecycle runs the
+      // node-only setupServer entry from jest.setup.ts.
+      testEnvironmentOptions: {
+        customExportConditions: ['node', 'node-addons'],
+      },
+      testMatch: ['<rootDir>/src/**/*.test.{js,jsx,ts,tsx}'],
+      testPathIgnorePatterns: ['<rootDir>/src/lib/'],
       setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
     },
   ],

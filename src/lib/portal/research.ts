@@ -41,6 +41,30 @@ const isRelevant = (title: string): boolean => {
   return RELEVANT_TITLE_KEYWORDS.some((k) => lower.includes(k))
 }
 
+const FEATURED_RESEARCH_TITLES = [
+  'agentic taste modeling',
+  'a theory of tpot',
+  'opportunity mining',
+  'discovering the postrat canon',
+] as const
+
+/** Select the four editorial homepage posts in their intended display order. */
+export function selectFeaturedResearchPosts(
+  posts: ResearchPost[],
+): ResearchPost[] {
+  const remaining = new Set(posts.map((post) => post.url))
+  return FEATURED_RESEARCH_TITLES.flatMap((title): ResearchPost[] => {
+    const post = posts.find(
+      (candidate) =>
+        remaining.has(candidate.url) &&
+        candidate.title.trim().toLocaleLowerCase().includes(title),
+    )
+    if (!post) return []
+    remaining.delete(post.url)
+    return [post]
+  })
+}
+
 const decodeEntities = (s: string): string =>
   s
     .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))

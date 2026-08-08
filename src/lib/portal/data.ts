@@ -11,7 +11,7 @@ import {
   fetchPortalTrends,
 } from './analytics'
 import type { PortalLiveAnalytics } from './analytics'
-import { getResearchPosts } from './research'
+import { getResearchPosts, selectFeaturedResearchPosts } from './research'
 import { selectHomepageStream } from './stream'
 import type {
   PortalData,
@@ -732,7 +732,11 @@ export async function getPortalData(
       ? getCachedHomepageStreamCandidates(sourceKey)
       : getCachedInitialStream(sourceKey),
     view === 'home'
-      ? loadOptionalPortalData('research', getResearchPosts, [])
+      ? loadOptionalPortalData(
+          'research',
+          async () => selectFeaturedResearchPosts(await getResearchPosts(24)),
+          [],
+        )
       : Promise.resolve([]),
     view === 'home'
       ? loadOptionalPortalData(

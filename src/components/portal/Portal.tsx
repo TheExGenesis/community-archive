@@ -421,21 +421,40 @@ export default function Portal({
                   action={{ label: 'Trends explorer', href: '/stream#trends' }}
                 />
                 <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
+                  {weeklyBars.length > 0 && (
+                    <div
+                      className={`flex items-center gap-3 pb-1 text-[10px] font-medium uppercase tracking-wide ${MUTED}`}
+                    >
+                      <span className="w-[90px] sm:w-[110px]" />
+                      <span className="w-[54px] text-right">7d tweets</span>
+                      <span className="flex-1">Relative volume</span>
+                      <span className="w-[52px] text-right">7d change</span>
+                    </div>
+                  )}
                   {weeklyBars.map((b) => (
                     <div
                       key={b.term}
                       className="flex items-center gap-3 py-[5px]"
                     >
-                      <span className="w-[130px] truncate text-[13px] font-semibold">
+                      <span className="w-[90px] truncate text-[13px] font-semibold sm:w-[110px]">
                         {b.term}
                       </span>
-                      <div className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]">
+                      <span className="w-[54px] text-right text-[12px] tabular-nums text-muted-foreground">
+                        {b.last7.toLocaleString('en-US')}
+                      </span>
+                      <div
+                        className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]"
+                        role="img"
+                        aria-label={`${b.term}: ${b.last7.toLocaleString('en-US')} tweets in the last seven days`}
+                        title={`${b.last7.toLocaleString('en-US')} tweets in the last 7 days; bar is relative to ${weeklyBars[0].term}`}
+                      >
                         <div
                           className="h-full rounded bg-brand"
                           style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
                         />
                       </div>
                       <span
+                        title={`${b.last7.toLocaleString('en-US')} tweets vs ${b.prev7.toLocaleString('en-US')} in the previous 7 days`}
                         className={`w-[52px] text-right text-[12px] font-bold tabular-nums ${
                           b.status === 'inactive'
                             ? MUTED

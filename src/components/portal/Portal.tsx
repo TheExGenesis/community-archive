@@ -24,6 +24,10 @@ import {
   PORTAL_STREAM_POLL_INTERVAL_MS,
 } from './live'
 import HomepageSearch from '@/components/HomepageSearch'
+import {
+  comparePortalTweetChronology,
+  selectHomepageStream,
+} from '@/lib/portal/stream'
 
 export type PortalView = 'home' | 'stream'
 
@@ -41,6 +45,10 @@ const fmtDelta = (term: TermWeek) => {
   return `${term.deltaPct >= 0 ? '+' : '−'}${Math.abs(term.deltaPct)}%`
 }
 
+function compareTweetIds(left: string, right: string): number {
+  return left.length - right.length || left.localeCompare(right)
+}
+
 function newestCursor(tweets: PortalTweet[]) {
   return tweets.reduce<{ observedAt: string; id: string } | null>(
     (latest, tweet) => {
@@ -48,7 +56,10 @@ function newestCursor(tweets: PortalTweet[]) {
       const timeDiff =
         new Date(tweet.observedAt).getTime() -
         new Date(latest.observedAt).getTime()
-      if (timeDiff > 0 || (timeDiff === 0 && tweet.id > latest.id)) {
+      if (
+        timeDiff > 0 ||
+        (timeDiff === 0 && compareTweetIds(tweet.id, latest.id) > 0)
+      ) {
         return { observedAt: tweet.observedAt, id: tweet.id }
       }
       return latest
@@ -58,15 +69,8 @@ function newestCursor(tweets: PortalTweet[]) {
 }
 
 function oldestPageCursor(tweets: PortalTweet[]) {
-  const oldest = [...tweets].sort(compareTweetChronology).at(-1)
+  const oldest = [...tweets].sort(comparePortalTweetChronology).at(-1)
   return oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null
-}
-
-function compareTweetChronology(left: PortalTweet, right: PortalTweet) {
-  return (
-    new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime() ||
-    right.id.localeCompare(left.id)
-  )
 }
 
 function Chip({
@@ -375,7 +379,7 @@ export default function Portal({
       older.forEach((tweet) => seenIds.current.add(tweet.id))
       if (older.length > 0) {
         setVisible((current) =>
-          [...current, ...older].sort(compareTweetChronology),
+          [...current, ...older].sort(comparePortalTweetChronology),
         )
       }
       pageCursor.current = nextCursor
@@ -417,12 +421,14 @@ export default function Portal({
           .sort(
             (a, b) =>
               new Date(a.observedAt).getTime() -
-                new Date(b.observedAt).getTime() || a.id.localeCompare(b.id),
+                new Date(b.observedAt).getTime() || compareTweetIds(a.id, b.id),
           )
         if (fresh.length > 0) {
           fresh.forEach((t) => seenIds.current.add(t.id))
           setVisible((current) =>
-            [...fresh, ...current].sort(compareTweetChronology),
+            view === 'home'
+              ? selectHomepageStream([...fresh, ...current], 30)
+              : [...fresh, ...current].sort(comparePortalTweetChronology),
           )
         }
       } catch {
@@ -440,7 +446,7 @@ export default function Portal({
       controller.abort()
       window.clearInterval(interval)
     }
-  }, [])
+  }, [view])
 
   useEffect(() => {
     if (view !== 'stream' || !hasMore) return

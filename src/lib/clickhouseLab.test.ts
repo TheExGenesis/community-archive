@@ -131,4 +131,17 @@ describe('ClickHouse staging lab guard', () => {
       'https://stream.example/analytics/recent-bangers?limit=50&hours=48',
     )
   })
+
+  test('allows only paired portal stream cursor inputs', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['portal-stream'],
+      new URLSearchParams(
+        'limit=100&after=2026-08-07T12%3A00%3A00.000Z&after_id=42&raw_sql=DROP',
+      ),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/portal-stream?limit=100&after=2026-08-07T12%3A00%3A00.000Z&after_id=42',
+    )
+  })
 })

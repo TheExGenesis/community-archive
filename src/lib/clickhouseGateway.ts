@@ -64,6 +64,12 @@ export function analyticsGatewayRequestUrl(
     /^[A-Za-z0-9_@]{1,80}$/.test(cleanPath[1])
   ) {
     allowedParams = new Set(['limit'])
+  } else if (
+    cleanPath.length === 2 &&
+    cleanPath[0] === 'tweet' &&
+    /^\d{1,20}$/.test(cleanPath[1])
+  ) {
+    allowedParams = new Set()
   }
 
   if (!allowedParams)

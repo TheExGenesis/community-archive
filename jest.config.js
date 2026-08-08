@@ -8,6 +8,7 @@ const commonConfig = {
   setupFiles: ['<rootDir>/jest.polyfills.js'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^server-only$': '<rootDir>/jest.server-only.js',
   },
   transform: {
     '^.+\\.(t|j)sx?$': [

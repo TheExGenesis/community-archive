@@ -12,8 +12,8 @@ import {
 import { Archive } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { formatNumber } from '@/lib/formatNumber'
-import NextImage from 'next/image'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
+import ImageLightbox from '@/components/ImageLightbox'
 
 export interface TweetMedia {
   media_url: string
@@ -244,18 +244,16 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       return (
         <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
           {renderableMedia.slice(0, 4).map((mediaItem: any, index: number) => (
-            <div
+            <ImageLightbox
               key={index}
-              className="relative h-20 w-28 flex-none overflow-hidden rounded-md border border-border bg-muted sm:h-24 sm:w-36"
-            >
-              <NextImage
-                src={mediaItem.media_url}
-                alt={`Tweet image ${index + 1}`}
-                width={mediaItem.width || 240}
-                height={mediaItem.height || 160}
-                className="h-full w-full object-cover"
-              />
-            </div>
+              src={mediaItem.media_url}
+              alt={`Tweet image ${index + 1}`}
+              width={mediaItem.width || 1200}
+              height={mediaItem.height || 800}
+              sizes="(max-width: 640px) 7rem, 9rem"
+              className="h-20 w-28 flex-none rounded-md border border-border bg-muted sm:h-24 sm:w-36"
+              imageClassName="h-full w-full object-cover transition-transform hover:scale-[1.02]"
+            />
           ))}
           {renderableMedia.length > 4 && (
             <div className="flex h-20 w-20 flex-none items-center justify-center rounded-md border border-border bg-muted text-xs text-muted-foreground sm:h-24">
@@ -268,21 +266,23 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
 
     return (
       <div
-        className={`my-3 grid gap-2 ${mediaArray.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
+        className={`my-3 grid gap-2 ${renderableMedia.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
       >
         {renderableMedia.map((mediaItem: any, index: number) => (
-          <div
+          <ImageLightbox
             key={index}
-            className="relative overflow-hidden rounded-lg border border-border bg-muted"
-          >
-            <NextImage
-              src={mediaItem.media_url}
-              alt={`Tweet image ${index + 1}`}
-              width={mediaItem.width || 600}
-              height={mediaItem.height || 400}
-              className="min-h-40 h-full max-h-96 w-full object-cover"
-            />
-          </div>
+            src={mediaItem.media_url}
+            alt={`Tweet image ${index + 1}`}
+            width={mediaItem.width || 1200}
+            height={mediaItem.height || 800}
+            sizes={
+              renderableMedia.length > 1
+                ? '(max-width: 640px) 50vw, 360px'
+                : '(max-width: 640px) 100vw, 720px'
+            }
+            className="rounded-lg border border-border bg-muted"
+            imageClassName="h-full max-h-96 min-h-40 w-full object-cover transition-transform hover:scale-[1.01]"
+          />
         ))}
       </div>
     )
@@ -308,8 +308,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
     // Border + marker for syndication-hydrated quotes so it's clear the data isn't
     // from this archive.
     const externalClasses = quotedTweet.from_external
-      ? 'border-dashed border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-900/10'
-      : 'border-border bg-muted dark:bg-card'
+      ? 'border-dashed border-amber-300 bg-background dark:border-amber-700 dark:bg-card'
+      : 'border-border bg-background dark:bg-card'
 
     return (
       <div
@@ -377,24 +377,24 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                   )
                   .slice(0, compact ? 3 : undefined)
                   .map((mediaItem: any, index: number) => (
-                    <div
+                    <ImageLightbox
                       key={index}
+                      src={mediaItem.media_url}
+                      alt={`Quoted tweet image ${index + 1}`}
+                      width={mediaItem.width || 1200}
+                      height={mediaItem.height || 800}
+                      sizes={
+                        compact ? '6rem' : '(max-width: 640px) 100vw, 640px'
+                      }
                       className={`relative overflow-hidden rounded-md border dark:border-border ${
                         compact ? 'h-16 w-24 flex-none' : ''
                       }`}
-                    >
-                      <NextImage
-                        src={mediaItem.media_url}
-                        alt={`Quoted tweet image ${index + 1}`}
-                        width={300}
-                        height={200}
-                        className={
-                          compact
-                            ? 'h-full w-full object-cover'
-                            : 'h-auto max-h-48 w-full object-contain'
-                        }
-                      />
-                    </div>
+                      imageClassName={
+                        compact
+                          ? 'h-full w-full object-cover transition-transform hover:scale-[1.02]'
+                          : 'h-auto max-h-48 w-full object-contain transition-transform hover:scale-[1.01]'
+                      }
+                    />
                   ))}
               </div>
             )}

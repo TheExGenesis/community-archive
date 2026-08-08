@@ -1,3 +1,23 @@
+export interface PortalMedia {
+  url: string
+  type: string
+  width?: number
+  height?: number
+}
+
+export interface PortalQuotedTweet {
+  id: string
+  username: string
+  name: string
+  avatar: string | null
+  text: string
+  createdAt: string
+  likes: number
+  rts: number
+  media: PortalMedia[]
+  isDeleted?: boolean
+}
+
 export interface PortalTweet {
   id: string
   username: string
@@ -10,6 +30,8 @@ export interface PortalTweet {
   createdAt: string
   likes: number
   rts: number
+  media?: PortalMedia[]
+  quotedTweet?: PortalQuotedTweet
   /** Distinct non-self quote tweets from archive uploaders and opt-ins. */
   quoteCount?: number
 }

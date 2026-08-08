@@ -489,7 +489,10 @@ export default function Portal({
 
                   {historicalBanger && (
                     <div className={`${CARD} min-w-0 overflow-hidden`}>
-                      <PanelHeader title="Historical banger · near this day" />
+                      <PanelHeader
+                        title="Historical banger · near this day"
+                        action={{ label: 'More bangers', href: '/bangers' }}
+                      />
                       <TweetRow tweet={historicalBanger} collapsible showDate />
                     </div>
                   )}

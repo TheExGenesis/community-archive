@@ -103,7 +103,7 @@ interface ClickHouseTopQuotesResponse {
 
 export interface PortalLiveAnalytics {
   totalTweets: number
-  streamedToday: number
+  streamedLast24Hours: number
   generatedAt: string
   latestObservedAt: string | null
 }
@@ -356,7 +356,7 @@ export async function fetchPortalLiveAnalytics(
   now = new Date(),
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
 ): Promise<PortalLiveAnalytics> {
-  const start = startOfUtcDay(now)
+  const start = daysBefore(now, 1)
   const streamParams = new URLSearchParams({
     start: start.toISOString(),
     end: now.toISOString(),
@@ -382,9 +382,9 @@ export async function fetchPortalLiveAnalytics(
 
   return {
     totalTweets: safeCount(summary.data.totalTweets, 'tweet count'),
-    streamedToday: safeCount(
+    streamedLast24Hours: safeCount(
       stream.summary.totalTweets,
-      'streamed-today count',
+      'last-24-hours streamed count',
     ),
     generatedAt: safeTimestamp(summary.data.collectedAt, 'snapshot timestamp'),
     latestObservedAt: stream.summary.latestObservedAt

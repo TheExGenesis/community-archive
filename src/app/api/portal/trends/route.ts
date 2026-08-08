@@ -5,6 +5,7 @@ import {
   portalTrendTokens,
 } from '@/lib/portal/analytics'
 import { getIsMember } from '@/lib/portal/auth'
+import { enrichPortalTweets } from '@/lib/portal/data'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -61,7 +62,9 @@ export async function GET(request: NextRequest) {
         throw new Error('Include at least one term to load matching tweets')
       }
       return privateJson({
-        tweets: await fetchPortalTrendEvidence(includeTerms, excludeTerms, 30),
+        tweets: await enrichPortalTweets(
+          await fetchPortalTrendEvidence(includeTerms, excludeTerms, 30),
+        ),
       })
     }
 

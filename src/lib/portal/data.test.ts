@@ -151,6 +151,16 @@ describe('portal REST reads', () => {
           },
         ],
       } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      } as Response)
 
     await expect(getPortalStreamPage(30)).resolves.toEqual([
       {
@@ -163,10 +173,11 @@ describe('portal REST reads', () => {
         createdAt: '2026-08-07T19:00:00.000Z',
         likes: 3,
         rts: 2,
+        media: [],
       },
     ])
 
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
     const [tweetsUrl, tweetsInit] = fetchMock.mock.calls[0]
     expect(
       String(tweetsUrl).startsWith(
@@ -185,6 +196,129 @@ describe('portal REST reads', () => {
       },
     })
     expect(tweetsInit?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  test('batch-loads stream images and quoted tweets', async () => {
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async (input): Promise<Response> => {
+        const url = new URL(String(input))
+        const table = url.pathname.split('/').at(-1)
+        const tweetFilter = url.searchParams.get('tweet_id')
+
+        if (table === 'tweets') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                tweet_id: '42',
+                account_id: '7',
+                created_at: '2026-08-07T19:00:00.000Z',
+                updated_at: '2026-08-07T20:00:00.000Z',
+                full_text: 'A quote with a picture',
+                retweet_count: 2,
+                favorite_count: 3,
+                account: {
+                  username: 'archive_member',
+                  account_display_name: 'Archive Member',
+                },
+              },
+            ],
+          } as Response
+        }
+        if (table === 'all_profile') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => [],
+          } as Response
+        }
+        if (table === 'quote_tweets') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => [{ tweet_id: '42', quoted_tweet_id: '99' }],
+          } as Response
+        }
+        if (table === 'enriched_tweets') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                tweet_id: '99',
+                created_at: '2026-08-06T19:00:00.000Z',
+                full_text: 'The quoted thought',
+                retweet_count: 4,
+                favorite_count: 12,
+                username: 'quoted_member',
+                account_display_name: 'Quoted Member',
+                avatar_media_url: 'https://example.com/quoted-avatar.jpg',
+              },
+            ],
+          } as Response
+        }
+        if (table === 'tweet_media' && tweetFilter === 'in.(42)') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                tweet_id: '42',
+                media_url: 'https://pbs.twimg.com/media/main.jpg',
+                media_type: 'photo',
+                width: 1200,
+                height: 800,
+              },
+            ],
+          } as Response
+        }
+        if (table === 'tweet_media' && tweetFilter === 'in.(99)') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                tweet_id: '99',
+                media_url: 'https://pbs.twimg.com/media/quoted.jpg',
+                media_type: 'photo',
+                width: null,
+                height: null,
+              },
+            ],
+          } as Response
+        }
+        throw new Error(`Unexpected portal request: ${url}`)
+      })
+
+    const [tweet] = await getPortalStreamPage(30)
+
+    expect(tweet.media).toEqual([
+      {
+        url: 'https://pbs.twimg.com/media/main.jpg',
+        type: 'photo',
+        width: 1200,
+        height: 800,
+      },
+    ])
+    expect(tweet.quotedTweet).toEqual({
+      id: '99',
+      username: 'quoted_member',
+      name: 'Quoted Member',
+      avatar: 'https://example.com/quoted-avatar.jpg',
+      text: 'The quoted thought',
+      createdAt: '2026-08-06T19:00:00.000Z',
+      likes: 12,
+      rts: 4,
+      media: [
+        {
+          url: 'https://pbs.twimg.com/media/quoted.jpg',
+          type: 'photo',
+        },
+      ],
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(6)
   })
 
   test('encodes the composite polling cursor as a PostgREST or filter', async () => {

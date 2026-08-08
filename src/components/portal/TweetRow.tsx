@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import ImageLightbox from '@/components/ImageLightbox'
+import TweetAvatarImage from '@/components/TweetAvatarImage'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { PortalMedia, PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
 
 const HUES = [262, 32, 145, 4, 155, 200, 217, 88, 240, 190, 340, 45, 280, 20]
@@ -45,35 +47,25 @@ export function TweetAvatar({
   tweet,
   size = 34,
 }: {
-  tweet: Pick<PortalTweet, 'username' | 'avatar'>
+  tweet: Pick<PortalTweet, 'id' | 'username' | 'avatar'>
   size?: number
 }) {
   const initials = tweet.username.slice(0, 2).toUpperCase()
-  if (tweet.avatar) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+  return (
+    <Avatar className="flex-shrink-0" style={{ width: size, height: size }}>
+      <TweetAvatarImage
         src={tweet.avatar}
         alt=""
-        width={size}
-        height={size}
-        loading="lazy"
-        className="flex-shrink-0 rounded-full object-cover"
-        style={{ width: size, height: size }}
+        username={tweet.username}
+        tweetId={tweet.id}
       />
-    )
-  }
-  return (
-    <div
-      className="flex flex-shrink-0 items-center justify-center rounded-full text-[12px] font-extrabold text-white"
-      style={{
-        width: size,
-        height: size,
-        background: `hsl(${avatarHue(tweet.username)},42%,42%)`,
-      }}
-    >
-      {initials}
-    </div>
+      <AvatarFallback
+        className="text-[12px] font-extrabold text-white"
+        style={{ background: `hsl(${avatarHue(tweet.username)},42%,42%)` }}
+      >
+        {initials}
+      </AvatarFallback>
+    </Avatar>
   )
 }
 

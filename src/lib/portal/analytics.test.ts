@@ -1,4 +1,5 @@
 import {
+  fetchPortalBangersPage,
   fetchPortalTrendEvidence,
   fetchPortalTrendSeries,
   fetchPortalLiveAnalytics,
@@ -313,6 +314,7 @@ describe('ClickHouse-backed portal analytics', () => {
           fullText: 'A historical banger',
           favoriteCount: '500',
           retweetCount: '25',
+          avatarMediaUrl: 'https://pbs.twimg.com/alice.jpg',
         },
       ],
     })) as unknown as AnalyticsFetcher
@@ -322,6 +324,7 @@ describe('ClickHouse-backed portal analytics', () => {
         id: '123',
         quoteCount: 42,
         createdAt: '2024-08-07T12:00:00.000Z',
+        avatar: 'https://pbs.twimg.com/alice.jpg',
       }),
     ])
     expect(fetcher).toHaveBeenCalledWith(
@@ -333,6 +336,72 @@ describe('ClickHouse-backed portal analytics', () => {
         quote_ca_users_only: 'true',
       }),
       { timeoutMs: 30_000, revalidate: 86_400 },
+    )
+  })
+
+  test('maps a searched, scoped page with pagination metadata', async () => {
+    const fetcher = jest.fn(async () => ({
+      data: [
+        {
+          tweetId: '123',
+          quoteCount: '42',
+          accountId: '99',
+          username: 'alice',
+          displayName: 'Alice',
+          avatarMediaUrl: null,
+          createdAt: '2024-08-07 12:00:00.000',
+          fullText: 'A historical banger',
+          favoriteCount: '500',
+          retweetCount: '25',
+        },
+      ],
+      pagination: {
+        limit: 60,
+        offset: 60,
+        nextOffset: 120,
+        totalAvailable: 183,
+        snapshotSize: 1600,
+        yearCounts: [{ year: 2024, count: 22 }],
+        candidateRankingTruncated: true,
+      },
+    })) as unknown as AnalyticsFetcher
+
+    await expect(
+      fetchPortalBangersPage(
+        {
+          offset: 60,
+          sort: 'recent',
+          scope: 'members',
+          year: 2024,
+          query: '  historical  ',
+        },
+        fetcher,
+      ),
+    ).resolves.toEqual({
+      tweets: [expect.objectContaining({ id: '123', quoteCount: 42 })],
+      pagination: {
+        limit: 60,
+        offset: 60,
+        nextOffset: 120,
+        totalAvailable: 183,
+        snapshotSize: 1600,
+        yearCounts: [{ year: 2024, count: 22 }],
+        candidateRankingTruncated: true,
+      },
+    })
+    expect(fetcher).toHaveBeenCalledWith(
+      ['top-quotes'],
+      new URLSearchParams({
+        limit: '60',
+        offset: '60',
+        sort: 'recent',
+        exclude_self: 'true',
+        target_ca_users_only: 'true',
+        quote_ca_users_only: 'true',
+        year: '2024',
+        q: 'historical',
+      }),
+      { timeoutMs: 30_000 },
     )
   })
 })

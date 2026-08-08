@@ -1,6 +1,14 @@
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 import { CHART_TERMS, FIRST_TREND_YEAR, TREND_COLORS } from './trendConfig'
-import type { PortalTrends, PortalTweet, TermSeries, TermWeek } from './types'
+import type {
+  PortalBangersPage,
+  PortalBangersScope,
+  PortalBangersSort,
+  PortalTrends,
+  PortalTweet,
+  TermSeries,
+  TermWeek,
+} from './types'
 
 /** Wider watchlist used for the weekly rising/cooling panels. */
 export const WATCHLIST = [
@@ -95,10 +103,20 @@ interface ClickHouseTopQuote {
   fullText: string | null
   favoriteCount: string | number
   retweetCount: string | number
+  avatarMediaUrl: string | null
 }
 
 interface ClickHouseTopQuotesResponse {
   data: ClickHouseTopQuote[]
+  pagination?: {
+    limit: number
+    offset: number
+    nextOffset: number | null
+    totalAvailable: number
+    snapshotSize: number
+    yearCounts: Array<{ year: number; count: number }>
+    candidateRankingTruncated: boolean
+  }
 }
 
 export interface PortalLiveAnalytics {
@@ -441,21 +459,9 @@ export async function fetchPortalRecentBangers(
 }
 
 /** Canonical all-time banger ranking used for the historical daily choice. */
-export async function fetchPortalHistoricalBangers(
-  limit = 100,
-  fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
-): Promise<PortalTweet[]> {
-  const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)))
-  const response = await fetcher<ClickHouseTopQuotesResponse>(
-    ['top-quotes'],
-    new URLSearchParams({
-      limit: String(safeLimit),
-      exclude_self: 'true',
-      target_ca_users_only: 'false',
-      quote_ca_users_only: 'true',
-    }),
-    { timeoutMs: 30_000, revalidate: 86_400 },
-  )
+function mapHistoricalBangers(
+  response: ClickHouseTopQuotesResponse,
+): PortalTweet[] {
   if (!Array.isArray(response.data)) {
     throw new Error('ClickHouse top-quotes returned an invalid response')
   }
@@ -479,7 +485,7 @@ export async function fetchPortalHistoricalBangers(
       id: row.tweetId,
       username,
       name: row.displayName || username,
-      avatar: null,
+      avatar: row.avatarMediaUrl || null,
       text: row.fullText,
       observedAt: createdAt,
       createdAt,
@@ -488,6 +494,100 @@ export async function fetchPortalHistoricalBangers(
       quoteCount: safeCount(row.quoteCount, 'historical banger quote count'),
     }
   })
+}
+
+function safeBangersPagination(
+  value: ClickHouseTopQuotesResponse['pagination'],
+): PortalBangersPage['pagination'] {
+  if (!value || !Array.isArray(value.yearCounts)) {
+    throw new Error('ClickHouse top-quotes returned invalid pagination')
+  }
+  const limit = safeCount(value.limit, 'banger page limit')
+  const offset = safeCount(value.offset, 'banger page offset')
+  const totalAvailable = safeCount(
+    value.totalAvailable,
+    'banger total available',
+  )
+  const snapshotSize = safeCount(value.snapshotSize, 'banger snapshot size')
+  const nextOffset =
+    value.nextOffset === null
+      ? null
+      : safeCount(value.nextOffset, 'banger next offset')
+  const yearCounts = value.yearCounts.map(({ year, count }) => {
+    if (!Number.isInteger(year) || year < 2006 || year > 2200) {
+      throw new Error('ClickHouse top-quotes returned an invalid banger year')
+    }
+    return { year, count: safeCount(count, 'banger year count') }
+  })
+
+  return {
+    limit,
+    offset,
+    nextOffset,
+    totalAvailable,
+    snapshotSize,
+    yearCounts,
+    candidateRankingTruncated: value.candidateRankingTruncated === true,
+  }
+}
+
+export async function fetchPortalBangersPage(
+  {
+    limit = 60,
+    offset = 0,
+    sort = 'quotes',
+    scope = 'all',
+    year,
+    query = '',
+  }: {
+    limit?: number
+    offset?: number
+    sort?: PortalBangersSort
+    scope?: PortalBangersScope
+    year?: number
+    query?: string
+  } = {},
+  fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+): Promise<PortalBangersPage> {
+  const params = new URLSearchParams({
+    limit: String(Math.max(1, Math.min(100, Math.trunc(limit)))),
+    offset: String(Math.max(0, Math.min(5_000, Math.trunc(offset)))),
+    sort: sort === 'recent' ? 'recent' : 'quotes',
+    exclude_self: 'true',
+    target_ca_users_only: scope === 'members' ? 'true' : 'false',
+    quote_ca_users_only: 'true',
+  })
+  if (year !== undefined) params.set('year', String(year))
+  const safeQuery = query.trim().slice(0, 120)
+  if (safeQuery) params.set('q', safeQuery)
+
+  const response = await fetcher<ClickHouseTopQuotesResponse>(
+    ['top-quotes'],
+    params,
+    { timeoutMs: 30_000 },
+  )
+  return {
+    tweets: mapHistoricalBangers(response),
+    pagination: safeBangersPagination(response.pagination),
+  }
+}
+
+export async function fetchPortalHistoricalBangers(
+  limit = 100,
+  fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+): Promise<PortalTweet[]> {
+  const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)))
+  const response = await fetcher<ClickHouseTopQuotesResponse>(
+    ['top-quotes'],
+    new URLSearchParams({
+      limit: String(safeLimit),
+      exclude_self: 'true',
+      target_ca_users_only: 'false',
+      quote_ca_users_only: 'true',
+    }),
+    { timeoutMs: 30_000, revalidate: 86_400 },
+  )
+  return mapHistoricalBangers(response)
 }
 
 export async function fetchPortalTrends(

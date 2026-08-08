@@ -13,6 +13,11 @@ import { PORTAL_ARTICLES } from './articles'
 import { PORTAL_TOOLS } from './tools'
 import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
 import { TweetRow } from './TweetRow'
+import {
+  estimateLiveTweetCount,
+  liveCounterRefreshInterval,
+  PORTAL_STREAM_POLL_INTERVAL_MS,
+} from './live'
 import HomepageSearch from '@/components/HomepageSearch'
 
 export type PortalView = 'home' | 'stream'
@@ -126,11 +131,48 @@ function PanelHeader({
   )
 }
 
-function LiveCounter({ count }: { count: string }) {
+function LiveCounter({
+  count,
+  gain,
+  generatedAt,
+}: {
+  count: number
+  gain: number
+  generatedAt: string
+}) {
+  // Keep the server and first client render identical, then begin projecting
+  // from the analytics snapshot after hydration.
+  const [displayCount, setDisplayCount] = useState(count)
+
+  useEffect(() => {
+    const update = () =>
+      setDisplayCount((current) =>
+        Math.max(
+          current,
+          estimateLiveTweetCount({
+            totalTweets: count,
+            streamedLast24Hours: gain,
+            generatedAt,
+          }),
+        ),
+      )
+    update()
+
+    const intervalMs = liveCounterRefreshInterval(gain)
+    if (intervalMs === null) return
+    const interval = window.setInterval(update, intervalMs)
+    return () => window.clearInterval(interval)
+  }, [count, gain, generatedAt])
+
   return (
-    <span className={`inline-flex items-center gap-[7px] text-[12px] ${MUTED}`}>
+    <span
+      className={`inline-flex items-center gap-[7px] text-[12px] ${MUTED}`}
+      title={`Estimated live total, paced by ${gain.toLocaleString('en-US')} tweets streamed in the last 24 hours`}
+    >
       <span className="h-[7px] w-[7px] animate-pulse rounded-full bg-[#2acf80]" />
-      <span className="tabular-nums">{count} tweets</span>
+      <span className="tabular-nums">
+        {displayCount.toLocaleString('en-US')} tweets
+      </span>
     </span>
   )
 }
@@ -202,7 +244,10 @@ export default function Portal({
 
   useEffect(() => {
     const controller = new AbortController()
-    const poll = setInterval(async () => {
+    let polling = false
+    const poll = async () => {
+      if (polling) return
+      polling = true
       try {
         const params = new URLSearchParams()
         if (updateCursor.current) {
@@ -211,14 +256,16 @@ export default function Portal({
         }
         const res = await fetch(`/api/portal/stream?${params.toString()}`, {
           signal: controller.signal,
+          cache: 'no-store',
         })
         if (!res.ok) return
         const { tweets, updateCursor: nextUpdateCursor } =
           (await res.json()) as {
             tweets: PortalTweet[]
-            updateCursor: { observedAt: string; id: string } | null
+            updateCursor?: { observedAt: string; id: string } | null
           }
-        if (nextUpdateCursor) updateCursor.current = nextUpdateCursor
+        const responseCursor = nextUpdateCursor ?? newestCursor(tweets)
+        if (responseCursor) updateCursor.current = responseCursor
         const fresh = tweets
           .filter((t) => !seenIds.current.has(t.id))
           .sort(
@@ -234,11 +281,18 @@ export default function Portal({
         }
       } catch {
         // network hiccup; try again next poll
+      } finally {
+        polling = false
       }
-    }, 45_000)
+    }
+    void poll()
+    const interval = window.setInterval(
+      () => void poll(),
+      PORTAL_STREAM_POLL_INTERVAL_MS,
+    )
     return () => {
       controller.abort()
-      clearInterval(poll)
+      window.clearInterval(interval)
     }
   }, [])
 
@@ -255,8 +309,6 @@ export default function Portal({
     observer.observe(target)
     return () => observer.disconnect()
   }, [hasMore, loadMore, view])
-
-  const liveCount = stats.totalTweets.toLocaleString('en-US')
 
   // ---- derived trend views ----------------------------------------------
   const weeklyRanked = useMemo(
@@ -365,7 +417,11 @@ export default function Portal({
               Today on the archive
             </h2>
             <span className="flex items-baseline gap-3">
-              <LiveCounter count={liveCount} />
+              <LiveCounter
+                count={stats.totalTweets}
+                gain={stats.streamedLast24Hours}
+                generatedAt={stats.generatedAt}
+              />
               <span className={`text-[12.5px] ${MUTED}`}>{generatedDate}</span>
             </span>
           </div>
@@ -374,7 +430,7 @@ export default function Portal({
             <StatCard
               label="Tweets archived"
               value={stats.totalTweets.toLocaleString('en-US')}
-              note={`+${stats.streamedToday.toLocaleString('en-US')} streamed today`}
+              note={`+${stats.streamedLast24Hours.toLocaleString('en-US')} streamed in the last 24h`}
               noteClass="text-[#16a34a] dark:text-[#2acf80]"
             />
             <StatCard
@@ -504,7 +560,7 @@ export default function Portal({
                   action={{ label: 'All research', href: '/research' }}
                 />
                 <div className="flex flex-col">
-                  {data.research.slice(0, 3).map((post) => (
+                  {data.research.slice(0, 5).map((post) => (
                     <a
                       key={post.url}
                       href={post.url}
@@ -649,7 +705,11 @@ export default function Portal({
                 <h1 className="text-[26px] font-semibold" style={SERIF}>
                   Live stream
                 </h1>
-                <LiveCounter count={liveCount} />
+                <LiveCounter
+                  count={stats.totalTweets}
+                  gain={stats.streamedLast24Hours}
+                  generatedAt={stats.generatedAt}
+                />
               </div>
               <div className={`mb-3.5 text-[13px] ${MUTED}`}>
                 Tweets arriving from the browser-extension firehose, as

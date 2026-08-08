@@ -17,7 +17,7 @@ export interface PortalTweet {
 export interface PortalStats {
   totalTweets: number
   accountCount: number
-  streamedToday: number
+  streamedLast24Hours: number
   joinedThisWeek: number
   firstYear: number
   currentYear: number

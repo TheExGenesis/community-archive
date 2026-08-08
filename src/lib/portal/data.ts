@@ -429,7 +429,7 @@ const getCachedCorpusSnapshot = unstable_cache(
 )
 const getCachedStatsSnapshot = unstable_cache(
   async (_sourceKey: string) => computePortalStatsSnapshot(),
-  ['portal-stats-snapshot-v5'],
+  ['portal-stats-snapshot-v6'],
   { revalidate: 300 },
 )
 const getCachedInitialStream = unstable_cache(
@@ -525,7 +525,7 @@ export async function getPortalData(
   const stats: PortalStats = {
     totalTweets: live.totalTweets,
     accountCount: live.accountCount,
-    streamedToday: live.streamedToday,
+    streamedLast24Hours: live.streamedLast24Hours,
     joinedThisWeek: live.joinedThisWeek,
     firstYear: corpus.firstYear,
     currentYear: corpus.currentYear,

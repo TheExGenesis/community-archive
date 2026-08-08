@@ -642,6 +642,12 @@ const getCachedRecentBangers = unstable_cache(
   ['portal-recent-bangers-v2'],
   { revalidate: 1_800 },
 )
+const getCachedBangersExplorer = unstable_cache(
+  async (_sourceKey: string) =>
+    enrichPortalTweets(await fetchPortalHistoricalBangers(100)),
+  ['portal-bangers-explorer-v1'],
+  { revalidate: 86_400 },
+)
 
 export async function loadOptionalPortalData<T>(
   section: string,
@@ -672,7 +678,7 @@ export async function loadPortalComponentData<T>(
 }
 
 export async function getPortalBangers(): Promise<PortalTweet[]> {
-  return getCachedRecentBangers(portalDataSourceKey())
+  return getCachedBangersExplorer(portalDataSourceKey())
 }
 
 /** Cached corpus-wide seed series for the authenticated trends explorer. */

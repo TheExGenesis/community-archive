@@ -121,6 +121,13 @@ Staging synchronization is automatic; production synchronization is not:
   ClickHouse QA, retrieve the query-gateway bearer token from its authoritative
   host at command runtime without printing or persisting it. Use preview builds
   only for final staging verification.
+- Treat every new or changed query-gateway route as a gateway-first release.
+  Once its focused tests, type-check, bundle, and review are high-confidence,
+  merge and deploy the gateway instead of leaving deployment as a follow-up.
+  Verify gateway health, smoke-test the changed route and one neighboring route
+  with runtime-only authentication, and only then merge or deploy a dependent
+  frontend PR. Link the gateway PR and production verification in the frontend
+  PR so the dependency cannot be mistaken for completed work.
 
 ## Development And Verification
 

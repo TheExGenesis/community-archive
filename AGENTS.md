@@ -99,12 +99,18 @@ Staging synchronization is automatic; production synchronization is not:
 
 ## Analytics Data Sources
 
-- Use ClickHouse for corpus-scale read analytics when a supported gateway
-  endpoint exists, including summaries, trends, stream analytics, and banger
-  discovery. Cache expensive snapshots at an interval appropriate to the UI.
+- Use ClickHouse for corpus-scale read analytics and portal tweet records when
+  a supported gateway endpoint exists, including summaries, trends, stream
+  entries, bangers, and tweet detail payloads. A record surfaced by a
+  ClickHouse-backed portal list must keep using ClickHouse on its detail route;
+  do not rehydrate it from the staging or production Supabase project. If the
+  gateway lacks a required portal corpus endpoint, add a narrow endpoint rather
+  than a production Supabase read fallback. Cache expensive snapshots at an
+  interval appropriate to the UI.
 - Keep Supabase authoritative for authentication, writes, canonical membership,
-  and records not represented in ClickHouse. Do not use the daily ClickHouse
-  `memberAccounts` summary as the live uploader-plus-opt-in count.
+  consent/policy state, editorial application data, and records not represented
+  in ClickHouse. Do not use the daily ClickHouse `memberAccounts` summary as the
+  live uploader-plus-opt-in count.
 - Develop and verify analytics changes locally first. For production-backed
   ClickHouse QA, retrieve the query-gateway bearer token from its authoritative
   host at command runtime without printing or persisting it. Use preview builds

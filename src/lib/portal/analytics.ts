@@ -14,6 +14,21 @@ export const CHART_TERMS: { term: string; color: string }[] = [
   { term: 'ai agents', color: '#e879f9' },
 ]
 
+export const TREND_COLORS = [
+  '#3b82f6',
+  '#f59e0b',
+  '#a78bfa',
+  '#f87171',
+  '#2acf80',
+  '#38bdf8',
+  '#e879f9',
+  '#fb7185',
+  '#14b8a6',
+  '#8b5cf6',
+  '#f97316',
+  '#84cc16',
+]
+
 /** Wider watchlist used for the weekly rising/cooling panels. */
 export const WATCHLIST = [
   'ai agents',
@@ -58,6 +73,25 @@ interface ClickHouseTrendRow {
 
 interface ClickHouseTrendResponse {
   data: ClickHouseTrendRow[]
+}
+
+interface ClickHouseSearchTweet {
+  tweetId: string
+  accountId: string
+  createdAt: string
+  fullText: string
+  favoriteCount: string | number
+  retweetCount: string | number
+  username: string | null
+  accountDisplayName: string | null
+  avatarMediaUrl: string | null
+}
+
+interface ClickHouseSearchResponse {
+  data: {
+    tweets: ClickHouseSearchTweet[]
+    nextOffset: number | null
+  }
 }
 
 interface ClickHouseRecentBanger {
@@ -192,6 +226,157 @@ function ratePerHundredThousand(row: ClickHouseTrendRow): number {
   const tweets = safeCount(row.tweets, 'trend tweet count')
   const totalTweets = safeCount(row.totalTweets, 'trend corpus count')
   return totalTweets === 0 ? 0 : (tweets / totalTweets) * 100_000
+}
+
+/** Matches the gateway's word normalization for word-trend and search. */
+export function portalTrendTokens(value: string): string[] {
+  return normalizedTextTokens(value).slice(0, 4)
+}
+
+function normalizedTextTokens(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .toLocaleLowerCase()
+        .split(/[^\p{L}\p{N}_]+/u)
+        .filter((token) => token.length > 0 && token.length <= 48),
+    ),
+  )
+}
+
+function stableTrendColor(term: string): string {
+  let hash = 0
+  for (const character of term) {
+    hash = (Math.imul(hash, 31) + character.charCodeAt(0)) >>> 0
+  }
+  return TREND_COLORS[hash % TREND_COLORS.length]
+}
+
+function textMatchesTrend(text: string, term: string): boolean {
+  const textTokens = new Set(normalizedTextTokens(text))
+  return portalTrendTokens(term).every((token) => textTokens.has(token))
+}
+
+/** Fetch one or more user-selected yearly series in parallel. */
+export async function fetchPortalTrendSeries(
+  terms: string[],
+  now = new Date(),
+  fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+): Promise<Pick<PortalTrends, 'years' | 'series' | 'computedAt'>> {
+  const currentYear = now.getUTCFullYear()
+  const years = Array.from(
+    { length: currentYear - FIRST_TREND_YEAR + 1 },
+    (_, index) => FIRST_TREND_YEAR + index,
+  )
+  const responses = await runBatched(
+    terms.map(
+      (term) => () =>
+        fetchTrend(
+          term,
+          'year',
+          `${FIRST_TREND_YEAR}-01-01`,
+          `${currentYear + 1}-01-01`,
+          fetcher,
+        ),
+    ),
+  )
+
+  const series = terms.map((term, index): TermSeries => {
+    const rows = new Map<number, ClickHouseTrendRow>()
+    for (const row of responses[index].data) {
+      const bucket = new Date(normalizeClickHouseTimestamp(row.bucket))
+      if (Number.isNaN(bucket.getTime())) {
+        throw new Error('ClickHouse word-trend returned an invalid bucket')
+      }
+      rows.set(bucket.getUTCFullYear(), row)
+    }
+    return {
+      term,
+      color: stableTrendColor(term),
+      tweetsPerYear: years.map((year) => {
+        const row = rows.get(year)
+        return row ? safeCount(row.tweets, 'trend tweet count') : 0
+      }),
+      perYear: years.map((year) => {
+        const row = rows.get(year)
+        return row ? ratePerHundredThousand(row) : 0
+      }),
+    }
+  })
+
+  return { years, series, computedAt: now.toISOString() }
+}
+
+/**
+ * Latest posts counted by at least one included trend, minus posts matching an
+ * excluded trend. Each query uses the same all-token semantics as word-trend.
+ */
+export async function fetchPortalTrendEvidence(
+  includeTerms: string[],
+  excludeTerms: string[],
+  limit = 30,
+  fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+): Promise<PortalTweet[]> {
+  const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
+  const candidateLimit = Math.min(50, Math.max(safeLimit * 2, 30))
+  const responses = await runBatched(
+    includeTerms.map(
+      (term) => () =>
+        fetcher<ClickHouseSearchResponse>(
+          ['search'],
+          new URLSearchParams({
+            q: term,
+            mode: 'all',
+            limit: String(candidateLimit),
+            offset: '0',
+          }),
+          { timeoutMs: 30_000 },
+        ),
+    ),
+    // The current query gateway intentionally serializes corpus searches.
+    // Keep evidence requests ordered while trend aggregation stays concurrent.
+    1,
+  )
+
+  const unique = new Map<string, PortalTweet>()
+  for (const response of responses) {
+    if (!Array.isArray(response.data?.tweets)) {
+      throw new Error('ClickHouse search returned an invalid response')
+    }
+    for (const row of response.data.tweets) {
+      if (
+        !/^\d{1,32}$/.test(row.tweetId) ||
+        !/^\d{1,32}$/.test(row.accountId) ||
+        typeof row.fullText !== 'string'
+      ) {
+        throw new Error('ClickHouse search returned an invalid tweet')
+      }
+      if (excludeTerms.some((term) => textMatchesTrend(row.fullText, term))) {
+        continue
+      }
+      const username = row.username || 'unknown'
+      const createdAt = safeTimestamp(row.createdAt, 'trend tweet timestamp')
+      unique.set(row.tweetId, {
+        id: row.tweetId,
+        username,
+        name: row.accountDisplayName || username,
+        avatar: row.avatarMediaUrl || null,
+        text: row.fullText,
+        observedAt: createdAt,
+        createdAt,
+        likes: safeCount(row.favoriteCount, 'trend tweet favorite count'),
+        rts: safeCount(row.retweetCount, 'trend tweet repost count'),
+      })
+    }
+  }
+
+  return Array.from(unique.values())
+    .sort(
+      (left, right) =>
+        new Date(right.createdAt).getTime() -
+          new Date(left.createdAt).getTime() || right.id.localeCompare(left.id),
+    )
+    .slice(0, safeLimit)
 }
 
 export async function fetchPortalLiveAnalytics(
@@ -372,18 +557,25 @@ export async function fetchPortalTrends(
   const weeklyResponses = responses.slice(CHART_TERMS.length)
 
   const series: TermSeries[] = CHART_TERMS.map(({ term, color }, index) => {
-    const values = new Map<number, number>()
+    const rows = new Map<number, ClickHouseTrendRow>()
     for (const row of yearlyResponses[index].data) {
       const bucket = new Date(normalizeClickHouseTimestamp(row.bucket))
       if (Number.isNaN(bucket.getTime())) {
         throw new Error('ClickHouse word-trend returned an invalid bucket')
       }
-      values.set(bucket.getUTCFullYear(), ratePerHundredThousand(row))
+      rows.set(bucket.getUTCFullYear(), row)
     }
     return {
       term,
       color,
-      perYear: years.map((year) => values.get(year) ?? 0),
+      tweetsPerYear: years.map((year) => {
+        const row = rows.get(year)
+        return row ? safeCount(row.tweets, 'trend tweet count') : 0
+      }),
+      perYear: years.map((year) => {
+        const row = rows.get(year)
+        return row ? ratePerHundredThousand(row) : 0
+      }),
     }
   })
 

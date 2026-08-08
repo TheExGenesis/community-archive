@@ -418,7 +418,7 @@ export default function Portal({
               <div className={`${CARD} flex flex-1 flex-col`}>
                 <PanelHeader
                   title="Trending terms · 7 days"
-                  action={{ label: 'Trends explorer', href: '/stream#trends' }}
+                  action={{ label: 'Trends explorer', href: '/trends' }}
                 />
                 <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
                   {weeklyBars.length > 0 && (

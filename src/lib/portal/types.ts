@@ -35,6 +35,8 @@ export interface TermWeek {
 export interface TermSeries {
   term: string
   color: string
+  /** raw matching tweet counts, one entry per year */
+  tweetsPerYear: number[]
   /** occurrences per 100k tweets, one entry per year */
   perYear: number[]
 }

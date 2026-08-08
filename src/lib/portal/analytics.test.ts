@@ -1,4 +1,6 @@
 import {
+  fetchPortalTrendEvidence,
+  fetchPortalTrendSeries,
   fetchPortalLiveAnalytics,
   fetchPortalHistoricalBangers,
   fetchPortalRecentBangers,
@@ -121,6 +123,9 @@ describe('ClickHouse-backed portal analytics', () => {
     expect(trends.series.find(({ term }) => term === 'tpot')?.perYear).toEqual([
       1000, 0, 0, 0, 0, 0, 0, 2000,
     ])
+    expect(
+      trends.series.find(({ term }) => term === 'tpot')?.tweetsPerYear,
+    ).toEqual([10, 0, 0, 0, 0, 0, 0, 40])
     expect(trends.weekly.find(({ term }) => term === 'tpot')).toEqual({
       term: 'tpot',
       last7: 8,
@@ -134,6 +139,100 @@ describe('ClickHouse-backed portal analytics', () => {
     expect(trends.weekly.find(({ term }) => term === 'jhana')?.status).toBe(
       'inactive',
     )
+  })
+
+  test('fetches several user-selected trend series concurrently', async () => {
+    const fetcher = jest.fn(
+      async (_path: string[], params: URLSearchParams) => ({
+        data: [
+          {
+            bucket: '2026-01-01 00:00:00.000',
+            tweets: params.get('q') === 'alpha' ? '20' : '5',
+            totalTweets: '1000',
+            ratePerThousand: 0,
+          },
+        ],
+      }),
+    ) as unknown as AnalyticsFetcher
+
+    const result = await fetchPortalTrendSeries(
+      ['alpha', 'beta'],
+      new Date('2026-08-07T12:00:00.000Z'),
+      fetcher,
+    )
+
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(result.series).toEqual([
+      expect.objectContaining({
+        term: 'alpha',
+        tweetsPerYear: [0, 0, 0, 0, 0, 0, 0, 20],
+        perYear: [0, 0, 0, 0, 0, 0, 0, 2000],
+      }),
+      expect.objectContaining({
+        term: 'beta',
+        tweetsPerYear: [0, 0, 0, 0, 0, 0, 0, 5],
+        perYear: [0, 0, 0, 0, 0, 0, 0, 500],
+      }),
+    ])
+  })
+
+  test('merges included evidence and removes tweets matching excluded terms', async () => {
+    const tweet = (tweetId: string, fullText: string, createdAt: string) => ({
+      tweetId,
+      accountId: '42',
+      createdAt,
+      fullText,
+      favoriteCount: '3',
+      retweetCount: '1',
+      username: 'alice',
+      accountDisplayName: 'Alice',
+      avatarMediaUrl: null,
+    })
+    const fetcher = jest.fn(
+      async (_path: string[], params: URLSearchParams) => ({
+        data: {
+          tweets:
+            params.get('q') === 'alpha'
+              ? [
+                  tweet(
+                    '100',
+                    'alpha without the excluded idea',
+                    '2026-08-07 10:00:00.000',
+                  ),
+                  tweet(
+                    '101',
+                    'alpha and moloch together',
+                    '2026-08-07 11:00:00.000',
+                  ),
+                ]
+              : [
+                  tweet('102', 'beta arrives later', '2026-08-07 12:00:00.000'),
+                  tweet(
+                    '100',
+                    'alpha without the excluded idea',
+                    '2026-08-07 10:00:00.000',
+                  ),
+                ],
+          nextOffset: null,
+        },
+      }),
+    ) as unknown as AnalyticsFetcher
+
+    const result = await fetchPortalTrendEvidence(
+      ['alpha', 'beta'],
+      ['moloch'],
+      30,
+      fetcher,
+    )
+
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(result.map(({ id }) => id)).toEqual(['102', '100'])
+    expect(result[0]).toMatchObject({
+      username: 'alice',
+      createdAt: '2026-08-07T12:00:00.000Z',
+      likes: 3,
+      rts: 1,
+    })
   })
 
   test('rejects invalid ClickHouse counts instead of rendering false zeros', async () => {

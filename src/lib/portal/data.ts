@@ -475,6 +475,11 @@ export async function getPortalBangers(): Promise<PortalTweet[]> {
   return getCachedRecentBangers(portalDataSourceKey())
 }
 
+/** Cached corpus-wide seed series for the authenticated trends explorer. */
+export async function getPortalTrendSnapshot(): Promise<PortalTrends> {
+  return (await getCachedCorpusSnapshot(portalDataSourceKey())).trends
+}
+
 export async function getPortalData(
   view: 'home' | 'stream' = 'home',
 ): Promise<PortalData> {

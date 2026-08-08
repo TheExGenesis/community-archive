@@ -12,6 +12,7 @@ import {
 import { PORTAL_ARTICLES } from './articles'
 import { PORTAL_TOOLS } from './tools'
 import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
+import { HistoricalBangersCarousel } from './HistoricalBangersCarousel'
 import { TweetRow } from './TweetRow'
 import HomepageSearch from '@/components/HomepageSearch'
 
@@ -296,7 +297,6 @@ export default function Portal({
 
   const bestStrands = PORTAL_TOOLS.find((t) => t.name === 'Best Strands')
   const recentBanger = data.recentBangers[0] ?? null
-  const historicalBanger = data.historicalBangers[0] ?? null
 
   const generatedDate = useMemo(() => {
     const d = new Date(stats.generatedAt)
@@ -475,7 +475,7 @@ export default function Portal({
                 </div>
               </div>
 
-              {(recentBanger || historicalBanger) && (
+              {(recentBanger || data.historicalBangers.length > 0) && (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {recentBanger && (
                     <div className={`${CARD} min-w-0 overflow-hidden`}>
@@ -487,12 +487,7 @@ export default function Portal({
                     </div>
                   )}
 
-                  {historicalBanger && (
-                    <div className={`${CARD} min-w-0 overflow-hidden`}>
-                      <PanelHeader title="Historical banger · near this day" />
-                      <TweetRow tweet={historicalBanger} collapsible showDate />
-                    </div>
-                  )}
+                  <HistoricalBangersCarousel tweets={data.historicalBangers} />
                 </div>
               )}
             </div>

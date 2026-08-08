@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/database-types'
+import { isProductionSupabaseUrl } from '@/lib/isProductionSupabaseUrl'
 
 /**
  * Test Database Utilities - Direct Insertion Version
@@ -13,6 +14,43 @@ import { Database } from '@/database-types'
 
 // Test account ID prefix to identify test data
 const TEST_ACCOUNT_PREFIX = 'test_'
+
+const isLocalHostname = (hostname: string) =>
+  hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+
+const getSupabaseProjectRef = (url: URL): string | undefined => {
+  const apiMatch = url.hostname.match(/^([a-z0-9-]+)\.supabase\.co$/i)
+  if (apiMatch) return apiMatch[1]
+
+  const databaseMatch = url.hostname.match(/^db\.([a-z0-9-]+)\.supabase\.co$/i)
+  if (databaseMatch) return databaseMatch[1]
+
+  return decodeURIComponent(url.username).match(/^postgres\.([a-z0-9-]+)$/i)?.[1]
+}
+
+const assertSafeTestDatabaseConfig = (supabaseUrl: string, postgresConnectionString: string) => {
+  if (isProductionSupabaseUrl(supabaseUrl) || isProductionSupabaseUrl(postgresConnectionString)) {
+    throw new Error('Database insertion tests refuse to run against the production Supabase project')
+  }
+
+  const apiUrl = new URL(supabaseUrl)
+  const databaseUrl = new URL(postgresConnectionString)
+  const apiIsLocal = isLocalHostname(apiUrl.hostname)
+  const databaseIsLocal = isLocalHostname(databaseUrl.hostname)
+
+  if (apiIsLocal !== databaseIsLocal) {
+    throw new Error('TESTS_SUPABASE_URL and TESTS_POSTGRES_CONNECTION_STRING target different databases')
+  }
+
+  if (!apiIsLocal) {
+    const apiProjectRef = getSupabaseProjectRef(apiUrl)
+    const databaseProjectRef = getSupabaseProjectRef(databaseUrl)
+
+    if (!apiProjectRef || !databaseProjectRef || apiProjectRef !== databaseProjectRef) {
+      throw new Error('Remote database test URLs must identify the same non-production Supabase project')
+    }
+  }
+}
 
 // Generate unique test account ID using timestamp and random number
 export const generateTestAccountId = (): string => {
@@ -29,19 +67,17 @@ export const createTestClient = (): SupabaseClient<Database> => {
     throw new Error('Test client can only be created in development/test mode')
   }
   
-  const useRemoteDevDb = process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true'
+  const url = process.env.TESTS_SUPABASE_URL
+  const serviceRole = process.env.TESTS_SUPABASE_SERVICE_ROLE
+  const postgresConnectionString = process.env.TESTS_POSTGRES_CONNECTION_STRING
   
-  const url = useRemoteDevDb 
-    ? process.env.NEXT_PUBLIC_SUPABASE_URL!
-    : process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL!
-    
-  const serviceRole = useRemoteDevDb
-    ? process.env.SUPABASE_SERVICE_ROLE!
-    : process.env.NEXT_PUBLIC_LOCAL_SERVICE_ROLE!
-  
-  if (!url || !serviceRole) {
-    throw new Error('Missing required environment variables for test client')
+  if (!url || !serviceRole || !postgresConnectionString) {
+    throw new Error(
+      'Database insertion tests require TESTS_SUPABASE_URL, TESTS_SUPABASE_SERVICE_ROLE, and TESTS_POSTGRES_CONNECTION_STRING'
+    )
   }
+
+  assertSafeTestDatabaseConfig(url, postgresConnectionString)
   
   return createClient<Database>(url, serviceRole)
 }
@@ -90,6 +126,7 @@ export const cleanupTestData = async (
 ): Promise<void> => {
   const accountIds = tracker.getAccountIds()
   const tweetIds = tracker.getTweetIds()
+  let mentionedUserIds: string[] = []
   
   console.log(`🧹 Cleaning up test data for ${accountIds.length} accounts`)
   
@@ -97,6 +134,15 @@ export const cleanupTestData = async (
   
   // 1. Delete user_mentions (references tweets and mentioned_users)
   if (tweetIds.length > 0) {
+    const { data: mentions } = await supabase
+      .from('user_mentions')
+      .select('mentioned_user_id')
+      .in('tweet_id', tweetIds)
+
+    mentionedUserIds = Array.from(
+      new Set((mentions || []).map(mention => mention.mentioned_user_id))
+    )
+
     await supabase
       .from('user_mentions')
       .delete()
@@ -162,19 +208,23 @@ export const cleanupTestData = async (
     }
   }
   
-  // 8. Delete mentioned_users that were only referenced by our test tweets
-  if (accountIds.length > 0) {
-    // Find mentioned users that no longer have any mentions
-    const { data: orphanedUsers } = await supabase
-      .from('mentioned_users')
-      .select('user_id')
-      .not('user_id', 'in', `(SELECT DISTINCT mentioned_user_id FROM user_mentions)`)
-    
-    if (orphanedUsers && orphanedUsers.length > 0) {
+  // 8. Delete mentioned_users created by our test tweets if nothing else references them
+  if (mentionedUserIds.length > 0) {
+    const { data: remainingMentions } = await supabase
+      .from('user_mentions')
+      .select('mentioned_user_id')
+      .in('mentioned_user_id', mentionedUserIds)
+
+    const stillReferenced = new Set(
+      (remainingMentions || []).map(mention => mention.mentioned_user_id)
+    )
+    const orphanedUserIds = mentionedUserIds.filter(id => !stillReferenced.has(id))
+
+    if (orphanedUserIds.length > 0) {
       await supabase
         .from('mentioned_users')
         .delete()
-        .in('user_id', orphanedUsers.map(u => u.user_id))
+        .in('user_id', orphanedUserIds)
     }
   }
   
@@ -201,13 +251,6 @@ export const cleanupTestData = async (
       .delete()
       .in('account_id', accountIds)
   }
-  
-  // 12. Clean up any orphaned test data based on prefix pattern
-  // This is a safety net for any missed test data
-  await supabase
-    .from('all_account')
-    .delete()
-    .like('account_id', `${TEST_ACCOUNT_PREFIX}%`)
   
   console.log('✅ Test data cleanup complete')
 }

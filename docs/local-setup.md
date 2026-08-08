@@ -189,8 +189,11 @@ Use `scripts/download_storage.ts` to download the storage files from the databas
 - `pnpm lint` — Runs ESLint for all files in the `src` directory.
 - `pnpm format-check` — Runs Prettier and checks if any files have formatting issues.
 - `pnpm format` — Runs Prettier and formats files.
-- `pnpm test` — Runs all the jest tests in the project.
-- `pnpm test:ci` — Runs all the jest tests in the project, Jest will assume it is running in a CI environment.
+- `pnpm test` — Runs the hermetic server and client Jest projects.
+- `pnpm test:ci` — Runs the same hermetic suite serially for CI.
+- `pnpm test:db-schema` — Runs read-only schema contracts against an explicitly configured test Supabase project.
+- `pnpm test:db` — Runs archive insertion tests against an explicitly configured test database.
+- `pnpm test:all` — Runs every project after the database test environment is provisioned.
 - `pnpm analyze` — Builds the project and opens the bundle analyzer.
 - `pnpm gen-api-docs` — Generates OpenAPI docs.
 - `pnpm gen-types` — Generates TypeScript types from the remote Supabase instance.

@@ -49,27 +49,18 @@ tests/
 
 1. Set up environment variables in `.env.local`:
 ```bash
-# For local Supabase
-# Database Configuration
-# Choose between local Supabase or remote dev database
-NEXT_PUBLIC_USE_REMOTE_DEV_DB=false  # Set to true for remote DB
-
-# Local Supabase (if NEXT_PUBLIC_USE_REMOTE_DEV_DB=false)
-NEXT_PUBLIC_LOCAL_SUPABASE_URL=http://localhost:54321
-NEXT_PUBLIC_LOCAL_SERVICE_ROLE=your-local-service-role-key
-
-# Remote Dev Database (if NEXT_PUBLIC_USE_REMOTE_DEV_DB=true)
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE=your-service-role-key
-
-# Choose which to use
-NEXT_PUBLIC_USE_REMOTE_DEV_DB=true  # or false for local
-# Test-specific (for direct postgres connection)
+# These must point to the same local or dedicated non-production Supabase database.
+TESTS_SUPABASE_URL=http://localhost:54321
+TESTS_SUPABASE_SERVICE_ROLE=your-test-service-role-key
 TESTS_POSTGRES_CONNECTION_STRING=postgresql://postgres:password@localhost:54322/postgres
 
-# Environment
-NODE_ENV=test or development
+# Optional when running the helper directly; Jest sets this automatically.
+NODE_ENV=test
 ```
+
+Remote test URLs are accepted only when both URLs identify the same Supabase
+project. The known production project is always refused. Do not reuse the app's
+normal Supabase variables for these destructive integration tests.
 
 2. Generate mock archives:
 ```bash
@@ -97,11 +88,11 @@ pnpm test:db:watch
 # With coverage
 pnpm test:db:coverage
 
-# Run specific test file
-npx jest tests/db-insertion/db-insertion.test.ts
+# Run the database insertion project directly
+pnpm exec jest --selectProjects db-insertion --runInBand
 
 # Run specific test case
-npx jest tests/db-insertion/db-insertion.test.ts -t "should insert account and profile correctly"
+pnpm exec jest --selectProjects db-insertion --runInBand -t "should insert account and profile correctly"
 ```
 
 ## Key Differences from Temp Table Approach
@@ -297,7 +288,7 @@ DELETE FROM all_account WHERE account_id LIKE 'test_%';
 node tests/db-insertion/fixtures/test-connection.js
 
 # Check environment variables
-echo $NEXT_PUBLIC_LOCAL_SUPABASE_URL
+echo $TESTS_SUPABASE_URL
 echo $TESTS_POSTGRES_CONNECTION_STRING
 ```
 
@@ -317,7 +308,7 @@ Run tests with additional logging:
 DEBUG=true npm test:db
 
 # Run single test with verbose output
-npx jest tests/db-insertion/db-insertion.test.ts --verbose --no-cache
+pnpm exec jest --selectProjects db-insertion --runInBand --verbose --no-cache
 ```
 
 ## Implementation Notes

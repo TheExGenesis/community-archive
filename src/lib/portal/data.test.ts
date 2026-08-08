@@ -7,6 +7,7 @@ import {
   fetchPortalMemberCount,
   getPortalStreamPage,
   getPortalStreamUpdates,
+  loadOptionalPortalData,
   portalDataSourceKey,
   resolvePortalReadConfig,
   selectDailyBangers,
@@ -51,6 +52,27 @@ describe('portal read source', () => {
     expect(key).toBe(
       'portal-v5:preview:analytics.example:prod-project.supabase.co',
     )
+  })
+})
+
+describe('optional portal data', () => {
+  test('returns a fallback without rejecting the page when a section fails', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation()
+
+    await expect(
+      loadOptionalPortalData(
+        'historical-bangers',
+        async () => {
+          throw new Error('Analytics gateway is temporarily unavailable')
+        },
+        [],
+      ),
+    ).resolves.toEqual([])
+
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('"section":"historical-bangers"'),
+    )
+    consoleError.mockRestore()
   })
 })
 

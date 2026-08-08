@@ -14,10 +14,12 @@ import { PORTAL_TOOLS } from './tools'
 import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
 import { TweetRow } from './TweetRow'
 import {
-  estimateLiveTweetCount,
   estimateLiveTweetGain,
   interpolateLiveTweetCount,
+  liveCounterBurstDelay,
+  LIVE_COUNTER_CATCH_UP_BURST_BASE_MS,
   LIVE_COUNTER_CATCH_UP_DURATION_MS,
+  liveTweetCatchUpRange,
   liveCounterRefreshInterval,
   PORTAL_STREAM_POLL_INTERVAL_MS,
 } from './live'
@@ -134,7 +136,7 @@ function PanelHeader({
   )
 }
 
-function LiveCounter({
+function useLiveTweetCount({
   count,
   gain,
   generatedAt,
@@ -142,23 +144,26 @@ function LiveCounter({
   count: number
   gain: number
   generatedAt: string
-}) {
+}): number {
   // Keep the server and first client render identical, then begin projecting
   // from the analytics snapshot after hydration.
   const [displayCount, setDisplayCount] = useState(count)
   const displayCountRef = useRef(count)
 
   useEffect(() => {
-    let animationInterval: number | null = null
-    let liveInterval: number | null = null
+    let timer: number | null = null
+    let cancelled = false
+    let animationBurstIndex = 0
+    let liveBurstIndex = 0
     const animationStartedAt = Date.now()
-    const startCount = Math.max(count, displayCountRef.current)
-    const targetCount = estimateLiveTweetCount({
+    const catchUp = liveTweetCatchUpRange({
       totalTweets: count,
       streamedLast24Hours: gain,
       generatedAt,
       now: animationStartedAt,
     })
+    const startCount = Math.max(catchUp.startCount, displayCountRef.current)
+    const targetCount = Math.max(catchUp.targetCount, startCount)
 
     const updateDisplayCount = (nextCount: number) => {
       const monotonicCount = Math.max(displayCountRef.current, nextCount)
@@ -172,16 +177,26 @@ function LiveCounter({
       if (intervalMs === null) return
       const liveStartedAt = Date.now()
       const liveStartCount = displayCountRef.current
-      liveInterval = window.setInterval(() => {
+      const tick = () => {
+        if (cancelled) return
         updateDisplayCount(
           liveStartCount +
             estimateLiveTweetGain(gain, Date.now() - liveStartedAt),
         )
-      }, intervalMs)
+        timer = window.setTimeout(
+          tick,
+          liveCounterBurstDelay(intervalMs, liveBurstIndex++),
+        )
+      }
+      timer = window.setTimeout(
+        tick,
+        liveCounterBurstDelay(intervalMs, liveBurstIndex++),
+      )
     }
 
     const prefersReducedMotion =
       window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    updateDisplayCount(startCount)
     if (prefersReducedMotion || targetCount <= startCount) {
       updateDisplayCount(targetCount)
       startLiveUpdates()
@@ -196,25 +211,36 @@ function LiveCounter({
           }),
         )
         if (elapsedMs >= LIVE_COUNTER_CATCH_UP_DURATION_MS) {
-          if (animationInterval !== null) {
-            window.clearInterval(animationInterval)
-            animationInterval = null
-          }
           startLiveUpdates()
+          return
         }
+        const baseDelay = Math.min(
+          LIVE_COUNTER_CATCH_UP_BURST_BASE_MS,
+          liveCounterRefreshInterval(gain) ??
+            LIVE_COUNTER_CATCH_UP_BURST_BASE_MS,
+        )
+        const remainingMs = LIVE_COUNTER_CATCH_UP_DURATION_MS - elapsedMs
+        timer = window.setTimeout(
+          animate,
+          Math.min(
+            remainingMs,
+            liveCounterBurstDelay(baseDelay, animationBurstIndex++),
+          ),
+        )
       }
       animate()
-      animationInterval = window.setInterval(animate, 100)
     }
 
     return () => {
-      if (animationInterval !== null) {
-        window.clearInterval(animationInterval)
-      }
-      if (liveInterval !== null) window.clearInterval(liveInterval)
+      cancelled = true
+      if (timer !== null) window.clearTimeout(timer)
     }
   }, [count, gain, generatedAt])
 
+  return displayCount
+}
+
+function LiveCounter({ count, gain }: { count: number; gain: number }) {
   return (
     <span
       className={`inline-flex items-center gap-[7px] text-[12px] ${MUTED}`}
@@ -222,9 +248,76 @@ function LiveCounter({
     >
       <span className="h-[7px] w-[7px] animate-pulse rounded-full bg-[#2acf80]" />
       <span className="tabular-nums">
-        {displayCount.toLocaleString('en-US')} tweets
+        {count.toLocaleString('en-US')} tweets
       </span>
     </span>
+  )
+}
+
+function ArchiveOverview({
+  stats,
+  generatedDate,
+}: {
+  stats: PortalData['stats']
+  generatedDate: string
+}) {
+  const count = useLiveTweetCount({
+    count: stats.totalTweets,
+    gain: stats.streamedLast24Hours,
+    generatedAt: stats.generatedAt,
+  })
+
+  return (
+    <>
+      <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-[30px] font-semibold" style={SERIF}>
+          Today on the archive
+        </h2>
+        <span className="flex items-baseline gap-3">
+          <LiveCounter count={count} gain={stats.streamedLast24Hours} />
+          <span className={`text-[12.5px] ${MUTED}`}>{generatedDate}</span>
+        </span>
+      </div>
+
+      <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard
+          label="Tweets archived"
+          value={count.toLocaleString('en-US')}
+          note={`+${stats.streamedLast24Hours.toLocaleString('en-US')} streamed in the last 24h`}
+          noteClass="text-[#16a34a] dark:text-[#2acf80]"
+        />
+        <StatCard
+          label="Community members"
+          value={stats.accountCount.toLocaleString('en-US')}
+          note={
+            stats.joinedThisWeek > 0
+              ? `${stats.joinedThisWeek} upload${stats.joinedThisWeek === 1 ? '' : 's'} this week`
+              : 'volunteered archives'
+          }
+        />
+        <StatCard
+          label="Corpus span"
+          value={`${stats.firstYear}–${stats.currentYear}`}
+          note={`${stats.currentYear - stats.firstYear} years of discourse`}
+        />
+      </div>
+    </>
+  )
+}
+
+function LiveStreamHeading({ stats }: { stats: PortalData['stats'] }) {
+  const count = useLiveTweetCount({
+    count: stats.totalTweets,
+    gain: stats.streamedLast24Hours,
+    generatedAt: stats.generatedAt,
+  })
+  return (
+    <div className="mb-1.5 flex items-baseline gap-3">
+      <h1 className="text-[26px] font-semibold" style={SERIF}>
+        Live stream
+      </h1>
+      <LiveCounter count={count} gain={stats.streamedLast24Hours} />
+    </div>
   )
 }
 
@@ -463,42 +556,7 @@ export default function Portal({
             </div>
           </div>
 
-          <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-[30px] font-semibold" style={SERIF}>
-              Today on the archive
-            </h2>
-            <span className="flex items-baseline gap-3">
-              <LiveCounter
-                count={stats.totalTweets}
-                gain={stats.streamedLast24Hours}
-                generatedAt={stats.generatedAt}
-              />
-              <span className={`text-[12.5px] ${MUTED}`}>{generatedDate}</span>
-            </span>
-          </div>
-
-          <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-            <StatCard
-              label="Tweets archived"
-              value={stats.totalTweets.toLocaleString('en-US')}
-              note={`+${stats.streamedLast24Hours.toLocaleString('en-US')} streamed in the last 24h`}
-              noteClass="text-[#16a34a] dark:text-[#2acf80]"
-            />
-            <StatCard
-              label="Community members"
-              value={stats.accountCount.toLocaleString('en-US')}
-              note={
-                stats.joinedThisWeek > 0
-                  ? `${stats.joinedThisWeek} upload${stats.joinedThisWeek === 1 ? '' : 's'} this week`
-                  : 'volunteered archives'
-              }
-            />
-            <StatCard
-              label="Corpus span"
-              value={`${stats.firstYear}–${stats.currentYear}`}
-              note={`${stats.currentYear - stats.firstYear} years of discourse`}
-            />
-          </div>
+          <ArchiveOverview stats={stats} generatedDate={generatedDate} />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.45fr_1fr]">
             <div className="flex flex-col gap-4">
@@ -752,16 +810,7 @@ export default function Portal({
               >
                 ← Dashboard
               </Link>
-              <div className="mb-1.5 flex items-baseline gap-3">
-                <h1 className="text-[26px] font-semibold" style={SERIF}>
-                  Live stream
-                </h1>
-                <LiveCounter
-                  count={stats.totalTweets}
-                  gain={stats.streamedLast24Hours}
-                  generatedAt={stats.generatedAt}
-                />
-              </div>
+              <LiveStreamHeading stats={stats} />
               <div className={`mb-3.5 text-[13px] ${MUTED}`}>
                 Tweets arriving from the browser-extension firehose, as
                 contributors read their timelines.

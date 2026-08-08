@@ -91,12 +91,18 @@ describe.each<PortalView>(['home', 'stream'])(
       )
       expect(screen.getByText('fresh tweet')).toBeInTheDocument()
       expect(screen.getByText('14,000,000 tweets')).toBeInTheDocument()
+      if (view === 'home') {
+        expect(screen.getByText('14,000,000')).toBeInTheDocument()
+        expect(
+          screen.getByText('+2,400 streamed in the last 24h'),
+        ).toBeInTheDocument()
+      }
 
       await act(async () => {
         jest.advanceTimersByTime(30_000)
         await Promise.resolve()
       })
-      expect(screen.getByText('14,000,050 tweets')).toBeInTheDocument()
+      expect(screen.getByText('14,000,010 tweets')).toBeInTheDocument()
 
       await act(async () => {
         jest.advanceTimersByTime(29_999)
@@ -110,10 +116,19 @@ describe.each<PortalView>(['home', 'stream'])(
         await Promise.resolve()
       })
       expect(fetchMock).toHaveBeenCalledTimes(2)
-      expect(screen.getByText('14,000,100 tweets')).toBeInTheDocument()
+      expect(screen.getByText('14,000,024 tweets')).toBeInTheDocument()
       expect(String(fetchMock.mock.calls[1][0])).toContain(
         'after=2026-08-07T12%3A01%3A00.000Z&afterId=101',
       )
+
+      await act(async () => {
+        jest.advanceTimersByTime(240_000)
+        await Promise.resolve()
+      })
+      expect(screen.getByText('14,000,100 tweets')).toBeInTheDocument()
+      if (view === 'home') {
+        expect(screen.getByText('14,000,100')).toBeInTheDocument()
+      }
 
       unmount()
     })

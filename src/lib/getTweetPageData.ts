@@ -12,6 +12,10 @@ import {
 } from './twitterSyndication'
 import { isClickHouseReadsEnabled } from './clickhouseGateway'
 import { fetchClickHouseTweetPageData } from './clickhouseTweetPage'
+import {
+  fetchClickHouseQuotePosts,
+  type ClickHouseQuotePostsData,
+} from './clickhouseQuotePosts'
 
 interface RpcTweet {
   tweet_id: string
@@ -99,28 +103,29 @@ interface TweetPageResult {
 }
 
 /**
- * Load the permalink tweet from ClickHouse when enabled while reading reverse
- * quote metadata from the canonical Supabase relationship table. The Supabase
- * RPC remains the complete tweet/thread fallback.
+ * Load portal permalink records and incoming quote posts from the same
+ * ClickHouse snapshot when enabled. The Supabase RPC remains the complete
+ * tweet/thread fallback for environments without ClickHouse reads.
  */
 export async function getTweetPageData(
   tweetId: string,
 ): Promise<TweetPageResult> {
-  const clickHouseTweetPromise = fetchClickHouseTweet(tweetId)
+  const clickHousePage = await fetchClickHousePage(tweetId)
+  if (clickHousePage) return clickHousePage
+
   const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
 
-  const [clickHouseTweet, { data, error }] = await Promise.all([
-    clickHouseTweetPromise,
-    supabase.rpc('get_tweet_page_data' as any, { p_tweet_id: tweetId }),
-  ])
+  const { data, error } = await supabase.rpc('get_tweet_page_data' as any, {
+    p_tweet_id: tweetId,
+  })
 
   if (error || !data) {
     console.error('get_tweet_page_data RPC failed:', error?.message, {
       tweetId,
     })
     return {
-      tweet: clickHouseTweet,
+      tweet: null,
       threadTree: null,
       quotingTweets: [],
       quotingTweetCount: 0,
@@ -132,15 +137,6 @@ export async function getTweetPageData(
   const quotingTweetCount = Number(
     result.quoting_tweet_count ?? quotingTweets.length,
   )
-
-  if (clickHouseTweet) {
-    return {
-      tweet: clickHouseTweet,
-      threadTree: null,
-      quotingTweets,
-      quotingTweetCount,
-    }
-  }
 
   if (!result.tweet) {
     return {
@@ -211,13 +207,29 @@ export async function getTweetPageData(
   return { tweet: mainTweet, threadTree, quotingTweets, quotingTweetCount }
 }
 
-async function fetchClickHouseTweet(
+async function fetchClickHousePage(
   tweetId: string,
-): Promise<TweetData | null> {
+): Promise<TweetPageResult | null> {
   if (!isClickHouseReadsEnabled()) return null
 
   try {
-    return await fetchClickHouseTweetPageData(tweetId)
+    const [tweet, quotePosts] = await Promise.all([
+      fetchClickHouseTweetPageData(tweetId),
+      fetchClickHouseQuotePosts(tweetId).catch((error) => {
+        console.error('ClickHouse quote posts failed:', {
+          tweetId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        return { tweets: [], totalCount: 0 } satisfies ClickHouseQuotePostsData
+      }),
+    ])
+    if (!tweet) return null
+    return {
+      tweet,
+      threadTree: null,
+      quotingTweets: quotePosts.tweets,
+      quotingTweetCount: quotePosts.totalCount,
+    }
   } catch (error) {
     console.error('ClickHouse tweet detail failed; falling back to Supabase:', {
       tweetId,

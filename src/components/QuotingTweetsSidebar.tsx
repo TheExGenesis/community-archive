@@ -146,8 +146,8 @@ export default function QuotingTweetsSidebar({
 
         {totalCount > tweets.length && (
           <p className="border-t border-border bg-muted/40 px-5 py-3 text-center text-xs text-muted-foreground">
-            Showing the top {tweets.length} of {formatNumber(totalCount)}{' '}
-            archived quotes
+            Showing {tweets.length} of {formatNumber(totalCount)} archived
+            quotes
           </p>
         )}
       </div>

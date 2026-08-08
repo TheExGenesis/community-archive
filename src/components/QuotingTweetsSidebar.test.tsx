@@ -39,7 +39,7 @@ describe('QuotingTweetsSidebar', () => {
     expect(markup).toContain('A useful perspective &amp; a second thought.')
     expect(markup).toContain('href="/tweets/quote-1"')
     expect(markup).toContain('aria-label="15 quotes"')
-    expect(markup).toContain('Showing the top 1 of 15')
+    expect(markup).toContain('Showing 1 of 15')
   })
 
   it('shows an archive-specific empty state', () => {

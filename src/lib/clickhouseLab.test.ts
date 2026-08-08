@@ -149,4 +149,24 @@ describe('ClickHouse staging lab guard', () => {
       ),
     ).toThrow('Unsupported ClickHouse analytics endpoint')
   })
+
+  test('allows bounded reverse-quote parameters for numeric tweet IDs', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['quote-posts', '2085375983708692599'],
+      new URLSearchParams(
+        'limit=12&offset=0&exclude_self=true&quote_ca_users_only=true&raw_sql=DROP',
+      ),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/quote-posts/2085375983708692599?limit=12&offset=0&exclude_self=true&quote_ca_users_only=true',
+    )
+    expect(() =>
+      analyticsGatewayRequestUrl(
+        ['quote-posts', 'not-a-tweet'],
+        new URLSearchParams(),
+        'https://stream.example/analytics',
+      ),
+    ).toThrow('Unsupported ClickHouse analytics endpoint')
+  })
 })

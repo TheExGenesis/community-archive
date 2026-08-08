@@ -131,4 +131,22 @@ describe('ClickHouse staging lab guard', () => {
       'https://stream.example/analytics/recent-bangers?limit=50&hours=48',
     )
   })
+
+  test('allows only numeric tweet-detail paths and no query parameters', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['tweet', '2085473085399150817'],
+      new URLSearchParams('raw_sql=DROP'),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/tweet/2085473085399150817',
+    )
+    expect(() =>
+      analyticsGatewayRequestUrl(
+        ['tweet', 'not-a-tweet'],
+        new URLSearchParams(),
+        'https://stream.example/analytics',
+      ),
+    ).toThrow('Unsupported ClickHouse analytics endpoint')
+  })
 })

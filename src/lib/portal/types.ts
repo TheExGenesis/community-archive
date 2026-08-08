@@ -114,4 +114,16 @@ export interface PortalData {
   recentBangers: PortalTweet[]
   /** Calendar-matched canonical bangers, refreshed daily. */
   historicalBangers: PortalTweet[]
+  /** Request failures are carried to the client so only their panels degrade. */
+  failures: {
+    liveAnalytics: boolean
+    memberCount: boolean
+    joinedThisWeek: boolean
+    corpusRange: boolean
+    trends: boolean
+    initialStream: boolean
+    research: boolean
+    recentBangers: boolean
+    historicalBangers: boolean
+  }
 }

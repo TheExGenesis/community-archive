@@ -144,6 +144,17 @@ function PanelHeader({
   )
 }
 
+function PanelUnavailable({ message }: { message: string }) {
+  return (
+    <div
+      role="status"
+      className={`min-h-24 flex items-center justify-center px-4 py-8 text-center text-[13px] ${MUTED}`}
+    >
+      {message}
+    </div>
+  )
+}
+
 function useLiveTweetCount({
   count,
   gain,
@@ -265,9 +276,14 @@ function LiveCounter({ count, gain }: { count: number; gain: number }) {
 function ArchiveOverview({
   stats,
   generatedDate,
+  failures,
 }: {
   stats: PortalData['stats']
   generatedDate: string
+  failures: Pick<
+    PortalData['failures'],
+    'liveAnalytics' | 'memberCount' | 'joinedThisWeek' | 'corpusRange'
+  >
 }) {
   const count = useLiveTweetCount({
     count: stats.totalTweets,
@@ -281,39 +297,75 @@ function ArchiveOverview({
         <h2 className="text-[30px] font-semibold" style={SERIF}>
           Today on the archive
         </h2>
-        <span className="flex items-baseline gap-3">
-          <LiveCounter count={count} gain={stats.streamedLast24Hours} />
-          <span className={`text-[12.5px] ${MUTED}`}>{generatedDate}</span>
-        </span>
+        {!failures.liveAnalytics && (
+          <span className="flex items-baseline gap-3">
+            <LiveCounter count={count} gain={stats.streamedLast24Hours} />
+            <span className={`text-[12.5px] ${MUTED}`}>{generatedDate}</span>
+          </span>
+        )}
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           label="Tweets archived"
-          value={count.toLocaleString('en-US')}
-          note={`+${stats.streamedLast24Hours.toLocaleString('en-US')} streamed in the last 24h`}
-          noteClass="text-[#16a34a] dark:text-[#2acf80]"
+          value={
+            failures.liveAnalytics
+              ? 'Unavailable'
+              : count.toLocaleString('en-US')
+          }
+          note={
+            failures.liveAnalytics
+              ? 'Tweet totals are temporarily unavailable.'
+              : `+${stats.streamedLast24Hours.toLocaleString('en-US')} streamed in the last 24h`
+          }
+          noteClass={
+            failures.liveAnalytics
+              ? undefined
+              : 'text-[#16a34a] dark:text-[#2acf80]'
+          }
         />
         <StatCard
           label="Community members"
-          value={stats.accountCount.toLocaleString('en-US')}
+          value={
+            failures.memberCount
+              ? 'Unavailable'
+              : stats.accountCount.toLocaleString('en-US')
+          }
           note={
-            stats.joinedThisWeek > 0
-              ? `${stats.joinedThisWeek} upload${stats.joinedThisWeek === 1 ? '' : 's'} this week`
-              : 'volunteered archives'
+            failures.memberCount
+              ? 'Member count is temporarily unavailable.'
+              : failures.joinedThisWeek
+                ? 'Recent upload count is temporarily unavailable.'
+                : stats.joinedThisWeek > 0
+                  ? `${stats.joinedThisWeek} upload${stats.joinedThisWeek === 1 ? '' : 's'} this week`
+                  : 'volunteered archives'
           }
         />
         <StatCard
           label="Corpus span"
-          value={`${stats.firstYear}–${stats.currentYear}`}
-          note={`${stats.currentYear - stats.firstYear} years of discourse`}
+          value={
+            failures.corpusRange
+              ? 'Unavailable'
+              : `${stats.firstYear}–${stats.currentYear}`
+          }
+          note={
+            failures.corpusRange
+              ? 'Corpus range is temporarily unavailable.'
+              : `${stats.currentYear - stats.firstYear} years of discourse`
+          }
         />
       </div>
     </>
   )
 }
 
-function LiveStreamHeading({ stats }: { stats: PortalData['stats'] }) {
+function LiveStreamHeading({
+  stats,
+  unavailable,
+}: {
+  stats: PortalData['stats']
+  unavailable: boolean
+}) {
   const count = useLiveTweetCount({
     count: stats.totalTweets,
     gain: stats.streamedLast24Hours,
@@ -324,7 +376,9 @@ function LiveStreamHeading({ stats }: { stats: PortalData['stats'] }) {
       <h1 className="text-[26px] font-semibold" style={SERIF}>
         Live stream
       </h1>
-      <LiveCounter count={count} gain={stats.streamedLast24Hours} />
+      {!unavailable && (
+        <LiveCounter count={count} gain={stats.streamedLast24Hours} />
+      )}
     </div>
   )
 }
@@ -340,6 +394,9 @@ export default function Portal({
 
   // ---- live stream state -------------------------------------------------
   const [visible, setVisible] = useState<PortalTweet[]>(data.initialStream)
+  const [streamUnavailable, setStreamUnavailable] = useState(
+    data.failures.initialStream,
+  )
   const seenIds = useRef<Set<string>>(
     new Set(data.initialStream.map((t) => t.id)),
   )
@@ -347,7 +404,9 @@ export default function Portal({
   const pageCursor = useRef(oldestPageCursor(data.initialStream))
   const loadingMoreRef = useRef(false)
   const loadMoreTarget = useRef<HTMLDivElement>(null)
-  const [hasMore, setHasMore] = useState(data.initialStream.length >= 30)
+  const [hasMore, setHasMore] = useState(
+    !data.failures.initialStream && data.initialStream.length >= 30,
+  )
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const loadMore = useCallback(async () => {
@@ -410,7 +469,11 @@ export default function Portal({
           signal: controller.signal,
           cache: 'no-store',
         })
-        if (!res.ok) return
+        if (!res.ok) {
+          setStreamUnavailable(true)
+          return
+        }
+        setStreamUnavailable(false)
         const { tweets, updateCursor: nextUpdateCursor } =
           (await res.json()) as {
             tweets: PortalTweet[]
@@ -434,6 +497,7 @@ export default function Portal({
           )
         }
       } catch {
+        if (!controller.signal.aborted) setStreamUnavailable(true)
         // network hiccup; try again next poll
       } finally {
         polling = false
@@ -531,15 +595,25 @@ export default function Portal({
               Community Archive
             </h1>
             <p className="text-xl leading-8 text-zinc-500 dark:text-[#a7a7b4]">
-              We preserve{' '}
-              <strong className="font-semibold text-foreground">
-                {compact(stats.totalTweets)} public tweets
-              </strong>{' '}
-              from{' '}
-              <strong className="font-semibold text-foreground">
-                {stats.accountCount.toLocaleString('en-US')} community members
-              </strong>
-              .
+              {data.failures.liveAnalytics || data.failures.memberCount ? (
+                <>
+                  We preserve public conversations as open source
+                  infrastructure.
+                </>
+              ) : (
+                <>
+                  We preserve{' '}
+                  <strong className="font-semibold text-foreground">
+                    {compact(stats.totalTweets)} public tweets
+                  </strong>{' '}
+                  from{' '}
+                  <strong className="font-semibold text-foreground">
+                    {stats.accountCount.toLocaleString('en-US')} community
+                    members
+                  </strong>
+                  .
+                </>
+              )}
             </p>
             <p className={`text-xs ${FAINT}`}>
               Backed by{' '}
@@ -566,7 +640,11 @@ export default function Portal({
             </div>
           </div>
 
-          <ArchiveOverview stats={stats} generatedDate={generatedDate} />
+          <ArchiveOverview
+            stats={stats}
+            generatedDate={generatedDate}
+            failures={data.failures}
+          />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.45fr_1fr]">
             <div className="flex h-full min-h-0 flex-col gap-4 lg:overflow-hidden">
@@ -587,7 +665,10 @@ export default function Portal({
                   {visible.slice(0, HOME_LIVE_STREAM_LIMIT).map((t, i) => (
                     <TweetRow key={t.id} tweet={t} compact animate={i === 0} />
                   ))}
-                  {visible.length === 0 && (
+                  {visible.length === 0 && streamUnavailable && (
+                    <PanelUnavailable message="Live stream is temporarily unavailable." />
+                  )}
+                  {visible.length === 0 && !streamUnavailable && (
                     <div
                       className={`px-4 py-8 text-center text-[13px] ${MUTED}`}
                     >
@@ -603,7 +684,9 @@ export default function Portal({
                   action={{ label: 'Trends explorer', href: '/trends' }}
                 />
                 <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
-                  {weeklyBars.length > 0 && (
+                  {data.failures.trends ? (
+                    <PanelUnavailable message="Trending terms are temporarily unavailable." />
+                  ) : weeklyBars.length > 0 ? (
                     <div
                       className={`flex items-center gap-3 pb-1 text-[10px] font-medium uppercase tracking-wide ${MUTED}`}
                     >
@@ -612,44 +695,45 @@ export default function Portal({
                       <span className="flex-1">Relative volume</span>
                       <span className="w-[52px] text-right">7d change</span>
                     </div>
-                  )}
-                  {weeklyBars.map((b) => (
-                    <div
-                      key={b.term}
-                      className="flex items-center gap-3 py-[5px]"
-                    >
-                      <span className="w-[90px] truncate text-[13px] font-semibold sm:w-[110px]">
-                        {b.term}
-                      </span>
-                      <span className="w-[54px] text-right text-[12px] tabular-nums text-muted-foreground">
-                        {b.last7.toLocaleString('en-US')}
-                      </span>
+                  ) : null}
+                  {!data.failures.trends &&
+                    weeklyBars.map((b) => (
                       <div
-                        className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]"
-                        role="img"
-                        aria-label={`${b.term}: ${b.last7.toLocaleString('en-US')} tweets in the last seven days`}
-                        title={`${b.last7.toLocaleString('en-US')} tweets in the last 7 days; bar is relative to ${weeklyBars[0].term}`}
+                        key={b.term}
+                        className="flex items-center gap-3 py-[5px]"
                       >
+                        <span className="w-[90px] truncate text-[13px] font-semibold sm:w-[110px]">
+                          {b.term}
+                        </span>
+                        <span className="w-[54px] text-right text-[12px] tabular-nums text-muted-foreground">
+                          {b.last7.toLocaleString('en-US')}
+                        </span>
                         <div
-                          className="h-full rounded bg-brand"
-                          style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
-                        />
+                          className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]"
+                          role="img"
+                          aria-label={`${b.term}: ${b.last7.toLocaleString('en-US')} tweets in the last seven days`}
+                          title={`${b.last7.toLocaleString('en-US')} tweets in the last 7 days; bar is relative to ${weeklyBars[0].term}`}
+                        >
+                          <div
+                            className="h-full rounded bg-brand"
+                            style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
+                          />
+                        </div>
+                        <span
+                          title={`${b.last7.toLocaleString('en-US')} tweets vs ${b.prev7.toLocaleString('en-US')} in the previous 7 days`}
+                          className={`w-[52px] text-right text-[12px] font-bold tabular-nums ${
+                            b.status === 'inactive'
+                              ? MUTED
+                              : (b.deltaPct ?? 0) >= 0
+                                ? 'text-[#16a34a] dark:text-[#2acf80]'
+                                : 'text-[#dc2626] dark:text-[#f87171]'
+                          }`}
+                        >
+                          {fmtDelta(b)}
+                        </span>
                       </div>
-                      <span
-                        title={`${b.last7.toLocaleString('en-US')} tweets vs ${b.prev7.toLocaleString('en-US')} in the previous 7 days`}
-                        className={`w-[52px] text-right text-[12px] font-bold tabular-nums ${
-                          b.status === 'inactive'
-                            ? MUTED
-                            : (b.deltaPct ?? 0) >= 0
-                              ? 'text-[#16a34a] dark:text-[#2acf80]'
-                              : 'text-[#dc2626] dark:text-[#f87171]'
-                        }`}
-                      >
-                        {fmtDelta(b)}
-                      </span>
-                    </div>
-                  ))}
-                  {weeklyBars.length === 0 && (
+                    ))}
+                  {!data.failures.trends && weeklyBars.length === 0 && (
                     <div className={`py-8 text-center text-[13px] ${MUTED}`}>
                       No watchlist activity in the last seven days.
                     </div>
@@ -657,20 +741,27 @@ export default function Portal({
                 </div>
               </div>
 
-              {(recentBanger || historicalBanger) && (
+              {(recentBanger ||
+                historicalBanger ||
+                data.failures.recentBangers ||
+                data.failures.historicalBangers) && (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {recentBanger && (
+                  {(recentBanger || data.failures.recentBangers) && (
                     <div
                       className={`${CARD} flex min-w-0 flex-col overflow-hidden lg:min-h-[320px]`}
                     >
                       <PanelHeader title="Banger of the moment" />
-                      <div className="flex flex-1 flex-col [&>article]:flex-1">
-                        <TweetRow tweet={recentBanger} collapsible />
-                      </div>
+                      {recentBanger ? (
+                        <div className="flex flex-1 flex-col [&>article]:flex-1">
+                          <TweetRow tweet={recentBanger} collapsible />
+                        </div>
+                      ) : (
+                        <PanelUnavailable message="Recent bangers are temporarily unavailable." />
+                      )}
                     </div>
                   )}
 
-                  {historicalBanger && (
+                  {(historicalBanger || data.failures.historicalBangers) && (
                     <div
                       className={`${CARD} flex min-w-0 flex-col overflow-hidden lg:min-h-[320px]`}
                     >
@@ -678,13 +769,17 @@ export default function Portal({
                         title="Historical Banger"
                         action={{ label: 'More bangers', href: '/bangers' }}
                       />
-                      <div className="flex flex-1 flex-col [&>article]:flex-1">
-                        <TweetRow
-                          tweet={historicalBanger}
-                          collapsible
-                          showDate
-                        />
-                      </div>
+                      {historicalBanger ? (
+                        <div className="flex flex-1 flex-col [&>article]:flex-1">
+                          <TweetRow
+                            tweet={historicalBanger}
+                            collapsible
+                            showDate
+                          />
+                        </div>
+                      ) : (
+                        <PanelUnavailable message="Historical bangers are temporarily unavailable." />
+                      )}
                     </div>
                   )}
                 </div>
@@ -698,47 +793,51 @@ export default function Portal({
                   action={{ label: 'All research', href: '/research' }}
                 />
                 <div className="flex flex-col">
-                  {data.research.slice(0, 4).map((post) => (
-                    <a
-                      key={post.url}
-                      href={post.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group flex items-start gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div
-                          className="flex items-baseline gap-1.5 text-[15.5px] font-semibold leading-snug"
-                          style={SERIF}
-                        >
-                          {post.title}
-                          <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
-                        </div>
-                        {post.excerpt && (
+                  {data.failures.research ? (
+                    <PanelUnavailable message="Featured research is temporarily unavailable." />
+                  ) : (
+                    data.research.slice(0, 4).map((post) => (
+                      <a
+                        key={post.url}
+                        href={post.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-start gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
+                      >
+                        <div className="min-w-0 flex-1">
                           <div
-                            className={`mt-1 line-clamp-2 text-[12.5px] leading-normal ${MUTED}`}
+                            className="flex items-baseline gap-1.5 text-[15.5px] font-semibold leading-snug"
+                            style={SERIF}
                           >
-                            {post.excerpt}
+                            {post.title}
+                            <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
                           </div>
-                        )}
-                        <div className={`mt-1 text-[12px] ${MUTED}`}>
-                          {RESEARCH_SOURCE.name}
-                          {post.date &&
-                            ` · ${new Date(post.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                          {post.excerpt && (
+                            <div
+                              className={`mt-1 line-clamp-2 text-[12.5px] leading-normal ${MUTED}`}
+                            >
+                              {post.excerpt}
+                            </div>
+                          )}
+                          <div className={`mt-1 text-[12px] ${MUTED}`}>
+                            {RESEARCH_SOURCE.name}
+                            {post.date &&
+                              ` · ${new Date(post.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                          </div>
                         </div>
-                      </div>
-                      {post.image && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={post.image}
-                          alt=""
-                          loading="lazy"
-                          className="mt-0.5 h-14 w-20 flex-shrink-0 rounded-[4px] border border-zinc-200 object-cover dark:border-[#26262a]"
-                        />
-                      )}
-                    </a>
-                  ))}
-                  {data.research.length === 0 && (
+                        {post.image && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={post.image}
+                            alt=""
+                            loading="lazy"
+                            className="mt-0.5 h-14 w-20 flex-shrink-0 rounded-[4px] border border-zinc-200 object-cover dark:border-[#26262a]"
+                          />
+                        )}
+                      </a>
+                    ))
+                  )}
+                  {!data.failures.research && data.research.length === 0 && (
                     <a
                       href={RESEARCH_SOURCE.url}
                       target="_blank"
@@ -862,7 +961,10 @@ export default function Portal({
               >
                 ← Dashboard
               </Link>
-              <LiveStreamHeading stats={stats} />
+              <LiveStreamHeading
+                stats={stats}
+                unavailable={data.failures.liveAnalytics}
+              />
               <div className={`mb-3.5 text-[13px] ${MUTED}`}>
                 Tweets arriving from the browser-extension firehose, as
                 contributors read their timelines.
@@ -876,7 +978,10 @@ export default function Portal({
                     showArchivedBadge
                   />
                 ))}
-                {visible.length === 0 && (
+                {visible.length === 0 && streamUnavailable && (
+                  <PanelUnavailable message="Live stream is temporarily unavailable." />
+                )}
+                {visible.length === 0 && !streamUnavailable && (
                   <div className={`px-4 py-8 text-center text-[13px] ${MUTED}`}>
                     Waiting for the firehose…
                   </div>
@@ -897,7 +1002,18 @@ export default function Portal({
               </div>
             </div>
             <div id="trends" className="scroll-mt-32">
-              <TrendsView trends={trends} risers={risers} fallers={fallers} />
+              {data.failures.trends ? (
+                <>
+                  <h2 className="mb-3 text-[18px] font-semibold" style={SERIF}>
+                    Trends in ideas
+                  </h2>
+                  <div className={CARD}>
+                    <PanelUnavailable message="Trends are temporarily unavailable." />
+                  </div>
+                </>
+              ) : (
+                <TrendsView trends={trends} risers={risers} fallers={fallers} />
+              )}
             </div>
           </div>
         </div>

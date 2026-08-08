@@ -11,7 +11,6 @@ import {
   fetchPortalRecentBangers,
   fetchPortalTrends,
 } from './analytics'
-import type { PortalLiveAnalytics } from './analytics'
 import { getResearchPosts, selectFeaturedResearchPosts } from './research'
 import { selectHomepageStream } from './stream'
 import type {
@@ -42,18 +41,12 @@ export interface PortalStreamPageCursor {
   id: string
 }
 
-interface PortalCorpusSnapshot {
-  trends: PortalTrends
+interface PortalCorpusRange {
   firstYear: number
   currentYear: number
 }
 
 const PORTAL_READ_TIMEOUT_MS = 10_000
-
-type PortalStatsSnapshot = PortalLiveAnalytics & {
-  accountCount: number
-  joinedThisWeek: number
-}
 
 function required(value: string | undefined, name: string): string {
   if (!value) throw new Error(`${name} is not configured`)
@@ -580,10 +573,7 @@ export function selectDailyBangers(
   return [selected, ...candidates.filter((_, index) => index !== selectedIndex)]
 }
 
-async function fetchCorpusRange(): Promise<{
-  firstYear: number
-  currentYear: number
-}> {
+async function fetchCorpusRange(): Promise<PortalCorpusRange> {
   const [firstResult, latestResult] = await Promise.all([
     portalRestRows<{ created_at: string }>(
       'tweets',
@@ -613,44 +603,43 @@ async function fetchCorpusRange(): Promise<{
   }
 }
 
-async function computePortalCorpusSnapshot(): Promise<PortalCorpusSnapshot> {
-  const [trends, range] = await Promise.all([
-    fetchPortalTrends(),
-    fetchCorpusRange(),
-  ])
-  return { trends, ...range }
-}
-
-async function computePortalStatsSnapshot(): Promise<PortalStatsSnapshot> {
-  const [analytics, accountCount, joinedThisWeekResponse] = await Promise.all([
-    fetchPortalLiveAnalytics(),
-    fetchPortalMemberCount(),
-    portalRestRequest(
-      'archive_upload',
-      new URLSearchParams({
-        select: 'id',
-        created_at: `gte.${isoDaysAgo(7)}`,
-      }),
-      { method: 'HEAD', prefer: 'count=exact' },
-    ),
-  ])
-  return {
-    ...analytics,
-    accountCount,
-    joinedThisWeek: exactCount(joinedThisWeekResponse, 'upload'),
-  }
+async function fetchPortalJoinedThisWeek(): Promise<number> {
+  const response = await portalRestRequest(
+    'archive_upload',
+    new URLSearchParams({
+      select: 'id',
+      created_at: `gte.${isoDaysAgo(7)}`,
+    }),
+    { method: 'HEAD', prefer: 'count=exact' },
+  )
+  return exactCount(response, 'upload')
 }
 
 // Arguments participate in the cache key, keeping staging/prod sources and
 // deployment environments isolated even when the Data Cache survives deploys.
-const getCachedCorpusSnapshot = unstable_cache(
-  async (_sourceKey: string) => computePortalCorpusSnapshot(),
-  ['portal-corpus-snapshot-v3'],
+const getCachedTrendsSnapshot = unstable_cache(
+  async (_sourceKey: string) => fetchPortalTrends(),
+  ['portal-trends-snapshot-v1'],
   { revalidate: 86_400 },
 )
-const getCachedStatsSnapshot = unstable_cache(
-  async (_sourceKey: string) => computePortalStatsSnapshot(),
-  ['portal-stats-snapshot-v6'],
+const getCachedCorpusRange = unstable_cache(
+  async (_sourceKey: string) => fetchCorpusRange(),
+  ['portal-corpus-range-v1'],
+  { revalidate: 86_400 },
+)
+const getCachedLiveAnalytics = unstable_cache(
+  async (_sourceKey: string) => fetchPortalLiveAnalytics(),
+  ['portal-live-analytics-v1'],
+  { revalidate: 300 },
+)
+const getCachedMemberCount = unstable_cache(
+  async (_sourceKey: string) => fetchPortalMemberCount(),
+  ['portal-member-count-v1'],
+  { revalidate: 300 },
+)
+const getCachedJoinedThisWeek = unstable_cache(
+  async (_sourceKey: string) => fetchPortalJoinedThisWeek(),
+  ['portal-joined-this-week-v1'],
   { revalidate: 300 },
 )
 const getCachedInitialStream = unstable_cache(
@@ -698,7 +687,7 @@ export async function loadPortalComponentData<T>(
     console.error(
       JSON.stringify({
         level: 'error',
-        message: 'Optional portal data failed',
+        message: 'Portal component data failed',
         section,
         error: error instanceof Error ? error.message : String(error),
       }),
@@ -726,7 +715,7 @@ export async function getPortalBangersPage(
 
 /** Cached corpus-wide seed series for the authenticated trends explorer. */
 export async function getPortalTrendSnapshot(): Promise<PortalTrends> {
-  return (await getCachedCorpusSnapshot(portalDataSourceKey())).trends
+  return getCachedTrendsSnapshot(portalDataSourceKey())
 }
 
 export async function getPortalData(
@@ -735,63 +724,110 @@ export async function getPortalData(
   const sourceKey = portalDataSourceKey()
   const today = new Date().toISOString().slice(0, 10)
   const [
-    corpus,
-    live,
+    trends,
+    corpusRange,
+    liveAnalytics,
+    memberCount,
+    joinedThisWeek,
     initialStream,
     research,
     recentBangers,
     historicalBangers,
   ] = await Promise.all([
-    getCachedCorpusSnapshot(sourceKey),
-    getCachedStatsSnapshot(sourceKey),
+    loadPortalComponentData(
+      'trends',
+      () => getCachedTrendsSnapshot(sourceKey),
+      { years: [], series: [], weekly: [], computedAt: '' },
+    ),
+    loadPortalComponentData(
+      'corpus-range',
+      () => getCachedCorpusRange(sourceKey),
+      { firstYear: 0, currentYear: 0 },
+    ),
+    loadPortalComponentData(
+      'live-analytics',
+      () => getCachedLiveAnalytics(sourceKey),
+      {
+        totalTweets: 0,
+        streamedLast24Hours: 0,
+        generatedAt: new Date().toISOString(),
+        latestObservedAt: null,
+      },
+    ),
+    loadPortalComponentData(
+      'member-count',
+      () => getCachedMemberCount(sourceKey),
+      0,
+    ),
+    loadPortalComponentData(
+      'joined-this-week',
+      () => getCachedJoinedThisWeek(sourceKey),
+      0,
+    ),
+    loadPortalComponentData(
+      'initial-stream',
+      () =>
+        view === 'home'
+          ? getCachedHomepageStreamCandidates(sourceKey)
+          : getCachedInitialStream(sourceKey),
+      [],
+    ),
     view === 'home'
-      ? getCachedHomepageStreamCandidates(sourceKey)
-      : getCachedInitialStream(sourceKey),
-    view === 'home'
-      ? loadOptionalPortalData(
+      ? loadPortalComponentData(
           'research',
           async () => selectFeaturedResearchPosts(await getResearchPosts(24)),
           [],
         )
-      : Promise.resolve([]),
+      : Promise.resolve({ data: [], failed: false }),
     view === 'home'
-      ? loadOptionalPortalData(
+      ? loadPortalComponentData(
           'recent-bangers',
           () => getCachedRecentBangers(sourceKey),
           [],
         )
-      : Promise.resolve([]),
+      : Promise.resolve({ data: [], failed: false }),
     view === 'home'
-      ? loadOptionalPortalData(
+      ? loadPortalComponentData(
           'historical-bangers',
           () => getCachedHistoricalBangers(sourceKey, today),
           [],
         )
-      : Promise.resolve([]),
+      : Promise.resolve({ data: [], failed: false }),
   ])
   const stats: PortalStats = {
-    totalTweets: live.totalTweets,
-    accountCount: live.accountCount,
-    streamedLast24Hours: live.streamedLast24Hours,
-    joinedThisWeek: live.joinedThisWeek,
-    firstYear: corpus.firstYear,
-    currentYear: corpus.currentYear,
-    generatedAt: live.generatedAt,
+    totalTweets: liveAnalytics.data.totalTweets,
+    accountCount: memberCount.data,
+    streamedLast24Hours: liveAnalytics.data.streamedLast24Hours,
+    joinedThisWeek: joinedThisWeek.data,
+    firstYear: corpusRange.data.firstYear,
+    currentYear: corpusRange.data.currentYear,
+    generatedAt: liveAnalytics.data.generatedAt,
   }
   const selectedStream =
     view === 'home'
       ? selectHomepageStream(
-          [...initialStream, ...recentBangers],
+          [...initialStream.data, ...recentBangers.data],
           30,
-          new Date(live.generatedAt),
+          new Date(liveAnalytics.data.generatedAt),
         )
-      : initialStream
+      : initialStream.data
   return {
     stats,
-    trends: corpus.trends,
+    trends: trends.data,
     initialStream: selectedStream,
-    research,
-    recentBangers,
-    historicalBangers,
+    research: research.data,
+    recentBangers: recentBangers.data,
+    historicalBangers: historicalBangers.data,
+    failures: {
+      liveAnalytics: liveAnalytics.failed,
+      memberCount: memberCount.failed,
+      joinedThisWeek: joinedThisWeek.failed,
+      corpusRange: corpusRange.failed,
+      trends: trends.failed,
+      initialStream: initialStream.failed,
+      research: research.failed,
+      recentBangers: recentBangers.failed,
+      historicalBangers: historicalBangers.failed,
+    },
   }
 }

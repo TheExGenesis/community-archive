@@ -1,3 +1,5 @@
+jest.mock('server-only', () => ({}), { virtual: true })
+
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/portal/trends/route'
 import {

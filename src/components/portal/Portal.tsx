@@ -572,7 +572,7 @@ export default function Portal({
                   role="region"
                   aria-label="Live tweet stream"
                   tabIndex={0}
-                  className="flex max-h-[420px] flex-col overflow-y-auto overscroll-contain [scrollbar-gutter:stable] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60"
+                  className="flex max-h-[420px] flex-col overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60 [&::-webkit-scrollbar]:hidden"
                 >
                   {visible.slice(0, HOME_LIVE_STREAM_LIMIT).map((t, i) => (
                     <TweetRow key={t.id} tweet={t} compact animate={i === 0} />

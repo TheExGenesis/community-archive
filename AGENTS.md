@@ -121,6 +121,12 @@ Staging synchronization is automatic; production synchronization is not:
   ClickHouse QA, retrieve the query-gateway bearer token from its authoritative
   host at command runtime without printing or persisting it. Use preview builds
   only for final staging verification.
+- A signed-in render of `/` calls the ClickHouse-backed portal data layer, so
+  Supabase development credentials alone cannot exercise that page; the
+  analytics gateway URL and token are also required. For visual-only portal QA,
+  prefer a representative fixture-backed harness. Configure the real gateway
+  only when analytics behavior itself is under test, and never substitute a
+  production Supabase read for missing ClickHouse access.
 
 ## Development And Verification
 

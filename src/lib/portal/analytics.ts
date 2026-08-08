@@ -551,7 +551,7 @@ export async function fetchPortalBangersPage(
 ): Promise<PortalBangersPage> {
   const params = new URLSearchParams({
     limit: String(Math.max(1, Math.min(100, Math.trunc(limit)))),
-    offset: String(Math.max(0, Math.min(5_000, Math.trunc(offset)))),
+    offset: String(Math.max(0, Math.min(1_000_000, Math.trunc(offset)))),
     sort: sort === 'recent' ? 'recent' : 'quotes',
     exclude_self: 'true',
     target_ca_users_only: scope === 'members' ? 'true' : 'false',

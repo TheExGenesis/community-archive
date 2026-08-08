@@ -44,14 +44,14 @@ describe('portal bangers route', () => {
   test('forwards bounded paging, ranking, scope, year, and search', async () => {
     const response = await GET(
       new NextRequest(
-        'https://community-archive.org/api/portal/bangers?offset=120&scope=members&sort=recent&year=2024&q=agency',
+        'https://community-archive.org/api/portal/bangers?offset=5001&scope=members&sort=recent&year=2024&q=agency',
       ),
     )
 
     expect(response.status).toBe(200)
     expect(getPortalBangersPageMock).toHaveBeenCalledWith({
       limit: 60,
-      offset: 120,
+      offset: 5001,
       scope: 'members',
       sort: 'recent',
       year: 2024,

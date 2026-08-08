@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const params = new URL(request.url).searchParams
-    const offset = boundedInteger(params.get('offset'), 0, 0, 5_000)
+    const offset = boundedInteger(params.get('offset'), 0, 0, 1_000_000)
     const year = params.has('year')
       ? boundedInteger(
           params.get('year'),

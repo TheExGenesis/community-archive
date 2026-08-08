@@ -357,8 +357,8 @@ describe('ClickHouse-backed portal analytics', () => {
       ],
       pagination: {
         limit: 60,
-        offset: 60,
-        nextOffset: 120,
+        offset: 5001,
+        nextOffset: 5061,
         totalAvailable: 183,
         snapshotSize: 1600,
         yearCounts: [{ year: 2024, count: 22 }],
@@ -369,7 +369,7 @@ describe('ClickHouse-backed portal analytics', () => {
     await expect(
       fetchPortalBangersPage(
         {
-          offset: 60,
+          offset: 5001,
           sort: 'recent',
           scope: 'members',
           year: 2024,
@@ -381,8 +381,8 @@ describe('ClickHouse-backed portal analytics', () => {
       tweets: [expect.objectContaining({ id: '123', quoteCount: 42 })],
       pagination: {
         limit: 60,
-        offset: 60,
-        nextOffset: 120,
+        offset: 5001,
+        nextOffset: 5061,
         totalAvailable: 183,
         snapshotSize: 1600,
         yearCounts: [{ year: 2024, count: 22 }],
@@ -393,7 +393,7 @@ describe('ClickHouse-backed portal analytics', () => {
       ['top-quotes'],
       new URLSearchParams({
         limit: '60',
-        offset: '60',
+        offset: '5001',
         sort: 'recent',
         exclude_self: 'true',
         target_ca_users_only: 'true',

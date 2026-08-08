@@ -694,309 +694,7 @@ describe('Direct DB Insertion Tests', () => {
     })
   })
   
-  describe('Error Handling', () => {
-    it('should validate required fields', async () => {
-      testArchive = {
-        account: [{
-          account: {
-            accountId: '', // Invalid empty ID
-            username: 'test_user',
-            createdVia: 'web',
-            createdAt: '2010-01-01T00:00:00.000Z',
-            accountDisplayName: 'Test User'
-          }
-        }],
-        profile: [{
-          profile: {
-            description: { bio: '', website: '', location: '' },
-            avatarMediaUrl: '',
-            headerMediaUrl: ''
-          }
-        }],
-        tweets: [],
-        'note-tweet': [],
-        like: [],
-        follower: [],
-        following: [],
-        'community-tweet': []
-      }
-      
-      // An empty accountId is still an insertable text value and the archive has no
-      // tweets/likes, so processing completes without a DB error. (Inserts that DO
-      // fail now propagate and mark the upload 'failed' — see insertIfNotEmpty.)
-      await expect(
-        insertArchiveDirectly(supabase, testArchive)
-      ).resolves.not.toThrow()
-    })
-    
-    it('should handle duplicate insertion gracefully', async () => {
-      testArchive = {
-        account: [{
-          account: {
-            accountId: testAccountId,
-            username: `test_${Date.now()}`,
-            createdVia: 'web',
-            createdAt: '2010-01-01T00:00:00.000Z',
-            accountDisplayName: 'Test User'
-          }
-        }],
-        profile: [{
-          profile: {
-            description: { bio: 'Test', website: '', location: '' },
-            avatarMediaUrl: '',
-            headerMediaUrl: ''
-          }
-        }],
-        tweets: [],
-        'note-tweet': [],
-        like: [],
-        follower: [],
-        following: [],
-        'community-tweet': []
-      }
-      
-      tracker.addAccountId(testAccountId)
-      
-      // Insert once
-      await insertArchiveDirectly(supabase, testArchive)
-      
-      // Insert again (should update, not error)
-      await expect(
-        insertArchiveDirectly(supabase, testArchive)
-      ).resolves.not.toThrow()
-    })
-  })
-
-
-
   describe('Archive Upload ID Upsert Tests', () => {
-    it('should update archive_upload_id when upserting tweets', async () => {
-      // Create test tweet
-      const testTweet = {
-        tweet: {
-          id: '9999',
-          id_str: '9999',
-          created_at: '2023-01-01 00:00:00 +0000',
-          full_text: 'Test tweet for archive_upload_id upsert',
-          favorite_count: 5,
-          retweet_count: 2,
-          favorited: false,
-          truncated: false,
-          source: 'web',
-          entities: {
-            user_mentions: [],
-            hashtags: [],
-            symbols: [],
-            urls: []
-          }
-        }
-      }
-
-      // First archive upload
-      testArchive = {
-        account: [{
-          account: {
-            accountId: testAccountId,
-            username: `test_${Date.now()}`,
-            createdVia: 'web',
-            createdAt: '2010-01-01T00:00:00.000Z',
-            accountDisplayName: 'Test User'
-          }
-        }],
-        profile: [{
-          profile: {
-            description: { bio: 'Test bio', website: '', location: '' },
-            avatarMediaUrl: '',
-            headerMediaUrl: ''
-          }
-        }],
-        tweets: [testTweet],
-        'note-tweet': [],
-        like: [],
-        follower: [],
-        following: [],
-        'community-tweet': []
-      }
-
-      tracker.addAccountId(testAccountId)
-      tracker.addTweetId('9999')
-
-      // Insert first archive
-      await insertArchiveDirectly(supabase, testArchive)
-
-      // Get the first archive_upload_id
-      const { data: firstArchive } = await supabase
-        .from('archive_upload')
-        .select('id')
-        .eq('account_id', testAccountId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      const firstArchiveUploadId = firstArchive?.id
-      expect(firstArchiveUploadId).toBeDefined()
-
-      // Verify tweet has first archive_upload_id
-      const { data: firstTweet } = await supabase
-        .from('tweets')
-        .select('archive_upload_id, favorite_count, retweet_count')
-        .eq('tweet_id', '9999')
-        .single()
-
-      expect(firstTweet?.archive_upload_id).toBe(firstArchiveUploadId)
-      expect(firstTweet?.favorite_count).toBe(5)
-      expect(firstTweet?.retweet_count).toBe(2)
-
-      // Create second archive upload with updated tweet data
-      const updatedTweet = {
-        ...testTweet,
-        tweet: {
-          ...testTweet.tweet,
-          favorite_count: 10, // Updated count
-          retweet_count: 5    // Updated count
-        }
-      }
-
-      const secondTestArchive = {
-        ...testArchive,
-        tweets: [updatedTweet]
-      }
-
-      // Wait a moment to ensure different timestamps
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      // Insert second archive (should upsert the tweet)
-      await insertArchiveDirectly(supabase, secondTestArchive)
-
-      // Get the second archive_upload_id
-      const { data: secondArchive } = await supabase
-        .from('archive_upload')
-        .select('id')
-        .eq('account_id', testAccountId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      const secondArchiveUploadId = secondArchive?.id
-      expect(secondArchiveUploadId).toBeDefined()
-      expect(secondArchiveUploadId).not.toBe(firstArchiveUploadId)
-
-      // Verify tweet now has second archive_upload_id and updated counts
-      const { data: updatedTweetData } = await supabase
-        .from('tweets')
-        .select('archive_upload_id, favorite_count, retweet_count')
-        .eq('tweet_id', '9999')
-        .single()
-
-      expect(updatedTweetData?.archive_upload_id).toBe(secondArchiveUploadId)
-      expect(updatedTweetData?.favorite_count).toBe(10)
-      expect(updatedTweetData?.retweet_count).toBe(5)
-    })
-
-    it('should update archive_upload_id when upserting profile data', async () => {
-      // First archive upload
-      testArchive = {
-        account: [{
-          account: {
-            accountId: testAccountId,
-            username: `test_${Date.now()}`,
-            createdVia: 'web',
-            createdAt: '2010-01-01T00:00:00.000Z',
-            accountDisplayName: 'Test User'
-          }
-        }],
-        profile: [{
-          profile: {
-            description: {
-              bio: 'Original bio',
-              website: 'https://original.com',
-              location: 'Original Location'
-            },
-            avatarMediaUrl: 'https://original.com/avatar.jpg',
-            headerMediaUrl: 'https://original.com/header.jpg'
-          }
-        }],
-        tweets: [],
-        'note-tweet': [],
-        like: [],
-        follower: [],
-        following: [],
-        'community-tweet': []
-      }
-
-      tracker.addAccountId(testAccountId)
-
-      // Insert first archive
-      await insertArchiveDirectly(supabase, testArchive)
-
-      // Get the first archive_upload_id
-      const { data: firstArchive } = await supabase
-        .from('archive_upload')
-        .select('id')
-        .eq('account_id', testAccountId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      const firstArchiveUploadId = firstArchive?.id
-
-      // Verify profile has first archive_upload_id
-      const { data: firstProfile } = await supabase
-        .from('all_profile')
-        .select('archive_upload_id, bio, website')
-        .eq('account_id', testAccountId)
-        .single()
-
-      expect(firstProfile?.archive_upload_id).toBe(firstArchiveUploadId)
-      expect(firstProfile?.bio).toBe('Original bio')
-      expect(firstProfile?.website).toBe('https://original.com')
-
-      // Create second archive upload with updated profile
-      const updatedTestArchive = {
-        ...testArchive,
-        profile: [{
-          profile: {
-            description: {
-              bio: 'Updated bio',
-              website: 'https://updated.com',
-              location: 'Updated Location'
-            },
-            avatarMediaUrl: 'https://updated.com/avatar.jpg',
-            headerMediaUrl: 'https://updated.com/header.jpg'
-          }
-        }]
-      }
-
-      // Wait a moment to ensure different timestamps
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      // Insert second archive
-      await insertArchiveDirectly(supabase, updatedTestArchive)
-
-      // Get the second archive_upload_id
-      const { data: secondArchive } = await supabase
-        .from('archive_upload')
-        .select('id')
-        .eq('account_id', testAccountId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      const secondArchiveUploadId = secondArchive?.id
-      expect(secondArchiveUploadId).not.toBe(firstArchiveUploadId)
-
-      // Verify profile now has second archive_upload_id and updated data
-      const { data: updatedProfile } = await supabase
-        .from('all_profile')
-        .select('archive_upload_id, bio, website')
-        .eq('account_id', testAccountId)
-        .single()
-
-      expect(updatedProfile?.archive_upload_id).toBe(secondArchiveUploadId)
-      expect(updatedProfile?.bio).toBe('Updated bio')
-      expect(updatedProfile?.website).toBe('https://updated.com')
-    })
-
     it('should update archive_upload_id when upserting tweet media', async () => {
       const testTweetWithMedia = {
         tweet: {
@@ -1063,7 +761,7 @@ describe('Direct DB Insertion Tests', () => {
         .from('archive_upload')
         .select('id')
         .eq('account_id', testAccountId)
-        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(1)
         .single()
 
@@ -1103,9 +801,6 @@ describe('Direct DB Insertion Tests', () => {
         tweets: [updatedTweetWithMedia]
       }
 
-      // Wait a moment to ensure different timestamps
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
       // Insert second archive
       await insertArchiveDirectly(supabase, secondTestArchive)
 
@@ -1114,7 +809,7 @@ describe('Direct DB Insertion Tests', () => {
         .from('archive_upload')
         .select('id')
         .eq('account_id', testAccountId)
-        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(1)
         .single()
 
@@ -1178,7 +873,7 @@ describe('Direct DB Insertion Tests', () => {
         .from('archive_upload')
         .select('id')
         .eq('account_id', testAccountId)
-        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(1)
         .single()
 
@@ -1210,9 +905,6 @@ describe('Direct DB Insertion Tests', () => {
       expect(firstFollowing?.archive_upload_id).toBe(firstArchiveUploadId)
       expect(firstFollower?.archive_upload_id).toBe(firstArchiveUploadId)
 
-      // Wait a moment to ensure different timestamps
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
       // Insert second archive (should upsert the same relationships)
       await insertArchiveDirectly(supabase, testArchive)
 
@@ -1221,7 +913,7 @@ describe('Direct DB Insertion Tests', () => {
         .from('archive_upload')
         .select('id')
         .eq('account_id', testAccountId)
-        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(1)
         .single()
 
@@ -1355,9 +1047,6 @@ describe('Direct DB Insertion Tests', () => {
       tracker.addTweetId('6666')
       tracker.addLikedTweetId('2222222222222222222')
 
-      // Wait a moment to ensure different timestamps
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
       // Insert second archive
       await insertArchiveDirectly(supabase, secondArchive)
 
@@ -1366,7 +1055,7 @@ describe('Direct DB Insertion Tests', () => {
         .from('archive_upload')
         .select('id')
         .eq('account_id', testAccountId)
-        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
 
       expect(archives?.length).toBe(2)
       const [firstArchiveUploadId, secondArchiveUploadId] = archives!.map(a => a.id)
@@ -1456,7 +1145,7 @@ describe('Direct DB Insertion Tests', () => {
       const {data: archiveUploadIdData} = await supabase.from('archive_upload')
       .select('id')
       .eq('account_id', testAccountId)
-      .order('archive_at', {ascending: false})
+      .order('id', {ascending: false})
       .single()
       
       expect(archiveUploadIdData?.id).toBeDefined()

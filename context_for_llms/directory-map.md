@@ -25,7 +25,6 @@ This document outlines the directory structure of the Community Archive project.
 ├── node_modules/                # Project dependencies
 ├── public/                      # Static assets served by the Next.js application
 │   ├── placeholder.jpg          # Placeholder image
-│   ├── mockServiceWorker.js     # Mock service worker for testing or development
 │   └── openapi.json             # OpenAPI specification for the API
 ├── scratchpad/                  # Temporary files or experimental code
 ├── scripts/                     # Various scripts for development, data processing, etc.
@@ -73,11 +72,6 @@ This document outlines the directory structure of the Community Archive project.
 │   │   │   └── page.tsx         # Page component providing instructions for users to manually delete DMs from their Twitter archive prior to upload.
 │   │   ├── search/              # Search page and related components
 │   │   │   └── page.tsx         # Page component for the main search interface. Uses `AdvancedSearchForm` and `TweetList` to display results based on URL query params.
-│   │   ├── test-examples/       # Example pages and components for testing purposes
-│   │   │   ├── counter.test.tsx # Test file for the counter component
-│   │   │   ├── counter.tsx      # Example counter component
-│   │   │   ├── page.test.tsx    # Test file for the example page
-│   │   │   └── page.tsx         # Example page for testing
 │   │   ├── tweets/              # Pages related to displaying tweets
 │   │   │   ├── [tweet_id]/      # Dynamic route for individual tweet permalink pages
 │   │   │   │   └── page.tsx     # Page component for displaying a single tweet specified by `tweet_id`.
@@ -109,8 +103,6 @@ This document outlines the directory structure of the Community Archive project.
 │   │   ├── MobileMenu.tsx       # Mobile navigation menu component, uses a sheet (drawer) for links.
 │   │   ├── NextLogo.tsx         # Next.js logo component
 │   │   ├── OpenCollectiveContributors.tsx # Component to display Open Collective members (functionality largely merged into/superseded by TieredSupportersDisplay).
-│   │   ├── ReactQueryExample.test.tsx # Test for ReactQueryExample component
-│   │   ├── ReactQueryExample.tsx  # Example component using React Query
 │   │   ├── SearchTweets.tsx     # Older/alternative component for searching tweets, using direct search functions from `pgSearch.ts`. Displays results using the `Tweet` component. Not the primary search interface.
 │   │   ├── ShowcasedApps.tsx    # Displays applications built with the archive, typically in a carousel.
 │   │   ├── SignIn.tsx           # Client component for user authentication. Uses `useAuthAndArchive` hook. Provides mock sign-in (email/password to `/api/auth/changeuserid`) for local dev (without remote DB) and Twitter OAuth via Supabase for other environments. Handles sign-out. Displays user status and auth actions.
@@ -124,8 +116,7 @@ This document outlines the directory structure of the Community Archive project.
 │   │   ├── UploadHomepageSection.tsx # Client component for the homepage managing archive uploads. Shows previous upload status, handles new .zip file selection and initial processing, then opens `FileUploadDialog`. Includes archive deletion functionality.
 │   │   └── activity-tracker.tsx # Client component that renders a GitHub-style activity calendar/heatmap. Displays daily activity counts with color-coded intensity and tooltips for details.
 │   ├── hooks/                   # Custom React hooks
-│   │   ├── useAuthAndArchive.tsx # Custom hook to manage user authentication state (subscribes to Supabase `onAuthStateChange`, fetches session) and checks if the current user has uploaded their archive by querying the `archive_upload` table using `userMetadata.provider_id`. Returns `userMetadata` and `isArchiveUploaded`.
-│   │   └── useGetMessage.ts     # Custom React Query hook that fetches data from the example `/api/message` endpoint using `axios`. Used by `ReactQueryExample.tsx`.
+│   │   └── useAuthAndArchive.tsx # Custom hook to manage user authentication state (subscribes to Supabase `onAuthStateChange`, fetches session) and checks if the current user has uploaded their archive by querying the `archive_upload` table using `userMetadata.provider_id`. Returns `userMetadata` and `isArchiveUploaded`.
 │   ├── lib/                     # Core logic, utility functions, and Supabase client setup
 │   │   ├── queries/             # Database query functions/utilities
 │   │   │   └── tweetQueries.ts  # Contains `fetchTweets` function for generalized tweet fetching with `FilterCriteria`, used by `TweetList.tsx`.
@@ -150,16 +141,9 @@ This document outlines the directory structure of the Community Archive project.
 │   │   ├── types.ts             # Custom TypeScript types for the application, including `TimelineTweet`, `FilterCriteria`, `TweetMediaItem`, etc.
 │   │   ├── user.ts              # Exports utility functions `getFirstTweets` and `getTopTweets` to fetch a user's initial or most popular tweets.
 │   │   └── user-utils.ts        # Exports `formatUserData` function to transform raw user data into a `FormattedUser` type, handling potentially array-based profile information.
-│   ├── mocks/                   # Mock data or service implementations for testing (likely with MSW - Mock Service Worker)
-│   │   ├── browser.ts           # MSW setup for browser environments
-│   │   ├── handlers.ts          # MSW request handlers
-│   │   ├── index.ts             # Main export for mocks
-│   │   └── server.ts            # MSW setup for server environments (e.g., Node tests)
 │   ├── providers/               # React context providers
 │   │   ├── ReactQueryProvider.tsx # Client component that initializes and provides a `QueryClient` from `@tanstack/react-query` for client-side server state management (fetching, caching).
 │   │   └── ThemeProvider.tsx      # Client component wrapper around `next-themes/ThemeProvider` to enable light/dark mode switching.
-│   ├── test/                    # Test files and configurations
-│   │   └── test-utils.tsx       # Utility functions for testing
 │   ├── utils/                   # General utility functions for the application.
 │   │   ├── supabase.ts          # Utility functions for creating Supabase clients (browser, server, admin, middleware) with environment-aware configurations.
 │   │   └── tailwind.ts          # Utility function `cn` for conditionally merging Tailwind CSS classes using `clsx` and `tailwind-merge`.

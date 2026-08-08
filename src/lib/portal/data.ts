@@ -456,8 +456,16 @@ export async function loadOptionalPortalData<T>(
   loader: () => Promise<T>,
   fallback: T,
 ): Promise<T> {
+  return (await loadPortalComponentData(section, loader, fallback)).data
+}
+
+export async function loadPortalComponentData<T>(
+  section: string,
+  loader: () => Promise<T>,
+  fallback: T,
+): Promise<{ data: T; failed: boolean }> {
   try {
-    return await loader()
+    return { data: await loader(), failed: false }
   } catch (error) {
     console.error(
       JSON.stringify({
@@ -467,7 +475,7 @@ export async function loadOptionalPortalData<T>(
         error: error instanceof Error ? error.message : String(error),
       }),
     )
-    return fallback
+    return { data: fallback, failed: true }
   }
 }
 

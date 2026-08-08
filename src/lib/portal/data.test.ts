@@ -8,6 +8,7 @@ import {
   getPortalStreamPage,
   getPortalStreamUpdates,
   loadOptionalPortalData,
+  loadPortalComponentData,
   portalDataSourceKey,
   resolvePortalReadConfig,
   selectDailyBangers,
@@ -56,6 +57,25 @@ describe('portal read source', () => {
 })
 
 describe('optional portal data', () => {
+  test('reports a component failure while returning its local fallback', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation()
+
+    await expect(
+      loadPortalComponentData(
+        'trends-explorer',
+        async () => {
+          throw new Error('Analytics gateway is temporarily unavailable')
+        },
+        { series: [] },
+      ),
+    ).resolves.toEqual({ data: { series: [] }, failed: true })
+
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('"section":"trends-explorer"'),
+    )
+    consoleError.mockRestore()
+  })
+
   test('returns a fallback without rejecting the page when a section fails', async () => {
     const consoleError = jest.spyOn(console, 'error').mockImplementation()
 

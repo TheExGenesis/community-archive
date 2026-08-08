@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import Link from 'next/link'
+import { CHART_TERMS } from '@/lib/portal/trendConfig'
 import type { PortalTrends, PortalTweet, TermSeries } from '@/lib/portal/types'
 import { TweetRow } from './TweetRow'
 import { BODY, CARD, MUTED, SERIF } from './styles'
@@ -44,6 +45,23 @@ const SERIES_COLORS = [
   '#f97316',
   '#84cc16',
 ]
+const DEFAULT_TREND_TERMS = CHART_TERMS.map(({ term }) => term)
+
+async function requestTrendSeries(terms: string[]): Promise<SeriesResponse> {
+  const params = new URLSearchParams({ view: 'series' })
+  terms.forEach((term) => params.append('q', term))
+  const response = await fetch(`/api/portal/trends?${params.toString()}`)
+  const body = (await response
+    .json()
+    .catch(() => null)) as SeriesResponse | null
+  if (!response.ok) {
+    throw new Error(body?.error || 'Could not load those trends')
+  }
+  if (!body || !Array.isArray(body.years) || !Array.isArray(body.series)) {
+    throw new Error('The trends service returned an invalid response')
+  }
+  return body
+}
 
 function niceCeiling(value: number): number {
   if (value <= 0) return 1
@@ -74,8 +92,10 @@ function filterLabel(term: string, filter: FeedFilter): string {
 
 export default function TrendsExplorer({
   initialTrends,
+  initialLoadFailed = false,
 }: {
   initialTrends: PortalTrends
+  initialLoadFailed?: boolean
 }) {
   const [years, setYears] = useState(initialTrends.years)
   const [series, setSeries] = useState(initialTrends.series)
@@ -97,7 +117,11 @@ export default function TrendsExplorer({
   const [scale, setScale] = useState<TrendScale>('normalized')
   const [termInput, setTermInput] = useState('')
   const [isAdding, setIsAdding] = useState(false)
+  const [isRetryingDefaults, setIsRetryingDefaults] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
+  const [chartError, setChartError] = useState<string | null>(
+    initialLoadFailed ? 'The default trends could not be loaded.' : null,
+  )
   const [evidence, setEvidence] = useState<PortalTweet[]>([])
   const [isLoadingEvidence, setIsLoadingEvidence] = useState(true)
   const [feedError, setFeedError] = useState<string | null>(null)
@@ -145,9 +169,14 @@ export default function TrendsExplorer({
             signal: controller.signal,
           },
         )
-        const body = (await response.json()) as FeedResponse
+        const body = (await response
+          .json()
+          .catch(() => null)) as FeedResponse | null
         if (!response.ok) {
-          throw new Error(body.error || 'Could not load matching tweets')
+          throw new Error(body?.error || 'Could not load matching tweets')
+        }
+        if (!body || !Array.isArray(body.tweets)) {
+          throw new Error('The tweet feed returned an invalid response')
         }
         setEvidence(body.tweets)
       } catch (error) {
@@ -204,14 +233,8 @@ export default function TrendsExplorer({
     }
 
     setIsAdding(true)
-    const params = new URLSearchParams({ view: 'series' })
-    newTerms.forEach((term) => params.append('q', term))
     try {
-      const response = await fetch(`/api/portal/trends?${params.toString()}`)
-      const body = (await response.json()) as SeriesResponse
-      if (!response.ok) {
-        throw new Error(body.error || 'Could not add those trends')
-      }
+      const body = await requestTrendSeries(newTerms)
 
       const firstColorIndex = series.length
       const additions = body.series.map((item, index) => ({
@@ -230,6 +253,7 @@ export default function TrendsExplorer({
           additions.map(({ term }) => [term, 'include' as const]),
         ),
       }))
+      setChartError(null)
       setTermInput('')
     } catch (error) {
       setAddError(
@@ -237,6 +261,44 @@ export default function TrendsExplorer({
       )
     } finally {
       setIsAdding(false)
+    }
+  }
+
+  const retryDefaultTrends = async () => {
+    setIsRetryingDefaults(true)
+    try {
+      const body = await requestTrendSeries(DEFAULT_TREND_TERMS)
+      const defaultColors = new Map(
+        CHART_TERMS.map(({ term, color }) => [term, color]),
+      )
+      const defaults = body.series.map((item) => ({
+        ...item,
+        color: defaultColors.get(item.term) ?? item.color,
+      }))
+      setYears(body.years)
+      setSeries(defaults)
+      setChartEnabled(
+        Object.fromEntries(
+          defaults.map(({ term }, index) => [term, index < 4]),
+        ),
+      )
+      setFeedFilters(
+        Object.fromEntries(
+          defaults.map(({ term }, index) => [
+            term,
+            index === 0 ? 'include' : 'off',
+          ]),
+        ),
+      )
+      setChartError(null)
+    } catch (error) {
+      setChartError(
+        error instanceof Error
+          ? error.message
+          : 'The default trends could not be loaded.',
+      )
+    } finally {
+      setIsRetryingDefaults(false)
     }
   }
 
@@ -309,7 +371,7 @@ export default function TrendsExplorer({
                 />
                 <button
                   type="submit"
-                  disabled={isAdding}
+                  disabled={isAdding || isRetryingDefaults}
                   className="h-10 rounded-[4px] bg-brand px-4 text-[13px] font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
                 >
                   {isAdding ? 'Adding…' : 'Add trends'}
@@ -363,6 +425,29 @@ export default function TrendsExplorer({
                   ))}
                 </div>
               </div>
+
+              {chartError && (
+                <div
+                  className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[4px] border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-950 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-100 sm:mx-5"
+                  role="alert"
+                >
+                  <div className="text-[12.5px]">
+                    <span className="font-bold">Chart data unavailable.</span>{' '}
+                    {chartError} Retry this chart without reloading the page;
+                    other dashboard areas are unaffected.
+                  </div>
+                  {series.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void retryDefaultTrends()}
+                      disabled={isRetryingDefaults}
+                      className="rounded-[4px] border border-amber-400 bg-white px-2.5 py-1.5 text-[11.5px] font-bold text-amber-950 hover:bg-amber-100 disabled:cursor-wait disabled:opacity-60 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-100"
+                    >
+                      {isRetryingDefaults ? 'Retrying…' : 'Retry defaults'}
+                    </button>
+                  )}
+                </div>
+              )}
 
               <div className="px-2 pb-1 pt-3 sm:px-4">
                 <svg
@@ -448,7 +533,9 @@ export default function TrendsExplorer({
                       fontSize={13}
                       className="fill-zinc-400 dark:fill-[#6d6d78]"
                     >
-                      Select a trend below to draw it.
+                      {series.length === 0
+                        ? 'Add a trend above to start charting.'
+                        : 'Select a trend below to draw it.'}
                     </text>
                   )}
                 </svg>
@@ -491,6 +578,11 @@ export default function TrendsExplorer({
                       </button>
                     )
                   })}
+                  {series.length === 0 && (
+                    <span className={`py-1 text-[12px] ${MUTED}`}>
+                      No trend series loaded.
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

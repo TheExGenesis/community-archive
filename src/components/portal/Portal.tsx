@@ -27,6 +27,8 @@ import HomepageSearch from '@/components/HomepageSearch'
 
 export type PortalView = 'home' | 'stream'
 
+const HOME_LIVE_STREAM_LIMIT = 3
+
 const compact = (n: number) =>
   new Intl.NumberFormat('en', {
     notation: 'compact',
@@ -567,7 +569,7 @@ export default function Portal({
                   action={{ label: 'Open firehose', href: '/stream' }}
                 />
                 <div className="flex flex-col">
-                  {visible.slice(0, 5).map((t, i) => (
+                  {visible.slice(0, HOME_LIVE_STREAM_LIMIT).map((t, i) => (
                     <TweetRow key={t.id} tweet={t} compact animate={i === 0} />
                   ))}
                   {visible.length === 0 && (

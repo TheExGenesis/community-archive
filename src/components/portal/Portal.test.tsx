@@ -31,6 +31,17 @@ const freshTweet: PortalTweet = {
   createdAt: '2026-08-07T12:00:30.000Z',
 }
 
+const previewTweets = Array.from(
+  { length: 5 },
+  (_, index): PortalTweet => ({
+    ...seedTweet,
+    id: String(200 + index),
+    text: `preview tweet ${index + 1}`,
+    observedAt: `2026-08-07T12:0${index}:00.000Z`,
+    createdAt: `2026-08-07T11:5${index}:00.000Z`,
+  }),
+)
+
 const data: PortalData = {
   stats: {
     totalTweets: 14_000_000,
@@ -128,6 +139,33 @@ describe.each<PortalView>(['home', 'stream'])(
       expect(screen.getByText('14,000,100 tweets')).toBeInTheDocument()
       if (view === 'home') {
         expect(screen.getByText('14,000,100')).toBeInTheDocument()
+      }
+
+      unmount()
+    })
+
+    test('keeps the dashboard preview shorter than the full stream', async () => {
+      jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ tweets: [], updateCursor: null }),
+      } as Response)
+
+      const { unmount } = render(
+        <Portal data={{ ...data, initialStream: previewTweets }} view={view} />,
+      )
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      expect(screen.getByText('preview tweet 1')).toBeInTheDocument()
+      expect(screen.getByText('preview tweet 3')).toBeInTheDocument()
+      if (view === 'home') {
+        expect(screen.queryByText('preview tweet 4')).not.toBeInTheDocument()
+        expect(screen.queryByText('preview tweet 5')).not.toBeInTheDocument()
+      } else {
+        expect(screen.getByText('preview tweet 4')).toBeInTheDocument()
+        expect(screen.getByText('preview tweet 5')).toBeInTheDocument()
       }
 
       unmount()

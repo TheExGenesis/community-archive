@@ -55,6 +55,17 @@ const data: PortalData = {
   research,
   recentBangers: [banger],
   historicalBangers: [{ ...banger, id: '99', text: 'A historical banger' }],
+  failures: {
+    liveAnalytics: false,
+    memberCount: false,
+    joinedThisWeek: false,
+    corpusRange: false,
+    trends: false,
+    initialStream: false,
+    research: false,
+    recentBangers: false,
+    historicalBangers: false,
+  },
 }
 
 test('renders the balanced homepage composition and editorial labels', async () => {

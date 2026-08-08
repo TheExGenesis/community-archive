@@ -66,6 +66,17 @@ const data: PortalData = {
   research: [],
   recentBangers: [],
   historicalBangers: [],
+  failures: {
+    liveAnalytics: false,
+    memberCount: false,
+    joinedThisWeek: false,
+    corpusRange: false,
+    trends: false,
+    initialStream: false,
+    research: false,
+    recentBangers: false,
+    historicalBangers: false,
+  },
 }
 
 describe.each<PortalView>(['home', 'stream'])(
@@ -183,3 +194,66 @@ describe.each<PortalView>(['home', 'stream'])(
     })
   },
 )
+
+describe('portal component failures', () => {
+  beforeEach(() => {
+    jest.useFakeTimers()
+    jest.setSystemTime(Date.parse('2026-08-07T13:00:00.000Z'))
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 503,
+    } as Response)
+  })
+
+  afterEach(() => {
+    jest.clearAllTimers()
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+  })
+
+  test('renders local fallbacks while the rest of the homepage remains usable', async () => {
+    const failedData: PortalData = {
+      ...data,
+      initialStream: [],
+      failures: Object.fromEntries(
+        Object.keys(data.failures).map((key) => [key, true]),
+      ) as PortalData['failures'],
+    }
+
+    render(<Portal data={failedData} view="home" />)
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(
+      screen.getByText(
+        'We preserve public conversations as open source infrastructure.',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Tweet totals are temporarily unavailable.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Member count is temporarily unavailable.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Corpus range is temporarily unavailable.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Live stream is temporarily unavailable.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Trending terms are temporarily unavailable.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Featured research is temporarily unavailable.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Recent bangers are temporarily unavailable.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Historical bangers are temporarily unavailable.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Explore the archive')).toBeInTheDocument()
+  })
+})

@@ -15,6 +15,9 @@ import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
 import { TweetRow } from './TweetRow'
 import {
   estimateLiveTweetCount,
+  estimateLiveTweetGain,
+  interpolateLiveTweetCount,
+  LIVE_COUNTER_CATCH_UP_DURATION_MS,
   liveCounterRefreshInterval,
   PORTAL_STREAM_POLL_INTERVAL_MS,
 } from './live'
@@ -143,25 +146,73 @@ function LiveCounter({
   // Keep the server and first client render identical, then begin projecting
   // from the analytics snapshot after hydration.
   const [displayCount, setDisplayCount] = useState(count)
+  const displayCountRef = useRef(count)
 
   useEffect(() => {
-    const update = () =>
-      setDisplayCount((current) =>
-        Math.max(
-          current,
-          estimateLiveTweetCount({
-            totalTweets: count,
-            streamedLast24Hours: gain,
-            generatedAt,
-          }),
-        ),
-      )
-    update()
+    let animationInterval: number | null = null
+    let liveInterval: number | null = null
+    const animationStartedAt = Date.now()
+    const startCount = Math.max(count, displayCountRef.current)
+    const targetCount = estimateLiveTweetCount({
+      totalTweets: count,
+      streamedLast24Hours: gain,
+      generatedAt,
+      now: animationStartedAt,
+    })
 
-    const intervalMs = liveCounterRefreshInterval(gain)
-    if (intervalMs === null) return
-    const interval = window.setInterval(update, intervalMs)
-    return () => window.clearInterval(interval)
+    const updateDisplayCount = (nextCount: number) => {
+      const monotonicCount = Math.max(displayCountRef.current, nextCount)
+      if (monotonicCount === displayCountRef.current) return
+      displayCountRef.current = monotonicCount
+      setDisplayCount(monotonicCount)
+    }
+
+    const startLiveUpdates = () => {
+      const intervalMs = liveCounterRefreshInterval(gain)
+      if (intervalMs === null) return
+      const liveStartedAt = Date.now()
+      const liveStartCount = displayCountRef.current
+      liveInterval = window.setInterval(() => {
+        updateDisplayCount(
+          liveStartCount +
+            estimateLiveTweetGain(gain, Date.now() - liveStartedAt),
+        )
+      }, intervalMs)
+    }
+
+    const prefersReducedMotion =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    if (prefersReducedMotion || targetCount <= startCount) {
+      updateDisplayCount(targetCount)
+      startLiveUpdates()
+    } else {
+      const animate = () => {
+        const elapsedMs = Date.now() - animationStartedAt
+        updateDisplayCount(
+          interpolateLiveTweetCount({
+            startCount,
+            targetCount,
+            elapsedMs,
+          }),
+        )
+        if (elapsedMs >= LIVE_COUNTER_CATCH_UP_DURATION_MS) {
+          if (animationInterval !== null) {
+            window.clearInterval(animationInterval)
+            animationInterval = null
+          }
+          startLiveUpdates()
+        }
+      }
+      animate()
+      animationInterval = window.setInterval(animate, 100)
+    }
+
+    return () => {
+      if (animationInterval !== null) {
+        window.clearInterval(animationInterval)
+      }
+      if (liveInterval !== null) window.clearInterval(liveInterval)
+    }
   }, [count, gain, generatedAt])
 
   return (

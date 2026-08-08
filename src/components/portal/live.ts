@@ -1,6 +1,15 @@
 const DAY_MS = 86_400_000
 
 export const PORTAL_STREAM_POLL_INTERVAL_MS = 60_000
+export const LIVE_COUNTER_CATCH_UP_DURATION_MS = 60_000
+
+export function estimateLiveTweetGain(
+  streamedLast24Hours: number,
+  elapsedMs: number,
+): number {
+  if (streamedLast24Hours <= 0 || elapsedMs <= 0) return 0
+  return Math.floor((elapsedMs / DAY_MS) * streamedLast24Hours)
+}
 
 export function estimateLiveTweetCount({
   totalTweets,
@@ -19,8 +28,23 @@ export function estimateLiveTweetCount({
   }
 
   const elapsedMs = Math.min(Math.max(now - generatedAtMs, 0), DAY_MS)
-  const estimatedGain = Math.floor((elapsedMs / DAY_MS) * streamedLast24Hours)
-  return totalTweets + estimatedGain
+  return totalTweets + estimateLiveTweetGain(streamedLast24Hours, elapsedMs)
+}
+
+export function interpolateLiveTweetCount({
+  startCount,
+  targetCount,
+  elapsedMs,
+  durationMs = LIVE_COUNTER_CATCH_UP_DURATION_MS,
+}: {
+  startCount: number
+  targetCount: number
+  elapsedMs: number
+  durationMs?: number
+}): number {
+  if (targetCount <= startCount || durationMs <= 0) return startCount
+  const progress = Math.min(Math.max(elapsedMs / durationMs, 0), 1)
+  return startCount + Math.floor((targetCount - startCount) * progress)
 }
 
 export function liveCounterRefreshInterval(

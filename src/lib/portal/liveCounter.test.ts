@@ -1,5 +1,7 @@
 import {
   estimateLiveTweetCount,
+  interpolateLiveTweetCount,
+  LIVE_COUNTER_CATCH_UP_DURATION_MS,
   liveCounterRefreshInterval,
   PORTAL_STREAM_POLL_INTERVAL_MS,
 } from '@/components/portal/live'
@@ -42,5 +44,25 @@ describe('portal live updates', () => {
     expect(liveCounterRefreshInterval(24)).toBe(PORTAL_STREAM_POLL_INTERVAL_MS)
     expect(liveCounterRefreshInterval(8_640)).toBe(10_000)
     expect(liveCounterRefreshInterval(864_000)).toBe(1_000)
+  })
+
+  test('animates the catch-up difference evenly over one minute', () => {
+    const input = { startCount: 14_000_000, targetCount: 14_012_000 }
+
+    expect(interpolateLiveTweetCount({ ...input, elapsedMs: 0 })).toBe(
+      14_000_000,
+    )
+    expect(
+      interpolateLiveTweetCount({
+        ...input,
+        elapsedMs: LIVE_COUNTER_CATCH_UP_DURATION_MS / 2,
+      }),
+    ).toBe(14_006_000)
+    expect(
+      interpolateLiveTweetCount({
+        ...input,
+        elapsedMs: LIVE_COUNTER_CATCH_UP_DURATION_MS,
+      }),
+    ).toBe(14_012_000)
   })
 })

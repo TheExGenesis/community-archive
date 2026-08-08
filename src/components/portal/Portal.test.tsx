@@ -58,6 +58,7 @@ describe.each<PortalView>(['home', 'stream'])(
   (view) => {
     beforeEach(() => {
       jest.useFakeTimers()
+      jest.setSystemTime(Date.parse('2026-08-07T13:00:00.000Z'))
     })
 
     afterEach(() => {
@@ -89,9 +90,16 @@ describe.each<PortalView>(['home', 'stream'])(
         'after=2026-08-07T12%3A00%3A00.000Z&afterId=100',
       )
       expect(screen.getByText('fresh tweet')).toBeInTheDocument()
+      expect(screen.getByText('14,000,000 tweets')).toBeInTheDocument()
 
       await act(async () => {
-        jest.advanceTimersByTime(59_999)
+        jest.advanceTimersByTime(30_000)
+        await Promise.resolve()
+      })
+      expect(screen.getByText('14,000,050 tweets')).toBeInTheDocument()
+
+      await act(async () => {
+        jest.advanceTimersByTime(29_999)
         await Promise.resolve()
       })
       expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -102,6 +110,7 @@ describe.each<PortalView>(['home', 'stream'])(
         await Promise.resolve()
       })
       expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(screen.getByText('14,000,100 tweets')).toBeInTheDocument()
       expect(String(fetchMock.mock.calls[1][0])).toContain(
         'after=2026-08-07T12%3A01%3A00.000Z&afterId=101',
       )

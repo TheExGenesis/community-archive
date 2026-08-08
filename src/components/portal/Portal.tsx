@@ -669,7 +669,7 @@ export default function Portal({
               )}
             </div>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 lg:justify-between">
               <div className={CARD}>
                 <PanelHeader
                   title="Research"

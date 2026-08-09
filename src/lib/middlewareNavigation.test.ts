@@ -17,7 +17,7 @@ function challengeCookie(): string {
 test.each([
   ['the RSC header', 'https://community-archive.org/bangers', { rsc: '1' }],
   [
-    'the Vercel-preserved query marker',
+    'the RSC query marker',
     'https://community-archive.org/bangers?_rsc=preview',
     {},
   ],
@@ -30,6 +30,15 @@ test.each([
     'the Next router state header',
     'https://community-archive.org/bangers',
     { 'next-router-state-tree': '["",{}]' },
+  ],
+  [
+    'same-origin browser Fetch Metadata',
+    'https://community-archive.org/bangers',
+    {
+      'sec-fetch-dest': 'empty',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'same-origin',
+    },
   ],
 ])(
   'allows Next.js RSC requests identified by %s',
@@ -47,7 +56,10 @@ test.each([
 
     expect(response.status).toBe(200)
     expect(response.headers.get('x-middleware-next')).toBe('1')
-    if ('next-router-prefetch' in rscHeaders) {
+    if (
+      'next-router-prefetch' in rscHeaders ||
+      'sec-fetch-dest' in rscHeaders
+    ) {
       expect(response.cookies.get('__rl')).toBeUndefined()
     }
   },

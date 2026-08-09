@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { isMonitoringHealthRoute } from '@/lib/monitoringHealthRoute'
 import { createMiddlewareClient } from '@/utils/supabase'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -240,6 +241,7 @@ export async function middleware(request: NextRequest) {
   const pageRoute = isPageRoute(pathname)
   const previewBot = isPreviewBot(ua)
   const publicDocumentationRoute = isPublicDocumentationRoute(pathname)
+  const monitoringHealthRoute = isMonitoringHealthRoute(pathname)
   // Server Action POSTs go to the page route URL (e.g. POST /admin) but with
   // `next-action` header and Accept: text/x-component — not text/html. The
   // browser-fingerprint check would otherwise 403 them and the client sees
@@ -248,7 +250,7 @@ export async function middleware(request: NextRequest) {
     request.method === 'POST' && request.headers.has('next-action')
 
   // ── Stage 1: Bot User-Agent Detection (all routes) ──────────────────────
-  if (!previewBot && !publicDocumentationRoute) {
+  if (!previewBot && !publicDocumentationRoute && !monitoringHealthRoute) {
     // Block empty or missing UA
     if (!ua || ua.trim().length === 0) {
       return blocked(403, 'Forbidden')
@@ -344,7 +346,11 @@ export async function middleware(request: NextRequest) {
   // endpoints don't fight with the cookie/challenge flow. But unprotected
   // /api routes are a cheap DoS target, so apply the in-memory IP bucket
   // (no cookie, no challenge) here. Tighter quota than page routes.
-  if (pathname.startsWith('/api/') && process.env.NODE_ENV !== 'development') {
+  if (
+    pathname.startsWith('/api/') &&
+    !monitoringHealthRoute &&
+    process.env.NODE_ENV !== 'development'
+  ) {
     const ip = getIp(request)
     const country = request.headers.get('x-vercel-ip-country') || ''
     const isSG = country === 'SG'

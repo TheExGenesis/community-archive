@@ -242,6 +242,11 @@ export async function middleware(request: NextRequest) {
   const previewBot = isPreviewBot(ua)
   const publicDocumentationRoute = isPublicDocumentationRoute(pathname)
   const monitoringHealthRoute = isMonitoringHealthRoute(pathname)
+  const isRscRequest = request.headers.get('rsc') === '1'
+  const isRoutePrefetch =
+    isRscRequest &&
+    (request.headers.get('next-router-prefetch') === '1' ||
+      request.headers.get('purpose') === 'prefetch')
   // Server Action POSTs go to the page route URL (e.g. POST /admin) but with
   // `next-action` header and Accept: text/x-component — not text/html. The
   // browser-fingerprint check would otherwise 403 them and the client sees
@@ -272,7 +277,8 @@ export async function middleware(request: NextRequest) {
     pageRoute &&
     !previewBot &&
     !publicDocumentationRoute &&
-    !isServerAction
+    !isServerAction &&
+    !isRscRequest
   ) {
     const accept = request.headers.get('accept') || ''
     const acceptLang = request.headers.get('accept-language')
@@ -294,7 +300,7 @@ export async function middleware(request: NextRequest) {
   // ── Stage 3: Geo-Aware Rate Limiting (all page routes) ──────────────────
   // Skipped in development — local reloads and devtools hot-refreshes easily
   // burn through the 30 req/min budget and lock you out for a minute.
-  if (pageRoute && process.env.NODE_ENV !== 'development') {
+  if (pageRoute && !isRoutePrefetch && process.env.NODE_ENV !== 'development') {
     const ip = getIp(request)
     const country = request.headers.get('x-vercel-ip-country') || ''
     const isSG = country === 'SG'

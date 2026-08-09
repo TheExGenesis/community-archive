@@ -21,23 +21,37 @@ test.each([
     'https://community-archive.org/bangers?_rsc=preview',
     {},
   ],
-])('allows RSC prefetches identified by %s', async (_, url, rscHeaders) => {
-  const request = new NextRequest(url, {
-    headers: {
-      ...browserHeaders,
-      ...rscHeaders,
-      accept: '*/*',
-      cookie: `__cc=${challengeCookie()}`,
-      'next-router-prefetch': '1',
-    },
-  })
+  [
+    'the durable Next prefetch header',
+    'https://community-archive.org/bangers',
+    { 'next-router-prefetch': '1' },
+  ],
+  [
+    'the Next router state header',
+    'https://community-archive.org/bangers',
+    { 'next-router-state-tree': '["",{}]' },
+  ],
+])(
+  'allows Next.js RSC requests identified by %s',
+  async (_, url, rscHeaders) => {
+    const request = new NextRequest(url, {
+      headers: {
+        ...browserHeaders,
+        ...rscHeaders,
+        accept: '*/*',
+        cookie: `__cc=${challengeCookie()}`,
+      },
+    })
 
-  const response = await middleware(request)
+    const response = await middleware(request)
 
-  expect(response.status).toBe(200)
-  expect(response.headers.get('x-middleware-next')).toBe('1')
-  expect(response.cookies.get('__rl')).toBeUndefined()
-})
+    expect(response.status).toBe(200)
+    expect(response.headers.get('x-middleware-next')).toBe('1')
+    if ('next-router-prefetch' in rscHeaders) {
+      expect(response.cookies.get('__rl')).toBeUndefined()
+    }
+  },
+)
 
 test('keeps browser fingerprinting on document page requests', async () => {
   const request = new NextRequest('https://community-archive.org/bangers', {

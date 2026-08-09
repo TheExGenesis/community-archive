@@ -242,13 +242,14 @@ export async function middleware(request: NextRequest) {
   const previewBot = isPreviewBot(ua)
   const publicDocumentationRoute = isPublicDocumentationRoute(pathname)
   const monitoringHealthRoute = isMonitoringHealthRoute(pathname)
+  const isRoutePrefetch =
+    request.headers.get('next-router-prefetch') === '1' ||
+    request.headers.get('purpose') === 'prefetch'
   const isRscRequest =
     request.headers.get('rsc') === '1' ||
-    request.nextUrl.searchParams.has('_rsc')
-  const isRoutePrefetch =
-    isRscRequest &&
-    (request.headers.get('next-router-prefetch') === '1' ||
-      request.headers.get('purpose') === 'prefetch')
+    request.nextUrl.searchParams.has('_rsc') ||
+    isRoutePrefetch ||
+    request.headers.has('next-router-state-tree')
   // Server Action POSTs go to the page route URL (e.g. POST /admin) but with
   // `next-action` header and Accept: text/x-component — not text/html. The
   // browser-fingerprint check would otherwise 403 them and the client sees

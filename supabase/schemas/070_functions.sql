@@ -2745,6 +2745,7 @@ ALTER FUNCTION "public"."get_main_thread"("p_conversation_id" "text") OWNER TO "
 CREATE OR REPLACE FUNCTION "public"."get_tweet_page_data"("p_tweet_id" "text")
 RETURNS "jsonb"
 LANGUAGE "plpgsql" STABLE SECURITY INVOKER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
     v_result jsonb;
@@ -2764,7 +2765,9 @@ BEGIN
             'mentioned_users', '[]'::jsonb,
             'conversation_tweets', '[]'::jsonb,
             'conversation_media', '[]'::jsonb,
-            'quoted_tweets', '[]'::jsonb
+            'quoted_tweets', '[]'::jsonb,
+            'quoting_tweet_count', 0,
+            'quoting_tweets', '[]'::jsonb
         );
     END IF;
 
@@ -2851,6 +2854,63 @@ BEGIN
             JOIN public.enriched_tweets qt_tweet ON qt_tweet.tweet_id = qt.quoted_tweet_id
             WHERE qt.tweet_id = ANY(v_conversation_tweet_ids)
             AND qt.quoted_tweet_id IS NOT NULL
+        ), '[]'::jsonb),
+        'quoting_tweet_count', (
+            SELECT COUNT(DISTINCT incoming_quote.tweet_id)
+            FROM public.quote_tweets incoming_quote
+            WHERE incoming_quote.quoted_tweet_id = p_tweet_id
+        ),
+        'quoting_tweets', COALESCE((
+            SELECT jsonb_agg(
+                jsonb_build_object(
+                    'tweet_id', quoting_tweet.tweet_id,
+                    'account_id', quoting_tweet.account_id,
+                    'created_at', quoting_tweet.created_at,
+                    'full_text', quoting_tweet.full_text,
+                    'retweet_count', quoting_tweet.retweet_count,
+                    'favorite_count', quoting_tweet.favorite_count,
+                    'reply_to_tweet_id', quoting_tweet.reply_to_tweet_id,
+                    'reply_to_username', quoting_tweet.reply_to_username,
+                    'quoted_tweet_id', p_tweet_id,
+                    'username', quoting_tweet.username,
+                    'account_display_name', quoting_tweet.account_display_name,
+                    'avatar_media_url', quoting_tweet.avatar_media_url,
+                    'media', COALESCE((
+                        SELECT jsonb_agg(to_jsonb(qtm))
+                        FROM public.tweet_media qtm
+                        WHERE qtm.tweet_id = quoting_tweet.tweet_id
+                    ), '[]'::jsonb)
+                )
+                ORDER BY quoting_tweet.favorite_count DESC NULLS LAST,
+                         quoting_tweet.created_at DESC
+            )
+            FROM (
+                SELECT
+                    t.tweet_id,
+                    t.account_id,
+                    t.created_at,
+                    t.full_text,
+                    t.retweet_count,
+                    t.favorite_count,
+                    t.reply_to_tweet_id,
+                    t.reply_to_username,
+                    a.username,
+                    a.account_display_name,
+                    profile.avatar_media_url
+                FROM public.quote_tweets incoming_quote
+                JOIN public.tweets t ON t.tweet_id = incoming_quote.tweet_id
+                JOIN public.all_account a ON a.account_id = t.account_id
+                LEFT JOIN LATERAL (
+                    SELECT ap.avatar_media_url
+                    FROM public.all_profile ap
+                    WHERE ap.account_id = t.account_id
+                    ORDER BY ap.archive_upload_id DESC
+                    LIMIT 1
+                ) profile ON true
+                WHERE incoming_quote.quoted_tweet_id = p_tweet_id
+                ORDER BY t.favorite_count DESC NULLS LAST, t.created_at DESC
+                LIMIT 12
+            ) quoting_tweet
         ), '[]'::jsonb)
     ) INTO v_result;
 

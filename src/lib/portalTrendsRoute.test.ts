@@ -1,3 +1,5 @@
+jest.mock('server-only', () => ({}), { virtual: true })
+
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/portal/trends/route'
 import {
@@ -18,6 +20,10 @@ jest.mock('@/lib/portal/analytics', () => ({
   ),
 }))
 jest.mock('@/lib/portal/auth', () => ({ getIsMember: jest.fn() }))
+
+jest.mock('@/lib/portal/data', () => ({
+  enrichPortalTweets: jest.fn(async (tweets: unknown[]) => tweets),
+}))
 
 const fetchPortalTrendEvidenceMock =
   fetchPortalTrendEvidence as jest.MockedFunction<

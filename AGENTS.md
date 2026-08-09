@@ -127,6 +127,13 @@ Staging synchronization is automatic; production synchronization is not:
   prefer a representative fixture-backed harness. Configure the real gateway
   only when analytics behavior itself is under test, and never substitute a
   production Supabase read for missing ClickHouse access.
+- Treat every new or changed query-gateway route as a gateway-first release.
+  Once its focused tests, type-check, bundle, and review are high-confidence,
+  merge and deploy the gateway instead of leaving deployment as a follow-up.
+  Verify gateway health, smoke-test the changed route and one neighboring route
+  with runtime-only authentication, and only then merge or deploy a dependent
+  frontend PR. Link the gateway PR and production verification in the frontend
+  PR so the dependency cannot be mistaken for completed work.
 
 ## Development And Verification
 
@@ -145,9 +152,14 @@ pnpm test:db             # Requires the database test environment
 pnpm build
 ```
 
-After local schema changes, use `pnpm dev:gen-types`. `pnpm gen-types` targets
-the configured remote Supabase project and therefore requires the appropriate
-credentials and authorization.
+Every Husky pre-commit run regenerates database types through
+`scripts/pre-commit.sh`, including commits without schema changes. In the
+default local mode, start Docker and local Supabase with `supabase start`, and
+define `SUPABASE_AUTH_TWITTER_CLIENT_ID` and `SUPABASE_AUTH_TWITTER_SECRET` in
+`.env` so the Supabase CLI can parse `supabase/config.toml`. When
+`NEXT_PUBLIC_USE_REMOTE_DEV_DB=true` is set in `.env`, the hook instead runs
+`pnpm gen-types` against the configured remote project and requires
+`SUPABASE_ACCESS_TOKEN`.
 
 For archive-worker commands and environment requirements, use
 `services/process_archive/README_DOCKER.md` rather than copying deployment

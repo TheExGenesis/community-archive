@@ -13,9 +13,20 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
   'word-trend': new Set(['q', 'bucket', 'match', 'from', 'to']),
   'stream-stats': new Set(['start', 'end', 'granularity', 'scope']),
   'recent-bangers': new Set(['limit', 'hours']),
+  'portal-stream': new Set([
+    'limit',
+    'before',
+    'before_id',
+    'after',
+    'after_id',
+  ]),
   'missing-accounts': new Set(['limit']),
   'top-quotes': new Set([
     'limit',
+    'offset',
+    'sort',
+    'year',
+    'q',
     'exclude_self',
     'target_ca_users_only',
     'quote_ca_users_only',
@@ -64,6 +75,25 @@ export function analyticsGatewayRequestUrl(
     /^[A-Za-z0-9_@]{1,80}$/.test(cleanPath[1])
   ) {
     allowedParams = new Set(['limit'])
+  } else if (
+    cleanPath.length === 2 &&
+    cleanPath[0] === 'tweet' &&
+    /^\d{1,20}$/.test(cleanPath[1])
+  ) {
+    allowedParams = new Set()
+  } else if (
+    cleanPath.length === 2 &&
+    cleanPath[0] === 'quote-posts' &&
+    /^\d{1,20}$/.test(cleanPath[1])
+  ) {
+    allowedParams = new Set([
+      'limit',
+      'offset',
+      'exclude_self',
+      'quote_ca_users_only',
+      'include_usernames',
+      'exclude_usernames',
+    ])
   }
 
   if (!allowedParams)

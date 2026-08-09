@@ -30,16 +30,36 @@ export interface PortalTweet {
   createdAt: string
   likes: number
   rts: number
+  /** Latest ClickHouse follower observation, used only for homepage ranking. */
+  followers?: number
   media?: PortalMedia[]
   quotedTweet?: PortalQuotedTweet
   /** Distinct non-self quote tweets from archive uploaders and opt-ins. */
   quoteCount?: number
 }
 
+export type PortalBangersScope = 'all' | 'members'
+export type PortalBangersSort = 'quotes' | 'recent'
+
+export interface PortalBangersPagination {
+  limit: number
+  offset: number
+  nextOffset: number | null
+  totalAvailable: number
+  snapshotSize: number
+  yearCounts: Array<{ year: number; count: number }>
+  candidateRankingTruncated: boolean
+}
+
+export interface PortalBangersPage {
+  tweets: PortalTweet[]
+  pagination: PortalBangersPagination
+}
+
 export interface PortalStats {
   totalTweets: number
   accountCount: number
-  streamedToday: number
+  streamedLast24Hours: number
   joinedThisWeek: number
   firstYear: number
   currentYear: number

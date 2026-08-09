@@ -1,4 +1,5 @@
 import {
+  fetchPortalBangersPage,
   fetchPortalTrendEvidence,
   fetchPortalTrendSeries,
   fetchPortalLiveAnalytics,
@@ -11,7 +12,7 @@ import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 type AnalyticsFetcher = typeof fetchAnalyticsGatewayJson
 
 describe('ClickHouse-backed portal analytics', () => {
-  test('maps canonical summary and observation-time daily stats', async () => {
+  test('maps the canonical summary and rolling 24-hour stream stats', async () => {
     const fetcher = jest.fn(async (path: string[]) => {
       if (path[0] === 'summary') {
         return {
@@ -36,7 +37,7 @@ describe('ClickHouse-backed portal analytics', () => {
       fetchPortalLiveAnalytics(new Date('2026-08-07T12:00:00.000Z'), fetcher),
     ).resolves.toEqual({
       totalTweets: 14_800_000,
-      streamedToday: 1234,
+      streamedLast24Hours: 1234,
       generatedAt: '2026-08-07T12:00:00.000Z',
       latestObservedAt: '2026-08-07T11:59:00.000Z',
     })
@@ -46,7 +47,7 @@ describe('ClickHouse-backed portal analytics', () => {
       ([path]) => path[0] === 'stream-stats',
     )
     expect(streamCall?.[1].toString()).toBe(
-      'start=2026-08-07T00%3A00%3A00.000Z&end=2026-08-07T12%3A00%3A00.000Z&granularity=hour&scope=firehose',
+      'start=2026-08-06T12%3A00%3A00.000Z&end=2026-08-07T12%3A00%3A00.000Z&granularity=hour&scope=firehose',
     )
   })
 
@@ -313,6 +314,7 @@ describe('ClickHouse-backed portal analytics', () => {
           fullText: 'A historical banger',
           favoriteCount: '500',
           retweetCount: '25',
+          avatarMediaUrl: 'https://pbs.twimg.com/alice.jpg',
         },
       ],
     })) as unknown as AnalyticsFetcher
@@ -322,6 +324,7 @@ describe('ClickHouse-backed portal analytics', () => {
         id: '123',
         quoteCount: 42,
         createdAt: '2024-08-07T12:00:00.000Z',
+        avatar: 'https://pbs.twimg.com/alice.jpg',
       }),
     ])
     expect(fetcher).toHaveBeenCalledWith(
@@ -333,6 +336,72 @@ describe('ClickHouse-backed portal analytics', () => {
         quote_ca_users_only: 'true',
       }),
       { timeoutMs: 30_000, revalidate: 86_400 },
+    )
+  })
+
+  test('maps a searched, scoped page with pagination metadata', async () => {
+    const fetcher = jest.fn(async () => ({
+      data: [
+        {
+          tweetId: '123',
+          quoteCount: '42',
+          accountId: '99',
+          username: 'alice',
+          displayName: 'Alice',
+          avatarMediaUrl: null,
+          createdAt: '2024-08-07 12:00:00.000',
+          fullText: 'A historical banger',
+          favoriteCount: '500',
+          retweetCount: '25',
+        },
+      ],
+      pagination: {
+        limit: 60,
+        offset: 5001,
+        nextOffset: 5061,
+        totalAvailable: 183,
+        snapshotSize: 1600,
+        yearCounts: [{ year: 2024, count: 22 }],
+        candidateRankingTruncated: true,
+      },
+    })) as unknown as AnalyticsFetcher
+
+    await expect(
+      fetchPortalBangersPage(
+        {
+          offset: 5001,
+          sort: 'recent',
+          scope: 'members',
+          year: 2024,
+          query: '  historical  ',
+        },
+        fetcher,
+      ),
+    ).resolves.toEqual({
+      tweets: [expect.objectContaining({ id: '123', quoteCount: 42 })],
+      pagination: {
+        limit: 60,
+        offset: 5001,
+        nextOffset: 5061,
+        totalAvailable: 183,
+        snapshotSize: 1600,
+        yearCounts: [{ year: 2024, count: 22 }],
+        candidateRankingTruncated: true,
+      },
+    })
+    expect(fetcher).toHaveBeenCalledWith(
+      ['top-quotes'],
+      new URLSearchParams({
+        limit: '60',
+        offset: '5001',
+        sort: 'recent',
+        exclude_self: 'true',
+        target_ca_users_only: 'true',
+        quote_ca_users_only: 'true',
+        year: '2024',
+        q: 'historical',
+      }),
+      { timeoutMs: 30_000 },
     )
   })
 })

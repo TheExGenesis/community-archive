@@ -1,11 +1,21 @@
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
-import { ConversationTree, ThreadTweet, buildConversationTree } from './threadUtils'
+import {
+  ConversationTree,
+  ThreadTweet,
+  buildConversationTree,
+} from './threadUtils'
 import { TweetData } from '@/components/TweetComponent'
 import {
   fetchSyndicatedTweets,
   type SyndicatedTweet,
 } from './twitterSyndication'
+import { isClickHouseReadsEnabled } from './clickhouseGateway'
+import { fetchClickHouseTweetPageData } from './clickhouseTweetPage'
+import {
+  fetchClickHouseQuotePosts,
+  type ClickHouseQuotePostsData,
+} from './clickhouseQuotePosts'
 
 interface RpcTweet {
   tweet_id: string
@@ -58,6 +68,22 @@ interface RpcQuotedTweet {
   media: RpcMedia[]
 }
 
+interface RpcQuotingTweet {
+  tweet_id: string
+  account_id: string
+  created_at: string
+  full_text: string
+  retweet_count: number | null
+  favorite_count: number
+  reply_to_tweet_id: string | null
+  reply_to_username: string | null
+  quoted_tweet_id: string
+  username: string
+  account_display_name: string
+  avatar_media_url: string | null
+  media: RpcMedia[]
+}
+
 interface RpcResult {
   tweet: RpcTweet | null
   media: RpcMedia[]
@@ -65,18 +91,28 @@ interface RpcResult {
   conversation_tweets: RpcTweet[]
   conversation_media: RpcMedia[]
   quoted_tweets: RpcQuotedTweet[]
+  quoting_tweet_count?: number
+  quoting_tweets?: RpcQuotingTweet[]
 }
 
 interface TweetPageResult {
   tweet: TweetData | null
   threadTree: ConversationTree | null
+  quotingTweets: TweetData[]
+  quotingTweetCount: number
 }
 
 /**
- * Fetch all data needed for the tweet page in a single RPC call.
- * Replaces ~24 separate Supabase HTTP calls with 1.
+ * Load portal permalink records and incoming quote posts from the same
+ * ClickHouse snapshot when enabled. The Supabase RPC remains the complete
+ * tweet/thread fallback for environments without ClickHouse reads.
  */
-export async function getTweetPageData(tweetId: string): Promise<TweetPageResult> {
+export async function getTweetPageData(
+  tweetId: string,
+): Promise<TweetPageResult> {
+  const clickHousePage = await fetchClickHousePage(tweetId)
+  if (clickHousePage) return clickHousePage
+
   const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
 
@@ -85,14 +121,30 @@ export async function getTweetPageData(tweetId: string): Promise<TweetPageResult
   })
 
   if (error || !data) {
-    console.error('get_tweet_page_data RPC failed:', error?.message, { tweetId })
-    return { tweet: null, threadTree: null }
+    console.error('get_tweet_page_data RPC failed:', error?.message, {
+      tweetId,
+    })
+    return {
+      tweet: null,
+      threadTree: null,
+      quotingTweets: [],
+      quotingTweetCount: 0,
+    }
   }
 
   const result = data as unknown as RpcResult
+  const quotingTweets = (result.quoting_tweets ?? []).map(buildQuotingTweetData)
+  const quotingTweetCount = Number(
+    result.quoting_tweet_count ?? quotingTweets.length,
+  )
 
   if (!result.tweet) {
-    return { tweet: null, threadTree: null }
+    return {
+      tweet: null,
+      threadTree: null,
+      quotingTweets: [],
+      quotingTweetCount: 0,
+    }
   }
 
   // Collect every tweet id referenced by the conversation that the RPC couldn't
@@ -152,7 +204,71 @@ export async function getTweetPageData(tweetId: string): Promise<TweetPageResult
     syndicated,
   )
 
-  return { tweet: mainTweet, threadTree }
+  return { tweet: mainTweet, threadTree, quotingTweets, quotingTweetCount }
+}
+
+async function fetchClickHousePage(
+  tweetId: string,
+): Promise<TweetPageResult | null> {
+  if (!isClickHouseReadsEnabled()) return null
+
+  try {
+    const [tweet, quotePosts] = await Promise.all([
+      fetchClickHouseTweetPageData(tweetId),
+      fetchClickHouseQuotePosts(tweetId).catch((error) => {
+        console.error('ClickHouse quote posts failed:', {
+          tweetId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        return { tweets: [], totalCount: 0 } satisfies ClickHouseQuotePostsData
+      }),
+    ])
+    if (!tweet) return null
+    return {
+      tweet,
+      threadTree: null,
+      quotingTweets: quotePosts.tweets,
+      quotingTweetCount: quotePosts.totalCount,
+    }
+  } catch (error) {
+    console.error('ClickHouse tweet detail failed; falling back to Supabase:', {
+      tweetId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return null
+  }
+}
+
+function buildQuotingTweetData(tweet: RpcQuotingTweet): TweetData {
+  return {
+    tweet_id: tweet.tweet_id,
+    account_id: tweet.account_id,
+    created_at: tweet.created_at,
+    full_text: tweet.full_text,
+    retweet_count: tweet.retweet_count,
+    favorite_count: tweet.favorite_count,
+    reply_to_tweet_id: tweet.reply_to_tweet_id,
+    reply_to_username: tweet.reply_to_username ?? undefined,
+    quote_tweet_id: tweet.quoted_tweet_id,
+    retweeted_tweet_id: null,
+    avatar_media_url: tweet.avatar_media_url,
+    username: tweet.username,
+    account_display_name: tweet.account_display_name,
+    media: (tweet.media ?? []).map((media) => ({
+      media_url: media.media_url,
+      media_type: media.media_type,
+      width: media.width ?? undefined,
+      height: media.height ?? undefined,
+    })),
+    urls: [],
+    account: {
+      username: tweet.username,
+      account_display_name: tweet.account_display_name,
+      profile: tweet.avatar_media_url
+        ? { avatar_media_url: tweet.avatar_media_url }
+        : undefined,
+    },
+  }
 }
 
 // Convert a SyndicatedTweet into the quoted-tweet shape both ThreadTweet and TweetData
@@ -210,7 +326,9 @@ function buildTweetData(
   }))
 
   // Find the quoted tweet for this tweet
-  const quotedTweet = quotedTweets.find((qt) => qt.source_tweet_id === tweet.tweet_id)
+  const quotedTweet = quotedTweets.find(
+    (qt) => qt.source_tweet_id === tweet.tweet_id,
+  )
 
   // Build mentioned_users in the shape TweetComponent expects
   const mentions = mentionedUsers
@@ -316,7 +434,9 @@ function buildThreadTree(
         height: m.height,
       }))
 
-    const quotedTweet = quotedTweets.find((qt) => qt.source_tweet_id === ct.tweet_id)
+    const quotedTweet = quotedTweets.find(
+      (qt) => qt.source_tweet_id === ct.tweet_id,
+    )
 
     return {
       tweet_id: ct.tweet_id,
@@ -335,7 +455,8 @@ function buildThreadTree(
       // ct.quoted_tweet_id is sourced from enriched_tweets and survives even if the
       // quoted tweet itself was deleted; the RPC's quoted_tweets list won't contain it
       // in that case. Preserve the relationship and surface a placeholder.
-      quote_tweet_id: ct.quoted_tweet_id ?? (quotedTweet ? quotedTweet.tweet_id : null),
+      quote_tweet_id:
+        ct.quoted_tweet_id ?? (quotedTweet ? quotedTweet.tweet_id : null),
       quoted_tweet: quotedTweet
         ? {
             tweet_id: quotedTweet.tweet_id,

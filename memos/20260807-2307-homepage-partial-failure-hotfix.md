@@ -46,3 +46,19 @@ failure discarded the independently available member and recent-upload counts.
 
 Revert the hotfix commit. No schema, cache-storage, environment, or external
 service changes are involved.
+
+## 2026-08-09 readiness follow-up
+
+After rebasing onto the frontend readiness endpoint, production reported
+Supabase Auth unavailable because `/auth/v1/health` now requires the existing
+public API key in the `apikey` header. The health probe now sends
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` without returning it in the response.
+
+Readiness also matches the partial-failure boundary: Supabase Auth remains a
+required dependency and returns HTTP 503 when unavailable, while a missing or
+failed analytics gateway returns HTTP 200 with `status: degraded`. The portal
+can therefore remain in service with local analytics-panel fallbacks.
+
+Focused verification after the rebase: type-check plus 26 readiness and portal
+failure/recovery tests passed. No schema, credential, or production environment
+change is required.

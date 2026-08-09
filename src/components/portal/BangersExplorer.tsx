@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Columns3, List, Loader2, Search, X } from 'lucide-react'
+import { Columns3, Grid2X2, Loader2, Search, X } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -142,6 +142,13 @@ export function BangersExplorer({
   const visibleTweets = useMemo(
     () => page.tweets.filter((tweet) => matchesQuery(tweet, query)),
     [page.tweets, query],
+  )
+  const tweetRanks = useMemo(
+    () =>
+      new Map(
+        page.tweets.map((tweet, index) => [tweet.id, index + 1] as const),
+      ),
+    [page.tweets],
   )
   const groupedTweets = useMemo(() => {
     const groups = new Map<number, PortalTweet[]>()
@@ -282,7 +289,7 @@ export function BangersExplorer({
 
   return (
     <section aria-label="Browse bangers">
-      <div className={`${CARD} mb-4 p-3 sm:p-4`}>
+      <div className={`${CARD} mb-6 p-4 shadow-sm sm:p-5`}>
         <label className="block">
           <span
             className={`mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
@@ -439,8 +446,8 @@ export function BangersExplorer({
                     : idleSegmentClassName
                 }`}
               >
-                <List aria-hidden="true" className="h-3.5 w-3.5" />
-                List
+                <Grid2X2 aria-hidden="true" className="h-3.5 w-3.5" />
+                Cards
               </button>
               <button
                 type="button"
@@ -460,7 +467,7 @@ export function BangersExplorer({
         </div>
       </div>
 
-      <div className="min-h-7 mb-3 flex flex-wrap items-center justify-between gap-2 px-0.5">
+      <div className="min-h-7 mb-4 flex flex-wrap items-center justify-between gap-2 px-0.5">
         <p aria-live="polite" className={`text-[12.5px] tabular-nums ${MUTED}`}>
           {isSearching
             ? 'Searching ranked bangers…'
@@ -499,9 +506,15 @@ export function BangersExplorer({
           ) : null}
         </div>
       ) : view === 'list' ? (
-        <div className={`${CARD} mx-auto max-w-[900px] overflow-hidden`}>
+        <div className="grid grid-cols-1 items-start gap-x-5 gap-y-6 lg:grid-cols-2">
           {visibleTweets.map((tweet) => (
-            <TweetRow key={tweet.id} tweet={tweet} showDate collapsible />
+            <TweetRow
+              key={tweet.id}
+              tweet={tweet}
+              featuredRank={tweetRanks.get(tweet.id)}
+              showDate
+              collapsible
+            />
           ))}
         </div>
       ) : (
@@ -534,11 +547,12 @@ export function BangersExplorer({
                         : pluralizeTweets(yearTotal)}
                     </span>
                   </div>
-                  <div className={`${CARD} overflow-hidden`}>
+                  <div className="space-y-5">
                     {yearTweets.map((tweet) => (
                       <TweetRow
                         key={tweet.id}
                         tweet={tweet}
+                        featuredRank={tweetRanks.get(tweet.id)}
                         showDate
                         collapsible
                       />

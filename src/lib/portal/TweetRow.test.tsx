@@ -42,6 +42,7 @@ const tweet: PortalTweet = {
   createdAt: '2026-08-07T19:00:00.000Z',
   likes: 3,
   rts: 2,
+  quoteCount: 12,
   media: [
     {
       url: 'https://pbs.twimg.com/media/main.jpg',
@@ -69,6 +70,13 @@ const tweet: PortalTweet = {
 }
 
 describe('portal TweetRow media', () => {
+  test('can present a tweet as a ranked banger card', () => {
+    render(<TweetRow tweet={tweet} featuredRank={1} />)
+
+    expect(screen.getByLabelText('Rank 1')).toHaveTextContent('#1')
+    expect(screen.getByText(/12 archive quotes/)).toHaveClass('rounded-full')
+  })
+
   test('renders quotes and closes an enlarged image when the backdrop is clicked', async () => {
     render(<TweetRow tweet={tweet} />)
 

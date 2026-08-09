@@ -44,21 +44,31 @@ export default async function BangersPage({
 
   return (
     <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
-      <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[1280px] px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
         <Link
           href="/"
-          className={`mb-2 inline-flex text-[12.5px] font-semibold ${MUTED} hover:text-brand`}
+          className={`mb-5 inline-flex text-[12.5px] font-semibold ${MUTED} hover:text-brand`}
         >
           ← Dashboard
         </Link>
-        <h1 className="mb-1.5 text-[26px] font-semibold" style={SERIF}>
-          Bangers
-        </h1>
-        <p className={`mb-5 max-w-3xl text-[13px] leading-relaxed ${MUTED}`}>
-          The archive&apos;s most quoted tweets, ranked by distinct quote tweets
-          from archive uploaders and opted-in members. Quotes by the original
-          author do not count. Browse the full ranked snapshot as it loads.
-        </p>
+        <header className="mb-7 max-w-[760px]">
+          <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-brand">
+            <span aria-hidden="true">✦</span>
+            The archive&apos;s all-time greats
+          </p>
+          <h1
+            className="mb-2 text-[34px] font-semibold leading-tight sm:text-[38px]"
+            style={SERIF}
+          >
+            Bangers
+          </h1>
+          <p className={`text-[13.5px] leading-relaxed ${MUTED}`}>
+            The archive&apos;s most quoted tweets, ranked by distinct quote
+            tweets from archive uploaders and opted-in members. Quotes by the
+            original author do not count. Browse the full ranked snapshot as it
+            loads.
+          </p>
+        </header>
         <BangersExplorer
           key={`${scope}:${sort}:${year ?? 'all'}:${query}`}
           initialPage={initialPage}

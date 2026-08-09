@@ -186,6 +186,7 @@ export function TweetRow({
   animate = false,
   compact = false,
   collapsible = false,
+  featuredRank,
   showDate = false,
   showArchivedBadge = false,
 }: {
@@ -193,15 +194,24 @@ export function TweetRow({
   animate?: boolean
   compact?: boolean
   collapsible?: boolean
+  featuredRank?: number
   showDate?: boolean
   showArchivedBadge?: boolean
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const canExpand = collapsible && tweet.text.length > 280
   const href = `/tweets/${tweet.id}`
-  const rowClassName = `flex gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23] ${
-    animate ? 'portal-slide-in' : ''
-  }`
+  const isFeatured = featuredRank !== undefined
+  const isTopThree = isFeatured && featuredRank <= 3
+  const rowClassName = isFeatured
+    ? `relative mt-2 flex min-w-0 gap-3 rounded-lg border px-4 pb-4 pt-5 shadow-sm transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-brand/50 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:hover:border-brand/60 sm:gap-3.5 sm:px-5 sm:pb-5 sm:pt-6 ${
+        isTopThree
+          ? 'border-amber-200/90 bg-gradient-to-br from-amber-50/80 via-white to-white dark:border-amber-400/25 dark:from-amber-400/[0.06] dark:via-[#1b1b1e] dark:to-[#1b1b1e]'
+          : 'border-zinc-200 bg-white dark:border-[#303036] dark:bg-[#1b1b1e]'
+      } ${animate ? 'portal-slide-in' : ''}`
+    : `flex gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23] ${
+        animate ? 'portal-slide-in' : ''
+      }`
 
   const tweetContent = (
     <>
@@ -222,7 +232,9 @@ export function TweetRow({
         className={`mt-0.5 leading-relaxed text-zinc-700 dark:text-[#d9d9de] ${
           compact
             ? 'line-clamp-2 text-[13.5px]'
-            : `text-[14px] ${canExpand && !isExpanded ? 'line-clamp-5' : ''}`
+            : `${isFeatured ? 'text-[14.5px]' : 'text-[14px]'} ${
+                canExpand && !isExpanded ? 'line-clamp-5' : ''
+              }`
         }`}
       >
         {tweet.text}
@@ -255,7 +267,13 @@ export function TweetRow({
       {!compact && (
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
           {tweet.quoteCount !== undefined && (
-            <span className="font-semibold text-brand">
+            <span
+              className={`font-semibold text-brand ${
+                isFeatured
+                  ? 'border-brand/15 rounded-full border bg-brand/[0.07] px-2 py-0.5'
+                  : ''
+              }`}
+            >
               ✦ {formatCount(tweet.quoteCount)} archive quotes
             </span>
           )}
@@ -269,8 +287,20 @@ export function TweetRow({
 
   return (
     <article className={rowClassName}>
+      {isFeatured ? (
+        <span
+          aria-label={`Rank ${featuredRank}`}
+          className={`absolute right-4 top-0 -translate-y-1/2 rounded-full border px-2.5 py-1 text-[10.5px] font-extrabold tabular-nums tracking-[0.06em] shadow-sm ${
+            isTopThree
+              ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-400/40 dark:bg-[#2b2418] dark:text-amber-200'
+              : 'border-brand/25 bg-blue-50 text-brand dark:bg-[#20283a]'
+          }`}
+        >
+          #{featuredRank}
+        </span>
+      ) : null}
       <Link href={href} aria-label={`View tweet by @${tweet.username}`}>
-        <TweetAvatar tweet={tweet} />
+        <TweetAvatar tweet={tweet} size={isFeatured ? 38 : 34} />
       </Link>
       {details}
       {compact && (

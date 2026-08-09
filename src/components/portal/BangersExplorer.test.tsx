@@ -12,8 +12,16 @@ import type { PortalBangersPage, PortalTweet } from '@/lib/portal/types'
 const push = jest.fn()
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 jest.mock('./TweetRow', () => ({
-  TweetRow: ({ tweet }: { tweet: PortalTweet }) => (
-    <article data-testid="tweet-row">{tweet.text}</article>
+  TweetRow: ({
+    tweet,
+    featuredRank,
+  }: {
+    tweet: PortalTweet
+    featuredRank?: number
+  }) => (
+    <article data-testid="tweet-row" data-rank={featuredRank}>
+      {tweet.text}
+    </article>
   ),
 }))
 
@@ -99,6 +107,9 @@ describe('BangersExplorer', () => {
     expect(
       screen.getAllByTestId('tweet-row').map((row) => row.textContent),
     ).toEqual(['Another older thought', 'Older favorite', 'Newest thought'])
+    expect(
+      screen.getAllByTestId('tweet-row').map((row) => row.dataset.rank),
+    ).toEqual(['1', '2', '3'])
     expect(screen.getByRole('link', { name: 'Most quoted' })).toHaveAttribute(
       'aria-current',
       'page',

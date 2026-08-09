@@ -14,13 +14,20 @@ function challengeCookie(): string {
   return Math.floor(Date.now() / 3_600_000).toString(36)
 }
 
-test('allows Next.js RSC prefetches without counting them as page views', async () => {
-  const request = new NextRequest('https://community-archive.org/bangers', {
+test.each([
+  ['the RSC header', 'https://community-archive.org/bangers', { rsc: '1' }],
+  [
+    'the Vercel-preserved query marker',
+    'https://community-archive.org/bangers?_rsc=preview',
+    {},
+  ],
+])('allows RSC prefetches identified by %s', async (_, url, rscHeaders) => {
+  const request = new NextRequest(url, {
     headers: {
       ...browserHeaders,
+      ...rscHeaders,
       accept: '*/*',
       cookie: `__cc=${challengeCookie()}`,
-      rsc: '1',
       'next-router-prefetch': '1',
     },
   })

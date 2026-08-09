@@ -242,7 +242,9 @@ export async function middleware(request: NextRequest) {
   const previewBot = isPreviewBot(ua)
   const publicDocumentationRoute = isPublicDocumentationRoute(pathname)
   const monitoringHealthRoute = isMonitoringHealthRoute(pathname)
-  const isRscRequest = request.headers.get('rsc') === '1'
+  const isRscRequest =
+    request.headers.get('rsc') === '1' ||
+    request.nextUrl.searchParams.has('_rsc')
   const isRoutePrefetch =
     isRscRequest &&
     (request.headers.get('next-router-prefetch') === '1' ||

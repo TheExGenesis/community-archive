@@ -81,6 +81,9 @@ Before each commit, the hook will:
 #### Troubleshooting
 
 - **Hook not running?** Make sure Husky is installed: `npx husky install`
+- **Commit fails because `.husky/_/husky.sh` is missing?** If dependencies were
+  installed with `HUSKY=0`, initialize the hook helpers in that worktree with
+  `HUSKY=1 pnpm exec husky install`, then retry the commit normally.
 - **Types generation failing?**
   - For remote DB: Ensure `SUPABASE_ACCESS_TOKEN` is set in your environment
   - For local DB: Make sure Supabase is running (`supabase start`)

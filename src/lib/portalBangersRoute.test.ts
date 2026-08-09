@@ -4,7 +4,10 @@ import { getIsMember } from '@/lib/portal/auth'
 import { getPortalBangersPage } from '@/lib/portal/data'
 
 jest.mock('@/lib/portal/auth', () => ({ getIsMember: jest.fn() }))
-jest.mock('@/lib/portal/data', () => ({ getPortalBangersPage: jest.fn() }))
+jest.mock('@/lib/portal/data', () => ({
+  getPortalBangersPage: jest.fn(),
+  PORTAL_BANGERS_PAGE_SIZE: 30,
+}))
 
 const getIsMemberMock = getIsMember as jest.MockedFunction<typeof getIsMember>
 const getPortalBangersPageMock = getPortalBangersPage as jest.MockedFunction<
@@ -19,7 +22,7 @@ describe('portal bangers route', () => {
     getPortalBangersPageMock.mockResolvedValue({
       tweets: [],
       pagination: {
-        limit: 60,
+        limit: 30,
         offset: 0,
         nextOffset: null,
         totalAvailable: 0,
@@ -50,7 +53,7 @@ describe('portal bangers route', () => {
 
     expect(response.status).toBe(200)
     expect(getPortalBangersPageMock).toHaveBeenCalledWith({
-      limit: 60,
+      limit: 30,
       offset: 5001,
       scope: 'members',
       sort: 'recent',

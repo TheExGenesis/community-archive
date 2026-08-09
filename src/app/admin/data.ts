@@ -5,6 +5,7 @@ import {
 import type { User } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
+import { getCurrentUser } from '@/lib/portal/auth'
 
 export const ADMIN_USERNAME = 'exgenesis'
 const PRODUCTION_SUPABASE_HOST = 'fabxmporizzqflnftavs.supabase.co'
@@ -91,7 +92,12 @@ export const getTwitterUsername = (user: User): string | null => {
   const identity = getTwitterIdentity(user)
   if (!identity) return null
   const data = (identity.identity_data ?? {}) as Record<string, unknown>
-  for (const key of ['user_name', 'preferred_username', 'screen_name', 'username']) {
+  for (const key of [
+    'user_name',
+    'preferred_username',
+    'screen_name',
+    'username',
+  ]) {
     const v = data[key]
     if (typeof v === 'string' && v.trim()) {
       return v.trim().toLowerCase().replace(/^@/, '')
@@ -172,13 +178,8 @@ export function getDisplayUsername(user: User): string | null {
 // Non-throwing variant for places that need to *know* whether the visitor is
 // admin (e.g. to hide nav links) but must not redirect.
 export async function checkIsAdmin(): Promise<boolean> {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) return false
+  const user = await getCurrentUser()
+  if (!user) return false
   return isAdminUser(user)
 }
 

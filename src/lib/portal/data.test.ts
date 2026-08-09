@@ -5,6 +5,7 @@ jest.mock('next/cache', () => ({
 
 import {
   fetchPortalMemberCount,
+  getInitialPortalBangersPage,
   getPortalStreamPage,
   getPortalStreamUpdates,
   loadOptionalPortalData,
@@ -209,6 +210,37 @@ describe('portal reads', () => {
       },
     })
     expect(tweetsInit?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  test('loads the initial bangers explorer in a 30-row page', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          data: [],
+          pagination: {
+            limit: 30,
+            offset: 0,
+            nextOffset: null,
+            totalAvailable: 0,
+            snapshotSize: 0,
+            yearCounts: [],
+            candidateRankingTruncated: false,
+          },
+        }),
+    } as Response)
+
+    await expect(getInitialPortalBangersPage()).resolves.toMatchObject({
+      tweets: [],
+      pagination: { limit: 30, offset: 0 },
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const requestUrl = new URL(String(fetchMock.mock.calls[0][0]))
+    expect(requestUrl.pathname).toBe('/analytics/top-quotes')
+    expect(requestUrl.searchParams.get('limit')).toBe('30')
+    expect(requestUrl.searchParams.get('offset')).toBe('0')
   })
 
   test('encodes the observation cursor for ClickHouse polling', async () => {

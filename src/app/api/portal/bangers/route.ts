@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getIsMember } from '@/lib/portal/auth'
-import { getPortalBangersPage } from '@/lib/portal/data'
+import {
+  getPortalBangersPage,
+  PORTAL_BANGERS_PAGE_SIZE,
+} from '@/lib/portal/data'
 import type { PortalBangersScope, PortalBangersSort } from '@/lib/portal/types'
 
 export const dynamic = 'force-dynamic'
@@ -53,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     return privateJson(
       await getPortalBangersPage({
-        limit: 60,
+        limit: PORTAL_BANGERS_PAGE_SIZE,
         offset,
         scope,
         sort,

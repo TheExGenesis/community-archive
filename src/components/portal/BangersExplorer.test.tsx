@@ -114,11 +114,22 @@ describe('BangersExplorer', () => {
   test('offers only banger-relevant ranking and author scopes', () => {
     renderExplorer()
 
+    const orderedMasonryItems = Array.from(
+      screen
+        .getByTestId('bangers-masonry')
+        .querySelectorAll<HTMLElement>('[data-masonry-order]'),
+    ).sort(
+      (left, right) => Number(left.style.order) - Number(right.style.order),
+    )
     expect(
-      screen.getAllByTestId('tweet-row').map((row) => row.textContent),
+      orderedMasonryItems.map(
+        (item) => within(item).getByTestId('tweet-row').textContent,
+      ),
     ).toEqual(['Another older thought', 'Older favorite', 'Newest thought'])
     expect(
-      screen.getAllByTestId('tweet-row').map((row) => row.dataset.rank),
+      orderedMasonryItems.map(
+        (item) => within(item).getByTestId('tweet-row').dataset.rank,
+      ),
     ).toEqual(['1', '2', '3'])
     expect(screen.getByRole('link', { name: 'Most quoted' })).toHaveAttribute(
       'aria-current',
@@ -134,9 +145,23 @@ describe('BangersExplorer', () => {
     expect(screen.queryByText('Likes')).not.toBeInTheDocument()
     expect(screen.queryByText('Reposts')).not.toBeInTheDocument()
     expect(screen.getByTestId('bangers-masonry')).toHaveClass(
-      'columns-1',
-      'lg:columns-2',
+      'flex',
+      'lg:grid',
+      'lg:grid-cols-2',
     )
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-0'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['1', '3'])
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-1'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['2'])
+    expect(
+      orderedMasonryItems.map((item) => item.dataset.masonryOrder),
+    ).toEqual(['1', '2', '3'])
   })
 
   test('keeps today selected across ranking and author links', () => {

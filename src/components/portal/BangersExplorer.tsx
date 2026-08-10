@@ -163,6 +163,22 @@ export function BangersExplorer({
     () => page.tweets.filter((tweet) => matchesQuery(tweet, query)),
     [page.tweets, query],
   )
+  const masonryColumns = useMemo(
+    () =>
+      visibleTweets.reduce<
+        [
+          Array<{ tweet: PortalTweet; order: number }>,
+          Array<{ tweet: PortalTweet; order: number }>,
+        ]
+      >(
+        (columns, tweet, order) => {
+          columns[order % 2].push({ tweet, order })
+          return columns
+        },
+        [[], []],
+      ),
+    [visibleTweets],
+  )
   const tweetRanks = useMemo(
     () =>
       new Map(
@@ -564,16 +580,29 @@ export function BangersExplorer({
       ) : view === 'list' ? (
         <div
           data-testid="bangers-masonry"
-          className="columns-1 gap-5 lg:columns-2"
+          className="flex flex-col lg:grid lg:grid-cols-2 lg:items-start lg:gap-5"
         >
-          {visibleTweets.map((tweet) => (
-            <div key={tweet.id} className="mb-6 break-inside-avoid">
-              <TweetRow
-                tweet={tweet}
-                featuredRank={tweetRanks.get(tweet.id)}
-                showDate
-                collapsible
-              />
+          {masonryColumns.map((column, columnIndex) => (
+            <div
+              key={columnIndex}
+              data-testid={`bangers-masonry-column-${columnIndex}`}
+              className="contents lg:block lg:space-y-6"
+            >
+              {column.map(({ tweet, order }) => (
+                <div
+                  key={tweet.id}
+                  data-masonry-order={order + 1}
+                  className="mb-6 lg:mb-0"
+                  style={{ order }}
+                >
+                  <TweetRow
+                    tweet={tweet}
+                    featuredRank={tweetRanks.get(tweet.id)}
+                    showDate
+                    collapsible
+                  />
+                </div>
+              ))}
             </div>
           ))}
         </div>

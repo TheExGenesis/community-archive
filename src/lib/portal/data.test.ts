@@ -2,10 +2,22 @@ jest.mock('server-only', () => ({}), { virtual: true })
 jest.mock('next/cache', () => ({
   unstable_cache: (callback: unknown) => callback,
 }))
+jest.mock('./analytics', () => ({
+  fetchPortalBangersPage: jest.fn(),
+  fetchPortalHistoricalBangers: jest.fn(),
+  fetchPortalLiveAnalytics: jest.fn(),
+  fetchPortalRecentBangers: jest.fn(),
+  fetchPortalTrends: jest.fn(),
+}))
+jest.mock('./research', () => ({
+  getResearchPosts: jest.fn(),
+  selectFeaturedResearchPosts: jest.fn((posts: unknown) => posts),
+}))
 
 import {
   fetchPortalMemberCount,
   getInitialPortalBangersPage,
+  getPortalData,
   getPortalStreamPage,
   getPortalStreamUpdates,
   loadOptionalPortalData,
@@ -14,7 +26,36 @@ import {
   resolvePortalReadConfig,
   selectDailyBangers,
 } from './data'
+import {
+  fetchPortalBangersPage,
+  fetchPortalHistoricalBangers,
+  fetchPortalLiveAnalytics,
+  fetchPortalRecentBangers,
+  fetchPortalTrends,
+} from './analytics'
+import { getResearchPosts } from './research'
 import type { PortalTweet } from './types'
+
+const fetchPortalHistoricalBangersMock =
+  fetchPortalHistoricalBangers as jest.MockedFunction<
+    typeof fetchPortalHistoricalBangers
+  >
+const fetchPortalBangersPageMock =
+  fetchPortalBangersPage as jest.MockedFunction<typeof fetchPortalBangersPage>
+const fetchPortalLiveAnalyticsMock =
+  fetchPortalLiveAnalytics as jest.MockedFunction<
+    typeof fetchPortalLiveAnalytics
+  >
+const fetchPortalRecentBangersMock =
+  fetchPortalRecentBangers as jest.MockedFunction<
+    typeof fetchPortalRecentBangers
+  >
+const fetchPortalTrendsMock = fetchPortalTrends as jest.MockedFunction<
+  typeof fetchPortalTrends
+>
+const getResearchPostsMock = getResearchPosts as jest.MockedFunction<
+  typeof getResearchPosts
+>
 
 describe('portal read source', () => {
   test('uses an explicit server-only row source without changing app Supabase', () => {
@@ -94,6 +135,131 @@ describe('optional portal data', () => {
       expect.stringContaining('"section":"historical-bangers"'),
     )
     consoleError.mockRestore()
+  })
+})
+
+describe('portal page resilience', () => {
+  const previousEnv = {
+    portalUrl: process.env.PORTAL_READ_SUPABASE_URL,
+    portalKey: process.env.PORTAL_READ_SUPABASE_ANON_KEY,
+    analyticsUrl: process.env.CLICKHOUSE_ANALYTICS_API_URL,
+    analyticsToken: process.env.CLICKHOUSE_ANALYTICS_API_TOKEN,
+  }
+
+  beforeEach(() => {
+    jest.spyOn(console, 'error').mockImplementation()
+    process.env.PORTAL_READ_SUPABASE_URL = 'https://prod-project.supabase.co/'
+    process.env.PORTAL_READ_SUPABASE_ANON_KEY = 'prod-public-anon'
+    process.env.CLICKHOUSE_ANALYTICS_API_URL =
+      'https://analytics.community-archive.org/analytics'
+    process.env.CLICKHOUSE_ANALYTICS_API_TOKEN = 'test-token'
+
+    fetchPortalTrendsMock.mockResolvedValue({
+      years: [],
+      series: [],
+      weekly: [],
+      computedAt: '2026-08-07T20:00:00.000Z',
+    })
+    fetchPortalLiveAnalyticsMock.mockResolvedValue({
+      totalTweets: 1_000,
+      streamedLast24Hours: 25,
+      generatedAt: '2026-08-07T20:00:00.000Z',
+      latestObservedAt: '2026-08-07T20:00:00.000Z',
+    })
+    fetchPortalRecentBangersMock.mockResolvedValue([])
+    fetchPortalHistoricalBangersMock.mockResolvedValue([])
+    getResearchPostsMock.mockResolvedValue([])
+
+    jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
+      const url = new URL(String(input))
+      if (url.pathname.endsWith('/portal-stream')) {
+        return new Response('gateway unavailable', { status: 503 })
+      }
+      if (init?.method === 'HEAD') {
+        return new Response(null, {
+          status: 200,
+          headers: { 'content-range': '0-0/42' },
+        })
+      }
+      if (url.pathname.endsWith('/tweets')) {
+        const createdAt = url.searchParams.get('order')?.endsWith('.asc')
+          ? '2007-01-01T00:00:00.000Z'
+          : '2026-08-07T00:00:00.000Z'
+        return new Response(JSON.stringify([{ created_at: createdAt }]), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+      throw new Error(`Unexpected test request: ${url}`)
+    })
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
+    jest.clearAllMocks()
+    const restore = (name: string, value: string | undefined) => {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
+    restore('PORTAL_READ_SUPABASE_URL', previousEnv.portalUrl)
+    restore('PORTAL_READ_SUPABASE_ANON_KEY', previousEnv.portalKey)
+    restore('CLICKHOUSE_ANALYTICS_API_URL', previousEnv.analyticsUrl)
+    restore('CLICKHOUSE_ANALYTICS_API_TOKEN', previousEnv.analyticsToken)
+  })
+
+  test('keeps the page available when the initial stream request fails', async () => {
+    await expect(getPortalData()).resolves.toMatchObject({
+      initialStream: [],
+      failures: {
+        initialStream: true,
+        liveAnalytics: false,
+        memberCount: false,
+        corpusRange: false,
+        trends: false,
+      },
+    })
+  })
+
+  test('preserves other components when the trends request fails', async () => {
+    fetchPortalTrendsMock.mockRejectedValueOnce(
+      new Error('trend snapshot unavailable'),
+    )
+
+    await expect(getPortalData()).resolves.toMatchObject({
+      stats: {
+        totalTweets: 1_000,
+        accountCount: 42,
+        firstYear: 2007,
+        currentYear: 2026,
+      },
+      trends: { years: [], series: [], weekly: [] },
+      failures: {
+        trends: true,
+        liveAnalytics: false,
+        memberCount: false,
+        corpusRange: false,
+      },
+    })
+  })
+
+  test('preserves member and corpus metrics when live analytics fails', async () => {
+    fetchPortalLiveAnalyticsMock.mockRejectedValueOnce(
+      new Error('live analytics unavailable'),
+    )
+
+    await expect(getPortalData()).resolves.toMatchObject({
+      stats: {
+        totalTweets: 0,
+        accountCount: 42,
+        firstYear: 2007,
+        currentYear: 2026,
+      },
+      failures: {
+        liveAnalytics: true,
+        memberCount: false,
+        corpusRange: false,
+      },
+    })
   })
 })
 
@@ -213,34 +379,30 @@ describe('portal reads', () => {
   })
 
   test('loads the initial bangers explorer in a 30-row page', async () => {
-    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      text: async () =>
-        JSON.stringify({
-          data: [],
-          pagination: {
-            limit: 30,
-            offset: 0,
-            nextOffset: null,
-            totalAvailable: 0,
-            snapshotSize: 0,
-            yearCounts: [],
-            candidateRankingTruncated: false,
-          },
-        }),
-    } as Response)
+    fetchPortalBangersPageMock.mockResolvedValueOnce({
+      tweets: [],
+      pagination: {
+        limit: 30,
+        offset: 0,
+        nextOffset: null,
+        totalAvailable: 0,
+        snapshotSize: 0,
+        yearCounts: [],
+        candidateRankingTruncated: false,
+      },
+    })
 
     await expect(getInitialPortalBangersPage()).resolves.toMatchObject({
       tweets: [],
       pagination: { limit: 30, offset: 0 },
     })
 
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    const requestUrl = new URL(String(fetchMock.mock.calls[0][0]))
-    expect(requestUrl.pathname).toBe('/analytics/top-quotes')
-    expect(requestUrl.searchParams.get('limit')).toBe('30')
-    expect(requestUrl.searchParams.get('offset')).toBe('0')
+    expect(fetchPortalBangersPageMock).toHaveBeenCalledTimes(1)
+    expect(fetchPortalBangersPageMock).toHaveBeenCalledWith({
+      limit: 30,
+      scope: 'all',
+      sort: 'quotes',
+    })
   })
 
   test('encodes the observation cursor for ClickHouse polling', async () => {

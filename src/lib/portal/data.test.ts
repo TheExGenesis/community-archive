@@ -17,6 +17,7 @@ jest.mock('./research', () => ({
 import {
   fetchPortalMemberCount,
   getInitialPortalBangersPage,
+  getPortalBangersPage,
   getPortalData,
   getPortalStreamPage,
   getPortalStreamUpdates,
@@ -270,6 +271,7 @@ describe('portal reads', () => {
   const previousClickHouseToken = process.env.CLICKHOUSE_ANALYTICS_API_TOKEN
 
   beforeEach(() => {
+    fetchPortalBangersPageMock.mockReset()
     process.env.PORTAL_READ_SUPABASE_URL = 'https://prod-project.supabase.co/'
     process.env.PORTAL_READ_SUPABASE_ANON_KEY = 'prod-public-anon'
     process.env.CLICKHOUSE_ANALYTICS_API_URL =
@@ -403,6 +405,136 @@ describe('portal reads', () => {
       scope: 'all',
       sort: 'quotes',
     })
+  })
+
+  test('builds an exact ranked page from the recent prefix for today', async () => {
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date('2026-08-10T14:00:00.000Z'))
+    fetchPortalBangersPageMock.mockResolvedValueOnce({
+      tweets: [
+        {
+          id: 'today-low',
+          username: 'alice',
+          name: 'Alice',
+          avatar: null,
+          text: 'Today with fewer quotes',
+          observedAt: '2026-08-10T13:00:00.000Z',
+          createdAt: '2026-08-10T13:00:00.000Z',
+          likes: 4,
+          rts: 0,
+          quoteCount: 2,
+        },
+        {
+          id: 'today-high',
+          username: 'bob',
+          name: 'Bob',
+          avatar: null,
+          text: 'Today with more quotes',
+          observedAt: '2026-08-10T12:00:00.000Z',
+          createdAt: '2026-08-10T12:00:00.000Z',
+          likes: 8,
+          rts: 0,
+          quoteCount: 9,
+        },
+        {
+          id: 'yesterday',
+          username: 'carol',
+          name: 'Carol',
+          avatar: null,
+          text: 'Yesterday',
+          observedAt: '2026-08-09T23:59:59.000Z',
+          createdAt: '2026-08-09T23:59:59.000Z',
+          likes: 20,
+          rts: 0,
+          quoteCount: 20,
+        },
+      ],
+      pagination: {
+        limit: 100,
+        offset: 0,
+        nextOffset: 100,
+        totalAvailable: 1_000,
+        snapshotSize: 1_000,
+        yearCounts: [{ year: 2026, count: 1_000 }],
+        candidateRankingTruncated: false,
+      },
+    })
+
+    try {
+      await expect(
+        getPortalBangersPage({ period: 'today', sort: 'quotes' }),
+      ).resolves.toMatchObject({
+        tweets: [{ id: 'today-high' }, { id: 'today-low' }],
+        pagination: {
+          nextOffset: null,
+          totalAvailable: 2,
+          snapshotSize: 2,
+          yearCounts: [{ year: 2026, count: 2 }],
+        },
+      })
+      expect(fetchPortalBangersPageMock).toHaveBeenCalledWith({
+        limit: 100,
+        offset: 0,
+        sort: 'recent',
+        scope: 'all',
+        query: '',
+      })
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  test('starts this week on Monday at midnight UTC', async () => {
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date('2026-08-12T14:00:00.000Z'))
+    fetchPortalBangersPageMock.mockResolvedValueOnce({
+      tweets: [
+        {
+          id: 'monday',
+          username: 'alice',
+          name: 'Alice',
+          avatar: null,
+          text: 'Monday banger',
+          observedAt: '2026-08-10T00:00:00.000Z',
+          createdAt: '2026-08-10T00:00:00.000Z',
+          likes: 4,
+          rts: 0,
+          quoteCount: 2,
+        },
+        {
+          id: 'sunday',
+          username: 'bob',
+          name: 'Bob',
+          avatar: null,
+          text: 'Sunday banger',
+          observedAt: '2026-08-09T23:59:59.000Z',
+          createdAt: '2026-08-09T23:59:59.000Z',
+          likes: 8,
+          rts: 0,
+          quoteCount: 9,
+        },
+      ],
+      pagination: {
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        totalAvailable: 1_000,
+        snapshotSize: 1_000,
+        yearCounts: [{ year: 2026, count: 1_000 }],
+        candidateRankingTruncated: false,
+      },
+    })
+
+    try {
+      await expect(
+        getPortalBangersPage({ period: 'week' }),
+      ).resolves.toMatchObject({
+        tweets: [{ id: 'monday' }],
+        pagination: { totalAvailable: 1 },
+      })
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   test('encodes the observation cursor for ClickHouse polling', async () => {

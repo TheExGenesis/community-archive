@@ -58,7 +58,27 @@ describe('portal bangers route', () => {
       scope: 'members',
       sort: 'recent',
       year: 2024,
+      period: undefined,
       query: 'agency',
+    })
+  })
+
+  test('forwards this-week filtering instead of a year', async () => {
+    const response = await GET(
+      new NextRequest(
+        'https://community-archive.org/api/portal/bangers?period=week&year=2024',
+      ),
+    )
+
+    expect(response.status).toBe(200)
+    expect(getPortalBangersPageMock).toHaveBeenCalledWith({
+      limit: 30,
+      offset: 0,
+      scope: 'all',
+      sort: 'quotes',
+      year: undefined,
+      period: 'week',
+      query: '',
     })
   })
 
@@ -66,6 +86,17 @@ describe('portal bangers route', () => {
     const response = await GET(
       new NextRequest(
         'https://community-archive.org/api/portal/bangers?offset=-1',
+      ),
+    )
+
+    expect(response.status).toBe(400)
+    expect(getPortalBangersPageMock).not.toHaveBeenCalled()
+  })
+
+  test('rejects an unsupported time period', async () => {
+    const response = await GET(
+      new NextRequest(
+        'https://community-archive.org/api/portal/bangers?period=month',
       ),
     )
 

@@ -484,31 +484,31 @@ describe('portal reads', () => {
     }
   })
 
-  test('starts this week on Monday at midnight UTC', async () => {
+  test('uses a rolling seven-day window instead of the calendar week', async () => {
     jest.useFakeTimers()
     jest.setSystemTime(new Date('2026-08-12T14:00:00.000Z'))
     fetchPortalBangersPageMock.mockResolvedValueOnce({
       tweets: [
         {
-          id: 'monday',
+          id: 'sunday',
           username: 'alice',
           name: 'Alice',
           avatar: null,
-          text: 'Monday banger',
-          observedAt: '2026-08-10T00:00:00.000Z',
-          createdAt: '2026-08-10T00:00:00.000Z',
+          text: 'Sunday banger',
+          observedAt: '2026-08-09T23:59:59.000Z',
+          createdAt: '2026-08-09T23:59:59.000Z',
           likes: 4,
           rts: 0,
           quoteCount: 2,
         },
         {
-          id: 'sunday',
+          id: 'eight-days-ago',
           username: 'bob',
           name: 'Bob',
           avatar: null,
-          text: 'Sunday banger',
-          observedAt: '2026-08-09T23:59:59.000Z',
-          createdAt: '2026-08-09T23:59:59.000Z',
+          text: 'Outside the rolling window',
+          observedAt: '2026-08-04T13:59:59.000Z',
+          createdAt: '2026-08-04T13:59:59.000Z',
           likes: 8,
           rts: 0,
           quoteCount: 9,
@@ -529,7 +529,7 @@ describe('portal reads', () => {
       await expect(
         getPortalBangersPage({ period: 'week' }),
       ).resolves.toMatchObject({
-        tweets: [{ id: 'monday' }],
+        tweets: [{ id: 'sunday' }],
         pagination: { totalAvailable: 1 },
       })
     } finally {

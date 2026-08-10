@@ -7,7 +7,11 @@ import {
   within,
 } from '@testing-library/react'
 import { BangersExplorer } from './BangersExplorer'
-import type { PortalBangersPage, PortalTweet } from '@/lib/portal/types'
+import type {
+  PortalBangersPage,
+  PortalBangersPeriod,
+  PortalTweet,
+} from '@/lib/portal/types'
 
 const push = jest.fn()
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
@@ -80,9 +84,15 @@ function page(
   }
 }
 
-function renderExplorer(initialPage = page()) {
+function renderExplorer(initialPage = page(), period?: PortalBangersPeriod) {
   return render(
-    <BangersExplorer initialPage={initialPage} scope="all" sort="quotes" />,
+    <BangersExplorer
+      initialPage={initialPage}
+      scope="all"
+      sort="quotes"
+      currentYear={2026}
+      period={period}
+    />,
   )
 }
 
@@ -123,6 +133,26 @@ describe('BangersExplorer', () => {
     ).toHaveAttribute('href', '/bangers?scope=members')
     expect(screen.queryByText('Likes')).not.toBeInTheDocument()
     expect(screen.queryByText('Reposts')).not.toBeInTheDocument()
+    expect(screen.getByTestId('bangers-masonry')).toHaveClass(
+      'columns-1',
+      'lg:columns-2',
+    )
+  })
+
+  test('keeps today selected across ranking and author links', () => {
+    renderExplorer(page(), 'today')
+
+    expect(
+      screen.getByRole('combobox', { name: 'Filter by time' }),
+    ).toHaveTextContent('Today')
+    expect(screen.getByRole('link', { name: 'Most recent' })).toHaveAttribute(
+      'href',
+      '/bangers?sort=recent&period=today',
+    )
+    expect(
+      screen.getByRole('link', { name: 'Archive members' }),
+    ).toHaveAttribute('href', '/bangers?scope=members&period=today')
+    expect(screen.getByText(/from today/)).toBeVisible()
   })
 
   test('searches names and text and can clear the result', () => {

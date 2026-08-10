@@ -15,6 +15,7 @@ import { getResearchPosts, selectFeaturedResearchPosts } from './research'
 import { selectHomepageStream } from './stream'
 import type {
   PortalBangersPage,
+  PortalBangersPeriod,
   PortalBangersScope,
   PortalBangersSort,
   PortalData,
@@ -48,6 +49,8 @@ interface PortalCorpusRange {
 
 const PORTAL_READ_TIMEOUT_MS = 10_000
 export const PORTAL_BANGERS_PAGE_SIZE = 30
+const PORTAL_BANGERS_PERIOD_SCAN_PAGE_SIZE = 100
+const PORTAL_BANGERS_PERIOD_SCAN_PAGE_LIMIT = 25
 
 function required(value: string | undefined, name: string): string {
   if (!value) throw new Error(`${name} is not configured`)
@@ -669,6 +672,100 @@ const getCachedRecentBangers = unstable_cache(
   ['portal-recent-bangers-v2'],
   { revalidate: 1_800 },
 )
+
+function portalBangersPeriodStart(
+  period: PortalBangersPeriod,
+  now = new Date(),
+): string {
+  const start = new Date(now)
+  start.setUTCHours(0, 0, 0, 0)
+  if (period === 'week') {
+    const daysSinceMonday = (start.getUTCDay() + 6) % 7
+    start.setUTCDate(start.getUTCDate() - daysSinceMonday)
+  }
+  return start.toISOString()
+}
+
+async function fetchPortalBangersPeriodSnapshot(
+  _sourceKey: string,
+  periodStart: string,
+  scope: PortalBangersScope,
+  query: string,
+): Promise<{ tweets: PortalTweet[]; candidateRankingTruncated: boolean }> {
+  const tweets: PortalTweet[] = []
+  let offset = 0
+  let candidateRankingTruncated = false
+
+  for (
+    let pageIndex = 0;
+    pageIndex < PORTAL_BANGERS_PERIOD_SCAN_PAGE_LIMIT;
+    pageIndex += 1
+  ) {
+    const page = await fetchPortalBangersPage({
+      limit: PORTAL_BANGERS_PERIOD_SCAN_PAGE_SIZE,
+      offset,
+      sort: 'recent',
+      scope,
+      query,
+    })
+    candidateRankingTruncated ||= page.pagination.candidateRankingTruncated
+
+    const firstOlderIndex = page.tweets.findIndex(
+      (tweet) => tweet.createdAt < periodStart,
+    )
+    tweets.push(
+      ...(firstOlderIndex === -1
+        ? page.tweets
+        : page.tweets.slice(0, firstOlderIndex)),
+    )
+
+    if (firstOlderIndex !== -1 || page.pagination.nextOffset === null) {
+      return {
+        tweets: dedupePortalTweets(tweets),
+        candidateRankingTruncated,
+      }
+    }
+    if (page.tweets.length === 0) break
+    offset = page.pagination.nextOffset
+  }
+
+  return {
+    tweets: dedupePortalTweets(tweets),
+    candidateRankingTruncated: true,
+  }
+}
+
+function dedupePortalTweets(tweets: PortalTweet[]): PortalTweet[] {
+  return Array.from(new Map(tweets.map((tweet) => [tweet.id, tweet])).values())
+}
+
+function sortPortalBangers(
+  tweets: PortalTweet[],
+  sort: PortalBangersSort,
+): PortalTweet[] {
+  return [...tweets].sort((left, right) => {
+    if (sort === 'recent') {
+      return (
+        Date.parse(right.createdAt) - Date.parse(left.createdAt) ||
+        (right.quoteCount ?? 0) - (left.quoteCount ?? 0) ||
+        right.id.localeCompare(left.id)
+      )
+    }
+    return (
+      (right.quoteCount ?? 0) - (left.quoteCount ?? 0) ||
+      right.likes - left.likes ||
+      Date.parse(right.createdAt) - Date.parse(left.createdAt) ||
+      right.id.localeCompare(left.id)
+    )
+  })
+}
+
+const getCachedPortalBangersPeriodSnapshot = unstable_cache(
+  fetchPortalBangersPeriodSnapshot,
+  ['portal-bangers-period-snapshot-v1'],
+  { revalidate: 300 },
+)
+
 const getCachedInitialBangersPage = unstable_cache(
   async (
     _sourceKey: string,
@@ -720,9 +817,56 @@ export async function getPortalBangersPage(
     sort?: PortalBangersSort
     scope?: PortalBangersScope
     year?: number
+    period?: PortalBangersPeriod
     query?: string
   } = {},
 ): Promise<PortalBangersPage> {
+  if (options.period) {
+    const limit = Math.max(
+      1,
+      Math.min(100, Math.trunc(options.limit ?? PORTAL_BANGERS_PAGE_SIZE)),
+    )
+    const offset = Math.max(
+      0,
+      Math.min(1_000_000, Math.trunc(options.offset ?? 0)),
+    )
+    const sort = options.sort ?? 'quotes'
+    const scope = options.scope ?? 'all'
+    const query = options.query?.trim().slice(0, 120) ?? ''
+    const periodStart = portalBangersPeriodStart(options.period)
+    const snapshot = await getCachedPortalBangersPeriodSnapshot(
+      portalDataSourceKey(),
+      periodStart,
+      scope,
+      query,
+    )
+    const ranked = sortPortalBangers(snapshot.tweets, sort)
+    const pageTweets = ranked.slice(offset, offset + limit)
+    const nextOffset = offset + pageTweets.length
+    const yearCounts = new Map<number, number>()
+    for (const tweet of ranked) {
+      const year = new Date(tweet.createdAt).getUTCFullYear()
+      if (Number.isFinite(year)) {
+        yearCounts.set(year, (yearCounts.get(year) ?? 0) + 1)
+      }
+    }
+    return {
+      tweets: await enrichPortalTweets(pageTweets),
+      pagination: {
+        limit,
+        offset,
+        nextOffset: nextOffset < ranked.length ? nextOffset : null,
+        totalAvailable: ranked.length,
+        snapshotSize: ranked.length,
+        yearCounts: Array.from(yearCounts, ([year, count]) => ({
+          year,
+          count,
+        })).sort((left, right) => right.year - left.year),
+        candidateRankingTruncated: snapshot.candidateRankingTruncated,
+      },
+    }
+  }
+
   const page = await fetchPortalBangersPage(options)
   return {
     ...page,
@@ -735,18 +879,19 @@ export async function getInitialPortalBangersPage(
     sort?: PortalBangersSort
     scope?: PortalBangersScope
     year?: number
+    period?: PortalBangersPeriod
     query?: string
   } = {},
 ): Promise<PortalBangersPage> {
   const scope = options.scope ?? 'all'
   const sort = options.sort ?? 'quotes'
   const query = options.query?.trim() ?? ''
-  if (query) {
+  if (query || options.period) {
     return getPortalBangersPage({
       limit: PORTAL_BANGERS_PAGE_SIZE,
       scope,
       sort,
-      year: options.year,
+      ...(options.period ? { period: options.period } : { year: options.year }),
       query,
     })
   }

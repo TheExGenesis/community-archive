@@ -4,7 +4,11 @@ import {
   getPortalBangersPage,
   PORTAL_BANGERS_PAGE_SIZE,
 } from '@/lib/portal/data'
-import type { PortalBangersScope, PortalBangersSort } from '@/lib/portal/types'
+import type {
+  PortalBangersPeriod,
+  PortalBangersScope,
+  PortalBangersSort,
+} from '@/lib/portal/types'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -39,14 +43,23 @@ export async function GET(request: NextRequest) {
   try {
     const params = new URL(request.url).searchParams
     const offset = boundedInteger(params.get('offset'), 0, 0, 1_000_000)
-    const year = params.has('year')
-      ? boundedInteger(
-          params.get('year'),
-          new Date().getUTCFullYear(),
-          2006,
-          new Date().getUTCFullYear() + 1,
-        )
-      : undefined
+    const periodValue = params.get('period')
+    if (periodValue && periodValue !== 'today' && periodValue !== 'week') {
+      throw new Error('Invalid bangers period')
+    }
+    const period: PortalBangersPeriod | undefined =
+      periodValue === 'today' || periodValue === 'week'
+        ? periodValue
+        : undefined
+    const year =
+      !period && params.has('year')
+        ? boundedInteger(
+            params.get('year'),
+            new Date().getUTCFullYear(),
+            2006,
+            new Date().getUTCFullYear() + 1,
+          )
+        : undefined
     const scope: PortalBangersScope =
       params.get('scope') === 'members' ? 'members' : 'all'
     const sort: PortalBangersSort =
@@ -61,6 +74,7 @@ export async function GET(request: NextRequest) {
         scope,
         sort,
         year,
+        period,
         query,
       }),
     )

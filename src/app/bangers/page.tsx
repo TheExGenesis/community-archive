@@ -4,7 +4,11 @@ import { BangersExplorer } from '@/components/portal/BangersExplorer'
 import { MUTED, SERIF } from '@/components/portal/styles'
 import { getIsMember } from '@/lib/portal/auth'
 import { getInitialPortalBangersPage } from '@/lib/portal/data'
-import type { PortalBangersScope, PortalBangersSort } from '@/lib/portal/types'
+import type {
+  PortalBangersPeriod,
+  PortalBangersScope,
+  PortalBangersSort,
+} from '@/lib/portal/types'
 
 export const metadata = { title: 'Bangers · Community Archive' }
 export const maxDuration = 60
@@ -25,6 +29,9 @@ export default async function BangersPage({
     paramValue(searchParams.sort) === 'recent' ? 'recent' : 'quotes'
   const scope: PortalBangersScope =
     paramValue(searchParams.scope) === 'members' ? 'members' : 'all'
+  const periodValue = paramValue(searchParams.period)
+  const period: PortalBangersPeriod | undefined =
+    periodValue === 'today' || periodValue === 'week' ? periodValue : undefined
   const requestedYear = Number(paramValue(searchParams.year))
   const currentYear = new Date().getUTCFullYear()
   const year =
@@ -37,7 +44,7 @@ export default async function BangersPage({
   const initialPage = await getInitialPortalBangersPage({
     scope,
     sort,
-    year,
+    ...(period ? { period } : { year }),
     query,
   })
 
@@ -69,11 +76,13 @@ export default async function BangersPage({
           </p>
         </header>
         <BangersExplorer
-          key={`${scope}:${sort}:${year ?? 'all'}:${query}`}
+          key={`${scope}:${sort}:${period ?? year ?? 'all'}:${query}`}
           initialPage={initialPage}
           scope={scope}
           sort={sort}
-          year={year}
+          currentYear={currentYear}
+          year={period ? undefined : year}
+          period={period}
           initialQuery={query}
           initialView={
             paramValue(searchParams.view) === 'years' ? 'years' : 'list'

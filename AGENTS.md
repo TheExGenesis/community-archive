@@ -83,6 +83,11 @@ Staging synchronization is automatic; production synchronization is not:
 
 ## Supabase Invariants And Gotchas
 
+- Browser archive uploads currently overwrite
+  `archives/{username}/archive.json`, while the processor resolves that path
+  later from the username on `archive_upload`. Do not treat an upload row as an
+  immutable replay reference. A decoupled or dual-sink processor must first use
+  a unique object key recorded on the upload before it can promise exact replay.
 - The project PostgREST limit is 1,000 rows. Any operation requiring every row
   must paginate with a stable `.order()` on a unique or indexed column. For
   counts, prefer `.select('*', { count: 'exact', head: true })`.

@@ -1,6 +1,22 @@
 import 'server-only'
+import * as React from 'react'
 import { cookies } from 'next/headers'
+import type { User } from '@supabase/supabase-js'
 import { createServerClient } from '@/utils/supabase'
+
+type RequestCache = <T>(loader: () => Promise<T>) => () => Promise<T>
+const withoutRequestCache: RequestCache = (loader) => loader
+
+// Next's React Server Components runtime supplies React.cache(), while the
+// repository's React 18 Jest runtime does not. Keep the test fallback local;
+// production requests use React.cache() and deduplicate this auth round trip
+// across layouts and pages.
+const requestCache =
+  (
+    React as typeof React & {
+      cache?: RequestCache
+    }
+  ).cache ?? withoutRequestCache
 
 /**
  * Member preview is available in development always, and on deployments that
@@ -11,6 +27,16 @@ import { createServerClient } from '@/utils/supabase'
 export const isMemberPreviewEnabled = () =>
   process.env.NODE_ENV === 'development' ||
   process.env.NEXT_PUBLIC_ENABLE_MEMBER_PREVIEW === 'true'
+
+export const getCurrentUser = requestCache(async (): Promise<User | null> => {
+  const cookieStore = cookies()
+  const supabase = createServerClient(cookieStore)
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+  return error ? null : user
+})
 
 /**
  * Whether the current request comes from a signed-in member.
@@ -26,9 +52,5 @@ export async function getIsMember(): Promise<boolean> {
   ) {
     return true
   }
-  const supabase = createServerClient(cookieStore)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return !!user
+  return !!(await getCurrentUser())
 }

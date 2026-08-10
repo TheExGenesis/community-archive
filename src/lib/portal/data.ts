@@ -47,6 +47,7 @@ interface PortalCorpusRange {
 }
 
 const PORTAL_READ_TIMEOUT_MS = 10_000
+export const PORTAL_BANGERS_PAGE_SIZE = 30
 
 function required(value: string | undefined, name: string): string {
   if (!value) throw new Error(`${name} is not configured`)
@@ -668,6 +669,22 @@ const getCachedRecentBangers = unstable_cache(
   ['portal-recent-bangers-v2'],
   { revalidate: 1_800 },
 )
+const getCachedInitialBangersPage = unstable_cache(
+  async (
+    _sourceKey: string,
+    scope: PortalBangersScope,
+    sort: PortalBangersSort,
+    year: number | null,
+  ) =>
+    getPortalBangersPage({
+      limit: PORTAL_BANGERS_PAGE_SIZE,
+      scope,
+      sort,
+      ...(year === null ? {} : { year }),
+    }),
+  ['portal-initial-bangers-page-v1'],
+  { revalidate: 300 },
+)
 export async function loadOptionalPortalData<T>(
   section: string,
   loader: () => Promise<T>,
@@ -711,6 +728,34 @@ export async function getPortalBangersPage(
     ...page,
     tweets: await enrichPortalTweets(page.tweets),
   }
+}
+
+export async function getInitialPortalBangersPage(
+  options: {
+    sort?: PortalBangersSort
+    scope?: PortalBangersScope
+    year?: number
+    query?: string
+  } = {},
+): Promise<PortalBangersPage> {
+  const scope = options.scope ?? 'all'
+  const sort = options.sort ?? 'quotes'
+  const query = options.query?.trim() ?? ''
+  if (query) {
+    return getPortalBangersPage({
+      limit: PORTAL_BANGERS_PAGE_SIZE,
+      scope,
+      sort,
+      year: options.year,
+      query,
+    })
+  }
+  return getCachedInitialBangersPage(
+    portalDataSourceKey(),
+    scope,
+    sort,
+    options.year ?? null,
+  )
 }
 
 /** Cached corpus-wide seed series for the authenticated trends explorer. */

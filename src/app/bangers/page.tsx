@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { BangersExplorer } from '@/components/portal/BangersExplorer'
 import { MUTED, SERIF } from '@/components/portal/styles'
 import { getIsMember } from '@/lib/portal/auth'
-import { getPortalBangersPage } from '@/lib/portal/data'
+import { getInitialPortalBangersPage } from '@/lib/portal/data'
 import type { PortalBangersScope, PortalBangersSort } from '@/lib/portal/types'
 
 export const metadata = { title: 'Bangers · Community Archive' }
@@ -34,8 +34,7 @@ export default async function BangersPage({
       ? requestedYear
       : undefined
   const query = paramValue(searchParams.q).trim().slice(0, 120)
-  const initialPage = await getPortalBangersPage({
-    limit: 60,
+  const initialPage = await getInitialPortalBangersPage({
     scope,
     sort,
     year,

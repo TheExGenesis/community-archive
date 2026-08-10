@@ -16,6 +16,7 @@ jest.mock('./research', () => ({
 
 import {
   fetchPortalMemberCount,
+  getInitialPortalBangersPage,
   getPortalData,
   getPortalStreamPage,
   getPortalStreamUpdates,
@@ -26,6 +27,7 @@ import {
   selectDailyBangers,
 } from './data'
 import {
+  fetchPortalBangersPage,
   fetchPortalHistoricalBangers,
   fetchPortalLiveAnalytics,
   fetchPortalRecentBangers,
@@ -38,6 +40,8 @@ const fetchPortalHistoricalBangersMock =
   fetchPortalHistoricalBangers as jest.MockedFunction<
     typeof fetchPortalHistoricalBangers
   >
+const fetchPortalBangersPageMock =
+  fetchPortalBangersPage as jest.MockedFunction<typeof fetchPortalBangersPage>
 const fetchPortalLiveAnalyticsMock =
   fetchPortalLiveAnalytics as jest.MockedFunction<
     typeof fetchPortalLiveAnalytics
@@ -372,6 +376,33 @@ describe('portal reads', () => {
       },
     })
     expect(tweetsInit?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  test('loads the initial bangers explorer in a 30-row page', async () => {
+    fetchPortalBangersPageMock.mockResolvedValueOnce({
+      tweets: [],
+      pagination: {
+        limit: 30,
+        offset: 0,
+        nextOffset: null,
+        totalAvailable: 0,
+        snapshotSize: 0,
+        yearCounts: [],
+        candidateRankingTruncated: false,
+      },
+    })
+
+    await expect(getInitialPortalBangersPage()).resolves.toMatchObject({
+      tweets: [],
+      pagination: { limit: 30, offset: 0 },
+    })
+
+    expect(fetchPortalBangersPageMock).toHaveBeenCalledTimes(1)
+    expect(fetchPortalBangersPageMock).toHaveBeenCalledWith({
+      limit: 30,
+      scope: 'all',
+      sort: 'quotes',
+    })
   })
 
   test('encodes the observation cursor for ClickHouse polling', async () => {

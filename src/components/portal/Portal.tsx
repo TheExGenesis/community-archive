@@ -796,7 +796,7 @@ export default function Portal({
                   {data.failures.research ? (
                     <PanelUnavailable message="Featured research is temporarily unavailable." />
                   ) : (
-                    data.research.slice(0, 4).map((post) => (
+                    data.research.slice(0, 3).map((post) => (
                       <a
                         key={post.url}
                         href={post.url}

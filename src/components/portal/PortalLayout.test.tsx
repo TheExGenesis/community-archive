@@ -83,8 +83,8 @@ test('renders the balanced homepage composition and editorial labels', async () 
   })
 
   expect(screen.getByText('Featured research')).toBeInTheDocument()
-  expect(screen.getByText('Research post 4')).toBeInTheDocument()
-  expect(screen.queryByText('Research post 5')).not.toBeInTheDocument()
+  expect(screen.getByText('Research post 3')).toBeInTheDocument()
+  expect(screen.queryByText('Research post 4')).not.toBeInTheDocument()
   expect(screen.getByText('Historical Banger')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: /More bangers/i })).toHaveAttribute(
     'href',

@@ -193,7 +193,7 @@ export default async function ClassicHomepage() {
   }
 
   const isOptedIn = canShowHomepageSearch(user?.id, optedInStatus)
-  const mostFollowed = mostFollowedAccounts.slice(0, 7)
+  const mostFollowed = mostFollowedAccounts.slice(0, 8)
 
   const totalAmountRaised = financialContributors.reduce(
     (sum, contributor) => sum + contributor.totalAmountDonated,

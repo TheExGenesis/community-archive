@@ -70,10 +70,11 @@ const tweet: PortalTweet = {
 }
 
 describe('portal TweetRow media', () => {
-  test('can present a tweet as a ranked banger card', () => {
+  test('highlights a top banger without showing a corner rank badge', () => {
     render(<TweetRow tweet={tweet} featuredRank={1} />)
 
-    expect(screen.getByLabelText('Rank 1')).toHaveTextContent('#1')
+    expect(screen.queryByLabelText('Rank 1')).not.toBeInTheDocument()
+    expect(screen.getByRole('article')).toHaveClass('from-amber-50/80')
     expect(screen.getByText(/12 archive quotes/)).toHaveClass('rounded-full')
   })
 

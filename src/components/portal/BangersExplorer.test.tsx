@@ -7,7 +7,11 @@ import {
   within,
 } from '@testing-library/react'
 import { BangersExplorer } from './BangersExplorer'
-import type { PortalBangersPage, PortalTweet } from '@/lib/portal/types'
+import type {
+  PortalBangersPage,
+  PortalBangersPeriod,
+  PortalTweet,
+} from '@/lib/portal/types'
 
 const push = jest.fn()
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
@@ -80,9 +84,15 @@ function page(
   }
 }
 
-function renderExplorer(initialPage = page()) {
+function renderExplorer(initialPage = page(), period?: PortalBangersPeriod) {
   return render(
-    <BangersExplorer initialPage={initialPage} scope="all" sort="quotes" />,
+    <BangersExplorer
+      initialPage={initialPage}
+      scope="all"
+      sort="quotes"
+      currentYear={2026}
+      period={period}
+    />,
   )
 }
 
@@ -104,11 +114,22 @@ describe('BangersExplorer', () => {
   test('offers only banger-relevant ranking and author scopes', () => {
     renderExplorer()
 
+    const orderedMasonryItems = Array.from(
+      screen
+        .getByTestId('bangers-masonry')
+        .querySelectorAll<HTMLElement>('[data-masonry-order]'),
+    ).sort(
+      (left, right) => Number(left.style.order) - Number(right.style.order),
+    )
     expect(
-      screen.getAllByTestId('tweet-row').map((row) => row.textContent),
+      orderedMasonryItems.map(
+        (item) => within(item).getByTestId('tweet-row').textContent,
+      ),
     ).toEqual(['Another older thought', 'Older favorite', 'Newest thought'])
     expect(
-      screen.getAllByTestId('tweet-row').map((row) => row.dataset.rank),
+      orderedMasonryItems.map(
+        (item) => within(item).getByTestId('tweet-row').dataset.rank,
+      ),
     ).toEqual(['1', '2', '3'])
     expect(screen.getByRole('link', { name: 'Most quoted' })).toHaveAttribute(
       'aria-current',
@@ -123,6 +144,40 @@ describe('BangersExplorer', () => {
     ).toHaveAttribute('href', '/bangers?scope=members')
     expect(screen.queryByText('Likes')).not.toBeInTheDocument()
     expect(screen.queryByText('Reposts')).not.toBeInTheDocument()
+    expect(screen.getByTestId('bangers-masonry')).toHaveClass(
+      'flex',
+      'lg:grid',
+      'lg:grid-cols-2',
+    )
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-0'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['1', '3'])
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-1'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['2'])
+    expect(
+      orderedMasonryItems.map((item) => item.dataset.masonryOrder),
+    ).toEqual(['1', '2', '3'])
+  })
+
+  test('keeps today selected across ranking and author links', () => {
+    renderExplorer(page(), 'today')
+
+    expect(
+      screen.getByRole('combobox', { name: 'Filter by time' }),
+    ).toHaveTextContent('Today')
+    expect(screen.getByRole('link', { name: 'Most recent' })).toHaveAttribute(
+      'href',
+      '/bangers?sort=recent&period=today',
+    )
+    expect(
+      screen.getByRole('link', { name: 'Archive members' }),
+    ).toHaveAttribute('href', '/bangers?scope=members&period=today')
+    expect(screen.getByText(/from today/)).toBeVisible()
   })
 
   test('searches names and text and can clear the result', () => {

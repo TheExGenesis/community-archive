@@ -138,6 +138,21 @@ export default function OptInForm({
             <p className="text-lg font-semibold text-green-600 dark:text-green-400">
               ✓ You&apos;re opted in to tweet streaming!
             </p>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Next, request your X archive so you can upload it and fill in
+                older posts.
+              </p>
+              <Button asChild size="lg">
+                <a
+                  href="https://x.com/settings/download_your_data"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Request your X archive
+                </a>
+              </Button>
+            </div>
             <Link href="/profile">
               <Button variant="outline" size="lg" className="px-8 py-3">
                 Manage Privacy Settings

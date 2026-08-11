@@ -7,6 +7,7 @@ import TweetCard from '@/components/TweetCard'
 import { CHART_TERMS } from '@/lib/portal/trendConfig'
 import {
   cachedTrendEvidence,
+  hasCompleteTrendEvidence,
   storeTrendEvidence,
   trendEvidenceCacheKey,
 } from '@/lib/portal/trendEvidenceCache'
@@ -35,6 +36,7 @@ interface FeedResponse {
 }
 
 const MAX_SERIES = 12
+const EVIDENCE_PAGE_SIZE = 30
 const RANGE_QUERY_DEBOUNCE_MS = 1_200
 const compactAxisFormatter = new Intl.NumberFormat('en', {
   notation: 'compact',
@@ -238,8 +240,11 @@ export default function TrendsExplorer({
     const termsToLoad = includeTerms.filter(
       (term) =>
         forceRefresh ||
-        !evidenceCacheRef.current.has(
-          trendEvidenceCacheKey(term, requestedYears),
+        !hasCompleteTrendEvidence(
+          evidenceCacheRef.current,
+          term,
+          requestedYears,
+          EVIDENCE_PAGE_SIZE,
         ),
     )
     if (termsToLoad.length === 0) {
@@ -460,7 +465,17 @@ export default function TrendsExplorer({
   const selectedEndIndex = selectedYears ? years.indexOf(selectedYears.end) : -1
   const isUpdatingEvidence =
     includeTerms.length > 0 &&
-    (isLoadingEvidence || !sameYears(selectedYears, requestedYears))
+    (isLoadingEvidence ||
+      (!sameYears(selectedYears, requestedYears) &&
+        includeTerms.some(
+          (term) =>
+            !hasCompleteTrendEvidence(
+              evidenceCacheRef.current,
+              term,
+              selectedYears,
+              EVIDENCE_PAGE_SIZE,
+            ),
+        )))
 
   const yearForPointer = (clientX: number): number | null => {
     const svg = chartRef.current

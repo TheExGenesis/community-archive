@@ -13,6 +13,18 @@ export interface TrendEvidenceCacheEntry {
 
 export const MAX_TREND_EVIDENCE_CACHE_ENTRIES = 96
 
+function tweetFallsWithinRange(
+  tweet: PortalTweet,
+  range: TrendEvidenceRange,
+): boolean {
+  const createdAt = new Date(tweet.createdAt).getTime()
+  return (
+    Number.isFinite(createdAt) &&
+    createdAt >= Date.UTC(range.start, 0, 1) &&
+    createdAt < Date.UTC(range.end + 1, 0, 1)
+  )
+}
+
 export function trendEvidenceCacheKey(
   term: string,
   range: TrendEvidenceRange | null,
@@ -34,6 +46,35 @@ export function storeTrendEvidence(
   }
 }
 
+/**
+ * Whether the cache can answer this term/range without a top-up request.
+ * An exact response is complete even when empty. A broader response is only
+ * complete when a full page of its returned tweets survives local filtering.
+ */
+export function hasCompleteTrendEvidence(
+  cache: ReadonlyMap<string, TrendEvidenceCacheEntry>,
+  term: string,
+  range: TrendEvidenceRange | null,
+  limit = 30,
+): boolean {
+  if (cache.has(trendEvidenceCacheKey(term, range))) return true
+  if (!range) return false
+
+  return Array.from(cache.values()).some((entry) => {
+    if (entry.term !== term) return false
+    if (
+      entry.range &&
+      (entry.range.start > range.start || entry.range.end < range.end)
+    ) {
+      return false
+    }
+    return (
+      entry.tweets.filter((tweet) => tweetFallsWithinRange(tweet, range))
+        .length >= limit
+    )
+  })
+}
+
 export function cachedTrendEvidence(
   cache: ReadonlyMap<string, TrendEvidenceCacheEntry>,
   includedTerms: string[],
@@ -41,8 +82,6 @@ export function cachedTrendEvidence(
   limit = 30,
 ): PortalTweet[] {
   const included = new Set(includedTerms)
-  const rangeStart = range ? Date.UTC(range.start, 0, 1) : null
-  const rangeEnd = range ? Date.UTC(range.end + 1, 0, 1) : null
   const unique = new Map<string, PortalTweet>()
 
   cache.forEach((entry) => {
@@ -50,8 +89,7 @@ export function cachedTrendEvidence(
     for (const tweet of entry.tweets) {
       const createdAt = new Date(tweet.createdAt).getTime()
       if (!Number.isFinite(createdAt)) continue
-      if (rangeStart !== null && createdAt < rangeStart) continue
-      if (rangeEnd !== null && createdAt >= rangeEnd) continue
+      if (range && !tweetFallsWithinRange(tweet, range)) continue
       unique.set(tweet.id, tweet)
     }
   })

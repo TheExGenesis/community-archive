@@ -678,11 +678,25 @@ function portalBangersPeriodStart(
   now = new Date(),
 ): string {
   const start = new Date(now)
-  start.setUTCHours(0, 0, 0, 0)
-  if (period === 'week') {
+  if (period === 'today') {
+    start.setUTCDate(start.getUTCDate() - 1)
+  } else if (period === 'week') {
+    start.setUTCHours(0, 0, 0, 0)
     const daysSinceMonday = (start.getUTCDay() + 6) % 7
     start.setUTCDate(start.getUTCDate() - daysSinceMonday)
+  } else {
+    start.setUTCMonth(start.getUTCMonth() - 3)
   }
+  return start.toISOString()
+}
+
+function portalBangersSnapshotStart(
+  period: PortalBangersPeriod,
+  now = new Date(),
+): string {
+  const start = new Date(portalBangersPeriodStart(period, now))
+  if (period === 'today') start.setUTCMinutes(0, 0, 0)
+  if (period === 'three-months') start.setUTCHours(0, 0, 0, 0)
   return start.toISOString()
 }
 
@@ -833,14 +847,19 @@ export async function getPortalBangersPage(
     const sort = options.sort ?? 'quotes'
     const scope = options.scope ?? 'all'
     const query = options.query?.trim().slice(0, 120) ?? ''
-    const periodStart = portalBangersPeriodStart(options.period)
+    const now = new Date()
+    const periodStart = portalBangersPeriodStart(options.period, now)
+    const snapshotStart = portalBangersSnapshotStart(options.period, now)
     const snapshot = await getCachedPortalBangersPeriodSnapshot(
       portalDataSourceKey(),
-      periodStart,
+      snapshotStart,
       scope,
       query,
     )
-    const ranked = sortPortalBangers(snapshot.tweets, sort)
+    const ranked = sortPortalBangers(
+      snapshot.tweets.filter((tweet) => tweet.createdAt >= periodStart),
+      sort,
+    )
     const pageTweets = ranked.slice(offset, offset + limit)
     const nextOffset = offset + pageTweets.length
     const yearCounts = new Map<number, number>()

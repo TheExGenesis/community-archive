@@ -4,6 +4,7 @@ import React from 'react'
 import TweetComponent, { compactTweetGridClass } from './TweetComponent'
 import { Button } from '@/components/ui/button'
 import { Download, SearchX } from 'lucide-react'
+import type { TweetOrigin } from '@/lib/navigation'
 
 interface UnifiedTweetListProps {
   tweets: any[]
@@ -16,6 +17,8 @@ interface UnifiedTweetListProps {
   headerDescription?: string
   collapseLongTweets?: boolean
   compact?: boolean
+  permalinkOrigin?: TweetOrigin
+  permalinkReturnTo?: string
 }
 
 /**
@@ -34,6 +37,8 @@ export default function UnifiedTweetList({
   headerDescription,
   collapseLongTweets = false,
   compact = false,
+  permalinkOrigin,
+  permalinkReturnTo,
 }: UnifiedTweetListProps) {
   const handleExportCsv = () => {
     if (tweets.length === 0) {
@@ -175,6 +180,8 @@ export default function UnifiedTweetList({
                   tweet={tweet}
                   collapseLongText={collapseLongTweets}
                   compact
+                  permalinkOrigin={permalinkOrigin}
+                  permalinkReturnTo={permalinkReturnTo}
                 />
               </div>
             ))}
@@ -190,6 +197,8 @@ export default function UnifiedTweetList({
               <TweetComponent
                 tweet={tweet}
                 collapseLongText={collapseLongTweets}
+                permalinkOrigin={permalinkOrigin}
+                permalinkReturnTo={permalinkReturnTo}
               />
             </div>
           ))}

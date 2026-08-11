@@ -1,9 +1,12 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import type { KeyboardEvent, MouseEvent } from 'react'
 import ImageLightbox from '@/components/ImageLightbox'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
+import { tweetPermalinkHref, type TweetOrigin } from '@/lib/navigation'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { PortalMedia, PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
 
@@ -42,6 +45,15 @@ export const shortDate = (iso: string) =>
     month: 'short',
     year: 'numeric',
   })
+
+export function decodeTweetText(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&#x0?27;/gi, "'")
+}
 
 export function TweetAvatar({
   tweet,
@@ -133,9 +145,13 @@ function TweetImages({
 function QuotedTweet({
   tweet,
   compact,
+  origin,
+  returnTo,
 }: {
   tweet: PortalQuotedTweet
   compact: boolean
+  origin?: TweetOrigin
+  returnTo?: string
 }) {
   if (tweet.isDeleted) {
     return (
@@ -148,7 +164,7 @@ function QuotedTweet({
   return (
     <div className="mt-2 rounded-[4px] border border-zinc-200 bg-white p-2.5 dark:border-[#303036] dark:bg-[#18181b]">
       <Link
-        href={`/tweets/${tweet.id}`}
+        href={tweetPermalinkHref(tweet.id, origin, returnTo)}
         className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         <div className="flex items-center gap-2">
@@ -163,7 +179,7 @@ function QuotedTweet({
         <div
           className={`${compact ? 'line-clamp-3' : ''} mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-zinc-700 dark:text-[#d9d9de]`}
         >
-          {tweet.text}
+          {decodeTweetText(tweet.text)}
         </div>
       </Link>
       <TweetImages
@@ -181,6 +197,19 @@ function QuotedTweet({
   )
 }
 
+export interface TweetCardProps {
+  tweet: PortalTweet
+  animate?: boolean
+  compact?: boolean
+  collapsible?: boolean
+  featuredRank?: number
+  showDate?: boolean
+  showArchivedBadge?: boolean
+  clickable?: boolean
+  origin?: TweetOrigin
+  returnTo?: string
+}
+
 export function TweetRow({
   tweet,
   animate = false,
@@ -189,29 +218,37 @@ export function TweetRow({
   featuredRank,
   showDate = false,
   showArchivedBadge = false,
-}: {
-  tweet: PortalTweet
-  animate?: boolean
-  compact?: boolean
-  collapsible?: boolean
-  featuredRank?: number
-  showDate?: boolean
-  showArchivedBadge?: boolean
-}) {
+  clickable = false,
+  origin,
+  returnTo,
+}: TweetCardProps) {
+  const router = useRouter()
   const [isExpanded, setIsExpanded] = useState(false)
   const canExpand = collapsible && tweet.text.length > 280
-  const href = `/tweets/${tweet.id}`
+  const href = tweetPermalinkHref(tweet.id, origin, returnTo)
   const isFeatured = featuredRank !== undefined
-  const isTopThree = isFeatured && featuredRank <= 3
+  const isClickable = clickable || isFeatured
   const rowClassName = isFeatured
-    ? `relative flex min-w-0 gap-3 rounded-lg border p-4 shadow-sm transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-brand/50 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:hover:border-brand/60 sm:gap-3.5 sm:p-5 ${
-        isTopThree
-          ? 'border-amber-200/90 bg-gradient-to-br from-amber-50/80 via-white to-white dark:border-amber-400/25 dark:from-amber-400/[0.06] dark:via-[#1b1b1e] dark:to-[#1b1b1e]'
-          : 'border-zinc-200 bg-white dark:border-[#303036] dark:bg-[#1b1b1e]'
-      } ${animate ? 'portal-slide-in' : ''}`
+    ? `relative flex min-w-0 gap-3 rounded-lg border border-zinc-200/75 bg-white p-4 shadow-sm dark:border-[#303036]/80 dark:bg-[#1b1b1e] sm:gap-3.5 sm:p-5 ${
+        animate ? 'portal-slide-in' : ''
+      }`
     : `flex gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23] ${
         animate ? 'portal-slide-in' : ''
       }`
+
+  const activateCard = () => router.push(href)
+  const handleCardClick = (event: MouseEvent<HTMLElement>) => {
+    if (!isClickable) return
+    const target = event.target as HTMLElement
+    if (target.closest('a, button, [role="button"]')) return
+    activateCard()
+  }
+  const handleCardKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (!isClickable || event.target !== event.currentTarget) return
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    activateCard()
+  }
 
   const tweetContent = (
     <>
@@ -237,7 +274,7 @@ export function TweetRow({
               }`
         }`}
       >
-        {tweet.text}
+        {decodeTweetText(tweet.text)}
       </div>
     </>
   )
@@ -262,7 +299,12 @@ export function TweetRow({
       )}
       <TweetImages media={tweet.media} compact={compact} label="Tweet image" />
       {tweet.quotedTweet && (
-        <QuotedTweet tweet={tweet.quotedTweet} compact={compact} />
+        <QuotedTweet
+          tweet={tweet.quotedTweet}
+          compact={compact}
+          origin={origin}
+          returnTo={returnTo}
+        />
       )}
       {!compact && (
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
@@ -286,7 +328,18 @@ export function TweetRow({
   )
 
   return (
-    <article className={rowClassName}>
+    <article
+      className={`${rowClassName} ${
+        isClickable
+          ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2'
+          : ''
+      }`}
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
+      role={isClickable ? 'link' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      aria-label={isClickable ? `View tweet by @${tweet.username}` : undefined}
+    >
       <Link href={href} aria-label={`View tweet by @${tweet.username}`}>
         <TweetAvatar tweet={tweet} size={isFeatured ? 38 : 34} />
       </Link>

@@ -40,6 +40,21 @@ function privateJson(body: unknown, status = 200) {
   })
 }
 
+function optionalDate(value: string | null, label: string): string | undefined {
+  if (value === null) return undefined
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`Choose a valid ${label} date`)
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`)
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.toISOString().slice(0, 10) !== value
+  ) {
+    throw new Error(`Choose a valid ${label} date`)
+  }
+  return value
+}
+
 export async function GET(request: NextRequest) {
   if (!(await getIsMember())) {
     return privateJson({ error: 'Sign in to explore trends' }, 401)
@@ -57,13 +72,21 @@ export async function GET(request: NextRequest) {
 
     if (view === 'feed') {
       const includeTerms = normalizedTerms(params.getAll('include'))
-      const excludeTerms = normalizedTerms(params.getAll('exclude'))
       if (includeTerms.length === 0) {
         throw new Error('Include at least one term to load matching tweets')
       }
+      const since = optionalDate(params.get('since'), 'start')
+      const until = optionalDate(params.get('until'), 'end')
+      if (since && until && since >= until) {
+        throw new Error('Choose an end date after the start date')
+      }
       return privateJson({
         tweets: await enrichPortalTweets(
-          await fetchPortalTrendEvidence(includeTerms, excludeTerms, 30),
+          await fetchPortalTrendEvidence(includeTerms, {
+            limit: 30,
+            since,
+            until,
+          }),
         ),
       })
     }

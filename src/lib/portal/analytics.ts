@@ -243,11 +243,6 @@ function stableTrendColor(term: string): string {
   return TREND_COLORS[hash % TREND_COLORS.length]
 }
 
-function textMatchesTrend(text: string, term: string): boolean {
-  const textTokens = new Set(normalizedTextTokens(text))
-  return portalTrendTokens(term).every((token) => textTokens.has(token))
-}
-
 /** Fetch one or more user-selected yearly series in parallel. */
 export async function fetchPortalTrendSeries(
   terms: string[],
@@ -298,14 +293,16 @@ export async function fetchPortalTrendSeries(
   return { years, series, computedAt: now.toISOString() }
 }
 
-/**
- * Latest posts counted by at least one included trend, minus posts matching an
- * excluded trend. Each query uses the same all-token semantics as word-trend.
- */
+interface PortalTrendEvidenceOptions {
+  limit?: number
+  since?: string
+  until?: string
+}
+
+/** Latest posts counted by at least one included trend in an optional period. */
 export async function fetchPortalTrendEvidence(
   includeTerms: string[],
-  excludeTerms: string[],
-  limit = 30,
+  { limit = 30, since, until }: PortalTrendEvidenceOptions = {},
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
 ): Promise<PortalTweet[]> {
   const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
@@ -315,12 +312,17 @@ export async function fetchPortalTrendEvidence(
       (term) => () =>
         fetcher<ClickHouseSearchResponse>(
           ['search'],
-          new URLSearchParams({
-            q: term,
-            mode: 'all',
-            limit: String(candidateLimit),
-            offset: '0',
-          }),
+          (() => {
+            const params = new URLSearchParams({
+              q: term,
+              mode: 'all',
+              limit: String(candidateLimit),
+              offset: '0',
+            })
+            if (since) params.set('since', since)
+            if (until) params.set('until', until)
+            return params
+          })(),
           { timeoutMs: 30_000 },
         ),
     ),
@@ -341,9 +343,6 @@ export async function fetchPortalTrendEvidence(
         typeof row.fullText !== 'string'
       ) {
         throw new Error('ClickHouse search returned an invalid tweet')
-      }
-      if (excludeTerms.some((term) => textMatchesTrend(row.fullText, term))) {
-        continue
       }
       const username = row.username || 'unknown'
       const createdAt = safeTimestamp(row.createdAt, 'trend tweet timestamp')

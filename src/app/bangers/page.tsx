@@ -30,8 +30,6 @@ export default async function BangersPage({
   const scope: PortalBangersScope =
     paramValue(searchParams.scope) === 'members' ? 'members' : 'all'
   const periodValue = paramValue(searchParams.period)
-  const period: PortalBangersPeriod | undefined =
-    periodValue === 'today' || periodValue === 'week' ? periodValue : undefined
   const requestedYear = Number(paramValue(searchParams.year))
   const currentYear = new Date().getUTCFullYear()
   const year =
@@ -40,6 +38,15 @@ export default async function BangersPage({
     requestedYear <= currentYear + 1
       ? requestedYear
       : undefined
+  const period: PortalBangersPeriod | undefined =
+    periodValue === 'today' ||
+    periodValue === 'week' ||
+    periodValue === 'three-months'
+      ? periodValue
+      : periodValue === 'all' || year !== undefined
+        ? undefined
+        : 'today'
+  const allTime = periodValue === 'all'
   const query = paramValue(searchParams.q).trim().slice(0, 120)
   const initialPage = await getInitialPortalBangersPage({
     scope,
@@ -60,7 +67,7 @@ export default async function BangersPage({
         <header className="mb-7 max-w-[760px]">
           <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-brand">
             <span aria-hidden="true">✦</span>
-            The archive&apos;s all-time greats
+            The archive&apos;s standout posts
           </p>
           <h1
             className="mb-2 text-[34px] font-semibold leading-tight sm:text-[38px]"
@@ -71,8 +78,8 @@ export default async function BangersPage({
           <p className={`text-[13.5px] leading-relaxed ${MUTED}`}>
             The archive&apos;s most quoted tweets, ranked by distinct quote
             tweets from archive uploaders and opted-in members. Quotes by the
-            original author do not count. Browse the full ranked snapshot as it
-            loads.
+            original author do not count. Today&apos;s rolling 24-hour view is
+            selected by default, with longer ranges available below.
           </p>
         </header>
         <BangersExplorer
@@ -83,10 +90,8 @@ export default async function BangersPage({
           currentYear={currentYear}
           year={period ? undefined : year}
           period={period}
+          allTime={allTime}
           initialQuery={query}
-          initialView={
-            paramValue(searchParams.view) === 'years' ? 'years' : 'list'
-          }
         />
       </div>
     </main>

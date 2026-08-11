@@ -137,6 +137,14 @@ Staging synchronization is automatic; production synchronization is not:
 
 ## Development And Verification
 
+### Tweet rendering
+
+- Use `src/components/TweetCard.tsx` as the canonical full-fidelity tweet card
+  for new product surfaces. Data adapters must preserve the complete text,
+  attached media, and quoted-tweet payload (including the quoted tweet's media)
+  before rendering. Do not introduce a surface-specific partial tweet renderer;
+  make intentionally compact variants explicit through the canonical component.
+
 Use Node 20 from `.nvmrc` and pnpm. Prefer the narrowest relevant check, then
 expand verification in proportion to risk.
 

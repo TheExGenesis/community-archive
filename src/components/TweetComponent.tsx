@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { tweetPermalinkHref, type TweetOrigin } from '@/lib/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import {
   FaHeart,
@@ -92,6 +93,8 @@ interface TweetComponentProps {
   className?: string
   collapseLongText?: boolean
   compact?: boolean
+  permalinkOrigin?: TweetOrigin
+  permalinkReturnTo?: string
 }
 
 export const compactTweetGridClass =
@@ -124,6 +127,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
   className = '',
   collapseLongText = false,
   compact = false,
+  permalinkOrigin,
+  permalinkReturnTo,
 }) => {
   const [isTextExpanded, setIsTextExpanded] = React.useState(false)
   // Support both interface formats for backwards compatibility
@@ -411,7 +416,11 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
               </div>
               <div className="flex items-center space-x-3">
                 <a
-                  href={`/tweets/${quotedTweet.tweet_id}`}
+                  href={tweetPermalinkHref(
+                    quotedTweet.tweet_id,
+                    permalinkOrigin,
+                    permalinkReturnTo,
+                  )}
                   className="transition-colors hover:text-foreground"
                   title="Permalink to quoted tweet"
                 >
@@ -441,7 +450,11 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       aria-label="Tweet links"
     >
       <a
-        href={`/tweets/${tweet.tweet_id}`}
+        href={tweetPermalinkHref(
+          tweet.tweet_id,
+          permalinkOrigin,
+          permalinkReturnTo,
+        )}
         className={`${compactActionClass} border-brand/30 bg-brand/10 text-brand hover:bg-brand/20`}
         aria-label="View tweet in Community Archive"
         title="View tweet in Community Archive"
@@ -663,7 +676,11 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span>{new Date(tweet.created_at).toLocaleDateString()}</span>
           <a
-            href={`/tweets/${tweet.tweet_id}`}
+            href={tweetPermalinkHref(
+              tweet.tweet_id,
+              permalinkOrigin,
+              permalinkReturnTo,
+            )}
             className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
             title="Permalink"
           >

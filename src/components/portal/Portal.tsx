@@ -12,7 +12,7 @@ import {
 import { PORTAL_ARTICLES } from './articles'
 import { PORTAL_TOOLS } from './tools'
 import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
-import { TweetRow } from './TweetRow'
+import TweetCard from '@/components/TweetCard'
 import {
   estimateLiveTweetGain,
   interpolateLiveTweetCount,
@@ -663,7 +663,15 @@ export default function Portal({
                   className="flex max-h-[420px] flex-col overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60 lg:max-h-none lg:min-h-0 lg:flex-1 [&::-webkit-scrollbar]:hidden"
                 >
                   {visible.slice(0, HOME_LIVE_STREAM_LIMIT).map((t, i) => (
-                    <TweetRow key={t.id} tweet={t} compact animate={i === 0} />
+                    <TweetCard
+                      key={t.id}
+                      tweet={t}
+                      compact
+                      animate={i === 0}
+                      clickable
+                      origin="home"
+                      returnTo="/"
+                    />
                   ))}
                   {visible.length === 0 && streamUnavailable && (
                     <PanelUnavailable message="Live stream is temporarily unavailable." />
@@ -756,7 +764,13 @@ export default function Portal({
                       />
                       {recentBanger ? (
                         <div className="flex flex-1 flex-col [&>article]:flex-1">
-                          <TweetRow tweet={recentBanger} collapsible />
+                          <TweetCard
+                            tweet={recentBanger}
+                            collapsible
+                            clickable
+                            origin="home"
+                            returnTo="/"
+                          />
                         </div>
                       ) : (
                         <PanelUnavailable message="Recent bangers are temporarily unavailable." />
@@ -774,10 +788,13 @@ export default function Portal({
                       />
                       {historicalBanger ? (
                         <div className="flex flex-1 flex-col [&>article]:flex-1">
-                          <TweetRow
+                          <TweetCard
                             tweet={historicalBanger}
                             collapsible
                             showDate
+                            clickable
+                            origin="home"
+                            returnTo="/"
                           />
                         </div>
                       ) : (
@@ -974,7 +991,7 @@ export default function Portal({
               </div>
               <div className={`${CARD} overflow-hidden`}>
                 {visible.map((t, i) => (
-                  <TweetRow
+                  <TweetCard
                     key={t.id}
                     tweet={t}
                     animate={i === 0}

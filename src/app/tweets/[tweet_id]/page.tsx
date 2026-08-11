@@ -1,15 +1,22 @@
 import { getTweetPageData } from '@/lib/getTweetPageData'
 import { notFound } from 'next/navigation'
 import TweetComponent from '@/components/TweetComponent'
+import TweetBackLink from '@/components/TweetBackLink'
 import ThreadView from '@/components/ThreadView'
 import QuotingTweetsSidebar from '@/components/QuotingTweetsSidebar'
-import Link from 'next/link'
-import { ArrowLeft, Link2, MessagesSquare } from 'lucide-react'
+import { getTweetBackLink } from '@/lib/navigation'
+import { Link2, MessagesSquare } from 'lucide-react'
 
 // ISR: serve from CDN cache, revalidate at most once per hour
 export const revalidate = 3600
 
-export default async function TweetPage({ params }: any) {
+export default async function TweetPage({
+  params,
+  searchParams,
+}: {
+  params: { tweet_id: string }
+  searchParams?: Record<string, string | string[] | undefined>
+}) {
   const { tweet_id } = params
   const { tweet, threadTree, quotingTweets, quotingTweetCount } =
     await getTweetPageData(tweet_id)
@@ -19,17 +26,16 @@ export default async function TweetPage({ params }: any) {
   }
 
   const isThread = threadTree && Object.keys(threadTree.tweets).length > 1
+  const backLink = getTweetBackLink(searchParams)
 
   return (
     <main className="min-h-screen bg-background">
       <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-        <Link
-          href="/search"
-          className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to search
-        </Link>
+        <TweetBackLink
+          href={backLink.href}
+          label={backLink.label}
+          useHistory={backLink.hasKnownOrigin}
+        />
 
         <header className="mb-8 mt-8 border-b border-border pb-7">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-brand">
@@ -70,6 +76,7 @@ export default async function TweetPage({ params }: any) {
           <QuotingTweetsSidebar
             tweets={quotingTweets}
             totalCount={quotingTweetCount}
+            targetTweet={tweet}
           />
         </div>
       </section>

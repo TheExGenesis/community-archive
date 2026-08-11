@@ -9,6 +9,16 @@ jest.mock('@/components/TweetAvatarImage', () => ({
   __esModule: true,
   default: () => null,
 }))
+jest.mock('@/components/ImageLightbox', () => ({
+  __esModule: true,
+  default: ({ src, alt }: { src: string; alt: string }) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt} />
+  ),
+}))
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn() }),
+}))
 
 const quotingTweet: TweetData = {
   tweet_id: 'quote-1',
@@ -23,28 +33,61 @@ const quotingTweet: TweetData = {
   avatar_media_url: 'https://example.com/avatar.jpg',
   username: 'quote_author',
   account_display_name: 'Quote Author',
-  media: [],
+  media: [
+    {
+      media_url: 'https://example.com/quote-image.jpg',
+      media_type: 'photo',
+    },
+  ],
   urls: [],
+}
+
+const targetTweet: TweetData = {
+  ...quotingTweet,
+  tweet_id: 'original-1',
+  account_id: 'account-2',
+  full_text: 'The complete original tweet being quoted.',
+  username: 'original_author',
+  account_display_name: 'Original Author',
+  quote_tweet_id: null,
+  media: [
+    {
+      media_url: 'https://example.com/original-image.jpg',
+      media_type: 'photo',
+    },
+  ],
 }
 
 describe('QuotingTweetsSidebar', () => {
   it('renders quoting tweets, engagement, and the complete result count', () => {
     const markup = renderToStaticMarkup(
-      <QuotingTweetsSidebar tweets={[quotingTweet]} totalCount={15} />,
+      <QuotingTweetsSidebar
+        tweets={[quotingTweet]}
+        totalCount={15}
+        targetTweet={targetTweet}
+      />,
     )
 
     expect(markup).toContain('aria-labelledby="quoting-tweets-heading"')
     expect(markup).toContain('Tweets quoting this')
     expect(markup).toContain('Quote Author')
     expect(markup).toContain('A useful perspective &amp; a second thought.')
+    expect(markup).toContain('quote-image.jpg')
+    expect(markup).toContain('The complete original tweet being quoted.')
+    expect(markup).toContain('original-image.jpg')
     expect(markup).toContain('href="/tweets/quote-1"')
     expect(markup).toContain('aria-label="15 quotes"')
-    expect(markup).toContain('Showing 1 of 15')
+    expect(markup).not.toContain('Open quote')
+    expect(markup).toContain('Load more quotes')
   })
 
   it('shows an archive-specific empty state', () => {
     const markup = renderToStaticMarkup(
-      <QuotingTweetsSidebar tweets={[]} totalCount={0} />,
+      <QuotingTweetsSidebar
+        tweets={[]}
+        totalCount={0}
+        targetTweet={targetTweet}
+      />,
     )
 
     expect(markup).toContain('No archived quotes yet')

@@ -61,7 +61,7 @@ export default function ImageLightbox({
           width={width}
           height={height}
           sizes="96vw"
-          className="max-h-[92vh] w-auto max-w-[96vw] rounded-md object-contain"
+          className="h-auto max-h-[92vh] w-[min(96vw,1200px)] max-w-[96vw] rounded-md object-contain"
         />
       </DialogContent>
     </Dialog>

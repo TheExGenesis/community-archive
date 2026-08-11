@@ -750,7 +750,10 @@ export default function Portal({
                     <div
                       className={`${CARD} flex min-w-0 flex-col overflow-hidden lg:min-h-[320px]`}
                     >
-                      <PanelHeader title="Banger of the moment" />
+                      <PanelHeader
+                        title="Banger of the moment"
+                        action={{ label: 'More bangers', href: '/bangers' }}
+                      />
                       {recentBanger ? (
                         <div className="flex flex-1 flex-col [&>article]:flex-1">
                           <TweetRow tweet={recentBanger} collapsible />

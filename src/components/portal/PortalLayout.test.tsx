@@ -86,10 +86,13 @@ test('renders the balanced homepage composition and editorial labels', async () 
   expect(screen.getByText('Research post 4')).toBeInTheDocument()
   expect(screen.queryByText('Research post 5')).not.toBeInTheDocument()
   expect(screen.getByText('Historical Banger')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: /More bangers/i })).toHaveAttribute(
-    'href',
-    '/bangers',
-  )
+  const moreBangersLinks = screen.getAllByRole('link', {
+    name: /More bangers/i,
+  })
+  expect(moreBangersLinks).toHaveLength(2)
+  moreBangersLinks.forEach((link) => {
+    expect(link).toHaveAttribute('href', '/bangers')
+  })
   expect(
     screen.getByRole('link', { name: /Export the archive/i }),
   ).toHaveAttribute(

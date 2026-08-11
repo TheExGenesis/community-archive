@@ -178,6 +178,27 @@ describe('ClickHouse-backed portal analytics', () => {
     ])
   })
 
+  test('caps concurrent trend scans at the two-query gateway budget', async () => {
+    let active = 0
+    let maxActive = 0
+    const fetcher = jest.fn(async () => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      await new Promise((resolve) => setTimeout(resolve, 2))
+      active -= 1
+      return { data: [] }
+    }) as unknown as AnalyticsFetcher
+
+    await fetchPortalTrendSeries(
+      ['alpha', 'beta', 'gamma', 'delta', 'epsilon'],
+      new Date('2026-08-07T12:00:00.000Z'),
+      fetcher,
+    )
+
+    expect(fetcher).toHaveBeenCalledTimes(5)
+    expect(maxActive).toBe(2)
+  })
+
   test('merges included evidence and forwards a selected date range', async () => {
     const tweet = (tweetId: string, fullText: string, createdAt: string) => ({
       tweetId,

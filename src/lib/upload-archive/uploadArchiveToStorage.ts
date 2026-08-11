@@ -1,22 +1,18 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Archive } from '../types'
 import { devLog } from '../devLog'
-import { createAdminBrowserClient } from '@/utils/supabase'
 import { refreshSession } from '../refreshSession'
+import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
 
 export const uploadArchiveToStorage = async (
   supabase: SupabaseClient,
   archive: Archive,
 ): Promise<void> => {
-  // Upload archive objects to storage
-  const username = archive.account[0].account.username.toLowerCase()
-
-  const archiveSize = JSON.stringify(archive).length / (1024 * 1024)
+  const serializedArchive = JSON.stringify(archive)
+  const archiveSize = serializedArchive.length / (1024 * 1024)
   console.log(`Size of archive: ${archiveSize.toFixed(2)} MB`)
   const isDevelopment = process.env.NODE_ENV === 'development'
   const useRemoteDevDb = process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true'
-
-  console.log('Uploading archive to storage', { username })
 
   try {
     await refreshSession(supabase)
@@ -24,7 +20,24 @@ export const uploadArchiveToStorage = async (
     console.error('Error refreshing session:', error)
   }
 
-  // const supabaseAdmin = createAdminBrowserClient()
+  // getUser verifies the session with Supabase Auth. Never derive this path
+  // from the uploaded archive: its account metadata is controlled by the file.
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+  if (userError || !user) {
+    throw new Error(
+      `Unable to verify the archive owner: ${userError?.message ?? 'no authenticated user'}`,
+    )
+  }
+
+  const username = getSessionTwitterUsername(user)
+  if (!username) {
+    throw new Error('Unable to determine a trusted username for this session')
+  }
+
+  console.log('Uploading archive to storage', { username })
 
   devLog('storage - supabase config', {
     isDevelopment,
@@ -35,7 +48,7 @@ export const uploadArchiveToStorage = async (
   const bucketName = 'archives'
   const { data, error: uploadError } = await supabase.storage
     .from(bucketName)
-    .upload(`${username}/archive.json`, JSON.stringify(archive), {
+    .upload(`${username}/archive.json`, serializedArchive, {
       upsert: true,
     })
   if (uploadError && uploadError.message !== 'The resource already exists') {

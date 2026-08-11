@@ -1,5 +1,53 @@
 -- Row Level Security policies and enablement
 
+-- Storage policies for the public archives bucket. Writes are restricted to
+-- the folder named by trusted, server-controlled app_metadata; the upload
+-- client derives the same name from its verified Twitter identity (#372).
+CREATE POLICY "Archives are publicly readable" ON "storage"."objects"
+  FOR SELECT TO public
+  USING (("bucket_id" = 'archives'::"text"));
+
+CREATE POLICY "Users can upload their own archive" ON "storage"."objects"
+  FOR INSERT TO "authenticated"
+  WITH CHECK (
+    ("bucket_id" = 'archives'::"text")
+    AND ("storage"."filename"("name") = 'archive.json'::"text")
+    AND (
+      "lower"(("storage"."foldername"("name"))[1]) =
+      "lower"((SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text")))
+    )
+  );
+
+CREATE POLICY "Users can update their own archive" ON "storage"."objects"
+  FOR UPDATE TO "authenticated"
+  USING (
+    ("bucket_id" = 'archives'::"text")
+    AND ("storage"."filename"("name") = 'archive.json'::"text")
+    AND (
+      "lower"(("storage"."foldername"("name"))[1]) =
+      "lower"((SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text")))
+    )
+  )
+  WITH CHECK (
+    ("bucket_id" = 'archives'::"text")
+    AND ("storage"."filename"("name") = 'archive.json'::"text")
+    AND (
+      "lower"(("storage"."foldername"("name"))[1]) =
+      "lower"((SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text")))
+    )
+  );
+
+CREATE POLICY "Users can delete their own archive" ON "storage"."objects"
+  FOR DELETE TO "authenticated"
+  USING (
+    ("bucket_id" = 'archives'::"text")
+    AND ("storage"."filename"("name") = 'archive.json'::"text")
+    AND (
+      "lower"(("storage"."foldername"("name"))[1]) =
+      "lower"((SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text")))
+    )
+  );
+
 -- Modification policies for authenticated users
 CREATE POLICY "Data is modifiable by their users" ON "public"."all_account" TO "authenticated" USING (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))) WITH CHECK (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")));
 CREATE POLICY "Data is modifiable by their users" ON "public"."all_profile" TO "authenticated" USING (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))) WITH CHECK (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")));

@@ -10,6 +10,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { TimelineTweet } from '@/lib/types'
 import { FilterCriteria, fetchTweets } from '@/lib/queries/tweetQueries'
 import { AlertCircle } from 'lucide-react'
+import type { TweetOrigin } from '@/lib/navigation'
 
 interface TweetListProps {
   filterCriteria: FilterCriteria
@@ -20,6 +21,8 @@ interface TweetListProps {
   resultsDescription?: string
   collapseLongTweets?: boolean
   compact?: boolean
+  permalinkOrigin?: TweetOrigin
+  permalinkReturnTo?: string
 }
 
 const DEFAULT_ITEMS_PER_PAGE = 20
@@ -33,6 +36,8 @@ export default function TweetList({
   resultsDescription,
   collapseLongTweets = false,
   compact = false,
+  permalinkOrigin,
+  permalinkReturnTo,
 }: TweetListProps) {
   const [tweets, setTweets] = useState<TimelineTweet[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -200,6 +205,8 @@ export default function TweetList({
         headerDescription={resultsDescription}
         collapseLongTweets={collapseLongTweets}
         compact={compact}
+        permalinkOrigin={permalinkOrigin}
+        permalinkReturnTo={permalinkReturnTo}
       />
 
       {error && tweets.length > 0 && (

@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Columns3, Grid2X2, Loader2, Search, X } from 'lucide-react'
+import { Loader2, Search, X } from 'lucide-react'
+import TweetCard from '@/components/TweetCard'
 import {
   Select,
   SelectContent,
@@ -18,10 +19,7 @@ import type {
   PortalBangersSort,
   PortalTweet,
 } from '@/lib/portal/types'
-import { TweetRow } from './TweetRow'
-import { CARD, MUTED, SERIF } from './styles'
-
-type BangersView = 'list' | 'years'
+import { CARD, MUTED } from './styles'
 
 interface BangersExplorerProps {
   initialPage: PortalBangersPage
@@ -30,8 +28,8 @@ interface BangersExplorerProps {
   currentYear: number
   year?: number
   period?: PortalBangersPeriod
+  allTime?: boolean
   initialQuery?: string
-  initialView?: BangersView
 }
 
 const segmentClassName =
@@ -41,21 +39,12 @@ const activeSegmentClassName =
 const idleSegmentClassName =
   'border-zinc-300 bg-transparent text-zinc-600 hover:border-zinc-500 hover:text-zinc-950 dark:border-[#3a3a40] dark:text-[#a7a7b4] dark:hover:border-zinc-500 dark:hover:text-white'
 
-function tweetYear(tweet: PortalTweet): number | null {
-  const year = new Date(tweet.createdAt).getUTCFullYear()
-  return Number.isFinite(year) ? year : null
-}
-
 function matchesQuery(tweet: PortalTweet, query: string): boolean {
   const normalized = query.trim().toLocaleLowerCase()
   if (!normalized) return true
   return `${tweet.name} ${tweet.username} ${tweet.text}`
     .toLocaleLowerCase()
     .includes(normalized)
-}
-
-function pluralizeTweets(count: number): string {
-  return `${count} ${count === 1 ? 'tweet' : 'tweets'}`
 }
 
 function dedupeTweets(tweets: PortalTweet[]): PortalTweet[] {
@@ -68,14 +57,14 @@ function bangersHref({
   sort,
   year,
   period,
-  view,
+  allTime,
 }: {
   query: string
   scope: PortalBangersScope
   sort: PortalBangersSort
   year?: number
   period?: PortalBangersPeriod
-  view: BangersView
+  allTime?: boolean
 }): string {
   const params = new URLSearchParams()
   const trimmedQuery = query.trim()
@@ -84,7 +73,7 @@ function bangersHref({
   if (sort === 'recent') params.set('sort', sort)
   if (period) params.set('period', period)
   else if (year !== undefined) params.set('year', String(year))
-  if (view === 'years') params.set('view', view)
+  else if (allTime) params.set('period', 'all')
   const search = params.toString()
   return `/bangers${search ? `?${search}` : ''}`
 }
@@ -123,13 +112,12 @@ export function BangersExplorer({
   currentYear,
   year,
   period,
+  allTime = false,
   initialQuery = '',
-  initialView = 'list',
 }: BangersExplorerProps) {
   const router = useRouter()
   const [query, setQuery] = useState(initialQuery)
   const [loadedQuery, setLoadedQuery] = useState(initialQuery.trim())
-  const [view, setView] = useState<BangersView>(initialView)
   const [page, setPage] = useState(initialPage)
   const [isLoading, setIsLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -137,6 +125,7 @@ export function BangersExplorer({
   const requestVersionRef = useRef(0)
   const requestControllerRef = useRef<AbortController | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const columnLoadMoreRefs = useRef<Array<HTMLDivElement | null>>([])
 
   const availableYears = useMemo(() => {
     const years = page.pagination.yearCounts.map(({ year }) => year)
@@ -152,13 +141,6 @@ export function BangersExplorer({
     }
     return years.sort((left, right) => right - left)
   }, [currentYear, page.pagination.yearCounts, period, year])
-  const yearTotals = useMemo(
-    () =>
-      new Map(
-        page.pagination.yearCounts.map(({ year, count }) => [year, count]),
-      ),
-    [page.pagination.yearCounts],
-  )
   const visibleTweets = useMemo(
     () => page.tweets.filter((tweet) => matchesQuery(tweet, query)),
     [page.tweets, query],
@@ -186,19 +168,6 @@ export function BangersExplorer({
       ),
     [page.tweets],
   )
-  const groupedTweets = useMemo(() => {
-    const groups = new Map<number, PortalTweet[]>()
-    for (const tweet of visibleTweets) {
-      const groupYear = tweetYear(tweet)
-      if (groupYear === null) continue
-      const group = groups.get(groupYear) ?? []
-      group.push(tweet)
-      groups.set(groupYear, group)
-    }
-    return Array.from(groups.entries()).sort(
-      ([leftYear], [rightYear]) => rightYear - leftYear,
-    )
-  }, [visibleTweets])
 
   const requestPage = useCallback(
     async ({
@@ -287,15 +256,17 @@ export function BangersExplorer({
   }, [loadedQuery, query, requestPage])
 
   useEffect(() => {
-    const target = loadMoreRef.current
-    if (!target || page.pagination.nextOffset === null) return
+    const targets = [loadMoreRef.current, ...columnLoadMoreRefs.current].filter(
+      (target): target is HTMLDivElement => Boolean(target),
+    )
+    if (targets.length === 0 || page.pagination.nextOffset === null) return
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) loadMore()
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMore()
       },
       { rootMargin: '700px 0px' },
     )
-    observer.observe(target)
+    targets.forEach((target) => observer.observe(target))
     return () => observer.disconnect()
   }, [loadMore, page.pagination.nextOffset])
 
@@ -307,22 +278,40 @@ export function BangersExplorer({
   )
 
   useEffect(() => {
-    const nextUrl = bangersHref({ query, scope, sort, year, period, view })
+    const nextUrl = bangersHref({
+      query,
+      scope,
+      sort,
+      year,
+      period,
+      allTime,
+    })
     window.history.replaceState(window.history.state, '', nextUrl)
-  }, [period, query, scope, sort, view, year])
+  }, [allTime, period, query, scope, sort, year])
 
   const hasFilters =
-    query.trim().length > 0 || year !== undefined || period !== undefined
+    query.trim().length > 0 ||
+    year !== undefined ||
+    allTime ||
+    (period !== undefined && period !== 'today')
   const selectedTime = period ?? (year === undefined ? 'all' : `year-${year}`)
   const clearFilters = () => {
     setQuery('')
-    if (year !== undefined || period !== undefined) {
-      router.push(bangersHref({ query: '', scope, sort, view }))
+    if (year !== undefined || allTime || period !== 'today') {
+      router.push(bangersHref({ query: '', scope, sort, period: 'today' }))
     }
   }
   const isSearching = query.trim() !== loadedQuery
   const loadedCount = page.tweets.length
   const totalCount = page.pagination.totalAvailable
+  const currentReturnTo = bangersHref({
+    query,
+    scope,
+    sort,
+    year,
+    period,
+    allTime,
+  })
 
   return (
     <section aria-label="Browse bangers">
@@ -373,7 +362,7 @@ export function BangersExplorer({
                   sort,
                   year,
                   period,
-                  view,
+                  allTime,
                 })}
                 aria-current={scope === 'all' ? 'page' : undefined}
                 className={`${segmentClassName} rounded-l-[3px] ${
@@ -391,7 +380,7 @@ export function BangersExplorer({
                   sort,
                   year,
                   period,
-                  view,
+                  allTime,
                 })}
                 aria-current={scope === 'members' ? 'page' : undefined}
                 className={`${segmentClassName} -ml-px rounded-r-[3px] ${
@@ -419,7 +408,7 @@ export function BangersExplorer({
                   sort: 'quotes',
                   year,
                   period,
-                  view,
+                  allTime,
                 })}
                 aria-current={sort === 'quotes' ? 'page' : undefined}
                 className={`${segmentClassName} rounded-l-[3px] ${
@@ -437,7 +426,7 @@ export function BangersExplorer({
                   sort: 'recent',
                   year,
                   period,
-                  view,
+                  allTime,
                 })}
                 aria-current={sort === 'recent' ? 'page' : undefined}
                 className={`${segmentClassName} -ml-px rounded-r-[3px] ${
@@ -461,7 +450,11 @@ export function BangersExplorer({
               value={selectedTime}
               onValueChange={(value) => {
                 const nextPeriod =
-                  value === 'today' || value === 'week' ? value : undefined
+                  value === 'today' ||
+                  value === 'week' ||
+                  value === 'three-months'
+                    ? value
+                    : undefined
                 const nextYear = value.startsWith('year-')
                   ? Number(value.slice(5))
                   : undefined
@@ -472,7 +465,7 @@ export function BangersExplorer({
                     sort,
                     year: nextYear,
                     period: nextPeriod,
-                    view,
+                    allTime: value === 'all',
                   }),
                 )
               }}
@@ -484,9 +477,10 @@ export function BangersExplorer({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="rounded-[3px]">
+                <SelectItem value="all">All time</SelectItem>
                 <SelectItem value="today">Today</SelectItem>
                 <SelectItem value="week">This week</SelectItem>
-                <SelectItem value="all">All time</SelectItem>
+                <SelectItem value="three-months">Last 3 months</SelectItem>
                 {availableYears.map((availableYear) => (
                   <SelectItem
                     key={availableYear}
@@ -498,42 +492,6 @@ export function BangersExplorer({
               </SelectContent>
             </Select>
           </label>
-
-          <div>
-            <span
-              className={`mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
-            >
-              View
-            </span>
-            <div className="flex">
-              <button
-                type="button"
-                aria-pressed={view === 'list'}
-                onClick={() => setView('list')}
-                className={`${segmentClassName} rounded-l-[3px] ${
-                  view === 'list'
-                    ? activeSegmentClassName
-                    : idleSegmentClassName
-                }`}
-              >
-                <Grid2X2 aria-hidden="true" className="h-3.5 w-3.5" />
-                Cards
-              </button>
-              <button
-                type="button"
-                aria-pressed={view === 'years'}
-                onClick={() => setView('years')}
-                className={`${segmentClassName} -ml-px rounded-r-[3px] ${
-                  view === 'years'
-                    ? activeSegmentClassName
-                    : idleSegmentClassName
-                }`}
-              >
-                <Columns3 aria-hidden="true" className="h-3.5 w-3.5" />
-                By year
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -542,8 +500,11 @@ export function BangersExplorer({
           {isSearching
             ? 'Searching ranked bangers…'
             : `Showing ${loadedCount.toLocaleString()} of ${totalCount.toLocaleString()} ranked ${totalCount === 1 ? 'tweet' : 'tweets'}`}
-          {!isSearching && period === 'today' ? ' from today' : ''}
+          {!isSearching && period === 'today' ? ' from the last 24 hours' : ''}
           {!isSearching && period === 'week' ? ' from this week' : ''}
+          {!isSearching && period === 'three-months'
+            ? ' from the last 3 months'
+            : ''}
           {!isSearching && !period && year !== undefined ? ` from ${year}` : ''}
           {!isSearching && loadedQuery ? ` matching “${loadedQuery}”` : ''}
           {!isSearching && page.pagination.candidateRankingTruncated
@@ -577,7 +538,7 @@ export function BangersExplorer({
             </button>
           ) : null}
         </div>
-      ) : view === 'list' ? (
+      ) : (
         <div
           data-testid="bangers-masonry"
           className="flex flex-col lg:grid lg:grid-cols-2 lg:items-start lg:gap-5"
@@ -595,62 +556,26 @@ export function BangersExplorer({
                   className="mb-6 lg:mb-0"
                   style={{ order }}
                 >
-                  <TweetRow
+                  <TweetCard
                     tweet={tweet}
                     featuredRank={tweetRanks.get(tweet.id)}
                     showDate
                     collapsible
+                    origin="bangers"
+                    returnTo={currentReturnTo}
                   />
                 </div>
               ))}
+              <div
+                ref={(element) => {
+                  columnLoadMoreRefs.current[columnIndex] = element
+                }}
+                data-testid={`bangers-column-sentinel-${columnIndex}`}
+                aria-hidden="true"
+                className="hidden h-px lg:block"
+              />
             </div>
           ))}
-        </div>
-      ) : (
-        <div>
-          {groupedTweets.length > 1 ? (
-            <p className={`mb-2 text-[11.5px] ${MUTED}`}>
-              Scroll sideways to browse every year.
-            </p>
-          ) : null}
-          <div className="grid auto-cols-[minmax(290px,1fr)] grid-flow-col gap-4 overflow-x-auto pb-4">
-            {groupedTweets.map(([groupYear, yearTweets]) => {
-              const yearTotal = yearTotals.get(groupYear) ?? yearTweets.length
-              return (
-                <section
-                  key={groupYear}
-                  aria-labelledby={`bangers-year-${groupYear}`}
-                  className="min-w-0"
-                >
-                  <div className="mb-2 flex items-baseline justify-between border-b-2 border-zinc-800 pb-2 dark:border-zinc-200">
-                    <h2
-                      id={`bangers-year-${groupYear}`}
-                      className="text-[22px] font-semibold"
-                      style={SERIF}
-                    >
-                      {groupYear}
-                    </h2>
-                    <span className={`text-[11.5px] tabular-nums ${MUTED}`}>
-                      {yearTweets.length < yearTotal
-                        ? `${yearTweets.length} of ${yearTotal} loaded`
-                        : pluralizeTweets(yearTotal)}
-                    </span>
-                  </div>
-                  <div className="space-y-5">
-                    {yearTweets.map((tweet) => (
-                      <TweetRow
-                        key={tweet.id}
-                        tweet={tweet}
-                        featuredRank={tweetRanks.get(tweet.id)}
-                        showDate
-                        collapsible
-                      />
-                    ))}
-                  </div>
-                </section>
-              )
-            })}
-          </div>
         </div>
       )}
 

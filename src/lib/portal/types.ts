@@ -40,7 +40,7 @@ export interface PortalTweet {
 
 export type PortalBangersScope = 'all' | 'members'
 export type PortalBangersSort = 'quotes' | 'recent'
-export type PortalBangersPeriod = 'today' | 'week'
+export type PortalBangersPeriod = 'today' | 'week' | 'three-months'
 
 export interface PortalBangersPagination {
   limit: number

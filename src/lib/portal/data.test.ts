@@ -407,7 +407,7 @@ describe('portal reads', () => {
     })
   })
 
-  test('builds an exact ranked page from the recent prefix for today', async () => {
+  test('builds an exact ranked page from the rolling 24-hour prefix', async () => {
     jest.useFakeTimers()
     jest.setSystemTime(new Date('2026-08-10T14:00:00.000Z'))
     fetchPortalBangersPageMock.mockResolvedValueOnce({
@@ -437,16 +437,28 @@ describe('portal reads', () => {
           quoteCount: 9,
         },
         {
-          id: 'yesterday',
+          id: 'boundary',
           username: 'carol',
           name: 'Carol',
           avatar: null,
-          text: 'Yesterday',
-          observedAt: '2026-08-09T23:59:59.000Z',
-          createdAt: '2026-08-09T23:59:59.000Z',
+          text: 'Exactly 24 hours ago',
+          observedAt: '2026-08-09T14:00:00.000Z',
+          createdAt: '2026-08-09T14:00:00.000Z',
           likes: 20,
           rts: 0,
           quoteCount: 20,
+        },
+        {
+          id: 'outside-window',
+          username: 'dave',
+          name: 'Dave',
+          avatar: null,
+          text: 'One second outside the window',
+          observedAt: '2026-08-09T13:59:59.000Z',
+          createdAt: '2026-08-09T13:59:59.000Z',
+          likes: 40,
+          rts: 0,
+          quoteCount: 40,
         },
       ],
       pagination: {
@@ -464,12 +476,12 @@ describe('portal reads', () => {
       await expect(
         getPortalBangersPage({ period: 'today', sort: 'quotes' }),
       ).resolves.toMatchObject({
-        tweets: [{ id: 'today-high' }, { id: 'today-low' }],
+        tweets: [{ id: 'boundary' }, { id: 'today-high' }, { id: 'today-low' }],
         pagination: {
           nextOffset: null,
-          totalAvailable: 2,
-          snapshotSize: 2,
-          yearCounts: [{ year: 2026, count: 2 }],
+          totalAvailable: 3,
+          snapshotSize: 3,
+          yearCounts: [{ year: 2026, count: 3 }],
         },
       })
       expect(fetchPortalBangersPageMock).toHaveBeenCalledWith({
@@ -530,6 +542,59 @@ describe('portal reads', () => {
         getPortalBangersPage({ period: 'week' }),
       ).resolves.toMatchObject({
         tweets: [{ id: 'monday' }],
+        pagination: { totalAvailable: 1 },
+      })
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  test('uses a rolling three-calendar-month window', async () => {
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date('2026-08-10T14:00:00.000Z'))
+    fetchPortalBangersPageMock.mockResolvedValueOnce({
+      tweets: [
+        {
+          id: 'inside-quarter',
+          username: 'alice',
+          name: 'Alice',
+          avatar: null,
+          text: 'Inside the quarter',
+          observedAt: '2026-05-10T14:00:00.000Z',
+          createdAt: '2026-05-10T14:00:00.000Z',
+          likes: 4,
+          rts: 0,
+          quoteCount: 2,
+        },
+        {
+          id: 'outside-quarter',
+          username: 'bob',
+          name: 'Bob',
+          avatar: null,
+          text: 'Outside the quarter',
+          observedAt: '2026-05-10T13:59:59.000Z',
+          createdAt: '2026-05-10T13:59:59.000Z',
+          likes: 8,
+          rts: 0,
+          quoteCount: 9,
+        },
+      ],
+      pagination: {
+        limit: 100,
+        offset: 0,
+        nextOffset: null,
+        totalAvailable: 2,
+        snapshotSize: 2,
+        yearCounts: [{ year: 2026, count: 2 }],
+        candidateRankingTruncated: false,
+      },
+    })
+
+    try {
+      await expect(
+        getPortalBangersPage({ period: 'three-months' }),
+      ).resolves.toMatchObject({
+        tweets: [{ id: 'inside-quarter' }],
         pagination: { totalAvailable: 1 },
       })
     } finally {

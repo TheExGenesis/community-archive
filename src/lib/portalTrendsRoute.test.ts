@@ -74,27 +74,41 @@ describe('portal trends route', () => {
     ])
   })
 
-  test('forwards include and exclude filters to the evidence search', async () => {
+  test('forwards included terms and a selected date range to evidence search', async () => {
     fetchPortalTrendEvidenceMock.mockResolvedValue([])
 
     const response = await GET(
       new NextRequest(
-        'https://community-archive.org/api/portal/trends?view=feed&include=Alpha&include=Beta&exclude=Moloch',
+        'https://community-archive.org/api/portal/trends?view=feed&include=Alpha&include=Beta&since=2022-01-01&until=2025-01-01',
       ),
     )
 
     expect(response.status).toBe(200)
     expect(fetchPortalTrendEvidenceMock).toHaveBeenCalledWith(
       ['alpha', 'beta'],
-      ['moloch'],
-      30,
+      {
+        limit: 30,
+        since: '2022-01-01',
+        until: '2025-01-01',
+      },
     )
   })
 
   test('rejects an evidence query without an included term', async () => {
     const response = await GET(
       new NextRequest(
-        'https://community-archive.org/api/portal/trends?view=feed&exclude=moloch',
+        'https://community-archive.org/api/portal/trends?view=feed',
+      ),
+    )
+
+    expect(response.status).toBe(400)
+    expect(fetchPortalTrendEvidenceMock).not.toHaveBeenCalled()
+  })
+
+  test('rejects an inverted evidence date range', async () => {
+    const response = await GET(
+      new NextRequest(
+        'https://community-archive.org/api/portal/trends?view=feed&include=tpot&since=2026-01-01&until=2025-01-01',
       ),
     )
 

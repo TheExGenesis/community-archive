@@ -1,155 +1,263 @@
-import React from 'react'
-import Link from 'next/link'
-import { FaHeart, FaRetweet } from 'react-icons/fa'
-import { Quote } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import TweetAvatarImage from '@/components/TweetAvatarImage'
+'use client'
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Loader2, Quote } from 'lucide-react'
+import TweetCard from '@/components/TweetCard'
 import type { TweetData } from '@/components/TweetComponent'
 import { formatNumber } from '@/lib/formatNumber'
+import type {
+  PortalMedia,
+  PortalQuotedTweet,
+  PortalTweet,
+} from '@/lib/portal/types'
 
 interface QuotingTweetsSidebarProps {
   tweets: TweetData[]
   totalCount: number
+  targetTweet: TweetData
 }
 
-const dateFormatter = new Intl.DateTimeFormat('en', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-  timeZone: 'UTC',
-})
-
-function decodeTweetText(text: string) {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;|&#x27;/g, "'")
+interface QuotesPageResponse {
+  tweets: TweetData[]
+  totalCount: number
+  nextOffset: number | null
+  error?: string
 }
 
-function getAvatarInitial(...values: Array<string | undefined>) {
-  for (const value of values) {
-    const initial = Array.from(value?.trim() ?? '')[0]
-    if (initial) return initial
+const PAGE_SIZE = 12
+
+function portalMedia(media: TweetData['media']): PortalMedia[] {
+  return (media ?? []).map((item) => ({
+    url: item.media_url,
+    type: item.media_type,
+    width: item.width,
+    height: item.height,
+  }))
+}
+
+function quotedTweet(tweet: TweetData): PortalQuotedTweet {
+  return {
+    id: tweet.tweet_id,
+    username: tweet.username,
+    name: tweet.account_display_name,
+    avatar: tweet.avatar_media_url,
+    text: tweet.full_text,
+    createdAt: tweet.created_at,
+    likes: tweet.favorite_count,
+    rts: tweet.retweet_count ?? 0,
+    media: portalMedia(tweet.media),
   }
-  return 'U'
+}
+
+function portalTweet(tweet: TweetData, target: TweetData): PortalTweet {
+  return {
+    id: tweet.tweet_id,
+    username: tweet.username,
+    name: tweet.account_display_name,
+    avatar: tweet.avatar_media_url,
+    text: tweet.full_text,
+    observedAt: tweet.created_at,
+    createdAt: tweet.created_at,
+    likes: tweet.favorite_count,
+    rts: tweet.retweet_count ?? 0,
+    media: portalMedia(tweet.media),
+    quotedTweet: quotedTweet(target),
+  }
+}
+
+function dedupeTweets(tweets: TweetData[]): TweetData[] {
+  return Array.from(
+    new Map(tweets.map((tweet) => [tweet.tweet_id, tweet])).values(),
+  )
 }
 
 export default function QuotingTweetsSidebar({
-  tweets,
-  totalCount,
+  tweets: initialTweets,
+  totalCount: initialTotalCount,
+  targetTweet,
 }: QuotingTweetsSidebarProps) {
+  const [tweets, setTweets] = useState(initialTweets)
+  const [totalCount, setTotalCount] = useState(initialTotalCount)
+  const [nextOffset, setNextOffset] = useState<number | null>(
+    initialTweets.length < initialTotalCount ? initialTweets.length : null,
+  )
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [isDesktop, setIsDesktop] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const loadingRef = useRef(false)
+  const requestControllerRef = useRef<AbortController | null>(null)
+
+  const renderedTweets = useMemo(
+    () => tweets.map((tweet) => portalTweet(tweet, targetTweet)),
+    [targetTweet, tweets],
+  )
+
+  const loadMore = useCallback(async () => {
+    if (nextOffset === null || loadingRef.current) return
+
+    const controller = new AbortController()
+    requestControllerRef.current = controller
+    loadingRef.current = true
+    setIsLoading(true)
+    setLoadError(null)
+
+    try {
+      const response = await fetch(
+        `/api/tweets/${encodeURIComponent(targetTweet.tweet_id)}/quotes?offset=${nextOffset}&limit=${PAGE_SIZE}`,
+        { signal: controller.signal },
+      )
+      const body = (await response
+        .json()
+        .catch(() => null)) as QuotesPageResponse | null
+      if (!response.ok || !body || !Array.isArray(body.tweets)) {
+        throw new Error(body?.error || 'Could not load more archived quotes')
+      }
+
+      setTweets((current) => dedupeTweets([...current, ...body.tweets]))
+      setTotalCount(body.totalCount)
+      setNextOffset(body.nextOffset)
+    } catch (error) {
+      if (controller.signal.aborted) return
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : 'Could not load more archived quotes',
+      )
+    } finally {
+      if (!controller.signal.aborted) {
+        loadingRef.current = false
+        setIsLoading(false)
+      }
+    }
+  }, [nextOffset, targetTweet.tweet_id])
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)')
+    const update = () => setIsDesktop(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    const target = loadMoreRef.current
+    if (!target || nextOffset === null) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) void loadMore()
+      },
+      {
+        root: isDesktop ? scrollContainerRef.current : null,
+        rootMargin: '240px 0px',
+      },
+    )
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [isDesktop, loadMore, nextOffset])
+
+  useEffect(
+    () => () => {
+      requestControllerRef.current?.abort()
+    },
+    [],
+  )
+
   return (
     <aside
       aria-labelledby="quoting-tweets-heading"
-      className="lg:sticky lg:top-24"
+      className="lg:sticky lg:top-24 lg:h-[calc(100vh-7rem)] lg:min-h-0"
     >
-      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-          <div className="flex items-center gap-2">
-            <Quote className="h-4 w-4 text-brand" aria-hidden="true" />
-            <h2
-              id="quoting-tweets-heading"
-              className="font-semibold text-foreground"
+      <div className="flex overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:h-full lg:min-h-0 lg:flex-col">
+        <div className="flex min-w-0 flex-1 flex-col lg:min-h-0">
+          <div className="flex flex-none items-center justify-between gap-3 border-b border-border px-5 py-4">
+            <div className="flex items-center gap-2">
+              <Quote className="h-4 w-4 text-brand" aria-hidden="true" />
+              <h2
+                id="quoting-tweets-heading"
+                className="font-semibold text-foreground"
+              >
+                Tweets quoting this
+              </h2>
+            </div>
+            <span
+              className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold tabular-nums text-muted-foreground"
+              aria-label={`${totalCount} ${totalCount === 1 ? 'quote' : 'quotes'}`}
             >
-              Tweets quoting this
-            </h2>
+              {formatNumber(totalCount)}
+            </span>
           </div>
-          <span
-            className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold tabular-nums text-muted-foreground"
-            aria-label={`${totalCount} ${totalCount === 1 ? 'quote' : 'quotes'}`}
-          >
-            {formatNumber(totalCount)}
-          </span>
-        </div>
 
-        {tweets.length === 0 ? (
-          <div className="px-5 py-8 text-center">
-            <Quote
-              className="mx-auto h-7 w-7 text-muted-foreground/60"
-              aria-hidden="true"
-            />
-            <p className="mt-3 text-sm font-medium text-foreground">
-              No archived quotes yet
-            </p>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              Tweets in Community Archive that quote this post will appear here.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {tweets.map((tweet) => (
-              <article key={tweet.tweet_id} className="px-5 py-4">
-                <div className="flex items-start gap-3">
-                  <Avatar className="h-9 w-9 flex-shrink-0">
-                    <TweetAvatarImage
-                      src={tweet.avatar_media_url}
-                      alt={`${tweet.account_display_name}'s profile picture`}
-                      username={tweet.username}
-                      tweetId={tweet.tweet_id}
-                    />
-                    <AvatarFallback className="text-xs">
-                      {getAvatarInitial(
-                        tweet.account_display_name,
-                        tweet.username,
-                      )}
-                    </AvatarFallback>
-                  </Avatar>
+          {tweets.length === 0 ? (
+            <div className="px-5 py-8 text-center">
+              <Quote
+                className="mx-auto h-7 w-7 text-muted-foreground/60"
+                aria-hidden="true"
+              />
+              <p className="mt-3 text-sm font-medium text-foreground">
+                No archived quotes yet
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Tweets in Community Archive that quote this post will appear
+                here.
+              </p>
+            </div>
+          ) : (
+            <div
+              ref={scrollContainerRef}
+              role="region"
+              aria-label="Archived tweets quoting this post"
+              tabIndex={0}
+              className="min-h-0 divide-y divide-border overscroll-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/50 lg:flex-1 lg:overflow-y-auto"
+            >
+              {renderedTweets.map((tweet) => (
+                <TweetCard key={tweet.id} tweet={tweet} clickable showDate />
+              ))}
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 items-baseline gap-1.5">
-                      <span className="truncate text-sm font-semibold text-foreground">
-                        {tweet.account_display_name}
-                      </span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        @{tweet.username}
-                      </span>
-                    </div>
-                    <time
-                      dateTime={tweet.created_at}
-                      className="text-xs text-muted-foreground"
-                    >
-                      {dateFormatter.format(new Date(tweet.created_at))}
-                    </time>
-                  </div>
-                </div>
-
-                <p className="mt-3 line-clamp-4 whitespace-pre-wrap break-words text-sm leading-5 text-foreground">
-                  {decodeTweetText(tweet.full_text)}
-                </p>
-
-                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex items-center gap-1">
-                      <FaHeart aria-hidden="true" />
-                      {formatNumber(tweet.favorite_count)}
-                      <span className="sr-only">likes</span>
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <FaRetweet aria-hidden="true" />
-                      {formatNumber(tweet.retweet_count ?? 0)}
-                      <span className="sr-only">reposts</span>
-                    </span>
-                  </div>
-                  <Link
-                    href={`/tweets/${tweet.tweet_id}`}
-                    className="font-medium text-brand underline-offset-2 hover:underline"
+              {loadError ? (
+                <div className="px-5 py-4 text-center">
+                  <p className="text-xs text-red-600 dark:text-red-400">
+                    {loadError}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void loadMore()}
+                    className="mt-2 text-xs font-semibold text-brand hover:underline"
                   >
-                    Open quote
-                  </Link>
+                    Try again
+                  </button>
                 </div>
-              </article>
-            ))}
-          </div>
-        )}
+              ) : null}
 
-        {totalCount > tweets.length && (
-          <p className="border-t border-border bg-muted/40 px-5 py-3 text-center text-xs text-muted-foreground">
-            Showing {tweets.length} of {formatNumber(totalCount)} archived
-            quotes
-          </p>
-        )}
+              {nextOffset !== null ? (
+                <div
+                  ref={loadMoreRef}
+                  className="min-h-16 flex items-center justify-center px-5 py-3"
+                >
+                  <button
+                    type="button"
+                    onClick={() => void loadMore()}
+                    disabled={isLoading}
+                    className="inline-flex items-center gap-2 text-xs font-semibold text-brand disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {isLoading ? (
+                      <Loader2
+                        aria-hidden="true"
+                        className="h-3.5 w-3.5 animate-spin"
+                      />
+                    ) : null}
+                    {isLoading ? 'Loading quotes…' : 'Load more quotes'}
+                  </button>
+                </div>
+              ) : (
+                <p className="px-5 py-3 text-center text-xs text-muted-foreground">
+                  All {formatNumber(totalCount)} archived quotes loaded
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </aside>
   )

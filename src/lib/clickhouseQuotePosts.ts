@@ -11,6 +11,12 @@ interface ClickHouseQuotePost {
   fullText: string
   favoriteCount: string | number
   retweetCount: string | number
+  media?: Array<{
+    mediaUrl: string
+    mediaType: string
+    width: number | null
+    height: number | null
+  }>
 }
 
 interface ClickHouseQuotePostsResponse {
@@ -68,7 +74,12 @@ function quotePost(
     avatar_media_url: tweet.avatarUrl,
     username,
     account_display_name: displayName,
-    media: [],
+    media: (tweet.media ?? []).map((item) => ({
+      media_url: item.mediaUrl,
+      media_type: item.mediaType,
+      width: item.width ?? undefined,
+      height: item.height ?? undefined,
+    })),
     urls: [],
     account: {
       username,
@@ -83,16 +94,18 @@ function quotePost(
 export async function fetchClickHouseQuotePosts(
   tweetId: string,
   limit = 12,
+  offset = 0,
   fetcher = fetchAnalyticsGatewayJson,
 ): Promise<ClickHouseQuotePostsData> {
   if (!/^\d{1,20}$/.test(tweetId)) return EMPTY_QUOTE_POSTS
 
   const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)))
+  const safeOffset = Math.max(0, Math.min(5_000, Math.trunc(offset)))
   const response = await fetcher<ClickHouseQuotePostsResponse>(
     ['quote-posts', tweetId],
     new URLSearchParams({
       limit: String(safeLimit),
-      offset: '0',
+      offset: String(safeOffset),
       exclude_self: 'true',
       quote_ca_users_only: 'true',
     }),

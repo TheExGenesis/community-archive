@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { tweetPermalinkHref, type TweetOrigin } from '@/lib/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import {
   FaHeart,
@@ -12,6 +13,7 @@ import {
 import { Archive } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { formatNumber } from '@/lib/formatNumber'
+import { decodeTweetText } from '@/lib/tweetText'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
 import ImageLightbox from '@/components/ImageLightbox'
 
@@ -92,6 +94,8 @@ interface TweetComponentProps {
   className?: string
   collapseLongText?: boolean
   compact?: boolean
+  permalinkOrigin?: TweetOrigin
+  permalinkReturnTo?: string
 }
 
 export const compactTweetGridClass =
@@ -100,30 +104,13 @@ export const compactTweetGridClass =
 const compactActionClass =
   'inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
 
-// Helper function to decode HTML entities
-const decodeHtmlEntities = (text: string): string => {
-  if (typeof window === 'undefined') {
-    // Server-side fallback
-    return text
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#039;/g, "'")
-      .replace(/&#x27;/g, "'")
-      .replace(/&#x2F;/g, '/')
-  }
-  // Client-side: use DOM parser
-  const textarea = document.createElement('textarea')
-  textarea.innerHTML = text
-  return textarea.value
-}
-
 export const TweetComponent: React.FC<TweetComponentProps> = ({
   tweet,
   className = '',
   collapseLongText = false,
   compact = false,
+  permalinkOrigin,
+  permalinkReturnTo,
 }) => {
   const [isTextExpanded, setIsTextExpanded] = React.useState(false)
   // Support both interface formats for backwards compatibility
@@ -182,7 +169,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
 
   const formatText = (text: string) => {
     // First decode HTML entities
-    let formattedText = decodeHtmlEntities(text)
+    let formattedText = decodeTweetText(text)
 
     // Replace t.co URLs with their expanded versions or display URLs
     if (tweet.urls) {
@@ -358,7 +345,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                 compact ? 'line-clamp-3 text-xs leading-4' : 'text-sm leading-6'
               }`}
             >
-              {decodeHtmlEntities(quotedTweet.full_text)}
+              {decodeTweetText(quotedTweet.full_text)}
             </p>
             {quotedTweet.media && quotedTweet.media.length > 0 && (
               <div
@@ -411,7 +398,11 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
               </div>
               <div className="flex items-center space-x-3">
                 <a
-                  href={`/tweets/${quotedTweet.tweet_id}`}
+                  href={tweetPermalinkHref(
+                    quotedTweet.tweet_id,
+                    permalinkOrigin,
+                    permalinkReturnTo,
+                  )}
                   className="transition-colors hover:text-foreground"
                   title="Permalink to quoted tweet"
                 >
@@ -441,7 +432,11 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       aria-label="Tweet links"
     >
       <a
-        href={`/tweets/${tweet.tweet_id}`}
+        href={tweetPermalinkHref(
+          tweet.tweet_id,
+          permalinkOrigin,
+          permalinkReturnTo,
+        )}
         className={`${compactActionClass} border-brand/30 bg-brand/10 text-brand hover:bg-brand/20`}
         aria-label="View tweet in Community Archive"
         title="View tweet in Community Archive"
@@ -663,7 +658,11 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span>{new Date(tweet.created_at).toLocaleDateString()}</span>
           <a
-            href={`/tweets/${tweet.tweet_id}`}
+            href={tweetPermalinkHref(
+              tweet.tweet_id,
+              permalinkOrigin,
+              permalinkReturnTo,
+            )}
             className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
             title="Permalink"
           >

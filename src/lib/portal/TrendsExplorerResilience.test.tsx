@@ -108,4 +108,52 @@ describe('TrendsExplorer request isolation', () => {
     expect(screen.getByText('1/12 trends')).toBeVisible()
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
+
+  test('removes terms and uses a binary include filter', async () => {
+    const user = userEvent.setup()
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ tweets: [] }),
+    } as Response)
+
+    render(<TrendsExplorer initialTrends={successfulTrends} />)
+
+    const included = await screen.findByRole('button', {
+      name: 'tpot is included. Click to turn it off.',
+    })
+    await user.click(included)
+    expect(
+      screen.getByRole('button', {
+        name: 'tpot is off. Click to include it.',
+      }),
+    ).toBeVisible()
+    expect(screen.queryByText(/exclude/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove tpot trend' }))
+    expect(
+      screen.queryByRole('button', { name: 'Remove tpot trend' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('0/12 trends')).toBeVisible()
+  })
+
+  test('filters evidence to the selected graph period', async () => {
+    const user = userEvent.setup()
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ tweets: [] }),
+    } as Response)
+
+    render(<TrendsExplorer initialTrends={successfulTrends} />)
+
+    await user.selectOptions(screen.getByLabelText('Tweets from year'), '2025')
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([url]) =>
+          String(url).includes('since=2025-01-01&until=2026-01-01'),
+        ),
+      ).toBe(true),
+    )
+    expect(screen.getByRole('button', { name: 'Clear range' })).toBeVisible()
+  })
 })

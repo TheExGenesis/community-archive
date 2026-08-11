@@ -31,6 +31,9 @@ jest.mock('next/link', () => ({
     </a>
   ),
 }))
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn() }),
+}))
 
 const tweet: PortalTweet = {
   id: '42',
@@ -70,11 +73,13 @@ const tweet: PortalTweet = {
 }
 
 describe('portal TweetRow media', () => {
-  test('highlights a top banger without showing a corner rank badge', () => {
-    render(<TweetRow tweet={tweet} featuredRank={1} />)
+  test('uses the same neutral card treatment for a top banger', () => {
+    const { container } = render(<TweetRow tweet={tweet} featuredRank={1} />)
+    const card = container.querySelector('article')
 
     expect(screen.queryByLabelText('Rank 1')).not.toBeInTheDocument()
-    expect(screen.getByRole('article')).toHaveClass('from-amber-50/80')
+    expect(card).toHaveClass('border-zinc-200/75')
+    expect(card?.className).not.toMatch(/amber|blue/)
     expect(screen.getByText(/12 archive quotes/)).toHaveClass('rounded-full')
   })
 

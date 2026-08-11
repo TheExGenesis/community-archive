@@ -14,6 +14,14 @@ describe('fetchClickHouseQuotePosts', () => {
           fullText: 'Quoted commentary',
           favoriteCount: '13',
           retweetCount: '3',
+          media: [
+            {
+              mediaUrl: 'https://pbs.twimg.com/media/quote.jpg',
+              mediaType: 'photo',
+              width: 1200,
+              height: 800,
+            },
+          ],
         },
       ],
       query: { total: '7' },
@@ -22,6 +30,7 @@ describe('fetchClickHouseQuotePosts', () => {
     const result = await fetchClickHouseQuotePosts(
       '2085375983708692599',
       12,
+      24,
       fetcher,
     )
 
@@ -29,7 +38,7 @@ describe('fetchClickHouseQuotePosts', () => {
       ['quote-posts', '2085375983708692599'],
       new URLSearchParams({
         limit: '12',
-        offset: '0',
+        offset: '24',
         exclude_self: 'true',
         quote_ca_users_only: 'true',
       }),
@@ -46,7 +55,14 @@ describe('fetchClickHouseQuotePosts', () => {
           account_display_name: 'Puheenjohtaja',
           favorite_count: 13,
           retweet_count: 3,
-          media: [],
+          media: [
+            {
+              media_url: 'https://pbs.twimg.com/media/quote.jpg',
+              media_type: 'photo',
+              width: 1200,
+              height: 800,
+            },
+          ],
         }),
       ],
     })
@@ -56,7 +72,7 @@ describe('fetchClickHouseQuotePosts', () => {
     const fetcher = jest.fn()
 
     await expect(
-      fetchClickHouseQuotePosts('not-a-tweet', 12, fetcher),
+      fetchClickHouseQuotePosts('not-a-tweet', 12, 0, fetcher),
     ).resolves.toEqual({ tweets: [], totalCount: 0 })
     expect(fetcher).not.toHaveBeenCalled()
   })

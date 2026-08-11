@@ -44,11 +44,19 @@ export async function GET(request: NextRequest) {
     const params = new URL(request.url).searchParams
     const offset = boundedInteger(params.get('offset'), 0, 0, 1_000_000)
     const periodValue = params.get('period')
-    if (periodValue && periodValue !== 'today' && periodValue !== 'week') {
+    if (
+      periodValue &&
+      periodValue !== 'all' &&
+      periodValue !== 'today' &&
+      periodValue !== 'week' &&
+      periodValue !== 'three-months'
+    ) {
       throw new Error('Invalid bangers period')
     }
     const period: PortalBangersPeriod | undefined =
-      periodValue === 'today' || periodValue === 'week'
+      periodValue === 'today' ||
+      periodValue === 'week' ||
+      periodValue === 'three-months'
         ? periodValue
         : undefined
     const year =

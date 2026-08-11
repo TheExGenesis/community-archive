@@ -143,7 +143,7 @@ describe('ClickHouse-backed portal analytics', () => {
   })
 
   test('fetches several user-selected trend series concurrently', async () => {
-    const fetcher = jest.fn(
+    const fetcherMock = jest.fn(
       async (_path: string[], params: URLSearchParams) => ({
         data: [
           {
@@ -154,7 +154,8 @@ describe('ClickHouse-backed portal analytics', () => {
           },
         ],
       }),
-    ) as unknown as AnalyticsFetcher
+    )
+    const fetcher = fetcherMock as unknown as AnalyticsFetcher
 
     const result = await fetchPortalTrendSeries(
       ['alpha', 'beta'],
@@ -177,7 +178,7 @@ describe('ClickHouse-backed portal analytics', () => {
     ])
   })
 
-  test('merges included evidence and removes tweets matching excluded terms', async () => {
+  test('merges included evidence and forwards a selected date range', async () => {
     const tweet = (tweetId: string, fullText: string, createdAt: string) => ({
       tweetId,
       accountId: '42',
@@ -189,7 +190,7 @@ describe('ClickHouse-backed portal analytics', () => {
       accountDisplayName: 'Alice',
       avatarMediaUrl: null,
     })
-    const fetcher = jest.fn(
+    const fetcherMock = jest.fn(
       async (_path: string[], params: URLSearchParams) => ({
         data: {
           tweets:
@@ -200,11 +201,7 @@ describe('ClickHouse-backed portal analytics', () => {
                     'alpha without the excluded idea',
                     '2026-08-07 10:00:00.000',
                   ),
-                  tweet(
-                    '101',
-                    'alpha and moloch together',
-                    '2026-08-07 11:00:00.000',
-                  ),
+                  tweet('101', 'alpha joins in', '2026-08-07 11:00:00.000'),
                 ]
               : [
                   tweet('102', 'beta arrives later', '2026-08-07 12:00:00.000'),
@@ -217,17 +214,20 @@ describe('ClickHouse-backed portal analytics', () => {
           nextOffset: null,
         },
       }),
-    ) as unknown as AnalyticsFetcher
+    )
+    const fetcher = fetcherMock as unknown as AnalyticsFetcher
 
     const result = await fetchPortalTrendEvidence(
       ['alpha', 'beta'],
-      ['moloch'],
-      30,
+      { limit: 30, since: '2024-01-01', until: '2026-01-01' },
       fetcher,
     )
 
     expect(fetcher).toHaveBeenCalledTimes(2)
-    expect(result.map(({ id }) => id)).toEqual(['102', '100'])
+    expect(result.map(({ id }) => id)).toEqual(['102', '101', '100'])
+    expect(fetcherMock.mock.calls[0]?.[1]?.toString()).toContain(
+      'since=2024-01-01&until=2026-01-01',
+    )
     expect(result[0]).toMatchObject({
       username: 'alice',
       createdAt: '2026-08-07T12:00:00.000Z',

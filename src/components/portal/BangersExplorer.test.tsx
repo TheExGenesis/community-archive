@@ -1,11 +1,13 @@
 import '@testing-library/jest-dom'
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { BangersExplorer } from './BangersExplorer'
 import type {
   PortalBangersPage,
@@ -15,8 +17,9 @@ import type {
 
 const push = jest.fn()
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
-jest.mock('./TweetRow', () => ({
-  TweetRow: ({
+jest.mock('@/components/TweetCard', () => ({
+  __esModule: true,
+  default: ({
     tweet,
     featuredRank,
   }: {
@@ -30,7 +33,16 @@ jest.mock('./TweetRow', () => ({
 }))
 
 class IntersectionObserverMock {
-  observe() {}
+  static instances: IntersectionObserverMock[] = []
+  readonly observed: Element[] = []
+
+  constructor(readonly callback: IntersectionObserverCallback) {
+    IntersectionObserverMock.instances.push(this)
+  }
+
+  observe(target: Element) {
+    this.observed.push(target)
+  }
   disconnect() {}
   unobserve() {}
 }
@@ -100,10 +112,17 @@ describe('BangersExplorer', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/bangers')
     push.mockReset()
+    IntersectionObserverMock.instances = []
     Object.defineProperty(window, 'IntersectionObserver', {
       configurable: true,
       writable: true,
       value: IntersectionObserverMock,
+    })
+    Object.defineProperties(Element.prototype, {
+      hasPointerCapture: { configurable: true, value: () => false },
+      setPointerCapture: { configurable: true, value: () => undefined },
+      releasePointerCapture: { configurable: true, value: () => undefined },
+      scrollIntoView: { configurable: true, value: () => undefined },
     })
   })
 
@@ -177,7 +196,22 @@ describe('BangersExplorer', () => {
     expect(
       screen.getByRole('link', { name: 'Archive members' }),
     ).toHaveAttribute('href', '/bangers?scope=members&period=today')
-    expect(screen.getByText(/from today/)).toBeVisible()
+    expect(screen.getByText(/from the last 24 hours/)).toBeVisible()
+  })
+
+  test('orders all time above today and offers the last three months', async () => {
+    const user = userEvent.setup()
+    renderExplorer(page(), 'today')
+
+    await user.click(screen.getByRole('combobox', { name: 'Filter by time' }))
+
+    const options = screen.getAllByRole('option')
+    expect(options.slice(0, 4).map((option) => option.textContent)).toEqual([
+      'All time',
+      'Today',
+      'This week',
+      'Last 3 months',
+    ])
   })
 
   test('searches names and text and can clear the result', () => {
@@ -196,17 +230,13 @@ describe('BangersExplorer', () => {
     expect(screen.getAllByTestId('tweet-row')).toHaveLength(3)
   })
 
-  test('groups the all-years view into year columns with full totals', () => {
+  test('removes the by-year view control', () => {
     renderExplorer(page(tweets, 3, 4))
 
-    fireEvent.click(screen.getByRole('button', { name: 'By year' }))
-
-    const year2026 = screen.getByRole('region', { name: '2026' })
-    const year2025 = screen.getByRole('region', { name: '2025' })
-    expect(within(year2026).getAllByTestId('tweet-row')).toHaveLength(1)
-    expect(within(year2026).getByText('1 of 2 loaded')).toBeVisible()
-    expect(within(year2025).getAllByTestId('tweet-row')).toHaveLength(2)
-    expect(window.location.search).toBe('?view=years')
+    expect(
+      screen.queryByRole('button', { name: 'By year' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByTestId('bangers-masonry')).toBeVisible()
   })
 
   test('loads and appends the next ranked page', async () => {
@@ -227,5 +257,33 @@ describe('BangersExplorer', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
     expect(screen.getByText('All 4 matching bangers loaded.')).toBeVisible()
+  })
+
+  test('loads more when either masonry column reaches its end', async () => {
+    const nextTweet = tweet('4', 'Loaded from the short column', 2026, 2, 8)
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => page([nextTweet], null, 4),
+    } as Response)
+    renderExplorer(page(tweets, 3, 4))
+
+    const observer = IntersectionObserverMock.instances.at(-1)
+    const shortColumnSentinel = screen.getByTestId('bangers-column-sentinel-1')
+    expect(observer?.observed).toContain(shortColumnSentinel)
+    act(() => {
+      observer?.callback(
+        [
+          {
+            target: shortColumnSentinel,
+            isIntersecting: true,
+          } as unknown as IntersectionObserverEntry,
+        ],
+        observer as unknown as IntersectionObserver,
+      )
+    })
+
+    await waitFor(() =>
+      expect(screen.getByText('Loaded from the short column')).toBeVisible(),
+    )
   })
 })

@@ -1,15 +1,20 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { FormEvent, PointerEvent as ReactPointerEvent } from 'react'
 import Link from 'next/link'
+import TweetCard from '@/components/TweetCard'
 import { CHART_TERMS } from '@/lib/portal/trendConfig'
 import type { PortalTrends, PortalTweet, TermSeries } from '@/lib/portal/types'
-import { TweetRow } from './TweetRow'
 import { BODY, CARD, MUTED, SERIF } from './styles'
 
-type FeedFilter = 'include' | 'exclude' | 'off'
+type FeedFilter = 'include' | 'off'
 type TrendScale = 'raw' | 'normalized'
+
+interface SelectedYears {
+  start: number
+  end: number
+}
 
 interface SeriesResponse {
   years: number[]
@@ -79,14 +84,11 @@ function compactAxis(value: number): string {
 }
 
 function nextFeedFilter(filter: FeedFilter): FeedFilter {
-  if (filter === 'off') return 'include'
-  if (filter === 'include') return 'exclude'
-  return 'off'
+  return filter === 'off' ? 'include' : 'off'
 }
 
 function filterLabel(term: string, filter: FeedFilter): string {
-  if (filter === 'include') return `${term} is included. Click to exclude it.`
-  if (filter === 'exclude') return `${term} is excluded. Click to turn it off.`
+  if (filter === 'include') return `${term} is included. Click to turn it off.`
   return `${term} is off. Click to include it.`
 }
 
@@ -126,6 +128,9 @@ export default function TrendsExplorer({
   const [isLoadingEvidence, setIsLoadingEvidence] = useState(true)
   const [feedError, setFeedError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [selectedYears, setSelectedYears] = useState<SelectedYears | null>(null)
+  const [dragStartYear, setDragStartYear] = useState<number | null>(null)
+  const chartRef = useRef<SVGSVGElement>(null)
 
   const enabledSeries = useMemo(
     () => series.filter(({ term }) => chartEnabled[term]),
@@ -138,14 +143,6 @@ export default function TrendsExplorer({
         .filter((term) => feedFilters[term] === 'include'),
     [feedFilters, series],
   )
-  const excludeTerms = useMemo(
-    () =>
-      series
-        .map(({ term }) => term)
-        .filter((term) => feedFilters[term] === 'exclude'),
-    [feedFilters, series],
-  )
-
   useEffect(() => {
     if (includeTerms.length === 0) {
       setEvidence([])
@@ -160,7 +157,10 @@ export default function TrendsExplorer({
       setFeedError(null)
       const params = new URLSearchParams({ view: 'feed' })
       includeTerms.forEach((term) => params.append('include', term))
-      excludeTerms.forEach((term) => params.append('exclude', term))
+      if (selectedYears) {
+        params.set('since', `${selectedYears.start}-01-01`)
+        params.set('until', `${selectedYears.end + 1}-01-01`)
+      }
 
       try {
         const response = await fetch(
@@ -194,7 +194,21 @@ export default function TrendsExplorer({
 
     void loadEvidence()
     return () => controller.abort()
-  }, [excludeTerms, includeTerms, refreshKey])
+  }, [includeTerms, refreshKey, selectedYears])
+
+  const removeTerm = (term: string) => {
+    setSeries((current) => current.filter((item) => item.term !== term))
+    setChartEnabled((current) => {
+      const next = { ...current }
+      delete next[term]
+      return next
+    })
+    setFeedFilters((current) => {
+      const next = { ...current }
+      delete next[term]
+      return next
+    })
+  }
 
   const addTerms = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -326,6 +340,50 @@ export default function TrendsExplorer({
     (_, index) => X0 + (index * (X1 - X0)) / Math.max(years.length - 1, 1),
   )
   const yPosition = (value: number) => Y0 - (value / chartMax) * (Y0 - Y1)
+  const selectedStartIndex = selectedYears
+    ? years.indexOf(selectedYears.start)
+    : -1
+  const selectedEndIndex = selectedYears ? years.indexOf(selectedYears.end) : -1
+
+  const yearForPointer = (clientX: number): number | null => {
+    const svg = chartRef.current
+    if (!svg || years.length === 0) return null
+    const rect = svg.getBoundingClientRect()
+    if (rect.width === 0) return null
+    const svgX = ((clientX - rect.left) / rect.width) * W
+    const ratio = Math.max(0, Math.min(1, (svgX - X0) / (X1 - X0)))
+    const index = Math.round(ratio * Math.max(years.length - 1, 0))
+    return years[index] ?? null
+  }
+
+  const updateDraggedYears = (year: number, anchor = dragStartYear) => {
+    if (anchor === null) return
+    setSelectedYears({
+      start: Math.min(anchor, year),
+      end: Math.max(anchor, year),
+    })
+  }
+
+  const beginRangeSelection = (event: ReactPointerEvent<SVGRectElement>) => {
+    const year = yearForPointer(event.clientX)
+    if (year === null) return
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setDragStartYear(year)
+    setSelectedYears({ start: year, end: year })
+  }
+
+  const continueRangeSelection = (event: ReactPointerEvent<SVGRectElement>) => {
+    if (dragStartYear === null) return
+    const year = yearForPointer(event.clientX)
+    if (year !== null) updateDraggedYears(year)
+  }
+
+  const finishRangeSelection = (event: ReactPointerEvent<SVGRectElement>) => {
+    if (dragStartYear === null) return
+    const year = yearForPointer(event.clientX)
+    if (year !== null) updateDraggedYears(year)
+    setDragStartYear(null)
+  }
 
   return (
     <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
@@ -451,8 +509,9 @@ export default function TrendsExplorer({
 
               <div className="px-2 pb-1 pt-3 sm:px-4">
                 <svg
+                  ref={chartRef}
                   viewBox={`0 0 ${W} ${H}`}
-                  className="block w-full"
+                  className="block w-full touch-none select-none"
                   role="img"
                   aria-label={`Yearly term trends shown as ${scale === 'normalized' ? 'occurrences per 100,000 tweets' : 'raw tweet counts'}`}
                 >
@@ -538,7 +597,114 @@ export default function TrendsExplorer({
                         : 'Select a trend below to draw it.'}
                     </text>
                   )}
+                  {selectedYears &&
+                    selectedStartIndex >= 0 &&
+                    selectedEndIndex >= 0 && (
+                      <rect
+                        x={Math.max(
+                          X0,
+                          xPositions[selectedStartIndex] -
+                            (xPositions[1] - xPositions[0] || 16) / 2,
+                        )}
+                        y={Y1}
+                        width={
+                          Math.min(
+                            X1,
+                            xPositions[selectedEndIndex] +
+                              (xPositions[1] - xPositions[0] || 16) / 2,
+                          ) -
+                          Math.max(
+                            X0,
+                            xPositions[selectedStartIndex] -
+                              (xPositions[1] - xPositions[0] || 16) / 2,
+                          )
+                        }
+                        height={Y0 - Y1}
+                        className="pointer-events-none fill-blue-500/10 stroke-blue-500/60"
+                        strokeWidth={1}
+                      />
+                    )}
+                  <rect
+                    x={X0}
+                    y={Y1}
+                    width={X1 - X0}
+                    height={Y0 - Y1}
+                    fill="transparent"
+                    className="cursor-crosshair"
+                    aria-label="Drag horizontally to filter tweets by year"
+                    onPointerDown={beginRangeSelection}
+                    onPointerMove={continueRangeSelection}
+                    onPointerUp={finishRangeSelection}
+                    onPointerCancel={() => setDragStartYear(null)}
+                  />
                 </svg>
+              </div>
+
+              <div className="flex flex-wrap items-end gap-2 border-t border-zinc-100 px-4 py-3 dark:border-[#202023] sm:px-5">
+                <span className={`mr-auto text-[11.5px] ${MUTED}`}>
+                  Drag across the chart to filter the tweets by year.
+                </span>
+                <label className={`text-[11px] font-semibold ${MUTED}`}>
+                  From
+                  <select
+                    aria-label="Tweets from year"
+                    value={selectedYears?.start ?? ''}
+                    onChange={(event) => {
+                      if (!event.target.value) {
+                        setSelectedYears(null)
+                        return
+                      }
+                      const start = Number(event.target.value)
+                      setSelectedYears((current) => ({
+                        start,
+                        end: Math.max(start, current?.end ?? start),
+                      }))
+                    }}
+                    className="ml-1 rounded-[4px] border border-zinc-300 bg-white px-2 py-1 text-foreground dark:border-[#34343a] dark:bg-[#121214]"
+                  >
+                    <option value="">Any</option>
+                    {years.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={`text-[11px] font-semibold ${MUTED}`}>
+                  To
+                  <select
+                    aria-label="Tweets through year"
+                    value={selectedYears?.end ?? ''}
+                    onChange={(event) => {
+                      if (!event.target.value) {
+                        setSelectedYears(null)
+                        return
+                      }
+                      const end = Number(event.target.value)
+                      setSelectedYears((current) => ({
+                        start: Math.min(current?.start ?? end, end),
+                        end,
+                      }))
+                    }}
+                    className="ml-1 rounded-[4px] border border-zinc-300 bg-white px-2 py-1 text-foreground dark:border-[#34343a] dark:bg-[#121214]"
+                  >
+                    <option value="">Any</option>
+                    {years.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {selectedYears && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedYears(null)}
+                    className={`rounded-[4px] px-2 py-1 text-[11px] font-semibold ${MUTED} hover:text-foreground`}
+                  >
+                    Clear range
+                  </button>
+                )}
               </div>
 
               <div className="border-t border-zinc-100 px-4 py-3 dark:border-[#202023] sm:px-5">
@@ -551,31 +717,44 @@ export default function TrendsExplorer({
                   {series.map((item) => {
                     const active = !!chartEnabled[item.term]
                     return (
-                      <button
+                      <span
                         key={item.term}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() =>
-                          setChartEnabled((current) => ({
-                            ...current,
-                            [item.term]: !current[item.term],
-                          }))
-                        }
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${
+                        className={`inline-flex items-center overflow-hidden rounded-full border text-[12px] font-semibold transition-colors ${
                           active
                             ? 'border-zinc-400 bg-zinc-50 text-foreground dark:border-[#45454c] dark:bg-[#202024]'
                             : `border-zinc-200 bg-white dark:border-[#29292e] dark:bg-[#171719] ${MUTED}`
                         }`}
                       >
-                        <span
-                          className="h-2 w-2 rounded-full"
-                          style={{
-                            backgroundColor: item.color,
-                            opacity: active ? 1 : 0.3,
-                          }}
-                        />
-                        {item.term}
-                      </button>
+                        <button
+                          type="button"
+                          aria-pressed={active}
+                          aria-label={`${active ? 'Hide' : 'Show'} ${item.term} series`}
+                          onClick={() =>
+                            setChartEnabled((current) => ({
+                              ...current,
+                              [item.term]: !current[item.term],
+                            }))
+                          }
+                          className="inline-flex items-center gap-1.5 py-1.5 pl-2.5 pr-1.5"
+                        >
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{
+                              backgroundColor: item.color,
+                              opacity: active ? 1 : 0.3,
+                            }}
+                          />
+                          {item.term}
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${item.term} trend`}
+                          onClick={() => removeTerm(item.term)}
+                          className="px-2 py-1.5 text-[14px] leading-none opacity-60 hover:opacity-100"
+                        >
+                          ×
+                        </button>
+                      </span>
                     )
                   })}
                   {series.length === 0 && (
@@ -619,37 +798,43 @@ export default function TrendsExplorer({
                 {series.map(({ term }) => {
                   const filter = feedFilters[term] ?? 'off'
                   return (
-                    <button
+                    <span
                       key={term}
-                      type="button"
-                      aria-label={filterLabel(term, filter)}
-                      onClick={() =>
-                        setFeedFilters((current) => ({
-                          ...current,
-                          [term]: nextFeedFilter(current[term] ?? 'off'),
-                        }))
-                      }
-                      className={`rounded-full border px-2.5 py-1.5 text-[11.5px] font-bold transition-colors ${
+                      className={`inline-flex items-center overflow-hidden rounded-full border text-[11.5px] font-bold transition-colors ${
                         filter === 'include'
                           ? 'border-brand bg-brand/10 text-blue-700 dark:text-blue-300'
-                          : filter === 'exclude'
-                            ? 'border-red-400 bg-red-50 text-red-700 dark:border-red-500/70 dark:bg-red-950/30 dark:text-red-300'
-                            : `border-zinc-200 bg-white dark:border-[#29292e] dark:bg-[#171719] ${MUTED}`
+                          : `border-zinc-200 bg-white dark:border-[#29292e] dark:bg-[#171719] ${MUTED}`
                       }`}
                     >
-                      {filter === 'include'
-                        ? '+ '
-                        : filter === 'exclude'
-                          ? '− '
-                          : ''}
-                      {term}
-                    </button>
+                      <button
+                        type="button"
+                        aria-label={filterLabel(term, filter)}
+                        onClick={() =>
+                          setFeedFilters((current) => ({
+                            ...current,
+                            [term]: nextFeedFilter(current[term] ?? 'off'),
+                          }))
+                        }
+                        className="py-1.5 pl-2.5 pr-1.5"
+                      >
+                        {filter === 'include' ? '+ ' : ''}
+                        {term}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${term} trend from explorer`}
+                        onClick={() => removeTerm(term)}
+                        className="px-2 py-1.5 text-[14px] leading-none opacity-60 hover:opacity-100"
+                      >
+                        ×
+                      </button>
+                    </span>
                   )
                 })}
               </div>
               <div className={`mt-2.5 text-[10.5px] leading-normal ${MUTED}`}>
-                Click a pill to cycle: include → exclude → off. Includes are OR;
-                exclusions remove matching posts.
+                Click a pill to include it or turn it off. Included terms are
+                OR.
               </div>
             </div>
 
@@ -679,13 +864,20 @@ export default function TrendsExplorer({
                   <div
                     className={`px-4 py-12 text-center text-[13px] ${MUTED}`}
                   >
-                    No matching tweets after exclusions.
+                    No matching tweets in this period.
                   </div>
                 )}
               {!isLoadingEvidence &&
                 !feedError &&
                 evidence.map((tweet) => (
-                  <TweetRow key={tweet.id} tweet={tweet} collapsible />
+                  <TweetCard
+                    key={tweet.id}
+                    tweet={tweet}
+                    collapsible
+                    clickable
+                    origin="trends"
+                    returnTo="/trends"
+                  />
                 ))}
             </div>
           </aside>

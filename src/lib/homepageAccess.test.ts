@@ -1,4 +1,4 @@
-import { canShowHomepageSearch } from './homepageAccess'
+import { canShowHomepageSearch, hasPendingOptInAction } from './homepageAccess'
 
 describe('canShowHomepageSearch', () => {
   it('hides search from logged-out visitors', () => {
@@ -11,5 +11,17 @@ describe('canShowHomepageSearch', () => {
 
   it('shows search only to signed-in opted-in members', () => {
     expect(canShowHomepageSearch('user-1', true)).toBe(true)
+  })
+})
+
+describe('hasPendingOptInAction', () => {
+  it('recognizes the OAuth return action', () => {
+    expect(hasPendingOptInAction('optin')).toBe(true)
+    expect(hasPendingOptInAction(['other', 'optin'])).toBe(true)
+  })
+
+  it('ignores unrelated homepage actions', () => {
+    expect(hasPendingOptInAction(undefined)).toBe(false)
+    expect(hasPendingOptInAction('upload')).toBe(false)
   })
 })

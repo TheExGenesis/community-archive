@@ -28,7 +28,7 @@ const customJestConfig = {
       testEnvironment: 'node',
       testMatch: [
         '<rootDir>/src/lib/**/*.test.{js,jsx,ts,tsx}',
-        '<rootDir>/tests/admin-search-sanitize.test.ts',
+        '<rootDir>/tests/admin-*.test.ts',
       ],
       setupFilesAfterEnv: ['<rootDir>/jest.setup.server.ts'],
     },

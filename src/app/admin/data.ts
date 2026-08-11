@@ -1,16 +1,12 @@
-import {
-  createServerClient,
-  createServerServiceRoleClient,
-} from '@/utils/supabase'
+import { createServerServiceRoleClient } from '@/utils/supabase'
 import type { User } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/portal/auth'
 
 export const ADMIN_USERNAME = 'exgenesis'
 const PRODUCTION_SUPABASE_HOST = 'fabxmporizzqflnftavs.supabase.co'
 
-export const ACCOUNTS_PAGE_SIZE = 50
+export const ACCOUNTS_PAGE_SIZE = 25
 
 export type OptInRecord = {
   id: string
@@ -20,6 +16,7 @@ export type OptInRecord = {
   opted_in: boolean
   explicit_optout: boolean | null
   opt_out_reason: string | null
+  created_at: string | null
   updated_at: string | null
   opted_in_at: string | null
   opted_out_at: string | null
@@ -61,15 +58,26 @@ export type AccountsPage = {
   warning: string | null
 }
 
-export type AccountsCursor = {
-  /** ISO timestamp of the last seen all_account row, or null when none seen yet. */
-  updatedAt: string | null
-  /** account_id tie-breaker for stable keyset pagination. */
-  accountId: string
-}
+export type AccountsCursor =
+  | {
+      source: 'accounts'
+      /** ISO timestamp of the last seen all_account row. */
+      updatedAt: string | null
+      /** null means the all_account scan has not started yet. */
+      accountId: string | null
+    }
+  | {
+      source: 'optin'
+      /** Immutable created_at + id position for stable keyset pagination. */
+      createdAt: string | null
+      id: string
+    }
+
+type AccountCursor = Extract<AccountsCursor, { source: 'accounts' }>
+type OptInCursor = Extract<AccountsCursor, { source: 'optin' }>
 
 const OPT_IN_SELECT =
-  'id, user_id, username, twitter_user_id, opted_in, explicit_optout, opt_out_reason, updated_at, opted_in_at, opted_out_at'
+  'id, user_id, username, twitter_user_id, opted_in, explicit_optout, opt_out_reason, created_at, updated_at, opted_in_at, opted_out_at'
 
 const ACCOUNT_SELECT =
   'account_id, username, account_display_name, num_tweets, created_via, updated_at'
@@ -184,14 +192,11 @@ export async function checkIsAdmin(): Promise<boolean> {
 }
 
 export async function requireAdmin() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
+  // getCurrentUser is request-cached, so the root layout, page, and streamed
+  // admin sections share one Supabase Auth round trip.
+  const user = await getCurrentUser()
 
-  if (error || !user) {
+  if (!user) {
     redirect('/login?redirect=/admin')
   }
 
@@ -201,7 +206,7 @@ export async function requireAdmin() {
     notFound()
   }
 
-  return { user, cookieStore }
+  return { user }
 }
 
 export async function getAdminClient() {
@@ -307,17 +312,19 @@ async function fetchArchivedTweetCounts(
   return result
 }
 
-async function fetchOptInRows(
+export async function fetchOptInPage(
   admin: AdminClient,
   search: string,
-): Promise<OptInRecord[]> {
+  cursor: OptInCursor | null,
+  limit: number,
+): Promise<{ rows: OptInRecord[]; nextCursor: OptInCursor | null }> {
   let query = admin
     .from('optin')
     .select(OPT_IN_SELECT)
-    .order('opted_in', { ascending: false })
-    .order('explicit_optout', { ascending: false })
-    .order('updated_at', { ascending: false, nullsFirst: false })
-    .limit(500)
+    // created_at is immutable, unlike the status and updated_at fields that
+    // admin actions change. That keeps later pages stable while edits happen.
+    .order('created_at', { ascending: false, nullsFirst: false })
+    .order('id', { ascending: true })
 
   // Defense in depth: callers already pass a normalized string, but we
   // re-sanitize at the chokepoint before building a PostgREST .or() filter.
@@ -329,15 +336,41 @@ async function fetchOptInRows(
     )
   }
 
-  const { data, error } = await query
+  if (cursor) {
+    if (cursor.createdAt !== null) {
+      query = query.or(
+        `created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.gt.${cursor.id}),created_at.is.null`,
+      )
+    } else {
+      query = query.is('created_at', null).gt('id', cursor.id)
+    }
+  }
+
+  // Supabase ranges are inclusive, so requesting 0 through limit fetches one
+  // lookahead row. That detects another page without an exact COUNT query.
+  const { data, error } = await query.range(0, limit)
   if (error) throw error
-  return (data ?? []) as OptInRecord[]
+
+  const fetched = (data ?? []) as OptInRecord[]
+  const rows = fetched.slice(0, limit)
+  const last = rows[rows.length - 1]
+  return {
+    rows,
+    nextCursor:
+      fetched.length > limit && last
+        ? {
+            source: 'optin',
+            createdAt: last.created_at,
+            id: last.id,
+          }
+        : null,
+  }
 }
 
 async function fetchAccountsPage(
   admin: AdminClient,
   search: string,
-  cursor: AccountsCursor | null,
+  cursor: AccountCursor | null,
   excludeAccountIds: Set<string>,
   excludeUsernames: Set<string>,
   limit: number,
@@ -361,12 +394,12 @@ async function fetchAccountsPage(
     )
   }
 
-  if (cursor) {
+  if (cursor?.accountId) {
     // Keyset: (updated_at, account_id) strictly after the cursor under
     // (DESC NULLS LAST, ASC).
     if (cursor.updatedAt !== null) {
       query = query.or(
-        `updated_at.lt.${cursor.updatedAt},and(updated_at.eq.${cursor.updatedAt},account_id.gt.${cursor.accountId})`,
+        `updated_at.lt.${cursor.updatedAt},and(updated_at.eq.${cursor.updatedAt},account_id.gt.${cursor.accountId}),updated_at.is.null`,
       )
     } else {
       // Already in the NULL bucket — only ids strictly greater.
@@ -392,7 +425,11 @@ async function fetchAccountsPage(
   const reachedEnd = fetched.length < overscan
   const nextCursor: AccountsCursor | null =
     last && !reachedEnd
-      ? { updatedAt: last.updated_at, accountId: last.account_id }
+      ? {
+          source: 'accounts',
+          updatedAt: last.updated_at,
+          accountId: last.account_id,
+        }
       : null
 
   return { rows: filtered, nextCursor }
@@ -452,127 +489,90 @@ function buildAccountMergedRows(
   }))
 }
 
-export async function loadInitialAccounts(
-  search: string,
-): Promise<AccountsPage & { optInCount: number }> {
-  const admin = await getAdminClient()
+const mergeWarnings = (...warnings: Array<string | null>) =>
+  warnings.filter((warning): warning is string => Boolean(warning)).join(' ') ||
+  null
 
-  const optInRecords = await fetchOptInRows(admin, search)
-
-  const optInAccountIds = optInRecords
-    .map((r) => r.twitter_user_id)
+async function hydrateOptInRows(
+  admin: AdminClient,
+  records: OptInRecord[],
+): Promise<{
+  rows: MergedRow[]
+  excludeAccountIds: Set<string>
+  excludeUsernames: Set<string>
+  warning: string | null
+}> {
+  const optInAccountIds = records
+    .map((record) => record.twitter_user_id)
     .filter((id): id is string => Boolean(id))
-  const optInUsernames = optInRecords.map((r) => r.username.toLowerCase())
+  const optInUsernames = records.map((record) => record.username.toLowerCase())
 
-  const accountLookupSelect = ACCOUNT_SELECT
   const [byId, byUsername] = await Promise.all([
     optInAccountIds.length
       ? admin
           .from('all_account')
-          .select(accountLookupSelect)
+          .select(ACCOUNT_SELECT)
           .in('account_id', optInAccountIds)
       : Promise.resolve({ data: [], error: null }),
     optInUsernames.length
       ? admin
           .from('all_account')
-          .select(accountLookupSelect)
+          .select(ACCOUNT_SELECT)
           .in('username', optInUsernames)
       : Promise.resolve({ data: [], error: null }),
   ])
   if (byId.error) throw byId.error
   if (byUsername.error) throw byUsername.error
 
-  const optInAccountList = [
+  const accountList = [
     ...((byId.data ?? []) as AccountRecord[]),
     ...((byUsername.data ?? []) as AccountRecord[]),
   ]
-  const accountsByIdMap = new Map<string, AccountRecord>()
-  const accountsByUsernameMap = new Map<string, AccountRecord>()
-  for (const account of optInAccountList) {
-    accountsByIdMap.set(account.account_id, account)
-    accountsByUsernameMap.set(account.username.toLowerCase(), account)
+  const accountsById = new Map<string, AccountRecord>()
+  const accountsByUsername = new Map<string, AccountRecord>()
+  for (const account of accountList) {
+    accountsById.set(account.account_id, account)
+    accountsByUsername.set(account.username.toLowerCase(), account)
   }
-
-  const excludeAccountIds = new Set<string>(accountsByIdMap.keys())
-  const excludeUsernames = new Set<string>(accountsByUsernameMap.keys())
-
-  const { rows: firstAccounts, nextCursor } = await fetchAccountsPage(
-    admin,
-    search,
-    null,
-    excludeAccountIds,
-    excludeUsernames,
-    ACCOUNTS_PAGE_SIZE,
-  )
-
-  const candidateAccountIds = [
-    ...optInRecords.map((r) => r.twitter_user_id ?? ''),
-    ...optInAccountList.map((a) => a.account_id),
-    ...firstAccounts.map((a) => a.account_id),
-  ].filter(Boolean)
 
   const accountIdsForCounts = Array.from(
     new Set([
-      ...optInAccountList.map((a) => a.account_id),
-      ...firstAccounts.map((a) => a.account_id),
-      // Include opt-in rows' twitter_user_id even when no matching
-      // all_account exists, so the archived count can still resolve from
-      // tweets table (rare but possible for accounts the firehose touched
-      // before user_directory got refreshed).
-      ...optInRecords
-        .map((r) => r.twitter_user_id)
-        .filter((id): id is string => Boolean(id)),
+      ...accountList.map((account) => account.account_id),
+      // A tweet row can exist before all_account is refreshed, so preserve
+      // the direct opt-in id as a count and blocklist candidate too.
+      ...optInAccountIds,
     ]),
   )
-
   const [uploadCounts, archivedTweetCounts, scrapeBlocklist] =
     await Promise.all([
       fetchUploadCounts(admin, accountIdsForCounts),
       fetchArchivedTweetCounts(admin, accountIdsForCounts),
-      fetchScrapeBlocklist(admin, candidateAccountIds),
+      fetchScrapeBlocklist(admin, accountIdsForCounts),
     ])
 
-  const optInRows = buildOptInMergedRows(
-    optInRecords,
-    accountsByUsernameMap,
-    accountsByIdMap,
-    uploadCounts,
-    archivedTweetCounts,
-    scrapeBlocklist.blocked,
-  )
-  const accountRows = buildAccountMergedRows(
-    firstAccounts,
-    uploadCounts,
-    archivedTweetCounts,
-    scrapeBlocklist.blocked,
-  )
-
   return {
-    rows: [...optInRows, ...accountRows],
-    nextCursor,
+    rows: buildOptInMergedRows(
+      records,
+      accountsByUsername,
+      accountsById,
+      uploadCounts,
+      archivedTweetCounts,
+      scrapeBlocklist.blocked,
+    ),
+    excludeAccountIds: new Set([
+      ...accountList.map((account) => account.account_id),
+      ...optInAccountIds,
+    ]),
+    excludeUsernames: new Set(optInUsernames),
     warning: scrapeBlocklist.warning,
-    optInCount: optInRows.length,
   }
 }
 
-export async function loadMoreAccountsData(
-  search: string,
-  cursor: AccountsCursor,
-  excludeAccountIds: string[],
-  excludeUsernames: string[],
-): Promise<AccountsPage> {
-  const admin = await getAdminClient()
-
-  const { rows: accounts, nextCursor } = await fetchAccountsPage(
-    admin,
-    search,
-    cursor,
-    new Set(excludeAccountIds),
-    new Set(excludeUsernames.map((u) => u.toLowerCase())),
-    ACCOUNTS_PAGE_SIZE,
-  )
-
-  const accountIds = accounts.map((a) => a.account_id)
+async function hydrateAccountRows(
+  admin: AdminClient,
+  accounts: AccountRecord[],
+): Promise<{ rows: MergedRow[]; warning: string | null }> {
+  const accountIds = accounts.map((account) => account.account_id)
   const [uploadCounts, archivedTweetCounts, scrapeBlocklist] =
     await Promise.all([
       fetchUploadCounts(admin, accountIds),
@@ -587,8 +587,146 @@ export async function loadMoreAccountsData(
       archivedTweetCounts,
       scrapeBlocklist.blocked,
     ),
-    nextCursor,
     warning: scrapeBlocklist.warning,
+  }
+}
+
+async function loadAccountPage(
+  admin: AdminClient,
+  search: string,
+  cursor: AccountCursor | null,
+  excludeAccountIds: Set<string>,
+  excludeUsernames: Set<string>,
+  limit: number,
+): Promise<AccountsPage> {
+  const { rows: accounts, nextCursor } = await fetchAccountsPage(
+    admin,
+    search,
+    cursor?.accountId ? cursor : null,
+    excludeAccountIds,
+    excludeUsernames,
+    limit,
+  )
+  const hydrated = await hydrateAccountRows(admin, accounts)
+
+  return {
+    rows: hydrated.rows,
+    nextCursor,
+    warning: hydrated.warning,
+  }
+}
+
+export async function loadInitialAccounts(
+  search: string,
+): Promise<AccountsPage & { optInCount: number }> {
+  const admin = await getAdminClient()
+  const optInPage = await fetchOptInPage(
+    admin,
+    search,
+    null,
+    ACCOUNTS_PAGE_SIZE,
+  )
+  const optIn = await hydrateOptInRows(admin, optInPage.rows)
+
+  if (optInPage.nextCursor) {
+    return {
+      rows: optIn.rows,
+      nextCursor: optInPage.nextCursor,
+      warning: optIn.warning,
+      optInCount: optIn.rows.length,
+    }
+  }
+
+  const remaining = ACCOUNTS_PAGE_SIZE - optIn.rows.length
+  if (remaining === 0) {
+    return {
+      rows: optIn.rows,
+      nextCursor: { source: 'accounts', updatedAt: null, accountId: null },
+      warning: optIn.warning,
+      optInCount: optIn.rows.length,
+    }
+  }
+
+  const accounts = await loadAccountPage(
+    admin,
+    search,
+    null,
+    optIn.excludeAccountIds,
+    optIn.excludeUsernames,
+    remaining,
+  )
+
+  return {
+    rows: [...optIn.rows, ...accounts.rows],
+    nextCursor: accounts.nextCursor,
+    warning: mergeWarnings(optIn.warning, accounts.warning),
+    optInCount: optIn.rows.length,
+  }
+}
+
+export async function loadMoreAccountsData(
+  search: string,
+  cursor: AccountsCursor,
+  excludeAccountIds: string[],
+  excludeUsernames: string[],
+): Promise<AccountsPage> {
+  const admin = await getAdminClient()
+  const excludedIds = new Set(excludeAccountIds)
+  const excludedUsernames = new Set(
+    excludeUsernames.map((username) => username.toLowerCase()),
+  )
+
+  if (cursor.source === 'accounts') {
+    return loadAccountPage(
+      admin,
+      search,
+      cursor,
+      excludedIds,
+      excludedUsernames,
+      ACCOUNTS_PAGE_SIZE,
+    )
+  }
+
+  const optInPage = await fetchOptInPage(
+    admin,
+    search,
+    cursor,
+    ACCOUNTS_PAGE_SIZE,
+  )
+  const optIn = await hydrateOptInRows(admin, optInPage.rows)
+
+  if (optInPage.nextCursor) {
+    return {
+      rows: optIn.rows,
+      nextCursor: optInPage.nextCursor,
+      warning: optIn.warning,
+    }
+  }
+
+  const remaining = ACCOUNTS_PAGE_SIZE - optIn.rows.length
+  if (remaining === 0) {
+    return {
+      rows: optIn.rows,
+      nextCursor: { source: 'accounts', updatedAt: null, accountId: null },
+      warning: optIn.warning,
+    }
+  }
+
+  optIn.excludeAccountIds.forEach((id) => excludedIds.add(id))
+  optIn.excludeUsernames.forEach((username) => excludedUsernames.add(username))
+  const accounts = await loadAccountPage(
+    admin,
+    search,
+    null,
+    excludedIds,
+    excludedUsernames,
+    remaining,
+  )
+
+  return {
+    rows: [...optIn.rows, ...accounts.rows],
+    nextCursor: accounts.nextCursor,
+    warning: mergeWarnings(optIn.warning, accounts.warning),
   }
 }
 

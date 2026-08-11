@@ -13,6 +13,7 @@ import {
 import { Archive } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { formatNumber } from '@/lib/formatNumber'
+import { decodeTweetText } from '@/lib/tweetText'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
 import ImageLightbox from '@/components/ImageLightbox'
 
@@ -103,25 +104,6 @@ export const compactTweetGridClass =
 const compactActionClass =
   'inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
 
-// Helper function to decode HTML entities
-const decodeHtmlEntities = (text: string): string => {
-  if (typeof window === 'undefined') {
-    // Server-side fallback
-    return text
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#039;/g, "'")
-      .replace(/&#x27;/g, "'")
-      .replace(/&#x2F;/g, '/')
-  }
-  // Client-side: use DOM parser
-  const textarea = document.createElement('textarea')
-  textarea.innerHTML = text
-  return textarea.value
-}
-
 export const TweetComponent: React.FC<TweetComponentProps> = ({
   tweet,
   className = '',
@@ -187,7 +169,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
 
   const formatText = (text: string) => {
     // First decode HTML entities
-    let formattedText = decodeHtmlEntities(text)
+    let formattedText = decodeTweetText(text)
 
     // Replace t.co URLs with their expanded versions or display URLs
     if (tweet.urls) {
@@ -363,7 +345,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                 compact ? 'line-clamp-3 text-xs leading-4' : 'text-sm leading-6'
               }`}
             >
-              {decodeHtmlEntities(quotedTweet.full_text)}
+              {decodeTweetText(quotedTweet.full_text)}
             </p>
             {quotedTweet.media && quotedTweet.media.length > 0 && (
               <div

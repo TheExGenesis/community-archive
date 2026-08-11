@@ -24,7 +24,7 @@ const quotingTweet: TweetData = {
   tweet_id: 'quote-1',
   account_id: 'account-1',
   created_at: '2026-08-01T12:00:00Z',
-  full_text: 'A useful perspective &amp; a second thought.',
+  full_text: 'A useful perspective &amp;amp; a second thought.',
   retweet_count: 4,
   favorite_count: 21,
   reply_to_tweet_id: null,

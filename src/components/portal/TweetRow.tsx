@@ -7,6 +7,7 @@ import type { KeyboardEvent, MouseEvent } from 'react'
 import ImageLightbox from '@/components/ImageLightbox'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
 import { tweetPermalinkHref, type TweetOrigin } from '@/lib/navigation'
+import { decodeTweetText } from '@/lib/tweetText'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { PortalMedia, PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
 
@@ -45,15 +46,6 @@ export const shortDate = (iso: string) =>
     month: 'short',
     year: 'numeric',
   })
-
-export function decodeTweetText(text: string): string {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;|&#x0?27;/gi, "'")
-}
 
 export function TweetAvatar({
   tweet,

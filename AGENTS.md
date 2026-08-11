@@ -144,6 +144,8 @@ Staging synchronization is automatic; production synchronization is not:
   attached media, and quoted-tweet payload (including the quoted tweet's media)
   before rendering. Do not introduce a surface-specific partial tweet renderer;
   make intentionally compact variants explicit through the canonical component.
+- Normalize archive text with `src/lib/tweetText.ts`; do not add another local
+  HTML-entity decoder to a tweet surface.
 
 Use Node 20 from `.nvmrc` and pnpm. Prefer the narrowest relevant check, then
 expand verification in proportion to risk.

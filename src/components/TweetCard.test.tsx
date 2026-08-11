@@ -23,7 +23,7 @@ const tweet: PortalTweet = {
   username: 'alice',
   name: 'Alice',
   avatar: null,
-  text: 'A complete tweet with media and a quote.',
+  text: 'A complete tweet &amp;amp; media with &amp;gt; one encoding layer.',
   observedAt: '2026-08-10T12:00:00.000Z',
   createdAt: '2026-08-10T12:00:00.000Z',
   likes: 12,
@@ -34,7 +34,7 @@ const tweet: PortalTweet = {
     username: 'bob',
     name: 'Bob',
     avatar: null,
-    text: 'The complete quoted tweet.',
+    text: 'The complete &amp;quot;quoted&amp;quot; tweet.',
     createdAt: '2026-08-09T12:00:00.000Z',
     likes: 8,
     rts: 2,
@@ -49,9 +49,9 @@ describe('TweetCard', () => {
     render(<TweetCard tweet={tweet} />)
 
     expect(
-      screen.getByText('A complete tweet with media and a quote.'),
+      screen.getByText('A complete tweet & media with > one encoding layer.'),
     ).toBeVisible()
-    expect(screen.getByText('The complete quoted tweet.')).toBeVisible()
+    expect(screen.getByText('The complete "quoted" tweet.')).toBeVisible()
     expect(
       screen.getAllByTestId('tweet-image').map((image) => image.dataset.src),
     ).toEqual([

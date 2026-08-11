@@ -31,11 +31,13 @@ const recommendations = [
 interface OptInFormProps {
   userId: string
   initialOptInStatus: any
+  mockOptIn?: boolean
 }
 
 export default function OptInForm({
   userId,
   initialOptInStatus,
+  mockOptIn = false,
 }: OptInFormProps) {
   const router = useRouter()
   const { userMetadata } = useAuthAndArchive()
@@ -56,6 +58,11 @@ export default function OptInForm({
       setError(
         'Twitter username not found. Please make sure you signed in with Twitter.',
       )
+      return
+    }
+
+    if (mockOptIn) {
+      setIsOptedIn(true)
       return
     }
 
@@ -127,16 +134,33 @@ export default function OptInForm({
       {/* Main action area */}
       <div className={isOptedIn ? '' : 'py-8'}>
         {!isOptedIn ? (
-          <Button
-            onClick={handleSubmit}
-            disabled={isLoading}
-            size="lg"
-            className="min-w-[280px] px-12 py-6 text-xl font-semibold"
-          >
-            {isLoading ? 'Processing...' : 'Opt In to Tweet Streaming'}
-          </Button>
+          <div>
+            <Button
+              onClick={handleSubmit}
+              disabled={isLoading}
+              size="lg"
+              className="min-w-[280px] px-12 py-6 text-xl font-semibold"
+            >
+              {isLoading ? 'Processing...' : 'Opt In to Tweet Streaming'}
+            </Button>
+            {mockOptIn && (
+              <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
+                Staging preview: this button only changes this page. It will not
+                create or update an opt-in record.
+              </p>
+            )}
+          </div>
         ) : (
           <div className="mx-auto max-w-3xl space-y-10 text-left">
+            {mockOptIn && (
+              <Alert className="border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/30">
+                <AlertDescription className="text-sky-900 dark:text-sky-100">
+                  <strong>Staging preview:</strong> no opt-in record was
+                  changed. Refresh this page to test the flow again.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <section className="overflow-hidden rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 via-background to-sky-50 p-6 shadow-sm dark:border-green-900 dark:from-green-950/40 dark:via-background dark:to-sky-950/30 sm:p-8">
               <div className="space-y-6 text-center">
                 <div className="size-14 mx-auto flex items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/70 dark:text-green-300">

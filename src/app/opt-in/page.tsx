@@ -1,9 +1,19 @@
 import { requireAuth, getOptInStatus } from '@/lib/auth-utils'
 import OptInForm from '@/components/OptInForm'
+import { isStagingOptInPreviewEnabled } from '@/lib/stagingOptInPreview'
 
-export default async function OptInPage() {
+interface OptInPageProps {
+  searchParams?: {
+    mockOptIn?: string | string[]
+  }
+}
+
+export default async function OptInPage({ searchParams }: OptInPageProps) {
   const { user } = await requireAuth()
-  const { data: optInData } = await getOptInStatus(user.id)
+  const mockOptIn = isStagingOptInPreviewEnabled(
+    searchParams?.mockOptIn === '1',
+  )
+  const optInData = mockOptIn ? null : (await getOptInStatus(user.id)).data
 
   return (
     <main className="min-h-screen bg-card dark:bg-background">
@@ -20,7 +30,11 @@ export default async function OptInPage() {
             </p>
           </div>
 
-          <OptInForm userId={user.id} initialOptInStatus={optInData} />
+          <OptInForm
+            userId={user.id}
+            initialOptInStatus={optInData}
+            mockOptIn={mockOptIn}
+          />
 
           <div className="mt-8 border-t border-border pt-6 text-center">
             <p className="text-sm text-muted-foreground">

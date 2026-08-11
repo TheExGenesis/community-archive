@@ -3,6 +3,7 @@
 import React from 'react'
 import '@testing-library/jest-dom'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import OptInForm from '@/components/OptInForm'
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
 
@@ -84,5 +85,32 @@ describe('OptInForm opted-in experience', () => {
     expect(
       screen.getByRole('link', { name: /manage privacy settings/i }),
     ).toHaveAttribute('href', '/profile')
+  })
+
+  it('previews opt-in locally in staging without calling the API', async () => {
+    const user = userEvent.setup()
+    const fetchSpy = jest.spyOn(global, 'fetch')
+
+    render(<OptInForm userId="user-1" initialOptInStatus={null} mockOptIn />)
+
+    expect(
+      screen.getByText(/this button only changes this page/i),
+    ).toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('button', { name: /opt in to tweet streaming/i }),
+    )
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(
+      screen.getByRole('heading', {
+        name: 'Yay—thank you so much for opting in!',
+      }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/no opt-in record was changed/i),
+    ).toBeInTheDocument()
+
+    fetchSpy.mockRestore()
   })
 })

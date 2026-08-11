@@ -139,11 +139,13 @@ function TweetImages({
 function QuotedTweet({
   tweet,
   compact,
+  summary,
   origin,
   returnTo,
 }: {
   tweet: PortalQuotedTweet
   compact: boolean
+  summary: boolean
   origin?: TweetOrigin
   returnTo?: string
 }) {
@@ -155,6 +157,8 @@ function QuotedTweet({
     )
   }
 
+  const condensed = compact || summary
+
   return (
     <div className="mt-2 rounded-[4px] border border-zinc-200 bg-white p-2.5 dark:border-[#303036] dark:bg-[#18181b]">
       <Link
@@ -162,7 +166,7 @@ function QuotedTweet({
         className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         <div className="flex items-center gap-2">
-          <TweetAvatar tweet={tweet} size={compact ? 24 : 28} />
+          <TweetAvatar tweet={tweet} size={condensed ? 24 : 28} />
           <div className="min-w-0 text-[12px] leading-tight">
             <span className="font-bold">{tweet.name}</span>{' '}
             <span className="text-zinc-500 dark:text-[#a7a7b4]">
@@ -171,17 +175,19 @@ function QuotedTweet({
           </div>
         </div>
         <div
-          className={`${compact ? 'line-clamp-3' : ''} mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-zinc-700 dark:text-[#d9d9de]`}
+          className={`${condensed ? 'line-clamp-3' : ''} mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-zinc-700 dark:text-[#d9d9de]`}
         >
           {decodeTweetText(tweet.text)}
         </div>
       </Link>
-      <TweetImages
-        media={tweet.media}
-        compact={compact}
-        label="Quoted tweet image"
-      />
-      {!compact && (
+      {!summary && (
+        <TweetImages
+          media={tweet.media}
+          compact={compact}
+          label="Quoted tweet image"
+        />
+      )}
+      {!condensed && (
         <div className="mt-1.5 flex gap-4 text-[11.5px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
           <span>♥ {formatCount(tweet.likes)}</span>
           <span>⇄ {formatCount(tweet.rts)}</span>
@@ -200,6 +206,7 @@ export interface TweetCardProps {
   showDate?: boolean
   showArchivedBadge?: boolean
   clickable?: boolean
+  quotedTweetDisplay?: 'full' | 'summary'
   origin?: TweetOrigin
   returnTo?: string
 }
@@ -213,6 +220,7 @@ export function TweetRow({
   showDate = false,
   showArchivedBadge = false,
   clickable = false,
+  quotedTweetDisplay = 'full',
   origin,
   returnTo,
 }: TweetCardProps) {
@@ -296,6 +304,7 @@ export function TweetRow({
         <QuotedTweet
           tweet={tweet.quotedTweet}
           compact={compact}
+          summary={quotedTweetDisplay === 'summary'}
           origin={origin}
           returnTo={returnTo}
         />

@@ -84,6 +84,12 @@ const IN_MEMORY_MAX_SG = 5
 // DoS target (no HTML rendering cost shifts the attacker's effort lower).
 const IN_MEMORY_MAX_API_DEFAULT = 20
 const IN_MEMORY_MAX_API_SG = 5
+// Critical signed-in flows have their own buckets so unrelated read traffic
+// cannot consume the request that completes OAuth or persists consent.
+const IN_MEMORY_MAX_OPT_IN_DEFAULT = 10
+const IN_MEMORY_MAX_OPT_IN_SG = 5
+const IN_MEMORY_MAX_AUTH_CALLBACK_DEFAULT = 30
+const IN_MEMORY_MAX_AUTH_CALLBACK_SG = 10
 const CLEANUP_INTERVAL_MS = 5 * 60_000
 
 let lastCleanup = Date.now()
@@ -115,6 +121,35 @@ function checkInMemoryRateLimit(ip: string, maxRequests: number): boolean {
   recent.push(now)
   rateLimitMap.set(ip, recent)
   return false
+}
+
+function getApiRateLimitPolicy(
+  pathname: string,
+  method: string,
+  isSG: boolean,
+) {
+  if (pathname === '/api/opt-in' && method === 'POST') {
+    return {
+      bucket: 'api:opt-in',
+      maxRequests: isSG
+        ? IN_MEMORY_MAX_OPT_IN_SG
+        : IN_MEMORY_MAX_OPT_IN_DEFAULT,
+    }
+  }
+
+  if (pathname === '/api/auth/callback' && method === 'GET') {
+    return {
+      bucket: 'api:auth-callback',
+      maxRequests: isSG
+        ? IN_MEMORY_MAX_AUTH_CALLBACK_SG
+        : IN_MEMORY_MAX_AUTH_CALLBACK_DEFAULT,
+    }
+  }
+
+  return {
+    bucket: 'api',
+    maxRequests: isSG ? IN_MEMORY_MAX_API_SG : IN_MEMORY_MAX_API_DEFAULT,
+  }
 }
 
 // ─── Cookie-based rate limiting ──────────────────────────────────────────────
@@ -378,11 +413,15 @@ export async function middleware(request: NextRequest) {
     const ip = getIp(request)
     const country = request.headers.get('x-vercel-ip-country') || ''
     const isSG = country === 'SG'
-    const maxRequests = isSG ? IN_MEMORY_MAX_API_SG : IN_MEMORY_MAX_API_DEFAULT
+    const { bucket, maxRequests } = getApiRateLimitPolicy(
+      pathname,
+      request.method,
+      isSG,
+    )
 
     cleanupStaleEntries()
 
-    if (checkInMemoryRateLimit(`api:${ip}`, maxRequests)) {
+    if (checkInMemoryRateLimit(`${bucket}:${ip}`, maxRequests)) {
       const resp = new NextResponse(
         JSON.stringify({ error: 'Too Many Requests' }),
         {

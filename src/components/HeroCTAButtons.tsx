@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Tooltip,
   TooltipContent,
@@ -13,6 +14,7 @@ import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { createBrowserClient } from '@/utils/supabase'
 import { Users, Puzzle, Upload } from 'lucide-react'
 import { devLog } from '@/lib/devLog'
+import { updateOptIn } from '@/lib/optInApi'
 
 const CHROME_EXTENSION_URL =
   'https://chromewebstore.google.com/detail/community-archive-stream/igclpobjpjlphgllncjcgaookmncegbk'
@@ -29,13 +31,14 @@ export default function HeroCTAButtons({
   const { userMetadata } = useAuthAndArchive()
   const supabase = useMemo(() => createBrowserClient(), [])
   const autoOptInStarted = useRef(false)
+  const optInInFlight = useRef(false)
 
   const [user, setUser] = useState<any>(null)
   const [isOptedIn, setIsOptedIn] = useState(initialIsOptedIn)
   const [isOptInLoading, setIsOptInLoading] = useState(false)
+  const [optInError, setOptInError] = useState<string | null>(null)
 
   const twitterUsername = userMetadata?.user_name
-  const twitterUserId = userMetadata?.provider_id
   const shouldAutoOptIn = searchParams.get('action') === 'optin'
 
   // Get current user session
@@ -126,40 +129,38 @@ export default function HeroCTAButtons({
   }
 
   const completeOptIn = useCallback(async () => {
-    if (!user?.id || !twitterUsername || isOptedIn) return false
+    if (!user?.id || !twitterUsername || isOptedIn || optInInFlight.current) {
+      return false
+    }
 
+    optInInFlight.current = true
     setIsOptInLoading(true)
+    setOptInError(null)
 
     try {
-      const response = await fetch('/api/opt-in', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          username: twitterUsername.toLowerCase(),
-          twitterUserId: twitterUserId || null,
-          optedIn: true,
-          termsVersion: 'v1.0',
-        }),
+      await updateOptIn({
+        username: twitterUsername.toLowerCase(),
+        optedIn: true,
+        termsVersion: 'v1.0',
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to opt in')
-      }
 
       setIsOptedIn(true)
       router.replace('/')
       router.refresh()
       return true
-    } catch (err: any) {
-      console.error('Opt-in error:', err.message)
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to opt in. Please try again.'
+      console.error('Opt-in error:', message)
+      setOptInError(message)
       return false
     } finally {
+      optInInFlight.current = false
       setIsOptInLoading(false)
     }
-  }, [isOptedIn, router, twitterUserId, twitterUsername, user?.id])
+  }, [isOptedIn, router, twitterUsername, user?.id])
 
   // Clicking Opt in before authentication records the intent in the OAuth
   // callback URL. Complete that intent as soon as the returning session and
@@ -204,6 +205,7 @@ export default function HeroCTAButtons({
 
   const getOptInButtonText = () => {
     if (isOptInLoading) return 'Processing...'
+    if (optInError) return 'Retry opt in'
     if (!user) return 'Opt in'
     return 'Opt in'
   }
@@ -282,6 +284,11 @@ export default function HeroCTAButtons({
             </TooltipContent>
           </Tooltip>
         </div>
+        {optInError ? (
+          <Alert variant="destructive" className="max-w-xl" aria-live="polite">
+            <AlertDescription>{optInError}</AlertDescription>
+          </Alert>
+        ) : null}
       </div>
     </TooltipProvider>
   )

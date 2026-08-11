@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import HeroCTAButtons from './HeroCTAButtons'
 
 const mockReplace = jest.fn()
@@ -50,10 +50,9 @@ describe('HeroCTAButtons', () => {
       data: null,
       error: { code: 'PGRST116' },
     })
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true }),
-    })
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: true }), { status: 200 }),
+    )
     global.fetch = mockFetch
   })
 
@@ -70,9 +69,7 @@ describe('HeroCTAButtons', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        userId: 'auth-user-123',
         username: 'exampleuser',
-        twitterUserId: 'twitter-123',
         optedIn: true,
         termsVersion: 'v1.0',
       }),
@@ -94,5 +91,33 @@ describe('HeroCTAButtons', () => {
       expect(mockSingle).toHaveBeenCalledTimes(1)
     })
     expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('shows a retry action when the automatic opt-in is rate limited', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'Too Many Requests' }), {
+          status: 429,
+          headers: { 'Retry-After': '60' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ success: true }), { status: 200 }),
+      )
+
+    render(<HeroCTAButtons />)
+
+    expect(
+      await screen.findByText(
+        'Too many requests. Please wait 1 minute and try again.',
+      ),
+    ).toBeInTheDocument()
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(mockReplace).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /retry opt in/i }))
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/'))
   })
 })

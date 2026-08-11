@@ -27,6 +27,8 @@ export const WATCHLIST = [
 ]
 
 type AnalyticsFetcher = typeof fetchAnalyticsGatewayJson
+// Keep corpus-scan fan-out aligned with the two-query production capacity.
+const DEFAULT_ANALYTICS_CONCURRENCY = 2
 
 interface ClickHouseSummaryResponse {
   data: {
@@ -163,7 +165,7 @@ function utcDateParam(date: Date): string {
 
 async function runBatched<T>(
   jobs: Array<() => Promise<T>>,
-  concurrency = 6,
+  concurrency = DEFAULT_ANALYTICS_CONCURRENCY,
 ): Promise<T[]> {
   const results: T[] = new Array(jobs.length)
   let next = 0

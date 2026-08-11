@@ -163,8 +163,8 @@ export default function OptInForm({
 
             <section className="overflow-hidden rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 via-background to-sky-50 p-6 shadow-sm dark:border-green-900 dark:from-green-950/40 dark:via-background dark:to-sky-950/30 sm:p-8">
               <div className="space-y-6 text-center">
-                <div className="size-14 mx-auto flex items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/70 dark:text-green-300">
-                  <PartyPopper className="size-7" aria-hidden="true" />
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/70 dark:text-green-300">
+                  <PartyPopper className="h-7 w-7" aria-hidden="true" />
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
@@ -209,7 +209,7 @@ export default function OptInForm({
                     >
                       Request your X archive
                       <ArrowUpRight
-                        className="size-4 ml-2"
+                        className="ml-2 h-4 w-4"
                         aria-hidden="true"
                       />
                     </a>
@@ -258,7 +258,7 @@ export default function OptInForm({
                           {recommendation.title}
                         </h3>
                         <ArrowUpRight
-                          className="size-4 shrink-0 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground"
+                          className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground"
                           aria-hidden="true"
                         />
                       </div>

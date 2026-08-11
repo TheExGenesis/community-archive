@@ -79,6 +79,11 @@ describe('portal TweetRow media', () => {
 
     expect(screen.queryByLabelText('Rank 1')).not.toBeInTheDocument()
     expect(card).toHaveClass('border-zinc-200/75')
+    expect(card).toHaveClass(
+      'duration-100',
+      'hover:-translate-y-px',
+      'hover:border-[#dcdcdf]/75',
+    )
     expect(card?.className).not.toMatch(/amber|blue/)
     expect(screen.getByText(/12 archive quotes/)).toHaveClass('rounded-full')
   })

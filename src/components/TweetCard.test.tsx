@@ -82,7 +82,7 @@ describe('TweetCard', () => {
     expect(push).toHaveBeenCalledTimes(2)
   })
 
-  test('uses the same light neutral outline for every featured rank', () => {
+  test('uses the same subtle neutral hover for every featured rank', () => {
     const { container } = render(
       <>
         <TweetCard tweet={tweet} featuredRank={1} />
@@ -94,6 +94,14 @@ describe('TweetCard', () => {
     expect(cards).toHaveLength(2)
     expect(cards[0].className).toBe(cards[1].className)
     expect(cards[0]).toHaveClass('border-zinc-200/75')
-    expect(cards[0].className).not.toMatch(/blue|translate|hover:border/)
+    expect(cards[0]).toHaveClass(
+      'duration-100',
+      'ease-out',
+      'hover:-translate-y-px',
+      'hover:border-[#dcdcdf]/75',
+      'dark:hover:border-[#38383e]/80',
+      'motion-reduce:hover:translate-y-0',
+    )
+    expect(cards[0].className).not.toMatch(/blue/)
   })
 })

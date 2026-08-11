@@ -12,6 +12,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { PortalMedia, PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
 
 const HUES = [262, 32, 145, 4, 155, 200, 217, 88, 240, 190, 340, 45, 280, 20]
+const FEATURED_CARD_HOVER =
+  'transition-[transform,border-color,box-shadow] duration-100 ease-out hover:-translate-y-px hover:border-[#dcdcdf]/75 hover:shadow-[0_3px_9px_rgba(24,24,27,0.08)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:hover:border-[#38383e]/80 dark:hover:shadow-[0_3px_9px_rgba(0,0,0,0.22)]'
 
 export const avatarHue = (username: string) => {
   let h = 0
@@ -221,7 +223,7 @@ export function TweetRow({
   const isFeatured = featuredRank !== undefined
   const isClickable = clickable || isFeatured
   const rowClassName = isFeatured
-    ? `relative flex min-w-0 gap-3 rounded-lg border border-zinc-200/75 bg-white p-4 shadow-sm dark:border-[#303036]/80 dark:bg-[#1b1b1e] sm:gap-3.5 sm:p-5 ${
+    ? `relative flex min-w-0 gap-3 rounded-lg border border-zinc-200/75 bg-white p-4 shadow-sm dark:border-[#303036]/80 dark:bg-[#1b1b1e] sm:gap-3.5 sm:p-5 ${FEATURED_CARD_HOVER} ${
         animate ? 'portal-slide-in' : ''
       }`
     : `flex gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23] ${

@@ -407,9 +407,9 @@ describe('portal reads', () => {
     })
   })
 
-  test('builds an exact ranked page from the recent prefix for today', async () => {
+  test('uses a rolling 24-hour window for today', async () => {
     jest.useFakeTimers()
-    jest.setSystemTime(new Date('2026-08-10T14:00:00.000Z'))
+    jest.setSystemTime(new Date('2026-08-10T14:37:42.000Z'))
     fetchPortalBangersPageMock.mockResolvedValueOnce({
       tweets: [
         {
@@ -437,22 +437,34 @@ describe('portal reads', () => {
           quoteCount: 9,
         },
         {
-          id: 'yesterday',
+          id: 'window-boundary',
           username: 'carol',
           name: 'Carol',
           avatar: null,
-          text: 'Yesterday',
-          observedAt: '2026-08-09T23:59:59.000Z',
-          createdAt: '2026-08-09T23:59:59.000Z',
+          text: 'Exactly 24 hours ago',
+          observedAt: '2026-08-09T14:37:42.000Z',
+          createdAt: '2026-08-09T14:37:42.000Z',
           likes: 20,
           rts: 0,
           quoteCount: 20,
+        },
+        {
+          id: 'outside-window',
+          username: 'dave',
+          name: 'Dave',
+          avatar: null,
+          text: 'More than 24 hours ago',
+          observedAt: '2026-08-09T14:37:41.000Z',
+          createdAt: '2026-08-09T14:37:41.000Z',
+          likes: 30,
+          rts: 0,
+          quoteCount: 30,
         },
       ],
       pagination: {
         limit: 100,
         offset: 0,
-        nextOffset: 100,
+        nextOffset: null,
         totalAvailable: 1_000,
         snapshotSize: 1_000,
         yearCounts: [{ year: 2026, count: 1_000 }],
@@ -464,12 +476,16 @@ describe('portal reads', () => {
       await expect(
         getPortalBangersPage({ period: 'today', sort: 'quotes' }),
       ).resolves.toMatchObject({
-        tweets: [{ id: 'today-high' }, { id: 'today-low' }],
+        tweets: [
+          { id: 'window-boundary' },
+          { id: 'today-high' },
+          { id: 'today-low' },
+        ],
         pagination: {
           nextOffset: null,
-          totalAvailable: 2,
-          snapshotSize: 2,
-          yearCounts: [{ year: 2026, count: 2 }],
+          totalAvailable: 3,
+          snapshotSize: 3,
+          yearCounts: [{ year: 2026, count: 3 }],
         },
       })
       expect(fetchPortalBangersPageMock).toHaveBeenCalledWith({

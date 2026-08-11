@@ -3,9 +3,30 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
+import { ArrowUpRight, PartyPopper } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
+
+const recommendations = [
+  {
+    href: '/bangers',
+    imageSrc: '/images/featured/bangers.png',
+    imageAlt: 'Bangers community tweet rankings preview',
+    title: 'Bangers',
+    description:
+      'Browse the community’s standout tweets—the posts that archive members quote most.',
+  },
+  {
+    href: '/trends',
+    imageSrc: '/images/featured/trends.png',
+    imageAlt: 'Community Archive keyword trends explorer preview',
+    title: 'Keyword trends',
+    description:
+      'See how words, phrases, and ideas rise and fall across the archive over time.',
+  },
+]
 
 interface OptInFormProps {
   userId: string
@@ -23,7 +44,6 @@ export default function OptInForm({
   )
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
 
   // Get Twitter info from authenticated user metadata
   const twitterUsername = userMetadata?.user_name
@@ -31,7 +51,6 @@ export default function OptInForm({
 
   const handleSubmit = async () => {
     setError('')
-    setSuccess('')
 
     if (!twitterUsername) {
       setError(
@@ -64,11 +83,6 @@ export default function OptInForm({
       }
 
       setIsOptedIn(!isOptedIn)
-      setSuccess(
-        !isOptedIn
-          ? 'Successfully opted in to tweet streaming!'
-          : 'Successfully opted out of tweet streaming.',
-      )
 
       router.refresh()
     } catch (err: any) {
@@ -92,38 +106,26 @@ export default function OptInForm({
   return (
     <div className="space-y-8 text-center">
       {/* Current status as simple text */}
-      <div className="text-center">
-        <p className="text-lg text-muted-foreground">
-          Current Status:{' '}
-          <span
-            className={`font-semibold ${
-              isOptedIn
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-muted-foreground'
-            }`}
-          >
-            {isOptedIn ? 'Opted In' : 'Not Opted In'}
-          </span>
-        </p>
-      </div>
+      {!isOptedIn && (
+        <div className="text-center">
+          <p className="text-lg text-muted-foreground">
+            Current Status:{' '}
+            <span className="font-semibold text-muted-foreground">
+              Not Opted In
+            </span>
+          </p>
+        </div>
+      )}
 
-      {/* Error and success messages */}
+      {/* Error message */}
       {error && (
         <Alert variant="destructive" className="mx-auto max-w-md">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      {success && (
-        <Alert className="mx-auto max-w-md border-green-500 bg-green-50 dark:bg-green-900/20">
-          <AlertDescription className="text-green-800 dark:text-green-200">
-            {success}
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Main action area */}
-      <div className="py-8">
+      <div className={isOptedIn ? '' : 'py-8'}>
         {!isOptedIn ? (
           <Button
             onClick={handleSubmit}
@@ -134,30 +136,122 @@ export default function OptInForm({
             {isLoading ? 'Processing...' : 'Opt In to Tweet Streaming'}
           </Button>
         ) : (
-          <div className="space-y-4">
-            <p className="text-lg font-semibold text-green-600 dark:text-green-400">
-              ✓ You&apos;re opted in to tweet streaming!
-            </p>
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Next, request your X archive so you can upload it and fill in
-                older posts.
-              </p>
-              <Button asChild size="lg">
-                <a
-                  href="https://x.com/settings/download_your_data"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Request your X archive
-                </a>
+          <div className="mx-auto max-w-3xl space-y-10 text-left">
+            <section className="overflow-hidden rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 via-background to-sky-50 p-6 shadow-sm dark:border-green-900 dark:from-green-950/40 dark:via-background dark:to-sky-950/30 sm:p-8">
+              <div className="space-y-6 text-center">
+                <div className="size-14 mx-auto flex items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/70 dark:text-green-300">
+                  <PartyPopper className="size-7" aria-hidden="true" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                    Yay—thank you so much for opting in!
+                  </h2>
+                  <p className="mx-auto max-w-2xl text-muted-foreground">
+                    That&apos;s already a big help. We&apos;ll archive your
+                    public tweets going forward.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-8 rounded-xl border bg-background/80 p-5 text-left shadow-sm sm:p-6">
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold">
+                    Bring your past tweets with you
+                  </h3>
+                  <p className="text-sm leading-6 text-muted-foreground sm:text-base">
+                    We&apos;re still missing your past tweets. Upload your X
+                    archive once to backfill them, and after that you&apos;ll
+                    never need to upload again.
+                  </p>
+                  <p className="text-sm leading-6 text-muted-foreground sm:text-base">
+                    First, request your archive from X. They&apos;ll let you
+                    know when it&apos;s ready; then you can{' '}
+                    <Link
+                      href="/#upload-archive"
+                      className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                    >
+                      upload it here
+                    </Link>
+                    .
+                  </p>
+                </div>
+
+                <div className="mt-5">
+                  <Button asChild size="lg">
+                    <a
+                      href="https://x.com/settings/download_your_data"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Request your X archive
+                      <ArrowUpRight
+                        className="size-4 ml-2"
+                        aria-hidden="true"
+                      />
+                    </a>
+                  </Button>
+                </div>
+
+                <p className="mt-5 text-sm text-muted-foreground">
+                  Don&apos;t want to do that right now? That&apos;s completely
+                  fine. Your opt-in still helps.
+                </p>
+              </div>
+            </section>
+
+            <section
+              aria-labelledby="explore-next-heading"
+              className="space-y-5"
+            >
+              <div className="space-y-1 text-center">
+                <p className="text-sm font-medium text-muted-foreground">
+                  In the meantime, here are two fun places to start.
+                </p>
+                <h2 id="explore-next-heading" className="text-2xl font-bold">
+                  Explore the community archive
+                </h2>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                {recommendations.map((recommendation) => (
+                  <Link
+                    key={recommendation.href}
+                    href={recommendation.href}
+                    className="group overflow-hidden rounded-xl border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <div className="relative aspect-[3/1] overflow-hidden border-b bg-muted">
+                      <Image
+                        src={recommendation.imageSrc}
+                        alt={recommendation.imageAlt}
+                        fill
+                        sizes="(min-width: 640px) 360px, 100vw"
+                        className="object-cover object-top transition duration-300 group-hover:scale-[1.02]"
+                      />
+                    </div>
+                    <div className="space-y-1.5 p-5">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-lg font-semibold">
+                          {recommendation.title}
+                        </h3>
+                        <ArrowUpRight
+                          className="size-4 shrink-0 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground"
+                          aria-hidden="true"
+                        />
+                      </div>
+                      <p className="text-sm leading-6 text-muted-foreground">
+                        {recommendation.description}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+
+            <div className="text-center">
+              <Button asChild variant="outline" size="lg">
+                <Link href="/profile">Manage privacy settings</Link>
               </Button>
             </div>
-            <Link href="/profile">
-              <Button variant="outline" size="lg" className="px-8 py-3">
-                Manage Privacy Settings
-              </Button>
-            </Link>
           </div>
         )}
       </div>

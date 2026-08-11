@@ -109,9 +109,9 @@ describe('TweetCard', () => {
     expect(cards[0]).toHaveClass(
       'duration-100',
       'ease-out',
-      'hover:-translate-y-px',
-      'hover:border-[#dcdcdf]/75',
-      'dark:hover:border-[#38383e]/80',
+      'hover:-translate-y-0.5',
+      'hover:border-[#d4d4d7]/75',
+      'dark:hover:border-[#404046]/80',
       'motion-reduce:hover:translate-y-0',
     )
     expect(cards[0].className).not.toMatch(/blue/)

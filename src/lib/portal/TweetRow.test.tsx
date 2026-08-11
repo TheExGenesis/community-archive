@@ -84,8 +84,8 @@ describe('portal TweetRow media', () => {
     expect(card).toHaveClass('border-zinc-200/75')
     expect(card).toHaveClass(
       'duration-100',
-      'hover:-translate-y-px',
-      'hover:border-[#dcdcdf]/75',
+      'hover:-translate-y-0.5',
+      'hover:border-[#d4d4d7]/75',
     )
     expect(card?.className).not.toMatch(/amber|blue/)
     const archivedQuotes = screen.getByRole('link', {

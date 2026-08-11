@@ -2,6 +2,13 @@ import React from 'react'
 import Link from 'next/link'
 import { FaTwitter, FaGithub, FaDiscord } from 'react-icons/fa'
 
+const pastContributors: Array<{ name: string; href?: string }> = [
+  { name: '@IaimforGOAT', href: 'https://x.com/IaimforGOAT' },
+  { name: 'Defender' },
+  { name: 'Alexandre Variengien' },
+  { name: 'Christine' },
+]
+
 export default function AboutPage() {
   return (
     <div className="container mx-auto max-w-3xl px-4 py-8">
@@ -27,7 +34,7 @@ export default function AboutPage() {
       </section>
 
       <section className="mb-12">
-        <h2 className="mb-4 mt-8 text-2xl font-semibold">The Team</h2>
+        <h2 className="mb-4 mt-8 text-2xl font-semibold">Current Team</h2>
 
         <div className="space-y-6">
           <div className="flex items-start gap-4 rounded-lg bg-muted p-4 dark:bg-card">
@@ -39,7 +46,7 @@ export default function AboutPage() {
                   rel="noopener noreferrer"
                   className="transition-colors hover:text-brand"
                 >
-                  @exgenesis
+                  Xis
                 </a>
               </h3>
               <p className="text-muted-foreground">Creator & Lead</p>
@@ -53,30 +60,39 @@ export default function AboutPage() {
               <FaTwitter />
             </a>
           </div>
+        </div>
+      </section>
 
-          <div className="flex items-start gap-4 rounded-lg bg-muted p-4 dark:bg-card">
-            <div className="flex-1">
-              <h3 className="mb-1 text-xl font-semibold">
-                <a
-                  href="https://x.com/IaimforGOAT"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="transition-colors hover:text-brand"
-                >
-                  @IaimforGOAT
-                </a>
-              </h3>
-              <p className="text-muted-foreground">Core Contributor</p>
-            </div>
-            <a
-              href="https://x.com/IaimforGOAT"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-2xl text-muted-foreground transition-colors hover:text-brand"
+      <section className="mb-12">
+        <h2 className="mb-2 mt-8 text-2xl font-semibold">
+          Contributor Hall of Fame
+        </h2>
+        <p className="mb-4 text-muted-foreground">
+          Past contributors whose work helped build Community Archive.
+        </p>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {pastContributors.map((contributor) => (
+            <div
+              key={contributor.name}
+              className="rounded-lg bg-muted p-4 dark:bg-card"
             >
-              <FaTwitter />
-            </a>
-          </div>
+              <h3 className="text-lg font-semibold">
+                {contributor.href ? (
+                  <a
+                    href={contributor.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="transition-colors hover:text-brand"
+                  >
+                    {contributor.name}
+                  </a>
+                ) : (
+                  contributor.name
+                )}
+              </h3>
+            </div>
+          ))}
         </div>
       </section>
 

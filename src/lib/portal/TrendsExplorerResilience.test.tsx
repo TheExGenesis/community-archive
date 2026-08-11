@@ -2,12 +2,16 @@
 
 import '@testing-library/jest-dom'
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TrendsExplorer from '@/components/portal/TrendsExplorer'
 import { emptyPortalTrends } from './trendConfig'
 import type { PortalTrends } from './types'
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn() }),
+}))
 
 const successfulTrends: PortalTrends = {
   years: [2025, 2026],
@@ -23,8 +27,37 @@ const successfulTrends: PortalTrends = {
   computedAt: '2026-08-07T12:00:00.000Z',
 }
 
+const twoTrends: PortalTrends = {
+  ...successfulTrends,
+  series: [
+    successfulTrends.series[0],
+    {
+      term: 'postrat',
+      color: '#f59e0b',
+      tweetsPerYear: [5, 8],
+      perYear: [50, 80],
+    },
+  ],
+}
+
+function feedTweet(id: string, year: number) {
+  const createdAt = `${year}-06-01T00:00:00.000Z`
+  return {
+    id,
+    username: 'alice',
+    name: 'Alice',
+    avatar: null,
+    text: `tweet-${year}-${id}`,
+    observedAt: createdAt,
+    createdAt,
+    likes: 0,
+    rts: 0,
+  }
+}
+
 describe('TrendsExplorer request isolation', () => {
   afterEach(() => {
+    jest.useRealTimers()
     jest.restoreAllMocks()
   })
 
@@ -136,17 +169,58 @@ describe('TrendsExplorer request isolation', () => {
     expect(screen.getByText('0/12 trends')).toBeVisible()
   })
 
-  test('filters evidence to the selected graph period', async () => {
+  test('loads only a newly included term when prior term evidence is cached', async () => {
     const user = userEvent.setup()
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({ tweets: [] }),
     } as Response)
 
+    render(<TrendsExplorer initialTrends={twoTrends} />)
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    expect(String(fetchMock.mock.calls[0][0])).toContain('include=tpot')
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'postrat is off. Click to include it.',
+      }),
+    )
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    expect(String(fetchMock.mock.calls[1][0])).toContain('include=postrat')
+    expect(String(fetchMock.mock.calls[1][0])).not.toContain('include=tpot')
+  })
+
+  test('filters cached evidence immediately and debounces the range query', async () => {
+    jest.useFakeTimers()
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          tweets: [feedTweet('old', 2025), feedTweet('new', 2026)],
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ tweets: [feedTweet('range', 2025)] }),
+      } as Response)
+
     render(<TrendsExplorer initialTrends={successfulTrends} />)
 
+    expect(await screen.findByText('tweet-2025-old')).toBeVisible()
+    expect(screen.getByText('tweet-2026-new')).toBeVisible()
     await user.selectOptions(screen.getByLabelText('Tweets from year'), '2025')
 
+    expect(screen.getByText('tweet-2025-old')).toBeVisible()
+    expect(screen.queryByText('tweet-2026-new')).not.toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    act(() => jest.advanceTimersByTime(1_199))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    act(() => jest.advanceTimersByTime(1))
     await waitFor(() =>
       expect(
         fetchMock.mock.calls.some(([url]) =>
@@ -154,6 +228,7 @@ describe('TrendsExplorer request isolation', () => {
         ),
       ).toBe(true),
     )
+    expect(await screen.findByText('tweet-2025-range')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Clear range' })).toBeVisible()
   })
 })

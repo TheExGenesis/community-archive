@@ -5,16 +5,22 @@ import type { FormEvent, PointerEvent as ReactPointerEvent } from 'react'
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
 import { CHART_TERMS } from '@/lib/portal/trendConfig'
+import {
+  cachedTrendEvidence,
+  storeTrendEvidence,
+  trendEvidenceCacheKey,
+} from '@/lib/portal/trendEvidenceCache'
+import type {
+  TrendEvidenceCacheEntry,
+  TrendEvidenceRange,
+} from '@/lib/portal/trendEvidenceCache'
 import type { PortalTrends, PortalTweet, TermSeries } from '@/lib/portal/types'
 import { BODY, CARD, MUTED, SERIF } from './styles'
 
 type FeedFilter = 'include' | 'off'
 type TrendScale = 'raw' | 'normalized'
 
-interface SelectedYears {
-  start: number
-  end: number
-}
+type SelectedYears = TrendEvidenceRange
 
 interface SeriesResponse {
   years: number[]
@@ -29,6 +35,7 @@ interface FeedResponse {
 }
 
 const MAX_SERIES = 12
+const RANGE_QUERY_DEBOUNCE_MS = 1_200
 const compactAxisFormatter = new Intl.NumberFormat('en', {
   notation: 'compact',
   maximumFractionDigits: 1,
@@ -66,6 +73,36 @@ async function requestTrendSeries(terms: string[]): Promise<SeriesResponse> {
     throw new Error('The trends service returned an invalid response')
   }
   return body
+}
+
+async function requestTrendEvidence(
+  term: string,
+  selectedYears: SelectedYears | null,
+  signal: AbortSignal,
+): Promise<PortalTweet[]> {
+  const params = new URLSearchParams({ view: 'feed', include: term })
+  if (selectedYears) {
+    params.set('since', `${selectedYears.start}-01-01`)
+    params.set('until', `${selectedYears.end + 1}-01-01`)
+  }
+  const response = await fetch(`/api/portal/trends?${params.toString()}`, {
+    signal,
+  })
+  const body = (await response.json().catch(() => null)) as FeedResponse | null
+  if (!response.ok) {
+    throw new Error(body?.error || `Could not load tweets for ${term}`)
+  }
+  if (!body || !Array.isArray(body.tweets)) {
+    throw new Error('The tweet feed returned an invalid response')
+  }
+  return body.tweets
+}
+
+function sameYears(
+  left: SelectedYears | null,
+  right: SelectedYears | null,
+): boolean {
+  return left?.start === right?.start && left?.end === right?.end
 }
 
 function niceCeiling(value: number): number {
@@ -124,13 +161,27 @@ export default function TrendsExplorer({
   const [chartError, setChartError] = useState<string | null>(
     initialLoadFailed ? 'The default trends could not be loaded.' : null,
   )
-  const [evidence, setEvidence] = useState<PortalTweet[]>([])
   const [isLoadingEvidence, setIsLoadingEvidence] = useState(true)
   const [feedError, setFeedError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [selectedYears, setSelectedYears] = useState<SelectedYears | null>(null)
+  const [requestedYears, setRequestedYears] = useState<SelectedYears | null>(
+    null,
+  )
+  const [, setEvidenceCacheVersion] = useState(0)
   const [dragStartYear, setDragStartYear] = useState<number | null>(null)
   const chartRef = useRef<SVGSVGElement>(null)
+  const evidenceCacheRef = useRef<Map<string, TrendEvidenceCacheEntry>>(
+    new Map(),
+  )
+  const evidenceRequestsRef = useRef(
+    new Map<
+      string,
+      { controller: AbortController; promise: Promise<PortalTweet[]> }
+    >(),
+  )
+  const evidenceRequestSignatureRef = useRef('')
+  const handledRefreshKeyRef = useRef(0)
 
   const enabledSeries = useMemo(
     () => series.filter(({ term }) => chartEnabled[term]),
@@ -143,58 +194,121 @@ export default function TrendsExplorer({
         .filter((term) => feedFilters[term] === 'include'),
     [feedFilters, series],
   )
+  const evidence = cachedTrendEvidence(
+    evidenceCacheRef.current,
+    includeTerms,
+    selectedYears,
+  )
+
   useEffect(() => {
+    const requests = evidenceRequestsRef.current
+    return () => {
+      requests.forEach(({ controller }) => controller.abort())
+      requests.clear()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (dragStartYear !== null || sameYears(selectedYears, requestedYears)) {
+      return
+    }
+    setFeedError(null)
+    const timeout = window.setTimeout(
+      () => setRequestedYears(selectedYears),
+      RANGE_QUERY_DEBOUNCE_MS,
+    )
+    return () => window.clearTimeout(timeout)
+  }, [dragStartYear, requestedYears, selectedYears])
+
+  useEffect(() => {
+    const signature = JSON.stringify({
+      includeTerms,
+      requestedYears,
+      refreshKey,
+    })
+    evidenceRequestSignatureRef.current = signature
     if (includeTerms.length === 0) {
-      setEvidence([])
       setFeedError(null)
       setIsLoadingEvidence(false)
       return
     }
 
-    const controller = new AbortController()
+    const forceRefresh = refreshKey !== handledRefreshKeyRef.current
+    handledRefreshKeyRef.current = refreshKey
+    const termsToLoad = includeTerms.filter(
+      (term) =>
+        forceRefresh ||
+        !evidenceCacheRef.current.has(
+          trendEvidenceCacheKey(term, requestedYears),
+        ),
+    )
+    if (termsToLoad.length === 0) {
+      setFeedError(null)
+      setIsLoadingEvidence(false)
+      return
+    }
+
     const loadEvidence = async () => {
       setIsLoadingEvidence(true)
       setFeedError(null)
-      const params = new URLSearchParams({ view: 'feed' })
-      includeTerms.forEach((term) => params.append('include', term))
-      if (selectedYears) {
-        params.set('since', `${selectedYears.start}-01-01`)
-        params.set('until', `${selectedYears.end + 1}-01-01`)
+      const results: PromiseSettledResult<PortalTweet[]>[] = []
+      for (const term of termsToLoad) {
+        const key = trendEvidenceCacheKey(term, requestedYears)
+        let request = evidenceRequestsRef.current.get(key)
+        if (!request) {
+          const controller = new AbortController()
+          let promise: Promise<PortalTweet[]>
+          promise = requestTrendEvidence(
+            term,
+            requestedYears,
+            controller.signal,
+          )
+            .then((tweets) => {
+              storeTrendEvidence(evidenceCacheRef.current, {
+                term,
+                range: requestedYears,
+                tweets,
+              })
+              setEvidenceCacheVersion((version) => version + 1)
+              return tweets
+            })
+            .finally(() => {
+              if (evidenceRequestsRef.current.get(key)?.promise === promise) {
+                evidenceRequestsRef.current.delete(key)
+              }
+            })
+          request = { controller, promise }
+          evidenceRequestsRef.current.set(key, request)
+        }
+        try {
+          results.push({ status: 'fulfilled', value: await request.promise })
+        } catch (reason) {
+          results.push({ status: 'rejected', reason })
+        }
       }
-
-      try {
-        const response = await fetch(
-          `/api/portal/trends?${params.toString()}`,
-          {
-            signal: controller.signal,
-          },
-        )
-        const body = (await response
-          .json()
-          .catch(() => null)) as FeedResponse | null
-        if (!response.ok) {
-          throw new Error(body?.error || 'Could not load matching tweets')
-        }
-        if (!body || !Array.isArray(body.tweets)) {
-          throw new Error('The tweet feed returned an invalid response')
-        }
-        setEvidence(body.tweets)
-      } catch (error) {
-        if (controller.signal.aborted) return
-        setEvidence([])
+      if (evidenceRequestSignatureRef.current !== signature) return
+      const failure = results.find(
+        (result): result is PromiseRejectedResult =>
+          result.status === 'rejected',
+      )
+      if (failure) {
         setFeedError(
-          error instanceof Error
-            ? error.message
+          failure.reason instanceof Error
+            ? failure.reason.message
             : 'Could not load matching tweets',
         )
-      } finally {
-        if (!controller.signal.aborted) setIsLoadingEvidence(false)
       }
+      setIsLoadingEvidence(
+        includeTerms.some((term) =>
+          evidenceRequestsRef.current.has(
+            trendEvidenceCacheKey(term, requestedYears),
+          ),
+        ),
+      )
     }
 
     void loadEvidence()
-    return () => controller.abort()
-  }, [includeTerms, refreshKey, selectedYears])
+  }, [includeTerms, refreshKey, requestedYears])
 
   const removeTerm = (term: string) => {
     setSeries((current) => current.filter((item) => item.term !== term))
@@ -344,6 +458,9 @@ export default function TrendsExplorer({
     ? years.indexOf(selectedYears.start)
     : -1
   const selectedEndIndex = selectedYears ? years.indexOf(selectedYears.end) : -1
+  const isUpdatingEvidence =
+    includeTerms.length > 0 &&
+    (isLoadingEvidence || !sameYears(selectedYears, requestedYears))
 
   const yearForPointer = (clientX: number): number | null => {
     const svg = chartRef.current
@@ -780,12 +897,17 @@ export default function TrendsExplorer({
                   Tweets counted
                 </h2>
                 <p className={`mt-0.5 text-[11.5px] ${MUTED}`}>
-                  Latest posts matching any included trend.
+                  {selectedYears
+                    ? `Posts from ${selectedYears.start}–${selectedYears.end} matching any included trend.`
+                    : 'Latest posts matching any included trend.'}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setRefreshKey((key) => key + 1)}
+                onClick={() => {
+                  setRequestedYears(selectedYears)
+                  setRefreshKey((key) => key + 1)
+                }}
                 disabled={isLoadingEvidence || includeTerms.length === 0}
                 className={`text-[11.5px] font-semibold ${MUTED} hover:text-brand disabled:opacity-40`}
               >
@@ -842,22 +964,29 @@ export default function TrendsExplorer({
               className={`${CARD} max-h-[760px] overflow-y-auto`}
               aria-live="polite"
             >
-              {isLoadingEvidence && (
+              {isUpdatingEvidence && evidence.length === 0 && (
                 <div className={`px-4 py-12 text-center text-[13px] ${MUTED}`}>
                   Finding matching tweets…
                 </div>
               )}
-              {!isLoadingEvidence && includeTerms.length === 0 && (
+              {isUpdatingEvidence && evidence.length > 0 && (
+                <div
+                  className={`sticky top-0 z-10 border-b border-zinc-200 bg-white/95 px-4 py-2 text-[11.5px] backdrop-blur dark:border-[#29292e] dark:bg-[#171719]/95 ${MUTED}`}
+                >
+                  Updating this period in the background…
+                </div>
+              )}
+              {includeTerms.length === 0 && (
                 <div className={`px-4 py-12 text-center text-[13px] ${MUTED}`}>
                   Include at least one term to inspect its tweets.
                 </div>
               )}
-              {!isLoadingEvidence && feedError && (
-                <div className="px-4 py-10 text-center text-[13px] text-red-600 dark:text-red-400">
+              {feedError && (
+                <div className="border-b border-red-200 px-4 py-3 text-center text-[12px] text-red-600 dark:border-red-900/60 dark:text-red-400">
                   {feedError}
                 </div>
               )}
-              {!isLoadingEvidence &&
+              {!isUpdatingEvidence &&
                 !feedError &&
                 includeTerms.length > 0 &&
                 evidence.length === 0 && (
@@ -867,18 +996,16 @@ export default function TrendsExplorer({
                     No matching tweets in this period.
                   </div>
                 )}
-              {!isLoadingEvidence &&
-                !feedError &&
-                evidence.map((tweet) => (
-                  <TweetCard
-                    key={tweet.id}
-                    tweet={tweet}
-                    collapsible
-                    clickable
-                    origin="trends"
-                    returnTo="/trends"
-                  />
-                ))}
+              {evidence.map((tweet) => (
+                <TweetCard
+                  key={tweet.id}
+                  tweet={tweet}
+                  collapsible
+                  clickable
+                  origin="trends"
+                  returnTo="/trends"
+                />
+              ))}
             </div>
           </aside>
         </div>

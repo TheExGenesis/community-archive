@@ -212,7 +212,13 @@ export default function QuotingTweetsSidebar({
               className="min-h-0 divide-y divide-border overscroll-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/50 lg:flex-1 lg:overflow-y-auto"
             >
               {renderedTweets.map((tweet) => (
-                <TweetCard key={tweet.id} tweet={tweet} clickable showDate />
+                <TweetCard
+                  key={tweet.id}
+                  tweet={tweet}
+                  clickable
+                  quotedTweetDisplay="summary"
+                  showDate
+                />
               ))}
 
               {loadError ? (

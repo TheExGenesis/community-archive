@@ -60,6 +60,18 @@ describe('TweetCard', () => {
     ])
   })
 
+  test('can summarize only the repeated quoted tweet marker', () => {
+    render(<TweetCard tweet={tweet} quotedTweetDisplay="summary" />)
+
+    expect(screen.getByText('The complete "quoted" tweet.')).toHaveClass(
+      'line-clamp-3',
+    )
+    expect(
+      screen.getAllByTestId('tweet-image').map((image) => image.dataset.src),
+    ).toEqual(['https://example.com/tweet.jpg'])
+    expect(screen.queryByText('♥ 8')).not.toBeInTheDocument()
+  })
+
   test('makes the card clickable while preserving its origin', () => {
     const { container } = render(
       <TweetCard

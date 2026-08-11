@@ -152,6 +152,10 @@ export default function UploadArchiveSection() {
           <br className="hidden sm:block" />
           to build on top of our data and access our tools.
         </p>
+        <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
+          The public archive is updated every night with new tweets, and your
+          upload helps backfill older posts.
+        </p>
       </div>
 
       <div className="mx-auto grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-3">

@@ -316,9 +316,9 @@ export default async function ClassicHomepage() {
               Fill the gaps in the public record
             </h2>
             <p className="mx-auto mb-8 mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-              We refresh recent tweets every day. Upload your X archive to
-              backfill older posts, then use the extension to contribute new
-              tweets in real time while you browse.
+              We update the public archive every night with recent tweets.
+              Upload your X archive to backfill older posts, then use the
+              extension to contribute new tweets in real time while you browse.
             </p>
             <DynamicHeroCTAButtons initialIsOptedIn />
             <div className="mt-10 md:mt-12">{socialProof}</div>

@@ -51,9 +51,43 @@ Creating and Applying Migrations
 - After editing canonical files and validating locally:
   - Generate a migration: `supabase db diff -f <short_description>`
   - Commit schema edits + migration
-- Apply to production:
-  - `supabase db push`
-  - Refactors should be a no‑op; real changes will apply via the new migration.
+
+Production Promotion and Verification
+
+- A successful Supabase preview branch proves the migration on that branch; it
+  does not promote the migration to production. Merging the pull request can
+  deploy the Vercel frontend while the production database remains unchanged.
+- Deploy a frontend dependency to production before merging the frontend when
+  possible. If the merge has already happened, promote the database migration
+  immediately and verify both layers.
+- Promote from a clean worktree containing the exact committed migration:
+  1. Link explicitly to the production project and confirm the project ref.
+  2. Run `supabase migration list --linked`.
+  3. Run `supabase db push --dry-run --linked`.
+  4. Require the dry run to list only the intended migration or reviewed
+     migration set.
+  5. Run `supabase db push --linked`.
+  6. Verify the exact version and name in
+     `supabase_migrations.schema_migrations`, inspect the live objects or
+     behavior, and run the security advisor after policies, functions, views,
+     grants, or other security-sensitive changes.
+  7. Repeat the dry run and require `Remote database is up to date.`
+- Refactors should be a no-op; real changes will apply via the new migration.
+
+Production Ahead of the Current Branch
+
+- This can happen intentionally when another branch's backend dependency is
+  deployed before its frontend is merged. The CLI then reports a remote
+  migration version that is absent from the current worktree.
+- Do not mark the remote migration reverted, synthesize a replacement version,
+  or replay its SQL merely to make `db push` proceed. The remote migration
+  ledger is authoritative.
+- Locate the exact committed migration on its owning branch or pull request.
+  Build a temporary deployment worktree that contains that exact file plus the
+  migration being promoted, then rerun the dry run. Proceed only when the dry
+  run lists the intended unapplied migration and nothing else.
+- If the exact committed artifact cannot be found, stop and reconcile the
+  repository with the remote ledger before changing production.
 
 Common Patterns
 - New table: `020_tables.sql` (+ indexes in `030_indexes.sql`, constraints in `050_constraints.sql`)

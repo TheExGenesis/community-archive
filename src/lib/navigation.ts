@@ -1,3 +1,5 @@
+import { BANGERS_ALL_TIME_HREF } from './portal/bangers'
+
 export interface NavItem {
   href: string
   label: string
@@ -99,8 +101,9 @@ export const getPrimaryNav = (isMember: boolean): NavItem[] =>
   isMember
     ? [
         { href: '/', label: 'Home' },
-        { href: '/user-dir', label: 'Library' },
-        { href: '/stream', label: 'Stream' },
+        { href: '/user-dir', label: 'Users' },
+        { href: '/stream', label: 'Live stream' },
+        { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
         { href: '/trends', label: 'Trends' },
         { href: '/research', label: 'Research' },
         { href: '/tools', label: 'Tools' },
@@ -122,3 +125,12 @@ export const getMobileNav = (isMember: boolean): NavItem[] => [
   ...getUtilityNav(isMember),
   { href: '/search', label: 'Search' },
 ]
+
+export function isNavItemActive(pathname: string, href: string): boolean {
+  if (href.includes('#')) return false
+  const itemPathname = href.split('?')[0]
+  return (
+    pathname === itemPathname ||
+    (itemPathname !== '/' && pathname.startsWith(`${itemPathname}/`))
+  )
+}

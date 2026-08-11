@@ -221,6 +221,12 @@ describe('portal page resilience', () => {
     })
   })
 
+  test('loads the homepage Banger of the moment from a rolling week', async () => {
+    await getPortalData()
+
+    expect(fetchPortalRecentBangersMock).toHaveBeenCalledWith(50, 168)
+  })
+
   test('preserves other components when the trends request fails', async () => {
     fetchPortalTrendsMock.mockRejectedValueOnce(
       new Error('trend snapshot unavailable'),
@@ -496,31 +502,31 @@ describe('portal reads', () => {
     }
   })
 
-  test('starts this week on Monday at midnight UTC', async () => {
+  test('uses an exact rolling seven-day window', async () => {
     jest.useFakeTimers()
     jest.setSystemTime(new Date('2026-08-12T14:00:00.000Z'))
     fetchPortalBangersPageMock.mockResolvedValueOnce({
       tweets: [
         {
-          id: 'monday',
+          id: 'boundary',
           username: 'alice',
           name: 'Alice',
           avatar: null,
-          text: 'Monday banger',
-          observedAt: '2026-08-10T00:00:00.000Z',
-          createdAt: '2026-08-10T00:00:00.000Z',
+          text: 'Exactly seven days ago',
+          observedAt: '2026-08-05T14:00:00.000Z',
+          createdAt: '2026-08-05T14:00:00.000Z',
           likes: 4,
           rts: 0,
           quoteCount: 2,
         },
         {
-          id: 'sunday',
+          id: 'outside-window',
           username: 'bob',
           name: 'Bob',
           avatar: null,
-          text: 'Sunday banger',
-          observedAt: '2026-08-09T23:59:59.000Z',
-          createdAt: '2026-08-09T23:59:59.000Z',
+          text: 'One second outside the week',
+          observedAt: '2026-08-05T13:59:59.000Z',
+          createdAt: '2026-08-05T13:59:59.000Z',
           likes: 8,
           rts: 0,
           quoteCount: 9,
@@ -541,7 +547,7 @@ describe('portal reads', () => {
       await expect(
         getPortalBangersPage({ period: 'week' }),
       ).resolves.toMatchObject({
-        tweets: [{ id: 'monday' }],
+        tweets: [{ id: 'boundary' }],
         pagination: { totalAvailable: 1 },
       })
     } finally {

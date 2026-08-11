@@ -10,23 +10,23 @@ import {
   navigationMenuTriggerStyle,
 } from '@/components/ui/navigation-menu'
 import { cn } from '@/utils/tailwind'
-import { NavItem } from '@/lib/navigation'
+import { isNavItemActive, NavItem } from '@/lib/navigation'
 
 export default function HeaderNavigation({ items }: { items: NavItem[] }) {
   const pathname = usePathname()
 
   return (
-    <NavigationMenu className="hidden lg:flex">
+    <NavigationMenu className="hidden xl:flex">
       <NavigationMenuList>
         {items.map((item) => {
-          const isActive = !item.href.includes('#') && pathname === item.href
+          const isActive = isNavItemActive(pathname, item.href)
           return (
             <NavigationMenuItem key={item.href}>
               <Link href={item.href} legacyBehavior passHref>
                 <NavigationMenuLink
                   className={cn(
                     navigationMenuTriggerStyle(),
-                    'transition-colors duration-150 hover:bg-accent',
+                    'px-2.5 text-xs transition-colors duration-150 hover:bg-accent 2xl:px-4 2xl:text-sm',
                     isActive ? 'bg-muted font-semibold' : '',
                   )}
                 >

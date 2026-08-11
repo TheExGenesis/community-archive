@@ -12,6 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import type {
   PortalBangersPage,
   PortalBangersPeriod,
@@ -126,6 +132,7 @@ export function BangersExplorer({
   const requestControllerRef = useRef<AbortController | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const columnLoadMoreRefs = useRef<Array<HTMLDivElement | null>>([])
+  const isAllTime = allTime || (period === undefined && year === undefined)
 
   const availableYears = useMemo(() => {
     const years = page.pagination.yearCounts.map(({ year }) => year)
@@ -284,21 +291,18 @@ export function BangersExplorer({
       sort,
       year,
       period,
-      allTime,
+      allTime: isAllTime,
     })
     window.history.replaceState(window.history.state, '', nextUrl)
-  }, [allTime, period, query, scope, sort, year])
+  }, [isAllTime, period, query, scope, sort, year])
 
   const hasFilters =
-    query.trim().length > 0 ||
-    year !== undefined ||
-    allTime ||
-    (period !== undefined && period !== 'today')
+    query.trim().length > 0 || year !== undefined || period !== undefined
   const selectedTime = period ?? (year === undefined ? 'all' : `year-${year}`)
   const clearFilters = () => {
     setQuery('')
-    if (year !== undefined || allTime || period !== 'today') {
-      router.push(bangersHref({ query: '', scope, sort, period: 'today' }))
+    if (year !== undefined || period !== undefined) {
+      router.push(bangersHref({ query: '', scope, sort, allTime: true }))
     }
   }
   const isSearching = query.trim() !== loadedQuery
@@ -310,7 +314,7 @@ export function BangersExplorer({
     sort,
     year,
     period,
-    allTime,
+    allTime: isAllTime,
   })
 
   return (
@@ -347,99 +351,7 @@ export function BangersExplorer({
           </span>
         </label>
 
-        <div className="mt-3 flex flex-wrap items-end gap-x-5 gap-y-3">
-          <div>
-            <span
-              className={`mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
-            >
-              Tweets by
-            </span>
-            <div className="flex">
-              <Link
-                href={bangersHref({
-                  query,
-                  scope: 'all',
-                  sort,
-                  year,
-                  period,
-                  allTime,
-                })}
-                aria-current={scope === 'all' ? 'page' : undefined}
-                className={`${segmentClassName} rounded-l-[3px] ${
-                  scope === 'all'
-                    ? activeSegmentClassName
-                    : idleSegmentClassName
-                }`}
-              >
-                Anyone
-              </Link>
-              <Link
-                href={bangersHref({
-                  query,
-                  scope: 'members',
-                  sort,
-                  year,
-                  period,
-                  allTime,
-                })}
-                aria-current={scope === 'members' ? 'page' : undefined}
-                className={`${segmentClassName} -ml-px rounded-r-[3px] ${
-                  scope === 'members'
-                    ? activeSegmentClassName
-                    : idleSegmentClassName
-                }`}
-              >
-                Archive members
-              </Link>
-            </div>
-          </div>
-
-          <div>
-            <span
-              className={`mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
-            >
-              Rank
-            </span>
-            <div className="flex">
-              <Link
-                href={bangersHref({
-                  query,
-                  scope,
-                  sort: 'quotes',
-                  year,
-                  period,
-                  allTime,
-                })}
-                aria-current={sort === 'quotes' ? 'page' : undefined}
-                className={`${segmentClassName} rounded-l-[3px] ${
-                  sort === 'quotes'
-                    ? activeSegmentClassName
-                    : idleSegmentClassName
-                }`}
-              >
-                Most quoted
-              </Link>
-              <Link
-                href={bangersHref({
-                  query,
-                  scope,
-                  sort: 'recent',
-                  year,
-                  period,
-                  allTime,
-                })}
-                aria-current={sort === 'recent' ? 'page' : undefined}
-                className={`${segmentClassName} -ml-px rounded-r-[3px] ${
-                  sort === 'recent'
-                    ? activeSegmentClassName
-                    : idleSegmentClassName
-                }`}
-              >
-                Most recent
-              </Link>
-            </div>
-          </div>
-
+        <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <label>
             <span
               className={`mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
@@ -479,7 +391,7 @@ export function BangersExplorer({
               <SelectContent className="rounded-[3px]">
                 <SelectItem value="all">All time</SelectItem>
                 <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">This week</SelectItem>
+                <SelectItem value="week">Last 7 days</SelectItem>
                 <SelectItem value="three-months">Last 3 months</SelectItem>
                 {availableYears.map((availableYear) => (
                   <SelectItem
@@ -492,6 +404,111 @@ export function BangersExplorer({
               </SelectContent>
             </Select>
           </label>
+
+          <div className="flex flex-wrap items-end gap-x-5 gap-y-3 lg:justify-end">
+            <div>
+              <span
+                className={`mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
+              >
+                Rank
+              </span>
+              <div className="flex">
+                <TooltipProvider delayDuration={150}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link
+                        href={bangersHref({
+                          query,
+                          scope,
+                          sort: 'quotes',
+                          year,
+                          period,
+                          allTime: isAllTime,
+                        })}
+                        aria-current={sort === 'quotes' ? 'page' : undefined}
+                        className={`${segmentClassName} rounded-l-[3px] ${
+                          sort === 'quotes'
+                            ? activeSegmentClassName
+                            : idleSegmentClassName
+                        }`}
+                      >
+                        Best
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs">
+                      Best means most quoted by distinct archive uploaders and
+                      opted-in members. Quotes by the original author do not
+                      count.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Link
+                  href={bangersHref({
+                    query,
+                    scope,
+                    sort: 'recent',
+                    year,
+                    period,
+                    allTime: isAllTime,
+                  })}
+                  aria-current={sort === 'recent' ? 'page' : undefined}
+                  className={`${segmentClassName} -ml-px rounded-r-[3px] ${
+                    sort === 'recent'
+                      ? activeSegmentClassName
+                      : idleSegmentClassName
+                  }`}
+                >
+                  Recent
+                </Link>
+              </div>
+            </div>
+
+            <div>
+              <span
+                className={`mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
+              >
+                Tweets by
+              </span>
+              <div className="flex">
+                <Link
+                  href={bangersHref({
+                    query,
+                    scope: 'all',
+                    sort,
+                    year,
+                    period,
+                    allTime: isAllTime,
+                  })}
+                  aria-current={scope === 'all' ? 'page' : undefined}
+                  className={`${segmentClassName} rounded-l-[3px] ${
+                    scope === 'all'
+                      ? activeSegmentClassName
+                      : idleSegmentClassName
+                  }`}
+                >
+                  Anyone
+                </Link>
+                <Link
+                  href={bangersHref({
+                    query,
+                    scope: 'members',
+                    sort,
+                    year,
+                    period,
+                    allTime: isAllTime,
+                  })}
+                  aria-current={scope === 'members' ? 'page' : undefined}
+                  className={`${segmentClassName} -ml-px rounded-r-[3px] ${
+                    scope === 'members'
+                      ? activeSegmentClassName
+                      : idleSegmentClassName
+                  }`}
+                >
+                  Archive members
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -501,7 +518,7 @@ export function BangersExplorer({
             ? 'Searching ranked bangers…'
             : `Showing ${loadedCount.toLocaleString()} of ${totalCount.toLocaleString()} ranked ${totalCount === 1 ? 'tweet' : 'tweets'}`}
           {!isSearching && period === 'today' ? ' from the last 24 hours' : ''}
-          {!isSearching && period === 'week' ? ' from this week' : ''}
+          {!isSearching && period === 'week' ? ' from the last 7 days' : ''}
           {!isSearching && period === 'three-months'
             ? ' from the last 3 months'
             : ''}

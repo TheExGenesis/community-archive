@@ -179,9 +179,14 @@ describe.each<PortalView>(['home', 'stream'])(
       expect(screen.getByText('preview tweet 5')).toBeInTheDocument()
       expect(screen.getByText('preview tweet 12')).toBeInTheDocument()
       if (view === 'home') {
-        expect(
-          screen.getByRole('region', { name: 'Live tweet stream' }),
-        ).toHaveClass('max-h-[420px]', 'overflow-y-auto')
+        const preview = screen.getByRole('region', {
+          name: 'Live tweet stream',
+        })
+        expect(preview).toHaveClass('max-h-[420px]', 'overflow-y-auto')
+        expect(preview.parentElement).toHaveClass(
+          'lg:h-[420px]',
+          'lg:min-h-[420px]',
+        )
         expect(screen.queryByText('preview tweet 13')).not.toBeInTheDocument()
       } else {
         expect(

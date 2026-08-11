@@ -84,15 +84,16 @@ test('renders the balanced homepage composition and editorial labels', async () 
 
   expect(screen.getByText('Featured research')).toBeInTheDocument()
   expect(screen.getByText('Research post 3')).toBeInTheDocument()
-  expect(screen.queryByText('Research post 4')).not.toBeInTheDocument()
+  expect(screen.getByText('Research post 4')).toBeInTheDocument()
+  expect(screen.queryByText('Research post 5')).not.toBeInTheDocument()
   expect(screen.getByText('Historical Banger')).toBeInTheDocument()
-  const moreBangersLinks = screen.getAllByRole('link', {
-    name: /More bangers/i,
-  })
-  expect(moreBangersLinks).toHaveLength(2)
-  moreBangersLinks.forEach((link) => {
-    expect(link).toHaveAttribute('href', '/bangers')
-  })
+  expect(screen.getByRole('link', { name: /Recent bangers/i })).toHaveAttribute(
+    'href',
+    '/bangers?period=week',
+  )
+  expect(
+    screen.getByRole('link', { name: /All-time bangers/i }),
+  ).toHaveAttribute('href', '/bangers?period=all')
   expect(
     screen.getByRole('link', { name: /Export the archive/i }),
   ).toHaveAttribute(
@@ -104,6 +105,9 @@ test('renders the balanced homepage composition and editorial labels', async () 
     'lg:max-h-none',
     'overflow-y-auto',
   )
+  expect(
+    screen.getByRole('region', { name: 'Live tweet stream' }).parentElement,
+  ).toHaveClass('lg:h-[420px]', 'lg:min-h-[420px]')
 
   unmount()
   jest.clearAllTimers()

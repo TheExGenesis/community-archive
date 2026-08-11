@@ -9,6 +9,12 @@ import TweetAvatarImage from '@/components/TweetAvatarImage'
 import { tweetPermalinkHref, type TweetOrigin } from '@/lib/navigation'
 import { decodeTweetText } from '@/lib/tweetText'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { PortalMedia, PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
 
 const HUES = [262, 32, 145, 4, 155, 200, 217, 88, 240, 190, 340, 45, 280, 20]
@@ -211,6 +217,36 @@ export interface TweetCardProps {
   returnTo?: string
 }
 
+function ArchivedQuotesMetric({
+  count,
+  href,
+}: {
+  count: number
+  href: string
+}) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Link
+            href={href}
+            aria-label={`${count} archived quotes. Open tweet to see them.`}
+            className="inline-flex items-center gap-1 rounded-sm text-zinc-500 transition-colors hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 dark:text-[#a7a7b4] dark:hover:text-zinc-200"
+          >
+            <span aria-hidden="true">✦</span>
+            <span>{formatCount(count)} archived quotes</span>
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-xs">
+          Archived quotes are distinct quote tweets from archive uploaders and
+          opted-in members. Bangers uses this count for its Best ranking. Open
+          the tweet to see who quoted it.
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
 export function TweetRow({
   tweet,
   animate = false,
@@ -312,15 +348,7 @@ export function TweetRow({
       {!compact && (
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
           {tweet.quoteCount !== undefined && (
-            <span
-              className={`font-semibold text-brand ${
-                isFeatured
-                  ? 'border-brand/15 rounded-full border bg-brand/[0.07] px-2 py-0.5'
-                  : ''
-              }`}
-            >
-              ✦ {formatCount(tweet.quoteCount)} archive quotes
-            </span>
+            <ArchivedQuotesMetric count={tweet.quoteCount} href={href} />
           )}
           <span>♥ {formatCount(tweet.likes)}</span>
           <span>⇄ {formatCount(tweet.rts)}</span>

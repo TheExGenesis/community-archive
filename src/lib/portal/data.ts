@@ -668,8 +668,8 @@ const getCachedHistoricalBangers = unstable_cache(
 )
 const getCachedRecentBangers = unstable_cache(
   async (_sourceKey: string) =>
-    enrichPortalTweets(await fetchPortalRecentBangers(50, 48)),
-  ['portal-recent-bangers-v2'],
+    enrichPortalTweets(await fetchPortalRecentBangers(50, 168)),
+  ['portal-recent-bangers-v3'],
   { revalidate: 1_800 },
 )
 
@@ -681,9 +681,7 @@ function portalBangersPeriodStart(
   if (period === 'today') {
     start.setUTCDate(start.getUTCDate() - 1)
   } else if (period === 'week') {
-    start.setUTCHours(0, 0, 0, 0)
-    const daysSinceMonday = (start.getUTCDay() + 6) % 7
-    start.setUTCDate(start.getUTCDate() - daysSinceMonday)
+    start.setUTCDate(start.getUTCDate() - 7)
   } else {
     start.setUTCMonth(start.getUTCMonth() - 3)
   }
@@ -695,7 +693,7 @@ function portalBangersSnapshotStart(
   now = new Date(),
 ): string {
   const start = new Date(portalBangersPeriodStart(period, now))
-  if (period === 'today') start.setUTCMinutes(0, 0, 0)
+  if (period === 'today' || period === 'week') start.setUTCMinutes(0, 0, 0)
   if (period === 'three-months') start.setUTCHours(0, 0, 0, 0)
   return start.toISOString()
 }

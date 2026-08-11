@@ -28,6 +28,7 @@ import {
   comparePortalTweetChronology,
   selectHomepageStream,
 } from '@/lib/portal/stream'
+import { BANGERS_ALL_TIME_HREF, BANGERS_WEEK_HREF } from '@/lib/portal/bangers'
 
 export type PortalView = 'home' | 'stream'
 
@@ -649,7 +650,7 @@ export default function Portal({
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.45fr_1fr]">
             <div className="flex h-full min-h-0 flex-col gap-4 lg:overflow-hidden">
               <div
-                className={`${CARD} flex min-h-[420px] flex-col lg:min-h-[240px] lg:flex-1 lg:overflow-hidden lg:[contain:size]`}
+                className={`${CARD} flex min-h-[420px] flex-col lg:h-[420px] lg:min-h-[420px] lg:flex-none lg:overflow-hidden lg:[contain:size]`}
               >
                 <PanelHeader
                   title="Live stream"
@@ -760,7 +761,10 @@ export default function Portal({
                     >
                       <PanelHeader
                         title="Banger of the moment"
-                        action={{ label: 'More bangers', href: '/bangers' }}
+                        action={{
+                          label: 'Recent bangers',
+                          href: BANGERS_WEEK_HREF,
+                        }}
                       />
                       {recentBanger ? (
                         <div className="flex flex-1 flex-col [&>article]:flex-1">
@@ -784,7 +788,10 @@ export default function Portal({
                     >
                       <PanelHeader
                         title="Historical Banger"
-                        action={{ label: 'More bangers', href: '/bangers' }}
+                        action={{
+                          label: 'All-time bangers',
+                          href: BANGERS_ALL_TIME_HREF,
+                        }}
                       />
                       {historicalBanger ? (
                         <div className="flex flex-1 flex-col [&>article]:flex-1">
@@ -816,7 +823,7 @@ export default function Portal({
                   {data.failures.research ? (
                     <PanelUnavailable message="Featured research is temporarily unavailable." />
                   ) : (
-                    data.research.slice(0, 3).map((post) => (
+                    data.research.slice(0, 4).map((post) => (
                       <a
                         key={post.url}
                         href={post.url}

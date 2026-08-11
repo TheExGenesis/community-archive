@@ -2,19 +2,35 @@ import {
   getMobileNav,
   getPrimaryNav,
   getTweetBackLink,
+  isNavItemActive,
   tweetPermalinkHref,
 } from './navigation'
 
 describe('member navigation', () => {
-  it('includes the member directory in desktop and mobile navigation', () => {
+  it('uses explicit Users, Live stream, Bangers, and Search destinations', () => {
     expect(getPrimaryNav(true)).toContainEqual({
       href: '/user-dir',
-      label: 'Library',
+      label: 'Users',
     })
-    expect(getMobileNav(true)).toContainEqual({
-      href: '/user-dir',
-      label: 'Library',
+    expect(getPrimaryNav(true)).toContainEqual({
+      href: '/stream',
+      label: 'Live stream',
     })
+    expect(getPrimaryNav(true)).toContainEqual({
+      href: '/bangers?period=all',
+      label: 'Bangers',
+    })
+    expect(getMobileNav(true)).toEqual(
+      expect.arrayContaining([
+        { href: '/user-dir', label: 'Users' },
+        { href: '/stream', label: 'Live stream' },
+        { href: '/bangers?period=all', label: 'Bangers' },
+        { href: '/search', label: 'Search' },
+      ]),
+    )
+    expect(isNavItemActive('/bangers', '/bangers?period=all')).toBe(true)
+    expect(isNavItemActive('/stream', '/stream')).toBe(true)
+    expect(isNavItemActive('/search', '/bangers?period=all')).toBe(false)
   })
 })
 

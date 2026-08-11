@@ -3,6 +3,7 @@
 import React from 'react'
 import '@testing-library/jest-dom'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { TweetRow } from '@/components/portal/TweetRow'
 import type { PortalTweet } from '@/lib/portal/types'
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
@@ -21,15 +22,16 @@ jest.mock('next/image', () => ({
 
 jest.mock('next/link', () => ({
   __esModule: true,
-  default: ({
-    href,
-    children,
-    ...props
-  }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
-    <a href={String(href)} {...props}>
-      {children}
-    </a>
-  ),
+  default: React.forwardRef<
+    HTMLAnchorElement,
+    React.AnchorHTMLAttributes<HTMLAnchorElement>
+  >(function MockNextLink({ href, children, ...props }, ref) {
+    return (
+      <a ref={ref} href={String(href)} {...props}>
+        {children}
+      </a>
+    )
+  }),
 }))
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
@@ -73,14 +75,24 @@ const tweet: PortalTweet = {
 }
 
 describe('portal TweetRow media', () => {
-  test('uses the same neutral card treatment for a top banger', () => {
+  test('uses a neutral card and explains its archived-quote evidence', async () => {
+    const user = userEvent.setup()
     const { container } = render(<TweetRow tweet={tweet} featuredRank={1} />)
     const card = container.querySelector('article')
 
     expect(screen.queryByLabelText('Rank 1')).not.toBeInTheDocument()
     expect(card).toHaveClass('border-zinc-200/75')
     expect(card?.className).not.toMatch(/amber|blue/)
-    expect(screen.getByText(/12 archive quotes/)).toHaveClass('rounded-full')
+    const archivedQuotes = screen.getByRole('link', {
+      name: '12 archived quotes. Open tweet to see them.',
+    })
+    expect(archivedQuotes).toHaveClass('text-zinc-500')
+    expect(archivedQuotes).not.toHaveClass('rounded-full', 'text-brand')
+
+    await user.hover(archivedQuotes)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      /Bangers uses this count for its Best ranking/i,
+    )
   })
 
   test('renders quotes and closes an enlarged image when the backdrop is clicked', async () => {

@@ -130,7 +130,7 @@ describe('BangersExplorer', () => {
     jest.restoreAllMocks()
   })
 
-  test('offers only banger-relevant ranking and author scopes', () => {
+  test('defaults to Best of all time and orders the controls by intent', () => {
     renderExplorer()
 
     const orderedMasonryItems = Array.from(
@@ -150,17 +150,33 @@ describe('BangersExplorer', () => {
         (item) => within(item).getByTestId('tweet-row').dataset.rank,
       ),
     ).toEqual(['1', '2', '3'])
-    expect(screen.getByRole('link', { name: 'Most quoted' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Best' })).toHaveAttribute(
       'aria-current',
       'page',
     )
-    expect(screen.getByRole('link', { name: 'Most recent' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Best' })).toHaveAttribute(
       'href',
-      '/bangers?sort=recent',
+      '/bangers?period=all',
+    )
+    expect(screen.getByRole('link', { name: 'Recent' })).toHaveAttribute(
+      'href',
+      '/bangers?sort=recent&period=all',
     )
     expect(
       screen.getByRole('link', { name: 'Archive members' }),
-    ).toHaveAttribute('href', '/bangers?scope=members')
+    ).toHaveAttribute('href', '/bangers?scope=members&period=all')
+    expect(
+      screen.getByRole('combobox', { name: 'Filter by time' }),
+    ).toHaveTextContent('All time')
+    const when = screen.getByText('When')
+    const rank = screen.getByText('Rank')
+    const tweetsBy = screen.getByText('Tweets by')
+    expect(
+      when.compareDocumentPosition(rank) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      rank.compareDocumentPosition(tweetsBy) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(screen.queryByText('Likes')).not.toBeInTheDocument()
     expect(screen.queryByText('Reposts')).not.toBeInTheDocument()
     expect(screen.getByTestId('bangers-masonry')).toHaveClass(
@@ -189,7 +205,7 @@ describe('BangersExplorer', () => {
     expect(
       screen.getByRole('combobox', { name: 'Filter by time' }),
     ).toHaveTextContent('Today')
-    expect(screen.getByRole('link', { name: 'Most recent' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Recent' })).toHaveAttribute(
       'href',
       '/bangers?sort=recent&period=today',
     )
@@ -209,9 +225,25 @@ describe('BangersExplorer', () => {
     expect(options.slice(0, 4).map((option) => option.textContent)).toEqual([
       'All time',
       'Today',
-      'This week',
+      'Last 7 days',
       'Last 3 months',
     ])
+  })
+
+  test('explains the Best ranking on hover and keyboard focus', async () => {
+    const user = userEvent.setup()
+    renderExplorer()
+
+    const best = screen.getByRole('link', { name: 'Best' })
+    await user.hover(best)
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      /Best means most quoted by distinct archive uploaders/i,
+    )
+
+    await user.unhover(best)
+    best.focus()
+    expect(await screen.findByRole('tooltip')).toBeVisible()
   })
 
   test('searches names and text and can clear the result', () => {

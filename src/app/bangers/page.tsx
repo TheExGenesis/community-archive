@@ -43,10 +43,9 @@ export default async function BangersPage({
     periodValue === 'week' ||
     periodValue === 'three-months'
       ? periodValue
-      : periodValue === 'all' || year !== undefined
-        ? undefined
-        : 'today'
-  const allTime = periodValue === 'all'
+      : undefined
+  const allTime =
+    periodValue === 'all' || (period === undefined && year === undefined)
   const query = paramValue(searchParams.q).trim().slice(0, 120)
   const initialPage = await getInitialPortalBangersPage({
     scope,
@@ -76,10 +75,10 @@ export default async function BangersPage({
             Bangers
           </h1>
           <p className={`text-[13.5px] leading-relaxed ${MUTED}`}>
-            The archive&apos;s most quoted tweets, ranked by distinct quote
-            tweets from archive uploaders and opted-in members. Quotes by the
-            original author do not count. Today&apos;s rolling 24-hour view is
-            selected by default, with longer ranges available below.
+            The archive&apos;s best tweets, ranked by distinct archived quotes
+            from archive uploaders and opted-in members. Quotes by the original
+            author do not count. Best of all time is selected by default, with
+            recent ranges available below.
           </p>
         </header>
         <BangersExplorer

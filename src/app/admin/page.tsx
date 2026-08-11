@@ -6,6 +6,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Suspense } from 'react'
 import { AdminTable } from './AdminTable'
 import { RecentPrivacyActivity } from './RecentPrivacyActivity'
 import { loadRecentPrivacyActivity } from './activity'
@@ -26,6 +28,61 @@ export const dynamic = 'force-dynamic'
 // Has no effect on smaller actions; they return in milliseconds.
 export const maxDuration = 300
 
+async function RecentPrivacyActivitySection() {
+  const activity = await loadRecentPrivacyActivity()
+  return <RecentPrivacyActivity activity={activity} />
+}
+
+function SectionSkeleton({ label }: { label: string }) {
+  return (
+    <Card aria-label={label} aria-busy="true">
+      <CardHeader>
+        <Skeleton className="h-6 w-52" />
+        <Skeleton className="h-4 w-full max-w-2xl" />
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </CardContent>
+    </Card>
+  )
+}
+
+async function AccountsSection({ search }: { search: string }) {
+  const data = await loadInitialAccounts(search)
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Accounts</CardTitle>
+        <CardDescription>
+          Opt-in rows load first, followed by accounts with archive data sorted
+          by most recently updated. The manual opt-in input below creates an
+          opt-in row by Twitter username; if we already have an archive account
+          for that username the opt-in row is linked to it, otherwise it&apos;s
+          stored without a Twitter id and gets linked the next time that user
+          signs in or uploads an archive. Search runs against the full database;
+          the table updates in place.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {data.warning ? (
+          <div className="mb-4 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-950 dark:border-red-700 dark:bg-red-950/30 dark:text-red-100">
+            {data.warning}
+          </div>
+        ) : null}
+        <AdminTable
+          key={search}
+          initialRows={data.rows}
+          initialCursor={data.nextCursor}
+          initialSearch={search}
+        />
+      </CardContent>
+    </Card>
+  )
+}
+
 export default async function AdminPage({
   searchParams,
 }: {
@@ -33,10 +90,6 @@ export default async function AdminPage({
 }) {
   const { user } = await requireAdmin()
   const search = normalizeUsername(searchParams?.q)
-  const [data, recentPrivacyActivity] = await Promise.all([
-    loadInitialAccounts(search),
-    loadRecentPrivacyActivity(),
-  ])
   const twitterUsername = getDisplayUsername(user)
 
   return (
@@ -59,38 +112,17 @@ export default async function AdminPage({
             </div>
             <Badge variant="secondary">@{twitterUsername}</Badge>
           </div>
-          {data.warning ? (
-            <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-950 dark:border-red-700 dark:bg-red-950/30 dark:text-red-100">
-              {data.warning}
-            </div>
-          ) : null}
         </section>
 
-        <RecentPrivacyActivity activity={recentPrivacyActivity} />
+        <Suspense
+          fallback={<SectionSkeleton label="Loading recent privacy activity" />}
+        >
+          <RecentPrivacyActivitySection />
+        </Suspense>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Accounts</CardTitle>
-            <CardDescription>
-              Every public.optin row is pinned at the top, followed by accounts
-              with archive data sorted by most recently updated. The manual
-              opt-in input below creates an opt-in row by Twitter username; if
-              we already have an archive account for that username the opt-in
-              row is linked to it, otherwise it&apos;s stored without a Twitter
-              id and gets linked the next time that user signs in or uploads an
-              archive. Search runs against the full database; the table updates
-              in place.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AdminTable
-              key={search}
-              initialRows={data.rows}
-              initialCursor={data.nextCursor}
-              initialSearch={search}
-            />
-          </CardContent>
-        </Card>
+        <Suspense fallback={<SectionSkeleton label="Loading accounts" />}>
+          <AccountsSection search={search} />
+        </Suspense>
       </div>
     </main>
   )

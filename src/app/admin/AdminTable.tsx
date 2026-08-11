@@ -173,7 +173,7 @@ export function AdminTable({
   const [activeSearch, setActiveSearch] = useState(initialSearch)
   const [rows, setRows] = useState<MergedRow[]>(initialRows)
   const [cursor, setCursor] = useState<AccountsCursor | null>(initialCursor)
-  // Derived from rows so adding/removing opt-in entries can't drift the count
+  // Derived from loaded rows so adding/removing opt-in entries can't drift the count
   // (and so we don't have to coordinate two setState calls across a
   // StrictMode-double-invoked updater — which doubled the count in dev).
   const optInCount = useMemo(
@@ -253,7 +253,7 @@ export function AdminTable({
         // The action created a brand-new opt-in row that wasn't yet shown
         // (manual opt-in for an unknown account, or for an account outside
         // the currently-loaded page). Prepend it; optInCount is derived
-        // from rows so the pinned-count display updates automatically.
+        // from rows so the loaded-count display updates automatically.
         return [
           {
             key: `optin:${updated.id}`,
@@ -277,9 +277,7 @@ export function AdminTable({
         ...row,
         optInRecord: updated,
         blockedFromScraping: result.blockedFromScraping,
-        account: result.archiveDeleted
-          ? null
-          : (result.account ?? row.account),
+        account: result.archiveDeleted ? null : (result.account ?? row.account),
         archiveUploadCount: result.archiveDeleted
           ? 0
           : (result.archiveUploadCount ?? row.archiveUploadCount),
@@ -306,7 +304,10 @@ export function AdminTable({
         setError('Failed to load more accounts (no data returned)')
         return
       }
-      setRows((prev) => [...prev, ...page.rows])
+      setRows((prev) => {
+        const loadedKeys = new Set(prev.map((row) => row.key))
+        return [...prev, ...page.rows.filter((row) => !loadedKeys.has(row.key))]
+      })
       setCursor(page.nextCursor)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load more accounts')
@@ -401,7 +402,7 @@ export function AdminTable({
         </div>
         <p className="text-xs text-muted-foreground">
           {optInCount > 0
-            ? `${optInCount} opt-in row${optInCount === 1 ? '' : 's'} pinned at top · `
+            ? `${optInCount} opt-in row${optInCount === 1 ? '' : 's'} loaded first · `
             : ''}
           {rows.length} loaded
           {cursor ? ' · scroll for more' : ''}
@@ -450,9 +451,7 @@ export function AdminTable({
                         row.account.num_tweets !== row.archivedTweetCount ? (
                           <span className="text-muted-foreground">
                             {' '}
-                            (
-                            {compactNumber(row.account.num_tweets)} on
-                            Twitter)
+                            ({compactNumber(row.account.num_tweets)} on Twitter)
                           </span>
                         ) : null}
                       </div>

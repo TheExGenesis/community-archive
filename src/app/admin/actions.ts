@@ -83,7 +83,7 @@ export type AdminActionResult =
   | { ok: false; error: string }
 
 const OPT_IN_SELECT =
-  'id, user_id, username, twitter_user_id, opted_in, explicit_optout, opt_out_reason, updated_at, opted_in_at, opted_out_at'
+  'id, user_id, username, twitter_user_id, opted_in, explicit_optout, opt_out_reason, created_at, updated_at, opted_in_at, opted_out_at'
 
 async function isBlocked(
   admin: Awaited<ReturnType<typeof getAdminClient>>,
@@ -126,7 +126,6 @@ async function upsertScrapeBlock(
   )
   if (error) throw error
 }
-
 
 export async function loadMoreAccountsAction(input: {
   search: string
@@ -442,4 +441,3 @@ export async function adminOptOutAccount(
     }
   }
 }
-

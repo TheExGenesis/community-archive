@@ -40,6 +40,35 @@ describe('social graph filtering', () => {
     expect(filtered.omittedEdgesForPerformance).toBe(1)
   })
 
+  it('keeps the most central nodes when the node budget is reduced', () => {
+    const centralSnapshot = {
+      ...snapshot,
+      nodes: [
+        {
+          id: 'celebrity',
+          username: 'celebrity',
+          followers: 1_000_000,
+          degree: 1,
+        },
+        { id: 'hub', username: 'hub', followers: 100, degree: 3 },
+        { id: 'peer1', username: 'peer1', followers: 50, degree: 1 },
+        { id: 'peer2', username: 'peer2', followers: 40, degree: 1 },
+      ],
+      edges: [
+        { source: 'hub', target: 'peer1', strength: 4 },
+        { source: 'hub', target: 'peer2', strength: 3 },
+        { source: 'celebrity', target: 'peer1', strength: 0.1 },
+      ],
+    } as SocialGraphSnapshot
+    const filtered = filterSocialGraph(centralSnapshot, {
+      minimumFollowers: 0,
+      minimumStrength: 1,
+      maximumNodes: 2,
+    })
+    expect(filtered.nodes.map((node) => node.id)).toEqual(['hub', 'peer1'])
+    expect(filtered.edges).toHaveLength(1)
+  })
+
   it('maps follower counts through a reversible logarithmic slider', () => {
     const count = followerSliderToCount(50, 1_000_000)
     expect(count).toBeGreaterThan(900)

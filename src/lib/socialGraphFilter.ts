@@ -18,8 +18,18 @@ export interface FilteredSocialGraph {
   omittedEdgesForPerformance: number
 }
 
-function nodePriority(node: SocialGraphNode): number {
-  return Math.log10(node.followers + 10) * 10 + node.degree
+function weightedDegree(
+  nodes: SocialGraphNode[],
+  edges: SocialGraphEdge[],
+): Map<string, number> {
+  const eligibleIds = new Set(nodes.map((node) => node.id))
+  const scores = new Map(nodes.map((node) => [node.id, 0]))
+  for (const edge of edges) {
+    if (!eligibleIds.has(edge.source) || !eligibleIds.has(edge.target)) continue
+    scores.set(edge.source, (scores.get(edge.source) || 0) + edge.strength)
+    scores.set(edge.target, (scores.get(edge.target) || 0) + edge.strength)
+  }
+  return scores
 }
 
 export function filterSocialGraph(
@@ -27,21 +37,25 @@ export function filterSocialGraph(
   filters: SocialGraphFilters,
   maxVisibleEdges = MAX_VISIBLE_EDGES,
 ): FilteredSocialGraph {
-  const eligible = snapshot.nodes
-    .filter((node) => node.followers >= filters.minimumFollowers)
+  const followerEligible = snapshot.nodes.filter(
+    (node) => node.followers >= filters.minimumFollowers,
+  )
+  const strengthEligibleEdges = snapshot.edges.filter(
+    (edge) => edge.strength >= filters.minimumStrength,
+  )
+  const centrality = weightedDegree(followerEligible, strengthEligibleEdges)
+  const eligible = followerEligible
     .sort(
       (left, right) =>
-        nodePriority(right) - nodePriority(left) ||
+        (centrality.get(right.id) || 0) - (centrality.get(left.id) || 0) ||
+        right.degree - left.degree ||
         right.followers - left.followers ||
         left.username.localeCompare(right.username),
     )
     .slice(0, Math.max(1, Math.floor(filters.maximumNodes)))
   const nodeIds = new Set(eligible.map((node) => node.id))
-  const matchingEdges = snapshot.edges.filter(
-    (edge) =>
-      edge.strength >= filters.minimumStrength &&
-      nodeIds.has(edge.source) &&
-      nodeIds.has(edge.target),
+  const matchingEdges = strengthEligibleEdges.filter(
+    (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target),
   )
   const edges = matchingEdges.slice(0, maxVisibleEdges)
 

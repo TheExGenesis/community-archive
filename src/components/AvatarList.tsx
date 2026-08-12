@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { AvatarType } from '@/lib/types'
 import { formatNumber } from '@/lib/formatNumber'
@@ -12,6 +12,63 @@ type AvatarListProps = {
   title?: string
   compact?: boolean
 }
+
+function RecoverableArchiveAvatar({
+  avatar,
+  compact,
+}: {
+  avatar: AvatarType
+  compact: boolean
+}) {
+  const [avatarUrl, setAvatarUrl] = useState(
+    avatar.avatar_media_url || undefined,
+  )
+  const attemptedRecovery = useRef(false)
+
+  useEffect(() => {
+    attemptedRecovery.current = false
+    setAvatarUrl(avatar.avatar_media_url || undefined)
+  }, [avatar.account_id, avatar.avatar_media_url])
+
+  const recoverAvatar = useCallback(() => {
+    if (attemptedRecovery.current) return
+    attemptedRecovery.current = true
+    void fetch(`/api/profile/${encodeURIComponent(avatar.account_id)}/avatar`)
+      .then(async (response) => {
+        if (!response.ok) return null
+        const body = (await response.json()) as { avatar_media_url?: unknown }
+        return typeof body.avatar_media_url === 'string' &&
+          body.avatar_media_url
+          ? body.avatar_media_url
+          : null
+      })
+      .then((recoveredAvatarUrl) => {
+        if (recoveredAvatarUrl) setAvatarUrl(recoveredAvatarUrl)
+      })
+      .catch(() => undefined)
+  }, [avatar.account_id])
+
+  useEffect(() => {
+    if (!avatar.avatar_media_url) recoverAvatar()
+  }, [avatar.avatar_media_url, recoverAvatar])
+
+  return (
+    <Avatar className={compact ? 'h-10 w-10' : 'h-12 w-12'}>
+      {avatarUrl ? (
+        <AvatarImage
+          src={avatarUrl}
+          alt={`${avatar.username}'s avatar`}
+          onError={() => {
+            setAvatarUrl(undefined)
+            recoverAvatar()
+          }}
+        />
+      ) : null}
+      <AvatarFallback>{avatar.username[0].toUpperCase()}</AvatarFallback>
+    </Avatar>
+  )
+}
+
 const AvatarList = ({
   initialAvatars,
   title = 'Avatars',
@@ -36,21 +93,13 @@ const AvatarList = ({
         >
           {avatars.map((avatar) => (
             <Link
-              key={avatar.username}
+              key={avatar.account_id}
               href={userProfileHref(avatar.username, avatar.account_id)}
               className={`flex flex-col items-center text-center ${
                 compact ? 'w-16' : 'w-20'
               }`}
             >
-              <Avatar className={compact ? 'h-10 w-10' : 'h-12 w-12'}>
-                <AvatarImage
-                  src={avatar.avatar_media_url}
-                  alt={`${avatar.username}'s avatar`}
-                />
-                <AvatarFallback>
-                  {avatar.username[0].toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <RecoverableArchiveAvatar avatar={avatar} compact={compact} />
               <span
                 className={`mt-1 break-words hover:underline ${
                   compact ? 'text-[11px]' : 'text-xs'

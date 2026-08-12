@@ -7,14 +7,30 @@ import { getPortalData } from '@/lib/portal/data'
 jest.mock('server-only', () => ({}), { virtual: true })
 jest.mock('@/components/home/ClassicHomepage', () => ({
   __esModule: true,
-  default: ({ isMember, showCta }: { isMember: boolean; showCta: boolean }) => (
+  default: ({
+    homepagePeople,
+    isMember,
+    showCta,
+  }: {
+    homepagePeople: React.ReactNode
+    isMember: boolean
+    showCta: boolean
+  }) => (
     <div>
       shared homepage · member {String(isMember)} · CTA {String(showCta)}
+      {homepagePeople}
     </div>
   ),
 }))
 jest.mock('@/lib/portal/auth', () => ({ getIsMember: jest.fn() }))
 jest.mock('@/lib/portal/data', () => ({ getPortalData: jest.fn() }))
+jest.mock('@/components/home/HomepagePeople', () => ({
+  __esModule: true,
+  default: ({ isMember }: { isMember: boolean }) => (
+    <div>homepage people · member {String(isMember)}</div>
+  ),
+  HomepagePeopleFallback: () => <div>homepage people fallback</div>,
+}))
 
 const getIsMemberMock = getIsMember as jest.MockedFunction<typeof getIsMember>
 const getPortalDataMock = getPortalData as jest.MockedFunction<
@@ -37,9 +53,9 @@ describe('Homepage OAuth actions', () => {
   it('keeps an authenticated OAuth return on the opt-in completion surface', async () => {
     const page = await Homepage({ searchParams: { action: 'optin' } })
 
-    expect(renderToStaticMarkup(page)).toContain(
-      'shared homepage · member true · CTA true',
-    )
+    const markup = renderToStaticMarkup(page)
+    expect(markup).toContain('shared homepage · member true · CTA true')
+    expect(markup).toContain('homepage people · member true')
     expect(getIsMemberMock).toHaveBeenCalledTimes(1)
     expect(getPortalDataMock).toHaveBeenCalledTimes(1)
   })
@@ -47,9 +63,9 @@ describe('Homepage OAuth actions', () => {
   it('renders the same dashboard without the CTA for signed-in visitors', async () => {
     const page = await Homepage({ searchParams: {} })
 
-    expect(renderToStaticMarkup(page)).toContain(
-      'shared homepage · member true · CTA false',
-    )
+    const markup = renderToStaticMarkup(page)
+    expect(markup).toContain('shared homepage · member true · CTA false')
+    expect(markup).toContain('homepage people · member true')
     expect(getIsMemberMock).toHaveBeenCalledTimes(1)
     expect(getPortalDataMock).toHaveBeenCalledTimes(1)
   })
@@ -58,8 +74,8 @@ describe('Homepage OAuth actions', () => {
     getIsMemberMock.mockResolvedValue(false)
     const page = await Homepage({ searchParams: {} })
 
-    expect(renderToStaticMarkup(page)).toContain(
-      'shared homepage · member false · CTA true',
-    )
+    const markup = renderToStaticMarkup(page)
+    expect(markup).toContain('shared homepage · member false · CTA true')
+    expect(markup).toContain('homepage people · member false')
   })
 })

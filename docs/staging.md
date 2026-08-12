@@ -165,6 +165,37 @@ For PR-created Vercel Preview deployments, add the values from `.env.staging.gen
 
 After updating Preview env vars, redeploy the PR preview so the new values are picked up.
 
+### Programmatic smoke checks for protected previews
+
+The project's Vercel Preview deployments require SSO. For a non-interactive
+smoke check, run `vercel curl` from a checkout linked to the project through
+`.vercel/project.json`; it supplies deployment-protection access without
+disabling the protection setting.
+
+Community Archive's request middleware blocks the default curl user agent and
+JavaScript-challenges ordinary first-time page requests. Use one of the
+middleware's intentional social-preview user agents when checking rendered
+HTML or archive permalinks:
+
+```bash
+PREVIEW_URL=https://example-preview.vercel.app
+
+npx --yes vercel@latest curl / \
+  --deployment "$PREVIEW_URL" \
+  -- --silent --show-error --user-agent Twitterbot/1.0 \
+  --write-out '\nHTTP_STATUS:%{http_code}\n'
+
+npx --yes vercel@latest curl /tweets/<tweet-id> \
+  --deployment "$PREVIEW_URL" \
+  -- --silent --show-error --user-agent Twitterbot/1.0 \
+  --write-out '\nHTTP_STATUS:%{http_code}\n'
+```
+
+This verifies deployed server-rendered HTML and route availability. It does not
+replace a visual browser check; use an authenticated Vercel browser session for
+interactive preview QA, or perform the responsive visual pass locally before
+the remote smoke check.
+
 ## Keeping Staging Schema Current
 
 The `Sync staging database` GitHub Action soft-resets staging from the repo schema and mock seed data:

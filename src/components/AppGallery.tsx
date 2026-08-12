@@ -53,7 +53,7 @@ const galleryApps: GalleryApp[] = [
     icon: <FaUsers />,
     name: 'Community Builds',
     description: 'More projects from the community',
-    link: 'https://x.com/exgenesis/status/1835411943735140798',
+    link: '/tweets/1835411943735140798',
   },
 ]
 

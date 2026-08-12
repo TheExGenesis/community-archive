@@ -97,10 +97,7 @@ test('renders the balanced homepage composition and editorial labels', async () 
   )
   expect(
     screen.getByRole('link', { name: /Community Builds/i }),
-  ).toHaveAttribute(
-    'href',
-    'https://x.com/exgenesis/status/1835411943735140798',
-  )
+  ).toHaveAttribute('href', '/tweets/1835411943735140798')
   expect(screen.queryByText('Explore the archive')).not.toBeInTheDocument()
   expect(screen.getByRole('region', { name: 'Live tweet stream' })).toHaveClass(
     'lg:flex-1',

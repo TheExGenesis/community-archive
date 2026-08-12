@@ -340,6 +340,7 @@ describe('ClickHouse-backed portal analytics', () => {
     await expect(fetchPortalRecentBangers(500, 500, fetcher)).resolves.toEqual([
       {
         id: '2085365448686866863',
+        accountId: '14816854',
         username: 'katiebakes',
         name: 'Katie',
         avatar: 'https://pbs.twimg.com/katie.jpg',

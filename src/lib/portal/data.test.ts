@@ -350,6 +350,7 @@ describe('portal reads', () => {
     await expect(getPortalStreamPage(30)).resolves.toEqual([
       {
         id: '42',
+        accountId: '7',
         username: 'archive_member',
         name: 'Archive Member',
         avatar: 'https://example.com/avatar.jpg',

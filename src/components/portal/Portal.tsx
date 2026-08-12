@@ -34,8 +34,7 @@ export type PortalView = 'home' | 'stream'
 const HOME_LIVE_STREAM_LIMIT = 12
 const ARCHIVE_EXPORT_URL =
   'https://github.com/TheExGenesis/community-archive/releases/tag/data_export'
-const COMMUNITY_BUILDS_URL =
-  'https://x.com/exgenesis/status/1835411943735140798'
+const COMMUNITY_BUILDS_URL = '/tweets/1835411943735140798'
 
 type DashboardDestination =
   | 'all_time_bangers'
@@ -934,10 +933,8 @@ export default function Portal({
               </a>
               <a
                 href={COMMUNITY_BUILDS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
                 onClick={() =>
-                  captureDashboardDestination('community_builds', 'card', true)
+                  captureDashboardDestination('community_builds', 'card', false)
                 }
                 className={`${CARD} group flex items-center gap-3 px-4 py-4 transition-colors hover:border-brand/60`}
               >

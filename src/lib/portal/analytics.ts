@@ -32,14 +32,6 @@ type AnalyticsFetcher = typeof fetchAnalyticsGatewayJson
 // Keep corpus-scan fan-out aligned with the two-query production capacity.
 const DEFAULT_ANALYTICS_CONCURRENCY = 2
 
-interface ClickHouseSummaryResponse {
-  data: {
-    totalTweets: string | number
-    sourceUpdatedAt: string
-    collectedAt: string
-  }
-}
-
 interface ClickHouseStreamStatsResponse {
   summary: {
     totalTweets: string | number
@@ -124,9 +116,7 @@ interface ClickHouseTopQuotesResponse {
 }
 
 export interface PortalLiveAnalytics {
-  totalTweets: number
   streamedLast24Hours: number
-  generatedAt: string
   latestObservedAt: string | null
 }
 
@@ -412,14 +402,11 @@ export async function fetchPortalLiveAnalytics(
     scope: 'firehose',
   })
 
-  const [summary, stream] = await Promise.all([
-    fetcher<ClickHouseSummaryResponse>(['summary'], new URLSearchParams(), {
-      timeoutMs: 25_000,
-    }),
-    fetcher<ClickHouseStreamStatsResponse>(['stream-stats'], streamParams, {
-      timeoutMs: 25_000,
-    }),
-  ])
+  const stream = await fetcher<ClickHouseStreamStatsResponse>(
+    ['stream-stats'],
+    streamParams,
+    { timeoutMs: 25_000 },
+  )
 
   if (
     stream.summary?.scope !== 'firehose' ||
@@ -429,12 +416,10 @@ export async function fetchPortalLiveAnalytics(
   }
 
   return {
-    totalTweets: safeCount(summary.data.totalTweets, 'tweet count'),
     streamedLast24Hours: safeCount(
       stream.summary.totalTweets,
       'last-24-hours streamed count',
     ),
-    generatedAt: safeTimestamp(summary.data.collectedAt, 'snapshot timestamp'),
     latestObservedAt: stream.summary.latestObservedAt
       ? safeTimestamp(stream.summary.latestObservedAt, 'observation timestamp')
       : null,

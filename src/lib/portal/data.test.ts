@@ -15,6 +15,7 @@ jest.mock('./research', () => ({
 }))
 
 import {
+  fetchPortalCorpusStats,
   fetchPortalMemberCount,
   getInitialPortalBangersPage,
   getPortalBangersPage,
@@ -162,9 +163,7 @@ describe('portal page resilience', () => {
       computedAt: '2026-08-07T20:00:00.000Z',
     })
     fetchPortalLiveAnalyticsMock.mockResolvedValue({
-      totalTweets: 1_000,
       streamedLast24Hours: 25,
-      generatedAt: '2026-08-07T20:00:00.000Z',
       latestObservedAt: '2026-08-07T20:00:00.000Z',
     })
     fetchPortalRecentBangersMock.mockResolvedValue([])
@@ -181,6 +180,20 @@ describe('portal page resilience', () => {
           status: 200,
           headers: { 'content-range': '0-0/42' },
         })
+      }
+      if (url.pathname.endsWith('/global_activity_summary')) {
+        return new Response(
+          JSON.stringify([
+            {
+              total_tweets: 15_100_732,
+              last_updated: '2026-08-07T20:00:00.000Z',
+            },
+          ]),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        )
       }
       if (url.pathname.endsWith('/tweets')) {
         const createdAt = url.searchParams.get('order')?.endsWith('.asc')
@@ -234,7 +247,7 @@ describe('portal page resilience', () => {
 
     await expect(getPortalData()).resolves.toMatchObject({
       stats: {
-        totalTweets: 1_000,
+        totalTweets: 15_100_732,
         accountCount: 42,
         firstYear: 2007,
         currentYear: 2026,
@@ -249,14 +262,14 @@ describe('portal page resilience', () => {
     })
   })
 
-  test('preserves member and corpus metrics when live analytics fails', async () => {
+  test('preserves the Supabase corpus total when live analytics fails', async () => {
     fetchPortalLiveAnalyticsMock.mockRejectedValueOnce(
       new Error('live analytics unavailable'),
     )
 
     await expect(getPortalData()).resolves.toMatchObject({
       stats: {
-        totalTweets: 0,
+        totalTweets: 15_100_732,
         accountCount: 42,
         firstYear: 2007,
         currentYear: 2026,
@@ -283,6 +296,34 @@ describe('portal reads', () => {
     process.env.CLICKHOUSE_ANALYTICS_API_URL =
       'https://analytics.community-archive.org/analytics'
     process.env.CLICKHOUSE_ANALYTICS_API_TOKEN = 'test-token'
+  })
+
+  test('reads the homepage corpus total from the Supabase summary', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify([
+          {
+            total_tweets: 15_100_732,
+            last_updated: '2026-08-12T05:15:00.098756+00:00',
+          },
+        ]),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    )
+
+    await expect(fetchPortalCorpusStats()).resolves.toEqual({
+      totalTweets: 15_100_732,
+      generatedAt: '2026-08-12T05:15:00.098Z',
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://prod-project.supabase.co/rest/v1/global_activity_summary?select=total_tweets%2Clast_updated',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          apikey: 'prod-public-anon',
+          'Accept-Profile': 'public',
+        }),
+      }),
+    )
   })
 
   afterEach(() => {

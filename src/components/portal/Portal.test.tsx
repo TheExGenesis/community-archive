@@ -8,7 +8,9 @@ jest.mock('@/components/HomepageSearch', () => ({
 }))
 
 jest.mock('./TweetRow', () => ({
-  TweetRow: ({ tweet }: { tweet: PortalTweet }) => <div>{tweet.text}</div>,
+  TweetRow: ({ tweet, noClamp }: { tweet: PortalTweet; noClamp?: boolean }) => (
+    <div data-no-clamp={String(Boolean(noClamp))}>{tweet.text}</div>
+  ),
 }))
 
 const seedTweet: PortalTweet = {
@@ -179,6 +181,10 @@ describe.each<PortalView>(['home', 'stream'])(
       expect(screen.getByText('preview tweet 5')).toBeInTheDocument()
       expect(screen.getByText('preview tweet 12')).toBeInTheDocument()
       if (view === 'home') {
+        expect(screen.getByText('preview tweet 1')).toHaveAttribute(
+          'data-no-clamp',
+          'true',
+        )
         const preview = screen.getByRole('region', {
           name: 'Live tweet stream',
         })
@@ -189,6 +195,10 @@ describe.each<PortalView>(['home', 'stream'])(
         )
         expect(screen.queryByText('preview tweet 13')).not.toBeInTheDocument()
       } else {
+        expect(screen.getByText('preview tweet 1')).toHaveAttribute(
+          'data-no-clamp',
+          'false',
+        )
         expect(
           screen.queryByRole('region', { name: 'Live tweet stream' }),
         ).not.toBeInTheDocument()

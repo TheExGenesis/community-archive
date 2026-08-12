@@ -72,6 +72,17 @@ describe('TweetCard', () => {
     expect(screen.queryByText('♥ 8')).not.toBeInTheDocument()
   })
 
+  test('can disable text clamping independently of the card layout', () => {
+    render(<TweetCard tweet={tweet} compact noClamp />)
+
+    expect(
+      screen.getByText('A complete tweet & media with > one encoding layer.'),
+    ).not.toHaveClass('line-clamp-2')
+    expect(screen.getByText('The complete "quoted" tweet.')).not.toHaveClass(
+      'line-clamp-3',
+    )
+  })
+
   test('makes the card clickable while preserving its origin', () => {
     const { container } = render(
       <TweetCard

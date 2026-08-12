@@ -293,6 +293,7 @@ function mapClickHousePortalStreamTweet(
   const username = row.username || 'unknown'
   return {
     id: row.tweetId,
+    accountId: row.accountId,
     username,
     name: row.accountDisplayName || username,
     avatar: row.avatarMediaUrl || null,
@@ -379,6 +380,7 @@ interface PortalQuoteRelationRow {
 
 interface PortalQuotedTweetRow {
   tweet_id: string
+  account_id: string
   created_at: string
   full_text: string
   retweet_count: number | null
@@ -462,7 +464,7 @@ export async function enrichPortalTweets(
       'enriched_tweets',
       new URLSearchParams({
         select:
-          'tweet_id,created_at,full_text,retweet_count,favorite_count,username,account_display_name,avatar_media_url',
+          'tweet_id,account_id,created_at,full_text,retweet_count,favorite_count,username,account_display_name,avatar_media_url',
         tweet_id: quotedTweetIdFilter,
       }),
       'quoted tweet',
@@ -484,6 +486,7 @@ export async function enrichPortalTweets(
     const username = row.username || 'unknown'
     quotedTweets.set(row.tweet_id, {
       id: row.tweet_id,
+      accountId: row.account_id,
       username,
       name: row.account_display_name || username,
       avatar: row.avatar_media_url,

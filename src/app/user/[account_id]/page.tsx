@@ -14,9 +14,12 @@ import { formatNumber } from '@/lib/formatNumber'
 import { DownloadArchiveButton } from './DownloadArchiveButton'
 import Image from 'next/image'
 import TweetList from '@/components/TweetList'
+import UnifiedTweetList from '@/components/UnifiedTweetList'
+import type { TweetData } from '@/components/TweetComponent'
 import { FilterCriteria } from '@/lib/queries/tweetQueries'
 import { Archive, Radio } from 'lucide-react'
 import { getHighResolutionAvatarUrl } from '@/lib/avatar'
+import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
 
 // Style constants (glows removed)
 const unifiedDeepBlueBase = 'bg-card dark:bg-background'
@@ -132,7 +135,11 @@ export default async function User({
   const cookieStore = cookies()
   const supabase = createServerClient(cookieStore)
 
-  const userData = await getUserData(supabase, account_id)
+  const directoryUser = await getUserData(supabase, account_id)
+  const clickHouseProfile = directoryUser
+    ? null
+    : await getClickHouseUserProfile(account_id)
+  const userData = directoryUser || clickHouseProfile?.user
 
   if (!userData) {
     // Styled error message for consistency - Removed glow and shadow
@@ -156,18 +163,40 @@ export default async function User({
     )
   }
 
-  let summaryQuery = supabase
-    .from('account_activity_summary')
-    .select('mentioned_accounts')
-
-  summaryQuery = userData.account_id
-    ? summaryQuery.eq('account_id', userData.account_id)
-    : summaryQuery.eq('username', userData.username)
-
-  const { data: summaryData, error: summaryError } =
-    await summaryQuery.maybeSingle()
+  const { data: summaryData, error: summaryError } = directoryUser
+    ? directoryUser.account_id
+      ? await supabase
+          .from('account_activity_summary')
+          .select('mentioned_accounts')
+          .eq('account_id', directoryUser.account_id)
+          .maybeSingle()
+      : await supabase
+          .from('account_activity_summary')
+          .select('mentioned_accounts')
+          .eq('username', directoryUser.username)
+          .maybeSingle()
+    : { data: null, error: null }
 
   const showingSummaryData = !summaryError && summaryData?.mentioned_accounts
+  const clickHouseTweets: TweetData[] =
+    clickHouseProfile?.topTweets.map((tweet) => ({
+      tweet_id: tweet.tweetId,
+      account_id: userData.account_id || '',
+      created_at: tweet.createdAt,
+      full_text: tweet.fullText,
+      retweet_count: tweet.retweetCount,
+      favorite_count: tweet.favoriteCount,
+      reply_to_tweet_id: null,
+      quote_tweet_id: null,
+      retweeted_tweet_id: null,
+      avatar_media_url: userData.avatar_media_url,
+      username: userData.username,
+      account_display_name: userData.account_display_name,
+      media: [],
+      urls: [],
+      reply_to_username: tweet.replyToUsername || undefined,
+      mentioned_users: [],
+    })) || []
 
   return (
     <section
@@ -229,14 +258,23 @@ export default async function User({
           </>
         )}
 
-        {userData.account_id && (
+        {clickHouseProfile && clickHouseTweets.length > 0 && (
+          <div className="rounded-lg bg-muted p-6 dark:bg-card sm:p-8">
+            <h2 className="mb-4 text-2xl font-semibold text-foreground">
+              Top Tweets
+            </h2>
+            <UnifiedTweetList tweets={clickHouseTweets} />
+          </div>
+        )}
+
+        {directoryUser?.account_id && (
           <div className="rounded-lg bg-muted p-6 dark:bg-card sm:p-8">
             <h2 className="mb-6 text-2xl font-semibold text-foreground">
               Recent Tweets
             </h2>
             <TweetList
               filterCriteria={
-                { userId: userData.account_id } satisfies FilterCriteria
+                { userId: directoryUser.account_id } satisfies FilterCriteria
               }
               itemsPerPage={20}
             />

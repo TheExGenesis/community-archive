@@ -1,4 +1,5 @@
 import { BANGERS_ALL_TIME_HREF } from './portal/bangers'
+import { isTwitterUsername } from './apiInputValidation'
 
 export interface NavItem {
   href: string
@@ -6,6 +7,28 @@ export interface NavItem {
 }
 
 export type TweetOrigin = 'home' | 'stream' | 'bangers' | 'trends' | 'search'
+
+export function userProfileHref(
+  username: string | null | undefined,
+  accountId?: string | null,
+): string {
+  const cleanUsername = username?.trim().replace(/^@/, '')
+  const validUsername =
+    cleanUsername &&
+    isTwitterUsername(cleanUsername) &&
+    !/^\d+$/.test(cleanUsername)
+      ? cleanUsername
+      : null
+  if (accountId) {
+    const pathname = `/user/${encodeURIComponent(accountId)}`
+    return validUsername
+      ? `${pathname}?username=${encodeURIComponent(validUsername)}`
+      : pathname
+  }
+  return validUsername
+    ? `/user/${encodeURIComponent(`@${validUsername}`)}`
+    : '/user-dir'
+}
 
 export interface TweetBackLink {
   href: string

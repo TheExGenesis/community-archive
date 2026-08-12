@@ -1,10 +1,11 @@
 -- Row Level Security policies and enablement
 
--- Storage policies for the public archives bucket. Writes are restricted to
+-- Storage policies for the private archives bucket. Any signed-in Community
+-- Archive user may download raw archives, while writes remain restricted to
 -- the folder named by trusted, server-controlled app_metadata; the upload
 -- client derives the same name from its verified Twitter identity (#372).
-CREATE POLICY "Archives are publicly readable" ON "storage"."objects"
-  FOR SELECT TO public
+CREATE POLICY "Authenticated users can read archives" ON "storage"."objects"
+  FOR SELECT TO "authenticated"
   USING (("bucket_id" = 'archives'::"text"));
 
 CREATE POLICY "Users can upload their own archive" ON "storage"."objects"

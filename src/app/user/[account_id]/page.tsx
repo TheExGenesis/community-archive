@@ -17,6 +17,8 @@ import TweetList from '@/components/TweetList'
 import { FilterCriteria } from '@/lib/queries/tweetQueries'
 import { Archive, Radio } from 'lucide-react'
 import { getHighResolutionAvatarUrl } from '@/lib/avatar'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 
 // Style constants (glows removed)
 const unifiedDeepBlueBase = 'bg-card dark:bg-background'
@@ -24,7 +26,15 @@ const sectionPaddingClasses = 'py-12 md:py-16 lg:py-20'
 const contentWrapperClasses =
   'w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10'
 
-const UserProfile = ({ userData }: { userData: FormattedUser }) => {
+const UserProfile = ({
+  userData,
+  isAuthenticated,
+  returnPath,
+}: {
+  userData: FormattedUser
+  isAuthenticated: boolean
+  returnPath: string
+}) => {
   const account = userData
   return (
     // Profile info card - Removed shadow
@@ -116,7 +126,22 @@ const UserProfile = ({ userData }: { userData: FormattedUser }) => {
       </div>
       {account.has_archive && (
         <div className="mt-6 text-center sm:text-left">
-          <DownloadArchiveButton username={account.username} />
+          {isAuthenticated ? (
+            <DownloadArchiveButton username={account.username} />
+          ) : (
+            <div className="mt-4">
+              <Button asChild variant="outline">
+                <Link
+                  href={`/login?redirect=${encodeURIComponent(returnPath)}`}
+                >
+                  Sign in to download raw archive
+                </Link>
+              </Button>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Raw archive downloads require an account.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -132,7 +157,10 @@ export default async function User({
   const cookieStore = cookies()
   const supabase = createServerClient(cookieStore)
 
-  const userData = await getUserData(supabase, account_id)
+  const [userData, authResult] = await Promise.all([
+    getUserData(supabase, account_id),
+    supabase.auth.getUser(),
+  ])
 
   if (!userData) {
     // Styled error message for consistency - Removed glow and shadow
@@ -193,7 +221,11 @@ export default async function User({
             <Skeleton className="h-60 w-full rounded-lg bg-muted p-8 dark:bg-card" />
           }
         >
-          <UserProfile userData={userData} />
+          <UserProfile
+            userData={userData}
+            isAuthenticated={Boolean(authResult.data.user)}
+            returnPath={`/user/${account_id}`}
+          />
         </Suspense>
 
         {showingSummaryData && (

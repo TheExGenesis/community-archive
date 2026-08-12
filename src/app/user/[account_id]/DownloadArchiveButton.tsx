@@ -2,15 +2,17 @@
 
 import { Button } from '@/components/ui/button'
 import { FileDown } from 'lucide-react'
+import { createBrowserClient } from '@/utils/supabase'
 
 export function DownloadArchiveButton({ username }: { username: string }) {
-  const archiveUrl = `https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/${username.toLowerCase()}/archive.json`
-
   const handleDownload = async () => {
     try {
-      // Fetch the file
-      const response = await fetch(archiveUrl)
-      const blob = await response.blob()
+      const supabase = createBrowserClient()
+      const { data: blob, error } = await supabase.storage
+        .from('archives')
+        .download(`${username.toLowerCase()}/archive.json`)
+
+      if (error) throw error
 
       // Create a temporary link element
       const downloadUrl = window.URL.createObjectURL(blob)
@@ -41,7 +43,8 @@ export function DownloadArchiveButton({ username }: { username: string }) {
         Download Raw Archive
       </Button>
       <p className="mt-1 text-xs text-muted-foreground">
-        Downloads the complete Twitter archive in JSON format
+        Downloads the complete Twitter archive in JSON format. Sign-in is
+        required.
       </p>
     </div>
   )

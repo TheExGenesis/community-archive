@@ -150,6 +150,10 @@ Staging synchronization is automatic; production synchronization is not:
 Use Node 20 from `.nvmrc` and pnpm. Prefer the narrowest relevant check, then
 expand verification in proportion to risk.
 
+For non-interactive smoke checks against SSO-protected Vercel previews, follow
+`docs/staging.md`. Do not disable deployment protection to make a preview
+machine-readable.
+
 ```bash
 pnpm dev                 # Next.js with local Supabase
 pnpm dev-remote-db       # Next.js with configured remote development DB

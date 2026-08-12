@@ -66,6 +66,15 @@ The default staging login identity is configured via env:
 
 The staging UI shows a dropdown of seeded mock users (currently `alice_dev` and `xiq_dev`, see `supabase/seed.sql`) plus a sign-in button. Picking a user posts `{ username, providerId, displayName }` to the dev-login route; the server uses `STAGING_DEV_LOGIN_PASSWORD` from the environment as the shared password and derives the email as `<username>@staging.local`. No password is sent from the client. You can also deep-link to a specific user with `?as=<username>` on the sign-in page.
 
+### Mocking the opt-in completion UI
+
+While signed in through staging dev login, open `/opt-in?mockOptIn=1` to test
+the completed opt-in experience without reading or writing an opt-in record.
+The regular opt-in button updates only the current page; refresh to reset and
+repeat the flow. The query parameter is ignored unless staging dev login is
+enabled against a definitively non-production Supabase project. Open
+`/opt-in` without the query parameter to exercise the real staging write path.
+
 Do not commit the real password. The bootstrap script below writes it to an ignored `.env.staging.generated` file so it can be copied into Vercel's Preview environment.
 
 The server route always refuses staging dev login against the known production

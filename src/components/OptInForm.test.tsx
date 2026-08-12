@@ -104,7 +104,13 @@ describe('OptInForm opted-in experience', () => {
     )
     expect(
       screen.getByRole('img', { name: /dashboard preview/i }),
-    ).toHaveAttribute('src', '/images/featured/dashboard.png')
+    ).toHaveAttribute('src', '/images/featured/dashboard.jpg')
+    expect(
+      screen.getByRole('img', { name: /bangers tweet rankings preview/i }),
+    ).toHaveAttribute('src', '/images/featured/bangers-current.jpg')
+    expect(
+      screen.getByRole('img', { name: /trends preview/i }),
+    ).toHaveAttribute('src', '/images/featured/trends.jpg')
   })
 
   it('previews opt-in locally in staging without calling the API', async () => {

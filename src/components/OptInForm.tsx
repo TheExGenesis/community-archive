@@ -12,19 +12,19 @@ import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 const nextSteps = [
   {
     href: '/',
-    imageSrc: '/images/featured/dashboard.png',
+    imageSrc: '/images/featured/dashboard.jpg',
     imageAlt: 'Community Archive dashboard preview',
     title: 'Dashboard',
   },
   {
     href: '/bangers',
-    imageSrc: '/images/featured/bangers.png',
+    imageSrc: '/images/featured/bangers-current.jpg',
     imageAlt: 'Bangers tweet rankings preview',
     title: 'Bangers',
   },
   {
     href: '/trends',
-    imageSrc: '/images/featured/trends.png',
+    imageSrc: '/images/featured/trends.jpg',
     imageAlt: 'Community Archive trends preview',
     title: 'Trends',
   },

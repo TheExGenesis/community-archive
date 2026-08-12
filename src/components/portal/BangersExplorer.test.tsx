@@ -14,9 +14,14 @@ import type {
   PortalBangersPeriod,
   PortalTweet,
 } from '@/lib/portal/types'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 const push = jest.fn()
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
+jest.mock('@/lib/posthog', () => ({
+  capturePostHogEvent: jest.fn(),
+}))
+const mockCapturePostHogEvent = capturePostHogEvent as jest.Mock
 jest.mock('@/components/TweetCard', () => ({
   __esModule: true,
   default: ({
@@ -112,6 +117,7 @@ describe('BangersExplorer', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/bangers')
     push.mockReset()
+    mockCapturePostHogEvent.mockReset()
     IntersectionObserverMock.instances = []
     Object.defineProperty(window, 'IntersectionObserver', {
       configurable: true,
@@ -264,6 +270,14 @@ describe('BangersExplorer', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Archive members' }))
 
     expect(screen.getByText('Loading bangers…')).toBeVisible()
+    expect(mockCapturePostHogEvent).toHaveBeenCalledWith('bangers_action', {
+      action: 'scope_changed',
+      has_query: false,
+      time_range: 'all',
+      sort: 'quotes',
+      scope: 'members',
+      result_count: 3,
+    })
   })
 
   test('searches names and text and can clear the result', () => {

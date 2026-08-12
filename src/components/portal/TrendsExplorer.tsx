@@ -16,6 +16,7 @@ import type {
   TrendEvidenceRange,
 } from '@/lib/portal/trendEvidenceCache'
 import type { PortalTrends, PortalTweet, TermSeries } from '@/lib/portal/types'
+import { capturePostHogEvent } from '@/lib/posthog'
 import { BODY, CARD, MUTED, SERIF } from './styles'
 
 type FeedFilter = 'include' | 'off'
@@ -60,6 +61,18 @@ const SERIES_COLORS = [
   '#84cc16',
 ]
 const DEFAULT_TREND_TERMS = CHART_TERMS.map(({ term }) => term)
+
+type TrendsExplorerAction =
+  | 'chart_series_toggled'
+  | 'evidence_filter_toggled'
+  | 'evidence_refreshed'
+  | 'retry_defaults'
+  | 'scale_changed'
+  | 'term_removed'
+  | 'terms_added'
+  | 'terms_reactivated'
+  | 'year_filter_applied'
+  | 'year_filter_cleared'
 
 async function requestTrendSeries(terms: string[]): Promise<SeriesResponse> {
   const params = new URLSearchParams({ view: 'series' })
@@ -201,6 +214,25 @@ export default function TrendsExplorer({
     includeTerms,
     selectedYears,
   )
+  const captureExplorerAction = (
+    action: TrendsExplorerAction,
+    overrides: Partial<{
+      seriesCount: number
+      enabledSeriesCount: number
+      includedSeriesCount: number
+      hasYearFilter: boolean
+    }> = {},
+  ) => {
+    capturePostHogEvent('trends_explorer_action', {
+      action,
+      series_count: overrides.seriesCount ?? series.length,
+      enabled_series_count:
+        overrides.enabledSeriesCount ?? enabledSeries.length,
+      included_series_count:
+        overrides.includedSeriesCount ?? includeTerms.length,
+      has_year_filter: overrides.hasYearFilter ?? selectedYears !== null,
+    })
+  }
 
   useEffect(() => {
     const requests = evidenceRequestsRef.current
@@ -316,6 +348,17 @@ export default function TrendsExplorer({
   }, [includeTerms, refreshKey, requestedYears])
 
   const removeTerm = (term: string) => {
+    captureExplorerAction('term_removed', {
+      seriesCount: Math.max(0, series.length - 1),
+      enabledSeriesCount: Math.max(
+        0,
+        enabledSeries.length - (chartEnabled[term] ? 1 : 0),
+      ),
+      includedSeriesCount: Math.max(
+        0,
+        includeTerms.length - (feedFilters[term] === 'include' ? 1 : 0),
+      ),
+    })
     setSeries((current) => current.filter((item) => item.term !== term))
     setChartEnabled((current) => {
       const next = { ...current }
@@ -361,6 +404,13 @@ export default function TrendsExplorer({
       }))
     }
     if (newTerms.length === 0) {
+      const nextEnabled = new Set([
+        ...enabledSeries.map(({ term }) => term),
+        ...alreadyPresent,
+      ])
+      captureExplorerAction('terms_reactivated', {
+        enabledSeriesCount: nextEnabled.size,
+      })
       setTermInput('')
       return
     }
@@ -386,6 +436,20 @@ export default function TrendsExplorer({
           additions.map(({ term }) => [term, 'include' as const]),
         ),
       }))
+      const nextEnabled = new Set([
+        ...enabledSeries.map(({ term }) => term),
+        ...alreadyPresent,
+        ...additions.map(({ term }) => term),
+      ])
+      const nextIncluded = new Set([
+        ...includeTerms,
+        ...additions.map(({ term }) => term),
+      ])
+      captureExplorerAction('terms_added', {
+        seriesCount: series.length + additions.length,
+        enabledSeriesCount: nextEnabled.size,
+        includedSeriesCount: nextIncluded.size,
+      })
       setChartError(null)
       setTermInput('')
     } catch (error) {
@@ -423,6 +487,11 @@ export default function TrendsExplorer({
           ]),
         ),
       )
+      captureExplorerAction('retry_defaults', {
+        seriesCount: defaults.length,
+        enabledSeriesCount: Math.min(defaults.length, 4),
+        includedSeriesCount: defaults.length > 0 ? 1 : 0,
+      })
       setChartError(null)
     } catch (error) {
       setChartError(
@@ -514,6 +583,7 @@ export default function TrendsExplorer({
     if (dragStartYear === null) return
     const year = yearForPointer(event.clientX)
     if (year !== null) updateDraggedYears(year)
+    captureExplorerAction('year_filter_applied', { hasYearFilter: true })
     setDragStartYear(null)
   }
 
@@ -603,7 +673,11 @@ export default function TrendsExplorer({
                       key={option}
                       type="button"
                       aria-pressed={scale === option}
-                      onClick={() => setScale(option)}
+                      onClick={() => {
+                        if (scale === option) return
+                        captureExplorerAction('scale_changed')
+                        setScale(option)
+                      }}
                       className={`rounded-[3px] px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors ${
                         scale === option
                           ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
@@ -783,10 +857,16 @@ export default function TrendsExplorer({
                     value={selectedYears?.start ?? ''}
                     onChange={(event) => {
                       if (!event.target.value) {
+                        captureExplorerAction('year_filter_cleared', {
+                          hasYearFilter: false,
+                        })
                         setSelectedYears(null)
                         return
                       }
                       const start = Number(event.target.value)
+                      captureExplorerAction('year_filter_applied', {
+                        hasYearFilter: true,
+                      })
                       setSelectedYears((current) => ({
                         start,
                         end: Math.max(start, current?.end ?? start),
@@ -809,10 +889,16 @@ export default function TrendsExplorer({
                     value={selectedYears?.end ?? ''}
                     onChange={(event) => {
                       if (!event.target.value) {
+                        captureExplorerAction('year_filter_cleared', {
+                          hasYearFilter: false,
+                        })
                         setSelectedYears(null)
                         return
                       }
                       const end = Number(event.target.value)
+                      captureExplorerAction('year_filter_applied', {
+                        hasYearFilter: true,
+                      })
                       setSelectedYears((current) => ({
                         start: Math.min(current?.start ?? end, end),
                         end,
@@ -831,7 +917,12 @@ export default function TrendsExplorer({
                 {selectedYears && (
                   <button
                     type="button"
-                    onClick={() => setSelectedYears(null)}
+                    onClick={() => {
+                      captureExplorerAction('year_filter_cleared', {
+                        hasYearFilter: false,
+                      })
+                      setSelectedYears(null)
+                    }}
                     className={`rounded-[4px] px-2 py-1 text-[11px] font-semibold ${MUTED} hover:text-foreground`}
                   >
                     Clear range
@@ -861,12 +952,16 @@ export default function TrendsExplorer({
                           type="button"
                           aria-pressed={active}
                           aria-label={`${active ? 'Hide' : 'Show'} ${item.term} series`}
-                          onClick={() =>
+                          onClick={() => {
+                            captureExplorerAction('chart_series_toggled', {
+                              enabledSeriesCount:
+                                enabledSeries.length + (active ? -1 : 1),
+                            })
                             setChartEnabled((current) => ({
                               ...current,
                               [item.term]: !current[item.term],
                             }))
-                          }
+                          }}
                           className="inline-flex items-center gap-1.5 py-1.5 pl-2.5 pr-1.5"
                         >
                           <span
@@ -920,6 +1015,7 @@ export default function TrendsExplorer({
               <button
                 type="button"
                 onClick={() => {
+                  captureExplorerAction('evidence_refreshed')
                   setRequestedYears(selectedYears)
                   setRefreshKey((key) => key + 1)
                 }}
@@ -946,12 +1042,17 @@ export default function TrendsExplorer({
                       <button
                         type="button"
                         aria-label={filterLabel(term, filter)}
-                        onClick={() =>
+                        onClick={() => {
+                          captureExplorerAction('evidence_filter_toggled', {
+                            includedSeriesCount:
+                              includeTerms.length +
+                              (filter === 'include' ? -1 : 1),
+                          })
                           setFeedFilters((current) => ({
                             ...current,
                             [term]: nextFeedFilter(current[term] ?? 'off'),
                           }))
-                        }
+                        }}
                         className="py-1.5 pl-2.5 pr-1.5"
                       >
                         {filter === 'include' ? '+ ' : ''}

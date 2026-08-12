@@ -69,6 +69,7 @@ describe('sanitizePostHogEvent', () => {
       distinct_id: 'user-123',
       has_query: true,
       active_filter_count: 2,
+      surface: 'advanced',
       $current_url: 'https://example.com/search?q=private-words',
       $session_entry_url: 'https://example.com/search?q=private-words',
       utm_campaign: 'archive-launch',
@@ -85,6 +86,61 @@ describe('sanitizePostHogEvent', () => {
       utm_campaign: 'archive-launch',
       has_query: true,
       active_filter_count: 2,
+      surface: 'advanced',
+    })
+  })
+
+  it.each([
+    [
+      'dashboard_destination_opened',
+      {
+        destination: 'data_export',
+        surface: 'card',
+        external: true,
+      },
+    ],
+    [
+      'tweet_card_action',
+      {
+        action: 'expand',
+        origin: 'bangers',
+        has_media: true,
+        has_quoted_tweet: false,
+        is_featured: true,
+      },
+    ],
+    [
+      'bangers_action',
+      {
+        action: 'searched',
+        has_query: true,
+        time_range: 'three_months',
+        sort: 'quotes',
+        scope: 'members',
+        result_count: 42,
+      },
+    ],
+    [
+      'trends_explorer_action',
+      {
+        action: 'terms_added',
+        series_count: 6,
+        enabled_series_count: 5,
+        included_series_count: 2,
+        has_year_filter: false,
+      },
+    ],
+    ['portal_stream_loaded_more', { loaded_tweet_count: 30, has_more: true }],
+  ])('keeps aggregate properties for %s', (eventName, properties) => {
+    const event = captureResult(eventName, {
+      ...properties,
+      query: 'do not send this',
+      tweet_id: '1234567890',
+    })
+
+    expect(sanitizePostHogEvent(event)?.properties).toEqual({
+      $geoip_disable: true,
+      ...properties,
     })
   })
 
@@ -285,11 +341,13 @@ describe('capturePostHogEventWithClient', () => {
       capturePostHogEventWithClient(client, 'archive_search_submitted', {
         has_query: true,
         active_filter_count: 0,
+        surface: 'advanced',
       }),
     ).toBe(true)
     expect(client.capture).toHaveBeenCalledWith('archive_search_submitted', {
       has_query: true,
       active_filter_count: 0,
+      surface: 'advanced',
     })
   })
 

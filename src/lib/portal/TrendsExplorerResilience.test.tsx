@@ -7,7 +7,13 @@ import userEvent from '@testing-library/user-event'
 import TrendsExplorer from '@/components/portal/TrendsExplorer'
 import { emptyPortalTrends } from './trendConfig'
 import type { PortalTrends } from './types'
+import { capturePostHogEvent } from '@/lib/posthog'
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
+
+jest.mock('@/lib/posthog', () => ({
+  capturePostHogEvent: jest.fn(),
+}))
+const mockCapturePostHogEvent = capturePostHogEvent as jest.Mock
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
@@ -56,6 +62,10 @@ function feedTweet(id: string, year: number) {
 }
 
 describe('TrendsExplorer request isolation', () => {
+  beforeEach(() => {
+    mockCapturePostHogEvent.mockReset()
+  })
+
   afterEach(() => {
     jest.useRealTimers()
     jest.restoreAllMocks()
@@ -155,6 +165,16 @@ describe('TrendsExplorer request isolation', () => {
       name: 'tpot is included. Click to turn it off.',
     })
     await user.click(included)
+    expect(mockCapturePostHogEvent).toHaveBeenCalledWith(
+      'trends_explorer_action',
+      {
+        action: 'evidence_filter_toggled',
+        series_count: 1,
+        enabled_series_count: 1,
+        included_series_count: 0,
+        has_year_filter: false,
+      },
+    )
     expect(
       screen.getByRole('button', {
         name: 'tpot is off. Click to include it.',
@@ -163,6 +183,16 @@ describe('TrendsExplorer request isolation', () => {
     expect(screen.queryByText(/exclude/i)).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Remove tpot trend' }))
+    expect(mockCapturePostHogEvent).toHaveBeenLastCalledWith(
+      'trends_explorer_action',
+      {
+        action: 'term_removed',
+        series_count: 0,
+        enabled_series_count: 0,
+        included_series_count: 0,
+        has_year_filter: false,
+      },
+    )
     expect(
       screen.queryByRole('button', { name: 'Remove tpot trend' }),
     ).not.toBeInTheDocument()

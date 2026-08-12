@@ -19,6 +19,7 @@ import type {
   PortalBangersSort,
   PortalTweet,
 } from '@/lib/portal/types'
+import { capturePostHogEvent } from '@/lib/posthog'
 import { CARD, MUTED } from './styles'
 
 interface BangersExplorerProps {
@@ -38,6 +39,44 @@ const activeSegmentClassName =
   'border-zinc-800 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-950'
 const idleSegmentClassName =
   'border-zinc-300 bg-transparent text-zinc-600 hover:border-zinc-500 hover:text-zinc-950 dark:border-[#3a3a40] dark:text-[#a7a7b4] dark:hover:border-zinc-500 dark:hover:text-white'
+
+type BangersAction =
+  | 'filters_cleared'
+  | 'load_more_clicked'
+  | 'retry_clicked'
+  | 'scope_changed'
+  | 'searched'
+  | 'time_filter_changed'
+
+function captureBangersAction({
+  action,
+  query,
+  scope,
+  sort,
+  year,
+  period,
+  resultCount,
+}: {
+  action: BangersAction
+  query: string
+  scope: PortalBangersScope
+  sort: PortalBangersSort
+  year?: number
+  period?: PortalBangersPeriod
+  resultCount: number
+}) {
+  capturePostHogEvent('bangers_action', {
+    action,
+    has_query: Boolean(query.trim()),
+    time_range:
+      period === 'three-months'
+        ? 'three_months'
+        : (period ?? (year === undefined ? 'all' : 'year')),
+    sort,
+    scope,
+    result_count: resultCount,
+  })
+}
 
 function matchesQuery(tweet: PortalTweet, query: string): boolean {
   const normalized = query.trim().toLocaleLowerCase()
@@ -208,6 +247,17 @@ export function BangersExplorer({
             ? result.tweets
             : dedupeTweets([...current.tweets, ...result.tweets]),
         }))
+        if (replace) {
+          captureBangersAction({
+            action: 'searched',
+            query: requestQuery,
+            scope,
+            sort,
+            year,
+            period,
+            resultCount: result.pagination.totalAvailable,
+          })
+        }
       } catch (error) {
         if (controller.signal.aborted) return
         if (requestVersion === requestVersionRef.current) {
@@ -294,6 +344,15 @@ export function BangersExplorer({
     query.trim().length > 0 || year !== undefined || period !== undefined
   const selectedTime = period ?? (year === undefined ? 'all' : `year-${year}`)
   const clearFilters = () => {
+    captureBangersAction({
+      action: 'filters_cleared',
+      query,
+      scope,
+      sort,
+      year,
+      period,
+      resultCount: page.pagination.totalAvailable,
+    })
     setQuery('')
     if (year !== undefined || period !== undefined) {
       setIsNavigating(true)
@@ -364,6 +423,15 @@ export function BangersExplorer({
                 const nextYear = value.startsWith('year-')
                   ? Number(value.slice(5))
                   : undefined
+                captureBangersAction({
+                  action: 'time_filter_changed',
+                  query,
+                  scope,
+                  sort,
+                  year: nextYear,
+                  period: nextPeriod,
+                  resultCount: page.pagination.totalAvailable,
+                })
                 setIsNavigating(true)
                 router.push(
                   bangersHref({
@@ -427,6 +495,17 @@ export function BangersExplorer({
                   })}
                   onClick={(event) => {
                     const href = event.currentTarget.getAttribute('href')
+                    if (scope !== 'all') {
+                      captureBangersAction({
+                        action: 'scope_changed',
+                        query,
+                        scope: 'all',
+                        sort,
+                        year,
+                        period,
+                        resultCount: page.pagination.totalAvailable,
+                      })
+                    }
                     if (
                       event.button === 0 &&
                       !event.metaKey &&
@@ -458,6 +537,17 @@ export function BangersExplorer({
                   })}
                   onClick={(event) => {
                     const href = event.currentTarget.getAttribute('href')
+                    if (scope !== 'members') {
+                      captureBangersAction({
+                        action: 'scope_changed',
+                        query,
+                        scope: 'members',
+                        sort,
+                        year,
+                        period,
+                        resultCount: page.pagination.totalAvailable,
+                      })
+                    }
                     if (
                       event.button === 0 &&
                       !event.metaKey &&
@@ -586,7 +676,18 @@ export function BangersExplorer({
           </p>
           <button
             type="button"
-            onClick={retryLoad}
+            onClick={() => {
+              captureBangersAction({
+                action: 'retry_clicked',
+                query,
+                scope,
+                sort,
+                year,
+                period,
+                resultCount: page.pagination.totalAvailable,
+              })
+              retryLoad()
+            }}
             className="mt-2 text-[12px] font-semibold text-brand hover:underline"
           >
             Try again
@@ -602,7 +703,18 @@ export function BangersExplorer({
         >
           <button
             type="button"
-            onClick={loadMore}
+            onClick={() => {
+              captureBangersAction({
+                action: 'load_more_clicked',
+                query,
+                scope,
+                sort,
+                year,
+                period,
+                resultCount: page.pagination.totalAvailable,
+              })
+              loadMore()
+            }}
             disabled={isLoading || query.trim() !== loadedQuery}
             className="inline-flex items-center gap-2 rounded-[3px] border border-zinc-300 bg-transparent px-4 py-2 text-[12.5px] font-semibold hover:border-brand hover:text-brand disabled:cursor-wait disabled:opacity-60 dark:border-[#3a3a40]"
           >

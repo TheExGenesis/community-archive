@@ -52,10 +52,13 @@ describe('tweet detail navigation', () => {
     })
   })
 
-  it('maps homepage, Trends, and Search origins to honest labels', () => {
+  it('maps homepage, stream, Trends, and Search origins to honest labels', () => {
     expect(getTweetBackLink({ from: 'home', returnTo: '/' }).label).toBe(
       'Back to homepage',
     )
+    expect(
+      getTweetBackLink({ from: 'stream', returnTo: '/stream' }).label,
+    ).toBe('Back to live stream')
     expect(
       getTweetBackLink({ from: 'trends', returnTo: '/trends' }).label,
     ).toBe('Back to Trends')

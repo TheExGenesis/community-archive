@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { PortalMedia, PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 const HUES = [262, 32, 145, 4, 155, 200, 217, 88, 240, 190, 340, 45, 280, 20]
 const FEATURED_CARD_HOVER =
@@ -149,6 +150,7 @@ function QuotedTweet({
   noClamp,
   origin,
   returnTo,
+  onOpen,
 }: {
   tweet: PortalQuotedTweet
   compact: boolean
@@ -156,6 +158,7 @@ function QuotedTweet({
   noClamp: boolean
   origin?: TweetOrigin
   returnTo?: string
+  onOpen: () => void
 }) {
   if (tweet.isDeleted) {
     return (
@@ -171,6 +174,7 @@ function QuotedTweet({
     <div className="mt-2 rounded-[4px] border border-zinc-200 bg-white p-2.5 dark:border-[#303036] dark:bg-[#18181b]">
       <Link
         href={tweetPermalinkHref(tweet.id, origin, returnTo)}
+        onClick={onOpen}
         className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         <div className="flex items-center gap-2">
@@ -223,9 +227,11 @@ export interface TweetCardProps {
 function ArchivedQuotesMetric({
   count,
   href,
+  onOpen,
 }: {
   count: number
   href: string
+  onOpen: () => void
 }) {
   return (
     <TooltipProvider delayDuration={150}>
@@ -233,6 +239,7 @@ function ArchivedQuotesMetric({
         <TooltipTrigger asChild>
           <Link
             href={href}
+            onClick={onOpen}
             aria-label={`${count} archived quotes. Open tweet to see them.`}
             className="inline-flex items-center gap-1 rounded-sm text-zinc-500 transition-colors hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 dark:text-[#a7a7b4] dark:hover:text-zinc-200"
           >
@@ -270,6 +277,22 @@ export function TweetRow({
   const href = tweetPermalinkHref(tweet.id, origin, returnTo)
   const isFeatured = featuredRank !== undefined
   const isClickable = clickable || isFeatured
+  const captureAction = (
+    action:
+      | 'collapse'
+      | 'expand'
+      | 'open'
+      | 'open_archived_quotes'
+      | 'open_quoted_tweet',
+  ) => {
+    capturePostHogEvent('tweet_card_action', {
+      action,
+      origin: origin ?? 'unknown',
+      has_media: imageMedia(tweet.media).length > 0,
+      has_quoted_tweet: Boolean(tweet.quotedTweet),
+      is_featured: isFeatured,
+    })
+  }
   const rowClassName = isFeatured
     ? `relative flex min-w-0 gap-3 rounded-lg border border-zinc-200/75 bg-white p-4 shadow-sm dark:border-[#303036]/80 dark:bg-[#1b1b1e] sm:gap-3.5 sm:p-5 ${FEATURED_CARD_HOVER} ${
         animate ? 'portal-slide-in' : ''
@@ -278,7 +301,10 @@ export function TweetRow({
         animate ? 'portal-slide-in' : ''
       }`
 
-  const activateCard = () => router.push(href)
+  const activateCard = () => {
+    captureAction('open')
+    router.push(href)
+  }
   const handleCardClick = (event: MouseEvent<HTMLElement>) => {
     if (!isClickable) return
     const target = event.target as HTMLElement
@@ -333,6 +359,7 @@ export function TweetRow({
     <div className="min-w-0 flex-1">
       <Link
         href={href}
+        onClick={() => captureAction('open')}
         className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         {tweetContent}
@@ -341,7 +368,10 @@ export function TweetRow({
         <button
           type="button"
           aria-expanded={isExpanded}
-          onClick={() => setIsExpanded((expanded) => !expanded)}
+          onClick={() => {
+            captureAction(isExpanded ? 'collapse' : 'expand')
+            setIsExpanded((expanded) => !expanded)
+          }}
           className="mt-1 text-[12px] font-semibold text-brand hover:underline"
         >
           {isExpanded ? 'Show less' : 'Read more'}
@@ -356,12 +386,17 @@ export function TweetRow({
           noClamp={noClamp}
           origin={origin}
           returnTo={returnTo}
+          onOpen={() => captureAction('open_quoted_tweet')}
         />
       )}
       {!compact && (
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
           {tweet.quoteCount !== undefined && (
-            <ArchivedQuotesMetric count={tweet.quoteCount} href={href} />
+            <ArchivedQuotesMetric
+              count={tweet.quoteCount}
+              href={href}
+              onOpen={() => captureAction('open_archived_quotes')}
+            />
           )}
           <span>♥ {formatCount(tweet.likes)}</span>
           <span>⇄ {formatCount(tweet.rts)}</span>
@@ -384,7 +419,11 @@ export function TweetRow({
       tabIndex={isClickable ? 0 : undefined}
       aria-label={isClickable ? `View tweet by @${tweet.username}` : undefined}
     >
-      <Link href={href} aria-label={`View tweet by @${tweet.username}`}>
+      <Link
+        href={href}
+        onClick={() => captureAction('open')}
+        aria-label={`View tweet by @${tweet.username}`}
+      >
         <TweetAvatar tweet={tweet} size={isFeatured ? 38 : 34} />
       </Link>
       {details}

@@ -80,6 +80,7 @@ export default function AdvancedSearchForm() {
     capturePostHogEvent('archive_search_submitted', {
       has_query: Boolean(query.trim()),
       active_filter_count: activeFilters.length,
+      surface: 'advanced',
     })
     router.push(params.size > 0 ? `/search?${params.toString()}` : '/search')
   }

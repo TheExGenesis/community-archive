@@ -13,14 +13,14 @@ few stable event families by an `action`, `destination`, or `origin` property.
 
 ## Event catalog
 
-| Event | Covers | Main breakdowns |
-| --- | --- | --- |
-| `archive_search_submitted` | Homepage and advanced archive searches | `surface`, `has_query`, `active_filter_count` |
-| `dashboard_destination_opened` | Dashboard panel links, research, tools, Best Strands, and the Parquet export | `destination`, `surface`, `external` |
-| `tweet_card_action` | Opening, expanding, collapsing, opening quoted tweets, and opening archived quotes | `action`, `origin`, media/quote/featured booleans |
-| `bangers_action` | Search, time/rank/author filters, clear, load more, and retry | `action`, `time_range`, `sort`, `scope`, `result_count` |
-| `trends_explorer_action` | Add/reactivate/remove terms, chart and evidence filters, year ranges, scale, refresh, and retry | `action`, series counts, `has_year_filter` |
-| `portal_stream_loaded_more` | Reaching and successfully loading another live-stream page | `loaded_tweet_count`, `has_more` |
+| Event                          | Covers                                                                                          | Main breakdowns                                         |
+| ------------------------------ | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `archive_search_submitted`     | Homepage and advanced archive searches                                                          | `surface`, `has_query`, `active_filter_count`           |
+| `dashboard_destination_opened` | Dashboard panel links, research, tools, Best Strands, and the Parquet export                    | `destination`, `surface`, `external`                    |
+| `tweet_card_action`            | Opening, expanding, collapsing, opening quoted tweets, and opening archived quotes              | `action`, `origin`, media/quote/featured booleans       |
+| `bangers_action`               | Search, time/author filters, clear, load more, and retry                                        | `action`, `time_range`, `sort`, `scope`, `result_count` |
+| `trends_explorer_action`       | Add/reactivate/remove terms, chart and evidence filters, year ranges, scale, refresh, and retry | `action`, series counts, `has_year_filter`              |
+| `portal_stream_loaded_more`    | Reaching and successfully loading another live-stream page                                      | `loaded_tweet_count`, `has_more`                        |
 
 The stream now marks tweet links with `origin=stream`, so the tweet detail page
 can return readers to the live stream and PostHog can distinguish stream opens.

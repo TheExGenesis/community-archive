@@ -41,12 +41,12 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
     const tweet = tree.tweets[tweetId]
     const children = tree.children[tweetId] || []
     const isHighlighted = highlightTweetId === tweetId
+    // Descendants inherit this first reply wrapper, keeping the rail visible
+    // without consuming more horizontal space at every level.
+    const replyRail = depth === 1 ? 'border-l-2 border-border pl-3 sm:pl-4' : ''
 
     return (
-      <div
-        key={tweetId}
-        className={`thread-tweet-container ${depth > 0 ? 'ml-3 border-l-2 border-border pl-3 sm:ml-8 sm:pl-4' : ''}`}
-      >
+      <div key={tweetId} className={`thread-tweet-container ${replyRail}`}>
         {tweet.is_deleted_placeholder ? (
           // Tombstone — deleted from the archive AND syndication couldn't find it.
           <div className="mb-4 rounded-lg border border-dashed border-border bg-muted p-4 text-sm italic text-muted-foreground dark:bg-card">

@@ -147,6 +147,7 @@ function QuotedTweet({
   tweet,
   compact,
   summary,
+  noClamp,
   origin,
   returnTo,
   onOpen,
@@ -154,6 +155,7 @@ function QuotedTweet({
   tweet: PortalQuotedTweet
   compact: boolean
   summary: boolean
+  noClamp: boolean
   origin?: TweetOrigin
   returnTo?: string
   onOpen: () => void
@@ -185,7 +187,7 @@ function QuotedTweet({
           </div>
         </div>
         <div
-          className={`${condensed ? 'line-clamp-3' : ''} mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-zinc-700 dark:text-[#d9d9de]`}
+          className={`${condensed && !noClamp ? 'line-clamp-3' : ''} mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-zinc-700 dark:text-[#d9d9de]`}
         >
           {decodeTweetText(tweet.text)}
         </div>
@@ -212,6 +214,7 @@ export interface TweetCardProps {
   animate?: boolean
   compact?: boolean
   collapsible?: boolean
+  noClamp?: boolean
   featuredRank?: number
   showDate?: boolean
   showArchivedBadge?: boolean
@@ -259,6 +262,7 @@ export function TweetRow({
   animate = false,
   compact = false,
   collapsible = false,
+  noClamp = false,
   featuredRank,
   showDate = false,
   showArchivedBadge = false,
@@ -269,7 +273,7 @@ export function TweetRow({
 }: TweetCardProps) {
   const router = useRouter()
   const [isExpanded, setIsExpanded] = useState(false)
-  const canExpand = collapsible && tweet.text.length > 280
+  const canExpand = collapsible && !noClamp && tweet.text.length > 280
   const href = tweetPermalinkHref(tweet.id, origin, returnTo)
   const isFeatured = featuredRank !== undefined
   const isClickable = clickable || isFeatured
@@ -332,10 +336,18 @@ export function TweetRow({
       <div
         className={`mt-0.5 leading-relaxed text-zinc-700 dark:text-[#d9d9de] ${
           compact
-            ? 'line-clamp-2 text-[13.5px]'
-            : `${isFeatured ? 'text-[14.5px]' : 'text-[14px]'} ${
-                canExpand && !isExpanded ? 'line-clamp-5' : ''
-              }`
+            ? 'text-[13.5px]'
+            : isFeatured
+              ? 'text-[14.5px]'
+              : 'text-[14px]'
+        } ${
+          noClamp
+            ? ''
+            : compact
+              ? 'line-clamp-2'
+              : canExpand && !isExpanded
+                ? 'line-clamp-5'
+                : ''
         }`}
       >
         {decodeTweetText(tweet.text)}
@@ -371,6 +383,7 @@ export function TweetRow({
           tweet={tweet.quotedTweet}
           compact={compact}
           summary={quotedTweetDisplay === 'summary'}
+          noClamp={noClamp}
           origin={origin}
           returnTo={returnTo}
           onOpen={() => captureAction('open_quoted_tweet')}

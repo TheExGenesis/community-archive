@@ -16,6 +16,7 @@ import Image from 'next/image'
 import TweetList from '@/components/TweetList'
 import { FilterCriteria } from '@/lib/queries/tweetQueries'
 import { Archive, Radio } from 'lucide-react'
+import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 
 // Style constants (glows removed)
 const unifiedDeepBlueBase = 'bg-card dark:bg-background'
@@ -31,7 +32,10 @@ const UserProfile = ({ userData }: { userData: FormattedUser }) => {
       <div className="flex flex-col items-center space-y-4 sm:flex-row sm:items-start sm:space-x-6 sm:space-y-0">
         <Avatar className="h-24 w-24 ring-2 ring-brand ring-offset-2 dark:ring-offset-background sm:h-28 sm:w-28">
           <AvatarImage
-            src={account.avatar_media_url || '/placeholder.jpg'}
+            src={
+              getHighResolutionAvatarUrl(account.avatar_media_url) ||
+              '/placeholder.jpg'
+            }
             alt={`${account.account_display_name}'s avatar`}
           />
           <AvatarFallback className="text-3xl">

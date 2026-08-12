@@ -84,7 +84,6 @@ const isBangersAction = isOneOf([
   'retry_clicked',
   'scope_changed',
   'searched',
-  'sort_changed',
   'time_filter_changed',
 ])
 const isBangersTimeRange = isOneOf([

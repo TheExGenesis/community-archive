@@ -721,6 +721,7 @@ export default function Portal({
                       key={t.id}
                       tweet={t}
                       compact
+                      noClamp
                       animate={i === 0}
                       clickable
                       origin="home"

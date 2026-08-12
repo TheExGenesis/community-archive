@@ -84,6 +84,25 @@ export interface TermSeries {
   perYear: number[]
 }
 
+export type TrendGranularity = 'year' | 'month'
+
+export interface TrendBucketSeries {
+  term: string
+  color: string
+  /** raw matching tweet counts, one entry per bucket */
+  tweetsPerBucket: number[]
+  /** occurrences per 100k tweets, one entry per bucket */
+  perBucket: number[]
+}
+
+export interface PortalTrendSeries {
+  granularity: TrendGranularity
+  /** YYYY for yearly data and YYYY-MM for monthly data */
+  buckets: string[]
+  series: TrendBucketSeries[]
+  computedAt: string
+}
+
 export interface PortalTrends {
   years: number[]
   series: TermSeries[]

@@ -134,10 +134,9 @@ export const getPrimaryNav = (isMember: boolean): NavItem[] =>
         { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
         { href: '/trends', label: 'Trends' },
         { href: '/research', label: 'Research' },
-        { href: '/tools', label: 'Tools' },
       ]
     : [
-        { href: '/#products', label: 'Tools' },
+        { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
         { href: '/user-dir', label: 'Library' },
         { href: '/docs', label: 'Docs' },
         { href: '/#upload-archive', label: 'Upload archive' },

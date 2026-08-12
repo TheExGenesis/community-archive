@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { FaDatabase, FaExternalLinkAlt } from 'react-icons/fa'
+import { FaDatabase, FaExternalLinkAlt, FaUsers } from 'react-icons/fa'
 import {
   PortalData,
   PortalTweet,
@@ -10,7 +10,6 @@ import {
   RESEARCH_SOURCE,
 } from '@/lib/portal/types'
 import { PORTAL_ARTICLES } from './articles'
-import { PORTAL_TOOLS } from './tools'
 import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
 import TweetCard from '@/components/TweetCard'
 import {
@@ -23,7 +22,6 @@ import {
   liveCounterRefreshInterval,
   PORTAL_STREAM_POLL_INTERVAL_MS,
 } from './live'
-import HomepageSearch from '@/components/HomepageSearch'
 import {
   comparePortalTweetChronology,
   selectHomepageStream,
@@ -36,17 +34,17 @@ export type PortalView = 'home' | 'stream'
 const HOME_LIVE_STREAM_LIMIT = 12
 const ARCHIVE_EXPORT_URL =
   'https://github.com/TheExGenesis/community-archive/releases/tag/data_export'
+const COMMUNITY_BUILDS_URL =
+  'https://x.com/exgenesis/status/1835411943735140798'
 
 type DashboardDestination =
   | 'all_time_bangers'
-  | 'best_strands'
+  | 'community_builds'
   | 'data_export'
   | 'live_stream'
   | 'recent_bangers'
   | 'research'
   | 'research_article'
-  | 'tool'
-  | 'tools'
   | 'trends'
 
 function captureDashboardDestination(
@@ -66,6 +64,9 @@ const compact = (n: number) =>
     notation: 'compact',
     maximumFractionDigits: 1,
   }).format(n)
+
+const signInHref = (returnTo: string) =>
+  `/login?redirect=${encodeURIComponent(returnTo)}`
 
 const fmtDelta = (term: TermWeek) => {
   if (term.status === 'new') return 'new'
@@ -431,9 +432,13 @@ function LiveStreamHeading({
 export default function Portal({
   data,
   view,
+  isMember = true,
+  embedded = false,
 }: {
   data: PortalData
   view: PortalView
+  isMember?: boolean
+  embedded?: boolean
 }) {
   const { stats, trends } = data
 
@@ -614,7 +619,6 @@ export default function Portal({
     [withDelta],
   )
 
-  const bestStrands = PORTAL_TOOLS.find((t) => t.name === 'Best Strands')
   const recentBanger = data.recentBangers[0] ?? null
   const historicalBanger = data.historicalBangers[0] ?? null
 
@@ -631,65 +635,13 @@ export default function Portal({
     ).padStart(2, '0')} UTC`
   }, [stats.generatedAt])
 
+  const Root = embedded ? 'div' : 'main'
+
   return (
-    <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
+    <Root className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
       {/* ------------------------------------------------ Home ---------- */}
       {view === 'home' && (
         <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
-          {/* Hero: same gist as the logged-out homepage */}
-          <div className="mx-auto mb-40 mt-36 w-full max-w-[48rem] space-y-3 text-center">
-            <h1
-              className="text-6xl font-bold tracking-tight text-foreground"
-              style={SERIF}
-            >
-              Community Archive
-            </h1>
-            <p className="text-xl leading-8 text-zinc-500 dark:text-[#a7a7b4]">
-              {data.failures.liveAnalytics || data.failures.memberCount ? (
-                <>
-                  We preserve public conversations as open source
-                  infrastructure.
-                </>
-              ) : (
-                <>
-                  We preserve{' '}
-                  <strong className="font-semibold text-foreground">
-                    {compact(stats.totalTweets)} public tweets
-                  </strong>{' '}
-                  from{' '}
-                  <strong className="font-semibold text-foreground">
-                    {stats.accountCount.toLocaleString('en-US')} community
-                    members
-                  </strong>
-                  .
-                </>
-              )}
-            </p>
-            <p className={`text-xs ${FAINT}`}>
-              Backed by{' '}
-              <a
-                href="https://survivalandflourishing.fund/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`font-medium ${MUTED} transition-colors hover:text-brand hover:underline`}
-              >
-                Survival and Flourishing Fund
-              </a>{' '}
-              and{' '}
-              <a
-                href="https://x.com/VitalikButerin"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`font-medium ${MUTED} transition-colors hover:text-brand hover:underline`}
-              >
-                Vitalik Buterin
-              </a>
-            </p>
-            <div className="pt-4">
-              <HomepageSearch />
-            </div>
-          </div>
-
           <ArchiveOverview
             stats={stats}
             generatedDate={generatedDate}
@@ -745,8 +697,8 @@ export default function Portal({
                 <PanelHeader
                   title="Trending terms · 7 days"
                   action={{
-                    label: 'Trends explorer',
-                    href: '/trends',
+                    label: isMember ? 'Trends explorer' : 'Sign in for Trends',
+                    href: isMember ? '/trends' : signInHref('/trends'),
                     analyticsDestination: 'trends',
                   }}
                 />
@@ -954,41 +906,6 @@ export default function Portal({
                   )}
                 </div>
               </div>
-              {bestStrands && (
-                <a
-                  href={bestStrands.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() =>
-                    captureDashboardDestination('best_strands', 'card', true)
-                  }
-                  className={`${CARD} group overflow-hidden transition-colors hover:border-brand/60`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={bestStrands.image}
-                    alt={`${bestStrands.name} preview`}
-                    loading="lazy"
-                    className="aspect-[2/1] w-full border-b border-zinc-200 object-cover dark:border-[#26262a]"
-                  />
-                  <div className="flex items-start gap-2.5 px-4 py-3">
-                    <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
-                      {bestStrands.icon}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-[13.5px] font-bold">
-                        {bestStrands.name}
-                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
-                      </span>
-                      <span
-                        className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
-                      >
-                        {bestStrands.description}
-                      </span>
-                    </span>
-                  </div>
-                </a>
-              )}
               <a
                 href={ARCHIVE_EXPORT_URL}
                 target="_blank"
@@ -1015,54 +932,32 @@ export default function Portal({
                   Download →
                 </span>
               </a>
-            </div>
-          </div>
-
-          {/* Tools */}
-          <div id="products" className={`${CARD} mt-4 scroll-mt-32`}>
-            <PanelHeader
-              title="Explore the archive"
-              action={{
-                label: 'All tools',
-                href: '/tools',
-                analyticsDestination: 'tools',
-              }}
-              divider={false}
-            />
-            <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 lg:grid-cols-4">
-              {PORTAL_TOOLS.filter(
-                (t) =>
-                  !t.image &&
-                  !['Banger Bot', 'Highlights Bot'].includes(t.name),
-              ).map((tool) => (
-                <a
-                  key={tool.name}
-                  href={tool.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() =>
-                    captureDashboardDestination('tool', 'card', true)
-                  }
-                  className="group rounded-[4px] border border-zinc-200 bg-zinc-50 px-3 py-2.5 transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#121214] dark:hover:border-brand/60"
-                >
-                  <div className="flex items-start gap-2.5">
-                    <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
-                      {tool.icon}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-[13px] font-bold">
-                        {tool.name}
-                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
-                      </span>
-                      <span
-                        className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
-                      >
-                        {tool.description}
-                      </span>
-                    </span>
-                  </div>
-                </a>
-              ))}
+              <a
+                href={COMMUNITY_BUILDS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() =>
+                  captureDashboardDestination('community_builds', 'card', true)
+                }
+                className={`${CARD} group flex items-center gap-3 px-4 py-4 transition-colors hover:border-brand/60`}
+              >
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[4px] border border-zinc-200 bg-zinc-50 text-brand dark:border-[#2a2a2e] dark:bg-[#121214]">
+                  <FaUsers className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13.5px] font-bold">
+                    Community Builds
+                  </span>
+                  <span
+                    className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
+                  >
+                    Projects made with Community Archive data
+                  </span>
+                </span>
+                <span className="flex-shrink-0 text-[12px] font-semibold text-brand">
+                  Explore →
+                </span>
+              </a>
             </div>
           </div>
         </div>
@@ -1138,7 +1033,7 @@ export default function Portal({
           </div>
         </div>
       )}
-    </main>
+    </Root>
   )
 }
 

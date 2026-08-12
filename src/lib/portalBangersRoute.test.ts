@@ -1,24 +1,19 @@
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/portal/bangers/route'
-import { getIsMember } from '@/lib/portal/auth'
 import { getPortalBangersPage } from '@/lib/portal/data'
 
-jest.mock('@/lib/portal/auth', () => ({ getIsMember: jest.fn() }))
 jest.mock('@/lib/portal/data', () => ({
   getPortalBangersPage: jest.fn(),
   PORTAL_BANGERS_PAGE_SIZE: 30,
 }))
 
-const getIsMemberMock = getIsMember as jest.MockedFunction<typeof getIsMember>
 const getPortalBangersPageMock = getPortalBangersPage as jest.MockedFunction<
   typeof getPortalBangersPage
 >
 
 describe('portal bangers route', () => {
   beforeEach(() => {
-    getIsMemberMock.mockReset()
     getPortalBangersPageMock.mockReset()
-    getIsMemberMock.mockResolvedValue(true)
     getPortalBangersPageMock.mockResolvedValue({
       tweets: [],
       pagination: {
@@ -33,15 +28,14 @@ describe('portal bangers route', () => {
     })
   })
 
-  test('requires a signed-in member', async () => {
-    getIsMemberMock.mockResolvedValue(false)
-
+  test('serves public bangers with shared-cache headers', async () => {
     const response = await GET(
       new NextRequest('https://community-archive.org/api/portal/bangers'),
     )
 
-    expect(response.status).toBe(401)
-    expect(getPortalBangersPageMock).not.toHaveBeenCalled()
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toContain('public')
+    expect(getPortalBangersPageMock).toHaveBeenCalled()
   })
 
   test('forwards bounded paging, ranking, scope, year, and search', async () => {

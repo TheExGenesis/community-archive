@@ -30,7 +30,7 @@ export default async function TrendsPage({
 }: {
   searchParams?: Record<string, string | string[] | undefined>
 }) {
-  if (!(await getIsMember())) redirect('/')
+  if (!(await getIsMember())) redirect('/login?redirect=/trends')
   const initial = await loadPortalComponentData(
     'trends-explorer',
     getPortalTrendSnapshot,

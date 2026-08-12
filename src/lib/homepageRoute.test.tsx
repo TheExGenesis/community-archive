@@ -7,11 +7,11 @@ import { getPortalData } from '@/lib/portal/data'
 jest.mock('server-only', () => ({}), { virtual: true })
 jest.mock('@/components/home/ClassicHomepage', () => ({
   __esModule: true,
-  default: () => <div>classic homepage</div>,
-}))
-jest.mock('@/components/portal/Portal', () => ({
-  __esModule: true,
-  default: () => <div>member portal</div>,
+  default: ({ isMember, showCta }: { isMember: boolean; showCta: boolean }) => (
+    <div>
+      shared homepage · member {String(isMember)} · CTA {String(showCta)}
+    </div>
+  ),
 }))
 jest.mock('@/lib/portal/auth', () => ({ getIsMember: jest.fn() }))
 jest.mock('@/lib/portal/data', () => ({ getPortalData: jest.fn() }))
@@ -33,16 +33,29 @@ describe('Homepage OAuth actions', () => {
   it('keeps an authenticated OAuth return on the opt-in completion surface', async () => {
     const page = await Homepage({ searchParams: { action: 'optin' } })
 
-    expect(renderToStaticMarkup(page)).toContain('classic homepage')
-    expect(getIsMemberMock).not.toHaveBeenCalled()
-    expect(getPortalDataMock).not.toHaveBeenCalled()
-  })
-
-  it('renders the portal normally after the pending action is cleared', async () => {
-    const page = await Homepage({ searchParams: {} })
-
-    expect(renderToStaticMarkup(page)).toContain('member portal')
+    expect(renderToStaticMarkup(page)).toContain(
+      'shared homepage · member true · CTA true',
+    )
     expect(getIsMemberMock).toHaveBeenCalledTimes(1)
     expect(getPortalDataMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders the same dashboard without the CTA for signed-in visitors', async () => {
+    const page = await Homepage({ searchParams: {} })
+
+    expect(renderToStaticMarkup(page)).toContain(
+      'shared homepage · member true · CTA false',
+    )
+    expect(getIsMemberMock).toHaveBeenCalledTimes(1)
+    expect(getPortalDataMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders the shared dashboard with the CTA for logged-out visitors', async () => {
+    getIsMemberMock.mockResolvedValue(false)
+    const page = await Homepage({ searchParams: {} })
+
+    expect(renderToStaticMarkup(page)).toContain(
+      'shared homepage · member false · CTA true',
+    )
   })
 })

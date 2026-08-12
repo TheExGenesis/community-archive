@@ -105,6 +105,7 @@ export const getPrimaryNav = (isMember: boolean): NavItem[] =>
         { href: '/stream', label: 'Live stream' },
         { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
         { href: '/trends', label: 'Trends' },
+        { href: '/social-graph', label: 'Graph' },
         { href: '/research', label: 'Research' },
         { href: '/tools', label: 'Tools' },
       ]

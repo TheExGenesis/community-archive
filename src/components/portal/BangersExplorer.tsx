@@ -12,12 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import type {
   PortalBangersPage,
   PortalBangersPeriod,
@@ -55,6 +49,20 @@ function matchesQuery(tweet: PortalTweet, query: string): boolean {
 
 function dedupeTweets(tweets: PortalTweet[]): PortalTweet[] {
   return Array.from(new Map(tweets.map((tweet) => [tweet.id, tweet])).values())
+}
+
+function bangersHeading({
+  year,
+  period,
+}: {
+  year?: number
+  period?: PortalBangersPeriod
+}): string {
+  if (period === 'today') return 'Best of the last 24 hours'
+  if (period === 'week') return 'Best of the last 7 days'
+  if (period === 'three-months') return 'Best of the last 3 months'
+  if (year !== undefined) return `Best of ${year}`
+  return 'Best of all time'
 }
 
 function bangersHref({
@@ -126,12 +134,12 @@ export function BangersExplorer({
   const [loadedQuery, setLoadedQuery] = useState(initialQuery.trim())
   const [page, setPage] = useState(initialPage)
   const [isLoading, setIsLoading] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const loadingRef = useRef(false)
   const requestVersionRef = useRef(0)
   const requestControllerRef = useRef<AbortController | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
-  const columnLoadMoreRefs = useRef<Array<HTMLDivElement | null>>([])
   const isAllTime = allTime || (period === undefined && year === undefined)
 
   const availableYears = useMemo(() => {
@@ -151,22 +159,6 @@ export function BangersExplorer({
   const visibleTweets = useMemo(
     () => page.tweets.filter((tweet) => matchesQuery(tweet, query)),
     [page.tweets, query],
-  )
-  const masonryColumns = useMemo(
-    () =>
-      visibleTweets.reduce<
-        [
-          Array<{ tweet: PortalTweet; order: number }>,
-          Array<{ tweet: PortalTweet; order: number }>,
-        ]
-      >(
-        (columns, tweet, order) => {
-          columns[order % 2].push({ tweet, order })
-          return columns
-        },
-        [[], []],
-      ),
-    [visibleTweets],
   )
   const tweetRanks = useMemo(
     () =>
@@ -263,17 +255,15 @@ export function BangersExplorer({
   }, [loadedQuery, query, requestPage])
 
   useEffect(() => {
-    const targets = [loadMoreRef.current, ...columnLoadMoreRefs.current].filter(
-      (target): target is HTMLDivElement => Boolean(target),
-    )
-    if (targets.length === 0 || page.pagination.nextOffset === null) return
+    const target = loadMoreRef.current
+    if (!target || page.pagination.nextOffset === null) return
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) loadMore()
       },
       { rootMargin: '700px 0px' },
     )
-    targets.forEach((target) => observer.observe(target))
+    observer.observe(target)
     return () => observer.disconnect()
   }, [loadMore, page.pagination.nextOffset])
 
@@ -283,6 +273,10 @@ export function BangersExplorer({
     },
     [],
   )
+
+  useEffect(() => {
+    setIsNavigating(false)
+  }, [allTime, period, scope, sort, year])
 
   useEffect(() => {
     const nextUrl = bangersHref({
@@ -302,6 +296,7 @@ export function BangersExplorer({
   const clearFilters = () => {
     setQuery('')
     if (year !== undefined || period !== undefined) {
+      setIsNavigating(true)
       router.push(bangersHref({ query: '', scope, sort, allTime: true }))
     }
   }
@@ -316,7 +311,6 @@ export function BangersExplorer({
     period,
     allTime: isAllTime,
   })
-
   return (
     <section aria-label="Browse bangers">
       <div className={`${CARD} mb-6 p-4 shadow-sm sm:p-5`}>
@@ -370,6 +364,7 @@ export function BangersExplorer({
                 const nextYear = value.startsWith('year-')
                   ? Number(value.slice(5))
                   : undefined
+                setIsNavigating(true)
                 router.push(
                   bangersHref({
                     query,
@@ -384,9 +379,17 @@ export function BangersExplorer({
             >
               <SelectTrigger
                 aria-label="Filter by time"
-                className="h-9 w-[132px] rounded-[3px] border-zinc-300 bg-transparent px-3 text-[12px] font-semibold shadow-none focus:ring-brand/30 focus:ring-offset-0 dark:border-[#3a3a40]"
+                aria-busy={isNavigating}
+                disabled={isNavigating}
+                className="h-9 w-[148px] rounded-[3px] border-zinc-300 bg-transparent px-3 text-[12px] font-semibold shadow-none focus:ring-brand/30 focus:ring-offset-0 dark:border-[#3a3a40]"
               >
                 <SelectValue />
+                {isNavigating ? (
+                  <Loader2
+                    aria-label="Loading bangers"
+                    className="ml-auto h-3.5 w-3.5 animate-spin"
+                  />
+                ) : null}
               </SelectTrigger>
               <SelectContent className="rounded-[3px]">
                 <SelectItem value="all">All time</SelectItem>
@@ -410,63 +413,6 @@ export function BangersExplorer({
               <span
                 className={`mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
               >
-                Rank
-              </span>
-              <div className="flex">
-                <TooltipProvider delayDuration={150}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Link
-                        href={bangersHref({
-                          query,
-                          scope,
-                          sort: 'quotes',
-                          year,
-                          period,
-                          allTime: isAllTime,
-                        })}
-                        aria-current={sort === 'quotes' ? 'page' : undefined}
-                        className={`${segmentClassName} rounded-l-[3px] ${
-                          sort === 'quotes'
-                            ? activeSegmentClassName
-                            : idleSegmentClassName
-                        }`}
-                      >
-                        Best
-                      </Link>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                      Best means most quoted by distinct archive uploaders and
-                      opted-in members. Quotes by the original author do not
-                      count.
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <Link
-                  href={bangersHref({
-                    query,
-                    scope,
-                    sort: 'recent',
-                    year,
-                    period,
-                    allTime: isAllTime,
-                  })}
-                  aria-current={sort === 'recent' ? 'page' : undefined}
-                  className={`${segmentClassName} -ml-px rounded-r-[3px] ${
-                    sort === 'recent'
-                      ? activeSegmentClassName
-                      : idleSegmentClassName
-                  }`}
-                >
-                  Recent
-                </Link>
-              </div>
-            </div>
-
-            <div>
-              <span
-                className={`mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
-              >
                 Tweets by
               </span>
               <div className="flex">
@@ -479,6 +425,19 @@ export function BangersExplorer({
                     period,
                     allTime: isAllTime,
                   })}
+                  onClick={(event) => {
+                    const href = event.currentTarget.getAttribute('href')
+                    if (
+                      event.button === 0 &&
+                      !event.metaKey &&
+                      !event.ctrlKey &&
+                      !event.shiftKey &&
+                      !event.altKey &&
+                      href !== currentReturnTo
+                    ) {
+                      setIsNavigating(true)
+                    }
+                  }}
                   aria-current={scope === 'all' ? 'page' : undefined}
                   className={`${segmentClassName} rounded-l-[3px] ${
                     scope === 'all'
@@ -497,6 +456,19 @@ export function BangersExplorer({
                     period,
                     allTime: isAllTime,
                   })}
+                  onClick={(event) => {
+                    const href = event.currentTarget.getAttribute('href')
+                    if (
+                      event.button === 0 &&
+                      !event.metaKey &&
+                      !event.ctrlKey &&
+                      !event.shiftKey &&
+                      !event.altKey &&
+                      href !== currentReturnTo
+                    ) {
+                      setIsNavigating(true)
+                    }
+                  }}
                   aria-current={scope === 'members' ? 'page' : undefined}
                   className={`${segmentClassName} -ml-px rounded-r-[3px] ${
                     scope === 'members'
@@ -512,22 +484,50 @@ export function BangersExplorer({
         </div>
       </div>
 
-      <div className="min-h-7 mb-4 flex flex-wrap items-center justify-between gap-2 px-0.5">
-        <p aria-live="polite" className={`text-[12.5px] tabular-nums ${MUTED}`}>
-          {isSearching
-            ? 'Searching ranked bangers…'
-            : `Showing ${loadedCount.toLocaleString()} of ${totalCount.toLocaleString()} ranked ${totalCount === 1 ? 'tweet' : 'tweets'}`}
-          {!isSearching && period === 'today' ? ' from the last 24 hours' : ''}
-          {!isSearching && period === 'week' ? ' from the last 7 days' : ''}
-          {!isSearching && period === 'three-months'
-            ? ' from the last 3 months'
-            : ''}
-          {!isSearching && !period && year !== undefined ? ` from ${year}` : ''}
-          {!isSearching && loadedQuery ? ` matching “${loadedQuery}”` : ''}
-          {!isSearching && page.pagination.candidateRankingTruncated
-            ? ` · top ${page.pagination.snapshotSize.toLocaleString()} candidate snapshot`
-            : ''}
-        </p>
+      <div className="min-h-12 mb-4 flex flex-wrap items-end justify-between gap-2 px-0.5">
+        <div>
+          <h2 className="text-[19px] font-bold uppercase tracking-[0.035em]">
+            {bangersHeading({ year, period })}
+          </h2>
+          <p
+            aria-live="polite"
+            className={`mt-0.5 inline-flex items-center gap-1.5 text-[12.5px] tabular-nums ${MUTED}`}
+          >
+            {isNavigating ? (
+              <>
+                <Loader2
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5 animate-spin"
+                />
+                Loading bangers…
+              </>
+            ) : isSearching ? (
+              'Searching ranked bangers…'
+            ) : (
+              `Showing ${loadedCount.toLocaleString()} of ${totalCount.toLocaleString()} ranked ${totalCount === 1 ? 'tweet' : 'tweets'}`
+            )}
+            {!isNavigating && !isSearching && period === 'today'
+              ? ' from the last 24 hours'
+              : ''}
+            {!isNavigating && !isSearching && period === 'week'
+              ? ' from the last 7 days'
+              : ''}
+            {!isNavigating && !isSearching && period === 'three-months'
+              ? ' from the last 3 months'
+              : ''}
+            {!isNavigating && !isSearching && !period && year !== undefined
+              ? ` from ${year}`
+              : ''}
+            {!isNavigating && !isSearching && loadedQuery
+              ? ` matching “${loadedQuery}”`
+              : ''}
+            {!isNavigating &&
+            !isSearching &&
+            page.pagination.candidateRankingTruncated
+              ? ` · top ${page.pagination.snapshotSize.toLocaleString()} candidate snapshot`
+              : ''}
+          </p>
+        </div>
         {hasFilters ? (
           <button
             type="button"
@@ -558,38 +558,21 @@ export function BangersExplorer({
       ) : (
         <div
           data-testid="bangers-masonry"
-          className="flex flex-col lg:grid lg:grid-cols-2 lg:items-start lg:gap-5"
+          className="columns-1 gap-5 lg:columns-2 xl:columns-3"
         >
-          {masonryColumns.map((column, columnIndex) => (
+          {visibleTweets.map((tweet, order) => (
             <div
-              key={columnIndex}
-              data-testid={`bangers-masonry-column-${columnIndex}`}
-              className="contents lg:block lg:space-y-6"
+              key={tweet.id}
+              data-masonry-order={order + 1}
+              className="mb-6 break-inside-avoid"
             >
-              {column.map(({ tweet, order }) => (
-                <div
-                  key={tweet.id}
-                  data-masonry-order={order + 1}
-                  className="mb-6 lg:mb-0"
-                  style={{ order }}
-                >
-                  <TweetCard
-                    tweet={tweet}
-                    featuredRank={tweetRanks.get(tweet.id)}
-                    showDate
-                    collapsible
-                    origin="bangers"
-                    returnTo={currentReturnTo}
-                  />
-                </div>
-              ))}
-              <div
-                ref={(element) => {
-                  columnLoadMoreRefs.current[columnIndex] = element
-                }}
-                data-testid={`bangers-column-sentinel-${columnIndex}`}
-                aria-hidden="true"
-                className="hidden h-px lg:block"
+              <TweetCard
+                tweet={tweet}
+                featuredRank={tweetRanks.get(tweet.id)}
+                showDate
+                collapsible
+                origin="bangers"
+                returnTo={currentReturnTo}
               />
             </div>
           ))}
@@ -614,6 +597,7 @@ export function BangersExplorer({
       {page.pagination.nextOffset !== null ? (
         <div
           ref={loadMoreRef}
+          data-testid="bangers-load-more-sentinel"
           className="min-h-20 flex items-center justify-center py-5"
         >
           <button

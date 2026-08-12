@@ -1,7 +1,12 @@
 'use client'
 
 import React from 'react'
-import { tweetPermalinkHref, type TweetOrigin } from '@/lib/navigation'
+import Link from 'next/link'
+import {
+  tweetPermalinkHref,
+  userProfileHref,
+  type TweetOrigin,
+} from '@/lib/navigation'
 import { formatDistanceToNow } from 'date-fns'
 import {
   FaHeart,
@@ -137,6 +142,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
   let displayUsername = originalUsername
   let displayName = originalDisplayName
   let profilePicUrl = originalProfilePicUrl
+  let displayAccountId: string | undefined = tweet.account_id
 
   if (isRtFormat && rtMatch) {
     const rtUsername = rtMatch[1]
@@ -151,6 +157,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       const mentionedUser = mentionedUserRecord.mentioned_user
       displayUsername = mentionedUser.screen_name
       displayName = mentionedUser.name
+      displayAccountId = mentionedUser.user_id || undefined
 
       // Use the mentioned user's avatar if available, otherwise use placeholder
       if (mentionedUser.account?.profile?.avatar_media_url) {
@@ -164,6 +171,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       displayUsername = rtUsername
       displayName = rtUsername // fallback to username as display name
       profilePicUrl = undefined
+      displayAccountId = undefined
     }
   }
 
@@ -292,6 +300,10 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       )
     }
     const quotedProfilePic = quotedTweet.avatar_media_url
+    const quotedProfileHref = userProfileHref(
+      quotedTweet.username,
+      quotedTweet.account_id,
+    )
     // Border + marker for syndication-hydrated quotes so it's clear the data isn't
     // from this archive.
     const externalClasses = quotedTweet.from_external
@@ -310,29 +322,40 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
         <div
           className={`flex items-start ${compact ? 'space-x-2' : 'space-x-3'}`}
         >
-          <Avatar
-            className={`${compact ? 'h-6 w-6' : 'h-8 w-8'} flex-shrink-0`}
+          <Link
+            href={quotedProfileHref}
+            aria-label={`View @${quotedTweet.username}'s profile`}
+            className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <TweetAvatarImage
-              src={quotedProfilePic}
-              alt={`${quotedTweet.account_display_name}'s profile picture`}
-              username={quotedTweet.username}
-              tweetId={quotedTweet.tweet_id}
-            />
-            <AvatarFallback>
-              {quotedTweet.account_display_name?.charAt(0) ||
-                quotedTweet.username?.charAt(0) ||
-                'U'}
-            </AvatarFallback>
-          </Avatar>
+            <Avatar
+              className={`${compact ? 'h-6 w-6' : 'h-8 w-8'} flex-shrink-0`}
+            >
+              <TweetAvatarImage
+                src={quotedProfilePic}
+                alt={`${quotedTweet.account_display_name}'s profile picture`}
+                username={quotedTweet.username}
+                tweetId={quotedTweet.tweet_id}
+              />
+              <AvatarFallback>
+                {quotedTweet.account_display_name?.charAt(0) ||
+                  quotedTweet.username?.charAt(0) ||
+                  'U'}
+              </AvatarFallback>
+            </Avatar>
+          </Link>
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
-              <span className="text-sm font-bold text-foreground">
-                {quotedTweet.account_display_name}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                @{quotedTweet.username}
-              </span>
+              <Link
+                href={quotedProfileHref}
+                className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span className="text-sm font-bold text-foreground">
+                  {quotedTweet.account_display_name}
+                </span>{' '}
+                <span className="text-sm text-muted-foreground">
+                  @{quotedTweet.username}
+                </span>
+              </Link>
               <span className="text-xs text-muted-foreground">
                 •{' '}
                 {formatDistanceToNow(new Date(quotedTweet.created_at), {
@@ -465,6 +488,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       day: 'numeric',
       year: 'numeric',
     })
+    const profileHref = userProfileHref(displayUsername, displayAccountId)
 
     return (
       <div className={`${compactTweetGridClass} ${className}`}>
@@ -472,24 +496,35 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
           role="cell"
           className="col-span-2 flex min-w-0 items-center gap-2.5 md:col-span-1"
         >
-          <Avatar className="h-8 w-8 flex-shrink-0">
-            <TweetAvatarImage
-              src={profilePicUrl}
-              alt={`${displayName}'s profile picture`}
-              username={displayUsername}
-              tweetId={tweet.retweeted_tweet_id || tweet.tweet_id}
-            />
-            <AvatarFallback className="text-xs">
-              {displayName?.charAt(0) || displayUsername?.charAt(0) || 'U'}
-            </AvatarFallback>
-          </Avatar>
+          <Link
+            href={profileHref}
+            aria-label={`View @${displayUsername}'s profile`}
+            className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Avatar className="h-8 w-8 flex-shrink-0">
+              <TweetAvatarImage
+                src={profilePicUrl}
+                alt={`${displayName}'s profile picture`}
+                username={displayUsername}
+                tweetId={tweet.retweeted_tweet_id || tweet.tweet_id}
+              />
+              <AvatarFallback className="text-xs">
+                {displayName?.charAt(0) || displayUsername?.charAt(0) || 'U'}
+              </AvatarFallback>
+            </Avatar>
+          </Link>
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-sm font-semibold text-foreground">
-              {displayName}
-            </div>
-            <div className="truncate text-xs text-muted-foreground">
-              @{displayUsername}
-            </div>
+            <Link
+              href={profileHref}
+              className="block rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <div className="truncate text-sm font-semibold text-foreground">
+                {displayName}
+              </div>
+              <div className="truncate text-xs text-muted-foreground">
+                @{displayUsername}
+              </div>
+            </Link>
             {(isRetweet || isRtFormat) && (
               <div className="mt-1 flex items-center truncate text-[11px] text-muted-foreground">
                 <FaRetweet className="mr-1 flex-shrink-0" />@{originalUsername}{' '}
@@ -583,6 +618,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
     )
   }
 
+  const profileHref = userProfileHref(displayUsername, displayAccountId)
+
   return (
     <div className={className}>
       {(isRetweet || isRtFormat) && (
@@ -593,21 +630,32 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       )}
 
       <div className="mb-3 flex items-start">
-        <Avatar className="mr-3 h-11 w-11 flex-shrink-0">
-          <TweetAvatarImage
-            src={profilePicUrl}
-            alt={`${displayName}'s profile picture`}
-            username={displayUsername}
-            tweetId={tweet.retweeted_tweet_id || tweet.tweet_id}
-          />
-          <AvatarFallback>
-            {displayName?.charAt(0) || displayUsername?.charAt(0) || 'U'}
-          </AvatarFallback>
-        </Avatar>
+        <Link
+          href={profileHref}
+          aria-label={`View @${displayUsername}'s profile`}
+          className="mr-3 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Avatar className="h-11 w-11 flex-shrink-0">
+            <TweetAvatarImage
+              src={profilePicUrl}
+              alt={`${displayName}'s profile picture`}
+              username={displayUsername}
+              tweetId={tweet.retweeted_tweet_id || tweet.tweet_id}
+            />
+            <AvatarFallback>
+              {displayName?.charAt(0) || displayUsername?.charAt(0) || 'U'}
+            </AvatarFallback>
+          </Avatar>
+        </Link>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="font-bold text-foreground">{displayName}</span>
-            <span className="text-muted-foreground">@{displayUsername}</span>
+            <Link
+              href={profileHref}
+              className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span className="font-bold text-foreground">{displayName}</span>{' '}
+              <span className="text-muted-foreground">@{displayUsername}</span>
+            </Link>
             <span className="text-sm text-muted-foreground">
               •{' '}
               {formatDistanceToNow(new Date(tweet.created_at), {

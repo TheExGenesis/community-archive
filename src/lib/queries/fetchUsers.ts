@@ -3,6 +3,8 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { devLog } from '@/lib/devLog'
 import { rankUserSuggestions } from '@/lib/searchSuggestions'
 import type { UserSuggestion } from '@/lib/searchSuggestions'
+import { userProfileHref } from '@/lib/navigation'
+import { isTwitterUsername } from '@/lib/apiInputValidation'
 
 export interface FetchUsersOptions {
   limit?: number
@@ -20,7 +22,7 @@ export const buildDirectorySearchFilter = (search: string) => {
 }
 
 export const getDirectoryProfileHref = (user: DirectoryUser) =>
-  `/user/${encodeURIComponent(user.directory_id)}`
+  userProfileHref(user.username, user.directory_id)
 
 export const fetchUsers = async (
   supabase: SupabaseClient,
@@ -155,14 +157,21 @@ export const getUserData = async (
   `
 
   const isDirectoryIdentifier = /^(archive|optin):/.test(decodedIdentifier)
+  const isExplicitUsername = decodedIdentifier.startsWith('@')
+  const usernameIdentifier = isExplicitUsername
+    ? decodedIdentifier.slice(1)
+    : decodedIdentifier
+  if (isExplicitUsername && !isTwitterUsername(usernameIdentifier)) return null
   const initialQuery = supabase
     .schema('public')
     .from('user_directory')
     .select(select)
 
-  const { data: accountMatch, error: accountError } = isDirectoryIdentifier
-    ? await initialQuery.eq('directory_id', decodedIdentifier).maybeSingle()
-    : await initialQuery.eq('account_id', decodedIdentifier).maybeSingle()
+  const { data: accountMatch, error: accountError } = isExplicitUsername
+    ? { data: null, error: null }
+    : isDirectoryIdentifier
+      ? await initialQuery.eq('directory_id', decodedIdentifier).maybeSingle()
+      : await initialQuery.eq('account_id', decodedIdentifier).maybeSingle()
 
   if (accountError) throw accountError
 
@@ -172,7 +181,7 @@ export const getUserData = async (
       .schema('public')
       .from('user_directory')
       .select(select)
-      .ilike('username', decodedIdentifier)
+      .ilike('username', usernameIdentifier)
       .limit(1)
       .maybeSingle()
 

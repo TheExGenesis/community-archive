@@ -4,7 +4,23 @@ import {
   getTweetBackLink,
   isNavItemActive,
   tweetPermalinkHref,
+  userProfileHref,
 } from './navigation'
+
+describe('user profile navigation', () => {
+  it('prefers readable usernames while retaining account-ID compatibility', () => {
+    expect(userProfileHref('@archive_user', '123')).toBe(
+      '/user/%40archive_user',
+    )
+    expect(userProfileHref(undefined, '123')).toBe('/user/123')
+    expect(userProfileHref('not valid', '123')).toBe('/user/123')
+    expect(userProfileHref('123', '456')).toBe('/user/456')
+    expect(userProfileHref('a'.repeat(15), '456')).toBe(
+      `/user/%40${'a'.repeat(15)}`,
+    )
+    expect(userProfileHref('a'.repeat(16), '456')).toBe('/user/456')
+  })
+})
 
 describe('member navigation', () => {
   it('uses explicit Users, Live stream, Bangers, and Search destinations', () => {

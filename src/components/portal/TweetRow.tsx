@@ -6,7 +6,11 @@ import { useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 import ImageLightbox from '@/components/ImageLightbox'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
-import { tweetPermalinkHref, type TweetOrigin } from '@/lib/navigation'
+import {
+  tweetPermalinkHref,
+  userProfileHref,
+  type TweetOrigin,
+} from '@/lib/navigation'
 import { decodeTweetText } from '@/lib/tweetText'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -169,23 +173,38 @@ function QuotedTweet({
   }
 
   const condensed = compact || summary
+  const profileHref = userProfileHref(tweet.username, tweet.accountId)
 
   return (
     <div className="mt-2 rounded-[4px] border border-zinc-200 bg-white p-2.5 dark:border-[#303036] dark:bg-[#18181b]">
+      <div className="flex items-center gap-2">
+        <Link
+          href={profileHref}
+          aria-label={`View @${tweet.username}'s profile`}
+          className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          <TweetAvatar tweet={tweet} size={condensed ? 24 : 28} />
+        </Link>
+        <div className="min-w-0 text-[12px] leading-tight">
+          <Link
+            href={profileHref}
+            className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          >
+            <span className="font-bold">{tweet.name}</span>{' '}
+            <span className="text-zinc-500 dark:text-[#a7a7b4]">
+              @{tweet.username}
+            </span>
+          </Link>{' '}
+          <span className="text-zinc-500 dark:text-[#a7a7b4]">
+            · {relativeTime(tweet.createdAt)}
+          </span>
+        </div>
+      </div>
       <Link
         href={tweetPermalinkHref(tweet.id, origin, returnTo)}
         onClick={onOpen}
         className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
-        <div className="flex items-center gap-2">
-          <TweetAvatar tweet={tweet} size={condensed ? 24 : 28} />
-          <div className="min-w-0 text-[12px] leading-tight">
-            <span className="font-bold">{tweet.name}</span>{' '}
-            <span className="text-zinc-500 dark:text-[#a7a7b4]">
-              @{tweet.username} · {relativeTime(tweet.createdAt)}
-            </span>
-          </div>
-        </div>
         <div
           className={`${condensed && !noClamp ? 'line-clamp-3' : ''} mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-zinc-700 dark:text-[#d9d9de]`}
         >
@@ -275,6 +294,7 @@ export function TweetRow({
   const [isExpanded, setIsExpanded] = useState(false)
   const canExpand = collapsible && !noClamp && tweet.text.length > 280
   const href = tweetPermalinkHref(tweet.id, origin, returnTo)
+  const profileHref = userProfileHref(tweet.username, tweet.accountId)
   const isFeatured = featuredRank !== undefined
   const isClickable = clickable || isFeatured
   const captureAction = (
@@ -319,44 +339,50 @@ export function TweetRow({
   }
 
   const tweetContent = (
-    <>
+    <div
+      className={`mt-0.5 leading-relaxed text-zinc-700 dark:text-[#d9d9de] ${
+        compact
+          ? 'text-[13.5px]'
+          : isFeatured
+            ? 'text-[14.5px]'
+            : 'text-[14px]'
+      } ${
+        noClamp
+          ? ''
+          : compact
+            ? 'line-clamp-2'
+            : canExpand && !isExpanded
+              ? 'line-clamp-5'
+              : ''
+      }`}
+    >
+      {decodeTweetText(tweet.text)}
+    </div>
+  )
+
+  const details = (
+    <div className="min-w-0 flex-1">
       <div className="flex items-baseline gap-2 overflow-hidden">
-        <span
-          className={`truncate font-bold ${compact ? 'text-[13px]' : 'text-[13.5px]'}`}
+        <Link
+          href={profileHref}
+          className="min-w-0 rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
-          {tweet.name}
-        </span>
+          <span
+            className={`truncate font-bold ${compact ? 'text-[13px]' : 'text-[13.5px]'}`}
+          >
+            {tweet.name}
+          </span>{' '}
+          <span className="text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
+            @{tweet.username}
+          </span>
+        </Link>
         <span className="flex-shrink-0 text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
-          @{tweet.username} ·{' '}
+          ·{' '}
           {showDate
             ? shortDate(tweet.createdAt)
             : relativeTime(tweet.createdAt)}
         </span>
       </div>
-      <div
-        className={`mt-0.5 leading-relaxed text-zinc-700 dark:text-[#d9d9de] ${
-          compact
-            ? 'text-[13.5px]'
-            : isFeatured
-              ? 'text-[14.5px]'
-              : 'text-[14px]'
-        } ${
-          noClamp
-            ? ''
-            : compact
-              ? 'line-clamp-2'
-              : canExpand && !isExpanded
-                ? 'line-clamp-5'
-                : ''
-        }`}
-      >
-        {decodeTweetText(tweet.text)}
-      </div>
-    </>
-  )
-
-  const details = (
-    <div className="min-w-0 flex-1">
       <Link
         href={href}
         onClick={() => captureAction('open')}
@@ -419,11 +445,7 @@ export function TweetRow({
       tabIndex={isClickable ? 0 : undefined}
       aria-label={isClickable ? `View tweet by @${tweet.username}` : undefined}
     >
-      <Link
-        href={href}
-        onClick={() => captureAction('open')}
-        aria-label={`View tweet by @${tweet.username}`}
-      >
+      <Link href={profileHref} aria-label={`View @${tweet.username}'s profile`}>
         <TweetAvatar tweet={tweet} size={isFeatured ? 38 : 34} />
       </Link>
       {details}

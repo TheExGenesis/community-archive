@@ -350,6 +350,7 @@ export async function fetchPortalTrendEvidence(
       const createdAt = safeTimestamp(row.createdAt, 'trend tweet timestamp')
       unique.set(row.tweetId, {
         id: row.tweetId,
+        accountId: row.accountId,
         username,
         name: row.accountDisplayName || username,
         avatar: row.avatarMediaUrl || null,
@@ -443,6 +444,7 @@ export async function fetchPortalRecentBangers(
     const username = row.username || 'unknown'
     return {
       id: row.tweetId,
+      accountId: row.accountId,
       username,
       name: row.accountDisplayName || username,
       avatar: row.avatarMediaUrl || null,
@@ -484,6 +486,7 @@ function mapHistoricalBangers(
     )
     return {
       id: row.tweetId,
+      accountId: row.accountId,
       username,
       name: row.displayName || username,
       avatar: row.avatarMediaUrl || null,

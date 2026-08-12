@@ -7,6 +7,7 @@ export interface PortalMedia {
 
 export interface PortalQuotedTweet {
   id: string
+  accountId?: string
   username: string
   name: string
   avatar: string | null
@@ -20,6 +21,7 @@ export interface PortalQuotedTweet {
 
 export interface PortalTweet {
   id: string
+  accountId?: string
   username: string
   name: string
   avatar: string | null

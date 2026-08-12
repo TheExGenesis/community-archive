@@ -17,6 +17,7 @@ import TweetList from '@/components/TweetList'
 import { FilterCriteria } from '@/lib/queries/tweetQueries'
 import { Archive, Radio } from 'lucide-react'
 import { getHighResolutionAvatarUrl } from '@/lib/avatar'
+import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
 
 // Style constants (glows removed)
 const unifiedDeepBlueBase = 'bg-card dark:bg-background'
@@ -132,7 +133,9 @@ export default async function User({
   const cookieStore = cookies()
   const supabase = createServerClient(cookieStore)
 
-  const userData = await getUserData(supabase, account_id)
+  const userData =
+    (await getUserData(supabase, account_id)) ||
+    (await getClickHouseUserProfile(account_id))
 
   if (!userData) {
     // Styled error message for consistency - Removed glow and shadow

@@ -167,15 +167,51 @@ describe('ClickHouse-backed portal analytics', () => {
     expect(result.series).toEqual([
       expect.objectContaining({
         term: 'alpha',
-        tweetsPerYear: [0, 0, 0, 0, 0, 0, 0, 20],
-        perYear: [0, 0, 0, 0, 0, 0, 0, 2000],
+        tweetsPerBucket: [0, 0, 0, 0, 0, 0, 0, 20],
+        perBucket: [0, 0, 0, 0, 0, 0, 0, 2000],
       }),
       expect.objectContaining({
         term: 'beta',
-        tweetsPerYear: [0, 0, 0, 0, 0, 0, 0, 5],
-        perYear: [0, 0, 0, 0, 0, 0, 0, 500],
+        tweetsPerBucket: [0, 0, 0, 0, 0, 0, 0, 5],
+        perBucket: [0, 0, 0, 0, 0, 0, 0, 500],
       }),
     ])
+    expect(result.granularity).toBe('year')
+    expect(result.buckets.at(-1)).toBe('2026')
+  })
+
+  test('returns bounded monthly buckets for month granularity', async () => {
+    const fetcher = jest.fn(async () => ({
+      data: [
+        {
+          bucket: '2026-08-01 00:00:00.000',
+          tweets: '4',
+          totalTweets: '200',
+          ratePerThousand: 0,
+        },
+      ],
+    })) as unknown as AnalyticsFetcher
+
+    const result = await fetchPortalTrendSeries(
+      ['alpha'],
+      new Date('2026-08-07T12:00:00.000Z'),
+      fetcher,
+      'month',
+    )
+
+    expect(result.granularity).toBe('month')
+    expect(result.buckets[0]).toBe('2019-01')
+    expect(result.buckets.at(-1)).toBe('2026-08')
+    expect(result.series[0].tweetsPerBucket.at(-1)).toBe(4)
+    expect(fetcher).toHaveBeenCalledWith(
+      ['word-trend'],
+      expect.objectContaining({}),
+      { timeoutMs: 30_000 },
+    )
+    const params = (fetcher as jest.Mock).mock.calls[0][1] as URLSearchParams
+    expect(params.get('bucket')).toBe('month')
+    expect(params.get('from')).toBe('2019-01-01')
+    expect(params.get('to')).toBe('2026-09-01')
   })
 
   test('caps concurrent trend scans at the two-query gateway budget', async () => {

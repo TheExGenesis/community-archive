@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, PointerEvent as ReactPointerEvent } from 'react'
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
@@ -15,21 +15,26 @@ import type {
   TrendEvidenceCacheEntry,
   TrendEvidenceRange,
 } from '@/lib/portal/trendEvidenceCache'
-import type { PortalTrends, PortalTweet, TermSeries } from '@/lib/portal/types'
+import {
+  clampTrendRange,
+  parseTrendExplorerState,
+  serializeTrendExplorerState,
+} from '@/lib/portal/trendExplorerState'
+import type {
+  TrendExplorerUrlState,
+  TrendRange,
+} from '@/lib/portal/trendExplorerState'
+import type {
+  PortalTrends,
+  PortalTrendSeries,
+  PortalTweet,
+  TrendBucketSeries,
+  TrendGranularity,
+} from '@/lib/portal/types'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { BODY, CARD, MUTED, SERIF } from './styles'
 
 type FeedFilter = 'include' | 'off'
-type TrendScale = 'raw' | 'normalized'
-
-type SelectedYears = TrendEvidenceRange
-
-interface SeriesResponse {
-  years: number[]
-  series: TermSeries[]
-  computedAt: string
-  error?: string
-}
 
 interface FeedResponse {
   tweets: PortalTweet[]
@@ -74,17 +79,25 @@ type TrendsExplorerAction =
   | 'year_filter_applied'
   | 'year_filter_cleared'
 
-async function requestTrendSeries(terms: string[]): Promise<SeriesResponse> {
-  const params = new URLSearchParams({ view: 'series' })
+async function requestTrendSeries(
+  terms: string[],
+  granularity: TrendGranularity,
+): Promise<PortalTrendSeries> {
+  const params = new URLSearchParams({ view: 'series', granularity })
   terms.forEach((term) => params.append('q', term))
   const response = await fetch(`/api/portal/trends?${params.toString()}`)
-  const body = (await response
-    .json()
-    .catch(() => null)) as SeriesResponse | null
+  const body = (await response.json().catch(() => null)) as
+    | (PortalTrendSeries & { error?: string })
+    | null
   if (!response.ok) {
     throw new Error(body?.error || 'Could not load those trends')
   }
-  if (!body || !Array.isArray(body.years) || !Array.isArray(body.series)) {
+  if (
+    !body ||
+    body.granularity !== granularity ||
+    !Array.isArray(body.buckets) ||
+    !Array.isArray(body.series)
+  ) {
     throw new Error('The trends service returned an invalid response')
   }
   return body
@@ -92,13 +105,13 @@ async function requestTrendSeries(terms: string[]): Promise<SeriesResponse> {
 
 async function requestTrendEvidence(
   term: string,
-  selectedYears: SelectedYears | null,
+  range: TrendEvidenceRange | null,
   signal: AbortSignal,
 ): Promise<PortalTweet[]> {
   const params = new URLSearchParams({ view: 'feed', include: term })
-  if (selectedYears) {
-    params.set('since', `${selectedYears.start}-01-01`)
-    params.set('until', `${selectedYears.end + 1}-01-01`)
+  if (range) {
+    params.set('since', range.since)
+    params.set('until', range.until)
   }
   const response = await fetch(`/api/portal/trends?${params.toString()}`, {
     signal,
@@ -113,11 +126,84 @@ async function requestTrendEvidence(
   return body.tweets
 }
 
-function sameYears(
-  left: SelectedYears | null,
-  right: SelectedYears | null,
+function sameEvidenceRange(
+  left: TrendEvidenceRange | null,
+  right: TrendEvidenceRange | null,
 ): boolean {
-  return left?.start === right?.start && left?.end === right?.end
+  return left?.since === right?.since && left?.until === right?.until
+}
+
+function nextMonthStart(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number)
+  return new Date(Date.UTC(year, monthNumber, 1)).toISOString().slice(0, 10)
+}
+
+function evidenceRange(
+  range: TrendRange | null,
+  granularity: TrendGranularity,
+): TrendEvidenceRange | null {
+  if (!range) return null
+  if (granularity === 'month') {
+    return { since: `${range.start}-01`, until: nextMonthStart(range.end) }
+  }
+  return {
+    since: `${range.start}-01-01`,
+    until: `${Number(range.end) + 1}-01-01`,
+  }
+}
+
+function convertedRange(
+  range: TrendRange | null,
+  granularity: TrendGranularity,
+): TrendRange | null {
+  if (!range) return null
+  return granularity === 'month'
+    ? {
+        start: `${range.start.slice(0, 4)}-01`,
+        end: `${range.end.slice(0, 4)}-12`,
+      }
+    : { start: range.start.slice(0, 4), end: range.end.slice(0, 4) }
+}
+
+function annualSeries(initialTrends: PortalTrends): TrendBucketSeries[] {
+  return initialTrends.series.map((item) => ({
+    term: item.term,
+    color: item.color,
+    tweetsPerBucket: item.tweetsPerYear,
+    perBucket: item.perYear,
+  }))
+}
+
+function snapshotBuckets(
+  initialTrends: PortalTrends,
+  granularity: TrendGranularity,
+): string[] {
+  if (granularity === 'year') return initialTrends.years.map(String)
+  const firstYear = initialTrends.years[0]
+  const lastYear = initialTrends.years.at(-1)
+  if (firstYear === undefined || lastYear === undefined) return []
+  const computedAt = new Date(initialTrends.computedAt)
+  const lastMonth =
+    !Number.isNaN(computedAt.getTime()) &&
+    computedAt.getUTCFullYear() === lastYear
+      ? computedAt.getUTCMonth() + 1
+      : 12
+  const count = (lastYear - firstYear) * 12 + lastMonth
+  return Array.from({ length: count }, (_, index) => {
+    const year = firstYear + Math.floor(index / 12)
+    const month = (index % 12) + 1
+    return `${year}-${String(month).padStart(2, '0')}`
+  })
+}
+
+function bucketLabel(bucket: string, granularity: TrendGranularity): string {
+  if (granularity === 'year') return bucket
+  const [year, month] = bucket.split('-').map(Number)
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, 1)))
 }
 
 function niceCeiling(value: number): number {
@@ -147,30 +233,65 @@ function filterLabel(term: string, filter: FeedFilter): string {
 export default function TrendsExplorer({
   initialTrends,
   initialLoadFailed = false,
+  initialSearch = '',
 }: {
   initialTrends: PortalTrends
   initialLoadFailed?: boolean
+  initialSearch?: string
 }) {
-  const [years, setYears] = useState(initialTrends.years)
-  const [series, setSeries] = useState(initialTrends.series)
+  const initialUrlState = useRef(
+    parseTrendExplorerState(
+      initialSearch,
+      initialTrends.series.map(({ term }) => term),
+    ),
+  ).current
+  const initialAnnualSeries = useRef(annualSeries(initialTrends)).current
+  const initialAnnualByTerm = useMemo(
+    () => new Map(initialAnnualSeries.map((item) => [item.term, item])),
+    [initialAnnualSeries],
+  )
+  const initialBuckets = useRef(
+    snapshotBuckets(initialTrends, initialUrlState.granularity),
+  ).current
+  const initialSelectedRange = useRef(
+    clampTrendRange(initialUrlState.range, initialBuckets),
+  ).current
+  const [configuredTerms, setConfiguredTerms] = useState(initialUrlState.terms)
+  const [granularity, setGranularity] = useState(initialUrlState.granularity)
+  const [buckets, setBuckets] = useState<string[]>(initialBuckets)
+  const [series, setSeries] = useState<TrendBucketSeries[]>(() =>
+    initialUrlState.granularity === 'year'
+      ? initialUrlState.terms.flatMap((term) => {
+          const item = initialAnnualByTerm.get(term)
+          return item ? [item] : []
+        })
+      : [],
+  )
   const [chartEnabled, setChartEnabled] = useState<Record<string, boolean>>(
     () =>
       Object.fromEntries(
-        initialTrends.series.map(({ term }, index) => [term, index < 4]),
+        initialUrlState.terms.map((term) => [
+          term,
+          initialUrlState.shown.includes(term),
+        ]),
       ),
   )
   const [feedFilters, setFeedFilters] = useState<Record<string, FeedFilter>>(
     () =>
       Object.fromEntries(
-        initialTrends.series.map(({ term }, index) => [
+        initialUrlState.terms.map((term) => [
           term,
-          index === 0 ? 'include' : 'off',
+          initialUrlState.included.includes(term) ? 'include' : 'off',
         ]),
       ),
   )
-  const [scale, setScale] = useState<TrendScale>('normalized')
+  const [scale, setScale] = useState(initialUrlState.scale)
   const [termInput, setTermInput] = useState('')
   const [isAdding, setIsAdding] = useState(false)
+  const [isLoadingSeries, setIsLoadingSeries] = useState(
+    initialUrlState.granularity === 'month' ||
+      initialUrlState.terms.some((term) => !initialAnnualByTerm.has(term)),
+  )
   const [isRetryingDefaults, setIsRetryingDefaults] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
   const [chartError, setChartError] = useState<string | null>(
@@ -179,13 +300,19 @@ export default function TrendsExplorer({
   const [isLoadingEvidence, setIsLoadingEvidence] = useState(true)
   const [feedError, setFeedError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [selectedYears, setSelectedYears] = useState<SelectedYears | null>(null)
-  const [requestedYears, setRequestedYears] = useState<SelectedYears | null>(
-    null,
+  const [selectedRange, setSelectedRange] = useState<TrendRange | null>(
+    initialSelectedRange,
   )
+  const selectedEvidenceRange = useMemo(
+    () => evidenceRange(selectedRange, granularity),
+    [granularity, selectedRange],
+  )
+  const [requestedRange, setRequestedRange] =
+    useState<TrendEvidenceRange | null>(selectedEvidenceRange)
   const [, setEvidenceCacheVersion] = useState(0)
-  const [dragStartYear, setDragStartYear] = useState<number | null>(null)
+  const [dragStartBucket, setDragStartBucket] = useState<string | null>(null)
   const chartRef = useRef<SVGSVGElement>(null)
+  const seriesRequestIdRef = useRef(0)
   const evidenceCacheRef = useRef<Map<string, TrendEvidenceCacheEntry>>(
     new Map(),
   )
@@ -198,21 +325,45 @@ export default function TrendsExplorer({
   const evidenceRequestSignatureRef = useRef('')
   const handledRefreshKeyRef = useRef(0)
 
+  const loadConfiguredSeries = useCallback(
+    async (terms: string[], nextGranularity: TrendGranularity) => {
+      const requestId = ++seriesRequestIdRef.current
+      setIsLoadingSeries(true)
+      setChartError(null)
+      try {
+        const body = await requestTrendSeries(terms, nextGranularity)
+        if (seriesRequestIdRef.current !== requestId) return
+        setBuckets(body.buckets)
+        setSeries(body.series)
+        setSelectedRange((current) => clampTrendRange(current, body.buckets))
+      } catch (error) {
+        if (seriesRequestIdRef.current !== requestId) return
+        setChartError(
+          error instanceof Error
+            ? error.message
+            : 'The trend series could not be loaded.',
+        )
+      } finally {
+        if (seriesRequestIdRef.current === requestId) {
+          setIsLoadingSeries(false)
+        }
+      }
+    },
+    [],
+  )
+
   const enabledSeries = useMemo(
     () => series.filter(({ term }) => chartEnabled[term]),
     [chartEnabled, series],
   )
   const includeTerms = useMemo(
-    () =>
-      series
-        .map(({ term }) => term)
-        .filter((term) => feedFilters[term] === 'include'),
-    [feedFilters, series],
+    () => configuredTerms.filter((term) => feedFilters[term] === 'include'),
+    [configuredTerms, feedFilters],
   )
   const evidence = cachedTrendEvidence(
     evidenceCacheRef.current,
     includeTerms,
-    selectedYears,
+    selectedEvidenceRange,
   )
   const captureExplorerAction = (
     action: TrendsExplorerAction,
@@ -230,9 +381,52 @@ export default function TrendsExplorer({
         overrides.enabledSeriesCount ?? enabledSeries.length,
       included_series_count:
         overrides.includedSeriesCount ?? includeTerms.length,
-      has_year_filter: overrides.hasYearFilter ?? selectedYears !== null,
+      has_year_filter: overrides.hasYearFilter ?? selectedRange !== null,
     })
   }
+
+  const urlState = useMemo<TrendExplorerUrlState>(
+    () => ({
+      terms: configuredTerms,
+      shown: configuredTerms.filter((term) => chartEnabled[term]),
+      included: includeTerms,
+      scale,
+      granularity,
+      range: selectedRange,
+    }),
+    [
+      chartEnabled,
+      configuredTerms,
+      granularity,
+      includeTerms,
+      scale,
+      selectedRange,
+    ],
+  )
+  const serializedState = useMemo(
+    () => serializeTrendExplorerState(urlState),
+    [urlState],
+  )
+  const returnTo = `/trends?${serializedState}`
+
+  useEffect(() => {
+    const needsSeriesRequest =
+      granularity === 'month' ||
+      configuredTerms.some((term) => !initialAnnualByTerm.has(term))
+    if (needsSeriesRequest) {
+      void loadConfiguredSeries(configuredTerms, granularity)
+    }
+    // Only hydrate series missing from the server snapshot on first mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const nextUrl = `/trends?${serializedState}`
+    const currentUrl = `${window.location.pathname}${window.location.search}`
+    if (currentUrl !== nextUrl) {
+      window.history.replaceState(window.history.state, '', nextUrl)
+    }
+  }, [serializedState])
 
   useEffect(() => {
     const requests = evidenceRequestsRef.current
@@ -243,21 +437,24 @@ export default function TrendsExplorer({
   }, [])
 
   useEffect(() => {
-    if (dragStartYear !== null || sameYears(selectedYears, requestedYears)) {
+    if (
+      dragStartBucket !== null ||
+      sameEvidenceRange(selectedEvidenceRange, requestedRange)
+    ) {
       return
     }
     setFeedError(null)
     const timeout = window.setTimeout(
-      () => setRequestedYears(selectedYears),
+      () => setRequestedRange(selectedEvidenceRange),
       RANGE_QUERY_DEBOUNCE_MS,
     )
     return () => window.clearTimeout(timeout)
-  }, [dragStartYear, requestedYears, selectedYears])
+  }, [dragStartBucket, requestedRange, selectedEvidenceRange])
 
   useEffect(() => {
     const signature = JSON.stringify({
       includeTerms,
-      requestedYears,
+      requestedRange,
       refreshKey,
     })
     evidenceRequestSignatureRef.current = signature
@@ -275,7 +472,7 @@ export default function TrendsExplorer({
         !hasCompleteTrendEvidence(
           evidenceCacheRef.current,
           term,
-          requestedYears,
+          requestedRange,
           EVIDENCE_PAGE_SIZE,
         ),
     )
@@ -290,20 +487,20 @@ export default function TrendsExplorer({
       setFeedError(null)
       const results: PromiseSettledResult<PortalTweet[]>[] = []
       for (const term of termsToLoad) {
-        const key = trendEvidenceCacheKey(term, requestedYears)
+        const key = trendEvidenceCacheKey(term, requestedRange)
         let request = evidenceRequestsRef.current.get(key)
         if (!request) {
           const controller = new AbortController()
           let promise: Promise<PortalTweet[]>
           promise = requestTrendEvidence(
             term,
-            requestedYears,
+            requestedRange,
             controller.signal,
           )
             .then((tweets) => {
               storeTrendEvidence(evidenceCacheRef.current, {
                 term,
-                range: requestedYears,
+                range: requestedRange,
                 tweets,
               })
               setEvidenceCacheVersion((version) => version + 1)
@@ -338,14 +535,14 @@ export default function TrendsExplorer({
       setIsLoadingEvidence(
         includeTerms.some((term) =>
           evidenceRequestsRef.current.has(
-            trendEvidenceCacheKey(term, requestedYears),
+            trendEvidenceCacheKey(term, requestedRange),
           ),
         ),
       )
     }
 
     void loadEvidence()
-  }, [includeTerms, refreshKey, requestedYears])
+  }, [includeTerms, refreshKey, requestedRange])
 
   const removeTerm = (term: string) => {
     captureExplorerAction('term_removed', {
@@ -359,6 +556,7 @@ export default function TrendsExplorer({
         includeTerms.length - (feedFilters[term] === 'include' ? 1 : 0),
       ),
     })
+    setConfiguredTerms((current) => current.filter((item) => item !== term))
     setSeries((current) => current.filter((item) => item.term !== term))
     setChartEnabled((current) => {
       const next = { ...current }
@@ -389,10 +587,10 @@ export default function TrendsExplorer({
       return
     }
 
-    const existing = new Set(series.map(({ term }) => term))
+    const existing = new Set(configuredTerms)
     const alreadyPresent = requested.filter((term) => existing.has(term))
     const newTerms = requested.filter((term) => !existing.has(term))
-    if (series.length + newTerms.length > MAX_SERIES) {
+    if (configuredTerms.length + newTerms.length > MAX_SERIES) {
       setAddError(`Show up to ${MAX_SERIES} trends at once.`)
       return
     }
@@ -417,15 +615,16 @@ export default function TrendsExplorer({
 
     setIsAdding(true)
     try {
-      const body = await requestTrendSeries(newTerms)
+      const body = await requestTrendSeries(newTerms, granularity)
 
       const firstColorIndex = series.length
       const additions = body.series.map((item, index) => ({
         ...item,
         color: SERIES_COLORS[(firstColorIndex + index) % SERIES_COLORS.length],
       }))
-      setYears(body.years)
+      setBuckets(body.buckets)
       setSeries((current) => [...current, ...additions])
+      setConfiguredTerms((current) => [...current, ...newTerms])
       setChartEnabled((current) => ({
         ...current,
         ...Object.fromEntries(additions.map(({ term }) => [term, true])),
@@ -464,7 +663,7 @@ export default function TrendsExplorer({
   const retryDefaultTrends = async () => {
     setIsRetryingDefaults(true)
     try {
-      const body = await requestTrendSeries(DEFAULT_TREND_TERMS)
+      const body = await requestTrendSeries(DEFAULT_TREND_TERMS, granularity)
       const defaultColors = new Map(
         CHART_TERMS.map(({ term, color }) => [term, color]),
       )
@@ -472,8 +671,9 @@ export default function TrendsExplorer({
         ...item,
         color: defaultColors.get(item.term) ?? item.color,
       }))
-      setYears(body.years)
+      setBuckets(body.buckets)
       setSeries(defaults)
+      setConfiguredTerms(DEFAULT_TREND_TERMS)
       setChartEnabled(
         Object.fromEntries(
           defaults.map(({ term }, index) => [term, index < 4]),
@@ -504,8 +704,20 @@ export default function TrendsExplorer({
     }
   }
 
-  const valuesFor = (item: TermSeries) =>
-    scale === 'normalized' ? item.perYear : item.tweetsPerYear
+  const selectGranularity = (nextGranularity: TrendGranularity) => {
+    if (nextGranularity === granularity) return
+    const nextBuckets = snapshotBuckets(initialTrends, nextGranularity)
+    setGranularity(nextGranularity)
+    setSelectedRange((current) =>
+      clampTrendRange(convertedRange(current, nextGranularity), nextBuckets),
+    )
+    setBuckets(nextBuckets)
+    setSeries([])
+    void loadConfiguredSeries(configuredTerms, nextGranularity)
+  }
+
+  const valuesFor = (item: TrendBucketSeries) =>
+    scale === 'normalized' ? item.perBucket : item.tweetsPerBucket
   const maxValue = Math.max(
     1,
     ...enabledSeries.flatMap((item) => valuesFor(item)),
@@ -524,67 +736,81 @@ export default function TrendsExplorer({
   const X1 = 732
   const Y0 = 326
   const Y1 = 24
-  const xPositions = years.map(
-    (_, index) => X0 + (index * (X1 - X0)) / Math.max(years.length - 1, 1),
+  const xPositions = buckets.map(
+    (_, index) => X0 + (index * (X1 - X0)) / Math.max(buckets.length - 1, 1),
   )
+  const axisTickIndexes = buckets
+    .map((_, index) => index)
+    .filter(
+      (index) =>
+        granularity === 'year' ||
+        index === 0 ||
+        index === buckets.length - 1 ||
+        index % 12 === 0,
+    )
   const yPosition = (value: number) => Y0 - (value / chartMax) * (Y0 - Y1)
-  const selectedStartIndex = selectedYears
-    ? years.indexOf(selectedYears.start)
+  const selectedStartIndex = selectedRange
+    ? buckets.indexOf(selectedRange.start)
     : -1
-  const selectedEndIndex = selectedYears ? years.indexOf(selectedYears.end) : -1
+  const selectedEndIndex = selectedRange
+    ? buckets.indexOf(selectedRange.end)
+    : -1
   const isUpdatingEvidence =
     includeTerms.length > 0 &&
     (isLoadingEvidence ||
-      (!sameYears(selectedYears, requestedYears) &&
+      (!sameEvidenceRange(selectedEvidenceRange, requestedRange) &&
         includeTerms.some(
           (term) =>
             !hasCompleteTrendEvidence(
               evidenceCacheRef.current,
               term,
-              selectedYears,
+              selectedEvidenceRange,
               EVIDENCE_PAGE_SIZE,
             ),
         )))
 
-  const yearForPointer = (clientX: number): number | null => {
+  const bucketForPointer = (clientX: number): string | null => {
     const svg = chartRef.current
-    if (!svg || years.length === 0) return null
+    if (!svg || buckets.length === 0) return null
     const rect = svg.getBoundingClientRect()
     if (rect.width === 0) return null
     const svgX = ((clientX - rect.left) / rect.width) * W
     const ratio = Math.max(0, Math.min(1, (svgX - X0) / (X1 - X0)))
-    const index = Math.round(ratio * Math.max(years.length - 1, 0))
-    return years[index] ?? null
+    const index = Math.round(ratio * Math.max(buckets.length - 1, 0))
+    return buckets[index] ?? null
   }
 
-  const updateDraggedYears = (year: number, anchor = dragStartYear) => {
+  const updateDraggedRange = (bucket: string, anchor = dragStartBucket) => {
     if (anchor === null) return
-    setSelectedYears({
-      start: Math.min(anchor, year),
-      end: Math.max(anchor, year),
+    setSelectedRange({
+      start: anchor < bucket ? anchor : bucket,
+      end: anchor > bucket ? anchor : bucket,
     })
   }
 
   const beginRangeSelection = (event: ReactPointerEvent<SVGRectElement>) => {
-    const year = yearForPointer(event.clientX)
-    if (year === null) return
+    const bucket = bucketForPointer(event.clientX)
+    if (bucket === null) return
     event.currentTarget.setPointerCapture(event.pointerId)
-    setDragStartYear(year)
-    setSelectedYears({ start: year, end: year })
+    setDragStartBucket(bucket)
   }
 
   const continueRangeSelection = (event: ReactPointerEvent<SVGRectElement>) => {
-    if (dragStartYear === null) return
-    const year = yearForPointer(event.clientX)
-    if (year !== null) updateDraggedYears(year)
+    if (dragStartBucket === null) return
+    const bucket = bucketForPointer(event.clientX)
+    if (bucket !== null && bucket !== dragStartBucket) {
+      updateDraggedRange(bucket)
+    }
   }
 
   const finishRangeSelection = (event: ReactPointerEvent<SVGRectElement>) => {
-    if (dragStartYear === null) return
-    const year = yearForPointer(event.clientX)
-    if (year !== null) updateDraggedYears(year)
-    captureExplorerAction('year_filter_applied', { hasYearFilter: true })
-    setDragStartYear(null)
+    if (dragStartBucket === null) return
+    const bucket = bucketForPointer(event.clientX)
+    if (bucket !== null && bucket !== dragStartBucket) {
+      updateDraggedRange(bucket)
+      captureExplorerAction('year_filter_applied', { hasYearFilter: true })
+    }
+    setDragStartBucket(null)
   }
 
   return (
@@ -607,7 +833,7 @@ export default function TrendsExplorer({
             </p>
           </div>
           <div className={`text-[12px] ${MUTED}`}>
-            Full corpus · {years[0]}–{years.at(-1)}
+            Full corpus · {initialTrends.years[0]}–{initialTrends.years.at(-1)}
           </div>
         </div>
 
@@ -645,7 +871,7 @@ export default function TrendsExplorer({
                     'Multi-word trends match all words; up to four distinct words are counted.'}
                 </span>
                 <span className={`text-[11.5px] tabular-nums ${MUTED}`}>
-                  {series.length}/{MAX_SERIES} trends
+                  {configuredTerms.length}/{MAX_SERIES} trends
                 </span>
               </div>
             </div>
@@ -656,37 +882,60 @@ export default function TrendsExplorer({
                   <h2 className="text-[14px] font-bold">
                     {scale === 'normalized'
                       ? 'Frequency per 100k tweets'
-                      : 'Matching tweets by year'}
+                      : `Matching tweets by ${granularity}`}
                   </h2>
                   <p className={`mt-0.5 text-[11.5px] ${MUTED}`}>
                     {scale === 'normalized'
-                      ? 'Adjusted for the archive’s changing annual volume.'
-                      : 'Raw matching tweet count in each calendar year.'}
+                      ? `Adjusted for the archive’s changing ${granularity === 'year' ? 'annual' : 'monthly'} volume.`
+                      : `Raw matching tweet count in each calendar ${granularity}.`}
                   </p>
                 </div>
-                <div
-                  className="inline-flex rounded-[4px] border border-zinc-300 p-0.5 dark:border-[#34343a]"
-                  aria-label="Trend scale"
-                >
-                  {(['raw', 'normalized'] as const).map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      aria-pressed={scale === option}
-                      onClick={() => {
-                        if (scale === option) return
-                        captureExplorerAction('scale_changed')
-                        setScale(option)
-                      }}
-                      className={`rounded-[3px] px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors ${
-                        scale === option
-                          ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                          : `${MUTED} hover:text-foreground`
-                      }`}
-                    >
-                      {option === 'raw' ? 'Raw count' : 'Per 100k'}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap gap-2">
+                  <div
+                    className="inline-flex rounded-[4px] border border-zinc-300 p-0.5 dark:border-[#34343a]"
+                    aria-label="Trend granularity"
+                  >
+                    {(['year', 'month'] as const).map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        aria-pressed={granularity === option}
+                        onClick={() => selectGranularity(option)}
+                        disabled={isLoadingSeries}
+                        className={`rounded-[3px] px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${
+                          granularity === option
+                            ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                            : `${MUTED} hover:text-foreground`
+                        }`}
+                      >
+                        {option === 'year' ? 'Years' : 'Months'}
+                      </button>
+                    ))}
+                  </div>
+                  <div
+                    className="inline-flex rounded-[4px] border border-zinc-300 p-0.5 dark:border-[#34343a]"
+                    aria-label="Trend scale"
+                  >
+                    {(['raw', 'normalized'] as const).map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        aria-pressed={scale === option}
+                        onClick={() => {
+                          if (scale === option) return
+                          captureExplorerAction('scale_changed')
+                          setScale(option)
+                        }}
+                        className={`rounded-[3px] px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors ${
+                          scale === option
+                            ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                            : `${MUTED} hover:text-foreground`
+                        }`}
+                      >
+                        {option === 'raw' ? 'Raw count' : 'Per 100k'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -719,7 +968,7 @@ export default function TrendsExplorer({
                   viewBox={`0 0 ${W} ${H}`}
                   className="block w-full touch-none select-none"
                   role="img"
-                  aria-label={`Yearly term trends shown as ${scale === 'normalized' ? 'occurrences per 100,000 tweets' : 'raw tweet counts'}`}
+                  aria-label={`${granularity === 'year' ? 'Yearly' : 'Monthly'} term trends shown as ${scale === 'normalized' ? 'occurrences per 100,000 tweets' : 'raw tweet counts'}`}
                 >
                   {gridValues.map((value) => (
                     <g key={value}>
@@ -742,16 +991,16 @@ export default function TrendsExplorer({
                       </text>
                     </g>
                   ))}
-                  {years.map((year, index) => (
+                  {axisTickIndexes.map((index) => (
                     <text
-                      key={year}
+                      key={buckets[index]}
                       x={xPositions[index]}
                       y={350}
                       textAnchor="middle"
                       fontSize={11}
                       className="fill-zinc-400 dark:fill-[#6d6d78]"
                     >
-                      {year}
+                      {bucketLabel(buckets[index], granularity)}
                     </text>
                   ))}
                   {enabledSeries.map((item) => {
@@ -773,14 +1022,14 @@ export default function TrendsExplorer({
                         />
                         {values.map((value, index) => (
                           <circle
-                            key={years[index]}
+                            key={buckets[index]}
                             cx={xPositions[index]}
                             cy={yPosition(value)}
                             r={3}
                             fill={item.color}
                             className="stroke-white dark:stroke-[#1b1b1e]"
                             strokeWidth={1.5}
-                            aria-label={`${item.term} · ${years[index]} · ${
+                            aria-label={`${item.term} · ${bucketLabel(buckets[index], granularity)} · ${
                               scale === 'normalized'
                                 ? `${compactAxis(value)} per 100k`
                                 : `${Math.round(value).toLocaleString('en-US')} tweets`
@@ -798,12 +1047,14 @@ export default function TrendsExplorer({
                       fontSize={13}
                       className="fill-zinc-400 dark:fill-[#6d6d78]"
                     >
-                      {series.length === 0
-                        ? 'Add a trend above to start charting.'
-                        : 'Select a trend below to draw it.'}
+                      {isLoadingSeries
+                        ? `Loading ${granularity === 'month' ? 'monthly' : 'yearly'} trends…`
+                        : series.length === 0
+                          ? 'Add a trend above to start charting.'
+                          : 'Select a trend below to draw it.'}
                     </text>
                   )}
-                  {selectedYears &&
+                  {selectedRange &&
                     selectedStartIndex >= 0 &&
                     selectedEndIndex >= 0 && (
                       <rect
@@ -837,91 +1088,167 @@ export default function TrendsExplorer({
                     height={Y0 - Y1}
                     fill="transparent"
                     className="cursor-crosshair"
-                    aria-label="Drag horizontally to filter tweets by year"
+                    aria-label={`Drag horizontally to filter tweets by ${granularity}`}
                     onPointerDown={beginRangeSelection}
                     onPointerMove={continueRangeSelection}
                     onPointerUp={finishRangeSelection}
-                    onPointerCancel={() => setDragStartYear(null)}
+                    onPointerCancel={() => setDragStartBucket(null)}
                   />
                 </svg>
               </div>
 
               <div className="flex flex-wrap items-end gap-2 border-t border-zinc-100 px-4 py-3 dark:border-[#202023] sm:px-5">
                 <span className={`mr-auto text-[11.5px] ${MUTED}`}>
-                  Drag across the chart to filter the tweets by year.
+                  Drag across the chart to filter tweets by {granularity}.
+                  Clicking alone keeps the current range.
                 </span>
-                <label className={`text-[11px] font-semibold ${MUTED}`}>
-                  From
-                  <select
-                    aria-label="Tweets from year"
-                    value={selectedYears?.start ?? ''}
-                    onChange={(event) => {
-                      if (!event.target.value) {
-                        captureExplorerAction('year_filter_cleared', {
-                          hasYearFilter: false,
-                        })
-                        setSelectedYears(null)
-                        return
-                      }
-                      const start = Number(event.target.value)
-                      captureExplorerAction('year_filter_applied', {
-                        hasYearFilter: true,
-                      })
-                      setSelectedYears((current) => ({
-                        start,
-                        end: Math.max(start, current?.end ?? start),
-                      }))
-                    }}
-                    className="ml-1 rounded-[4px] border border-zinc-300 bg-white px-2 py-1 text-foreground dark:border-[#34343a] dark:bg-[#121214]"
-                  >
-                    <option value="">Any</option>
-                    {years.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={`text-[11px] font-semibold ${MUTED}`}>
-                  To
-                  <select
-                    aria-label="Tweets through year"
-                    value={selectedYears?.end ?? ''}
-                    onChange={(event) => {
-                      if (!event.target.value) {
-                        captureExplorerAction('year_filter_cleared', {
-                          hasYearFilter: false,
-                        })
-                        setSelectedYears(null)
-                        return
-                      }
-                      const end = Number(event.target.value)
-                      captureExplorerAction('year_filter_applied', {
-                        hasYearFilter: true,
-                      })
-                      setSelectedYears((current) => ({
-                        start: Math.min(current?.start ?? end, end),
-                        end,
-                      }))
-                    }}
-                    className="ml-1 rounded-[4px] border border-zinc-300 bg-white px-2 py-1 text-foreground dark:border-[#34343a] dark:bg-[#121214]"
-                  >
-                    <option value="">Any</option>
-                    {years.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {selectedYears && (
+                {granularity === 'year' ? (
+                  <>
+                    <label className={`text-[11px] font-semibold ${MUTED}`}>
+                      From
+                      <select
+                        aria-label="Tweets from year"
+                        value={selectedRange?.start ?? ''}
+                        onChange={(event) => {
+                          if (!event.target.value) {
+                            captureExplorerAction('year_filter_cleared', {
+                              hasYearFilter: false,
+                            })
+                            setSelectedRange(null)
+                            return
+                          }
+                          const start = event.target.value
+                          captureExplorerAction('year_filter_applied', {
+                            hasYearFilter: true,
+                          })
+                          setSelectedRange((current) => ({
+                            start,
+                            end:
+                              current && current.end >= start
+                                ? current.end
+                                : start,
+                          }))
+                        }}
+                        className="ml-1 rounded-[4px] border border-zinc-300 bg-white px-2 py-1 text-foreground dark:border-[#34343a] dark:bg-[#121214]"
+                      >
+                        <option value="">Any</option>
+                        {buckets.map((bucket) => (
+                          <option key={bucket} value={bucket}>
+                            {bucket}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className={`text-[11px] font-semibold ${MUTED}`}>
+                      To
+                      <select
+                        aria-label="Tweets through year"
+                        value={selectedRange?.end ?? ''}
+                        onChange={(event) => {
+                          if (!event.target.value) {
+                            captureExplorerAction('year_filter_cleared', {
+                              hasYearFilter: false,
+                            })
+                            setSelectedRange(null)
+                            return
+                          }
+                          const end = event.target.value
+                          captureExplorerAction('year_filter_applied', {
+                            hasYearFilter: true,
+                          })
+                          setSelectedRange((current) => ({
+                            start:
+                              current && current.start <= end
+                                ? current.start
+                                : end,
+                            end,
+                          }))
+                        }}
+                        className="ml-1 rounded-[4px] border border-zinc-300 bg-white px-2 py-1 text-foreground dark:border-[#34343a] dark:bg-[#121214]"
+                      >
+                        <option value="">Any</option>
+                        {buckets.map((bucket) => (
+                          <option key={bucket} value={bucket}>
+                            {bucket}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <label className={`text-[11px] font-semibold ${MUTED}`}>
+                      From
+                      <input
+                        type="month"
+                        aria-label="Tweets from month"
+                        min={buckets[0]}
+                        max={buckets.at(-1)}
+                        value={selectedRange?.start ?? ''}
+                        onChange={(event) => {
+                          const start = event.target.value
+                          if (!start) {
+                            captureExplorerAction('year_filter_cleared', {
+                              hasYearFilter: false,
+                            })
+                            setSelectedRange(null)
+                            return
+                          }
+                          captureExplorerAction('year_filter_applied', {
+                            hasYearFilter: true,
+                          })
+                          setSelectedRange((current) => ({
+                            start,
+                            end:
+                              current && current.end >= start
+                                ? current.end
+                                : start,
+                          }))
+                        }}
+                        className="ml-1 rounded-[4px] border border-zinc-300 bg-white px-2 py-1 text-foreground dark:border-[#34343a] dark:bg-[#121214]"
+                      />
+                    </label>
+                    <label className={`text-[11px] font-semibold ${MUTED}`}>
+                      To
+                      <input
+                        type="month"
+                        aria-label="Tweets through month"
+                        min={buckets[0]}
+                        max={buckets.at(-1)}
+                        value={selectedRange?.end ?? ''}
+                        onChange={(event) => {
+                          const end = event.target.value
+                          if (!end) {
+                            captureExplorerAction('year_filter_cleared', {
+                              hasYearFilter: false,
+                            })
+                            setSelectedRange(null)
+                            return
+                          }
+                          captureExplorerAction('year_filter_applied', {
+                            hasYearFilter: true,
+                          })
+                          setSelectedRange((current) => ({
+                            start:
+                              current && current.start <= end
+                                ? current.start
+                                : end,
+                            end,
+                          }))
+                        }}
+                        className="ml-1 rounded-[4px] border border-zinc-300 bg-white px-2 py-1 text-foreground dark:border-[#34343a] dark:bg-[#121214]"
+                      />
+                    </label>
+                  </>
+                )}
+                {selectedRange && (
                   <button
                     type="button"
                     onClick={() => {
                       captureExplorerAction('year_filter_cleared', {
                         hasYearFilter: false,
                       })
-                      setSelectedYears(null)
+                      setSelectedRange(null)
                     }}
                     className={`rounded-[4px] px-2 py-1 text-[11px] font-semibold ${MUTED} hover:text-foreground`}
                   >
@@ -937,11 +1264,14 @@ export default function TrendsExplorer({
                   Series shown
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {series.map((item) => {
-                    const active = !!chartEnabled[item.term]
+                  {configuredTerms.map((term, index) => {
+                    const item = series.find((entry) => entry.term === term)
+                    const active = !!chartEnabled[term]
+                    const color =
+                      item?.color ?? SERIES_COLORS[index % SERIES_COLORS.length]
                     return (
                       <span
-                        key={item.term}
+                        key={term}
                         className={`inline-flex items-center overflow-hidden rounded-full border text-[12px] font-semibold transition-colors ${
                           active
                             ? 'border-zinc-400 bg-zinc-50 text-foreground dark:border-[#45454c] dark:bg-[#202024]'
@@ -951,7 +1281,7 @@ export default function TrendsExplorer({
                         <button
                           type="button"
                           aria-pressed={active}
-                          aria-label={`${active ? 'Hide' : 'Show'} ${item.term} series`}
+                          aria-label={`${active ? 'Hide' : 'Show'} ${term} series`}
                           onClick={() => {
                             captureExplorerAction('chart_series_toggled', {
                               enabledSeriesCount:
@@ -959,7 +1289,7 @@ export default function TrendsExplorer({
                             })
                             setChartEnabled((current) => ({
                               ...current,
-                              [item.term]: !current[item.term],
+                              [term]: !current[term],
                             }))
                           }}
                           className="inline-flex items-center gap-1.5 py-1.5 pl-2.5 pr-1.5"
@@ -967,16 +1297,16 @@ export default function TrendsExplorer({
                           <span
                             className="h-2 w-2 rounded-full"
                             style={{
-                              backgroundColor: item.color,
+                              backgroundColor: color,
                               opacity: active ? 1 : 0.3,
                             }}
                           />
-                          {item.term}
+                          {term}
                         </button>
                         <button
                           type="button"
-                          aria-label={`Remove ${item.term} trend`}
-                          onClick={() => removeTerm(item.term)}
+                          aria-label={`Remove ${term} trend`}
+                          onClick={() => removeTerm(term)}
                           className="px-2 py-1.5 text-[14px] leading-none opacity-60 hover:opacity-100"
                         >
                           ×
@@ -984,7 +1314,7 @@ export default function TrendsExplorer({
                       </span>
                     )
                   })}
-                  {series.length === 0 && (
+                  {configuredTerms.length === 0 && (
                     <span className={`py-1 text-[12px] ${MUTED}`}>
                       No trend series loaded.
                     </span>
@@ -994,9 +1324,10 @@ export default function TrendsExplorer({
             </div>
 
             <p className={`mt-3 text-[12px] leading-relaxed ${BODY}`}>
-              Normalization divides each term’s annual count by all archived
-              tweets from that year, then scales the result to 100,000. This
-              makes years with different archive coverage comparable.
+              Normalization divides each term’s {granularity} count by all
+              archived tweets from that {granularity}, then scales the result to
+              100,000. This makes periods with different archive coverage
+              comparable.
             </p>
           </section>
 
@@ -1007,8 +1338,8 @@ export default function TrendsExplorer({
                   Tweets counted
                 </h2>
                 <p className={`mt-0.5 text-[11.5px] ${MUTED}`}>
-                  {selectedYears
-                    ? `Posts from ${selectedYears.start}–${selectedYears.end} matching any included trend.`
+                  {selectedRange
+                    ? `Posts from ${bucketLabel(selectedRange.start, granularity)}–${bucketLabel(selectedRange.end, granularity)} matching any included trend.`
                     : 'Latest posts matching any included trend.'}
                 </p>
               </div>
@@ -1016,7 +1347,7 @@ export default function TrendsExplorer({
                 type="button"
                 onClick={() => {
                   captureExplorerAction('evidence_refreshed')
-                  setRequestedYears(selectedYears)
+                  setRequestedRange(selectedEvidenceRange)
                   setRefreshKey((key) => key + 1)
                 }}
                 disabled={isLoadingEvidence || includeTerms.length === 0}
@@ -1028,7 +1359,7 @@ export default function TrendsExplorer({
 
             <div className={`${CARD} mb-3 p-3`}>
               <div className="flex flex-wrap gap-1.5">
-                {series.map(({ term }) => {
+                {configuredTerms.map((term) => {
                   const filter = feedFilters[term] ?? 'off'
                   return (
                     <span
@@ -1119,7 +1450,7 @@ export default function TrendsExplorer({
                   collapsible
                   clickable
                   origin="trends"
-                  returnTo="/trends"
+                  returnTo={returnTo}
                 />
               ))}
             </div>

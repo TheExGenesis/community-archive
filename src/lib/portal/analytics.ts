@@ -5,8 +5,10 @@ import type {
   PortalBangersScope,
   PortalBangersSort,
   PortalTrends,
+  PortalTrendSeries,
   PortalTweet,
   TermSeries,
+  TrendGranularity,
   TermWeek,
 } from './types'
 
@@ -184,7 +186,7 @@ async function runBatched<T>(
 
 function trendParams(
   term: string,
-  bucket: 'day' | 'year',
+  bucket: 'day' | TrendGranularity,
   from: string,
   to: string,
 ): URLSearchParams {
@@ -199,7 +201,7 @@ function trendParams(
 
 async function fetchTrend(
   term: string,
-  bucket: 'day' | 'year',
+  bucket: 'day' | TrendGranularity,
   from: string,
   to: string,
   fetcher: AnalyticsFetcher,
@@ -245,54 +247,80 @@ function stableTrendColor(term: string): string {
   return TREND_COLORS[hash % TREND_COLORS.length]
 }
 
-/** Fetch one or more user-selected yearly series in parallel. */
+function trendBuckets(
+  granularity: TrendGranularity,
+  now: Date,
+): { buckets: string[]; from: string; to: string } {
+  const currentYear = now.getUTCFullYear()
+  if (granularity === 'year') {
+    return {
+      buckets: Array.from(
+        { length: currentYear - FIRST_TREND_YEAR + 1 },
+        (_, index) => String(FIRST_TREND_YEAR + index),
+      ),
+      from: `${FIRST_TREND_YEAR}-01-01`,
+      to: `${currentYear + 1}-01-01`,
+    }
+  }
+
+  const currentMonth = now.getUTCMonth()
+  const count = (currentYear - FIRST_TREND_YEAR) * 12 + currentMonth + 1
+  return {
+    buckets: Array.from({ length: count }, (_, index) => {
+      const year = FIRST_TREND_YEAR + Math.floor(index / 12)
+      const month = (index % 12) + 1
+      return `${year}-${String(month).padStart(2, '0')}`
+    }),
+    from: `${FIRST_TREND_YEAR}-01-01`,
+    to: new Date(Date.UTC(currentYear, currentMonth + 1, 1))
+      .toISOString()
+      .slice(0, 10),
+  }
+}
+
+function trendBucketKey(bucket: string, granularity: TrendGranularity): string {
+  const date = new Date(normalizeClickHouseTimestamp(bucket))
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('ClickHouse word-trend returned an invalid bucket')
+  }
+  const year = String(date.getUTCFullYear())
+  return granularity === 'year'
+    ? year
+    : `${year}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+/** Fetch one or more user-selected series with a bounded corpus range. */
 export async function fetchPortalTrendSeries(
   terms: string[],
   now = new Date(),
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
-): Promise<Pick<PortalTrends, 'years' | 'series' | 'computedAt'>> {
-  const currentYear = now.getUTCFullYear()
-  const years = Array.from(
-    { length: currentYear - FIRST_TREND_YEAR + 1 },
-    (_, index) => FIRST_TREND_YEAR + index,
-  )
+  granularity: TrendGranularity = 'year',
+): Promise<PortalTrendSeries> {
+  const { buckets, from, to } = trendBuckets(granularity, now)
   const responses = await runBatched(
-    terms.map(
-      (term) => () =>
-        fetchTrend(
-          term,
-          'year',
-          `${FIRST_TREND_YEAR}-01-01`,
-          `${currentYear + 1}-01-01`,
-          fetcher,
-        ),
-    ),
+    terms.map((term) => () => fetchTrend(term, granularity, from, to, fetcher)),
   )
 
-  const series = terms.map((term, index): TermSeries => {
-    const rows = new Map<number, ClickHouseTrendRow>()
+  const series = terms.map((term, index) => {
+    const rows = new Map<string, ClickHouseTrendRow>()
     for (const row of responses[index].data) {
-      const bucket = new Date(normalizeClickHouseTimestamp(row.bucket))
-      if (Number.isNaN(bucket.getTime())) {
-        throw new Error('ClickHouse word-trend returned an invalid bucket')
-      }
-      rows.set(bucket.getUTCFullYear(), row)
+      rows.set(trendBucketKey(row.bucket, granularity), row)
     }
     return {
       term,
       color: stableTrendColor(term),
-      tweetsPerYear: years.map((year) => {
-        const row = rows.get(year)
+      tweetsPerBucket: buckets.map((bucket) => {
+        const row = rows.get(bucket)
         return row ? safeCount(row.tweets, 'trend tweet count') : 0
       }),
-      perYear: years.map((year) => {
-        const row = rows.get(year)
+      perBucket: buckets.map((bucket) => {
+        const row = rows.get(bucket)
         return row ? ratePerHundredThousand(row) : 0
       }),
     }
   })
 
-  return { years, series, computedAt: now.toISOString() }
+  return { granularity, buckets, series, computedAt: now.toISOString() }
 }
 
 interface PortalTrendEvidenceOptions {

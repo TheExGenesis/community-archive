@@ -33,7 +33,7 @@ describe('trend evidence cache', () => {
     })
     storeTrendEvidence(cache, {
       term: 'tpot',
-      range: { start: 2024, end: 2024 },
+      range: { since: '2024-01-01', until: '2025-01-01' },
       tweets: [
         tweet('2', '2024-12-01T00:00:00.000Z'),
         tweet('1', '2024-01-01T00:00:00.000Z'),
@@ -46,9 +46,10 @@ describe('trend evidence cache', () => {
     })
 
     expect(
-      cachedTrendEvidence(cache, ['tpot'], { start: 2024, end: 2024 }).map(
-        ({ id }) => id,
-      ),
+      cachedTrendEvidence(cache, ['tpot'], {
+        since: '2024-01-01',
+        until: '2025-01-01',
+      }).map(({ id }) => id),
     ).toEqual(['2', '1'])
     expect(
       cachedTrendEvidence(cache, ['tpot', 'postrat'], null).map(({ id }) => id),
@@ -83,10 +84,16 @@ describe('trend evidence cache', () => {
     })
 
     expect(
-      hasCompleteTrendEvidence(cache, 'tpot', { start: 2026, end: 2026 }),
+      hasCompleteTrendEvidence(cache, 'tpot', {
+        since: '2026-01-01',
+        until: '2027-01-01',
+      }),
     ).toBe(true)
     expect(
-      hasCompleteTrendEvidence(cache, 'tpot', { start: 2025, end: 2025 }),
+      hasCompleteTrendEvidence(cache, 'tpot', {
+        since: '2025-01-01',
+        until: '2026-01-01',
+      }),
     ).toBe(false)
     expect(hasCompleteTrendEvidence(cache, 'tpot', null)).toBe(true)
   })

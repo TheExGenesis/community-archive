@@ -14,9 +14,14 @@ import type {
   PortalBangersPeriod,
   PortalTweet,
 } from '@/lib/portal/types'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 const push = jest.fn()
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
+jest.mock('@/lib/posthog', () => ({
+  capturePostHogEvent: jest.fn(),
+}))
+const mockCapturePostHogEvent = capturePostHogEvent as jest.Mock
 jest.mock('@/components/TweetCard', () => ({
   __esModule: true,
   default: ({
@@ -112,6 +117,7 @@ describe('BangersExplorer', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/bangers')
     push.mockReset()
+    mockCapturePostHogEvent.mockReset()
     IntersectionObserverMock.instances = []
     Object.defineProperty(window, 'IntersectionObserver', {
       configurable: true,
@@ -213,6 +219,23 @@ describe('BangersExplorer', () => {
       screen.getByRole('link', { name: 'Archive members' }),
     ).toHaveAttribute('href', '/bangers?scope=members&period=today')
     expect(screen.getByText(/from the last 24 hours/)).toBeVisible()
+  })
+
+  test('records semantic filter actions without the query text', () => {
+    renderExplorer()
+
+    const recent = screen.getByRole('link', { name: 'Recent' })
+    recent.addEventListener('click', (event) => event.preventDefault())
+    fireEvent.click(recent)
+
+    expect(mockCapturePostHogEvent).toHaveBeenCalledWith('bangers_action', {
+      action: 'sort_changed',
+      has_query: false,
+      time_range: 'all',
+      sort: 'recent',
+      scope: 'all',
+      result_count: 3,
+    })
   })
 
   test('orders all time above today and offers the last three months', async () => {

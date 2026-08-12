@@ -29,12 +29,37 @@ import {
   selectHomepageStream,
 } from '@/lib/portal/stream'
 import { BANGERS_ALL_TIME_HREF, BANGERS_WEEK_HREF } from '@/lib/portal/bangers'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 export type PortalView = 'home' | 'stream'
 
 const HOME_LIVE_STREAM_LIMIT = 12
 const ARCHIVE_EXPORT_URL =
   'https://github.com/TheExGenesis/community-archive/releases/tag/data_export'
+
+type DashboardDestination =
+  | 'all_time_bangers'
+  | 'best_strands'
+  | 'data_export'
+  | 'live_stream'
+  | 'recent_bangers'
+  | 'research'
+  | 'research_article'
+  | 'tool'
+  | 'tools'
+  | 'trends'
+
+function captureDashboardDestination(
+  destination: DashboardDestination,
+  surface: 'card' | 'list' | 'panel_header',
+  external: boolean,
+) {
+  capturePostHogEvent('dashboard_destination_opened', {
+    destination,
+    surface,
+    external,
+  })
+}
 
 const compact = (n: number) =>
   new Intl.NumberFormat('en', {
@@ -107,7 +132,12 @@ function PanelHeader({
   divider = true,
 }: {
   title: string
-  action?: { label: string; href: string; external?: boolean }
+  action?: {
+    label: string
+    href: string
+    analyticsDestination: DashboardDestination
+    external?: boolean
+  }
   live?: boolean
   divider?: boolean
 }) {
@@ -129,6 +159,13 @@ function PanelHeader({
             href={action.href}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() =>
+              captureDashboardDestination(
+                action.analyticsDestination,
+                'panel_header',
+                true,
+              )
+            }
             className="text-[12.5px] font-semibold text-brand hover:underline"
           >
             {action.label} →
@@ -136,6 +173,13 @@ function PanelHeader({
         ) : (
           <Link
             href={action.href}
+            onClick={() =>
+              captureDashboardDestination(
+                action.analyticsDestination,
+                'panel_header',
+                false,
+              )
+            }
             className="text-[12.5px] font-semibold text-brand hover:underline"
           >
             {action.label} →
@@ -445,7 +489,12 @@ export default function Portal({
         )
       }
       pageCursor.current = nextCursor
-      setHasMore(nextHasMore && nextCursor !== null)
+      const canLoadMore = nextHasMore && nextCursor !== null
+      setHasMore(canLoadMore)
+      capturePostHogEvent('portal_stream_loaded_more', {
+        loaded_tweet_count: older.length,
+        has_more: canLoadMore,
+      })
     } catch {
       // Keep the sentinel active so scrolling can retry after a network hiccup.
     } finally {
@@ -655,7 +704,11 @@ export default function Portal({
                 <PanelHeader
                   title="Live stream"
                   live
-                  action={{ label: 'Open firehose', href: '/stream' }}
+                  action={{
+                    label: 'Open firehose',
+                    href: '/stream',
+                    analyticsDestination: 'live_stream',
+                  }}
                 />
                 <div
                   role="region"
@@ -690,7 +743,11 @@ export default function Portal({
               <div className={`${CARD} flex flex-col`}>
                 <PanelHeader
                   title="Trending terms · 7 days"
-                  action={{ label: 'Trends explorer', href: '/trends' }}
+                  action={{
+                    label: 'Trends explorer',
+                    href: '/trends',
+                    analyticsDestination: 'trends',
+                  }}
                 />
                 <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
                   {data.failures.trends ? (
@@ -764,6 +821,7 @@ export default function Portal({
                         action={{
                           label: 'Recent bangers',
                           href: BANGERS_WEEK_HREF,
+                          analyticsDestination: 'recent_bangers',
                         }}
                       />
                       {recentBanger ? (
@@ -791,6 +849,7 @@ export default function Portal({
                         action={{
                           label: 'All-time bangers',
                           href: BANGERS_ALL_TIME_HREF,
+                          analyticsDestination: 'all_time_bangers',
                         }}
                       />
                       {historicalBanger ? (
@@ -817,7 +876,11 @@ export default function Portal({
               <div className={CARD}>
                 <PanelHeader
                   title="Featured research"
-                  action={{ label: 'All research', href: '/research' }}
+                  action={{
+                    label: 'All research',
+                    href: '/research',
+                    analyticsDestination: 'research',
+                  }}
                 />
                 <div className="flex flex-col">
                   {data.failures.research ? (
@@ -829,6 +892,13 @@ export default function Portal({
                         href={post.url}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() =>
+                          captureDashboardDestination(
+                            'research_article',
+                            'list',
+                            true,
+                          )
+                        }
                         className="group flex items-start gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
                       >
                         <div className="min-w-0 flex-1">
@@ -869,6 +939,13 @@ export default function Portal({
                       href={RESEARCH_SOURCE.url}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() =>
+                        captureDashboardDestination(
+                          'research_article',
+                          'list',
+                          true,
+                        )
+                      }
                       className={`px-4 py-6 text-center text-[13px] ${MUTED} hover:text-brand`}
                     >
                       Read the latest research at {RESEARCH_SOURCE.name} →
@@ -881,6 +958,9 @@ export default function Portal({
                   href={bestStrands.link}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() =>
+                    captureDashboardDestination('best_strands', 'card', true)
+                  }
                   className={`${CARD} group overflow-hidden transition-colors hover:border-brand/60`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -912,6 +992,9 @@ export default function Portal({
                 href={ARCHIVE_EXPORT_URL}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() =>
+                  captureDashboardDestination('data_export', 'card', true)
+                }
                 className={`${CARD} group flex items-center gap-3 px-4 py-4 transition-colors hover:border-brand/60`}
               >
                 <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[4px] border border-zinc-200 bg-zinc-50 text-brand dark:border-[#2a2a2e] dark:bg-[#121214]">
@@ -938,7 +1021,11 @@ export default function Portal({
           <div id="products" className={`${CARD} mt-4 scroll-mt-32`}>
             <PanelHeader
               title="Explore the archive"
-              action={{ label: 'All tools', href: '/tools' }}
+              action={{
+                label: 'All tools',
+                href: '/tools',
+                analyticsDestination: 'tools',
+              }}
               divider={false}
             />
             <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -952,6 +1039,9 @@ export default function Portal({
                   href={tool.link}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() =>
+                    captureDashboardDestination('tool', 'card', true)
+                  }
                   className="group rounded-[4px] border border-zinc-200 bg-zinc-50 px-3 py-2.5 transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#121214] dark:hover:border-brand/60"
                 >
                   <div className="flex items-start gap-2.5">
@@ -1003,6 +1093,8 @@ export default function Portal({
                     tweet={t}
                     animate={i === 0}
                     showArchivedBadge
+                    origin="stream"
+                    returnTo="/stream"
                   />
                 ))}
                 {visible.length === 0 && streamUnavailable && (

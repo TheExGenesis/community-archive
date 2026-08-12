@@ -5,7 +5,7 @@ export interface NavItem {
   label: string
 }
 
-export type TweetOrigin = 'home' | 'bangers' | 'trends' | 'search'
+export type TweetOrigin = 'home' | 'stream' | 'bangers' | 'trends' | 'search'
 
 export interface TweetBackLink {
   href: string
@@ -21,6 +21,11 @@ const TWEET_ORIGINS: Record<
     href: '/',
     label: 'Back to homepage',
     matches: (href) => href === '/' || href.startsWith('/?'),
+  },
+  stream: {
+    href: '/stream',
+    label: 'Back to live stream',
+    matches: (href) => href === '/stream' || href.startsWith('/stream?'),
   },
   bangers: {
     href: '/bangers',

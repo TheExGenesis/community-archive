@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import UserSearchInput from '@/components/UserSearchInput'
+import { capturePostHogEvent } from '@/lib/posthog'
 import { buildSearchParams } from '@/lib/searchParams'
 
 const exampleSearches = ['open source', 'AI alignment', 'from:vitalikbuterin']
@@ -18,6 +19,11 @@ export default function HomepageSearch() {
     if (!trimmedQuery) return
 
     const params = buildSearchParams(trimmedQuery)
+    capturePostHogEvent('archive_search_submitted', {
+      has_query: true,
+      active_filter_count: 0,
+      surface: 'homepage',
+    })
     router.push(`/search?${params.toString()}`)
   }
 

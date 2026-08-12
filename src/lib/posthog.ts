@@ -39,6 +39,75 @@ const isTrendMatch: PropertyValidator = (value): value is string =>
   typeof value === 'string' && ['all', 'any'].includes(value)
 const isQuoteLimit: PropertyValidator = (value): value is number =>
   typeof value === 'number' && [10, 25, 50, 100].includes(value)
+const isOneOf =
+  (values: readonly string[]): PropertyValidator =>
+  (value): value is string =>
+    typeof value === 'string' && values.includes(value)
+const isPortalSeriesCount: PropertyValidator = (value): value is number =>
+  typeof value === 'number' &&
+  Number.isSafeInteger(value) &&
+  value >= 0 &&
+  value <= 12
+
+const isSearchSurface = isOneOf(['advanced', 'homepage'])
+const isDashboardDestination = isOneOf([
+  'all_time_bangers',
+  'best_strands',
+  'data_export',
+  'live_stream',
+  'recent_bangers',
+  'research',
+  'research_article',
+  'tool',
+  'tools',
+  'trends',
+])
+const isDashboardLinkSurface = isOneOf(['card', 'list', 'panel_header'])
+const isTweetCardAction = isOneOf([
+  'collapse',
+  'expand',
+  'open',
+  'open_archived_quotes',
+  'open_quoted_tweet',
+])
+const isTweetOrigin = isOneOf([
+  'bangers',
+  'home',
+  'search',
+  'stream',
+  'trends',
+  'unknown',
+])
+const isBangersAction = isOneOf([
+  'filters_cleared',
+  'load_more_clicked',
+  'retry_clicked',
+  'scope_changed',
+  'searched',
+  'sort_changed',
+  'time_filter_changed',
+])
+const isBangersTimeRange = isOneOf([
+  'all',
+  'three_months',
+  'today',
+  'week',
+  'year',
+])
+const isBangersSort = isOneOf(['quotes', 'recent'])
+const isBangersScope = isOneOf(['all', 'members'])
+const isTrendsExplorerAction = isOneOf([
+  'chart_series_toggled',
+  'evidence_filter_toggled',
+  'evidence_refreshed',
+  'retry_defaults',
+  'scale_changed',
+  'term_removed',
+  'terms_added',
+  'terms_reactivated',
+  'year_filter_applied',
+  'year_filter_cleared',
+])
 
 const allowedEventProperties: Record<
   string,
@@ -60,6 +129,38 @@ const allowedEventProperties: Record<
   archive_search_submitted: {
     has_query: isBoolean,
     active_filter_count: isActiveFilterCount,
+    surface: isSearchSurface,
+  },
+  dashboard_destination_opened: {
+    destination: isDashboardDestination,
+    surface: isDashboardLinkSurface,
+    external: isBoolean,
+  },
+  tweet_card_action: {
+    action: isTweetCardAction,
+    origin: isTweetOrigin,
+    has_media: isBoolean,
+    has_quoted_tweet: isBoolean,
+    is_featured: isBoolean,
+  },
+  bangers_action: {
+    action: isBangersAction,
+    has_query: isBoolean,
+    time_range: isBangersTimeRange,
+    sort: isBangersSort,
+    scope: isBangersScope,
+    result_count: isNonnegativeInteger,
+  },
+  trends_explorer_action: {
+    action: isTrendsExplorerAction,
+    series_count: isPortalSeriesCount,
+    enabled_series_count: isPortalSeriesCount,
+    included_series_count: isPortalSeriesCount,
+    has_year_filter: isBoolean,
+  },
+  portal_stream_loaded_more: {
+    loaded_tweet_count: isNonnegativeInteger,
+    has_more: isBoolean,
   },
   word_trend_requested: {
     bucket: isTrendBucket,

@@ -4,13 +4,12 @@ import { getIsMember } from '@/lib/portal/auth'
 import { getPortalData } from '@/lib/portal/data'
 
 // The first request after a daily analytics-cache rollover builds the bounded
-// ClickHouse snapshot; subsequent member requests reuse the shared Data Cache.
+// ClickHouse snapshot; subsequent homepage requests reuse the shared Data Cache.
 export const maxDuration = 60
 
-// Signed-in members get the live archive portal; everyone else sees the
-// classic marketing homepage. Auth comes from cookies, so this page renders
-// dynamically — the portal's data layer does its own caching (24h for heavy
-// aggregates, minutes for stats and the initial stream).
+// Guests and members share one homepage/dashboard composition. Authentication
+// only selects the hero action and access links; the portal data layer handles
+// its own caching (24h for heavy aggregates, minutes for stats and the stream).
 interface HomepageProps {
   searchParams?: {
     action?: string | string[]

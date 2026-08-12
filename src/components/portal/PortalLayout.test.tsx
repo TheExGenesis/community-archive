@@ -117,7 +117,7 @@ test('renders the balanced homepage composition and editorial labels', async () 
   jest.restoreAllMocks()
 })
 
-test('keeps the public dashboard useful while routing protected tools through sign-in', async () => {
+test('keeps the public dashboard useful while routing Trends through sign-in', async () => {
   jest.useFakeTimers()
   jest.setSystemTime(Date.parse('2026-08-07T13:00:00.000Z'))
   jest.spyOn(global, 'fetch').mockResolvedValue({
@@ -140,9 +140,10 @@ test('keeps the public dashboard useful while routing protected tools through si
   expect(
     screen.getByRole('link', { name: /Sign in for Trends/i }),
   ).toHaveAttribute('href', '/login?redirect=%2Ftrends')
-  expect(
-    screen.getByRole('link', { name: /Sign in for firehose/i }),
-  ).toHaveAttribute('href', '/login?redirect=%2Fstream')
+  expect(screen.getByRole('link', { name: /Open firehose/i })).toHaveAttribute(
+    'href',
+    '/stream',
+  )
 
   unmount()
   jest.clearAllTimers()

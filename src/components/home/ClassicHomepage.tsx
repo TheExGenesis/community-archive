@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import AvatarList from '@/components/AvatarList'
+import HomepageSearch from '@/components/HomepageSearch'
 import Portal from '@/components/portal/Portal'
 import Testimonials from '@/components/home/Testimonials'
 import { formatNumber } from '@/lib/formatNumber'
@@ -151,6 +152,8 @@ export default async function ClassicHomepage({
 
           {showCta ? (
             <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} />
+          ) : isMember ? (
+            <HomepageSearch />
           ) : null}
 
           <div className="pt-2">

@@ -26,10 +26,19 @@ export interface SocialGraphEdge {
   target: string
   strength: number
   mutualInteractions: number
+  yearlyInteractions: Array<
+    [
+      year: number,
+      sourceInteractions: number,
+      targetInteractions: number,
+      sourceOutgoingInteractions: number,
+      targetOutgoingInteractions: number,
+    ]
+  >
 }
 
 export interface SocialGraphSnapshot {
-  version: 1
+  version: 2
   generatedAt: string
   semantics: {
     interactions: string[]
@@ -37,6 +46,11 @@ export interface SocialGraphSnapshot {
     mutualStrength: string
     mutualInteractions: string
     clusterPolicy: string
+    timeWindow: string
+  }
+  temporal: {
+    minYear: number
+    maxYear: number
   }
   stats: {
     nodeCount: number
@@ -62,11 +76,14 @@ export function validateSocialGraphSnapshot(
 ): asserts value is SocialGraphSnapshot {
   const snapshot = value as Partial<SocialGraphSnapshot> | null
   if (
-    snapshot?.version !== 1 ||
+    snapshot?.version !== 2 ||
     !Number.isFinite(Date.parse(snapshot.generatedAt || '')) ||
     !Array.isArray(snapshot.nodes) ||
     !Array.isArray(snapshot.edges) ||
     !Array.isArray(snapshot.clusters) ||
+    !Number.isSafeInteger(snapshot.temporal?.minYear) ||
+    !Number.isSafeInteger(snapshot.temporal?.maxYear) ||
+    (snapshot.temporal?.minYear || 0) > (snapshot.temporal?.maxYear || 0) ||
     snapshot.nodes.length !== snapshot.stats?.nodeCount ||
     snapshot.edges.length !== snapshot.stats?.edgeCount ||
     !snapshot.nodes.every(
@@ -84,7 +101,18 @@ export function validateSocialGraphSnapshot(
         typeof edge.source === 'string' &&
         typeof edge.target === 'string' &&
         validFinite(edge.strength) &&
-        validFinite(edge.mutualInteractions),
+        validFinite(edge.mutualInteractions) &&
+        Array.isArray(edge.yearlyInteractions) &&
+        edge.yearlyInteractions.every(
+          (entry) =>
+            Array.isArray(entry) &&
+            entry.length === 5 &&
+            Number.isSafeInteger(entry[0]) &&
+            validFinite(entry[1]) &&
+            validFinite(entry[2]) &&
+            validFinite(entry[3]) &&
+            validFinite(entry[4]),
+        ),
     )
   ) {
     throw new Error('ClickHouse social graph response is invalid')

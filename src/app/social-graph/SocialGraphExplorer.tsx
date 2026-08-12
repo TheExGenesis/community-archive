@@ -213,6 +213,8 @@ export default function SocialGraphExplorer({
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [followerSlider, setFollowerSlider] = useState(0)
+  const [startYear, setStartYear] = useState(snapshot.temporal.minYear)
+  const [endYear, setEndYear] = useState(snapshot.temporal.maxYear)
   const [minimumStrength, setMinimumStrength] = useState(
     Math.min(
       STRENGTH_SLIDER_MAX,
@@ -249,6 +251,14 @@ export default function SocialGraphExplorer({
     deferredMinimumStrength !== minimumStrength ||
     deferredMaximumNodes !== maximumNodes
   const clusters = useMemo(() => clusterMap(snapshot.clusters), [snapshot])
+  const years = useMemo(
+    () =>
+      Array.from(
+        { length: snapshot.temporal.maxYear - snapshot.temporal.minYear + 1 },
+        (_, index) => snapshot.temporal.maxYear - index,
+      ),
+    [snapshot.temporal.maxYear, snapshot.temporal.minYear],
+  )
   const nodeById = useMemo(
     () => new Map(snapshot.nodes.map((node) => [node.id, node])),
     [snapshot.nodes],
@@ -259,12 +269,16 @@ export default function SocialGraphExplorer({
         minimumFollowers: appliedMinimumFollowers,
         minimumStrength: deferredMinimumStrength,
         maximumNodes: deferredMaximumNodes,
+        startYear,
+        endYear,
       }),
     [
       snapshot,
       appliedMinimumFollowers,
       deferredMinimumStrength,
       deferredMaximumNodes,
+      endYear,
+      startYear,
     ],
   )
   const filteredSignature = useMemo(
@@ -537,6 +551,49 @@ export default function SocialGraphExplorer({
           step={1}
           onChange={setFollowerSlider}
         />
+        <fieldset>
+          <legend className="mb-1.5 text-[12px] font-medium">
+            Interaction years
+          </legend>
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <select
+              aria-label="Interaction start year"
+              value={startYear}
+              onChange={(event) => {
+                const next = Number(event.target.value)
+                setStartYear(next)
+                if (next > endYear) setEndYear(next)
+              }}
+              className="h-8 rounded-[3px] border border-zinc-200 bg-white px-2 text-[11px] dark:border-[#35353a] dark:bg-[#151517]"
+            >
+              {years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+            <span className={`text-[10px] ${MUTED}`}>through</span>
+            <select
+              aria-label="Interaction end year"
+              value={endYear}
+              onChange={(event) => {
+                const next = Number(event.target.value)
+                setEndYear(next)
+                if (next < startYear) setStartYear(next)
+              }}
+              className="h-8 rounded-[3px] border border-zinc-200 bg-white px-2 text-[11px] dark:border-[#35353a] dark:bg-[#151517]"
+            >
+              {years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className={`mt-1 text-[10px] ${MUTED}`}>
+            Inclusive UTC calendar years
+          </p>
+        </fieldset>
         <Slider
           label="Mutual strength"
           value={minimumStrength}
@@ -599,7 +656,7 @@ export default function SocialGraphExplorer({
             type="button"
             onClick={adaptGraph}
             disabled={isAdapting || filtered.nodes.length < 2}
-            className="flex h-8 w-full items-center justify-center gap-1.5 rounded-[3px] bg-brand px-3 text-[11px] font-semibold text-brand-foreground disabled:cursor-wait disabled:opacity-60"
+            className="flex h-8 w-full items-center justify-center gap-1.5 rounded-[3px] bg-brand px-3 text-[11px] font-semibold text-zinc-950 disabled:cursor-wait disabled:opacity-60"
           >
             {isAdapting ? (
               <Clock3 className="h-3.5 w-3.5 animate-pulse" />
@@ -710,7 +767,11 @@ export default function SocialGraphExplorer({
             <h2 className="text-[13px] font-semibold">
               {adaptiveIsCurrent ? 'Active communities' : 'Stable communities'}
             </h2>
-            <div className="mt-2 max-h-44 space-y-1.5 overflow-auto pr-1">
+            <div
+              className="mt-2 max-h-44 space-y-1.5 overflow-auto pr-1"
+              tabIndex={0}
+              aria-label="Community list"
+            >
               {(adaptiveIsCurrent && adaptiveResult
                 ? adaptiveLegendClusters
                 : snapshot.clusters
@@ -742,8 +803,9 @@ export default function SocialGraphExplorer({
           <p className="mt-2">
             For each direction, replies + quotes to this person are divided by
             all replies + quotes from that account, then multiplied by 100. The
-            edge uses the weaker direction. The node limit keeps the highest
-            weighted-degree accounts in the active graph. The stable server
+            edge uses the weaker direction. Counts and denominators are
+            recomputed for the selected years. The node limit keeps the highest
+            weighted-degree accounts in that active graph. The stable server
             layout stays fixed until you explicitly run an adaptive layout.
           </p>
         </details>

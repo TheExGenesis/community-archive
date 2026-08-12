@@ -10,6 +10,44 @@ export interface SocialGraphFilters {
   minimumFollowers: number
   minimumStrength: number
   maximumNodes: number
+  startYear: number
+  endYear: number
+}
+
+function edgeForYearWindow(
+  edge: SocialGraphEdge,
+  startYear: number,
+  endYear: number,
+): SocialGraphEdge | null {
+  let sourceInteractions = 0
+  let targetInteractions = 0
+  let sourceTotal = 0
+  let targetTotal = 0
+  for (const [
+    year,
+    sourceCount,
+    targetCount,
+    sourceOutgoing,
+    targetOutgoing,
+  ] of edge.yearlyInteractions) {
+    if (year < startYear || year > endYear) continue
+    sourceInteractions += sourceCount
+    targetInteractions += targetCount
+    sourceTotal += sourceOutgoing
+    targetTotal += targetOutgoing
+  }
+  if (!sourceInteractions || !targetInteractions) return null
+  if (!sourceTotal || !targetTotal) return null
+  return {
+    ...edge,
+    strength: Number(
+      Math.min(
+        (100 * sourceInteractions) / sourceTotal,
+        (100 * targetInteractions) / targetTotal,
+      ).toFixed(4),
+    ),
+    mutualInteractions: Math.min(sourceInteractions, targetInteractions),
+  }
 }
 
 export interface FilteredSocialGraph {
@@ -40,8 +78,18 @@ export function filterSocialGraph(
   const followerEligible = snapshot.nodes.filter(
     (node) => node.followers >= filters.minimumFollowers,
   )
-  const strengthEligibleEdges = snapshot.edges.filter(
-    (edge) => edge.strength >= filters.minimumStrength,
+  const strengthEligibleEdges = snapshot.edges.flatMap((edge) => {
+    const windowed = edgeForYearWindow(edge, filters.startYear, filters.endYear)
+    return windowed && windowed.strength >= filters.minimumStrength
+      ? [windowed]
+      : []
+  })
+  strengthEligibleEdges.sort(
+    (left, right) =>
+      right.strength - left.strength ||
+      right.mutualInteractions - left.mutualInteractions ||
+      left.source.localeCompare(right.source) ||
+      left.target.localeCompare(right.target),
   )
   const centrality = weightedDegree(followerEligible, strengthEligibleEdges)
   const eligible = followerEligible

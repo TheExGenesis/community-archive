@@ -32,6 +32,21 @@ describe('member navigation', () => {
     expect(isNavItemActive('/stream', '/stream')).toBe(true)
     expect(isNavItemActive('/search', '/bangers?period=all')).toBe(false)
   })
+
+  it('keeps Bangers public while reserving Trends for signed-in members', () => {
+    expect(getPrimaryNav(false)).toContainEqual({
+      href: '/bangers?period=all',
+      label: 'Bangers',
+    })
+    expect(getPrimaryNav(false)).not.toContainEqual({
+      href: '/trends',
+      label: 'Trends',
+    })
+    expect(getPrimaryNav(true)).toContainEqual({
+      href: '/trends',
+      label: 'Trends',
+    })
+  })
 })
 
 describe('tweet detail navigation', () => {

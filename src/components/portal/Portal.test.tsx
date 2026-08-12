@@ -2,11 +2,6 @@ import { act, render, screen } from '@testing-library/react'
 import Portal, { type PortalView } from './Portal'
 import type { PortalData, PortalTweet } from '@/lib/portal/types'
 
-jest.mock('@/components/HomepageSearch', () => ({
-  __esModule: true,
-  default: () => null,
-}))
-
 jest.mock('./TweetRow', () => ({
   TweetRow: ({ tweet, noClamp }: { tweet: PortalTweet; noClamp?: boolean }) => (
     <div data-no-clamp={String(Boolean(noClamp))}>{tweet.text}</div>
@@ -241,11 +236,6 @@ describe('portal component failures', () => {
     })
 
     expect(
-      screen.getByText(
-        'We preserve public conversations as open source infrastructure.',
-      ),
-    ).toBeInTheDocument()
-    expect(
       screen.getByText('Tweet totals are temporarily unavailable.'),
     ).toBeInTheDocument()
     expect(
@@ -269,6 +259,7 @@ describe('portal component failures', () => {
     expect(
       screen.getByText('Historical bangers are temporarily unavailable.'),
     ).toBeInTheDocument()
-    expect(screen.getByText('Explore the archive')).toBeInTheDocument()
+    expect(screen.getByText('Community Builds')).toBeInTheDocument()
+    expect(screen.queryByText('Explore the archive')).not.toBeInTheDocument()
   })
 })

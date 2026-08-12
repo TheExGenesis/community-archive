@@ -1,8 +1,6 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { BangersExplorer } from '@/components/portal/BangersExplorer'
 import { MUTED, SERIF } from '@/components/portal/styles'
-import { getIsMember } from '@/lib/portal/auth'
 import { getInitialPortalBangersPage } from '@/lib/portal/data'
 import type {
   PortalBangersPeriod,
@@ -23,7 +21,6 @@ export default async function BangersPage({
 }: {
   searchParams: BangersSearchParams
 }) {
-  if (!(await getIsMember())) redirect('/')
   const sort = 'quotes' as const
   const scope: PortalBangersScope =
     paramValue(searchParams.scope) === 'members' ? 'members' : 'all'

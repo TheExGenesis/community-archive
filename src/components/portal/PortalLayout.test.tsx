@@ -2,11 +2,6 @@ import { act, render, screen } from '@testing-library/react'
 import Portal from './Portal'
 import type { PortalData, PortalTweet, ResearchPost } from '@/lib/portal/types'
 
-jest.mock('@/components/HomepageSearch', () => ({
-  __esModule: true,
-  default: () => null,
-}))
-
 jest.mock('./TweetRow', () => ({
   TweetRow: ({ tweet }: { tweet: PortalTweet }) => <div>{tweet.text}</div>,
 }))
@@ -100,6 +95,13 @@ test('renders the balanced homepage composition and editorial labels', async () 
     'href',
     'https://github.com/TheExGenesis/community-archive/releases/tag/data_export',
   )
+  expect(
+    screen.getByRole('link', { name: /Community Builds/i }),
+  ).toHaveAttribute(
+    'href',
+    'https://x.com/exgenesis/status/1835411943735140798',
+  )
+  expect(screen.queryByText('Explore the archive')).not.toBeInTheDocument()
   expect(screen.getByRole('region', { name: 'Live tweet stream' })).toHaveClass(
     'lg:flex-1',
     'lg:max-h-none',
@@ -108,6 +110,39 @@ test('renders the balanced homepage composition and editorial labels', async () 
   expect(
     screen.getByRole('region', { name: 'Live tweet stream' }).parentElement,
   ).toHaveClass('lg:h-[420px]', 'lg:min-h-[420px]')
+
+  unmount()
+  jest.clearAllTimers()
+  jest.useRealTimers()
+  jest.restoreAllMocks()
+})
+
+test('keeps the public dashboard useful while routing protected tools through sign-in', async () => {
+  jest.useFakeTimers()
+  jest.setSystemTime(Date.parse('2026-08-07T13:00:00.000Z'))
+  jest.spyOn(global, 'fetch').mockResolvedValue({
+    ok: true,
+    json: async () => ({ tweets: [], updateCursor: null }),
+  } as Response)
+
+  const { unmount } = render(
+    <Portal data={data} view="home" isMember={false} embedded />,
+  )
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+
+  expect(screen.getByRole('link', { name: /Recent bangers/i })).toHaveAttribute(
+    'href',
+    '/bangers?period=week',
+  )
+  expect(
+    screen.getByRole('link', { name: /Sign in for Trends/i }),
+  ).toHaveAttribute('href', '/login?redirect=%2Ftrends')
+  expect(
+    screen.getByRole('link', { name: /Sign in for firehose/i }),
+  ).toHaveAttribute('href', '/login?redirect=%2Fstream')
 
   unmount()
   jest.clearAllTimers()

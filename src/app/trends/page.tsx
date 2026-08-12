@@ -12,7 +12,7 @@ export const metadata = { title: 'Trends · Community Archive' }
 export const maxDuration = 60
 
 export default async function TrendsPage() {
-  if (!(await getIsMember())) redirect('/')
+  if (!(await getIsMember())) redirect('/login?redirect=/trends')
   const initial = await loadPortalComponentData(
     'trends-explorer',
     getPortalTrendSnapshot,

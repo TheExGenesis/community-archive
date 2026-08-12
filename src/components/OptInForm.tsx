@@ -188,8 +188,7 @@ export default function OptInForm({
             Thanks for opting in!
           </h1>
           <p className="mx-auto max-w-2xl text-muted-foreground">
-            We&apos;ll keep your public tweets live over time. We still need
-            your archive to backfill older tweets.
+            We&apos;ll keep your public tweets live from now on.
           </p>
         </div>
         <p className="mx-auto max-w-2xl text-xs leading-5 text-muted-foreground">
@@ -211,26 +210,56 @@ export default function OptInForm({
         </p>
       </div>
 
-      <div className="mx-auto mt-8 max-w-2xl border-y border-green-200 py-6 text-center dark:border-green-900">
-        <Button asChild size="lg">
-          <a
-            href="https://x.com/settings/download_your_data"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Request your X archive
-            <ArrowUpRight className="ml-2 h-4 w-4" aria-hidden="true" />
-          </a>
-        </Button>
+      <div className="mt-8 border-y border-green-200 py-8 dark:border-green-900">
+        <div className="mx-auto max-w-2xl space-y-3 text-center">
+          <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
+            We still need your archive to preserve your earlier tweets.
+          </h2>
+          <p className="text-sm leading-6 text-muted-foreground sm:text-base">
+            Opting in lets us archive your public tweets starting now, but it
+            can&apos;t reach tweets you posted before today. Uploading your
+            archive makes your past tweets searchable and helps them inform
+            trend mapping and historical analysis. That&apos;s really helpful to
+            us and to the people building on the archive.
+          </p>
+        </div>
 
-        <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
-          Twitter takes a few days to let you download your archive. They will
-          email you when it&apos;s ready. If you already have it:
-        </p>
+        <ol className="mx-auto mt-6 grid max-w-3xl gap-4 sm:grid-cols-2">
+          <li className="flex h-full flex-col items-center rounded-xl border border-green-200 bg-background p-5 text-center dark:border-green-900">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg font-bold text-green-700 dark:bg-green-900/70 dark:text-green-300">
+              1
+            </div>
+            <h3 className="mt-4 font-semibold">Request your X archive</h3>
+            <p className="mt-2 flex-1 text-sm leading-6 text-muted-foreground">
+              Ask X for a copy of your data. They&apos;ll email you in a few
+              days when it&apos;s ready to download.
+            </p>
+            <Button asChild size="lg" className="mt-5">
+              <a
+                href="https://x.com/settings/download_your_data"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Request your archive
+                <ArrowUpRight className="ml-2 h-4 w-4" aria-hidden="true" />
+              </a>
+            </Button>
+          </li>
 
-        <Button asChild variant="outline" size="lg" className="mt-4">
-          <Link href="/#upload-archive">Upload your archive</Link>
-        </Button>
+          <li className="flex h-full flex-col items-center rounded-xl border border-green-200 bg-background p-5 text-center dark:border-green-900">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg font-bold text-green-700 dark:bg-green-900/70 dark:text-green-300">
+              2
+            </div>
+            <h3 className="mt-4 font-semibold">Upload your archive</h3>
+            <p className="mt-2 flex-1 text-sm leading-6 text-muted-foreground">
+              When it arrives, upload the .zip file to add your earlier tweets
+              to the Community Archive.
+            </p>
+            <Button asChild variant="outline" size="lg" className="mt-5">
+              <Link href="/#upload-archive">Upload your archive</Link>
+            </Button>
+          </li>
+        </ol>
       </div>
 
       <div className="mt-8 space-y-4">

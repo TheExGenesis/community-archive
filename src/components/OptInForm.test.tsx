@@ -62,15 +62,22 @@ describe('OptInForm opted-in experience', () => {
       }),
     ).toBeInTheDocument()
     expect(
-      screen.getByText(/keep your public tweets live over time/i),
+      screen.getByText(/keep your public tweets live from now on/i),
     ).toBeInTheDocument()
     expect(
-      screen.getByText(/still need your archive to backfill older tweets/i),
+      screen.getByRole('heading', {
+        name: /still need your archive to preserve your earlier tweets/i,
+      }),
     ).toBeInTheDocument()
-    expect(screen.getByText(/twitter takes a few days/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/can't reach tweets you posted before today/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/trend mapping and historical analysis/i),
+    ).toBeInTheDocument()
 
     expect(
-      screen.getByRole('link', { name: /request your x archive/i }),
+      screen.getByRole('link', { name: /request your archive/i }),
     ).toHaveAttribute('href', 'https://x.com/settings/download_your_data')
     expect(
       screen.getByRole('link', { name: /upload your archive/i }),

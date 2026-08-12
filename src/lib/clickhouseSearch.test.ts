@@ -43,6 +43,7 @@ describe('searchTweetsWithClickHouse', () => {
         replyToUsername: 'bob',
         startDate: '2024-01-01',
         endDate: '2025-01-01',
+        sort: 'likes',
       },
       2,
       20,
@@ -50,7 +51,7 @@ describe('searchTweetsWithClickHouse', () => {
     )
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      '/api/tweet-search?q=Open+source&mode=phrase&limit=20&offset=20&from_user=alice&reply_to_user=bob&since=2024-01-01&until=2025-01-01',
+      '/api/tweet-search?q=Open+source&mode=phrase&limit=20&offset=20&from_user=alice&reply_to_user=bob&since=2024-01-01&until=2025-01-01&sort=likes',
       { cache: 'no-store' },
     )
     expect(tweets).toEqual([
@@ -75,5 +76,19 @@ describe('searchTweetsWithClickHouse', () => {
         ],
       }),
     ])
+  })
+
+  test('stops cleanly before requesting an offset beyond the gateway cap', async () => {
+    const fetchImpl = jest.fn()
+
+    const tweets = await searchTweetsWithClickHouse(
+      { rawSearchQuery: 'archive', sort: 'likes' },
+      252,
+      20,
+      fetchImpl as any,
+    )
+
+    expect(tweets).toEqual([])
+    expect(fetchImpl).not.toHaveBeenCalled()
   })
 })

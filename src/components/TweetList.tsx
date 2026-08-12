@@ -8,7 +8,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { createBrowserClient } from '@/utils/supabase'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { TimelineTweet } from '@/lib/types'
-import { FilterCriteria, fetchTweets } from '@/lib/queries/tweetQueries'
+import {
+  FilterCriteria,
+  fetchTweets,
+  type TweetSearchSort,
+} from '@/lib/queries/tweetQueries'
 import { AlertCircle } from 'lucide-react'
 import type { TweetOrigin } from '@/lib/navigation'
 
@@ -23,6 +27,7 @@ interface TweetListProps {
   compact?: boolean
   permalinkOrigin?: TweetOrigin
   permalinkReturnTo?: string
+  onSearchSortChange?: (sort: TweetSearchSort) => void
 }
 
 const DEFAULT_ITEMS_PER_PAGE = 20
@@ -38,6 +43,7 @@ export default function TweetList({
   compact = false,
   permalinkOrigin,
   permalinkReturnTo,
+  onSearchSortChange,
 }: TweetListProps) {
   const [tweets, setTweets] = useState<TimelineTweet[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -207,6 +213,8 @@ export default function TweetList({
         compact={compact}
         permalinkOrigin={permalinkOrigin}
         permalinkReturnTo={permalinkReturnTo}
+        searchSort={filterCriteria.sort}
+        onSearchSortChange={onSearchSortChange}
       />
 
       {error && tweets.length > 0 && (

@@ -223,6 +223,40 @@ describe('fetchTweets — exact phrase search via FTS simple', () => {
     expect(result.tweets[0].tweet_id).toBe('pg-1')
   })
 
+  it('does not silently ignore a non-default sort when ClickHouse is disabled', async () => {
+    const result = await fetchTweets(
+      buildMockSupabase(),
+      {
+        searchQuery: 'hello',
+        rawSearchQuery: 'hello',
+        sort: 'likes',
+      },
+      1,
+      20,
+    )
+
+    expect(mockClickHouseSearch).not.toHaveBeenCalled()
+    expect(mockRpcSearch).not.toHaveBeenCalled()
+    expect(result.error.message).toContain('requires the ClickHouse')
+  })
+
+  it('does not silently ignore a non-default sort on a filter-only search', async () => {
+    process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH = 'true'
+    const result = await fetchTweets(
+      buildMockSupabase(),
+      {
+        fromUsername: 'alice',
+        sort: 'likes',
+      },
+      1,
+      20,
+    )
+
+    expect(mockClickHouseSearch).not.toHaveBeenCalled()
+    expect(mockRpcSearch).not.toHaveBeenCalled()
+    expect(result.error.message).toContain('requires a text query')
+  })
+
   it('returns exact phrase matches for multi-word queries', async () => {
     mockRpcExactPhrase.mockResolvedValueOnce([
       makeRpcTweet('1', 'cool project A'),

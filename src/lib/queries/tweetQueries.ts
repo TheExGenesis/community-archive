@@ -27,7 +27,10 @@ export interface FilterCriteria {
   endDate?: string // For tweets created before this date
   excludeRetweets?: boolean // Exclude native archive retweets that start with "RT @"
   includeQuoteTweets?: boolean // Batch-load quoted tweet bodies for rich rendering
+  sort?: TweetSearchSort // Server-side order for ClickHouse text search
 }
+
+export type TweetSearchSort = 'newest' | 'oldest' | 'likes' | 'reposts'
 
 const DEFAULT_PAGE_SIZE = 50
 const CLICKHOUSE_FILTER_PAGE_SIZE = 50
@@ -218,11 +221,22 @@ export async function fetchTweets(
     try {
       const offset = (page - 1) * pageSize
       const rawText = criteria.rawSearchQuery
+      const clickHouseSearchEnabled =
+        process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH === 'true'
 
       if (
-        rawText &&
-        process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH === 'true'
+        criteria.sort &&
+        criteria.sort !== 'newest' &&
+        (!rawText || !clickHouseSearchEnabled)
       ) {
+        throw new Error(
+          rawText
+            ? 'This search order requires the ClickHouse search service.'
+            : 'Search ordering requires a text query.',
+        )
+      }
+
+      if (rawText && clickHouseSearchEnabled) {
         try {
           const clickHouseTweets = await searchClickHousePage(
             criteria,
@@ -244,6 +258,7 @@ export async function fetchTweets(
             'ClickHouse tweet search failed; falling back to Supabase:',
             error,
           )
+          if (criteria.sort && criteria.sort !== 'newest') throw error
         }
       }
 

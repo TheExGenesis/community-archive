@@ -43,7 +43,7 @@ describe('getDirectoryProfileHref', () => {
           account_id: '123456789',
         }),
       ),
-    ).toBe('/user/%40archive_member')
+    ).toBe('/user/123456789?username=archive_member')
   })
 
   it('uses the username for opt-in-only members too', () => {
@@ -51,7 +51,7 @@ describe('getDirectoryProfileHref', () => {
       getDirectoryProfileHref(
         directoryUser({ directory_id: 'optin:42', account_id: null }),
       ),
-    ).toBe('/user/%40archive_member')
+    ).toBe('/user/optin%3A42?username=archive_member')
   })
 })
 

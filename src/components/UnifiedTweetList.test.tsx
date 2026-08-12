@@ -67,14 +67,14 @@ describe('UnifiedTweetList compact view', () => {
       screen.getAllByRole('link', {
         name: "View @archive_user's profile",
       })[0],
-    ).toHaveAttribute('href', '/user/%40archive_user')
+    ).toHaveAttribute('href', '/user/123?username=archive_user')
     expect(screen.getByAltText('Tweet image 1')).toBeInTheDocument()
     expect(screen.getByText('Quoted User')).toBeInTheDocument()
     expect(
       screen.getAllByRole('link', {
         name: "View @quoted_user's profile",
       })[0],
-    ).toHaveAttribute('href', '/user/%40quoted_user')
+    ).toHaveAttribute('href', '/user/456?username=quoted_user')
     expect(
       screen.getByText(
         'The quoted tweet is visible in compact search results.',

@@ -341,11 +341,7 @@ export function TweetRow({
   const tweetContent = (
     <div
       className={`mt-0.5 leading-relaxed text-zinc-700 dark:text-[#d9d9de] ${
-        compact
-          ? 'text-[13.5px]'
-          : isFeatured
-            ? 'text-[14.5px]'
-            : 'text-[14px]'
+        compact ? 'text-[13.5px]' : isFeatured ? 'text-[14.5px]' : 'text-[14px]'
       } ${
         noClamp
           ? ''

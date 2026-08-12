@@ -23,18 +23,40 @@ test('maps a corpus account into the public profile contract', async () => {
         following: '3',
         statusCount: '45',
       },
+      topTweets: [
+        {
+          tweetId: '99',
+          createdAt: '2024-01-02T03:04:05.000Z',
+          fullText: 'A top tweet',
+          replyToUsername: 'bob',
+          favoriteCount: '8',
+          retweetCount: 2,
+        },
+      ],
     },
   })
 
   await expect(getClickHouseUserProfile('42')).resolves.toEqual(
     expect.objectContaining({
-      account_id: '42',
-      username: 'alice',
-      account_display_name: 'Alice',
-      num_followers: 12,
-      num_tweets: 45,
-      has_archive: false,
-      is_opted_in: false,
+      user: expect.objectContaining({
+        account_id: '42',
+        username: 'alice',
+        account_display_name: 'Alice',
+        num_followers: 12,
+        num_tweets: 45,
+        has_archive: false,
+        is_opted_in: false,
+      }),
+      topTweets: [
+        {
+          tweetId: '99',
+          createdAt: '2024-01-02T03:04:05.000Z',
+          fullText: 'A top tweet',
+          replyToUsername: 'bob',
+          favoriteCount: 8,
+          retweetCount: 2,
+        },
+      ],
     }),
   )
 })

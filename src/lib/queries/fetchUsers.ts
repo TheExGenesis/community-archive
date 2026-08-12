@@ -22,7 +22,7 @@ export const buildDirectorySearchFilter = (search: string) => {
 }
 
 export const getDirectoryProfileHref = (user: DirectoryUser) =>
-  userProfileHref(user.username, user.directory_id)
+  userProfileHref(user.username, user.account_id || user.directory_id)
 
 export const fetchUsers = async (
   supabase: SupabaseClient,

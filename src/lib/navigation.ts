@@ -13,13 +13,21 @@ export function userProfileHref(
   accountId?: string | null,
 ): string {
   const cleanUsername = username?.trim().replace(/^@/, '')
-  const identifier =
+  const validUsername =
     cleanUsername &&
     isTwitterUsername(cleanUsername) &&
     !/^\d+$/.test(cleanUsername)
-      ? `@${cleanUsername}`
-      : accountId
-  return identifier ? `/user/${encodeURIComponent(identifier)}` : '/user-dir'
+      ? cleanUsername
+      : null
+  if (accountId) {
+    const pathname = `/user/${encodeURIComponent(accountId)}`
+    return validUsername
+      ? `${pathname}?username=${encodeURIComponent(validUsername)}`
+      : pathname
+  }
+  return validUsername
+    ? `/user/${encodeURIComponent(`@${validUsername}`)}`
+    : '/user-dir'
 }
 
 export interface TweetBackLink {

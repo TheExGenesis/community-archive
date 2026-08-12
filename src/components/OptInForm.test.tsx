@@ -7,23 +7,6 @@ import userEvent from '@testing-library/user-event'
 import OptInForm from '@/components/OptInForm'
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
 
-jest.mock('next/image', () => ({
-  __esModule: true,
-  default: ({
-    src,
-    alt,
-    fill: _fill,
-    ...props
-  }: React.ImgHTMLAttributes<HTMLImageElement> & { fill?: boolean }) => {
-    void _fill
-
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={String(src)} alt={alt} {...props} />
-    )
-  },
-}))
-
 jest.mock('next/link', () => ({
   __esModule: true,
   default: ({
@@ -58,33 +41,34 @@ describe('OptInForm opted-in experience', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'Yay—thank you so much for opting in!',
+        name: 'Thanks for opting in!',
       }),
     ).toBeInTheDocument()
     expect(
-      screen.getByText(/archive your public tweets going forward/i),
+      screen.getByText(/keep your public tweets live over time/i),
     ).toBeInTheDocument()
-    expect(screen.getByText(/never need to upload again/i)).toBeInTheDocument()
     expect(
-      screen.getByText(/that's completely fine. your opt-in still helps/i),
+      screen.getByText(/still need your archive to backfill older tweets/i),
     ).toBeInTheDocument()
 
     expect(
       screen.getByRole('link', { name: /request your x archive/i }),
     ).toHaveAttribute('href', 'https://x.com/settings/download_your_data')
     expect(
-      screen.getByRole('link', { name: /upload it here/i }),
+      screen.getByRole('link', { name: /upload your archive/i }),
     ).toHaveAttribute('href', '/#upload-archive')
     expect(screen.getByRole('link', { name: /bangers/i })).toHaveAttribute(
       'href',
       '/bangers',
     )
-    expect(
-      screen.getByRole('link', { name: /keyword trends/i }),
-    ).toHaveAttribute('href', '/trends')
-    expect(
-      screen.getByRole('link', { name: /manage privacy settings/i }),
-    ).toHaveAttribute('href', '/profile')
+    expect(screen.getByRole('link', { name: /trends/i })).toHaveAttribute(
+      'href',
+      '/trends',
+    )
+    expect(screen.getByRole('link', { name: /dashboard/i })).toHaveAttribute(
+      'href',
+      '/',
+    )
   })
 
   it('previews opt-in locally in staging without calling the API', async () => {
@@ -104,7 +88,7 @@ describe('OptInForm opted-in experience', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(
       screen.getByRole('heading', {
-        name: 'Yay—thank you so much for opting in!',
+        name: 'Thanks for opting in!',
       }),
     ).toBeInTheDocument()
     expect(

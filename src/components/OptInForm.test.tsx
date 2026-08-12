@@ -7,6 +7,23 @@ import userEvent from '@testing-library/user-event'
 import OptInForm from '@/components/OptInForm'
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
 
+jest.mock('next/image', () => ({
+  __esModule: true,
+  default: ({
+    src,
+    alt,
+    fill: _fill,
+    ...props
+  }: React.ImgHTMLAttributes<HTMLImageElement> & { fill?: boolean }) => {
+    void _fill
+
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={String(src)} alt={alt} {...props} />
+    )
+  },
+}))
+
 jest.mock('next/link', () => ({
   __esModule: true,
   default: ({
@@ -50,6 +67,7 @@ describe('OptInForm opted-in experience', () => {
     expect(
       screen.getByText(/still need your archive to backfill older tweets/i),
     ).toBeInTheDocument()
+    expect(screen.getByText(/twitter takes a few days/i)).toBeInTheDocument()
 
     expect(
       screen.getByRole('link', { name: /request your x archive/i }),
@@ -69,6 +87,17 @@ describe('OptInForm opted-in experience', () => {
       'href',
       '/',
     )
+    expect(screen.getByRole('link', { name: /data policy/i })).toHaveAttribute(
+      'href',
+      '/data-policy',
+    )
+    expect(screen.getByRole('link', { name: /profile/i })).toHaveAttribute(
+      'href',
+      '/profile',
+    )
+    expect(
+      screen.getByRole('img', { name: /dashboard preview/i }),
+    ).toHaveAttribute('src', '/images/featured/dashboard.png')
   })
 
   it('previews opt-in locally in staging without calling the API', async () => {

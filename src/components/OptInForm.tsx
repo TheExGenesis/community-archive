@@ -3,10 +3,32 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowUpRight, PartyPopper } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
+
+const nextSteps = [
+  {
+    href: '/',
+    imageSrc: '/images/featured/dashboard.png',
+    imageAlt: 'Community Archive dashboard preview',
+    title: 'Dashboard',
+  },
+  {
+    href: '/bangers',
+    imageSrc: '/images/featured/bangers.png',
+    imageAlt: 'Bangers tweet rankings preview',
+    title: 'Bangers',
+  },
+  {
+    href: '/trends',
+    imageSrc: '/images/featured/trends.png',
+    imageAlt: 'Community Archive trends preview',
+    title: 'Trends',
+  },
+]
 
 interface OptInFormProps {
   userId: string
@@ -90,117 +112,159 @@ export default function OptInForm({
     )
   }
 
-  return (
-    <div className="space-y-8 text-center">
-      {/* Current status as simple text */}
-      {!isOptedIn && (
-        <div className="text-center">
-          <p className="text-lg text-muted-foreground">
-            Current Status:{' '}
-            <span className="font-semibold text-muted-foreground">
-              Not Opted In
-            </span>
-          </p>
-        </div>
-      )}
+  return !isOptedIn ? (
+    <section className="rounded-lg bg-card p-6 text-center shadow-lg md:p-8">
+      <div className="mb-8">
+        <h1 className="mb-4 text-4xl font-bold text-foreground">
+          Tweet Streaming Opt-In
+        </h1>
+        <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
+          Allow your public tweets to be automatically preserved in the
+          Community Archive through our browser extension for historical and
+          research purposes.
+        </p>
+      </div>
 
-      {/* Error message */}
+      <p className="text-lg text-muted-foreground">
+        Current Status:{' '}
+        <span className="font-semibold text-muted-foreground">
+          Not Opted In
+        </span>
+      </p>
+
       {error && (
-        <Alert variant="destructive" className="mx-auto max-w-md">
+        <Alert variant="destructive" className="mx-auto mt-8 max-w-md">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      {/* Main action area */}
-      <div className={isOptedIn ? '' : 'py-8'}>
-        {!isOptedIn ? (
-          <div>
-            <Button
-              onClick={handleSubmit}
-              disabled={isLoading}
-              size="lg"
-              className="min-w-[280px] px-12 py-6 text-xl font-semibold"
-            >
-              {isLoading ? 'Processing...' : 'Opt In to Tweet Streaming'}
-            </Button>
-            {mockOptIn && (
-              <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
-                Staging preview: this button only changes this page. It will not
-                create or update an opt-in record.
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="mx-auto max-w-2xl space-y-6 text-left">
-            {mockOptIn && (
-              <Alert className="border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/30">
-                <AlertDescription className="text-sky-900 dark:text-sky-100">
-                  <strong>Staging preview:</strong> no opt-in record was
-                  changed. Refresh this page to test the flow again.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <section className="rounded-2xl border border-green-200 bg-green-50/60 p-6 shadow-sm dark:border-green-900 dark:bg-green-950/20 sm:p-8">
-              <div className="space-y-4 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/70 dark:text-green-300">
-                  <PartyPopper className="h-7 w-7" aria-hidden="true" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                    Thanks for opting in!
-                  </h2>
-                  <p className="mx-auto max-w-2xl text-muted-foreground">
-                    We&apos;ll keep your public tweets live over time. We still
-                    need your archive to backfill older tweets.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                <Button asChild size="lg">
-                  <a
-                    href="https://x.com/settings/download_your_data"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Request your X archive
-                    <ArrowUpRight className="ml-2 h-4 w-4" aria-hidden="true" />
-                  </a>
-                </Button>
-                <Button asChild variant="outline" size="lg">
-                  <Link href="/#upload-archive">Upload your archive</Link>
-                </Button>
-              </div>
-
-              <p className="mt-6 text-center text-sm text-muted-foreground">
-                Not ready to backfill? Continue to your{' '}
-                <Link
-                  href="/"
-                  className="font-medium text-foreground underline underline-offset-4"
-                >
-                  dashboard
-                </Link>
-                ,{' '}
-                <Link
-                  href="/bangers"
-                  className="font-medium text-foreground underline underline-offset-4"
-                >
-                  Bangers
-                </Link>{' '}
-                or{' '}
-                <Link
-                  href="/trends"
-                  className="font-medium text-foreground underline underline-offset-4"
-                >
-                  Trends
-                </Link>
-                .
-              </p>
-            </section>
-          </div>
-        )}
+      <div className="py-8">
+        <div>
+          <Button
+            onClick={handleSubmit}
+            disabled={isLoading}
+            size="lg"
+            className="min-w-[280px] px-12 py-6 text-xl font-semibold"
+          >
+            {isLoading ? 'Processing...' : 'Opt In to Tweet Streaming'}
+          </Button>
+          {mockOptIn && (
+            <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
+              Staging preview: this button only changes this page. It will not
+              create or update an opt-in record.
+            </p>
+          )}
+        </div>
       </div>
-    </div>
+
+      <div className="border-t border-border pt-6">
+        <p className="text-sm text-muted-foreground">
+          By opting in, you agree to our{' '}
+          <Link href="/data-policy" className="text-brand hover:underline">
+            Data Policy
+          </Link>
+          . Your public tweets will be archived and may persist even after
+          deletion from Twitter/X.
+        </p>
+      </div>
+    </section>
+  ) : (
+    <section className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-green-200 bg-green-50/60 p-6 text-left shadow-sm dark:border-green-900 dark:bg-green-950/20 sm:p-8">
+      {mockOptIn && (
+        <Alert className="mb-6 border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/30">
+          <AlertDescription className="text-sky-900 dark:text-sky-100">
+            <strong>Staging preview:</strong> no opt-in record was changed.
+            Refresh this page to test the flow again.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="space-y-4 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-700 dark:bg-green-900/70 dark:text-green-300">
+          <PartyPopper className="h-7 w-7" aria-hidden="true" />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+            Thanks for opting in!
+          </h1>
+          <p className="mx-auto max-w-2xl text-muted-foreground">
+            We&apos;ll keep your public tweets live over time. We still need
+            your archive to backfill older tweets.
+          </p>
+        </div>
+        <p className="mx-auto max-w-2xl text-xs leading-5 text-muted-foreground">
+          By opting in, you agree to our{' '}
+          <Link
+            href="/data-policy"
+            className="font-medium text-foreground underline underline-offset-4"
+          >
+            Data Policy
+          </Link>
+          . You can opt out in your{' '}
+          <Link
+            href="/profile"
+            className="font-medium text-foreground underline underline-offset-4"
+          >
+            profile
+          </Link>
+          .
+        </p>
+      </div>
+
+      <div className="mx-auto mt-8 max-w-2xl border-y border-green-200 py-6 text-center dark:border-green-900">
+        <Button asChild size="lg">
+          <a
+            href="https://x.com/settings/download_your_data"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Request your X archive
+            <ArrowUpRight className="ml-2 h-4 w-4" aria-hidden="true" />
+          </a>
+        </Button>
+
+        <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
+          Twitter takes a few days to let you download your archive. They will
+          email you when it&apos;s ready. If you already have it:
+        </p>
+
+        <Button asChild variant="outline" size="lg" className="mt-4">
+          <Link href="/#upload-archive">Upload your archive</Link>
+        </Button>
+      </div>
+
+      <div className="mt-8 space-y-4">
+        <p className="text-center text-sm text-muted-foreground">
+          Not ready to upload? Continue to your dashboard, Bangers, or Trends.
+        </p>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          {nextSteps.map((step) => (
+            <Link
+              key={step.href}
+              href={step.href}
+              className="group overflow-hidden rounded-xl border bg-background shadow-sm transition hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <div className="relative aspect-video overflow-hidden border-b bg-muted">
+                <Image
+                  src={step.imageSrc}
+                  alt={step.imageAlt}
+                  fill
+                  sizes="(min-width: 640px) 240px, 100vw"
+                  className="object-cover object-top transition duration-300 group-hover:scale-[1.02]"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3 p-4">
+                <h2 className="font-semibold">{step.title}</h2>
+                <ArrowUpRight
+                  className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground"
+                  aria-hidden="true"
+                />
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
   )
 }

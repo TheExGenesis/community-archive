@@ -1,6 +1,7 @@
 import {
   MAX_TREND_EVIDENCE_CACHE_ENTRIES,
   cachedTrendEvidence,
+  hasCompleteTrendEvidence,
   storeTrendEvidence,
 } from './trendEvidenceCache'
 import type { PortalTweet } from './types'
@@ -66,5 +67,27 @@ describe('trend evidence cache', () => {
 
     expect(cache.size).toBe(MAX_TREND_EVIDENCE_CACHE_ENTRIES)
     expect(Array.from(cache.values())[0].term).toBe('term-1')
+  })
+
+  test('uses a full page from a broader range without an exact-range top-up', () => {
+    const cache = new Map()
+    storeTrendEvidence(cache, {
+      term: 'tpot',
+      range: null,
+      tweets: Array.from({ length: 30 }, (_, index) =>
+        tweet(
+          String(index),
+          `2026-06-${String(index + 1).padStart(2, '0')}T00:00:00.000Z`,
+        ),
+      ),
+    })
+
+    expect(
+      hasCompleteTrendEvidence(cache, 'tpot', { start: 2026, end: 2026 }),
+    ).toBe(true)
+    expect(
+      hasCompleteTrendEvidence(cache, 'tpot', { start: 2025, end: 2025 }),
+    ).toBe(false)
+    expect(hasCompleteTrendEvidence(cache, 'tpot', null)).toBe(true)
   })
 })

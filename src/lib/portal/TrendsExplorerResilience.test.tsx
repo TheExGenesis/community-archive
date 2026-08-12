@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom'
 import React from 'react'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TrendsExplorer from '@/components/portal/TrendsExplorer'
 import { emptyPortalTrends } from './trendConfig'
@@ -230,5 +230,87 @@ describe('TrendsExplorer request isolation', () => {
     )
     expect(await screen.findByText('tweet-2025-range')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Clear range' })).toBeVisible()
+  })
+
+  test('skips a range top-up when a broader cache has a full page', async () => {
+    jest.useFakeTimers()
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
+    const tweets = Array.from({ length: 30 }, (_, index) =>
+      feedTweet(String(index), 2026),
+    )
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ tweets }),
+    } as Response)
+
+    render(<TrendsExplorer initialTrends={successfulTrends} />)
+
+    expect(await screen.findByText('tweet-2026-0')).toBeVisible()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await user.selectOptions(screen.getByLabelText('Tweets from year'), '2026')
+
+    expect(screen.getByText('tweet-2026-0')).toBeVisible()
+    expect(
+      screen.queryByText('Updating this period in the background…'),
+    ).not.toBeInTheDocument()
+    act(() => jest.advanceTimersByTime(1_200))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('does not query during a pointer drag and debounces after release', async () => {
+    jest.useFakeTimers()
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ tweets: [] }),
+    } as Response)
+
+    render(<TrendsExplorer initialTrends={successfulTrends} />)
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    const chart = screen.getByRole('img', {
+      name: /Yearly term trends shown as/,
+    })
+    Object.defineProperty(chart, 'getBoundingClientRect', {
+      value: () => ({ left: 0, width: 760 }),
+    })
+    const dragTarget = screen.getByLabelText(
+      'Drag horizontally to filter tweets by year',
+    ) as unknown as SVGRectElement & { setPointerCapture: jest.Mock }
+    dragTarget.setPointerCapture = jest.fn()
+    const dispatchPointer = (type: string, clientX: number) => {
+      const event = new Event(type, { bubbles: true })
+      Object.defineProperties(event, {
+        clientX: { value: clientX },
+        pointerId: { value: 1 },
+      })
+      fireEvent(dragTarget, event)
+    }
+
+    dispatchPointer('pointerdown', 62)
+    await waitFor(() =>
+      expect(screen.getByLabelText('Tweets from year')).toHaveValue('2025'),
+    )
+    dispatchPointer('pointermove', 732)
+    await waitFor(() =>
+      expect(screen.getByLabelText('Tweets through year')).toHaveValue('2026'),
+    )
+    act(() => jest.advanceTimersByTime(5_000))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    dispatchPointer('pointerup', 732)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Clear range' })).toBeVisible(),
+    )
+    act(() => jest.advanceTimersByTime(1_199))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      jest.advanceTimersByTime(1)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    expect(
+      await screen.findByText('No matching tweets in this period.'),
+    ).toBeVisible()
   })
 })

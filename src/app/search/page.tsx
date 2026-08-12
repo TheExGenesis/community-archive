@@ -65,6 +65,7 @@ function SearchPageContent() {
 
   const tweetListKey = normalizedSearchParams.toString()
   const hasSearch = tweetListKey.length > 0
+  const canSortSearchResults = Boolean(cleanRawText)
   const searchDescription = cleanRawText
     ? `Matching “${cleanRawText}” and the filters above`
     : 'Matching the filters above'
@@ -112,7 +113,9 @@ function SearchPageContent() {
               compact
               permalinkOrigin="search"
               permalinkReturnTo={`/search?${tweetListKey}`}
-              onSearchSortChange={handleSortChange}
+              onSearchSortChange={
+                canSortSearchResults ? handleSortChange : undefined
+              }
             />
           ) : (
             <div className="rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center sm:px-10">

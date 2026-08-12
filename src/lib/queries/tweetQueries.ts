@@ -225,13 +225,14 @@ export async function fetchTweets(
         process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH === 'true'
 
       if (
-        rawText &&
         criteria.sort &&
         criteria.sort !== 'newest' &&
-        !clickHouseSearchEnabled
+        (!rawText || !clickHouseSearchEnabled)
       ) {
         throw new Error(
-          'This search order requires the ClickHouse search service.',
+          rawText
+            ? 'This search order requires the ClickHouse search service.'
+            : 'Search ordering requires a text query.',
         )
       }
 

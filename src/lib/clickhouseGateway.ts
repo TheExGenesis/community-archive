@@ -7,6 +7,7 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'reply_to_user',
     'since',
     'until',
+    'sort',
     'limit',
     'offset',
   ]),

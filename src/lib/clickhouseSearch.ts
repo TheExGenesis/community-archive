@@ -38,17 +38,22 @@ export async function searchTweetsWithClickHouse(
     throw new Error('ClickHouse text search requires the raw search query')
   }
 
+  const offset = (page - 1) * pageSize
+  if (offset > 5_000) return []
+
   const params = new URLSearchParams({
     q: query,
     mode: query.split(/\s+/).length > 1 ? 'phrase' : 'all',
     limit: String(pageSize),
-    offset: String((page - 1) * pageSize),
+    offset: String(offset),
   })
   if (criteria.fromUsername) params.set('from_user', criteria.fromUsername)
   if (criteria.replyToUsername)
     params.set('reply_to_user', criteria.replyToUsername)
   if (criteria.startDate) params.set('since', criteria.startDate)
   if (criteria.endDate) params.set('until', criteria.endDate)
+  if (criteria.sort && criteria.sort !== 'newest')
+    params.set('sort', criteria.sort)
 
   const response = await fetchImpl(`/api/tweet-search?${params.toString()}`, {
     cache: 'no-store',

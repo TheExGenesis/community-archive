@@ -93,4 +93,37 @@ describe('UnifiedTweetList compact view', () => {
       screen.getByRole('button', { name: 'Show less' }),
     ).toBeInTheDocument()
   })
+
+  it('sends table-header sort choices to the server-search owner', async () => {
+    const onSearchSortChange = jest.fn()
+    render(
+      <UnifiedTweetList
+        tweets={[tweet]}
+        compact
+        searchSort="newest"
+        onSearchSortChange={onSearchSortChange}
+      />,
+    )
+
+    expect(screen.getByRole('columnheader', { name: /Date/ })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    )
+    await userEvent.click(screen.getByRole('button', { name: /Date/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sort by likes' }))
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Sort by reposts' }),
+    )
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Sort search results' }),
+      'likes',
+    )
+
+    expect(onSearchSortChange.mock.calls).toEqual([
+      ['oldest'],
+      ['likes'],
+      ['reposts'],
+      ['likes'],
+    ])
+  })
 })

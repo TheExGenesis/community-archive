@@ -28,7 +28,7 @@ export default async function SocialGraphPage() {
             Social graph
           </h1>
           <p className={`mt-2 text-[13px] ${MUTED}`}>
-            The hourly interaction graph is temporarily unavailable. No live
+            The daily interaction graph is temporarily unavailable. No live
             database query runs from this page, so it will recover when the next
             snapshot is published.
           </p>

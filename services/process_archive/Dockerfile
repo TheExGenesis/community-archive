@@ -42,8 +42,8 @@ RUN chmod +x /app/docker-entrypoint.sh
 
 # Default environment variables
 ENV LOG_LEVEL=info
-ENV PG_BATCH_SIZE=5000
-ENV MEMORY_BATCH_SIZE=15000
+ENV PG_BATCH_SIZE=1000
+ENV MEMORY_BATCH_SIZE=3000
 ENV MAX_MEMORY_MB=2000
 
 # Run as root user for simplicity in batch job environment

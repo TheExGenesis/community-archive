@@ -82,7 +82,7 @@ echo "[$TIMESTAMP] Starting process-archive execution" >> "$EXEC_LOG"
 echo "[$TIMESTAMP] Command: $@" >> "$EXEC_LOG"
 echo "[$TIMESTAMP] Environment: NODE_ENV=${NODE_ENV:-production}" >> "$EXEC_LOG"
 echo "[$TIMESTAMP] Memory limit: ${MAX_MEMORY_MB:-2000}MB" >> "$EXEC_LOG"
-echo "[$TIMESTAMP] Batch size: ${PG_BATCH_SIZE:-5000}" >> "$EXEC_LOG"
+echo "[$TIMESTAMP] Batch size: ${PG_BATCH_SIZE:-1000}" >> "$EXEC_LOG"
 
 # Function to log completion and cleanup
 log_completion() {

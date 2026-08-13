@@ -228,9 +228,70 @@ function DualRangeSlider({
   max: number
   onChange: (startValue: number, endValue: number) => void
 }) {
+  const trackRef = useRef<HTMLDivElement>(null)
   const span = Math.max(1, max - min)
   const startPosition = (100 * (startValue - min)) / span
   const endPosition = (100 * (endValue - min)) / span
+  const setHandleFromClientX = (handle: 'start' | 'end', clientX: number) => {
+    const bounds = trackRef.current?.getBoundingClientRect()
+    if (!bounds?.width) return
+    const ratio = Math.max(
+      0,
+      Math.min(1, (clientX - bounds.left) / bounds.width),
+    )
+    const nextYear = Math.round(min + ratio * span)
+    const [nextStart, nextEnd] = updateYearRange(
+      startValue,
+      endValue,
+      handle,
+      nextYear,
+    )
+    onChange(nextStart, nextEnd)
+  }
+  const moveHandleByKey = (handle: 'start' | 'end', key: string) => {
+    const current = handle === 'start' ? startValue : endValue
+    const next =
+      key === 'Home'
+        ? min
+        : key === 'End'
+          ? max
+          : key === 'ArrowLeft' || key === 'ArrowDown'
+            ? current - 1
+            : key === 'ArrowRight' || key === 'ArrowUp'
+              ? current + 1
+              : null
+    if (next === null) return false
+    const [nextStart, nextEnd] = updateYearRange(
+      startValue,
+      endValue,
+      handle,
+      Math.max(min, Math.min(max, next)),
+    )
+    onChange(nextStart, nextEnd)
+    return true
+  }
+
+  const handleProps = (handle: 'start' | 'end', value: number) => ({
+    'aria-label':
+      handle === 'start' ? 'Interaction start year' : 'Interaction end year',
+    'aria-valuemax': max,
+    'aria-valuemin': min,
+    'aria-valuenow': value,
+    'aria-valuetext': String(value),
+    onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (moveHandleByKey(handle, event.key)) event.preventDefault()
+    },
+    onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
+      event.currentTarget.setPointerCapture(event.pointerId)
+      setHandleFromClientX(handle, event.clientX)
+    },
+    onPointerMove: (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        setHandleFromClientX(handle, event.clientX)
+      }
+    },
+    role: 'slider',
+  })
 
   return (
     <fieldset>
@@ -240,8 +301,30 @@ function DualRangeSlider({
           {startValue}–{endValue}
         </span>
       </legend>
-      <div className="relative h-6">
-        <div className="absolute inset-x-0 top-[9px] h-1.5 rounded-full bg-zinc-200 dark:bg-[#35353a]">
+      <div
+        ref={trackRef}
+        className="relative h-6 touch-none"
+        onPointerDown={(event) => {
+          if (event.target !== event.currentTarget) return
+          const bounds = trackRef.current?.getBoundingClientRect()
+          if (!bounds?.width) return
+          const clickedYear = Math.round(
+            min +
+              Math.max(
+                0,
+                Math.min(1, (event.clientX - bounds.left) / bounds.width),
+              ) *
+                span,
+          )
+          const handle =
+            Math.abs(clickedYear - startValue) <=
+            Math.abs(clickedYear - endValue)
+              ? 'start'
+              : 'end'
+          setHandleFromClientX(handle, event.clientX)
+        }}
+      >
+        <div className="pointer-events-none absolute inset-x-0 top-[9px] h-1.5 rounded-full bg-zinc-200 dark:bg-[#35353a]">
           <div
             className="absolute h-full rounded-full bg-emerald-500"
             style={{
@@ -250,41 +333,17 @@ function DualRangeSlider({
             }}
           />
         </div>
-        <input
-          type="range"
-          aria-label="Interaction start year"
-          min={min}
-          max={max}
-          step={1}
-          value={startValue}
-          onChange={(event) => {
-            const [nextStart, nextEnd] = updateYearRange(
-              startValue,
-              endValue,
-              'start',
-              Number(event.target.value),
-            )
-            onChange(nextStart, nextEnd)
-          }}
-          className="dual-range-input absolute inset-x-0 top-0 z-20 h-6 w-full appearance-none bg-transparent"
+        <button
+          type="button"
+          {...handleProps('start', startValue)}
+          className="absolute top-1/2 z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-white bg-emerald-500 shadow-[0_0_0_1px_rgba(24,24,27,0.22)] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 active:cursor-grabbing dark:focus:ring-offset-[#1b1b1e]"
+          style={{ left: `${startPosition}%` }}
         />
-        <input
-          type="range"
-          aria-label="Interaction end year"
-          min={min}
-          max={max}
-          step={1}
-          value={endValue}
-          onChange={(event) => {
-            const [nextStart, nextEnd] = updateYearRange(
-              startValue,
-              endValue,
-              'end',
-              Number(event.target.value),
-            )
-            onChange(nextStart, nextEnd)
-          }}
-          className="dual-range-input absolute inset-x-0 top-0 z-10 h-6 w-full appearance-none bg-transparent"
+        <button
+          type="button"
+          {...handleProps('end', endValue)}
+          className="absolute top-1/2 z-10 h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-white bg-emerald-500 shadow-[0_0_0_1px_rgba(24,24,27,0.22)] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 active:cursor-grabbing dark:focus:ring-offset-[#1b1b1e]"
+          style={{ left: `${endPosition}%` }}
         />
       </div>
       <div className={`flex justify-between text-[10px] ${MUTED}`}>
@@ -292,41 +351,6 @@ function DualRangeSlider({
         <span>Inclusive UTC years</span>
         <span>{max}</span>
       </div>
-      <style jsx>{`
-        .dual-range-input {
-          pointer-events: none;
-        }
-        .dual-range-input::-webkit-slider-runnable-track {
-          height: 6px;
-          background: transparent;
-        }
-        .dual-range-input::-webkit-slider-thumb {
-          width: 16px;
-          height: 16px;
-          margin-top: -5px;
-          cursor: grab;
-          pointer-events: auto;
-          appearance: none;
-          border: 2px solid white;
-          border-radius: 9999px;
-          background: #10b981;
-          box-shadow: 0 0 0 1px rgba(24, 24, 27, 0.22);
-        }
-        .dual-range-input::-moz-range-track {
-          height: 6px;
-          background: transparent;
-        }
-        .dual-range-input::-moz-range-thumb {
-          width: 12px;
-          height: 12px;
-          cursor: grab;
-          pointer-events: auto;
-          border: 2px solid white;
-          border-radius: 9999px;
-          background: #10b981;
-          box-shadow: 0 0 0 1px rgba(24, 24, 27, 0.22);
-        }
-      `}</style>
     </fieldset>
   )
 }

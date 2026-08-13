@@ -336,14 +336,17 @@ function DualRangeSlider({
         <button
           type="button"
           {...handleProps('start', startValue)}
-          className="absolute top-1/2 z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-white bg-emerald-500 shadow-[0_0_0_1px_rgba(24,24,27,0.22)] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 active:cursor-grabbing dark:focus:ring-offset-[#1b1b1e]"
-          style={{ left: `${startPosition}%` }}
+          className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-white bg-emerald-500 shadow-[0_0_0_1px_rgba(24,24,27,0.22)] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 active:cursor-grabbing dark:focus:ring-offset-[#1b1b1e]"
+          style={{
+            left: `${startPosition}%`,
+            zIndex: startValue === endValue && startValue === max ? 30 : 20,
+          }}
         />
         <button
           type="button"
           {...handleProps('end', endValue)}
-          className="absolute top-1/2 z-10 h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-white bg-emerald-500 shadow-[0_0_0_1px_rgba(24,24,27,0.22)] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 active:cursor-grabbing dark:focus:ring-offset-[#1b1b1e]"
-          style={{ left: `${endPosition}%` }}
+          className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full border-2 border-white bg-emerald-500 shadow-[0_0_0_1px_rgba(24,24,27,0.22)] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 active:cursor-grabbing dark:focus:ring-offset-[#1b1b1e]"
+          style={{ left: `${endPosition}%`, zIndex: 25 }}
         />
       </div>
       <div className={`flex justify-between text-[10px] ${MUTED}`}>

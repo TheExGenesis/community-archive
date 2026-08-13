@@ -37,6 +37,26 @@ jest.mock('@/components/TweetCard', () => ({
   ),
 }))
 
+function mockViewportWidth(width: number) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: jest.fn((query: string) => {
+      const minWidth = Number(query.match(/min-width: (\d+)px/)?.[1] ?? 0)
+      return {
+        matches: width >= minWidth,
+        media: query,
+        onchange: null,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      }
+    }),
+  })
+}
+
 class IntersectionObserverMock {
   static instances: IntersectionObserverMock[] = []
   readonly observed: Element[] = []
@@ -78,6 +98,12 @@ const tweets = [
   tweet('2', 'Older favorite', 2025, 9, 100),
   tweet('1', 'Newest thought', 2026, 3, 10),
 ]
+const masonryTweets = [
+  ...tweets,
+  tweet('4', 'Fourth thought', 2026, 2, 8),
+  tweet('5', 'Fifth thought', 2026, 1, 7),
+  tweet('6', 'Sixth thought', 2026, 1, 6),
+]
 
 function page(
   pageTweets = tweets,
@@ -116,6 +142,7 @@ function renderExplorer(initialPage = page(), period?: PortalBangersPeriod) {
 describe('BangersExplorer', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/bangers')
+    mockViewportWidth(1440)
     push.mockReset()
     mockCapturePostHogEvent.mockReset()
     IntersectionObserverMock.instances = []
@@ -178,16 +205,70 @@ describe('BangersExplorer', () => {
     expect(screen.queryByText('Likes')).not.toBeInTheDocument()
     expect(screen.queryByText('Reposts')).not.toBeInTheDocument()
     expect(screen.getByTestId('bangers-masonry')).toHaveClass(
-      'columns-1',
-      'lg:columns-2',
-      'xl:columns-3',
+      'grid',
+      'items-start',
+      'gap-5',
     )
+    expect(screen.getByTestId('bangers-masonry')).toHaveStyle({
+      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    })
     expect(
-      screen.getAllByTestId('tweet-row').map((row) => row.dataset.rank),
-    ).toEqual(['1', '2', '3'])
+      within(screen.getByTestId('bangers-masonry-column-0'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['1'])
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-1'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['2'])
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-2'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['3'])
     expect(
       orderedMasonryItems.map((item) => item.dataset.masonryOrder),
     ).toEqual(['1', '2', '3'])
+  })
+
+  test('distributes ranked bangers left to right in the two-column layout', () => {
+    mockViewportWidth(1100)
+    renderExplorer(page(masonryTweets))
+
+    expect(screen.getByTestId('bangers-masonry')).toHaveStyle({
+      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    })
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-0'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['1', '3', '5'])
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-1'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['2', '4', '6'])
+  })
+
+  test('distributes ranked bangers left to right in the three-column layout', () => {
+    renderExplorer(page(masonryTweets))
+
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-0'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['1', '4'])
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-1'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['2', '5'])
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-2'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['3', '6'])
   })
 
   test('keeps today selected across author links', () => {

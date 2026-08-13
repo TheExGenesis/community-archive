@@ -6,7 +6,13 @@ export interface NavItem {
   label: string
 }
 
-export type TweetOrigin = 'home' | 'stream' | 'bangers' | 'trends' | 'search'
+export type TweetOrigin =
+  | 'home'
+  | 'stream'
+  | 'bangers'
+  | 'digest'
+  | 'trends'
+  | 'search'
 
 export function userProfileHref(
   username: string | null | undefined,
@@ -54,6 +60,11 @@ const TWEET_ORIGINS: Record<
     href: '/bangers',
     label: 'Back to Bangers',
     matches: (href) => href === '/bangers' || href.startsWith('/bangers?'),
+  },
+  digest: {
+    href: '/digest',
+    label: 'Back to Daily Digest',
+    matches: (href) => href === '/digest' || href.startsWith('/digest/'),
   },
   trends: {
     href: '/trends',
@@ -132,11 +143,13 @@ export const getPrimaryNav = (isMember: boolean): NavItem[] =>
         { href: '/user-dir', label: 'Users' },
         { href: '/stream', label: 'Live stream' },
         { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
+        { href: '/digest', label: 'Digest' },
         { href: '/trends', label: 'Trends' },
         { href: '/research', label: 'Research' },
       ]
     : [
         { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
+        { href: '/digest', label: 'Digest' },
         { href: '/user-dir', label: 'Library' },
         { href: '/docs', label: 'Docs' },
         { href: '/#upload-archive', label: 'Upload archive' },

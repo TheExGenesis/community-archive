@@ -1,5 +1,15 @@
 -- Row Level Security policies and enablement
 
+ALTER TABLE "public"."digest_prompt_versions" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."digest_runs" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."digest_editions" ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Published digest editions are publicly readable"
+  ON "public"."digest_editions"
+  FOR SELECT
+  TO "anon", "authenticated"
+  USING ("status" = 'published');
+
 -- Storage policies for the public archives bucket. Writes are restricted to
 -- the folder named by trusted, server-controlled app_metadata; the upload
 -- client derives the same name from its verified Twitter identity (#372).

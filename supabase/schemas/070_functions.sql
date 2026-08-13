@@ -3075,3 +3075,48 @@ REVOKE ALL ON FUNCTION public.admin_list_recent_delete_jobs(integer)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_list_recent_delete_jobs(integer)
   TO service_role;
+CREATE OR REPLACE FUNCTION "public"."publish_digest_edition"("p_edition_id" uuid)
+RETURNS "public"."digest_editions"
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+DECLARE
+  target "public"."digest_editions";
+BEGIN
+  SELECT *
+    INTO target
+    FROM "public"."digest_editions"
+   WHERE id = p_edition_id
+   FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Digest edition not found';
+  END IF;
+
+  IF target.status = 'archived' THEN
+    RAISE EXCEPTION 'Archived digest editions cannot be published';
+  END IF;
+
+  UPDATE "public"."digest_editions"
+     SET status = 'archived',
+         updated_at = now()
+   WHERE digest_date = target.digest_date
+     AND status = 'published'
+     AND id <> target.id;
+
+  UPDATE "public"."digest_editions"
+     SET status = 'published',
+         published_at = coalesce(published_at, now()),
+         updated_at = now()
+   WHERE id = target.id
+   RETURNING * INTO target;
+
+  RETURN target;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION "public"."publish_digest_edition"(uuid)
+  FROM PUBLIC, "anon", "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."publish_digest_edition"(uuid)
+  TO "service_role";

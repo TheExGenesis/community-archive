@@ -10,6 +10,7 @@ import { formatNumber } from '@/lib/formatNumber'
 import { getTopFollowedAccounts } from '@/lib/clickhouseAnalytics'
 import type { PortalData } from '@/lib/portal/types'
 import { createServerClient } from '@/utils/supabase'
+import { getLatestDigestPreview } from '@/lib/digest/data'
 
 const DynamicHeroCTAButtons = dynamic(
   () => import('@/components/HeroCTAButtons'),
@@ -73,7 +74,11 @@ export default async function ClassicHomepage({
 }: ClassicHomepageProps) {
   const cookieStore = cookies()
   const supabase = createServerClient(cookieStore)
-  const mostFollowed = (await getMostFollowedAccounts(supabase)).slice(0, 8)
+  const [mostFollowedAccounts, digestPreview] = await Promise.all([
+    getMostFollowedAccounts(supabase),
+    getLatestDigestPreview(),
+  ])
+  const mostFollowed = mostFollowedAccounts.slice(0, 8)
 
   let isOptedIn = false
   if (showCta && isMember) {
@@ -174,7 +179,13 @@ export default async function ClassicHomepage({
       </section>
 
       <section className="bg-zinc-100/80 py-4 dark:bg-transparent sm:py-7">
-        <Portal data={homepageData} view="home" isMember={isMember} embedded />
+        <Portal
+          data={homepageData}
+          view="home"
+          isMember={isMember}
+          digestPreview={digestPreview}
+          embedded
+        />
       </section>
 
       <section

@@ -28,6 +28,7 @@ import {
 } from '@/lib/portal/stream'
 import { BANGERS_ALL_TIME_HREF, BANGERS_WEEK_HREF } from '@/lib/portal/bangers'
 import { capturePostHogEvent } from '@/lib/posthog'
+import type { DigestPreview } from '@/lib/digest/types'
 
 export type PortalView = 'home' | 'stream'
 
@@ -40,6 +41,7 @@ type DashboardDestination =
   | 'all_time_bangers'
   | 'community_builds'
   | 'data_export'
+  | 'daily_digest'
   | 'live_stream'
   | 'recent_bangers'
   | 'research'
@@ -433,11 +435,13 @@ export default function Portal({
   view,
   isMember = true,
   embedded = false,
+  digestPreview = null,
 }: {
   data: PortalData
   view: PortalView
   isMember?: boolean
   embedded?: boolean
+  digestPreview?: DigestPreview | null
 }) {
   const { stats, trends } = data
 
@@ -647,7 +651,7 @@ export default function Portal({
             failures={data.failures}
           />
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.45fr_1fr]">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
             <div className="flex h-full min-h-0 flex-col gap-4 lg:overflow-hidden">
               <div
                 className={`${CARD} flex min-h-[420px] flex-col lg:h-[420px] lg:min-h-[420px] lg:flex-none lg:overflow-hidden lg:[contain:size]`}
@@ -692,78 +696,11 @@ export default function Portal({
                 </div>
               </div>
 
-              <div className={`${CARD} flex flex-col`}>
-                <PanelHeader
-                  title="Trending terms · 7 days"
-                  action={{
-                    label: isMember ? 'Trends explorer' : 'Sign in for Trends',
-                    href: isMember ? '/trends' : signInHref('/trends'),
-                    analyticsDestination: 'trends',
-                  }}
-                />
-                <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
-                  {data.failures.trends ? (
-                    <PanelUnavailable message="Trending terms are temporarily unavailable." />
-                  ) : weeklyBars.length > 0 ? (
-                    <div
-                      className={`flex items-center gap-3 pb-1 text-[10px] font-medium uppercase tracking-wide ${MUTED}`}
-                    >
-                      <span className="w-[90px] sm:w-[110px]" />
-                      <span className="w-[54px] text-right">7d tweets</span>
-                      <span className="flex-1">Relative volume</span>
-                      <span className="w-[52px] text-right">7d change</span>
-                    </div>
-                  ) : null}
-                  {!data.failures.trends &&
-                    weeklyBars.map((b) => (
-                      <div
-                        key={b.term}
-                        className="flex items-center gap-3 py-[5px]"
-                      >
-                        <span className="w-[90px] truncate text-[13px] font-semibold sm:w-[110px]">
-                          {b.term}
-                        </span>
-                        <span className="w-[54px] text-right text-[12px] tabular-nums text-muted-foreground">
-                          {b.last7.toLocaleString('en-US')}
-                        </span>
-                        <div
-                          className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]"
-                          role="img"
-                          aria-label={`${b.term}: ${b.last7.toLocaleString('en-US')} tweets in the last seven days`}
-                          title={`${b.last7.toLocaleString('en-US')} tweets in the last 7 days; bar is relative to ${weeklyBars[0].term}`}
-                        >
-                          <div
-                            className="h-full rounded bg-brand"
-                            style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
-                          />
-                        </div>
-                        <span
-                          title={`${b.last7.toLocaleString('en-US')} tweets vs ${b.prev7.toLocaleString('en-US')} in the previous 7 days`}
-                          className={`w-[52px] text-right text-[12px] font-bold tabular-nums ${
-                            b.status === 'inactive'
-                              ? MUTED
-                              : (b.deltaPct ?? 0) >= 0
-                                ? 'text-[#16a34a] dark:text-[#2acf80]'
-                                : 'text-[#dc2626] dark:text-[#f87171]'
-                          }`}
-                        >
-                          {fmtDelta(b)}
-                        </span>
-                      </div>
-                    ))}
-                  {!data.failures.trends && weeklyBars.length === 0 && (
-                    <div className={`py-8 text-center text-[13px] ${MUTED}`}>
-                      No watchlist activity in the last seven days.
-                    </div>
-                  )}
-                </div>
-              </div>
-
               {(recentBanger ||
                 historicalBanger ||
                 data.failures.recentBangers ||
                 data.failures.historicalBangers) && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4">
                   {(recentBanger || data.failures.recentBangers) && (
                     <div
                       className={`${CARD} flex min-w-0 flex-col overflow-hidden lg:min-h-[320px]`}
@@ -825,6 +762,100 @@ export default function Portal({
             </div>
 
             <div className="flex flex-col gap-4">
+              {digestPreview ? (
+                <Link
+                  href={digestPreview.href}
+                  onClick={() =>
+                    captureDashboardDestination('daily_digest', 'card', false)
+                  }
+                  className="group rounded-[4px] border border-blue-200 bg-blue-50 px-5 py-5 transition-colors hover:border-brand/60 dark:border-blue-900 dark:bg-blue-950/30"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[15px] font-bold">
+                      Latest Daily Digest
+                    </span>
+                    <span className="text-[12px] font-semibold text-brand">
+                      Read →
+                    </span>
+                  </div>
+                  <p
+                    className={`mt-2 line-clamp-3 text-[13px] leading-5 ${MUTED}`}
+                  >
+                    {digestPreview.executiveSummary}
+                  </p>
+                  <div className={`mt-3 text-[11.5px] ${MUTED}`}>
+                    {digestPreview.digestDate} · {digestPreview.storyCount}{' '}
+                    stories ·{' '}
+                    {digestPreview.storyTitles.slice(0, 3).join(' · ')}
+                  </div>
+                </Link>
+              ) : null}
+              <div className={`${CARD} flex flex-col`}>
+                <PanelHeader
+                  title="Trending terms · 7 days"
+                  action={{
+                    label: isMember ? 'Trends explorer' : 'Sign in for Trends',
+                    href: isMember ? '/trends' : signInHref('/trends'),
+                    analyticsDestination: 'trends',
+                  }}
+                />
+                <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
+                  {data.failures.trends ? (
+                    <PanelUnavailable message="Trending terms are temporarily unavailable." />
+                  ) : weeklyBars.length > 0 ? (
+                    <div
+                      className={`flex items-center gap-2 pb-1 text-[9px] font-medium uppercase tracking-wide ${MUTED}`}
+                    >
+                      <span className="w-[82px]" />
+                      <span className="w-[46px] text-right">Tweets</span>
+                      <span className="flex-1">Volume</span>
+                      <span className="w-[46px] text-right">Change</span>
+                    </div>
+                  ) : null}
+                  {!data.failures.trends &&
+                    weeklyBars.map((b) => (
+                      <div
+                        key={b.term}
+                        className="flex items-center gap-2 py-[6px]"
+                      >
+                        <span className="w-[82px] truncate text-[12px] font-semibold">
+                          {b.term}
+                        </span>
+                        <span className="w-[46px] text-right text-[11px] tabular-nums text-muted-foreground">
+                          {b.last7.toLocaleString('en-US')}
+                        </span>
+                        <div
+                          className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]"
+                          role="img"
+                          aria-label={`${b.term}: ${b.last7.toLocaleString('en-US')} tweets in the last seven days`}
+                          title={`${b.last7.toLocaleString('en-US')} tweets in the last 7 days; bar is relative to ${weeklyBars[0].term}`}
+                        >
+                          <div
+                            className="h-full rounded bg-brand"
+                            style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
+                          />
+                        </div>
+                        <span
+                          title={`${b.last7.toLocaleString('en-US')} tweets vs ${b.prev7.toLocaleString('en-US')} in the previous 7 days`}
+                          className={`w-[46px] text-right text-[11px] font-bold tabular-nums ${
+                            b.status === 'inactive'
+                              ? MUTED
+                              : (b.deltaPct ?? 0) >= 0
+                                ? 'text-[#16a34a] dark:text-[#2acf80]'
+                                : 'text-[#dc2626] dark:text-[#f87171]'
+                          }`}
+                        >
+                          {fmtDelta(b)}
+                        </span>
+                      </div>
+                    ))}
+                  {!data.failures.trends && weeklyBars.length === 0 && (
+                    <div className={`py-8 text-center text-[13px] ${MUTED}`}>
+                      No watchlist activity in the last seven days.
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className={CARD}>
                 <PanelHeader
                   title="Featured research"

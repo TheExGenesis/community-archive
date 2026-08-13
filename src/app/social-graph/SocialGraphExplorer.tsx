@@ -25,11 +25,7 @@ import {
   filterSocialGraph,
   followerSliderToCount,
 } from '@/lib/socialGraphFilter'
-import type {
-  AdaptiveClusteringAlgorithm,
-  AdaptiveGraphResult,
-  AdaptiveLayoutAlgorithm,
-} from '@/lib/socialGraphAdaptive'
+import type { AdaptiveGraphResult } from '@/lib/socialGraphAdaptive'
 import type {
   SocialGraphWorkerRequest,
   SocialGraphWorkerResponse,
@@ -393,10 +389,6 @@ export default function SocialGraphExplorer({
   const [maximumNodes, setMaximumNodes] = useState(
     Math.min(DEFAULT_MAX_VISIBLE_NODES, snapshot.stats.nodeCount),
   )
-  const [clusteringAlgorithm, setClusteringAlgorithm] =
-    useState<AdaptiveClusteringAlgorithm>('louvain')
-  const [layoutAlgorithm, setLayoutAlgorithm] =
-    useState<AdaptiveLayoutAlgorithm>('clustered-force')
   const [adaptiveResult, setAdaptiveResult] =
     useState<AdaptiveGraphResult | null>(null)
   const [adaptiveSignature, setAdaptiveSignature] = useState<string | null>(
@@ -447,7 +439,7 @@ export default function SocialGraphExplorer({
       `${filtered.nodes.map((node) => node.id).join(',')}|${filtered.edges.map((edge) => `${edge.source}:${edge.target}:${edge.strength}`).join(',')}`,
     [filtered.edges, filtered.nodes],
   )
-  const adaptiveRunSignature = `${filteredSignature}|${clusteringAlgorithm}|${layoutAlgorithm}`
+  const adaptiveRunSignature = `${filteredSignature}|louvain|clustered-force`
   const adaptiveIsCurrent = adaptiveSignature === adaptiveRunSignature
   const adaptiveLegendClusters = useMemo(() => {
     if (!adaptiveResult) return []
@@ -816,8 +808,8 @@ export default function SocialGraphExplorer({
       nodes: filtered.nodes,
       edges: filtered.edges,
       options: {
-        clustering: clusteringAlgorithm,
-        layout: layoutAlgorithm,
+        clustering: 'louvain',
+        layout: 'clustered-force',
       },
     }
     worker.postMessage(request)
@@ -931,40 +923,12 @@ export default function SocialGraphExplorer({
                   filters.
                 </p>
               </div>
-              <label className="block text-[11px]">
-                <span className="mb-1 block font-medium">Clustering</span>
-                <select
-                  aria-label="Adaptive clustering algorithm"
-                  value={clusteringAlgorithm}
-                  onChange={(event) =>
-                    setClusteringAlgorithm(
-                      event.target.value as AdaptiveClusteringAlgorithm,
-                    )
-                  }
-                  className="h-8 w-full rounded-[3px] border border-zinc-200 bg-white px-2 dark:border-[#35353a] dark:bg-[#151517]"
-                >
-                  <option value="louvain">Louvain</option>
-                  <option value="label-propagation">Label propagation</option>
-                </select>
-              </label>
-              <label className="block text-[11px]">
-                <span className="mb-1 block font-medium">Layout</span>
-                <select
-                  aria-label="Adaptive layout algorithm"
-                  value={layoutAlgorithm}
-                  onChange={(event) =>
-                    setLayoutAlgorithm(
-                      event.target.value as AdaptiveLayoutAlgorithm,
-                    )
-                  }
-                  className="h-8 w-full rounded-[3px] border border-zinc-200 bg-white px-2 dark:border-[#35353a] dark:bg-[#151517]"
-                >
-                  <option value="clustered-force">
-                    Community force-directed
-                  </option>
-                  <option value="force-directed">Force-directed</option>
-                </select>
-              </label>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
+                <dt className={MUTED}>Clustering</dt>
+                <dd className="font-medium">Louvain</dd>
+                <dt className={MUTED}>Layout</dt>
+                <dd className="font-medium">Community force-directed</dd>
+              </dl>
               <button
                 type="button"
                 onClick={adaptGraph}
@@ -1155,6 +1119,20 @@ export default function SocialGraphExplorer({
             recomputed for the selected years. The node limit keeps the highest
             weighted-degree accounts in that active graph. The stable server
             layout stays fixed until you explicitly run an adaptive layout.
+          </p>
+        </details>
+
+        <details className={`text-[11px] leading-relaxed ${MUTED}`}>
+          <summary className="cursor-pointer font-medium text-zinc-700 dark:text-[#d9d9de]">
+            How clustering &amp; layout work
+          </summary>
+          <p className="mt-2">
+            Louvain finds groups with stronger mutual-interaction weight inside
+            the group than outside it. Community force-directed layout then
+            pulls connected accounts together, pushes overlapping nodes apart,
+            and gently anchors each community to its own region. Recluster &amp;
+            relayout uses only the currently visible nodes and edges; it does
+            not rewrite the stable communities in the daily snapshot.
           </p>
         </details>
       </aside>

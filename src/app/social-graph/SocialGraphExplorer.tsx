@@ -4,7 +4,16 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { UndirectedGraph } from 'graphology'
 import Sigma from 'sigma'
 import type { NodeHoverDrawingFunction } from 'sigma/rendering'
-import { Clock3, Minus, Play, Plus, RotateCcw, Search, X } from 'lucide-react'
+import {
+  Clock3,
+  Minus,
+  Play,
+  Plus,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react'
 import { useTheme } from 'next-themes'
 import type {
   SocialGraphCluster,
@@ -25,6 +34,7 @@ import type {
   SocialGraphWorkerRequest,
   SocialGraphWorkerResponse,
 } from '@/workers/socialGraph.worker'
+import { nodeIdsForLabelCoverage, updateYearRange } from '@/lib/socialGraphView'
 import { MUTED, SERIF } from '@/components/portal/styles'
 
 interface NodeAttributes {
@@ -34,6 +44,9 @@ interface NodeAttributes {
   size: number
   color: string
   hidden?: boolean
+  forceLabel?: boolean
+  highlighted?: boolean
+  showHover?: boolean
 }
 
 interface EdgeAttributes {
@@ -43,6 +56,8 @@ interface EdgeAttributes {
 }
 
 const DEFAULT_MAX_VISIBLE_NODES = 650
+const DEFAULT_LABEL_PERCENTAGE = 20
+const NODE_HOVER_DELAY_MS = 1_000
 const STRENGTH_SLIDER_MAX = 3
 const ADAPTIVE_PALETTE = [
   '#2acf80',
@@ -93,6 +108,7 @@ function drawThemeNodeHover(
   isDark: boolean,
 ): NodeHoverDrawingFunction<NodeAttributes, EdgeAttributes> {
   return (context, data, settings) => {
+    if (!data.showHover) return
     const colors = themeColors(isDark)
     const label = typeof data.label === 'string' ? data.label : ''
     const font = `${settings.labelWeight} ${settings.labelSize}px ${settings.labelFont}`
@@ -197,6 +213,124 @@ function Slider({
   )
 }
 
+function DualRangeSlider({
+  label,
+  startValue,
+  endValue,
+  min,
+  max,
+  onChange,
+}: {
+  label: string
+  startValue: number
+  endValue: number
+  min: number
+  max: number
+  onChange: (startValue: number, endValue: number) => void
+}) {
+  const span = Math.max(1, max - min)
+  const startPosition = (100 * (startValue - min)) / span
+  const endPosition = (100 * (endValue - min)) / span
+
+  return (
+    <fieldset>
+      <legend className="mb-1.5 flex w-full items-center justify-between gap-3 text-[12px] font-medium">
+        <span>{label}</span>
+        <span className="tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
+          {startValue}–{endValue}
+        </span>
+      </legend>
+      <div className="relative h-6">
+        <div className="absolute inset-x-0 top-[9px] h-1.5 rounded-full bg-zinc-200 dark:bg-[#35353a]">
+          <div
+            className="absolute h-full rounded-full bg-emerald-500"
+            style={{
+              left: `${startPosition}%`,
+              width: `${endPosition - startPosition}%`,
+            }}
+          />
+        </div>
+        <input
+          type="range"
+          aria-label="Interaction start year"
+          min={min}
+          max={max}
+          step={1}
+          value={startValue}
+          onChange={(event) => {
+            const [nextStart, nextEnd] = updateYearRange(
+              startValue,
+              endValue,
+              'start',
+              Number(event.target.value),
+            )
+            onChange(nextStart, nextEnd)
+          }}
+          className="dual-range-input absolute inset-x-0 top-0 z-20 h-6 w-full appearance-none bg-transparent"
+        />
+        <input
+          type="range"
+          aria-label="Interaction end year"
+          min={min}
+          max={max}
+          step={1}
+          value={endValue}
+          onChange={(event) => {
+            const [nextStart, nextEnd] = updateYearRange(
+              startValue,
+              endValue,
+              'end',
+              Number(event.target.value),
+            )
+            onChange(nextStart, nextEnd)
+          }}
+          className="dual-range-input absolute inset-x-0 top-0 z-10 h-6 w-full appearance-none bg-transparent"
+        />
+      </div>
+      <div className={`flex justify-between text-[10px] ${MUTED}`}>
+        <span>{min}</span>
+        <span>Inclusive UTC years</span>
+        <span>{max}</span>
+      </div>
+      <style jsx>{`
+        .dual-range-input {
+          pointer-events: none;
+        }
+        .dual-range-input::-webkit-slider-runnable-track {
+          height: 6px;
+          background: transparent;
+        }
+        .dual-range-input::-webkit-slider-thumb {
+          width: 16px;
+          height: 16px;
+          margin-top: -5px;
+          cursor: grab;
+          pointer-events: auto;
+          appearance: none;
+          border: 2px solid white;
+          border-radius: 9999px;
+          background: #10b981;
+          box-shadow: 0 0 0 1px rgba(24, 24, 27, 0.22);
+        }
+        .dual-range-input::-moz-range-track {
+          height: 6px;
+          background: transparent;
+        }
+        .dual-range-input::-moz-range-thumb {
+          width: 12px;
+          height: 12px;
+          cursor: grab;
+          pointer-events: auto;
+          border: 2px solid white;
+          border-radius: 9999px;
+          background: #10b981;
+          box-shadow: 0 0 0 1px rgba(24, 24, 27, 0.22);
+        }
+      `}</style>
+    </fieldset>
+  )
+}
+
 export default function SocialGraphExplorer({
   snapshot,
 }: {
@@ -207,11 +341,19 @@ export default function SocialGraphExplorer({
   const workerRef = useRef<Worker | null>(null)
   const workerRequestRef = useRef(0)
   const workerSignatureRef = useRef('')
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hoverCandidateRef = useRef<string | null>(null)
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme !== 'light'
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
+  const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(
+    null,
+  )
   const [query, setQuery] = useState('')
+  const [labelPercentage, setLabelPercentage] = useState(
+    DEFAULT_LABEL_PERCENTAGE,
+  )
   const [followerSlider, setFollowerSlider] = useState(0)
   const [startYear, setStartYear] = useState(snapshot.temporal.minYear)
   const [endYear, setEndYear] = useState(snapshot.temporal.maxYear)
@@ -251,14 +393,6 @@ export default function SocialGraphExplorer({
     deferredMinimumStrength !== minimumStrength ||
     deferredMaximumNodes !== maximumNodes
   const clusters = useMemo(() => clusterMap(snapshot.clusters), [snapshot])
-  const years = useMemo(
-    () =>
-      Array.from(
-        { length: snapshot.temporal.maxYear - snapshot.temporal.minYear + 1 },
-        (_, index) => snapshot.temporal.maxYear - index,
-      ),
-    [snapshot.temporal.maxYear, snapshot.temporal.minYear],
-  )
   const nodeById = useMemo(
     () => new Map(snapshot.nodes.map((node) => [node.id, node])),
     [snapshot.nodes],
@@ -316,6 +450,72 @@ export default function SocialGraphExplorer({
         ]
       : connected
   }, [adaptiveResult])
+  const activeLegendClusters = useMemo(
+    () =>
+      adaptiveIsCurrent && adaptiveResult
+        ? adaptiveLegendClusters
+        : snapshot.clusters,
+    [
+      adaptiveIsCurrent,
+      adaptiveLegendClusters,
+      adaptiveResult,
+      snapshot.clusters,
+    ],
+  )
+  const communityByNode = useMemo(() => {
+    const result = new Map<string, string>()
+    for (const node of filtered.nodes) {
+      if (adaptiveIsCurrent && adaptiveResult) {
+        const community = adaptiveResult.communities[node.id] ?? -1
+        result.set(
+          node.id,
+          community >= 0 ? `adaptive-${community}` : 'adaptive-unconnected',
+        )
+      } else {
+        result.set(node.id, node.cluster)
+      }
+    }
+    return result
+  }, [adaptiveIsCurrent, adaptiveResult, filtered.nodes])
+  const communityColorByNode = useMemo(() => {
+    const colors = new Map(
+      activeLegendClusters.map((community) => [community.id, community.color]),
+    )
+    return new Map(
+      filtered.nodes.map((node) => [
+        node.id,
+        colors.get(communityByNode.get(node.id) || '') || '#71717a',
+      ]),
+    )
+  }, [activeLegendClusters, communityByNode, filtered.nodes])
+  const selectedCommunityNodeIds = useMemo(
+    () =>
+      new Set(
+        selectedCommunityId
+          ? filtered.nodes
+              .filter(
+                (node) => communityByNode.get(node.id) === selectedCommunityId,
+              )
+              .map((node) => node.id)
+          : [],
+      ),
+    [communityByNode, filtered.nodes, selectedCommunityId],
+  )
+  const labeledNodeIds = useMemo(
+    () =>
+      nodeIdsForLabelCoverage(
+        filtered.nodes,
+        labelPercentage,
+        communityByNode,
+        selectedCommunityId,
+      ),
+    [communityByNode, filtered.nodes, labelPercentage, selectedCommunityId],
+  )
+  const selectedCommunity = selectedCommunityId
+    ? activeLegendClusters.find(
+        (community) => community.id === selectedCommunityId,
+      )
+    : undefined
   const neighborIds = useMemo(() => {
     const result = new Set<string>()
     if (!selectedNodeId && !hoveredNodeId) return result
@@ -371,9 +571,9 @@ export default function SocialGraphExplorer({
           color: colors.label,
         },
         defaultDrawNodeHover: drawThemeNodeHover(isDark),
-        labelDensity: 0.08,
+        labelDensity: 0.01,
         labelFont: 'var(--font-manrope), sans-serif',
-        labelRenderedSizeThreshold: 7,
+        labelRenderedSizeThreshold: 10_000,
         labelSize: 12,
         minCameraRatio: 0.08,
         maxCameraRatio: 8,
@@ -383,12 +583,31 @@ export default function SocialGraphExplorer({
         zIndex: true,
       },
     )
-    renderer.on('clickNode', ({ node }) => setSelectedNodeId(node))
-    renderer.on('enterNode', ({ node }) => setHoveredNodeId(node))
-    renderer.on('leaveNode', () => setHoveredNodeId(null))
+    renderer.on('clickNode', ({ node }) => {
+      setSelectedNodeId(node)
+      setHoveredNodeId(null)
+    })
+    renderer.on('enterNode', ({ node }) => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+      hoverCandidateRef.current = node
+      hoverTimerRef.current = setTimeout(() => {
+        if (hoverCandidateRef.current === node) setHoveredNodeId(node)
+      }, NODE_HOVER_DELAY_MS)
+    })
+    renderer.on('leaveNode', ({ node }) => {
+      if (hoverCandidateRef.current === node) {
+        hoverCandidateRef.current = null
+        if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+        hoverTimerRef.current = null
+      }
+      setHoveredNodeId((current) => (current === node ? null : current))
+    })
     renderer.on('clickStage', () => setSelectedNodeId(null))
     rendererRef.current = renderer
     return () => {
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+      hoverTimerRef.current = null
+      hoverCandidateRef.current = null
       renderer.kill()
       rendererRef.current = null
     }
@@ -435,20 +654,82 @@ export default function SocialGraphExplorer({
     if (!renderer) return
     const focus = hoveredNodeId || selectedNodeId
     renderer.setSetting('nodeReducer', (node, data) => {
-      if (!focus || node === focus || neighborIds.has(node)) return data
-      return { ...data, color: '#3f3f46', label: null, zIndex: 0 }
+      const isFocusNode = !focus || node === focus || neighborIds.has(node)
+      const isCommunityNode =
+        !selectedCommunityId || selectedCommunityNodeIds.has(node)
+      const showHover = node === focus
+      const forceLabel = labeledNodeIds.has(node)
+
+      if (!isFocusNode || (!isCommunityNode && !focus)) {
+        return {
+          ...data,
+          color: isDark ? '#3f3f46' : '#d4d4d8',
+          forceLabel: false,
+          highlighted: false,
+          label: null,
+          showHover: false,
+          zIndex: 0,
+        }
+      }
+
+      return {
+        ...data,
+        forceLabel,
+        highlighted: showHover,
+        showHover,
+        size:
+          selectedCommunityId && isCommunityNode ? data.size * 1.12 : data.size,
+        zIndex:
+          showHover || (Boolean(selectedCommunityId) && isCommunityNode)
+            ? 1
+            : 0,
+      }
     })
     renderer.setSetting('edgeReducer', (edge, data) => {
-      if (!focus) return data
       const graph = renderer.getGraph()
       const [source, target] = graph.extremities(edge)
-      const visible = source === focus || target === focus
-      return visible
-        ? { ...data, color: 'rgba(42, 207, 128, 0.72)', zIndex: 1 }
-        : { ...data, hidden: true }
+      if (focus) {
+        const visible = source === focus || target === focus
+        return visible
+          ? { ...data, color: 'rgba(42, 207, 128, 0.72)', zIndex: 1 }
+          : { ...data, hidden: true }
+      }
+      if (selectedCommunityId) {
+        const internal =
+          selectedCommunityNodeIds.has(source) &&
+          selectedCommunityNodeIds.has(target)
+        return internal
+          ? {
+              ...data,
+              color: `${selectedCommunity?.color || '#2acf80'}80`,
+              zIndex: 1,
+            }
+          : { ...data, hidden: true }
+      }
+      return data
     })
     renderer.refresh()
-  }, [hoveredNodeId, neighborIds, selectedNodeId])
+  }, [
+    hoveredNodeId,
+    isDark,
+    labeledNodeIds,
+    neighborIds,
+    selectedCommunity,
+    selectedCommunityId,
+    selectedCommunityNodeIds,
+    selectedNodeId,
+  ])
+
+  useEffect(() => {
+    if (
+      selectedCommunityId &&
+      !activeLegendClusters.some(
+        (community) => community.id === selectedCommunityId,
+      )
+    ) {
+      setSelectedCommunityId(null)
+    }
+  }, [activeLegendClusters, selectedCommunityId])
 
   useEffect(() => {
     if (
@@ -475,6 +756,16 @@ export default function SocialGraphExplorer({
         { duration: 350 },
       )
     }
+  }
+
+  const toggleCommunity = (communityId: string) => {
+    const isClearing = selectedCommunityId === communityId
+    setSelectedCommunityId(isClearing ? null : communityId)
+    setSelectedNodeId(null)
+    setHoveredNodeId(null)
+    hoverCandidateRef.current = null
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    hoverTimerRef.current = null
   }
 
   const zoom = (factor: number) => {
@@ -551,49 +842,17 @@ export default function SocialGraphExplorer({
           step={1}
           onChange={setFollowerSlider}
         />
-        <fieldset>
-          <legend className="mb-1.5 text-[12px] font-medium">
-            Interaction years
-          </legend>
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-            <select
-              aria-label="Interaction start year"
-              value={startYear}
-              onChange={(event) => {
-                const next = Number(event.target.value)
-                setStartYear(next)
-                if (next > endYear) setEndYear(next)
-              }}
-              className="h-8 rounded-[3px] border border-zinc-200 bg-white px-2 text-[11px] dark:border-[#35353a] dark:bg-[#151517]"
-            >
-              {years.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-            <span className={`text-[10px] ${MUTED}`}>through</span>
-            <select
-              aria-label="Interaction end year"
-              value={endYear}
-              onChange={(event) => {
-                const next = Number(event.target.value)
-                setEndYear(next)
-                if (next < startYear) setStartYear(next)
-              }}
-              className="h-8 rounded-[3px] border border-zinc-200 bg-white px-2 text-[11px] dark:border-[#35353a] dark:bg-[#151517]"
-            >
-              {years.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </div>
-          <p className={`mt-1 text-[10px] ${MUTED}`}>
-            Inclusive UTC calendar years
-          </p>
-        </fieldset>
+        <DualRangeSlider
+          label="Interaction years"
+          startValue={startYear}
+          endValue={endYear}
+          min={snapshot.temporal.minYear}
+          max={snapshot.temporal.maxYear}
+          onChange={(nextStartYear, nextEndYear) => {
+            setStartYear(nextStartYear)
+            setEndYear(nextEndYear)
+          }}
+        />
         <Slider
           label="Mutual strength"
           value={minimumStrength}
@@ -613,82 +872,111 @@ export default function SocialGraphExplorer({
           onChange={setMaximumNodes}
         />
 
-        <div className="space-y-2.5 rounded-[3px] border border-zinc-200 p-3 dark:border-[#35353a]">
-          <div>
-            <h2 className="text-[12px] font-semibold">Adaptive structure</h2>
-            <p className={`mt-1 text-[10px] leading-relaxed ${MUTED}`}>
-              Recluster and lay out only the graph that survives these filters.
-            </p>
-          </div>
-          <label className="block text-[11px]">
-            <span className="mb-1 block font-medium">Clustering</span>
-            <select
-              aria-label="Adaptive clustering algorithm"
-              value={clusteringAlgorithm}
-              onChange={(event) =>
-                setClusteringAlgorithm(
-                  event.target.value as AdaptiveClusteringAlgorithm,
-                )
-              }
-              className="h-8 w-full rounded-[3px] border border-zinc-200 bg-white px-2 dark:border-[#35353a] dark:bg-[#151517]"
-            >
-              <option value="louvain">Louvain</option>
-              <option value="label-propagation">Label propagation</option>
-            </select>
-          </label>
-          <label className="block text-[11px]">
-            <span className="mb-1 block font-medium">Layout</span>
-            <select
-              aria-label="Adaptive layout algorithm"
-              value={layoutAlgorithm}
-              onChange={(event) =>
-                setLayoutAlgorithm(
-                  event.target.value as AdaptiveLayoutAlgorithm,
-                )
-              }
-              className="h-8 w-full rounded-[3px] border border-zinc-200 bg-white px-2 dark:border-[#35353a] dark:bg-[#151517]"
-            >
-              <option value="clustered-force">Community force-directed</option>
-              <option value="force-directed">Force-directed</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={adaptGraph}
-            disabled={isAdapting || filtered.nodes.length < 2}
-            className="flex h-8 w-full items-center justify-center gap-1.5 rounded-[3px] bg-brand px-3 text-[11px] font-semibold text-zinc-950 disabled:cursor-wait disabled:opacity-60"
-          >
-            {isAdapting ? (
-              <Clock3 className="h-3.5 w-3.5 animate-pulse" />
-            ) : (
-              <Play className="h-3.5 w-3.5" />
-            )}
-            {isAdapting ? 'Calculating…' : 'Recluster & relayout'}
-          </button>
-          {adaptiveResult && (
-            <div className={`text-[10px] leading-relaxed ${MUTED}`}>
-              <p>
-                {adaptiveResult.communityCount} communities · modularity{' '}
-                {adaptiveResult.modularity.toFixed(3)}
+        <details className="rounded-[3px] border border-zinc-200 dark:border-[#35353a]">
+          <summary className="flex cursor-pointer list-none items-center gap-2 p-3 text-[12px] font-semibold [&::-webkit-details-marker]:hidden">
+            <SlidersHorizontal className="h-3.5 w-3.5 text-brand" />
+            Advanced options
+          </summary>
+          <div className="space-y-4 border-t border-zinc-200 p-3 dark:border-[#35353a]">
+            <div>
+              <Slider
+                label="Names shown"
+                value={labelPercentage}
+                displayValue={`${labelPercentage}%`}
+                min={0}
+                max={100}
+                step={5}
+                onChange={setLabelPercentage}
+              />
+              <p className={`mt-1.5 text-[10px] leading-relaxed ${MUTED}`}>
+                Uses centrality order. A selected community always shows all of
+                its visible names.
               </p>
-              <p className="tabular-nums">
-                Cluster {adaptiveResult.clusterMs.toFixed(1)} ms · layout{' '}
-                {adaptiveResult.layoutMs.toFixed(1)} ms · total{' '}
-                {adaptiveResult.totalMs.toFixed(1)} ms
-              </p>
-              {!adaptiveIsCurrent && (
-                <p className="mt-1 text-amber-700 dark:text-amber-300">
-                  Filters changed; rerun to adapt this graph.
+            </div>
+
+            <div className="space-y-2.5 border-t border-zinc-200 pt-3 dark:border-[#35353a]">
+              <div>
+                <h2 className="text-[12px] font-semibold">
+                  Adaptive structure
+                </h2>
+                <p className={`mt-1 text-[10px] leading-relaxed ${MUTED}`}>
+                  Recluster and lay out only the graph that survives these
+                  filters.
+                </p>
+              </div>
+              <label className="block text-[11px]">
+                <span className="mb-1 block font-medium">Clustering</span>
+                <select
+                  aria-label="Adaptive clustering algorithm"
+                  value={clusteringAlgorithm}
+                  onChange={(event) =>
+                    setClusteringAlgorithm(
+                      event.target.value as AdaptiveClusteringAlgorithm,
+                    )
+                  }
+                  className="h-8 w-full rounded-[3px] border border-zinc-200 bg-white px-2 dark:border-[#35353a] dark:bg-[#151517]"
+                >
+                  <option value="louvain">Louvain</option>
+                  <option value="label-propagation">Label propagation</option>
+                </select>
+              </label>
+              <label className="block text-[11px]">
+                <span className="mb-1 block font-medium">Layout</span>
+                <select
+                  aria-label="Adaptive layout algorithm"
+                  value={layoutAlgorithm}
+                  onChange={(event) =>
+                    setLayoutAlgorithm(
+                      event.target.value as AdaptiveLayoutAlgorithm,
+                    )
+                  }
+                  className="h-8 w-full rounded-[3px] border border-zinc-200 bg-white px-2 dark:border-[#35353a] dark:bg-[#151517]"
+                >
+                  <option value="clustered-force">
+                    Community force-directed
+                  </option>
+                  <option value="force-directed">Force-directed</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={adaptGraph}
+                disabled={isAdapting || filtered.nodes.length < 2}
+                className="flex h-8 w-full items-center justify-center gap-1.5 rounded-[3px] bg-brand px-3 text-[11px] font-semibold text-zinc-950 disabled:cursor-wait disabled:opacity-60"
+              >
+                {isAdapting ? (
+                  <Clock3 className="h-3.5 w-3.5 animate-pulse" />
+                ) : (
+                  <Play className="h-3.5 w-3.5" />
+                )}
+                {isAdapting ? 'Calculating…' : 'Recluster & relayout'}
+              </button>
+              {adaptiveResult && (
+                <div className={`text-[10px] leading-relaxed ${MUTED}`}>
+                  <p>
+                    {adaptiveResult.communityCount} communities · modularity{' '}
+                    {adaptiveResult.modularity.toFixed(3)}
+                  </p>
+                  <p className="tabular-nums">
+                    Cluster {adaptiveResult.clusterMs.toFixed(1)} ms · layout{' '}
+                    {adaptiveResult.layoutMs.toFixed(1)} ms · total{' '}
+                    {adaptiveResult.totalMs.toFixed(1)} ms
+                  </p>
+                  {!adaptiveIsCurrent && (
+                    <p className="mt-1 text-amber-700 dark:text-amber-300">
+                      Filters changed; rerun to adapt this graph.
+                    </p>
+                  )}
+                </div>
+              )}
+              {adaptiveError && (
+                <p className="text-[10px] text-red-600 dark:text-red-400">
+                  {adaptiveError}
                 </p>
               )}
             </div>
-          )}
-          {adaptiveError && (
-            <p className="text-[10px] text-red-600 dark:text-red-400">
-              {adaptiveError}
-            </p>
-          )}
-        </div>
+          </div>
+        </details>
 
         <div className="grid grid-cols-2 gap-2 border-y border-zinc-200 py-3 text-[11px] dark:border-[#2b2b30]">
           <div>
@@ -712,7 +1000,7 @@ export default function SocialGraphExplorer({
           </p>
         )}
 
-        {selectedNode ? (
+        {selectedNode && (
           <div>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -748,7 +1036,18 @@ export default function SocialGraphExplorer({
                       onClick={() => focusNode(neighbor.id)}
                       className="flex w-full items-center justify-between gap-2 text-left text-[11px] hover:text-brand"
                     >
-                      <span className="truncate">@{neighbor.username}</span>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span
+                          className="h-2.5 w-2.5 flex-shrink-0 rounded-full ring-1 ring-black/10 dark:ring-white/10"
+                          style={{
+                            backgroundColor:
+                              communityColorByNode.get(neighbor.id) ||
+                              '#71717a',
+                          }}
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">@{neighbor.username}</span>
+                      </span>
                       <span className="tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
                         {edge.strength.toFixed(2)} · {edge.mutualInteractions}×
                       </span>
@@ -762,39 +1061,61 @@ export default function SocialGraphExplorer({
               )}
             </div>
           </div>
-        ) : (
-          <div>
+        )}
+
+        <div>
+          <div className="flex items-center justify-between gap-2">
             <h2 className="text-[13px] font-semibold">
               {adaptiveIsCurrent ? 'Active communities' : 'Stable communities'}
             </h2>
-            <div
-              className="mt-2 max-h-44 space-y-1.5 overflow-auto pr-1"
-              tabIndex={0}
-              aria-label="Community list"
-            >
-              {(adaptiveIsCurrent && adaptiveResult
-                ? adaptiveLegendClusters
-                : snapshot.clusters
-              )
-                .slice(0, 14)
-                .map((cluster) => (
-                  <div
-                    key={cluster.id}
-                    className="flex items-center justify-between gap-2 text-[11px]"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span
-                        className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
-                        style={{ backgroundColor: cluster.color }}
-                      />
-                      <span className="truncate">{cluster.label}</span>
-                    </span>
-                    <span className={MUTED}>{cluster.nodeCount}</span>
-                  </div>
-                ))}
-            </div>
+            {selectedCommunity && (
+              <button
+                type="button"
+                onClick={() => toggleCommunity(selectedCommunity.id)}
+                className="text-[10px] text-zinc-500 hover:text-zinc-900 dark:text-[#a7a7b4] dark:hover:text-white"
+              >
+                Show all
+              </button>
+            )}
           </div>
-        )}
+          {selectedCommunity && (
+            <p className={`mt-1 text-[10px] leading-relaxed ${MUTED}`}>
+              Highlighting {selectedCommunity.label}; all visible names in this
+              community are shown.
+            </p>
+          )}
+          <div
+            className="mt-2 max-h-44 space-y-1 overflow-auto pr-1"
+            tabIndex={0}
+            aria-label="Community list"
+          >
+            {activeLegendClusters.slice(0, 14).map((cluster) => {
+              const isSelected = selectedCommunityId === cluster.id
+              return (
+                <button
+                  type="button"
+                  key={cluster.id}
+                  aria-pressed={isSelected}
+                  onClick={() => toggleCommunity(cluster.id)}
+                  className={`flex w-full items-center justify-between gap-2 rounded-[3px] px-1.5 py-1 text-left text-[11px] transition-colors ${
+                    isSelected
+                      ? 'bg-zinc-100 font-medium dark:bg-[#2b2b30]'
+                      : 'hover:bg-zinc-50 dark:hover:bg-[#242428]'
+                  }`}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                      style={{ backgroundColor: cluster.color }}
+                    />
+                    <span className="truncate">{cluster.label}</span>
+                  </span>
+                  <span className={MUTED}>{cluster.nodeCount}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
         <details className={`text-[11px] leading-relaxed ${MUTED}`}>
           <summary className="cursor-pointer font-medium text-zinc-700 dark:text-[#d9d9de]">
@@ -841,7 +1162,7 @@ export default function SocialGraphExplorer({
           </button>
         </div>
         <div className="pointer-events-none absolute bottom-3 left-3 rounded-[3px] bg-white/80 px-2 py-1 text-[10px] text-zinc-500 backdrop-blur dark:bg-[#1b1b1e]/80 dark:text-[#a7a7b4]">
-          Scroll to zoom · drag to pan · select a node to isolate its ties
+          Scroll to zoom · drag to pan · click or hover 1s to inspect a node
         </div>
         {isPending && (
           <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 animate-pulse bg-brand" />

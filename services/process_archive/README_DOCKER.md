@@ -59,8 +59,8 @@ SUPABASE_SERVICE_ROLE=your-service-role-key
 LOG_LEVEL=info
 
 # Batch sizes
-PG_BATCH_SIZE=5000
-MEMORY_BATCH_SIZE=15000
+PG_BATCH_SIZE=1000
+MEMORY_BATCH_SIZE=3000
 MAX_MEMORY_MB=1000
 
 # Development mode
@@ -229,7 +229,11 @@ deploy:
 ### Memory Management
 - **Garbage Collection:** Enabled by default with `--expose-gc`
 - **Memory Limit:** Set via `MAX_MEMORY_MB` environment variable
-- **Batch Sizes:** Tune `PG_BATCH_SIZE` and `MEMORY_BATCH_SIZE`
+- **Batch Sizes:** Defaults are `PG_BATCH_SIZE=1000` and
+  `MEMORY_BATCH_SIZE=3000`. These conservative values reduce the size of each
+  PostgreSQL statement and bound per-chunk write pressure for unusually large
+  archives. Larger values can improve throughput, but validate them against the
+  pooler and concurrent ingestion workload before deploying.
 
 ### Database Performance
 - **Connection Pooling:** Max 5 connections
@@ -394,7 +398,7 @@ tail -f logs/execution.log
 [2024-01-15 02:00:01] Environment: NODE_ENV=production
 [2024-01-15 02:00:01] Memory limit: 2000MB
 [2024-01-15 02:00:01] Use COPY optimization: true
-[2024-01-15 02:00:01] Batch size: 5000
+[2024-01-15 02:00:01] Batch size: 1000
 [2024-01-15 02:05:23] ✅ Process completed successfully in 322s
 [2024-01-15 02:05:23] ---
 ```

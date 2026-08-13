@@ -41,6 +41,17 @@ describe('ClickHouse staging lab guard', () => {
     ).toThrow('Unsupported ClickHouse analytics endpoint')
   })
 
+  test('allows the parameterless corpus-count endpoint', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['corpus-count'],
+      new URLSearchParams('raw_sql=DROP'),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/corpus-count',
+    )
+  })
+
   test('allows only bounded tweet-search parameters', () => {
     const target = analyticsGatewayRequestUrl(
       ['search'],

@@ -1,0 +1,53 @@
+import { render, screen, within } from '@testing-library/react'
+import AboutPage from './page'
+
+describe('AboutPage contributors', () => {
+  it('shows the current and past contributors with their X accounts', () => {
+    render(<AboutPage />)
+
+    const currentHeading = screen.getByRole('heading', {
+      name: 'Current Contributors',
+    })
+    const currentSection = currentHeading.closest('section')
+    expect(currentSection).not.toBeNull()
+
+    const xiqLink = within(currentSection!).getByRole('link', {
+      name: 'Francisco Carvalho, or Xiq',
+    })
+    expect(xiqLink).toHaveAttribute('href', 'https://x.com/exgenesis')
+    expect(
+      within(currentSection!).getByRole('link', { name: 'Christine' }),
+    ).toHaveAttribute('href', 'https://x.com/christineist')
+
+    const xiqCard = xiqLink.closest('.rounded-lg')
+    expect(xiqCard?.querySelector('svg')).toBeNull()
+
+    const pastHeading = screen.getByRole('heading', {
+      name: 'Past Contributors',
+    })
+    const pastSection = pastHeading.closest('section')
+    expect(pastSection).not.toBeNull()
+    expect(
+      within(pastSection!).getByRole('link', { name: 'Defender' }),
+    ).toHaveAttribute('href', 'https://x.com/DefenderOfBasic')
+    expect(
+      within(pastSection!).getByRole('link', {
+        name: 'Alexandre Variengien',
+      }),
+    ).toHaveAttribute('href', 'https://x.com/A_Variengien')
+    expect(
+      within(pastSection!).queryByText('Christine'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('removes the retired mission copy and hall-of-fame heading', () => {
+    render(<AboutPage />)
+
+    expect(
+      screen.queryByText(/Twitter conversations represent a unique record/),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Contributor Hall of Fame' }),
+    ).not.toBeInTheDocument()
+  })
+})

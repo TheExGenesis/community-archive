@@ -20,6 +20,7 @@ import { FilterCriteria } from '@/lib/queries/tweetQueries'
 import { Archive, Radio } from 'lucide-react'
 import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
+import { ProjectContributorBadge } from '@/components/ProjectContributorBadge'
 
 // Style constants (glows removed)
 const unifiedDeepBlueBase = 'bg-card dark:bg-background'
@@ -51,6 +52,7 @@ const UserProfile = ({ userData }: { userData: FormattedUser }) => {
           </h1>
           <p className="text-lg text-muted-foreground">@{account.username}</p>
           <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
+            <ProjectContributorBadge username={account.username} />
             {account.has_archive && (
               <Badge variant="outline" className="gap-1.5">
                 <Archive aria-hidden="true" className="h-3.5 w-3.5" />

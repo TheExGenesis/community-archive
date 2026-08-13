@@ -1,4 +1,5 @@
 const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
+  'corpus-count': new Set(),
   summary: new Set(),
   search: new Set([
     'q',

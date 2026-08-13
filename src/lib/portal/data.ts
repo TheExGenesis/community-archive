@@ -52,6 +52,16 @@ interface PortalCorpusStats {
   generatedAt: string
 }
 
+interface ClickHouseCorpusCountResponse {
+  data: {
+    totalTweets: unknown
+    sourceUpdatedAt: unknown
+    collectedAt: unknown
+    source: 'clickhouse.tweet_content_versions'
+    countMode: 'unique_tweets_observed'
+  }
+}
+
 const PORTAL_READ_TIMEOUT_MS = 10_000
 export const PORTAL_BANGERS_PAGE_SIZE = 30
 const PORTAL_BANGERS_PERIOD_SCAN_PAGE_SIZE = 100
@@ -220,8 +230,24 @@ function portalSnapshotTimestamp(value: string, label: string): string {
   return timestamp.toISOString()
 }
 
-/** Supabase is authoritative for archive uploads until that path reaches ClickHouse. */
-export async function fetchPortalCorpusStats(): Promise<PortalCorpusStats> {
+function portalClickHouseTimestamp(value: string, label: string): string {
+  const normalized = /[zZ]$|[+-]\d\d:\d\d$/.test(value)
+    ? value
+    : `${value.replace(' ', 'T')}Z`
+  return portalSnapshotTimestamp(normalized, label)
+}
+
+function portalClickHouseCount(value: unknown, label: string): number {
+  if (
+    (typeof value !== 'string' && typeof value !== 'number') ||
+    (typeof value === 'string' && !/^\d+$/.test(value))
+  ) {
+    throw new Error(`Portal ${label} returned an invalid response`)
+  }
+  return portalSnapshotCount(Number(value), label)
+}
+
+async function fetchSupabasePortalCorpusStats(): Promise<PortalCorpusStats> {
   const rows = await portalRestRows<{
     total_tweets: number | null
     last_updated: string
@@ -241,6 +267,37 @@ export async function fetchPortalCorpusStats(): Promise<PortalCorpusStats> {
       rows[0].last_updated,
       'corpus summary timestamp',
     ),
+  }
+}
+
+/**
+ * ClickHouse owns the live analytical corpus count. Supabase's daily summary
+ * remains a last-known-good fallback during gateway or projection failures.
+ */
+export async function fetchPortalCorpusStats(): Promise<PortalCorpusStats> {
+  try {
+    const response =
+      await fetchAnalyticsGatewayJson<ClickHouseCorpusCountResponse>(
+        ['corpus-count'],
+        new URLSearchParams(),
+        { timeoutMs: PORTAL_READ_TIMEOUT_MS },
+      )
+    return {
+      totalTweets: portalClickHouseCount(
+        response.data.totalTweets,
+        'ClickHouse corpus tweet count',
+      ),
+      generatedAt: portalClickHouseTimestamp(
+        String(response.data.collectedAt),
+        'ClickHouse corpus count timestamp',
+      ),
+    }
+  } catch (error) {
+    console.error(
+      'Portal ClickHouse corpus count failed; falling back to Supabase:',
+      error,
+    )
+    return fetchSupabasePortalCorpusStats()
   }
 }
 

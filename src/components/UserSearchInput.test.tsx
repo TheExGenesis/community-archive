@@ -5,6 +5,12 @@ import '@testing-library/jest-dom'
 import UserSearchInput from './UserSearchInput'
 import { fetchUserSuggestions } from '@/lib/queries/fetchUsers'
 
+const mockPush = jest.fn()
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush }),
+}))
+
 jest.mock('@/utils/supabase', () => ({
   createBrowserClient: () => ({}),
 }))
@@ -33,10 +39,11 @@ function SearchHarness() {
 
 describe('UserSearchInput', () => {
   beforeEach(() => {
+    mockPush.mockReset()
     mockedFetchUserSuggestions.mockReset()
   })
 
-  it('offers matching users and inserts a from: filter when selected', async () => {
+  it('offers a profile row before a from: filter row', async () => {
     mockedFetchUserSuggestions.mockResolvedValue([
       {
         directory_id: 'archive:123',
@@ -53,22 +60,26 @@ describe('UserSearchInput', () => {
     })
     await userEvent.type(input, 'exg')
 
-    const option = await screen.findByRole('option', {
-      name: /Ex Genesis @exgenesis from:exgenesis/,
-    })
+    const options = await screen.findAllByRole('option')
     expect(mockedFetchUserSuggestions).toHaveBeenLastCalledWith(
       expect.anything(),
       'exg',
       6,
     )
+    expect(options).toHaveLength(2)
+    expect(options[0]).toHaveAccessibleName(/Ex Genesis @exgenesis Profile/)
+    expect(options[1]).toHaveAccessibleName(
+      /Search posts from @exgenesis from:exgenesis/,
+    )
 
-    await userEvent.click(option)
+    await userEvent.click(options[0])
 
-    expect(input).toHaveValue('from:exgenesis')
+    expect(mockPush).toHaveBeenCalledWith('/user/exgenesis')
+    expect(input).toHaveValue('exg')
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   })
 
-  it('supports arrow-key selection without submitting the parent form', async () => {
+  it('inserts a from: filter when the filter row is selected', async () => {
     mockedFetchUserSuggestions.mockResolvedValue([
       {
         directory_id: 'archive:123',
@@ -84,8 +95,45 @@ describe('UserSearchInput', () => {
       name: 'Search Community Archive',
     })
     await userEvent.type(input, 'exg')
-    await screen.findByRole('option')
+
+    const filterOption = await screen.findByRole('option', {
+      name: /Search posts from @exgenesis from:exgenesis/,
+    })
+
+    await userEvent.click(filterOption)
+
+    expect(input).toHaveValue('from:exgenesis')
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  })
+
+  it('supports arrow-key selection for both actions', async () => {
+    mockedFetchUserSuggestions.mockResolvedValue([
+      {
+        directory_id: 'archive:123',
+        username: 'exgenesis',
+        account_display_name: 'Ex Genesis',
+        avatar_media_url: null,
+        num_followers: 100,
+      },
+    ])
+
+    render(<SearchHarness />)
+    const input = screen.getByRole('combobox', {
+      name: 'Search Community Archive',
+    })
+    await userEvent.type(input, 'exg')
+    await screen.findAllByRole('option')
     await userEvent.keyboard('{ArrowDown}{Enter}')
+
+    expect(mockPush).toHaveBeenCalledWith('/user/exgenesis')
+    expect(input).toHaveValue('exg')
+
+    input.focus()
+    await userEvent.clear(input)
+    await userEvent.type(input, 'exg')
+    await screen.findAllByRole('option')
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}')
 
     expect(input).toHaveValue('from:exgenesis')
   })

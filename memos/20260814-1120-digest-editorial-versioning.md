@@ -55,14 +55,15 @@ ID.
 
 ## Staging verification
 
-Migrations `20260814180703` and `20260814182657` are applied and recorded on
-the Community Archive staging project. The second migration covers the
-edition-to-run foreign key identified by the performance advisor. The remaining
-Digest advisor notices are expected: prompt/run tables are service-role-only
-with RLS and no public policies, published editions are intentionally visible
-through their status-gated RLS policy, and new indexes have not yet accumulated
-usage. Anonymous and authenticated roles cannot select runs, and anonymous
-users cannot execute the publication RPC.
+Migrations `20260814165156`, `20260814180703`, `20260814182657`, and
+`20260814184340` are applied and recorded on the Community Archive staging
+project. The edition-to-run index covers the foreign key identified by the
+performance advisor. The remaining Digest advisor notices are expected:
+prompt/run tables are service-role-only with RLS and no public policies,
+published editions are intentionally visible through their status-gated RLS
+policy, and new indexes have not yet accumulated usage. Anonymous and
+authenticated roles cannot select runs, and anonymous users cannot execute the
+publication RPC.
 
 ## Live editorial smoke test
 
@@ -74,3 +75,9 @@ bullets and five stories; it correctly reclassified the P-vs.-NP post as a
 `Viral joke`. That smoke exposed a provider behavior where the 140-character
 JSON Schema ceiling clipped the catch-all bullet mid-word, leading to the
 schema-headroom change above.
+
+The final run's server trace also exposed that the staging project had skipped
+the already-committed `workflow_run_id` migration. Generation remained durable
+and completed, but the server could not persist the Workflow run ID. The
+missing migration is now applied and recorded, PostgREST's schema cache was
+reloaded, and run `e5942f91` was backfilled with its verified Workflow ID.

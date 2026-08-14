@@ -27,6 +27,9 @@ remaining stories. The prompt explicitly asks the model to inspect absurdity,
 tone, sarcasm, source credibility, replies, and quote-post context before
 treating a literal-sounding claim as news. Jokes, satire, and shitposts must be
 labeled and explained as such; genuine ambiguity belongs in the editor note.
+The schema leaves 200 characters of safety headroom around the 140-character
+editorial target so a provider cannot meet a hard limit by clipping the final
+catch-all sentence mid-word.
 
 ## Version boundaries
 
@@ -60,3 +63,14 @@ with RLS and no public policies, published editions are intentionally visible
 through their status-gated RLS policy, and new indexes have not yet accumulated
 usage. Anonymous and authenticated roles cannot select runs, and anonymous
 users cannot execute the publication RPC.
+
+## Live editorial smoke test
+
+The deployed preview staged August 12 as private draft v1, saved a manual
+inline correction as private draft v2, and retained both ledger entries. The
+public August 12 route remained unpublished. A linked AI revision continued
+after navigating away and completed in 56.9 seconds with exactly three summary
+bullets and five stories; it correctly reclassified the P-vs.-NP post as a
+`Viral joke`. That smoke exposed a provider behavior where the 140-character
+JSON Schema ceiling clipped the catch-all bullet mid-word, leading to the
+schema-headroom change above.

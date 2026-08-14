@@ -178,7 +178,9 @@ reply/quote context before reporting a claim as news; likely satire and
 shitposts must be treated as jokes or memes. It prefers the top-ranked banger
 as representative while allowing a more iconic choice. The lab can fork this
 into a new immutable version; prior runs keep their exact prompt and provider
-configuration.
+configuration. Summary bullets target 140 characters, while the transport
+schema allows up to 200 so a provider never satisfies the limit by clipping a
+catch-all sentence mid-word.
 
 ## Rollout gates
 

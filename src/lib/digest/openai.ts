@@ -14,7 +14,10 @@ export const DIGEST_JSON_SCHEMA = {
       type: 'array',
       minItems: 3,
       maxItems: 3,
-      items: { type: 'string', minLength: 35, maxLength: 140 },
+      // The editorial target remains 140 characters, but the schema leaves
+      // enough headroom for a complete catch-all sentence. Some compatible
+      // providers satisfy a hard maxLength by clipping generated text.
+      items: { type: 'string', minLength: 35, maxLength: 200 },
     },
     representative_tweet_index: {
       type: 'integer',

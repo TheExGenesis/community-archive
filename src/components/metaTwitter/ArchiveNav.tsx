@@ -3,7 +3,6 @@ import Link from 'next/link'
 export interface NavChapter {
   year: number
   count: number
-  phrase?: string
   topics: { label: string; slug: string }[]
 }
 
@@ -44,25 +43,13 @@ export function ArchiveNav({
           <div key={chapter.year} className="contents lg:block">
             <Link
               href={`${basePath}?chapter=${chapter.year}`}
-              className={`block whitespace-nowrap px-3 pb-1 pt-3 text-sm lg:whitespace-normal ${
+              className={`block whitespace-nowrap px-3 pb-1 pt-3 text-sm font-extrabold ${
                 yearActive && !activeTopicSlug
-                  ? 'text-foreground'
+                  ? 'text-foreground underline decoration-2 underline-offset-4'
                   : 'text-foreground/80 hover:text-foreground'
               }`}
             >
-              <span
-                className={`font-extrabold ${yearActive && !activeTopicSlug ? 'underline decoration-2 underline-offset-4' : ''}`}
-              >
-                {chapter.year}
-              </span>
-              {chapter.phrase && (
-                <span
-                  className="hidden text-[13px] italic leading-snug text-muted-foreground lg:block"
-                  style={{ fontFamily: 'var(--font-petrona), Georgia, serif' }}
-                >
-                  {chapter.phrase}
-                </span>
-              )}
+              {chapter.year}
             </Link>
             {chapter.topics.map((topic) => {
               const topicActive = yearActive && activeTopicSlug === topic.slug
@@ -70,7 +57,7 @@ export function ArchiveNav({
                 <Link
                   key={topic.slug}
                   href={`${basePath}?chapter=${chapter.year}&topic=${topic.slug}`}
-                  className={`whitespace-nowrap rounded-lg py-[5px] pl-3 pr-3 text-sm lg:block lg:pl-6 ${
+                  className={`whitespace-nowrap rounded-lg py-[5px] pl-3 pr-3 text-sm leading-snug lg:block lg:whitespace-normal lg:pl-6 ${
                     topicActive
                       ? 'bg-accent font-bold text-accent-foreground'
                       : 'font-normal text-muted-foreground hover:bg-muted'

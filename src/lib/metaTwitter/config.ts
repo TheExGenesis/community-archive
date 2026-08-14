@@ -20,8 +20,6 @@ export interface TopicConfig {
 
 export interface ChapterConfig {
   year: number
-  /** Short evocative chapter title, ideally in the owner's own words */
-  phrase?: string
   /** Short generated description of the era */
   description?: string
   topics: TopicConfig[]
@@ -42,44 +40,44 @@ export interface MetaTwitterProfileConfig {
 // via FTS counts, 2026-08).
 const T = {
   cuties: {
-    label: 'Building Cuties',
+    label: 'barreled along by cuties',
     slug: 'building-cuties',
     terms: ['cuties', 'matchmaking'],
     description:
       'Building the cuties dating app — dinners, group chats, and social infrastructure as plumbing for serendipity.',
   },
   friendship: {
-    label: 'Friendship',
+    label: 'what do your friends ask you for',
     slug: 'friendship',
     terms: ['friends', 'friendship'],
     description: 'On making, keeping, and introducing friends to one another.',
   },
   dating: {
-    label: 'Dating',
+    label: 'always go on 2 dates',
     slug: 'dating',
     terms: ['dating', 'romance'],
     description: 'Dating discourse, field notes from the romantic frontier.',
   },
   community: {
-    label: 'Community',
+    label: 'oh, I have a home again',
     slug: 'community',
     terms: ['community', 'dinner party'],
     description: 'Community building — dinners as infrastructure.',
   },
   art: {
-    label: 'Art',
+    label: 'experimental art parties',
     slug: 'art',
     terms: ['art', 'painting', 'museum'],
     description: 'Art, beauty, and feeling seen by paintings.',
   },
   ai: {
-    label: 'AI & startups',
+    label: 'social ai, tools for community flourishing',
     slug: 'ai',
     terms: ['AI', 'startup'],
     description: 'AI, startups, and building in public.',
   },
   sf: {
-    label: 'SF culture',
+    label: 'go look lost at config',
     slug: 'sf',
     terms: ['sf', 'san francisco'],
     description: 'San Francisco as a group project.',
@@ -97,37 +95,57 @@ export const META_TWITTER_PROFILES: Record<string, MetaTwitterProfileConfig> = {
     chapters: [
       {
         year: 2026,
-        phrase: 'my brain opened a new brain',
         description:
           'Building in public, dinners as infrastructure, and a softer internet.',
-        topics: [T.cuties, T.community, T.ai, T.friendship],
+        topics: [
+          { ...T.cuties, label: "hey they're on cuties!" },
+          { ...T.community, label: 'like YC but for public goods' },
+          { ...T.ai, label: 'social ai, tools for community flourishing' },
+          { ...T.friendship, label: 'what do your friends ask you for' },
+        ],
       },
       {
         year: 2025,
-        phrase: 'barreled along by cuties',
         description: 'The year Cuties went from group chat to institution.',
-        topics: [T.cuties, T.friendship, T.community, T.sf],
+        topics: [
+          { ...T.cuties, label: 'barreled along by cuties' },
+          { ...T.friendship, label: 'little groups of 3-4 friends' },
+          { ...T.community, label: 'find the next N lonely' },
+          { ...T.sf, label: 'lovember is happening btw' },
+        ],
       },
       {
         year: 2024,
-        phrase: 'oh my god what a love story',
         description:
           'Cuties gets serious, the dating discourse compounds, and the bangers keep landing.',
-        topics: [T.cuties, T.dating, T.friendship, T.ai],
+        topics: [
+          { ...T.cuties, label: '3rd relationship from cuties!' },
+          { ...T.dating, label: 'always go on 2 dates' },
+          { ...T.friendship, label: 'weddings of all of my major friendships' },
+          { ...T.ai, label: 'fertility clinic or open ai?' },
+        ],
       },
       {
         year: 2023,
-        phrase: 'the darling effect',
         description:
           'Peak dating discourse, viral late-twenties wisdom, and the first cuties experiments.',
-        topics: [T.dating, T.friendship, T.community, T.art],
+        topics: [
+          { ...T.dating, label: '+5 admiration points' },
+          { ...T.friendship, label: "you can't just cut and leave" },
+          { ...T.community, label: 'doing the community a favor' },
+          { ...T.art, label: 'those who get rothko paintings' },
+        ],
       },
       {
         year: 2022,
-        phrase: 'fun, meaningful and interesting work',
         description:
           'Friendship maximalism, art feelings, and the group chat era.',
-        topics: [T.friendship, T.art, T.dating, T.ai],
+        topics: [
+          { ...T.friendship, label: 'treat everyone like friends' },
+          { ...T.art, label: 'experimental art parties' },
+          { ...T.dating, label: 'a massive singles group chat' },
+          { ...T.ai, label: 'therapy of the future' },
+        ],
       },
     ],
     hallOfFamePinned: [

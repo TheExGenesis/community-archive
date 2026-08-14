@@ -29,6 +29,10 @@ jest.mock('@/components/digest/DigestDaySelector', () => ({
   DigestDaySelector: () => <div data-testid="day-selector" />,
 }))
 
+jest.mock('@/components/digest/DigestMarkdown', () => ({
+  DigestMarkdown: ({ children }: { children: string }) => <>{children}</>,
+}))
+
 describe('DigestEditionView', () => {
   test('shows the editorial lab shortcut only to admins', () => {
     const { rerender } = render(

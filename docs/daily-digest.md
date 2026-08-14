@@ -106,11 +106,12 @@ projection, not a write authority.
 5. Ask for a simple revision when needed. Each request creates a linked,
    immutable run with the instruction, exact request, provider response, usage,
    and validation trace; the source run remains unchanged.
-6. Edit the validated summary, story copy, labels, notes, and keywords inline,
-   then save those corrections as a new private draft. Editors can also stage
-   the validated output unchanged. Neither path mutates the model run or
-   replaces an existing published version, and every later save creates another
-   draft version.
+6. Edit the validated summary, story copy, and notes in a WYSIWYG Markdown
+   editor; edit labels and keywords as plain text. The public digest safely
+   renders bold, italic, strikethrough, inline code, and links. Saving creates a
+   new private draft. Editors can also stage the validated output unchanged.
+   Neither path mutates the model run or replaces an existing published
+   version, and every later save creates another draft version.
 7. Publish explicitly with the prominent **Publish Daily Digest** action.
    `publish_digest_edition(uuid)` archives the old version
    and publishes the selected draft in one database transaction.

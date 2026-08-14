@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { DigestStoryView } from '@/components/digest/DigestStoryView'
 import { getPublishedDigest } from '@/lib/digest/data'
+import { markdownToPlainText } from '@/lib/digest/markdown'
 
 export const revalidate = 300
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
@@ -19,8 +20,8 @@ export async function generateMetadata({
   )
   return story
     ? {
-        title: `${story.title} · Community Archive`,
-        description: story.subtitle,
+        title: `${markdownToPlainText(story.title)} · Community Archive`,
+        description: markdownToPlainText(story.subtitle),
       }
     : { title: 'Daily Digest · Community Archive' }
 }

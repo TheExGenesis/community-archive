@@ -11,6 +11,18 @@ jest.mock('./actions', () => ({
   saveDigestEditionAction: jest.fn(),
 }))
 
+jest.mock('./MarkdownField', () => ({
+  MarkdownField: ({
+    name,
+    label,
+    defaultValue,
+  }: {
+    name: string
+    label: string
+    defaultValue: string
+  }) => <textarea aria-label={label} name={name} defaultValue={defaultValue} />,
+}))
+
 describe('DigestContentFields', () => {
   test('makes validated summary and story copy directly editable', () => {
     render(
@@ -22,9 +34,9 @@ describe('DigestContentFields', () => {
     expect(screen.getByLabelText('Bullet 1')).toHaveValue(
       AUGUST_11_MOCK_DIGEST.content.executiveSummary[0],
     )
-    expect(
-      screen.getAllByLabelText('Title', { selector: 'input' })[0],
-    ).toHaveValue(AUGUST_11_MOCK_DIGEST.content.stories[0].title)
+    expect(screen.getAllByLabelText('Title')[0]).toHaveValue(
+      AUGUST_11_MOCK_DIGEST.content.stories[0].title,
+    )
     expect(screen.getAllByLabelText('Editor’s note')[0]).toHaveValue(
       AUGUST_11_MOCK_DIGEST.content.stories[0].editorialNote,
     )

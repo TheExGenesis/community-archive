@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
+import { DigestMarkdown } from '@/components/digest/DigestMarkdown'
 import { MUTED, SERIF } from '@/components/portal/styles'
 import type { DigestEdition, DigestStory } from '@/lib/digest/types'
 
@@ -74,12 +75,14 @@ export function DigestStoryView({
             className="mt-5 text-[42px] font-semibold leading-[1.06] tracking-[-0.01em] [text-wrap:pretty] sm:text-[56px]"
             style={SERIF}
           >
-            {story.titleIsQuote === false ? story.title : `“${story.title}”`}
+            {story.titleIsQuote === false ? null : '“'}
+            <DigestMarkdown>{story.title}</DigestMarkdown>
+            {story.titleIsQuote === false ? null : '”'}
           </h1>
           <p
             className={`mt-5 max-w-[64ch] text-lg leading-[1.65] [text-wrap:pretty] sm:text-xl ${MUTED}`}
           >
-            {story.subtitle}
+            <DigestMarkdown>{story.subtitle}</DigestMarkdown>
           </p>
         </header>
 
@@ -147,7 +150,9 @@ export function DigestStoryView({
                 {story.bullets.map((bullet) => (
                   <li key={bullet} className="flex gap-2.5">
                     <span aria-hidden="true">✦</span>
-                    <span>{bullet}</span>
+                    <span>
+                      <DigestMarkdown>{bullet}</DigestMarkdown>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -159,7 +164,7 @@ export function DigestStoryView({
                   Editor&apos;s note
                 </h2>
                 <p className={`mt-3 text-sm leading-6 ${MUTED}`}>
-                  {story.editorialNote}
+                  <DigestMarkdown>{story.editorialNote}</DigestMarkdown>
                 </p>
               </section>
             ) : null}

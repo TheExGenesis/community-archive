@@ -4,6 +4,7 @@ import {
   type DigestEditionContent,
 } from '@/lib/digest/types'
 import { saveDigestEditionAction } from './actions'
+import { MarkdownField } from './MarkdownField'
 import { SubmitButton } from './SubmitButton'
 
 const fieldClass =
@@ -21,17 +22,15 @@ export function DigestContentFields({
       <fieldset className="space-y-3">
         <legend className="font-semibold">Three-bullet summary</legend>
         {[0, 1, 2].map((index) => (
-          <label key={index} className="block text-xs font-semibold">
-            Bullet {index + 1}
-            <textarea
+          <div key={index} className="block text-xs font-semibold">
+            <MarkdownField
               name={`summary_${index}`}
+              label={`Bullet ${index + 1}`}
               defaultValue={summary[index] ?? ''}
-              rows={2}
               maxLength={300}
-              required
-              className={fieldClass}
+              editorClassName="font-serif text-base italic leading-6"
             />
-          </label>
+          </div>
         ))}
       </fieldset>
 
@@ -71,57 +70,47 @@ export function DigestContentFields({
                   ))}
                 </select>
               </label>
-              <label className="block text-xs font-semibold">
-                Title
-                <input
+              <div className="block text-xs font-semibold">
+                <MarkdownField
                   name={`story_${storyIndex}_title`}
+                  label="Title"
                   defaultValue={story.title}
                   maxLength={300}
-                  required
-                  className={fieldClass}
+                  editorClassName="font-serif text-xl font-semibold leading-7"
                 />
-              </label>
+              </div>
             </div>
-            <label className="mt-4 block text-xs font-semibold">
-              Explanatory subtitle
-              <textarea
+            <div className="mt-4 block text-xs font-semibold">
+              <MarkdownField
                 name={`story_${storyIndex}_subtitle`}
+                label="Explanatory subtitle"
                 defaultValue={story.subtitle}
-                rows={2}
                 maxLength={320}
-                required
-                className={fieldClass}
               />
-            </label>
+            </div>
             <div className="mt-4 grid gap-3">
               {story.bullets.map((bullet, bulletIndex) => (
-                <label
+                <div
                   key={`${story.slug}-bullet-${bulletIndex}`}
                   className="block text-xs font-semibold"
                 >
-                  In brief {bulletIndex + 1}
-                  <textarea
+                  <MarkdownField
                     name={`story_${storyIndex}_bullet_${bulletIndex}`}
+                    label={`In brief ${bulletIndex + 1}`}
                     defaultValue={bullet}
-                    rows={2}
                     maxLength={220}
-                    required
-                    className={fieldClass}
                   />
-                </label>
+                </div>
               ))}
             </div>
-            <label className="mt-4 block text-xs font-semibold">
-              Editor’s note
-              <textarea
+            <div className="mt-4 block text-xs font-semibold">
+              <MarkdownField
                 name={`story_${storyIndex}_editorial_note`}
+                label="Editor’s note"
                 defaultValue={story.editorialNote ?? ''}
-                rows={3}
                 maxLength={360}
-                required
-                className={fieldClass}
               />
-            </label>
+            </div>
           </fieldset>
         ))}
       </div>

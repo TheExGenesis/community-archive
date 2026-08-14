@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
 import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
+import { DigestMarkdown } from '@/components/digest/DigestMarkdown'
 import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
 import { buildSearchHref } from '@/lib/searchParams'
 import { MUTED, SERIF } from '@/components/portal/styles'
@@ -93,7 +94,7 @@ export function DigestEditionView({
           >
             {content.executiveSummary.map((bullet) => (
               <li key={bullet} className="pl-1 [text-wrap:pretty]">
-                {bullet}
+                <DigestMarkdown>{bullet}</DigestMarkdown>
               </li>
             ))}
           </ul>
@@ -142,15 +143,17 @@ export function DigestEditionView({
                         href={storyHref}
                         className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       >
-                        {story.titleIsQuote === false
-                          ? story.title
-                          : `“${story.title}”`}
+                        {story.titleIsQuote === false ? null : '“'}
+                        <DigestMarkdown allowLinks={false}>
+                          {story.title}
+                        </DigestMarkdown>
+                        {story.titleIsQuote === false ? null : '”'}
                       </Link>
                     </h2>
                     <p
                       className={`mt-3 max-w-[60ch] text-base leading-[1.65] [text-wrap:pretty] sm:text-[17.5px] ${MUTED}`}
                     >
-                      {story.subtitle}
+                      <DigestMarkdown>{story.subtitle}</DigestMarkdown>
                     </p>
 
                     <div className="mt-8">

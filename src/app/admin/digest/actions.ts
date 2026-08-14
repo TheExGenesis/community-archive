@@ -415,7 +415,7 @@ export async function createAndGenerateDigestDateAction(formData: FormData) {
     const initialEvent = event(
       'candidates',
       'completed',
-      `Saved up to 50 bangers authored during the ${digestDate} Pacific calendar day.`,
+      `Saved up to 50 bangers authored during the ${digestDate} Community Archive day (06:00 UTC to 05:59 UTC).`,
       {
         candidate_count: candidates.length,
         default_selected_count: candidates.length,
@@ -944,6 +944,7 @@ export async function saveDigestEditionAction(formData: FormData) {
   const { user } = await requireAdmin()
   const editionId = formString(formData, 'edition_id')
   const runId = formString(formData, 'run_id')
+  const publishImmediately = formString(formData, 'intent') === 'publish'
   if (!UUID_PATTERN.test(editionId)) {
     redirectToLab({ runId, error: 'Invalid edition ID.' })
   }
@@ -977,16 +978,50 @@ export async function saveDigestEditionAction(formData: FormData) {
     })
   }
   const version = (latest?.version ?? 0) + 1
-  const { error } = await admin.from('digest_editions').insert({
-    digest_date: edition.digestDate,
-    version,
-    status: 'draft',
-    source_run_id: edition.sourceRunId,
-    content: toJson(content),
-    created_by: user.id,
-  })
-  if (error) {
-    redirectToLab({ runId, error: `Could not save draft: ${error.message}` })
+  const { data: savedEdition, error } = await admin
+    .from('digest_editions')
+    .insert({
+      digest_date: edition.digestDate,
+      version,
+      status: 'draft',
+      source_run_id: edition.sourceRunId,
+      content: toJson(content),
+      created_by: user.id,
+    })
+    .select('*')
+    .single()
+  if (error || !savedEdition) {
+    redirectToLab({
+      runId,
+      error: `Could not save draft: ${error?.message ?? 'No edition was returned.'}`,
+    })
+  }
+  if (publishImmediately) {
+    const { data: publishedEdition, error: publishError } = await admin.rpc(
+      'publish_digest_edition',
+      { p_edition_id: savedEdition.id },
+    )
+    if (publishError || !publishedEdition) {
+      revalidateDigestPaths(edition.digestDate)
+      redirectToLab({
+        runId,
+        error: `Saved draft v${version}, but publish failed: ${publishError?.message ?? 'No published edition was returned.'}`,
+      })
+    }
+    await captureDigestPostHogEvent(user.id, {
+      event: 'digest_page_created',
+      properties: {
+        source: 'manual_edit',
+        status: 'published',
+        story_count: content.stories.length,
+        editorial_warning_count: content.editorialWarnings?.length ?? 0,
+      },
+    })
+    revalidateDigestPaths(publishedEdition.digest_date)
+    redirectToLab({
+      runId,
+      notice: `Saved and published ${publishedEdition.digest_date} edition v${publishedEdition.version}.`,
+    })
   }
   await captureDigestPostHogEvent(user.id, {
     event: 'digest_page_created',

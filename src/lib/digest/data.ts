@@ -143,7 +143,7 @@ export async function loadDigestLabState(runId?: string) {
       .select('*')
       .order('digest_date', { ascending: false })
       .order('version', { ascending: false })
-      .limit(30),
+      .limit(100),
   ])
 
   if (promptResult.error) throw promptResult.error

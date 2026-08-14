@@ -6,10 +6,14 @@ export function SubmitButton({
   children,
   pendingLabel,
   variant = 'primary',
+  name,
+  value,
 }: {
   children: ReactNode
   pendingLabel?: string
   variant?: 'primary' | 'secondary' | 'danger'
+  name?: string
+  value?: string
 }) {
   const [pending, setPending] = useState(false)
   const startPendingAfterSubmit = (event: MouseEvent<HTMLButtonElement>) => {
@@ -26,6 +30,8 @@ export function SubmitButton({
   return (
     <button
       type="submit"
+      name={name}
+      value={value}
       disabled={pending}
       onClick={startPendingAfterSubmit}
       className={`inline-flex items-center justify-center rounded-md border border-transparent px-4 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${colors}`}

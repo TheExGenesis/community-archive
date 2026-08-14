@@ -13,7 +13,7 @@ type DigestPostHogEvent =
       event: 'digest_page_created'
       properties: {
         source: 'generated' | 'manual_edit'
-        status: 'draft'
+        status: 'draft' | 'published'
         story_count: number
         editorial_warning_count: number
       }

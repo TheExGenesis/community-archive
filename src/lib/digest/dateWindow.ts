@@ -1,43 +1,7 @@
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+const DAY_MS = 24 * 60 * 60 * 1_000
 
-function datePartsInTimeZone(date: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date)
-  return Object.fromEntries(
-    parts
-      .filter(({ type }) => type !== 'literal')
-      .map(({ type, value }) => [type, Number(value)]),
-  ) as Record<string, number>
-}
-
-function timeZoneOffsetMs(date: Date, timeZone: string) {
-  const parts = datePartsInTimeZone(date, timeZone)
-  const representedAsUtc = Date.UTC(
-    parts.year,
-    parts.month - 1,
-    parts.day,
-    parts.hour,
-    parts.minute,
-    parts.second,
-  )
-  return representedAsUtc - Math.floor(date.getTime() / 1_000) * 1_000
-}
-
-function midnightInTimeZone(digestDate: string, timeZone: string) {
-  const [year, month, day] = digestDate.split('-').map(Number)
-  const guess = Date.UTC(year, month - 1, day)
-  let result = guess - timeZoneOffsetMs(new Date(guess), timeZone)
-  result = guess - timeZoneOffsetMs(new Date(result), timeZone)
-  return new Date(result)
-}
+export const DIGEST_DAY_START_UTC_HOUR = 6
 
 function shiftDate(digestDate: string, days: number) {
   const [year, month, day] = digestDate.split('-').map(Number)
@@ -45,21 +9,18 @@ function shiftDate(digestDate: string, days: number) {
   return shifted.toISOString().slice(0, 10)
 }
 
-export function digestDateInTimeZone(
-  date = new Date(),
-  timeZone = 'America/Los_Angeles',
-) {
-  const parts = datePartsInTimeZone(date, timeZone)
-  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
+export function digestDateForCommunityDay(date = new Date()) {
+  return new Date(date.getTime() - DIGEST_DAY_START_UTC_HOUR * 60 * 60 * 1_000)
+    .toISOString()
+    .slice(0, 10)
 }
 
-export function getDigestDateWindow(
-  digestDate: string,
-  timeZone = 'America/Los_Angeles',
-) {
+export function getDigestDateWindow(digestDate: string) {
   if (!DATE_PATTERN.test(digestDate)) throw new Error('Invalid digest date')
-  const windowStart = midnightInTimeZone(digestDate, timeZone)
-  const windowEnd = midnightInTimeZone(shiftDate(digestDate, 1), timeZone)
+  const windowStart = new Date(
+    `${digestDate}T${String(DIGEST_DAY_START_UTC_HOUR).padStart(2, '0')}:00:00.000Z`,
+  )
+  const windowEnd = new Date(windowStart.getTime() + DAY_MS)
   if (
     Number.isNaN(windowStart.getTime()) ||
     Number.isNaN(windowEnd.getTime()) ||
@@ -74,12 +35,8 @@ export function getDigestDateWindow(
   }
 }
 
-export function listPastDigestDates(
-  count = 7,
-  now = new Date(),
-  timeZone = 'America/Los_Angeles',
-) {
-  const today = digestDateInTimeZone(now, timeZone)
+export function listPastDigestDates(count = 7, now = new Date()) {
+  const today = digestDateForCommunityDay(now)
   return Array.from({ length: Math.max(0, count) }, (_, index) =>
     shiftDate(today, -(index + 1)),
   )
@@ -89,8 +46,7 @@ export function isRecentPastDigestDate(
   digestDate: string,
   now = new Date(),
   maximumDays = 30,
-  timeZone = 'America/Los_Angeles',
 ) {
   if (!DATE_PATTERN.test(digestDate)) return false
-  return listPastDigestDates(maximumDays, now, timeZone).includes(digestDate)
+  return listPastDigestDates(maximumDays, now).includes(digestDate)
 }

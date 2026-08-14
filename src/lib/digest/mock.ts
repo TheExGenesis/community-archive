@@ -603,8 +603,8 @@ export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
   isPreview: true,
   content: {
     digestDate: DIGEST_DATE,
-    windowStart: '2026-08-11T07:00:00.000Z',
-    windowEnd: '2026-08-12T07:00:00.000Z',
+    windowStart: '2026-08-11T06:00:00.000Z',
+    windowEnd: '2026-08-12T06:00:00.000Z',
     generatedAt: OBSERVED_AT,
     executiveSummary: [
       'AI led the day: hidden-reasoning research, Grok Bot, and Gemini’s billion-user claim.',

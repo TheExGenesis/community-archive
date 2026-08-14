@@ -144,9 +144,26 @@ export function DigestEditionEditor({
 
         <DigestContentFields content={edition.content} />
 
-        <SubmitButton pendingLabel="Saving new draft…">
-          Save as draft v{edition.version + 1}
-        </SubmitButton>
+        <div className="flex flex-wrap items-center gap-3 border-t pt-5">
+          <SubmitButton
+            pendingLabel="Saving new draft…"
+            variant="secondary"
+            name="intent"
+            value="draft"
+          >
+            Save as draft v{edition.version + 1}
+          </SubmitButton>
+          <SubmitButton
+            pendingLabel="Saving and publishing…"
+            name="intent"
+            value="publish"
+          >
+            Publish now
+          </SubmitButton>
+          <span className="text-xs text-muted-foreground">
+            Publish now saves these edits as a new version and makes it public.
+          </span>
+        </div>
       </form>
     </section>
   )

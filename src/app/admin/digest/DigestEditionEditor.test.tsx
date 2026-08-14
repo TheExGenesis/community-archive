@@ -4,11 +4,11 @@ import React from 'react'
 import '@testing-library/jest-dom'
 import { render, screen } from '@testing-library/react'
 import { AUGUST_11_MOCK_DIGEST } from '@/lib/digest/mock'
-import { DigestContentFields } from './DigestEditionEditor'
+import { DigestContentFields, DigestEditionEditor } from './DigestEditionEditor'
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
 
 jest.mock('./actions', () => ({
-  saveDigestEditionAction: jest.fn(),
+  saveDigestEditionAction: '/save-digest-edition',
 }))
 
 jest.mock('./MarkdownField', () => ({
@@ -39,6 +39,25 @@ describe('DigestContentFields', () => {
     )
     expect(screen.getAllByLabelText('Editor’s note')[0]).toHaveValue(
       AUGUST_11_MOCK_DIGEST.content.stories[0].editorialNote,
+    )
+  })
+
+  test('offers draft and immediate publish actions for edited copy', () => {
+    render(
+      <DigestEditionEditor
+        edition={AUGUST_11_MOCK_DIGEST}
+        runId="00000000-0000-4000-8000-000000000001"
+      />,
+    )
+
+    expect(
+      screen.getByRole('button', {
+        name: `Save as draft v${AUGUST_11_MOCK_DIGEST.version + 1}`,
+      }),
+    ).toHaveAttribute('value', 'draft')
+    expect(screen.getByRole('button', { name: 'Publish now' })).toHaveAttribute(
+      'value',
+      'publish',
     )
   })
 })

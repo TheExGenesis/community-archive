@@ -44,36 +44,52 @@ const formatDuration = (value: number | null) =>
 function RunList({
   runs,
   activeRun,
+  editions,
 }: {
   runs: DigestRun[]
   activeRun: DigestRun | null
+  editions: DigestEdition[]
 }) {
+  const publishedRunIds = new Set(
+    editions
+      .filter(({ status }) => status === 'published')
+      .map(({ sourceRunId }) => sourceRunId),
+  )
   return (
     <div className="space-y-2">
-      {runs.map((run) => (
-        <Link
-          key={run.id}
-          href={`/admin/digest?run=${run.id}`}
-          className={`block rounded-md border p-3 transition hover:border-zinc-400 ${
-            run.id === activeRun?.id
-              ? 'border-zinc-950 bg-zinc-50 dark:border-white dark:bg-zinc-900'
-              : 'border-zinc-200 dark:border-zinc-800'
-          }`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold">{run.digestDate}</span>
-            <Badge
-              variant={run.status === 'failed' ? 'destructive' : 'secondary'}
-            >
-              {run.status.replace('_', ' ')}
-            </Badge>
-          </div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            {run.candidates.filter(({ selected }) => selected).length} selected
-            · {formatDateTime(run.createdAt)}
-          </div>
-        </Link>
-      ))}
+      {runs.map((run) => {
+        const isPublished = publishedRunIds.has(run.id)
+        return (
+          <Link
+            key={run.id}
+            href={`/admin/digest?run=${run.id}`}
+            className={`block rounded-md border p-3 transition hover:border-zinc-400 ${
+              run.id === activeRun?.id
+                ? 'border-zinc-950 bg-zinc-50 dark:border-white dark:bg-zinc-900'
+                : 'border-zinc-200 dark:border-zinc-800'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold">{run.digestDate}</span>
+              <Badge
+                variant={
+                  isPublished
+                    ? 'default'
+                    : run.status === 'failed'
+                      ? 'destructive'
+                      : 'secondary'
+                }
+              >
+                {isPublished ? 'published' : run.status.replace('_', ' ')}
+              </Badge>
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {run.candidates.filter(({ selected }) => selected).length}{' '}
+              selected · {formatDateTime(run.createdAt)}
+            </div>
+          </Link>
+        )
+      })}
       {runs.length === 0 ? (
         <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
           No runs yet. Pull the latest 24-hour candidate snapshot to begin.
@@ -162,6 +178,13 @@ export default async function DigestLabPage({
         (edition) =>
           edition.sourceRunId === state.activeRun?.id &&
           edition.status === 'draft',
+      ) ?? null)
+    : null
+  const activePublished = state.activeRun
+    ? (state.editions.find(
+        (edition) =>
+          edition.sourceRunId === state.activeRun?.id &&
+          edition.status === 'published',
       ) ?? null)
     : null
 
@@ -299,9 +322,9 @@ export default async function DigestLabPage({
             <section className="rounded-lg border bg-card p-4">
               <h2 className="font-semibold">Generate a past day</h2>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                One click starts a durable job for that Pacific calendar day. It
-                keeps running after refresh or navigation; publication remains
-                manual.
+                Each day runs from 06:00 UTC through 05:59 UTC the next day, so
+                European morning and the same-date US West Coast evening stay
+                together. Jobs keep running after refresh or navigation.
               </p>
               {prompt ? (
                 <div className="mt-4">
@@ -325,7 +348,11 @@ export default async function DigestLabPage({
 
             <section className="rounded-lg border bg-card p-4">
               <h2 className="mb-3 font-semibold">Recent runs</h2>
-              <RunList runs={state.runs} activeRun={state.activeRun} />
+              <RunList
+                runs={state.runs}
+                activeRun={state.activeRun}
+                editions={state.editions}
+              />
             </section>
           </aside>
 
@@ -357,12 +384,16 @@ export default async function DigestLabPage({
                     </div>
                     <Badge
                       variant={
-                        state.activeRun.status === 'failed'
-                          ? 'destructive'
-                          : 'secondary'
+                        activePublished
+                          ? 'default'
+                          : state.activeRun.status === 'failed'
+                            ? 'destructive'
+                            : 'secondary'
                       }
                     >
-                      {state.activeRun.status.replace('_', ' ')}
+                      {activePublished
+                        ? 'published'
+                        : state.activeRun.status.replace('_', ' ')}
                     </Badge>
                   </div>
                   <div className="mt-5 grid gap-3 sm:grid-cols-4">

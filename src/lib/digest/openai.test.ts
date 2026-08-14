@@ -3,6 +3,7 @@ import { extractResponseText, generateDigestWithModel } from './openai'
 describe('OpenAI digest adapter', () => {
   const originalApiKey = process.env.OPENAI_API_KEY
   const originalDeepSeekApiKey = process.env.DEEPSEEK_API_KEY
+  const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY
 
   afterEach(() => {
     if (originalApiKey === undefined) delete process.env.OPENAI_API_KEY
@@ -10,6 +11,9 @@ describe('OpenAI digest adapter', () => {
     if (originalDeepSeekApiKey === undefined)
       delete process.env.DEEPSEEK_API_KEY
     else process.env.DEEPSEEK_API_KEY = originalDeepSeekApiKey
+    if (originalOpenRouterApiKey === undefined)
+      delete process.env.OPENROUTER_API_KEY
+    else process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey
   })
 
   test('extracts structured output text from a Responses API message', () => {
@@ -183,6 +187,67 @@ describe('OpenAI digest adapter', () => {
     expect(result).toMatchObject({
       totalTokens: 100,
       responseId: 'resp_deepseek',
+    })
+  })
+
+  test('uses OpenRouter chat completions with strict schema and zero-data-retention routing', async () => {
+    process.env.OPENROUTER_API_KEY = 'openrouter-test-key'
+    const fetcher = jest.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'gen_openrouter',
+          model: 'deepseek/deepseek-v4-flash-0731',
+          choices: [
+            {
+              message: {
+                content:
+                  '{"executive_summary":[],"representative_tweet_index":0,"stories":[],"keywords":[]}',
+              },
+            },
+          ],
+          usage: {
+            prompt_tokens: 90,
+            completion_tokens: 10,
+            total_tokens: 100,
+          },
+        }),
+        { status: 200 },
+      ),
+    ) as jest.MockedFunction<typeof fetch>
+
+    const result = await generateDigestWithModel(
+      {
+        runId: 'run-openrouter',
+        model: 'deepseek/deepseek-v4-flash-0731',
+        systemPrompt: 'Return the digest schema.',
+        userPrompt: 'Indexed corpus',
+        reasoningEffort: 'low',
+        maxOutputTokens: 6_000,
+        temperature: 0.2,
+      },
+      fetcher,
+    )
+
+    expect(fetcher.mock.calls[0][0]).toBe(
+      'https://openrouter.ai/api/v1/chat/completions',
+    )
+    const request = JSON.parse(String(fetcher.mock.calls[0][1]?.body))
+    expect(request).toMatchObject({
+      model: 'deepseek/deepseek-v4-flash-0731',
+      reasoning: { effort: 'low', exclude: true },
+      provider: { data_collection: 'deny', zdr: true },
+      max_tokens: 6_000,
+      temperature: 0.2,
+      response_format: {
+        type: 'json_schema',
+        json_schema: { strict: true },
+      },
+    })
+    expect(result).toMatchObject({
+      totalTokens: 100,
+      responseId: 'gen_openrouter',
+      model: 'deepseek/deepseek-v4-flash-0731',
+      outputError: null,
     })
   })
 })

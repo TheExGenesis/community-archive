@@ -2,9 +2,11 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { requireAdmin } from '@/app/admin/data'
 import { loadDigestLabState } from '@/lib/digest/data'
+import { listPastDigestDates } from '@/lib/digest/dateWindow'
 import type { DigestEdition, DigestRun } from '@/lib/digest/types'
 import {
   createDigestPromptVersionAction,
+  createAndGenerateDigestDateAction,
   createDigestRunAction,
   duplicateDigestRunAction,
   generateDigestRunAction,
@@ -139,6 +141,7 @@ export default async function DigestLabPage({
   await requireAdmin()
   const state = await loadDigestLabState(searchParams?.run)
   const prompt = state.prompts[0]
+  const pastDates = listPastDigestDates(7)
   const activePrompt =
     state.prompts.find(
       (item) => item.id === state.activeRun?.promptVersionId,
@@ -171,7 +174,7 @@ export default async function DigestLabPage({
             >
               {state.generationConfigured
                 ? 'Model configured'
-                : 'OPENAI_API_KEY missing'}
+                : 'Model key missing'}
             </Badge>
             <Link
               href="/digest"
@@ -236,6 +239,46 @@ export default async function DigestLabPage({
                   Apply the digest database migration first.
                 </p>
               )}
+            </section>
+
+            <section className="rounded-lg border bg-card p-4">
+              <h2 className="font-semibold">Generate a past day</h2>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                One click freezes that Pacific calendar day, fetches its
+                context, and sends one model request. Publication remains
+                manual.
+              </p>
+              {prompt ? (
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {pastDates.map((digestDate) => (
+                    <form
+                      key={digestDate}
+                      action={createAndGenerateDigestDateAction}
+                    >
+                      <input
+                        type="hidden"
+                        name="prompt_version_id"
+                        value={prompt.id}
+                      />
+                      <input
+                        type="hidden"
+                        name="digest_date"
+                        value={digestDate}
+                      />
+                      <SubmitButton
+                        pendingLabel="Generating…"
+                        variant="secondary"
+                      >
+                        {new Intl.DateTimeFormat('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          timeZone: 'UTC',
+                        }).format(new Date(`${digestDate}T12:00:00Z`))}
+                      </SubmitButton>
+                    </form>
+                  ))}
+                </div>
+              ) : null}
             </section>
 
             <section className="rounded-lg border bg-card p-4">
@@ -474,6 +517,20 @@ export default async function DigestLabPage({
                         </SubmitButton>
                       </form>
                     </div>
+                    {state.activeRun.parsedOutput.editorialWarnings?.length ? (
+                      <div className="mt-5 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                        <div className="font-semibold">
+                          Ready with editorial notes
+                        </div>
+                        <ul className="mt-2 list-disc space-y-1 pl-5">
+                          {state.activeRun.parsedOutput.editorialWarnings.map(
+                            (warning) => (
+                              <li key={warning}>{warning}</li>
+                            ),
+                          )}
+                        </ul>
+                      </div>
+                    ) : null}
                     <ul className="mt-5 list-disc space-y-2 rounded-md bg-blue-50 py-4 pl-9 pr-4 font-serif text-lg leading-7 text-blue-950 dark:bg-blue-950/30 dark:text-blue-100">
                       {state.activeRun.parsedOutput.executiveSummary.map(
                         (bullet) => (

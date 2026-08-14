@@ -1,6 +1,6 @@
 import { DIGEST_STORY_CATEGORIES } from './types'
 
-const DIGEST_JSON_SCHEMA = {
+export const DIGEST_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: [
@@ -14,7 +14,7 @@ const DIGEST_JSON_SCHEMA = {
       type: 'array',
       minItems: 3,
       maxItems: 5,
-      items: { type: 'string', minLength: 30, maxLength: 220 },
+      items: { type: 'string', minLength: 35, maxLength: 140 },
     },
     representative_tweet_index: {
       type: 'integer',
@@ -42,8 +42,8 @@ const DIGEST_JSON_SCHEMA = {
             type: 'string',
             enum: DIGEST_STORY_CATEGORIES,
           },
-          title: { type: 'string', minLength: 8, maxLength: 140 },
-          subtitle: { type: 'string', minLength: 80, maxLength: 190 },
+          title: { type: 'string', minLength: 8, maxLength: 110 },
+          subtitle: { type: 'string', minLength: 60, maxLength: 150 },
           bullets: {
             type: 'array',
             minItems: 1,
@@ -81,6 +81,7 @@ export interface DigestGenerationRequest {
   userPrompt: string
   reasoningEffort?: string
   maxOutputTokens?: number
+  temperature?: number
 }
 
 export interface DigestGenerationResponse {
@@ -126,15 +127,119 @@ export async function generateDigestWithModel(
   request: DigestGenerationRequest,
   fetchImpl: typeof fetch = fetch,
 ): Promise<DigestGenerationResponse> {
+  const isOpenRouter = request.model.includes('/')
   const isDeepSeek = request.model.startsWith('deepseek-')
-  const provider = isDeepSeek ? 'DeepSeek' : 'OpenAI'
-  const apiKey = isDeepSeek
-    ? process.env.DEEPSEEK_API_KEY
-    : process.env.OPENAI_API_KEY
+  const provider = isOpenRouter
+    ? 'OpenRouter'
+    : isDeepSeek
+      ? 'DeepSeek'
+      : 'OpenAI'
+  const apiKey = isOpenRouter
+    ? process.env.OPENROUTER_API_KEY
+    : isDeepSeek
+      ? process.env.DEEPSEEK_API_KEY
+      : process.env.OPENAI_API_KEY
   if (!apiKey) {
     throw new Error(
-      `${isDeepSeek ? 'DEEPSEEK_API_KEY' : 'OPENAI_API_KEY'} is not configured`,
+      `${isOpenRouter ? 'OPENROUTER_API_KEY' : isDeepSeek ? 'DEEPSEEK_API_KEY' : 'OPENAI_API_KEY'} is not configured`,
     )
+  }
+
+  if (isOpenRouter) {
+    const baseUrl = (
+      process.env.OPENROUTER_API_BASE_URL || 'https://openrouter.ai/api/v1'
+    ).replace(/\/$/, '')
+    const body: Record<string, unknown> = {
+      model: request.model,
+      messages: [
+        { role: 'system', content: request.systemPrompt },
+        { role: 'user', content: request.userPrompt },
+      ],
+      provider: { data_collection: 'deny', zdr: true },
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'community_archive_daily_digest',
+          strict: true,
+          schema: DIGEST_JSON_SCHEMA,
+        },
+      },
+    }
+    if (request.reasoningEffort) {
+      body.reasoning = { effort: request.reasoningEffort, exclude: true }
+    }
+    if (request.maxOutputTokens) body.max_tokens = request.maxOutputTokens
+    if (request.temperature !== undefined) {
+      body.temperature = request.temperature
+    }
+
+    const response = await fetchImpl(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://community-archive.org',
+        'X-Title': 'Community Archive Daily Digest',
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(90_000),
+    })
+    const responseText = await response.text()
+    if (!response.ok) {
+      throw new Error(
+        `OpenRouter generation failed (${response.status}): ${responseText.slice(0, 500)}`,
+      )
+    }
+
+    let payload: Record<string, unknown>
+    try {
+      payload = JSON.parse(responseText) as Record<string, unknown>
+    } catch {
+      throw new Error('OpenRouter generation returned invalid JSON')
+    }
+    const choice = Array.isArray(payload.choices) ? payload.choices[0] : null
+    const message =
+      choice && typeof choice === 'object'
+        ? (choice as { message?: unknown }).message
+        : null
+    const outputText =
+      message && typeof message === 'object'
+        ? (message as { content?: unknown }).content
+        : null
+    let output: unknown = null
+    let outputError: string | null = null
+    if (typeof outputText !== 'string') {
+      outputError = 'OpenRouter response did not include output text'
+    } else {
+      try {
+        output = JSON.parse(outputText)
+      } catch {
+        output = outputText
+        outputError = 'OpenRouter structured output was not valid JSON'
+      }
+    }
+    const usage =
+      payload.usage && typeof payload.usage === 'object'
+        ? (payload.usage as Record<string, unknown>)
+        : {}
+    const inputTokens = safeTokenCount(usage.prompt_tokens)
+    const outputTokens = safeTokenCount(usage.completion_tokens)
+    const totalTokens = safeTokenCount(usage.total_tokens)
+
+    return {
+      response: payload,
+      output,
+      outputError,
+      responseId: typeof payload.id === 'string' ? payload.id : null,
+      model: typeof payload.model === 'string' ? payload.model : request.model,
+      inputTokens,
+      outputTokens,
+      totalTokens:
+        totalTokens ??
+        (inputTokens !== null && outputTokens !== null
+          ? inputTokens + outputTokens
+          : null),
+    }
   }
 
   const baseUrl = (

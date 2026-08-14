@@ -215,24 +215,26 @@ describe('daily digest generation contract', () => {
     ).toThrow('three to five summary bullets')
   })
 
-  test('rejects subtitles too short to explain the quoted title', () => {
-    expect(() =>
-      assembleDigestEditionContent({
-        runId: 'run-1',
-        digestDate: '2026-08-12',
-        windowStart: '2026-08-11T12:00:00.000Z',
-        windowEnd: '2026-08-12T12:00:00.000Z',
-        allCandidateCount: 3,
-        enrichedCandidates: candidates,
-        modelOutput: {
-          ...modelOutput,
-          stories: [
-            { ...modelOutput.stories[0], subtitle: 'People discussed taste.' },
-            ...modelOutput.stories.slice(1),
-          ],
-        },
-      }),
-    ).toThrow('about 140 characters of explanatory context')
+  test('keeps a short subtitle as a non-fatal editorial warning', () => {
+    const edition = assembleDigestEditionContent({
+      runId: 'run-1',
+      digestDate: '2026-08-12',
+      windowStart: '2026-08-11T12:00:00.000Z',
+      windowEnd: '2026-08-12T12:00:00.000Z',
+      allCandidateCount: 3,
+      enrichedCandidates: candidates,
+      modelOutput: {
+        ...modelOutput,
+        stories: [
+          { ...modelOutput.stories[0], subtitle: 'People discussed taste.' },
+          ...modelOutput.stories.slice(1),
+        ],
+      },
+    })
+
+    expect(edition.editorialWarnings).toContain(
+      'Story 1 subtitle is outside the 60–150 character target.',
+    )
   })
 
   test('rejects fabricated tweet indices before publication', () => {
@@ -327,27 +329,33 @@ describe('daily digest generation contract', () => {
     ).toThrow('Story 1 is incomplete')
   })
 
-  test('rejects generated headlines that are not excerpts from a supplied post', () => {
-    expect(() =>
-      assembleDigestEditionContent({
-        runId: 'run-1',
-        digestDate: '2026-08-12',
-        windowStart: '2026-08-11T12:00:00.000Z',
-        windowEnd: '2026-08-12T12:00:00.000Z',
-        allCandidateCount: 3,
-        enrichedCandidates: candidates,
-        modelOutput: {
-          ...modelOutput,
-          stories: [
-            {
-              ...modelOutput.stories[0],
-              title: 'Taste became the benchmark of the day',
-            },
-            ...modelOutput.stories.slice(1),
-          ],
-        },
-      }),
-    ).toThrow('title must be a three- to eighteen-word excerpt')
+  test('accepts a concise paraphrased title and marks it as unquoted', () => {
+    const edition = assembleDigestEditionContent({
+      runId: 'run-1',
+      digestDate: '2026-08-12',
+      windowStart: '2026-08-11T12:00:00.000Z',
+      windowEnd: '2026-08-12T12:00:00.000Z',
+      allCandidateCount: 3,
+      enrichedCandidates: candidates,
+      modelOutput: {
+        ...modelOutput,
+        stories: [
+          {
+            ...modelOutput.stories[0],
+            title: 'Taste became the benchmark of the day',
+          },
+          ...modelOutput.stories.slice(1),
+        ],
+      },
+    })
+
+    expect(edition.stories[0]).toMatchObject({
+      title: 'Taste became the benchmark of the day',
+      titleIsQuote: false,
+    })
+    expect(edition.editorialWarnings).toContain(
+      'Story 1 title is a paraphrase rather than an exact tweet excerpt.',
+    )
   })
 
   test('uses the model-selected representative tweet instead of forcing rank one', () => {

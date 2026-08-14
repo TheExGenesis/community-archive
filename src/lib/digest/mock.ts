@@ -607,9 +607,9 @@ export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
     windowEnd: '2026-08-12T07:00:00.000Z',
     generatedAt: OBSERVED_AT,
     executiveSummary: [
-      'AI led the day: researchers reported a technique for extracting hidden model reasoning, xAI launched Grok Bot, and Google said Gemini passed one billion monthly users.',
-      'A moon-posting dating joke grew into a conversation about sincerity, engagement tactics, and choosing AI work over romance.',
-      'A repeated “women I looked up to” image prompt became a participatory meme, with each quote post adding a personal canon of formative influences.',
+      'AI led the day: hidden-reasoning research, Grok Bot, and Gemini’s billion-user claim.',
+      'Moon-posting turned dating bait and AI ambition into a joke about sincerity and status.',
+      'A repeated “women I looked up to” prompt became the day’s participatory meme.',
     ],
     topBanger: moonPosting,
     stories: [
@@ -619,7 +619,7 @@ export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
         keyword: 'hidden reasoning',
         title: 'We found a way to extract hidden reasoning of frontier models',
         subtitle:
-          'Researchers reported a technique for recovering hidden reasoning through multiple frontier-model APIs. The surrounding posts turned that technical claim into a security story by identifying credentials and personal information left inside public Claude Code and Codex traces.',
+          'A frontier-model reasoning exploit became a security story when public traces exposed credentials and personal data.',
         bullets: [
           'Researchers said extracted token counts matched billed thinking tokens for most tested prompts.',
           'A scan of roughly 7,000 public traces reportedly found API keys, email addresses, passwords, and other sensitive data.',
@@ -642,7 +642,7 @@ export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
         keyword: 'moon',
         title: 'True and pure moon-posting is done from reverence and love',
         subtitle:
-          'A joke about men using moon posts as dating bait collided with a reporter’s callout for people choosing AI careers over romance. Together, the posts became a conversation about sincerity, attention, ambition, and status online.',
+          'Moon-posting dating bait and a call for AI-over-romance sources converged on sincerity, ambition, and status.',
         bullets: [
           'One post described men adopting moon posts as engagement and DM bait after hearing that the tactic attracts women.',
           'Another sought people foregoing romantic relationships to pursue AI work.',
@@ -661,7 +661,7 @@ export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
         keyword: 'little guy',
         title: 'Bots are AI teammates that do real work for you',
         subtitle:
-          'xAI introduced Grok Bot as an early-beta agent that can sign into tools, perform tasks, and return finished work. Responses focused both on the product’s claimed autonomy and on the industry’s habit of wrapping powerful agents in cute mascot branding.',
+          'Grok Bot’s launch paired autonomous-work claims with jokes about AI labs branding powerful agents as cute mascots.',
         bullets: [
           'Grok Bot’s pitch was concrete: sign in to tools, do the work, and return with a finished result.',
           'Reactions mixed assistant enthusiasm with enterprise skepticism and vendor-lock-in concerns.',
@@ -681,7 +681,7 @@ export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
         title:
           'You have to understand, these were the women I looked up to in my formative years',
         subtitle:
-          'People reused the same sentence and image-list format to share the fictional characters, writers, performers, and role models who shaped them. The repetition made the format itself into a participatory, autobiographical meme.',
+          'People remixed one image-list prompt into autobiographical canons of the women and characters who shaped them.',
         bullets: [
           'The posts were iterations of one image-list format and sometimes quoted one another.',
           'The largest thread grew into a real discussion of formative writers and fictional characters.',
@@ -706,7 +706,7 @@ export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
         title:
           'Using this emergent behavior, we can watch the shifting market share in the AI race',
         subtitle:
-          'Google’s announcement that Gemini reached one billion monthly users appeared beside Pangram’s attempt to estimate model-family share from detected AI-written text. The two posts sound comparable, but they measure different populations and tell different stories about the AI market.',
+          'Gemini’s billion-user claim met Pangram’s model-share estimate, showing how different metrics tell different market stories.',
         bullets: [
           'Google announced more than one billion monthly Gemini users.',
           'Pangram used model-family attribution to estimate which systems produced observable AI-written text.',

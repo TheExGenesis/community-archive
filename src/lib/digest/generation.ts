@@ -29,6 +29,7 @@ interface ParsedModelDigest {
   representativeTweetIndex: number
   stories: ModelStory[]
   keywords: string[]
+  editorialWarnings: string[]
 }
 
 export type DigestPromptTweetKind = 'banger' | 'quote' | 'reply'
@@ -110,7 +111,7 @@ function parseModelDigest(
 ): ParsedModelDigest {
   if (!isRecord(value)) throw new Error('Digest output is not an object')
   const corpus = buildDigestPromptCorpus(candidates)
-  const executiveSummary = cleanStringArray(value.executive_summary, 5, 220)
+  const executiveSummary = cleanStringArray(value.executive_summary, 5, 300)
   const keywords = cleanStringArray(value.keywords, 12, 60)
   const representativeTweetIndex = value.representative_tweet_index
   if (
@@ -136,12 +137,17 @@ function parseModelDigest(
 
   const usedBangers = new Set<string>()
   const normalizedAllPosts = normalizedCorpus(corpus)
+  const editorialWarnings = executiveSummary.flatMap((bullet, index) =>
+    bullet.length < 35 || bullet.length > 140
+      ? [`Summary bullet ${index + 1} is outside the 35–140 character target.`]
+      : [],
+  )
 
   const stories = value.stories.map((story, index): ModelStory => {
     if (!isRecord(story)) throw new Error(`Story ${index + 1} is invalid`)
     const category = cleanCategory(story.category)
-    const title = cleanText(story.title, 140)
-    const subtitle = cleanText(story.subtitle, 190)
+    const title = cleanText(story.title, 300)
+    const subtitle = cleanText(story.subtitle, 320)
     const bullets = cleanStringArray(story.bullets, 3, 220)
     const editorialNote = cleanText(story.editorial_note, 360)
     const tweetIndices = cleanIndexArray(story.tweet_indices, 18)
@@ -154,11 +160,6 @@ function parseModelDigest(
       !tweetIndices?.length
     ) {
       throw new Error(`Story ${index + 1} is incomplete`)
-    }
-    if (subtitle.length < 80 || subtitle.split(/\s+/).length < 12) {
-      throw new Error(
-        `Story ${index + 1} subtitle must provide about 140 characters of explanatory context`,
-      )
     }
     const indexedTweets = tweetIndices.map((tweetIndex) => {
       const row = corpus[tweetIndex]
@@ -177,13 +178,19 @@ function parseModelDigest(
       )
     }
     const titleWordCount = title.split(/\s+/).length
-    if (
-      titleWordCount < 3 ||
-      titleWordCount > 18 ||
-      !titleOccursInOnePost(title, indexedTweets)
-    ) {
-      throw new Error(
-        `Story ${index + 1} title must be a three- to eighteen-word excerpt from one indexed story post`,
+    if (titleWordCount < 3 || titleWordCount > 18 || title.length > 110) {
+      editorialWarnings.push(
+        `Story ${index + 1} title is outside the 3–18 word / 110 character target.`,
+      )
+    }
+    if (!titleOccursInOnePost(title, indexedTweets)) {
+      editorialWarnings.push(
+        `Story ${index + 1} title is a paraphrase rather than an exact tweet excerpt.`,
+      )
+    }
+    if (subtitle.length < 60 || subtitle.length > 150) {
+      editorialWarnings.push(
+        `Story ${index + 1} subtitle is outside the 60–150 character target.`,
       )
     }
     for (const { tweetId } of bangerRows) {
@@ -214,6 +221,7 @@ function parseModelDigest(
     representativeTweetIndex,
     stories,
     keywords: exactKeywords,
+    editorialWarnings,
   }
 }
 
@@ -360,6 +368,7 @@ export function assembleDigestEditionContent(input: {
       category: story.category,
       keyword,
       title: story.title,
+      titleIsQuote: titleOccursInOnePost(story.title, indexedTweets),
       subtitle: story.subtitle,
       bullets: story.bullets,
       editorialNote: story.editorialNote,
@@ -382,6 +391,7 @@ export function assembleDigestEditionContent(input: {
     windowEnd: input.windowEnd,
     generatedAt: input.generatedAt ?? new Date().toISOString(),
     executiveSummary: parsed.executiveSummary,
+    editorialWarnings: parsed.editorialWarnings,
     topBanger,
     stories,
     keywords: parsed.keywords,

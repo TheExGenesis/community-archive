@@ -44,6 +44,7 @@ export interface DigestPromptVersion {
   parameters: {
     reasoning_effort?: string
     max_output_tokens?: number
+    temperature?: number
   }
   createdBy: string | null
   createdAt: string
@@ -55,6 +56,8 @@ export interface DigestStory {
   category?: DigestStoryCategory
   keyword: string
   title: string
+  /** True when the title is an exact excerpt from one selected tweet. */
+  titleIsQuote?: boolean
   subtitle: string
   bullets: string[]
   editorialNote?: string
@@ -70,6 +73,8 @@ export interface DigestEditionContent {
   windowEnd: string
   generatedAt: string
   executiveSummary: string[]
+  /** Non-fatal copy-quality deviations retained for editorial review. */
+  editorialWarnings?: string[]
   /** Model-selected representative tweet. The legacy key preserves saved-edition compatibility. */
   topBanger: PortalTweet
   stories: DigestStory[]

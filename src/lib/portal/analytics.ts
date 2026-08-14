@@ -452,6 +452,7 @@ export async function fetchPortalRecentBangers(
   limit = 50,
   hours = 48,
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+  end?: string,
 ): Promise<PortalTweet[]> {
   const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
   const safeHours = Math.max(1, Math.min(168, Math.trunc(hours)))
@@ -460,6 +461,7 @@ export async function fetchPortalRecentBangers(
     new URLSearchParams({
       limit: String(safeLimit),
       hours: String(safeHours),
+      ...(end ? { end: safeTimestamp(end, 'window end') } : {}),
     }),
     { timeoutMs: 30_000, revalidate: 1_800 },
   )

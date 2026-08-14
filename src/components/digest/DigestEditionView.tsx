@@ -130,7 +130,9 @@ export function DigestEditionView({
                         href={storyHref}
                         className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       >
-                        “{story.title}”
+                        {story.titleIsQuote === false
+                          ? story.title
+                          : `“${story.title}”`}
                       </Link>
                     </h2>
                     <p

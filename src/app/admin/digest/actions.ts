@@ -8,6 +8,11 @@ import { fetchClickHouseQuotePosts } from '@/lib/clickhouseQuotePosts'
 import { fetchPortalRecentBangers } from '@/lib/portal/analytics'
 import type { PortalTweet } from '@/lib/portal/types'
 import { fetchDigestReplies } from '@/lib/digest/context'
+import {
+  getDigestDateWindow,
+  isRecentPastDigestDate,
+  listPastDigestDates,
+} from '@/lib/digest/dateWindow'
 import { createDigestAdminClient } from '@/lib/digest/database'
 import {
   assembleDigestEditionContent,
@@ -16,6 +21,7 @@ import {
   type EnrichedDigestCandidate,
 } from '@/lib/digest/generation'
 import { generateDigestWithModel } from '@/lib/digest/openai'
+import { captureDigestPostHogEvent } from '@/lib/digest/posthogServer'
 import { mapDigestRun, mapPromptVersion, toJson } from '@/lib/digest/data'
 import type { DigestCandidate, DigestRunEvent } from '@/lib/digest/types'
 import { createServerServiceRoleClient } from '@/utils/supabase'
@@ -228,6 +234,14 @@ export async function createDigestRunAction(formData: FormData) {
     if (error) throw error
     createdRunId = run.id
     candidateCount = candidates.length
+    await captureDigestPostHogEvent(user.id, {
+      event: 'digest_generation_requested',
+      properties: {
+        source: 'admin_rolling_window',
+        candidate_count: candidates.length,
+        days_ago: 0,
+      },
+    })
   } catch (error) {
     console.error('[daily digest] candidate pull failed:', error)
     redirectToLab({ error: `Candidate pull failed: ${describeError(error)}` })
@@ -238,6 +252,117 @@ export async function createDigestRunAction(formData: FormData) {
     runId: createdRunId,
     notice: `Loaded ${candidateCount} qualifying bangers from the last 24 hours.`,
   })
+}
+
+export async function createAndGenerateDigestDateAction(formData: FormData) {
+  const { user } = await requireAdmin()
+  const promptVersionId = formString(formData, 'prompt_version_id')
+  const digestDate = formString(formData, 'digest_date')
+  if (!UUID_PATTERN.test(promptVersionId)) {
+    redirectToLab({ error: 'Choose a prompt version.' })
+  }
+  if (!isRecentPastDigestDate(digestDate)) {
+    redirectToLab({ error: 'Choose one of the previous 30 completed days.' })
+  }
+
+  const admin = createDigestAdminClient()
+  const [promptResult, runningResult] = await Promise.all([
+    admin
+      .from('digest_prompt_versions')
+      .select('id')
+      .eq('id', promptVersionId)
+      .maybeSingle(),
+    admin
+      .from('digest_runs')
+      .select('id')
+      .eq('digest_date', digestDate)
+      .eq('status', 'running')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+  if (promptResult.error || !promptResult.data) {
+    redirectToLab({ error: 'Prompt version not found.' })
+  }
+  if (runningResult.data) {
+    redirectToLab({
+      runId: runningResult.data.id,
+      error: 'That date already has a generation in progress.',
+    })
+  }
+
+  let createdRunId = ''
+  let candidateCount = 0
+  try {
+    const window = getDigestDateWindow(digestDate)
+    const tweets = await fetchPortalRecentBangers(
+      50,
+      24,
+      undefined,
+      window.windowEnd,
+    )
+    const candidates: DigestCandidate[] = selectDailyDigestBangers(tweets).map(
+      (tweet, index) => ({
+        tweet,
+        sourceRank: index + 1,
+        selected: true,
+      }),
+    )
+    const initialEvent = event(
+      'candidates',
+      'completed',
+      `Saved up to 50 bangers authored during the ${digestDate} Pacific calendar day.`,
+      {
+        candidate_count: candidates.length,
+        default_selected_count: candidates.length,
+        minimum_ca_quote_count: 3,
+        historical_window: true,
+      },
+    )
+    const { data: run, error } = await admin
+      .from('digest_runs')
+      .insert({
+        digest_date: digestDate,
+        prompt_version_id: promptVersionId,
+        window_start: window.windowStart,
+        window_end: window.windowEnd,
+        candidates: toJson(candidates),
+        events: toJson([initialEvent]),
+        created_by: user.id,
+      })
+      .select('id')
+      .single()
+    if (error) throw error
+    createdRunId = run.id
+    candidateCount = candidates.length
+
+    const daysAgo = listPastDigestDates(30).indexOf(digestDate) + 1
+    await captureDigestPostHogEvent(user.id, {
+      event: 'digest_generation_requested',
+      properties: {
+        source: 'admin_past_day',
+        candidate_count: candidates.length,
+        days_ago: daysAgo,
+      },
+    })
+  } catch (error) {
+    console.error('[daily digest] historical candidate pull failed:', error)
+    redirectToLab({
+      runId: createdRunId || undefined,
+      error: `Historical candidate pull failed: ${describeError(error)}`,
+    })
+  }
+
+  if (candidateCount < 3) {
+    redirectToLab({
+      runId: createdRunId,
+      error: `Only ${candidateCount} qualifying bangers were found for ${digestDate}; at least three are required.`,
+    })
+  }
+
+  const generationForm = new FormData()
+  generationForm.set('run_id', createdRunId)
+  return generateDigestRunAction(generationForm)
 }
 
 export async function duplicateDigestRunAction(formData: FormData) {
@@ -433,12 +558,14 @@ export async function generateDigestRunAction(formData: FormData) {
 
   try {
     const contextClient = createServerServiceRoleClient()
+    const windowStartMs = Date.parse(run.windowStart)
+    const windowEndMs = Date.parse(run.windowEnd)
     const contextResults = await mapWithConcurrency(
       selected,
       8,
       async (candidate) => {
         const [quotesResult, repliesResult] = await Promise.allSettled([
-          fetchClickHouseQuotePosts(candidate.tweet.id, 12),
+          fetchClickHouseQuotePosts(candidate.tweet.id, 100),
           fetchDigestReplies(contextClient, {
             bangerTweetId: candidate.tweet.id,
             windowStart: run.windowStart,
@@ -448,9 +575,13 @@ export async function generateDigestRunAction(formData: FormData) {
         ])
         const quotes =
           quotesResult.status === 'fulfilled'
-            ? quotesResult.value.tweets.map((tweet) =>
-                quoteTweetToPortalTweet(tweet, candidate.tweet),
-              )
+            ? quotesResult.value.tweets
+                .filter((tweet) => {
+                  const createdAt = Date.parse(tweet.created_at)
+                  return createdAt >= windowStartMs && createdAt < windowEndMs
+                })
+                .slice(0, 12)
+                .map((tweet) => quoteTweetToPortalTweet(tweet, candidate.tweet))
             : []
         const replies =
           repliesResult.status === 'fulfilled' ? repliesResult.value.tweets : []
@@ -465,9 +596,7 @@ export async function generateDigestRunAction(formData: FormData) {
             commentary,
             replyTweetIds: replies.map(({ id }) => id),
             totalReplyCount:
-              (quotesResult.status === 'fulfilled'
-                ? quotesResult.value.totalCount
-                : (candidate.tweet.quoteCount ?? 0)) +
+              quotes.length +
               (repliesResult.status === 'fulfilled'
                 ? repliesResult.value.totalCount
                 : 0),
@@ -538,6 +667,7 @@ export async function generateDigestRunAction(formData: FormData) {
       userPrompt,
       reasoningEffort: prompt.parameters.reasoning_effort,
       maxOutputTokens: prompt.parameters.max_output_tokens,
+      temperature: prompt.parameters.temperature,
     })
     const completedAt = new Date()
     const durationMs = completedAt.getTime() - startedAt.getTime()
@@ -669,6 +799,15 @@ export async function stageDigestEditionAction(formData: FormData) {
     .from('digest_runs')
     .update({ events: toJson(events), updated_at: new Date().toISOString() })
     .eq('id', runId)
+  await captureDigestPostHogEvent(user.id, {
+    event: 'digest_page_created',
+    properties: {
+      source: 'generated',
+      status: 'draft',
+      story_count: run.parsedOutput.stories.length,
+      editorial_warning_count: run.parsedOutput.editorialWarnings?.length ?? 0,
+    },
+  })
   revalidateDigestPaths(run.digestDate)
   redirectToLab({ runId, notice: `Staged digest edition v${version}.` })
 }

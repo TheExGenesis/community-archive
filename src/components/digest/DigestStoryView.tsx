@@ -74,7 +74,7 @@ export function DigestStoryView({
             className="mt-5 text-[42px] font-semibold leading-[1.06] tracking-[-0.01em] [text-wrap:pretty] sm:text-[56px]"
             style={SERIF}
           >
-            “{story.title}”
+            {story.titleIsQuote === false ? story.title : `“${story.title}”`}
           </h1>
           <p
             className={`mt-5 max-w-[64ch] text-lg leading-[1.65] [text-wrap:pretty] sm:text-xl ${MUTED}`}

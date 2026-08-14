@@ -54,6 +54,9 @@ export function mapPromptVersion(
       ...(typeof parameters.max_output_tokens === 'number'
         ? { max_output_tokens: parameters.max_output_tokens }
         : {}),
+      ...(typeof parameters.temperature === 'number'
+        ? { temperature: parameters.temperature }
+        : {}),
     },
     createdBy: row.created_by,
     createdAt: row.created_at,
@@ -150,7 +153,11 @@ export async function loadDigestLabState(runId?: string) {
     runs,
     editions,
     activeRun,
-    generationConfigured: Boolean(process.env.OPENAI_API_KEY),
+    generationConfigured: Boolean(
+      process.env.OPENROUTER_API_KEY ||
+        process.env.OPENAI_API_KEY ||
+        process.env.DEEPSEEK_API_KEY,
+    ),
   }
 }
 

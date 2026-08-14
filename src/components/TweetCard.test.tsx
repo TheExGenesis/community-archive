@@ -149,4 +149,20 @@ describe('TweetCard', () => {
     )
     expect(cards[0].className).not.toMatch(/blue/)
   })
+
+  test('supports a flat editorial treatment without changing tweet fidelity', () => {
+    const { container } = render(
+      <TweetCard tweet={tweet} variant="editorial" featuredRank={1} noClamp />,
+    )
+
+    const card = container.querySelector('article')
+    expect(card).not.toBeNull()
+    expect(card?.className).not.toMatch(
+      /rounded-lg|border-zinc-200\/75|shadow-sm/,
+    )
+    expect(
+      screen.getByText('A complete tweet & media with > one encoding layer.'),
+    ).toHaveClass('whitespace-pre-wrap', '[font-family:var(--font-petrona)]')
+    expect(screen.getByText('The complete "quoted" tweet.')).toBeVisible()
+  })
 })

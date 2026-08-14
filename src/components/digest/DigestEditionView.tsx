@@ -5,7 +5,7 @@ import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
 import type { DigestEdition } from '@/lib/digest/types'
 import { firstStoryMedia } from '@/lib/digest/storyMedia'
 import { buildSearchHref } from '@/lib/searchParams'
-import { CARD, MUTED, SERIF } from '@/components/portal/styles'
+import { MUTED, SERIF } from '@/components/portal/styles'
 
 const SUBSCRIBE_URL = 'https://xiqo.substack.com/subscribe'
 
@@ -18,6 +18,9 @@ const longDate = (date: string) =>
     timeZone: 'UTC',
   }).format(new Date(`${date}T12:00:00Z`))
 
+const sectionLabel =
+  'text-[11.5px] font-bold uppercase tracking-[0.22em] text-zinc-800 dark:text-zinc-200'
+
 export function DigestEditionView({
   edition,
   archive,
@@ -29,124 +32,140 @@ export function DigestEditionView({
   const returnTo = `/digest/${edition.digestDate}`
 
   return (
-    <main className="min-h-screen bg-zinc-100/70 py-8 dark:bg-background sm:py-12">
-      <article className="mx-auto w-full max-w-6xl rounded-lg border border-zinc-200 bg-white px-5 py-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 sm:px-10 sm:py-12">
+    <main className="min-h-screen bg-white dark:bg-[#111114]">
+      <article className="mx-auto w-full max-w-[1160px] px-5 pb-24 pt-8 sm:px-8 sm:pt-12 lg:px-12">
         {edition.isPreview ? (
-          <div className="mb-7 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-            <span className="font-semibold">Mock edition · preview only</span>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-2 border-y border-amber-300/70 py-2.5 text-xs text-amber-900 dark:border-amber-800/70 dark:text-amber-200">
+            <span className="font-bold uppercase tracking-[0.14em]">
+              Mock edition · preview only
+            </span>
             <span>
               Assembled from the August 11 banger-cluster research memo; not
               published.
             </span>
           </div>
         ) : null}
+
         <header>
-          <div className="flex flex-wrap items-end justify-between gap-5">
-            <div>
-              <div
-                className={`text-xs font-semibold uppercase tracking-[0.14em] ${MUTED}`}
-              >
-                The Daily Digest · {edition.isPreview ? 'Prototype · ' : ''}№{' '}
-                {edition.issueNumber} · v{edition.version}
-              </div>
-              <h1
-                className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl"
-                style={SERIF}
-              >
-                {longDate(edition.digestDate)}
-              </h1>
+          <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-2.5 dark:border-zinc-200">
+            <div className={sectionLabel}>The Daily Digest</div>
+            <div
+              className={`text-[11.5px] uppercase tracking-[0.18em] ${MUTED}`}
+            >
+              {edition.isPreview ? 'Prototype · ' : ''}№ {edition.issueNumber} ·
+              v{edition.version}
             </div>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <h1
+              className="text-[42px] font-semibold leading-[1.02] tracking-[-0.01em] sm:text-[56px] lg:text-[66px]"
+              style={SERIF}
+            >
+              {longDate(edition.digestDate)}
+            </h1>
             <a
               href={SUBSCRIBE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-md bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-white dark:text-zinc-950"
+              className="inline-flex w-fit shrink-0 items-center rounded-[4px] border border-zinc-300 px-4 py-2.5 text-sm font-semibold transition-colors hover:border-zinc-500 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-zinc-700 dark:hover:border-zinc-500 dark:hover:bg-zinc-900 sm:mb-2"
             >
               Get the weekly email
             </a>
           </div>
+
+          <div className="mt-7 border-t-[3px] border-zinc-800 dark:border-zinc-200" />
+          <div className="mt-[3px] border-t border-zinc-400 dark:border-zinc-600" />
+
           <p
-            className="mt-7 rounded-lg bg-blue-50 px-5 py-4 text-lg leading-8 text-blue-950 dark:bg-blue-950/30 dark:text-blue-100 sm:px-6"
+            className="mt-7 max-w-[66ch] text-lg italic leading-[1.65] text-zinc-700 [text-wrap:pretty] dark:text-zinc-300 sm:text-[21px]"
             style={SERIF}
           >
             {content.executiveSummary}
           </p>
         </header>
 
-        <div className="mt-8 grid items-start gap-7 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
-          <div className="min-w-0 space-y-7">
+        <div className="mt-12 grid items-start lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-x-14">
+          <div className="min-w-0">
             <section>
-              <div
-                className={`mb-2 text-xs font-semibold uppercase tracking-[0.12em] ${MUTED}`}
-              >
-                Top banger
+              <div className="flex items-center gap-3.5">
+                <span className={sectionLabel}>Top banger</span>
+                <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
               </div>
-              <TweetCard
-                tweet={content.topBanger}
-                featuredRank={1}
-                noClamp
-                showDate
-                origin="digest"
-                returnTo={returnTo}
-              />
+              <div className="mt-6">
+                <TweetCard
+                  tweet={content.topBanger}
+                  variant="editorial"
+                  featuredRank={1}
+                  noClamp
+                  showDate
+                  origin="digest"
+                  returnTo={returnTo}
+                />
+              </div>
             </section>
 
-            <div className="border-t border-zinc-950 pt-7 dark:border-zinc-100">
-              <div className="space-y-6">
-                {content.stories.map((story) => (
+            <div className="mt-12">
+              {content.stories.map((story) => {
+                const media = firstStoryMedia(story)
+                const storyHref = `/digest/${edition.digestDate}/${story.slug}`
+
+                return (
                   <article
                     key={story.slug}
-                    className={`${CARD} overflow-hidden`}
+                    className="border-t-2 border-zinc-800 pb-1 pt-7 dark:border-zinc-200"
                   >
-                    {firstStoryMedia(story) ? (
+                    <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted-foreground">
+                      <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
+                        {story.category ?? 'Story'}
+                      </span>
                       <Link
-                        href={`/digest/${edition.digestDate}/${story.slug}`}
-                        className="relative block aspect-[16/7] overflow-hidden border-b bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900"
+                        href={buildSearchHref(story.keyword)}
+                        className="rounded-sm font-semibold text-zinc-700 hover:text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:text-zinc-300"
+                      >
+                        {story.keyword}
+                      </Link>
+                    </div>
+
+                    <h2
+                      className="mt-4 text-[34px] font-semibold leading-[1.14] tracking-[-0.005em] [text-wrap:pretty] sm:text-[42px]"
+                      style={SERIF}
+                    >
+                      <Link
+                        href={storyHref}
+                        className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      >
+                        “{story.title}”
+                      </Link>
+                    </h2>
+                    <p
+                      className={`mt-3 max-w-[60ch] text-base leading-[1.65] [text-wrap:pretty] sm:text-[17.5px] ${MUTED}`}
+                    >
+                      {story.subtitle}
+                    </p>
+
+                    {media ? (
+                      <Link
+                        href={storyHref}
+                        className="relative mt-7 block aspect-[16/8] overflow-hidden rounded-[4px] border border-zinc-200 bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-zinc-800"
                         aria-label={`Read ${story.title}`}
                       >
                         <Image
-                          src={firstStoryMedia(story)!.url}
+                          src={media.url}
                           alt={`Image from ${story.title}`}
                           fill
-                          sizes="(max-width: 1024px) 100vw, 720px"
-                          className="object-cover transition duration-300 hover:scale-[1.01]"
+                          sizes="(max-width: 1024px) 100vw, 690px"
+                          className="object-contain transition duration-300 hover:scale-[1.01]"
                         />
                       </Link>
                     ) : null}
-                    <div className="p-5 sm:p-6">
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span className="rounded-full bg-blue-100 px-2.5 py-1 font-semibold text-blue-950 dark:bg-blue-950 dark:text-blue-100">
-                          {story.category ?? 'Story'}
-                        </span>
-                        <Link
-                          href={buildSearchHref(story.keyword)}
-                          className="rounded-sm font-medium hover:text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                        >
-                          {story.keyword}
-                        </Link>
-                      </div>
-                      <h2
-                        className="mt-3 text-2xl font-semibold leading-tight sm:text-3xl"
-                        style={SERIF}
-                      >
-                        <Link
-                          href={`/digest/${edition.digestDate}/${story.slug}`}
-                          className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                        >
-                          “{story.title}”
-                        </Link>
-                      </h2>
-                      <p
-                        className={`mt-2 text-sm leading-6 sm:text-base ${MUTED}`}
-                      >
-                        {story.subtitle}
-                      </p>
-                    </div>
-                    <div className="border-t dark:border-zinc-800">
+
+                    <div className="mt-8">
                       {story.bangers.slice(0, 2).map((tweet) => (
                         <TweetCard
                           key={tweet.id}
                           tweet={tweet}
+                          variant="editorial"
                           noClamp
                           showDate
                           origin="digest"
@@ -154,28 +173,39 @@ export function DigestEditionView({
                         />
                       ))}
                     </div>
-                    <div className="border-t px-5 py-4 dark:border-zinc-800 sm:px-6">
-                      <Link
-                        href={`/digest/${edition.digestDate}/${story.slug}`}
-                        className="inline-flex text-sm font-semibold text-brand hover:underline"
-                      >
-                        Read the full story and surrounding conversation →
-                      </Link>
+
+                    <Link
+                      href={storyHref}
+                      className="mt-5 inline-flex rounded-sm text-sm font-semibold text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                    >
+                      Read the full story and surrounding conversation →
+                    </Link>
+
+                    <div className="my-12 flex items-center gap-4 text-zinc-400 dark:text-zinc-600">
+                      <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
+                      <span className="text-[13px]" aria-hidden="true">
+                        ✦
+                      </span>
+                      <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
                     </div>
                   </article>
-                ))}
-              </div>
+                )
+              })}
             </div>
           </div>
 
-          <aside className="space-y-5 lg:sticky lg:top-24">
+          <aside className="mt-2 border-zinc-200 pt-10 dark:border-zinc-800 lg:sticky lg:top-24 lg:mt-0 lg:border-l lg:py-0 lg:pl-10">
             <DigestDaySelector
               currentDate={edition.digestDate}
               editions={archive}
+              variant="editorial"
             />
-            <section className={`${CARD} p-5`}>
-              <h2 className="font-semibold">Keywords in this edition</h2>
-              <div className="mt-3 flex flex-wrap gap-2">
+
+            <section className="mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800">
+              <h2 className="text-[19px] font-semibold" style={SERIF}>
+                Keywords in this edition
+              </h2>
+              <div className="mt-4 flex flex-wrap gap-2">
                 {content.keywords.map((keyword) => (
                   <Link
                     key={keyword}
@@ -188,8 +218,11 @@ export function DigestEditionView({
                 ))}
               </div>
             </section>
-            <section className={`${CARD} p-5 text-sm leading-6 ${MUTED}`}>
-              <p>
+
+            <section
+              className={`mt-8 border-t border-zinc-200 pt-7 text-[13.5px] leading-[1.75] dark:border-zinc-800 ${MUTED}`}
+            >
+              <p className="[text-wrap:pretty]">
                 {edition.isPreview
                   ? `Five public stories selected from 20 discovered clusters across the top ${content.source.selectedCount} bangers in the August 11 research snapshot.`
                   : `Clustered from ${content.source.selectedCount} selected bangers in a frozen 24-hour snapshot.`}{' '}
@@ -197,15 +230,18 @@ export function DigestEditionView({
               </p>
               <Link
                 href="/bangers?period=today"
-                className="mt-3 inline-flex font-semibold text-brand hover:underline"
+                className="mt-4 inline-flex font-semibold text-brand hover:underline"
               >
                 Explore today&apos;s bangers →
               </Link>
             </section>
+
             {archive.length > 1 ? (
-              <section className={`${CARD} p-5`}>
-                <h2 className="font-semibold">Recent editions</h2>
-                <div className="mt-3 space-y-2">
+              <section className="mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800">
+                <h2 className="text-[19px] font-semibold" style={SERIF}>
+                  Recent editions
+                </h2>
+                <div className="mt-4 space-y-2">
                   {archive
                     .filter((item) => item.id !== edition.id)
                     .slice(0, 6)
@@ -224,7 +260,7 @@ export function DigestEditionView({
           </aside>
         </div>
 
-        <footer className={`mt-10 border-t pt-5 text-xs leading-5 ${MUTED}`}>
+        <footer className={`mt-4 border-t pt-5 text-xs leading-5 ${MUTED}`}>
           {edition.isPreview
             ? 'Prototype assembled from a frozen research snapshot. Tweet text and engagement were hydrated for this preview; editorial summaries come from the cluster memo.'
             : 'Curated automatically from the previous 24 hours of archive bangers and reviewed through the Daily Digest lab before publication.'}

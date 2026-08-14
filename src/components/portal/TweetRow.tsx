@@ -233,6 +233,7 @@ function QuotedTweet({
 
 export interface TweetCardProps {
   tweet: PortalTweet
+  variant?: 'default' | 'editorial'
   animate?: boolean
   compact?: boolean
   collapsible?: boolean
@@ -281,6 +282,7 @@ function ArchivedQuotesMetric({
 
 export function TweetRow({
   tweet,
+  variant = 'default',
   animate = false,
   compact = false,
   collapsible = false,
@@ -299,6 +301,7 @@ export function TweetRow({
   const href = tweetPermalinkHref(tweet.id, origin, returnTo)
   const profileHref = userProfileHref(tweet.username, tweet.accountId)
   const isFeatured = featuredRank !== undefined
+  const isEditorial = variant === 'editorial'
   const isClickable = clickable || isFeatured
   const captureAction = (
     action:
@@ -316,13 +319,19 @@ export function TweetRow({
       is_featured: isFeatured,
     })
   }
-  const rowClassName = isFeatured
-    ? `relative flex min-w-0 gap-3 rounded-lg border border-zinc-200/75 bg-white p-4 shadow-sm dark:border-[#303036]/80 dark:bg-[#1b1b1e] sm:gap-3.5 sm:p-5 ${FEATURED_CARD_HOVER} ${
-        animate ? 'portal-slide-in' : ''
-      }`
-    : `flex gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23] ${
-        animate ? 'portal-slide-in' : ''
-      }`
+  const rowClassName = isEditorial
+    ? isFeatured
+      ? `relative flex min-w-0 gap-[18px] ${animate ? 'portal-slide-in' : ''}`
+      : `flex gap-[18px] border-t border-zinc-200 py-6 dark:border-[#26262a] ${
+          animate ? 'portal-slide-in' : ''
+        }`
+    : isFeatured
+      ? `relative flex min-w-0 gap-3 rounded-lg border border-zinc-200/75 bg-white p-4 shadow-sm dark:border-[#303036]/80 dark:bg-[#1b1b1e] sm:gap-3.5 sm:p-5 ${FEATURED_CARD_HOVER} ${
+          animate ? 'portal-slide-in' : ''
+        }`
+      : `flex gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23] ${
+          animate ? 'portal-slide-in' : ''
+        }`
 
   const activateCard = () => {
     captureAction('open')
@@ -343,8 +352,18 @@ export function TweetRow({
 
   const tweetContent = (
     <div
-      className={`mt-0.5 leading-relaxed text-zinc-700 dark:text-[#d9d9de] ${
-        compact ? 'text-[13.5px]' : isFeatured ? 'text-[14.5px]' : 'text-[14px]'
+      className={`${
+        isEditorial ? 'mt-2.5 whitespace-pre-wrap' : 'mt-0.5'
+      } break-words text-zinc-700 dark:text-[#d9d9de] ${
+        isEditorial
+          ? isFeatured
+            ? 'text-[20px] leading-[1.55] [font-family:var(--font-petrona)] sm:text-[22px]'
+            : 'text-[15.5px] leading-[1.7]'
+          : compact
+            ? 'text-[13.5px] leading-relaxed'
+            : isFeatured
+              ? 'text-[14.5px] leading-relaxed'
+              : 'text-[14px] leading-relaxed'
       } ${
         noClamp
           ? ''
@@ -367,7 +386,13 @@ export function TweetRow({
           className="min-w-0 rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
           <span
-            className={`truncate font-bold ${compact ? 'text-[13px]' : 'text-[13.5px]'}`}
+            className={`truncate font-bold ${
+              isEditorial
+                ? 'text-[14px]'
+                : compact
+                  ? 'text-[13px]'
+                  : 'text-[13.5px]'
+            }`}
           >
             {tweet.name}
           </span>{' '}
@@ -447,7 +472,10 @@ export function TweetRow({
       aria-label={isClickable ? `View tweet by @${tweet.username}` : undefined}
     >
       <Link href={profileHref} aria-label={`View @${tweet.username}'s profile`}>
-        <TweetAvatar tweet={tweet} size={isFeatured ? 38 : 34} />
+        <TweetAvatar
+          tweet={tweet}
+          size={isEditorial ? 44 : isFeatured ? 38 : 34}
+        />
       </Link>
       {details}
       {compact && (

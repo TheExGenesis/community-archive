@@ -41,6 +41,21 @@ server validates that grounding before an edition can be staged. The generated
 subtitle supplies connective context; the story page keeps source-grounded
 `In brief` bullets and a short editor's note for interpretation or caveats.
 
+### Editorial presentation
+
+The public edition adopts a newspaper-like, unboxed reading surface: a ruled
+masthead, large date, italic standfirst, main editorial column, and quiet
+calendar/context sidebar. Stories use strong rules and generous spacing rather
+than independent dashboard cards. Their lead media is shown uncropped, so each
+story has a visual without changing the archived asset.
+
+Digest tweet presentation is an `editorial` variant of the canonical
+`TweetCard`, not a separate renderer. It changes only the surrounding type,
+spacing, and rules; full text, media, videos, quoted tweets, metrics, links, and
+analytics behavior remain owned by the shared component. The story page uses
+the same treatment for both featured bangers and surrounding quote-post
+commentary.
+
 Set the server-only `DIGEST_MOCK_DATA=true` flag to show the fixture in another
 non-production environment. Do not set it in production.
 

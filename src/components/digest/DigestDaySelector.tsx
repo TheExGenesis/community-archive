@@ -14,10 +14,13 @@ const monthLabel = (year: number, month: number) =>
 export function DigestDaySelector({
   currentDate,
   editions,
+  variant = 'card',
 }: {
   currentDate: string
   editions: DigestEdition[]
+  variant?: 'card' | 'editorial'
 }) {
+  const editorial = variant === 'editorial'
   const [year, month] = currentDate.split('-').map(Number)
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
   const firstWeekday =
@@ -31,18 +34,30 @@ export function DigestDaySelector({
   ]
 
   return (
-    <section className={`${CARD} p-5`} aria-labelledby="digest-day-selector">
+    <section
+      className={editorial ? '' : `${CARD} p-5`}
+      aria-labelledby="digest-day-selector"
+    >
       <div className="flex items-baseline justify-between gap-3">
-        <h2 id="digest-day-selector" className="font-semibold">
+        <h2
+          id="digest-day-selector"
+          className={
+            editorial
+              ? 'text-[19px] font-semibold [font-family:var(--font-petrona)]'
+              : 'font-semibold'
+          }
+        >
           Choose a day
         </h2>
-        <span className={`text-xs ${MUTED}`}>{monthLabel(year, month)}</span>
+        <span className={`${editorial ? 'text-[12.5px]' : 'text-xs'} ${MUTED}`}>
+          {monthLabel(year, month)}
+        </span>
       </div>
       <div className="mt-4 grid grid-cols-7 gap-1 text-center">
         {WEEKDAYS.map((weekday, index) => (
           <span
             key={`${weekday}-${index}`}
-            className={`pb-1 text-[10px] font-semibold ${MUTED}`}
+            className={`pb-1 text-[10px] font-semibold tracking-[0.08em] ${MUTED}`}
             aria-hidden="true"
           >
             {weekday}
@@ -58,7 +73,9 @@ export function DigestDaySelector({
             return (
               <span
                 key={date}
-                className="flex aspect-square items-center justify-center rounded text-xs text-zinc-300 dark:text-zinc-700"
+                className={`flex aspect-square items-center justify-center rounded-[6px] ${
+                  editorial ? 'text-[12.5px]' : 'text-xs'
+                } text-zinc-300 dark:text-zinc-700`}
               >
                 {day}
               </span>
@@ -70,10 +87,18 @@ export function DigestDaySelector({
               href={`/digest/${date}`}
               aria-label={`${date}${edition.isPreview ? ', preview edition' : ''}`}
               aria-current={isCurrent ? 'date' : undefined}
-              className={`relative flex aspect-square items-center justify-center rounded text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
-                isCurrent
-                  ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950'
-                  : 'bg-blue-50 text-brand hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-950/70'
+              className={`relative flex aspect-square items-center justify-center rounded-[6px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
+                editorial
+                  ? `border text-[12.5px] ${
+                      isCurrent
+                        ? 'border-zinc-500 bg-zinc-100 font-bold text-zinc-950 dark:border-zinc-400 dark:bg-[#1b1b1e] dark:text-zinc-100'
+                        : 'border-transparent font-normal text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-[#1b1b1e]'
+                    }`
+                  : `text-xs font-semibold ${
+                      isCurrent
+                        ? 'bg-zinc-950 text-white dark:bg-white dark:text-zinc-950'
+                        : 'bg-blue-50 text-brand hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-950/70'
+                    }`
               }`}
             >
               {day}
@@ -89,8 +114,10 @@ export function DigestDaySelector({
           )
         })}
       </div>
-      <p className={`mt-3 text-[11px] leading-4 ${MUTED}`}>
-        Filled days have an edition. A dot marks preview data.
+      <p
+        className={`${editorial ? 'mt-4 text-xs leading-[1.6]' : 'mt-3 text-[11px] leading-4'} ${MUTED}`}
+      >
+        Available days have an edition. A dot marks preview data.
       </p>
     </section>
   )

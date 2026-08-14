@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { AvatarType } from '@/lib/types'
 import { formatNumber } from '@/lib/formatNumber'
+import Link from 'next/link'
+import { userProfileHref } from '@/lib/navigation'
 
 type AvatarListProps = {
   initialAvatars: AvatarType[]
@@ -33,9 +35,9 @@ const AvatarList = ({
           }`}
         >
           {avatars.map((avatar) => (
-            <a
+            <Link
               key={avatar.username}
-              href={`/user/${avatar.account_id}`}
+              href={userProfileHref(avatar.username, avatar.account_id)}
               className={`flex flex-col items-center text-center ${
                 compact ? 'w-16' : 'w-20'
               }`}
@@ -64,7 +66,7 @@ const AvatarList = ({
                 {avatar.num_followers &&
                   `${formatNumber(avatar.num_followers)} followers`}
               </span>
-            </a>
+            </Link>
           ))}
         </div>
       </div>

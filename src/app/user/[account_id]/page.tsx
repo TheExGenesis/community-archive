@@ -21,6 +21,8 @@ import { Archive, Radio } from 'lucide-react'
 import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
 import { ProjectContributorBadge } from '@/components/ProjectContributorBadge'
+import { userProfileHref } from '@/lib/navigation'
+import { redirect } from 'next/navigation'
 
 // Style constants (glows removed)
 const unifiedDeepBlueBase = 'bg-card dark:bg-background'
@@ -163,6 +165,15 @@ export default async function User({
         </div>
       </section>
     )
+  }
+
+  const requestedProfileHref = `/user/${encodeURIComponent(account_id)}`
+  const canonicalProfileHref = userProfileHref(
+    userData.username,
+    userData.account_id,
+  )
+  if (canonicalProfileHref !== requestedProfileHref) {
+    redirect(canonicalProfileHref)
   }
 
   const { data: summaryData, error: summaryError } = directoryUser

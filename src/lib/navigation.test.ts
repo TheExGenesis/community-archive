@@ -9,14 +9,14 @@ import {
 
 describe('user profile navigation', () => {
   it('prefers readable usernames while retaining account-ID compatibility', () => {
-    expect(userProfileHref('@archive_user', '123')).toBe(
-      '/user/123?username=archive_user',
-    )
+    expect(userProfileHref('exgenesis', '322603863')).toBe('/user/exgenesis')
+    expect(userProfileHref('@archive_user', '123')).toBe('/user/archive_user')
+    expect(userProfileHref('archive_user')).toBe('/user/archive_user')
     expect(userProfileHref(undefined, '123')).toBe('/user/123')
     expect(userProfileHref('not valid', '123')).toBe('/user/123')
     expect(userProfileHref('123', '456')).toBe('/user/456')
     expect(userProfileHref('a'.repeat(15), '456')).toBe(
-      `/user/456?username=${'a'.repeat(15)}`,
+      `/user/${'a'.repeat(15)}`,
     )
     expect(userProfileHref('a'.repeat(16), '456')).toBe('/user/456')
   })

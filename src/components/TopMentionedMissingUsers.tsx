@@ -18,6 +18,7 @@ import { devLog } from '@/lib/devLog'
 import { Label } from '@/components/ui/label'
 import { formatNumber } from '@/lib/formatNumber'
 import { getLatestAvatarMediaUrl } from '@/lib/avatar'
+import { userProfileHref } from '@/lib/navigation'
 
 export type MentionedUser = {
   mentioned_user_id: string
@@ -81,8 +82,7 @@ export default function TopMentionedUsers({
         const media_url = getLatestAvatarMediaUrl(accountData.profile)
         return {
           ...user,
-          mentioned_user_id:
-            accountData.account_id || user.mentioned_user_id,
+          mentioned_user_id: accountData.account_id || user.mentioned_user_id,
           account_display_name: accountData.account_display_name!,
           avatar_media_url: media_url,
           uploaded: true,
@@ -102,7 +102,7 @@ export default function TopMentionedUsers({
 
   const getUserLink = (user: MentionedUser) => {
     return user.uploaded
-      ? `/user/${user.mentioned_user_id}`
+      ? userProfileHref(user.screen_name, user.mentioned_user_id)
       : `https://twitter.com/${user.screen_name}`
   }
 

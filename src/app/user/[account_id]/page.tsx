@@ -1,4 +1,4 @@
-import { cache, Suspense } from 'react'
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { ProfileHeader } from '@/components/metaTwitter/ProfileHeader'
@@ -6,7 +6,6 @@ import type { NavChapter } from '@/components/metaTwitter/ArchiveNav'
 import { ProfileArchive } from '@/components/metaTwitter/ProfileArchive'
 import { ProfileArchiveSkeleton } from '@/components/metaTwitter/ProfilePageSkeleton'
 import { ProfileEditingProvider } from '@/components/metaTwitter/ProfileEditingContext'
-import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
 import { userProfileHref } from '@/lib/navigation'
 import {
   getCuratedProfileBangersPage,
@@ -17,67 +16,43 @@ import {
   PROFILE_BANGERS_INITIAL_LIMIT,
   resolveProfileChapterYear,
 } from '@/lib/metaTwitter/profilePagination'
-import {
-  getCachedArchivedAt,
-  getCachedProfileHeader,
-  resolveAccountId,
-} from '@/lib/metaTwitter/data'
-import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
+import { getCachedArchivedAt } from '@/lib/metaTwitter/data'
+import { resolveProfile } from '@/lib/metaTwitter/profile'
 
 interface PageProps {
   params: { account_id: string }
   searchParams: { chapter?: string; username?: string }
 }
 
-interface ResolvedProfile {
-  accountId: string
-  profile: ProfileHeaderData
-}
-
-const resolveProfile = cache(
-  async (param: string): Promise<ResolvedProfile | null> => {
-    const archiveAccountId = await resolveAccountId(param)
-    if (archiveAccountId) {
-      const profile = await getCachedProfileHeader(archiveAccountId)
-      if (profile) return { accountId: archiveAccountId, profile }
-    }
-
-    const clickHouseProfile = await getClickHouseUserProfile(param)
-    const accountId = clickHouseProfile?.user.account_id
-    if (!clickHouseProfile || !accountId) return null
-    const user = clickHouseProfile.user
-    return {
-      accountId,
-      profile: {
-        account_id: accountId,
-        username: user.username,
-        account_display_name: user.account_display_name,
-        created_at: user.created_at,
-        num_tweets: user.num_tweets,
-        num_followers: user.num_followers,
-        num_following: user.num_following,
-        num_likes: user.num_likes,
-        has_archive: user.has_archive,
-        is_opted_in: user.is_opted_in,
-        bio: user.bio,
-        website: user.website,
-        location: user.location,
-        avatar_media_url: user.avatar_media_url,
-        header_media_url: user.header_media_url ?? null,
-      },
-    }
-  },
-)
-
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const resolved = await resolveProfile(params.account_id)
   if (!resolved) return { title: 'User not found' }
-  const { profile } = resolved
+  const { accountId, profile } = resolved
+  const title = `${profile.account_display_name} (@${profile.username}) — Community Archive`
+  const normalizedBio = profile.bio?.replace(/\s+/g, ' ').trim()
+  const description = normalizedBio
+    ? normalizedBio.length > 200
+      ? `${normalizedBio.slice(0, 199).trimEnd()}…`
+      : normalizedBio
+    : `Explore @${profile.username}'s archived posts on Community Archive.`
+  const canonicalPath = userProfileHref(profile.username, accountId)
   return {
-    title: `${profile.account_display_name} (@${profile.username}) — Community Archive`,
-    description: profile.bio ?? undefined,
+    title,
+    description,
+    alternates: { canonical: canonicalPath },
+    openGraph: {
+      type: 'website',
+      url: canonicalPath,
+      title,
+      description,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
   }
 }
 

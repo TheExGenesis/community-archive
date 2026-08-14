@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 import { formatNumber } from '@/lib/formatNumber'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 
@@ -32,6 +33,7 @@ export function ProfileHeader({
   const headerUrl = profile.header_media_url
     ? `${profile.header_media_url.replace(/\/$/, '')}/1500x500`
     : null
+  const avatarUrl = getHighResolutionAvatarUrl(profile.avatar_media_url)
 
   return (
     <header>
@@ -49,12 +51,13 @@ export function ProfileHeader({
       </div>
       <div className="px-4 pb-4 sm:px-6">
         <div className="flex items-start justify-between gap-3">
-          {profile.avatar_media_url ? (
+          {avatarUrl ? (
             <Image
-              src={profile.avatar_media_url}
+              src={avatarUrl}
               alt={`${profile.account_display_name}'s avatar`}
               width={132}
               height={132}
+              sizes="132px"
               priority
               className="relative z-10 -mt-[66px] h-[132px] w-[132px] rounded-full border-4 border-card bg-muted object-cover"
             />

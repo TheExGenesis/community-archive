@@ -43,7 +43,7 @@ test('maps a corpus account into the public profile contract', async () => {
         username: 'alice',
         account_display_name: 'Alice',
         avatar_media_url:
-          'https://pbs.twimg.com/profile_images/42/avatar_400x400.jpg',
+          'https://pbs.twimg.com/profile_images/42/avatar_normal.jpg',
         num_followers: 12,
         num_tweets: 45,
         has_archive: false,

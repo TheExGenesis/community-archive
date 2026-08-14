@@ -9,6 +9,7 @@ import {
   Radio,
 } from 'lucide-react'
 
+import { getSmallAvatarUrl } from '@/lib/avatar'
 import type { MissingAccount } from '@/lib/missingAccounts'
 import { getMissingAccounts } from '@/lib/missingAccounts'
 
@@ -49,7 +50,7 @@ function accountUrl(account: MissingAccount): string {
 }
 
 function AccountIdentity({ account }: { account: MissingAccount }) {
-  const avatarUrl = supportedAvatarUrl(account.avatarUrl)
+  const avatarUrl = getSmallAvatarUrl(supportedAvatarUrl(account.avatarUrl))
   const displayName =
     account.displayName || account.username || 'Unknown account'
   const fallback = (account.username || account.displayName || '?')

@@ -4,6 +4,7 @@ import type { RefObject } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
+import { getSmallAvatarUrl } from '@/lib/avatar'
 import { formatNumber } from '@/lib/formatNumber'
 import { bangerPortalTweet } from '@/lib/metaTwitter/bangerPortalTweet'
 import { tweetPermalinkHref } from '@/lib/navigation'
@@ -245,14 +246,16 @@ export function Workspace({
                 </div>
               )}
               {people.map((person) => {
+                const avatarUrl = getSmallAvatarUrl(person.avatar_media_url)
                 const content = (
                   <div className="flex items-center gap-2.5">
-                    {person.avatar_media_url ? (
+                    {avatarUrl ? (
                       <Image
-                        src={person.avatar_media_url}
+                        src={avatarUrl}
                         alt=""
                         width={36}
                         height={36}
+                        sizes="36px"
                         className="h-9 w-9 flex-none rounded-full object-cover"
                       />
                     ) : (

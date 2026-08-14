@@ -5,6 +5,7 @@ import { ProfileHeader } from '@/components/metaTwitter/ProfileHeader'
 import type { NavChapter } from '@/components/metaTwitter/ArchiveNav'
 import { ProfileArchive } from '@/components/metaTwitter/ProfileArchive'
 import { ProfileArchiveSkeleton } from '@/components/metaTwitter/ProfilePageSkeleton'
+import { ProfileEditingProvider } from '@/components/metaTwitter/ProfileEditingContext'
 import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
 import { userProfileHref } from '@/lib/navigation'
 import {
@@ -86,14 +87,12 @@ async function ProfileArchiveContent({
   basePath,
   candidateYear,
   displayName,
-  isOwner,
 }: {
   accountId: string
   avatarUrl: string | null
   basePath: string
   candidateYear: number | null
   displayName: string
-  isOwner: boolean
 }) {
   const candidatePage = await getCuratedProfileBangersPage(accountId, {
     limit: PROFILE_BANGERS_INITIAL_LIMIT,
@@ -119,7 +118,6 @@ async function ProfileArchiveContent({
       displayName={displayName}
       initialYear={year}
       initialPage={initialPage}
-      isOwner={isOwner}
     />
   )
 }
@@ -173,28 +171,30 @@ export default async function UserPage({ params, searchParams }: PageProps) {
   return (
     <div className="flex justify-center px-4 pb-8 pt-4 sm:px-6">
       <div className="h-fit w-full max-w-[1220px] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_2px_16px_rgba(0,0,0,0.06)]">
-        <ProfileHeader
-          profile={profile}
-          downloadArchiveVisible={settings.downloadArchiveVisible}
-          archivedAt={null}
-          archivedAtSlot={
-            profile.has_archive ? (
-              <Suspense fallback={null}>
-                <ProfileArchivedAt accountId={accountId} />
-              </Suspense>
-            ) : null
-          }
-        />
-        <Suspense fallback={<ProfileArchiveSkeleton />}>
-          <ProfileArchiveContent
-            accountId={accountId}
-            avatarUrl={profile.avatar_media_url}
-            basePath={canonicalProfilePath}
-            candidateYear={candidateYear}
-            displayName={profile.account_display_name}
+        <ProfileEditingProvider>
+          <ProfileHeader
+            profile={profile}
+            downloadArchiveVisible={settings.downloadArchiveVisible}
+            archivedAt={null}
+            archivedAtSlot={
+              profile.has_archive ? (
+                <Suspense fallback={null}>
+                  <ProfileArchivedAt accountId={accountId} />
+                </Suspense>
+              ) : null
+            }
             isOwner={isOwner}
           />
-        </Suspense>
+          <Suspense fallback={<ProfileArchiveSkeleton />}>
+            <ProfileArchiveContent
+              accountId={accountId}
+              avatarUrl={profile.avatar_media_url}
+              basePath={canonicalProfilePath}
+              candidateYear={candidateYear}
+              displayName={profile.account_display_name}
+            />
+          </Suspense>
+        </ProfileEditingProvider>
       </div>
     </div>
   )

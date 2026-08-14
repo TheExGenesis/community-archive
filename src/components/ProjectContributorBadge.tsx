@@ -11,7 +11,7 @@ export function ProjectContributorBadge({ username }: { username: string }) {
       className="gap-1.5 border-brand/40 bg-brand/10 text-brand"
     >
       <Award aria-hidden="true" className="h-3.5 w-3.5" />
-      Project contributor
+      Archive contributor
     </Badge>
   )
 }

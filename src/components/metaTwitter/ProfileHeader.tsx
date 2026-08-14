@@ -4,7 +4,9 @@ import type { ReactNode } from 'react'
 import { PiInfo } from 'react-icons/pi'
 import { formatNumber } from '@/lib/formatNumber'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
+import { ProjectContributorBadge } from '@/components/ProjectContributorBadge'
 import { ProfileAvatar } from './ProfileAvatar'
+import { ProfileEditButton } from './ProfileEditButton'
 
 const monthYear = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', {
@@ -26,11 +28,13 @@ export function ProfileHeader({
   archivedAt,
   archivedAtSlot,
   downloadArchiveVisible = true,
+  isOwner = false,
 }: {
   profile: ProfileHeaderData
   archivedAt: string | null
   archivedAtSlot?: ReactNode
   downloadArchiveVisible?: boolean
+  isOwner?: boolean
 }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const archiveUrl =
@@ -73,13 +77,14 @@ export function ProfileHeader({
                 Download archive
               </a>
             )}
+            {isOwner ? <ProfileEditButton /> : null}
             <a
               href={`https://x.com/${profile.username}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-full bg-foreground px-4 py-[7px] text-sm font-semibold text-background hover:opacity-90"
+              className="rounded-full border border-border/70 bg-transparent px-4 py-[7px] text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              Follow on X
+              View on X
             </a>
           </div>
         </div>
@@ -88,9 +93,10 @@ export function ProfileHeader({
           <h1 className="text-xl font-extrabold">
             {profile.account_display_name}
           </h1>
+          <ProjectContributorBadge username={profile.username} />
           {(profile.has_archive || profile.is_opted_in) && (
             <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-              {profile.has_archive ? 'Archive contributor' : 'Community member'}
+              {profile.has_archive ? 'Archived tweets' : 'Opted in'}
             </span>
           )}
         </div>

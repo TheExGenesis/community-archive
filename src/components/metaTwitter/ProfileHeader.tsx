@@ -47,7 +47,7 @@ export function ProfileHeader({
           <img
             src={profile.avatar_media_url ?? ''}
             alt={profile.account_display_name}
-            className="-mt-[66px] h-[132px] w-[132px] rounded-full border-4 border-card bg-[#ddd] object-cover"
+            className="relative z-10 -mt-[66px] h-[132px] w-[132px] rounded-full border-4 border-card bg-[#ddd] object-cover"
           />
           <div className="flex gap-2 pt-3.5">
             <a

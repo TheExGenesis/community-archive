@@ -2,15 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import {
-  Archive,
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  Loader2,
-  Radio,
-  Search,
-} from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Search } from 'lucide-react'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -23,12 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { MembershipStatusIcon } from '@/components/MembershipStatusIcon'
 import { formatNumber } from '@/lib/formatNumber'
 import {
   fetchUsers,
@@ -329,50 +316,12 @@ export default function UserDirectoryPage() {
                         </time>
                       </TableCell>
                       <TableCell className="pr-4">
-                        <TooltipProvider delayDuration={150}>
-                          <div className="flex justify-end gap-0.5">
-                            {user.has_archive && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span
-                                    role="img"
-                                    tabIndex={0}
-                                    aria-label="Archive"
-                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-brand/60 outline-none transition-colors hover:bg-brand/5 hover:text-brand focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 dark:focus-visible:ring-offset-background"
-                                  >
-                                    <Archive
-                                      aria-hidden="true"
-                                      className="h-3.5 w-3.5"
-                                    />
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                  Archive
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                            {!user.has_archive && user.is_opted_in && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span
-                                    role="img"
-                                    tabIndex={0}
-                                    aria-label="Opted in"
-                                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-brand/60 outline-none transition-colors hover:bg-brand/5 hover:text-brand focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 dark:focus-visible:ring-offset-background"
-                                  >
-                                    <Radio
-                                      aria-hidden="true"
-                                      className="h-3.5 w-3.5"
-                                    />
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                  Opted in
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
-                        </TooltipProvider>
+                        <div className="flex justify-end gap-0.5">
+                          <MembershipStatusIcon
+                            hasArchive={user.has_archive}
+                            isOptedIn={user.is_opted_in}
+                          />
+                        </div>
                       </TableCell>
                     </TableRow>
                   )

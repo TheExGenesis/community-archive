@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { PiInfo } from 'react-icons/pi'
 import { formatNumber } from '@/lib/formatNumber'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
+import { MembershipStatusIcon } from '@/components/MembershipStatusIcon'
 import { ProjectContributorBadge } from '@/components/ProjectContributorBadge'
 import { ProfileAvatar } from './ProfileAvatar'
 import { ProfileEditButton } from './ProfileEditButton'
@@ -89,16 +90,17 @@ export function ProfileHeader({
           </div>
         </div>
 
-        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        <div className="mt-2.5 flex flex-wrap items-center">
           <h1 className="text-xl font-extrabold">
             {profile.account_display_name}
           </h1>
-          <ProjectContributorBadge username={profile.username} />
-          {(profile.has_archive || profile.is_opted_in) && (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-              {profile.has_archive ? 'Archived tweets' : 'Opted in'}
-            </span>
-          )}
+          <div className="ml-2 flex flex-wrap items-center gap-1.5">
+            <ProjectContributorBadge username={profile.username} />
+            <MembershipStatusIcon
+              hasArchive={profile.has_archive}
+              isOptedIn={profile.is_opted_in}
+            />
+          </div>
         </div>
         <div className="text-[15px] text-muted-foreground">
           @{profile.username}

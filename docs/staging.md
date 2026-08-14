@@ -34,6 +34,7 @@ ENABLE_CLICKHOUSE_LAB=true
 CLICKHOUSE_ANALYTICS_API_URL=https://analytics.community-archive.org/analytics
 CLICKHOUSE_SEARCH_API_URL=https://analytics.community-archive.org
 CLICKHOUSE_ANALYTICS_API_TOKEN=<shared-staging-gateway-token>
+CLICKHOUSE_ANALYTICS_ADMIN_TOKEN=<separate-social-graph-admin-token>
 
 # Opt-in application reads. Leave false until the dedicated /search endpoint is deployed.
 ENABLE_CLICKHOUSE_READS=false
@@ -150,6 +151,8 @@ For PR-created Vercel Preview deployments, add the values from `.env.staging.gen
 - `CLICKHOUSE_SEARCH_API_URL` (the standalone mirror-search gateway; falls
   back to `CLICKHOUSE_ANALYTICS_API_URL` only when omitted)
 - `CLICKHOUSE_ANALYTICS_API_TOKEN`
+- `CLICKHOUSE_ANALYTICS_ADMIN_TOKEN` (server-only; required for the admin-only
+  social-graph full refresh control)
 - `ENABLE_CLICKHOUSE_READS=false` (set true when testing homepage/search reads)
 - `NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH=false` (set true in the same build that
   should try ClickHouse text search)

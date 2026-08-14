@@ -50,11 +50,11 @@ test('does not label a non-member or offer an archive download', () => {
   expect(
     screen.queryByRole('link', { name: 'Download archive' }),
   ).not.toBeInTheDocument()
-  expect(
-    screen.getByRole('note', { name: 'Limited profile' }),
-  ).toHaveTextContent(
-    "This person is not a Community Archive user, so we don't have their full archive. We only have a limited selection of their tweets—ones that Archive users quoted, replied to, or liked, plus replies this person made in threads involving Archive users. They're welcome to sign in and opt out at any time.",
+  const notice = screen.getByRole('note', { name: 'Limited profile' })
+  expect(notice).toHaveTextContent(
+    'This user is not a Community Archive user, so we only have a selection of their tweets - ones that Archive users interacted with. Is this your profile? You can sign in and opt out at any time.',
   )
+  expect(notice.querySelector('svg')).toBeInTheDocument()
   expect(
     screen.getByRole('link', { name: 'sign in and opt out' }),
   ).toHaveAttribute('href', '/profile')

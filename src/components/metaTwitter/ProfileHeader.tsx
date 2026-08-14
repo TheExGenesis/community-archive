@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import { PiInfo } from 'react-icons/pi'
 import { formatNumber } from '@/lib/formatNumber'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 import { ProfileAvatar } from './ProfileAvatar'
@@ -105,22 +106,25 @@ export function ProfileHeader({
           <div
             role="note"
             aria-label="Limited profile"
-            className="bg-muted/45 mt-3 max-w-3xl rounded-lg border border-border px-3.5 py-3 text-sm leading-5 text-muted-foreground"
+            className="mt-3 flex max-w-5xl items-start gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-2 text-xs leading-5 text-muted-foreground/80 sm:text-[13px]"
           >
-            <span className="font-semibold text-foreground">
-              This person is not a Community Archive user,
-            </span>{' '}
-            so we don&apos;t have their full archive. We only have a limited
-            selection of their tweets—ones that Archive users quoted, replied
-            to, or liked, plus replies this person made in threads involving
-            Archive users. They&apos;re welcome to{' '}
-            <Link
-              href="/profile"
-              className="font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
-            >
-              sign in and opt out
-            </Link>{' '}
-            at any time.
+            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <PiInfo className="h-3 w-3" aria-hidden="true" />
+            </span>
+            <p>
+              <span className="font-semibold text-foreground/80">
+                This user is not a Community Archive user,
+              </span>{' '}
+              so we only have a selection of their tweets - ones that Archive
+              users interacted with. Is this your profile? You can{' '}
+              <Link
+                href="/profile"
+                className="font-semibold text-foreground/80 underline decoration-border underline-offset-4 hover:text-foreground hover:decoration-foreground"
+              >
+                sign in and opt out
+              </Link>{' '}
+              at any time.
+            </p>
           </div>
         ) : null}
 

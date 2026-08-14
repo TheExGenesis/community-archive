@@ -12,11 +12,16 @@ describe('AboutPage contributors', () => {
     expect(currentSection).not.toBeNull()
 
     const xiqLink = within(currentSection!).getByRole('link', {
-      name: 'Francisco Carvalho, or Xiq',
+      name: 'Francisco Carvalho (Xiq)',
     })
     expect(xiqLink).toHaveAttribute('href', 'https://x.com/exgenesis')
+    expect(xiqLink).toHaveTextContent('Francisco Carvalho (Xiq)')
+    expect(within(xiqLink).getByText('(Xiq)')).toHaveClass(
+      'text-muted-foreground',
+    )
+    expect(within(currentSection!).getByText('Founder')).toBeInTheDocument()
     expect(
-      within(currentSection!).getByRole('link', { name: 'Christine' }),
+      within(currentSection!).getByRole('link', { name: 'Christine Shiba' }),
     ).toHaveAttribute('href', 'https://x.com/christineist')
 
     const xiqCard = xiqLink.closest('.rounded-lg')
@@ -28,7 +33,7 @@ describe('AboutPage contributors', () => {
     const pastSection = pastHeading.closest('section')
     expect(pastSection).not.toBeNull()
     expect(
-      within(pastSection!).getByRole('link', { name: 'Defender' }),
+      within(pastSection!).getByRole('link', { name: '@DefenderOfBasic' }),
     ).toHaveAttribute('href', 'https://x.com/DefenderOfBasic')
     expect(
       within(pastSection!).getByRole('link', {
@@ -36,7 +41,7 @@ describe('AboutPage contributors', () => {
       }),
     ).toHaveAttribute('href', 'https://x.com/A_Variengien')
     expect(
-      within(pastSection!).queryByText('Christine'),
+      within(pastSection!).queryByText('Christine Shiba'),
     ).not.toBeInTheDocument()
   })
 

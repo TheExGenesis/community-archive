@@ -43,6 +43,12 @@ export default function AboutPage() {
                   className="transition-colors hover:text-brand"
                 >
                   {contributor.name}
+                  {contributor.qualifier ? (
+                    <span className="text-muted-foreground">
+                      {' '}
+                      ({contributor.qualifier})
+                    </span>
+                  ) : null}
                 </a>
               </h3>
               {contributor.role && (

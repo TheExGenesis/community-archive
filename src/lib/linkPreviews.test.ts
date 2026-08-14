@@ -3,9 +3,12 @@ import {
   assertSafeRemoteUrl,
   fetchLinkPreviewMetadata,
   fetchSafeRemoteResource,
+  fetchXArticleSyndicationMetadata,
   isPublicIpAddress,
   isXArticleUrl,
   normalizePreviewUrl,
+  shouldRefreshCachedPreview,
+  xArticleIdFromUrl,
 } from './linkPreviews'
 
 const publicResolver = async () => [{ address: '1.1.1.1', family: 4 }]
@@ -18,6 +21,8 @@ describe('link preview safety and metadata', () => {
     expect(isXArticleUrl('https://x.com/i/article/123')).toBe(true)
     expect(isXArticleUrl('https://twitter.com/alice/article/123')).toBe(true)
     expect(isXArticleUrl('https://x.com/alice/status/123')).toBe(false)
+    expect(xArticleIdFromUrl('https://x.com/i/article/123')).toBe('123')
+    expect(xArticleIdFromUrl('https://x.com/i/article/not-a-number')).toBeNull()
   })
 
   test('rejects literal and resolved private destinations', async () => {
@@ -96,6 +101,77 @@ describe('link preview safety and metadata', () => {
       siteName: 'X',
       isXArticle: true,
     })
+  })
+
+  test('extracts an X Article preview from its parent tweet syndication data', async () => {
+    const fetcher = jest.fn().mockResolvedValue({
+      article: {
+        article_id: '2051411546757324800',
+        title: 'Social traits &amp; wholesome online interactions',
+        preview_text: 'A useful teaser from the article.',
+        cover_media_url: 'https://pbs.twimg.com/media/cover.jpg',
+      },
+    })
+
+    const metadata = await fetchXArticleSyndicationMetadata(
+      'http://x.com/i/article/2051411546757324800',
+      '2054372105223913761',
+      fetcher,
+    )
+
+    expect(fetcher).toHaveBeenCalledWith('2054372105223913761')
+    expect(metadata).toEqual({
+      canonicalUrl: 'https://x.com/i/article/2051411546757324800',
+      title: 'Social traits & wholesome online interactions',
+      description: 'A useful teaser from the article.',
+      imageUrl: 'https://pbs.twimg.com/media/cover.jpg',
+      siteName: 'X',
+      contentType: 'application/json',
+      isXArticle: true,
+    })
+  })
+
+  test('rejects syndication metadata for a different X Article', async () => {
+    await expect(
+      fetchXArticleSyndicationMetadata(
+        'https://x.com/i/article/123',
+        '456',
+        async () => ({
+          article: {
+            article_id: '999',
+            title: 'Wrong article',
+          },
+        }),
+      ),
+    ).resolves.toBeNull()
+  })
+
+  test('refreshes legacy X Article fallbacks once without retrying new fallbacks immediately', () => {
+    const now = Date.parse('2026-08-14T23:00:00.000Z')
+    const url = 'http://x.com/i/article/2051411546757324800'
+
+    expect(
+      shouldRefreshCachedPreview(
+        url,
+        {
+          title: 'X Article',
+          image_url: null,
+          expires_at: '2026-09-13T23:00:00.000Z',
+        },
+        now,
+      ),
+    ).toBe(true)
+    expect(
+      shouldRefreshCachedPreview(
+        url,
+        {
+          title: 'X Article',
+          image_url: null,
+          expires_at: '2026-08-15T05:00:00.000Z',
+        },
+        now,
+      ),
+    ).toBe(false)
   })
 
   test('rejects oversized responses before reading the body', async () => {

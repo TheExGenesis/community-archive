@@ -1,8 +1,6 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
 import { MUTED, SERIF } from '@/components/portal/styles'
-import { firstStoryMedia } from '@/lib/digest/storyMedia'
 import type { DigestEdition, DigestStory } from '@/lib/digest/types'
 
 const timeLabel = (value: string | null) =>
@@ -26,7 +24,6 @@ export function DigestStoryView({
   story: DigestStory
 }) {
   const returnTo = `/digest/${edition.digestDate}/${story.slug}`
-  const ledeMedia = firstStoryMedia(story)
   const archivedQuotes = story.bangers.reduce(
     (total, tweet) => total + (tweet.quoteCount ?? 0),
     0,
@@ -61,9 +58,6 @@ export function DigestStoryView({
             <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
               {story.category ?? 'Story'}
             </span>
-            <span className="font-semibold text-zinc-700 dark:text-zinc-300">
-              {story.keyword}
-            </span>
             <span>· {story.bangers.length} bangers</span>
             <span>
               · {archivedQuotes} archived quote
@@ -91,19 +85,6 @@ export function DigestStoryView({
 
         <div className="mt-8 border-t-[3px] border-zinc-800 dark:border-zinc-200" />
         <div className="mt-[3px] border-t border-zinc-400 dark:border-zinc-600" />
-
-        {ledeMedia ? (
-          <div className="relative mt-8 aspect-[16/8] overflow-hidden rounded-[4px] border border-zinc-200 bg-white dark:border-zinc-800">
-            <Image
-              src={ledeMedia.url}
-              alt={`Image shared in the ${story.keyword} story`}
-              fill
-              sizes="(max-width: 1200px) 100vw, 1064px"
-              className="object-contain"
-              priority
-            />
-          </div>
-        ) : null}
 
         <div className="mt-10 grid items-start lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-x-14">
           <div className="min-w-0 space-y-12">

@@ -69,7 +69,7 @@ export interface DigestEditionContent {
   windowStart: string
   windowEnd: string
   generatedAt: string
-  executiveSummary: string
+  executiveSummary: string[]
   topBanger: PortalTweet
   stories: DigestStory[]
   keywords: string[]
@@ -136,6 +136,19 @@ export const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const isString = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0
+
+const normalizeExecutiveSummary = (value: unknown): string[] | null => {
+  if (isString(value)) return [value]
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > 5 ||
+    !value.every(isString)
+  ) {
+    return null
+  }
+  return value
+}
 
 const isNonnegativeNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0
@@ -213,13 +226,16 @@ export function parseDigestRunEvents(value: unknown): DigestRunEvent[] {
 export function parseDigestEditionContent(
   value: unknown,
 ): DigestEditionContent | null {
+  const executiveSummary = isRecord(value)
+    ? normalizeExecutiveSummary(value.executiveSummary)
+    : null
   if (
     !isRecord(value) ||
     !isString(value.digestDate) ||
     !isString(value.windowStart) ||
     !isString(value.windowEnd) ||
     !isString(value.generatedAt) ||
-    !isString(value.executiveSummary) ||
+    !executiveSummary ||
     !isPortalTweet(value.topBanger) ||
     !Array.isArray(value.stories) ||
     !Array.isArray(value.keywords) ||
@@ -271,5 +287,9 @@ export function parseDigestEditionContent(
     return null
   }
 
-  return { ...value, stories } as unknown as DigestEditionContent
+  return {
+    ...value,
+    executiveSummary,
+    stories,
+  } as unknown as DigestEditionContent
 }

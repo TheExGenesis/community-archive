@@ -12,6 +12,7 @@ describe('daily digest preview fixture', () => {
       isPreview: true,
     })
     expect(AUGUST_11_MOCK_DIGEST.content.stories).toHaveLength(5)
+    expect(AUGUST_11_MOCK_DIGEST.content.executiveSummary).toHaveLength(3)
     expect(AUGUST_11_MOCK_DIGEST.content.source).toMatchObject({
       candidateCount: 252,
       selectedCount: 30,
@@ -70,5 +71,18 @@ describe('daily digest preview fixture', () => {
         ?.stories.slice(0, 2)
         .map((story) => story.category),
     ).toEqual(['AI news', 'Viral joke'])
+  })
+
+  test('keeps editions with the former prose abstract readable', () => {
+    const legacy = structuredClone(
+      AUGUST_11_MOCK_DIGEST.content,
+    ) as unknown as {
+      executiveSummary: string
+    }
+    legacy.executiveSummary = 'A legacy one-paragraph abstract.'
+
+    expect(parseDigestEditionContent(legacy)?.executiveSummary).toEqual([
+      'A legacy one-paragraph abstract.',
+    ])
   })
 })

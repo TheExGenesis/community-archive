@@ -181,7 +181,7 @@ export async function getLatestDigestPreview(): Promise<DigestPreview | null> {
   return {
     href: `/digest/${edition.digestDate}`,
     digestDate: edition.digestDate,
-    executiveSummary: edition.content.executiveSummary,
+    executiveSummary: edition.content.executiveSummary.join(' '),
     storyCount: edition.content.stories.length,
     storyTitles: edition.content.stories.map((story) => story.title),
     isPreview: edition.isPreview,

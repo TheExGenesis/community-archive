@@ -12,8 +12,11 @@ Date: 2026-08-13
 - Use a short, vivid excerpt copied verbatim from one supplied tweet as the
   story title. The UI adds quotation marks; the model must not.
 - Keep generated copy for the subtitle, `In brief`, and editor's note. The
-  subtitle explains the cluster, while the editor's note calls out a caveat,
-  disagreement, or social dynamic without presenting analysis as a source fact.
+  subtitle names the people, event, and significance that the quoted title
+  leaves unstated, while the editor's note calls out a caveat, disagreement, or
+  social dynamic without presenting analysis as a source fact.
+- Render the edition abstract as three to five concrete bullet sentences rather
+  than a prose paragraph.
 - Render the top banger as the canonical full TweetCard with no clamp.
 - Link every edition keyword to the existing Community Archive search page.
 - Preserve the story page's surrounding quote-post conversation, `In brief`,
@@ -32,7 +35,7 @@ Date: 2026-08-13
 ## Prompt draft
 
 The executable version is inserted by
-`20260814044019_refine_daily_digest_editorial_labels_and_headlines.sql`.
+`20260814055701_refine_daily_digest_summary_and_subtitles.sql`.
 
 ### System prompt
 
@@ -47,26 +50,34 @@ The executable version is inserted by
 > banger or commentary post. Do not paraphrase, combine phrases, add ellipses,
 > title-case the excerpt, or add quotation marks; the interface adds quotation
 > marks. Include only supplied tweet IDs, never fabricate facts or engagement
-> counts, and preserve meaningful disagreement. Write a clear subtitle that
-> explains why the posts belong together. Write one to three source-grounded In
-> brief bullets. Write a short editor note that explains an important caveat,
-> disagreement, or social dynamic and clearly distinguishes interpretation from
-> source claims. Select useful quote-post commentary when it adds evidence,
-> interpretation, disagreement, or a visible continuation of a meme.
+> counts, and preserve meaningful disagreement. Because a source quote usually
+> lacks context, write a one- or two-sentence subtitle that names the people,
+> product, event, or format involved; states what happened; and explains why the
+> grouped posts belong together. Never merely restate the quoted title. Clearly
+> distinguish sourced claims from interpretation. Write one to three
+> source-grounded In brief bullets. Write a short editor note that explains an
+> important caveat, disagreement, or social dynamic and clearly distinguishes
+> interpretation from source claims. Select useful quote-post commentary when
+> it adds evidence, interpretation, disagreement, or a visible continuation of
+> a meme.
 
 ### User prompt template
 
 > Create the digest for `{{digest_date}}` covering `{{window_start}}` through
 > `{{window_end}}`.
 >
-> Return a one- or two-sentence executive summary, three to five stories, and a
-> short list of exact keywords found in the supplied posts. For each story,
+> Return three to five executive-summary bullets, three to five stories, and a
+> short list of exact keywords found in the supplied posts. Prefer three summary
+> bullets unless the day genuinely needs more. Each summary bullet must be one
+> concrete sentence that names the day's subjects and developments; together
+> they should let a reader understand the edition at a glance. For each story,
 > choose a loose editorial label, copy the title excerpt from exactly one
-> supplied post, explain the cluster in the subtitle, provide the In brief
-> bullets and editor note, and include only supplied tweet IDs. A story should
-> aggregate related bangers, not summarize a single post unless it clearly drove
-> the day. When commentary is available, select two to five commentary tweet IDs
-> that show the surrounding conversation; omit only posts that add no context.
+> supplied post, and use the subtitle to supply the who, what, and why that the
+> quote leaves unstated. Provide the In brief bullets and editor note, and include
+> only supplied tweet IDs. A story should aggregate related bangers, not
+> summarize a single post unless it clearly drove the day. When commentary is
+> available, select two to five commentary tweet IDs that show the surrounding
+> conversation; omit only posts that add no context.
 >
 > Candidate snapshot:
 > `{{candidate_json}}`
@@ -85,4 +96,7 @@ For each generated edition, review:
 5. The editor's note contributes a caveat or interpretation and does not invent
    evidence.
 6. Selected quote posts add context, dissent, or the next step in a meme.
-7. The executive summary accurately names the day's three to five stories.
+7. The abstract contains three to five concrete bullets that accurately name
+   the day's developments.
+8. Every subtitle supplies missing who/what/why context rather than paraphrasing
+   the quoted title.

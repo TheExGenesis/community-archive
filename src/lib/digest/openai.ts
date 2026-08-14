@@ -5,7 +5,12 @@ const DIGEST_JSON_SCHEMA = {
   additionalProperties: false,
   required: ['executive_summary', 'stories', 'trending_keywords'],
   properties: {
-    executive_summary: { type: 'string', minLength: 40, maxLength: 600 },
+    executive_summary: {
+      type: 'array',
+      minItems: 3,
+      maxItems: 5,
+      items: { type: 'string', minLength: 30, maxLength: 220 },
+    },
     stories: {
       type: 'array',
       minItems: 3,
@@ -30,7 +35,7 @@ const DIGEST_JSON_SCHEMA = {
           },
           keyword: { type: 'string', minLength: 2, maxLength: 60 },
           title: { type: 'string', minLength: 8, maxLength: 140 },
-          subtitle: { type: 'string', minLength: 20, maxLength: 280 },
+          subtitle: { type: 'string', minLength: 50, maxLength: 320 },
           bullets: {
             type: 'array',
             minItems: 1,

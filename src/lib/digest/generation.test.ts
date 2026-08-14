@@ -54,8 +54,11 @@ const candidates: EnrichedDigestCandidate[] = [
 ]
 
 const modelOutput = {
-  executive_summary:
-    'The archive debated taste, remembered a group house, and started mining a new parquet release.',
+  executive_summary: [
+    'A taste benchmark became a public disagreement about prediction and endorsement.',
+    'A group-house whiteboard prompted a conversation about memory carried by shared objects.',
+    'Researchers began discussing how a new parquet release could support reply-graph analysis.',
+  ],
   stories: [
     {
       category: 'AI news',
@@ -127,6 +130,7 @@ describe('daily digest generation contract', () => {
     })
 
     expect(edition.topBanger.id).toBe('1')
+    expect(edition.executiveSummary).toHaveLength(3)
     expect(edition.stories).toHaveLength(3)
     expect(edition.stories[0]).toMatchObject({
       slug: 'taste',
@@ -161,6 +165,43 @@ describe('daily digest generation contract', () => {
         },
       }),
     ).toThrow('does not occur in the posts')
+  })
+
+  test('rejects an abstract that is not a three- to five-item bullet list', () => {
+    expect(() =>
+      assembleDigestEditionContent({
+        runId: 'run-1',
+        digestDate: '2026-08-12',
+        windowStart: '2026-08-11T12:00:00.000Z',
+        windowEnd: '2026-08-12T12:00:00.000Z',
+        allCandidateCount: 3,
+        enrichedCandidates: candidates,
+        modelOutput: {
+          ...modelOutput,
+          executive_summary: ['Only one summary item.'],
+        },
+      }),
+    ).toThrow('three to five summary bullets')
+  })
+
+  test('rejects subtitles too short to explain the quoted title', () => {
+    expect(() =>
+      assembleDigestEditionContent({
+        runId: 'run-1',
+        digestDate: '2026-08-12',
+        windowStart: '2026-08-11T12:00:00.000Z',
+        windowEnd: '2026-08-12T12:00:00.000Z',
+        allCandidateCount: 3,
+        enrichedCandidates: candidates,
+        modelOutput: {
+          ...modelOutput,
+          stories: [
+            { ...modelOutput.stories[0], subtitle: 'People discussed taste.' },
+            ...modelOutput.stories.slice(1),
+          ],
+        },
+      }),
+    ).toThrow('at least twelve words of explanatory context')
   })
 
   test('rejects fabricated tweet IDs before publication', () => {

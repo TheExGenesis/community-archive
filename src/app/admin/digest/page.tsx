@@ -474,9 +474,13 @@ export default async function DigestLabPage({
                         </SubmitButton>
                       </form>
                     </div>
-                    <p className="mt-5 rounded-md bg-blue-50 p-4 font-serif text-lg leading-8 text-blue-950 dark:bg-blue-950/30 dark:text-blue-100">
-                      {state.activeRun.parsedOutput.executiveSummary}
-                    </p>
+                    <ul className="mt-5 list-disc space-y-2 rounded-md bg-blue-50 py-4 pl-9 pr-4 font-serif text-lg leading-7 text-blue-950 dark:bg-blue-950/30 dark:text-blue-100">
+                      {state.activeRun.parsedOutput.executiveSummary.map(
+                        (bullet) => (
+                          <li key={bullet}>{bullet}</li>
+                        ),
+                      )}
+                    </ul>
                     <div className="mt-5 space-y-4">
                       {state.activeRun.parsedOutput.stories.map((story) => (
                         <article

@@ -18,8 +18,7 @@ prototype.
   and an italic edition standfirst.
 - Main reading column paired with a narrower, rule-separated calendar and
   context rail.
-- Strong story separators, generous vertical rhythm, neutral type labels, and
-  uncropped lead media.
+- Strong story separators, generous vertical rhythm, and neutral type labels.
 - Matching story-detail hierarchy for the headline, bangers, surrounding
   conversation, `In brief`, and editor's note.
 
@@ -29,7 +28,8 @@ prototype.
 - Digest posts still use the canonical `TweetCard`; its new `editorial` variant
   changes presentation only and keeps profiles, links, metrics, archived media,
   videos, quoted tweets, and interaction analytics.
-- Every front-page story has an image from its archived source material.
+- Story media appears in its archived tweet context rather than as a duplicate
+  standalone cover image.
 - Loose editorial labels, verbatim tweet-excerpt titles, linked archive-search
   keywords, calendar navigation, story permalinks, and surrounding quote-post
   commentary remain intact.

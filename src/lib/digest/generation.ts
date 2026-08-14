@@ -25,7 +25,7 @@ interface ModelStory {
 }
 
 interface ParsedModelDigest {
-  executiveSummary: string
+  executiveSummary: string[]
   stories: ModelStory[]
   trendingKeywords: string[]
 }
@@ -91,10 +91,12 @@ function parseModelDigest(
   candidates: EnrichedDigestCandidate[],
 ): ParsedModelDigest {
   if (!isRecord(value)) throw new Error('Digest output is not an object')
-  const executiveSummary = cleanText(value.executive_summary, 600)
+  const executiveSummary = cleanStringArray(value.executive_summary, 5, 220)
   const trendingKeywords = cleanStringArray(value.trending_keywords, 12, 60)
-  if (!executiveSummary || !trendingKeywords) {
-    throw new Error('Digest output has an invalid summary or keyword list')
+  if (!executiveSummary || executiveSummary.length < 3 || !trendingKeywords) {
+    throw new Error(
+      'Digest output must have three to five summary bullets and a valid keyword list',
+    )
   }
   if (
     !Array.isArray(value.stories) ||
@@ -118,7 +120,7 @@ function parseModelDigest(
     const category = cleanCategory(story.category)
     const keyword = cleanText(story.keyword, 60)
     const title = cleanText(story.title, 140)
-    const subtitle = cleanText(story.subtitle, 280)
+    const subtitle = cleanText(story.subtitle, 320)
     const bullets = cleanStringArray(story.bullets, 3, 220)
     const editorialNote = cleanText(story.editorial_note, 360)
     const bangerTweetIds = cleanStringArray(story.banger_tweet_ids, 6, 20)
@@ -138,6 +140,11 @@ function parseModelDigest(
       !commentaryTweetIds
     ) {
       throw new Error(`Story ${index + 1} is incomplete`)
+    }
+    if (subtitle.split(/\s+/).length < 12) {
+      throw new Error(
+        `Story ${index + 1} subtitle must provide at least twelve words of explanatory context`,
+      )
     }
     const titleWordCount = title.split(/\s+/).length
     if (

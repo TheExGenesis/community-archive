@@ -1,9 +1,7 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
 import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
 import type { DigestEdition } from '@/lib/digest/types'
-import { firstStoryMedia } from '@/lib/digest/storyMedia'
 import { buildSearchHref } from '@/lib/searchParams'
 import { MUTED, SERIF } from '@/components/portal/styles'
 
@@ -77,12 +75,16 @@ export function DigestEditionView({
           <div className="mt-7 border-t-[3px] border-zinc-800 dark:border-zinc-200" />
           <div className="mt-[3px] border-t border-zinc-400 dark:border-zinc-600" />
 
-          <p
-            className="mt-7 max-w-[66ch] text-lg italic leading-[1.65] text-zinc-700 [text-wrap:pretty] dark:text-zinc-300 sm:text-[21px]"
+          <ul
+            className="mt-7 max-w-[70ch] list-disc space-y-2.5 pl-6 text-lg italic leading-[1.55] text-zinc-700 marker:text-zinc-400 dark:text-zinc-300 dark:marker:text-zinc-600 sm:text-[20px]"
             style={SERIF}
           >
-            {content.executiveSummary}
-          </p>
+            {content.executiveSummary.map((bullet) => (
+              <li key={bullet} className="pl-1 [text-wrap:pretty]">
+                {bullet}
+              </li>
+            ))}
+          </ul>
         </header>
 
         <div className="mt-12 grid items-start lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-x-14">
@@ -107,7 +109,6 @@ export function DigestEditionView({
 
             <div className="mt-12">
               {content.stories.map((story) => {
-                const media = firstStoryMedia(story)
                 const storyHref = `/digest/${edition.digestDate}/${story.slug}`
 
                 return (
@@ -119,12 +120,6 @@ export function DigestEditionView({
                       <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
                         {story.category ?? 'Story'}
                       </span>
-                      <Link
-                        href={buildSearchHref(story.keyword)}
-                        className="rounded-sm font-semibold text-zinc-700 hover:text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:text-zinc-300"
-                      >
-                        {story.keyword}
-                      </Link>
                     </div>
 
                     <h2
@@ -143,22 +138,6 @@ export function DigestEditionView({
                     >
                       {story.subtitle}
                     </p>
-
-                    {media ? (
-                      <Link
-                        href={storyHref}
-                        className="relative mt-7 block aspect-[16/8] overflow-hidden rounded-[4px] border border-zinc-200 bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-zinc-800"
-                        aria-label={`Read ${story.title}`}
-                      >
-                        <Image
-                          src={media.url}
-                          alt={`Image from ${story.title}`}
-                          fill
-                          sizes="(max-width: 1024px) 100vw, 690px"
-                          className="object-contain transition duration-300 hover:scale-[1.01]"
-                        />
-                      </Link>
-                    ) : null}
 
                     <div className="mt-8">
                       {story.bangers.slice(0, 2).map((tweet) => (

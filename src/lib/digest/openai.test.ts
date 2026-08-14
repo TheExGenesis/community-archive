@@ -29,7 +29,7 @@ describe('OpenAI digest adapter', () => {
           id: 'resp_123',
           model: 'gpt-test',
           output_text:
-            '{"executive_summary":"summary","stories":[],"trending_keywords":[]}',
+            '{"executive_summary":["one","two","three"],"stories":[],"trending_keywords":[]}',
           usage: { input_tokens: 100, output_tokens: 25, total_tokens: 125 },
         }),
         { status: 200 },
@@ -65,10 +65,13 @@ describe('OpenAI digest adapter', () => {
     expect(
       request.text.format.schema.properties.stories.items.required,
     ).toContain('editorial_note')
+    expect(
+      request.text.format.schema.properties.executive_summary,
+    ).toMatchObject({ type: 'array', minItems: 3, maxItems: 5 })
     expect(result).toMatchObject({
       responseId: 'resp_123',
       totalTokens: 125,
-      output: { executive_summary: 'summary' },
+      output: { executive_summary: ['one', 'two', 'three'] },
       outputError: null,
     })
   })

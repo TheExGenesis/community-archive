@@ -38,16 +38,19 @@ Keyword pills link to the existing archive search.
 Story titles are not generated headlines. Each is a three- to eighteen-word
 contiguous excerpt copied verbatim from one supplied banger or quote post. The
 server validates that grounding before an edition can be staged. The generated
-subtitle supplies connective context; the story page keeps source-grounded
-`In brief` bullets and a short editor's note for interpretation or caveats.
+subtitle must supply the people, event, and significance that the source quote
+leaves unstated rather than merely restating it. The story page keeps
+source-grounded `In brief` bullets and a short editor's note for interpretation
+or caveats. The edition abstract is three to five concrete bullet sentences so
+a reader can scan the day's developments before opening a story.
 
 ### Editorial presentation
 
 The public edition adopts a newspaper-like, unboxed reading surface: a ruled
 masthead, large date, italic standfirst, main editorial column, and quiet
 calendar/context sidebar. Stories use strong rules and generous spacing rather
-than independent dashboard cards. Their lead media is shown uncropped, so each
-story has a visual without changing the archived asset.
+than independent dashboard cards. Standalone cover images are omitted; story
+media appears in context inside the canonical tweet cards instead.
 
 Digest tweet presentation is an `editorial` variant of the canonical
 `TweetCard`, not a separate renderer. It changes only the surrounding type,
@@ -130,10 +133,11 @@ Do not expose any of these with a `NEXT_PUBLIC_` prefix. Public digest reads use
 the normal anonymous Supabase client and the `status = 'published'` RLS policy.
 
 The current prompt uses `gpt-5.6-terra`, low reasoning effort, and a 5,000-token
-output ceiling. Its structured output requires one loose editorial label, a
-verbatim title excerpt, source-grounded `In brief` bullets, an editor's note,
-and useful quote-post context. The lab can fork this into a new immutable
-version. It does not modify a prompt referenced by prior runs.
+output ceiling. Its structured output requires a three- to five-item abstract,
+one loose editorial label, a verbatim title excerpt, an explanatory subtitle,
+source-grounded `In brief` bullets, an editor's note, and useful quote-post
+context. The lab can fork this into a new immutable version. It does not modify
+a prompt referenced by prior runs.
 
 ## Rollout gates
 
@@ -142,7 +146,7 @@ daily timer or weekly Substack send is enabled:
 
 1. Apply `20260813000650_add_daily_digest_editorial_workspace.sql` and
    the subsequent Daily Digest prompt-version migrations through
-   `20260814044019_refine_daily_digest_editorial_labels_and_headlines.sql` to
+   `20260814055701_refine_daily_digest_summary_and_subtitles.sql` to
    staging.
 2. Run database security and performance advisors; verify anonymous users can
    read only published rows and cannot call `publish_digest_edition`.

@@ -107,6 +107,12 @@ Staging synchronization is automatic; production synchronization is not:
   gateway lacks a required portal corpus endpoint, add a narrow endpoint rather
   than a production Supabase read fallback. Cache expensive snapshots at an
   interval appropriate to the UI.
+- Keep resilient page fallbacks separate from publicly cacheable analytical API
+  responses. A route that emits `s-maxage` must preserve upstream availability:
+  return a non-cacheable non-2xx response on upstream failure, and never turn a
+  failure into an empty successful payload that the CDN or client will remember
+  as real data. Clients may keep the last successful value, but retryable
+  failures must remain distinguishable from a legitimate empty result.
 - The control-plane query gateway permits only one authenticated `/search` or
   `/analytics/search` request at a time and returns `503` with `Retry-After: 1`
   for overlap. Serialize multi-search fan-out in server callers; this limit does

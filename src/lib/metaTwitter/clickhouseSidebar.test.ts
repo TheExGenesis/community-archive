@@ -77,7 +77,7 @@ test('maps year-scoped ClickHouse media and interactions for the sidebar', async
       people_limit: '8',
       year: '2025',
     }),
-    { timeoutMs: 30_000, revalidate: 86_400 },
+    { timeoutMs: 30_000 },
   )
 })
 
@@ -90,7 +90,7 @@ test('omits the year for the all-time sidebar and rejects scope drift', async ()
   expect(allTimeFetcher).toHaveBeenCalledWith(
     ['user', '42', 'sidebar'],
     new URLSearchParams({ media_limit: '18', people_limit: '8' }),
-    { timeoutMs: 30_000, revalidate: 86_400 },
+    { timeoutMs: 30_000 },
   )
 
   const wrongYearFetcher = jest.fn(async () =>

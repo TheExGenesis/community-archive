@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { unstable_cache } from 'next/cache'
 import {
   fetchAnalyticsGatewayJson,
   type AnalyticsGatewayFetcher,
@@ -139,7 +140,7 @@ export async function fetchClickHouseProfileSidebar(
   const response = await fetcher<SidebarResponse>(
     ['user', accountId, 'sidebar'],
     params,
-    { timeoutMs: 30_000, revalidate: DAY },
+    { timeoutMs: 30_000 },
   )
   if (
     response.query?.accountId !== accountId ||
@@ -152,11 +153,7 @@ export async function fetchClickHouseProfileSidebar(
   const media = response.data?.media
   const people = response.data?.people
   const mediaCount = safeCount(response.data?.mediaCount)
-  if (
-    mediaCount === null ||
-    !Array.isArray(media) ||
-    !Array.isArray(people)
-  ) {
+  if (mediaCount === null || !Array.isArray(media) || !Array.isArray(people)) {
     throw new Error('ClickHouse returned an invalid profile sidebar')
   }
 
@@ -173,12 +170,18 @@ export async function fetchClickHouseProfileSidebar(
   }
 }
 
+const getCachedClickHouseProfileSidebar = unstable_cache(
+  fetchClickHouseProfileSidebar,
+  ['meta-twitter-clickhouse-profile-sidebar-v1'],
+  { revalidate: DAY },
+)
+
 export async function getClickHouseProfileSidebar(
   accountId: string,
   year: number | undefined,
 ): Promise<ClickHouseProfileSidebar> {
   try {
-    return await fetchClickHouseProfileSidebar(accountId, year)
+    return await getCachedClickHouseProfileSidebar(accountId, year)
   } catch (error) {
     devLog('metaTwitter getClickHouseProfileSidebar error', {
       accountId,

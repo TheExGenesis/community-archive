@@ -20,6 +20,8 @@ export interface TopicConfig {
 
 export interface ChapterConfig {
   year: number
+  /** Short evocative chapter title, ideally in the owner's own words */
+  phrase?: string
   /** Short generated description of the era */
   description?: string
   topics: TopicConfig[]
@@ -95,29 +97,34 @@ export const META_TWITTER_PROFILES: Record<string, MetaTwitterProfileConfig> = {
     chapters: [
       {
         year: 2026,
+        phrase: 'my brain opened a new brain',
         description:
           'Building in public, dinners as infrastructure, and a softer internet.',
         topics: [T.cuties, T.community, T.ai, T.friendship],
       },
       {
         year: 2025,
+        phrase: 'barreled along by cuties',
         description: 'The year Cuties went from group chat to institution.',
         topics: [T.cuties, T.friendship, T.community, T.sf],
       },
       {
         year: 2024,
+        phrase: 'oh my god what a love story',
         description:
           'Cuties gets serious, the dating discourse compounds, and the bangers keep landing.',
         topics: [T.cuties, T.dating, T.friendship, T.ai],
       },
       {
         year: 2023,
+        phrase: 'the darling effect',
         description:
           'Peak dating discourse, viral late-twenties wisdom, and the first cuties experiments.',
         topics: [T.dating, T.friendship, T.community, T.art],
       },
       {
         year: 2022,
+        phrase: 'fun, meaningful and interesting work',
         description:
           'Friendship maximalism, art feelings, and the group chat era.',
         topics: [T.friendship, T.art, T.dating, T.ai],

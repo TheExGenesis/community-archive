@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { formatNumber } from '@/lib/formatNumber'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
@@ -99,6 +100,29 @@ export function ProfileHeader({
             {profile.bio}
           </div>
         )}
+
+        {!profile.has_archive && !profile.is_opted_in ? (
+          <div
+            role="note"
+            aria-label="Limited profile"
+            className="bg-muted/45 mt-3 max-w-3xl rounded-lg border border-border px-3.5 py-3 text-sm leading-5 text-muted-foreground"
+          >
+            <span className="font-semibold text-foreground">
+              This person is not a Community Archive user,
+            </span>{' '}
+            so we don&apos;t have their full archive. We only have a limited
+            selection of their tweets—ones that Archive users quoted, replied
+            to, or liked, plus replies this person made in threads involving
+            Archive users. They&apos;re welcome to{' '}
+            <Link
+              href="/profile"
+              className="font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
+            >
+              sign in and opt out
+            </Link>{' '}
+            at any time.
+          </div>
+        ) : null}
 
         <div className="mt-2.5 flex flex-wrap gap-4 text-sm text-muted-foreground">
           {profile.location && <span>📍 {profile.location}</span>}

@@ -50,6 +50,14 @@ test('does not label a non-member or offer an archive download', () => {
   expect(
     screen.queryByRole('link', { name: 'Download archive' }),
   ).not.toBeInTheDocument()
+  expect(
+    screen.getByRole('note', { name: 'Limited profile' }),
+  ).toHaveTextContent(
+    "This person is not a Community Archive user, so we don't have their full archive. We only have a limited selection of their tweets—ones that Archive users quoted, replied to, or liked, plus replies this person made in threads involving Archive users. They're welcome to sign in and opt out at any time.",
+  )
+  expect(
+    screen.getByRole('link', { name: 'sign in and opt out' }),
+  ).toHaveAttribute('href', '/profile')
 })
 
 test('labels an opted-in non-uploader without offering a download', () => {
@@ -64,6 +72,9 @@ test('labels an opted-in non-uploader without offering a download', () => {
   expect(screen.queryByText('Archive contributor')).not.toBeInTheDocument()
   expect(
     screen.queryByRole('link', { name: 'Download archive' }),
+  ).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('note', { name: 'Limited profile' }),
   ).not.toBeInTheDocument()
 })
 
@@ -82,4 +93,7 @@ test('labels an uploader and exposes the archive download', () => {
     'href',
     'https://archive.supabase.co/storage/v1/object/public/archives/alice/archive.json',
   )
+  expect(
+    screen.queryByRole('note', { name: 'Limited profile' }),
+  ).not.toBeInTheDocument()
 })

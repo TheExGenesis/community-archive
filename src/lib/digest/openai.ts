@@ -46,7 +46,10 @@ export const DIGEST_JSON_SCHEMA = {
             enum: DIGEST_STORY_CATEGORIES,
           },
           title: { type: 'string', minLength: 8, maxLength: 110 },
-          subtitle: { type: 'string', minLength: 60, maxLength: 150 },
+          // A subtitle should remain concise, but this transport limit must
+          // leave room for a complete sentence. Some structured-output
+          // providers satisfy a tight maxLength by clipping the prose.
+          subtitle: { type: 'string', minLength: 60, maxLength: 500 },
           bullets: {
             type: 'array',
             minItems: 1,

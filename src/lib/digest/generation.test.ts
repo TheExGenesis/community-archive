@@ -238,7 +238,34 @@ describe('daily digest generation contract', () => {
     })
 
     expect(edition.editorialWarnings).toContain(
-      'Story 1 subtitle is outside the 60–150 character target.',
+      'Story 1 subtitle is outside the 60–320 character target.',
+    )
+  })
+
+  test('preserves a complete subtitle beyond the old 150-character schema cap', () => {
+    const subtitle =
+      'Thebes argued that image and video labs optimized their models to replace artists rather than collaborate with them, framing the newest releases as evidence that the same incentive pattern is continuing.'
+    expect(subtitle.length).toBeGreaterThan(150)
+
+    const edition = assembleDigestEditionContent({
+      runId: 'run-1',
+      digestDate: '2026-08-12',
+      windowStart: '2026-08-11T12:00:00.000Z',
+      windowEnd: '2026-08-12T12:00:00.000Z',
+      allCandidateCount: 3,
+      enrichedCandidates: candidates,
+      modelOutput: {
+        ...modelOutput,
+        stories: [
+          { ...modelOutput.stories[0], subtitle },
+          ...modelOutput.stories.slice(1),
+        ],
+      },
+    })
+
+    expect(edition.stories[0].subtitle).toBe(subtitle)
+    expect(edition.editorialWarnings).not.toContain(
+      'Story 1 subtitle is outside the 60–320 character target.',
     )
   })
 

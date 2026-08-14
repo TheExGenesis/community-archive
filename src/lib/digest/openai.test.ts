@@ -102,6 +102,9 @@ describe('OpenAI digest adapter', () => {
     expect(
       request.text.format.schema.properties.executive_summary.items,
     ).toMatchObject({ minLength: 35, maxLength: 200 })
+    expect(
+      request.text.format.schema.properties.stories.items.properties.subtitle,
+    ).toMatchObject({ minLength: 60, maxLength: 500 })
     expect(result).toMatchObject({
       responseId: 'resp_123',
       totalTokens: 125,

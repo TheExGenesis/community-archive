@@ -85,7 +85,7 @@ export function DigestContentFields({
                 name={`story_${storyIndex}_subtitle`}
                 label="Explanatory subtitle"
                 defaultValue={story.subtitle}
-                maxLength={320}
+                maxLength={500}
               />
             </div>
             <div className="mt-4 grid gap-3">

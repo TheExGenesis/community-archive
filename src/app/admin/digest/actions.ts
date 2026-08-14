@@ -91,7 +91,7 @@ function parseEditedDigestContent(
     )
     const subtitle = formString(formData, `story_${storyIndex}_subtitle`).slice(
       0,
-      320,
+      500,
     )
     const editorialNote = formString(
       formData,

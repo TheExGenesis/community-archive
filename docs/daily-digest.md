@@ -181,9 +181,11 @@ reply/quote context before reporting a claim as news; likely satire and
 shitposts must be treated as jokes or memes. It prefers the top-ranked banger
 as representative while allowing a more iconic choice. The lab can fork this
 into a new immutable version; prior runs keep their exact prompt and provider
-configuration. Summary bullets target 140 characters, while the transport
-schema allows up to 200 so a provider never satisfies the limit by clipping a
-catch-all sentence mid-word.
+configuration. Summary bullets target 140 characters while the transport
+schema allows up to 200. Subtitles prioritize one complete explanatory sentence
+over a fixed character target, with 500 characters of transport and editing
+headroom. These looser transport limits prevent a provider from satisfying the
+schema by clipping prose.
 
 ## Rollout gates
 
@@ -195,7 +197,7 @@ daily timer or weekly Substack send is enabled:
    `20260814062256_add_single_call_indexed_deepseek_digest_prompt.sql`,
    `20260814165156_add_digest_workflow_run_id.sql`, and
    `20260814180703_refine_daily_digest_editorial_workflow.sql` through
-   `20260814182657_index_digest_editions_source_run.sql` to staging.
+   `20260814212342_allow_complete_digest_subtitles.sql` to staging.
 2. Run database security and performance advisors; verify anonymous users can
    read only published rows and cannot call `publish_digest_edition`.
 3. Produce representative weekday and weekend runs, including sparse and noisy

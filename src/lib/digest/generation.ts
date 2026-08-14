@@ -147,7 +147,7 @@ function parseModelDigest(
     if (!isRecord(story)) throw new Error(`Story ${index + 1} is invalid`)
     const category = cleanCategory(story.category)
     const title = cleanText(story.title, 300)
-    const subtitle = cleanText(story.subtitle, 320)
+    const subtitle = cleanText(story.subtitle, 500)
     const bullets = cleanStringArray(story.bullets, 3, 220)
     const editorialNote = cleanText(story.editorial_note, 360)
     const tweetIndices = cleanIndexArray(story.tweet_indices, 18)
@@ -188,9 +188,9 @@ function parseModelDigest(
         `Story ${index + 1} title is a paraphrase rather than an exact tweet excerpt.`,
       )
     }
-    if (subtitle.length < 60 || subtitle.length > 150) {
+    if (subtitle.length < 60 || subtitle.length > 320) {
       editorialWarnings.push(
-        `Story ${index + 1} subtitle is outside the 60–150 character target.`,
+        `Story ${index + 1} subtitle is outside the 60–320 character target.`,
       )
     }
     for (const { tweetId } of bangerRows) {

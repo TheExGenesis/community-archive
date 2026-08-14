@@ -331,13 +331,12 @@ export async function fetchPortalTrendEvidence(
     includeTerms.map(
       (term) => () =>
         fetcher<ClickHouseSearchResponse>(
-          ['search'],
+          ['trend-evidence'],
           (() => {
             const params = new URLSearchParams({
               q: term,
               mode: 'all',
               limit: String(candidateLimit),
-              offset: '0',
             })
             if (since) params.set('since', since)
             if (until) params.set('until', until)
@@ -346,8 +345,8 @@ export async function fetchPortalTrendEvidence(
           { timeoutMs: 30_000 },
         ),
     ),
-    // The current query gateway intentionally serializes corpus searches.
-    // Keep evidence requests ordered while trend aggregation stays concurrent.
+    // The gateway composes cached calendar shards but still serializes a cold
+    // ClickHouse search. Keep multi-term evidence requests ordered.
     1,
   )
 

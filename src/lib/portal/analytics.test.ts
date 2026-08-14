@@ -268,6 +268,7 @@ describe('ClickHouse-backed portal analytics', () => {
     )
 
     expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(fetcherMock.mock.calls[0]?.[0]).toEqual(['trend-evidence'])
     expect(result.map(({ id }) => id)).toEqual(['102', '101', '100'])
     expect(fetcherMock.mock.calls[0]?.[1]?.toString()).toContain(
       'since=2024-01-01&until=2026-01-01',

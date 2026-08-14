@@ -65,6 +65,19 @@ describe('ClickHouse staging lab guard', () => {
     )
   })
 
+  test('allows only bounded trend-evidence parameters', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['trend-evidence'],
+      new URLSearchParams(
+        'q=tpot&mode=all&since=2024-01-01&until=2026-01-01&limit=50&offset=40',
+      ),
+      'https://analytics.example',
+    )
+    expect(target.toString()).toBe(
+      'https://analytics.example/trend-evidence?q=tpot&mode=all&since=2024-01-01&until=2026-01-01&limit=50',
+    )
+  })
+
   test('routes public search to its dedicated ClickHouse gateway', () => {
     expect(
       clickHouseSearchGatewayBaseUrl(

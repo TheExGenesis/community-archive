@@ -16,7 +16,7 @@ const RUNS = 5
 const ROOT_ENV = resolve(process.cwd(), '..', '.env')
 const PROMPT_MIGRATION = resolve(
   process.cwd(),
-  'supabase/migrations/20260814212342_allow_complete_digest_subtitles.sql',
+  'supabase/migrations/20260814215420_preserve_community_weighting_with_complete_subtitles.sql',
 )
 const OUTPUT_PATH = resolve(
   process.cwd(),

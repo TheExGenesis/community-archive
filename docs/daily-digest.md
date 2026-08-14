@@ -197,7 +197,8 @@ daily timer or weekly Substack send is enabled:
    `20260814062256_add_single_call_indexed_deepseek_digest_prompt.sql`,
    `20260814165156_add_digest_workflow_run_id.sql`, and
    `20260814180703_refine_daily_digest_editorial_workflow.sql` through
-   `20260814212342_allow_complete_digest_subtitles.sql` to staging.
+   `20260814215420_preserve_community_weighting_with_complete_subtitles.sql`
+   to staging.
 2. Run database security and performance advisors; verify anonymous users can
    read only published rows and cannot call `publish_digest_edition`.
 3. Produce representative weekday and weekend runs, including sparse and noisy

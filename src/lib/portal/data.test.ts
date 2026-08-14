@@ -254,6 +254,15 @@ describe('portal page resilience', () => {
     expect(fetchPortalRecentBangersMock).toHaveBeenCalledWith(50, 168)
   })
 
+  test('does not load trend analysis for the live stream page', async () => {
+    await expect(getPortalData('stream')).resolves.toMatchObject({
+      trends: { years: [], series: [], weekly: [], computedAt: '' },
+      failures: { trends: false },
+    })
+
+    expect(fetchPortalTrendsMock).not.toHaveBeenCalled()
+  })
+
   test('preserves other components when the trends request fails', async () => {
     fetchPortalTrendsMock.mockRejectedValueOnce(
       new Error('trend snapshot unavailable'),

@@ -47,12 +47,41 @@ describe('portal stream route', () => {
     })
     await expect(response.json()).resolves.toEqual(
       expect.objectContaining({
+        backlogTruncated: false,
         updateCursor: {
           observedAt: '2026-08-07T12:01:00.000Z',
           id: '123',
         },
       }),
     )
+  })
+
+  test('marks a full observation page as a truncated backlog', async () => {
+    getPortalStreamUpdatesMock.mockResolvedValue(
+      Array.from({ length: 100 }, (_, index) => ({
+        id: String(1_000 + index),
+        username: 'alice',
+        name: 'Alice',
+        avatar: null,
+        text: `update ${index}`,
+        observedAt: new Date(
+          Date.parse('2026-08-07T12:01:00.000Z') + index,
+        ).toISOString(),
+        createdAt: '2026-08-07T11:00:00.000Z',
+        likes: 1,
+        rts: 0,
+      })),
+    )
+
+    const response = await GET(
+      new NextRequest(
+        'https://community-archive.org/api/portal/stream?after=2026-08-07T12%3A00%3A00.000Z&afterId=100',
+      ),
+    )
+
+    await expect(response.json()).resolves.toMatchObject({
+      backlogTruncated: true,
+    })
   })
 
   test('returns an older authored-time page and its continuation cursor', async () => {
@@ -79,6 +108,9 @@ describe('portal stream route', () => {
       createdAt: '2026-08-07T12:00:00.000Z',
       id: '201',
     })
+    expect(response.headers.get('cache-control')).toBe(
+      'public, s-maxage=15, stale-while-revalidate=30',
+    )
     await expect(response.json()).resolves.toMatchObject({
       tweets: expect.arrayContaining([expect.objectContaining({ id: '200' })]),
       nextCursor: {
@@ -87,6 +119,16 @@ describe('portal stream route', () => {
       },
       hasMore: true,
     })
+  })
+
+  test('does not cache the current stream head', async () => {
+    getPortalStreamPageMock.mockResolvedValue([])
+
+    const response = await GET(
+      new NextRequest('https://community-archive.org/api/portal/stream'),
+    )
+
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
   })
 
   test('rejects malformed cursors before reading data', async () => {

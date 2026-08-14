@@ -22,6 +22,8 @@ export interface ArchiveTweet {
 export interface BangerTweet extends ArchiveTweet {
   quote_count: number
   quoting_accounts: number
+  quote_tweet_id?: string | null
+  quoted_tweet?: ArchiveTweet | null
 }
 
 export interface ArchiveMediaItem {

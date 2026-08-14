@@ -21,6 +21,31 @@ const banger = (tweetId: string, quoteCount: string, year: number) => ({
       height: '800',
     },
   ],
+  quoteTweetId: tweetId === '100' ? '200' : null,
+  quotedTweet:
+    tweetId === '100'
+      ? {
+          tweetId: '200',
+          accountId: '77',
+          username: 'quoted_member',
+          accountDisplayName: 'Quoted Member',
+          avatarMediaUrl:
+            'https://pbs.twimg.com/profile_images/77/quoted_normal.jpg',
+          createdAt: '2024-12-31 23:59:00.000',
+          fullText: 'The quoted source',
+          favoriteCount: '70',
+          retweetCount: '6',
+          replyToUsername: null,
+          media: [
+            {
+              mediaUrl: 'https://pbs.twimg.com/media/quoted.jpg',
+              mediaType: 'photo',
+              width: '900',
+              height: '600',
+            },
+          ],
+        }
+      : null,
 })
 
 test('loads every scoped page of profile bangers above the quote threshold', async () => {
@@ -69,6 +94,23 @@ test('loads every scoped page of profile bangers above the quote threshold', asy
             height: 800,
           },
         ],
+        quote_tweet_id: '200',
+        quoted_tweet: expect.objectContaining({
+          tweet_id: '200',
+          account_id: '77',
+          username: 'quoted_member',
+          avatar_media_url:
+            'https://pbs.twimg.com/profile_images/77/quoted_400x400.jpg',
+          full_text: 'The quoted source',
+          media: [
+            {
+              media_url: 'https://pbs.twimg.com/media/quoted.jpg',
+              media_type: 'photo',
+              width: 900,
+              height: 600,
+            },
+          ],
+        }),
       }),
       expect.objectContaining({ tweet_id: '101', quote_count: 5 }),
       expect.objectContaining({ tweet_id: '102', quote_count: 2 }),
@@ -110,5 +152,44 @@ test('refuses an unscoped legacy gateway response', async () => {
 
   await expect(fetchProfileBangers('42', fetcher)).rejects.toThrow(
     'does not support scoped profile bangers yet',
+  )
+})
+
+test('preserves a dangling quoted-tweet ID for the deleted-card placeholder', async () => {
+  const row = { ...banger('100', '8', 2025), quotedTweet: null }
+  const fetcher = jest.fn(async () => ({
+    data: [row],
+    pagination: {
+      nextOffset: null,
+      totalAvailable: 1,
+      yearCounts: [{ year: 2025, count: 1 }],
+    },
+    query: { targetAccountId: '42', minQuoteCount: 2 },
+  })) as unknown as AnalyticsGatewayFetcher
+
+  await expect(fetchProfileBangers('42', fetcher)).resolves.toMatchObject({
+    tweets: [{ quote_tweet_id: '200', quoted_tweet: null }],
+  })
+})
+
+test('rejects mismatched quoted-tweet content', async () => {
+  const row = banger('100', '8', 2025)
+  const fetcher = jest.fn(async () => ({
+    data: [
+      {
+        ...row,
+        quotedTweet: { ...row.quotedTweet, tweetId: '201' },
+      },
+    ],
+    pagination: {
+      nextOffset: null,
+      totalAvailable: 1,
+      yearCounts: [{ year: 2025, count: 1 }],
+    },
+    query: { targetAccountId: '42', minQuoteCount: 2 },
+  })) as unknown as AnalyticsGatewayFetcher
+
+  await expect(fetchProfileBangers('42', fetcher)).rejects.toThrow(
+    'mismatched quoted tweet content',
   )
 })

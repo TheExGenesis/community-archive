@@ -41,6 +41,30 @@ const tweets: BangerTweet[] = Array.from({ length: 13 }, (_, index) => ({
       : [],
   quote_count: 20 - index,
   quoting_accounts: 20 - index,
+  quote_tweet_id: index === 0 ? '200' : null,
+  quoted_tweet:
+    index === 0
+      ? {
+          tweet_id: '200',
+          account_id: '77',
+          created_at: '2024-12-31T23:59:00.000Z',
+          full_text: 'The quoted source',
+          favorite_count: 70,
+          retweet_count: 6,
+          reply_to_username: null,
+          username: 'quoted_member',
+          account_display_name: 'Quoted Member',
+          avatar_media_url: null,
+          media: [
+            {
+              media_url: 'https://example.com/quoted.jpg',
+              media_type: 'photo',
+              width: 900,
+              height: 600,
+            },
+          ],
+        }
+      : null,
 }))
 
 test('shows canonical banger cards progressively with media and evidence', async () => {
@@ -64,9 +88,14 @@ test('shows canonical banger cards progressively with media and evidence', async
       name: '20 archived quotes. Open tweet to see them.',
     }),
   ).toBeInTheDocument()
-  expect(screen.getByTestId('tweet-image')).toHaveAttribute(
+  expect(screen.getAllByTestId('tweet-image')[0]).toHaveAttribute(
     'data-src',
     'https://example.com/banger.jpg',
+  )
+  expect(screen.getByText('The quoted source')).toBeVisible()
+  expect(screen.getAllByTestId('tweet-image')[1]).toHaveAttribute(
+    'data-src',
+    'https://example.com/quoted.jpg',
   )
   expect(screen.getByText('100 likes')).toHaveClass('sr-only')
   expect(screen.getByText('10 reposts')).toHaveClass('sr-only')

@@ -1,7 +1,11 @@
-import type { BangerTweet } from './types'
-import type { PortalMedia, PortalTweet } from '@/lib/portal/types'
+import type { ArchiveTweet, BangerTweet } from './types'
+import type {
+  PortalMedia,
+  PortalQuotedTweet,
+  PortalTweet,
+} from '@/lib/portal/types'
 
-function portalMedia(tweet: BangerTweet): PortalMedia[] {
+function portalMedia(tweet: ArchiveTweet): PortalMedia[] {
   return tweet.media.flatMap((item): PortalMedia[] => {
     if (!item.media_url || !item.media_type) return []
 
@@ -14,6 +18,37 @@ function portalMedia(tweet: BangerTweet): PortalMedia[] {
       },
     ]
   })
+}
+
+function portalQuotedTweet(tweet: BangerTweet): PortalQuotedTweet | undefined {
+  if (tweet.quoted_tweet) {
+    const quoted = tweet.quoted_tweet
+    return {
+      id: quoted.tweet_id,
+      accountId: quoted.account_id,
+      username: quoted.username,
+      name: quoted.account_display_name,
+      avatar: quoted.avatar_media_url,
+      text: quoted.full_text,
+      createdAt: quoted.created_at,
+      likes: quoted.favorite_count,
+      rts: quoted.retweet_count ?? 0,
+      media: portalMedia(quoted),
+    }
+  }
+  if (!tweet.quote_tweet_id) return undefined
+  return {
+    id: tweet.quote_tweet_id,
+    username: '',
+    name: '',
+    avatar: null,
+    text: '',
+    createdAt: tweet.created_at,
+    likes: 0,
+    rts: 0,
+    media: [],
+    isDeleted: true,
+  }
 }
 
 /**
@@ -37,6 +72,7 @@ export function bangerPortalTweet(
     likes: tweet.favorite_count,
     rts: tweet.retweet_count ?? 0,
     media: portalMedia(tweet),
+    quotedTweet: portalQuotedTweet(tweet),
     quoteCount: tweet.quote_count,
   }
 }

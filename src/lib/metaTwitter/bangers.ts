@@ -27,6 +27,22 @@ interface TopQuoteRow {
   favoriteCount?: unknown
   retweetCount?: unknown
   media?: unknown
+  quoteTweetId?: unknown
+  quotedTweet?: unknown
+}
+
+interface QuotedTweetRow {
+  tweetId?: unknown
+  accountId?: unknown
+  username?: unknown
+  accountDisplayName?: unknown
+  avatarMediaUrl?: unknown
+  createdAt?: unknown
+  fullText?: unknown
+  favoriteCount?: unknown
+  retweetCount?: unknown
+  replyToUsername?: unknown
+  media?: unknown
 }
 
 interface TopQuoteMediaRow {
@@ -97,6 +113,52 @@ const mapMedia = (value: unknown): BangerTweet['media'][number] => {
   }
 }
 
+const mapQuotedTweet = (
+  value: unknown,
+): NonNullable<BangerTweet['quoted_tweet']> => {
+  const row = value as QuotedTweetRow
+  if (
+    typeof row.tweetId !== 'string' ||
+    !TWEET_ID_PATTERN.test(row.tweetId) ||
+    typeof row.accountId !== 'string' ||
+    !ACCOUNT_ID_PATTERN.test(row.accountId) ||
+    typeof row.username !== 'string' ||
+    !row.username ||
+    typeof row.fullText !== 'string'
+  ) {
+    throw new Error('ClickHouse returned an invalid quoted banger tweet')
+  }
+  return {
+    tweet_id: row.tweetId,
+    account_id: row.accountId,
+    created_at: safeTimestamp(row.createdAt),
+    full_text: row.fullText,
+    favorite_count: safeCount(
+      row.favoriteCount,
+      'quoted banger favorite count',
+    ),
+    retweet_count: safeCount(
+      row.retweetCount,
+      'quoted banger repost count',
+    ),
+    reply_to_username:
+      typeof row.replyToUsername === 'string' && row.replyToUsername
+        ? row.replyToUsername
+        : null,
+    username: row.username,
+    account_display_name:
+      typeof row.accountDisplayName === 'string' && row.accountDisplayName
+        ? row.accountDisplayName
+        : row.username,
+    avatar_media_url: getHighResolutionAvatarUrl(
+      typeof row.avatarMediaUrl === 'string' && row.avatarMediaUrl
+        ? row.avatarMediaUrl
+        : null,
+    ) ?? null,
+    media: Array.isArray(row.media) ? row.media.map(mapMedia) : [],
+  }
+}
+
 const mapBanger = (value: unknown, accountId: string): BangerTweet => {
   const row = value as TopQuoteRow
   if (
@@ -114,6 +176,28 @@ const mapBanger = (value: unknown, accountId: string): BangerTweet => {
     throw new Error(
       'ClickHouse returned a banger below the requested threshold',
     )
+  }
+  if (
+    !Object.prototype.hasOwnProperty.call(row, 'quoteTweetId') ||
+    !Object.prototype.hasOwnProperty.call(row, 'quotedTweet')
+  ) {
+    throw new Error('ClickHouse returned an incomplete banger card package')
+  }
+  const quoteTweetId =
+    row.quoteTweetId === null || row.quoteTweetId === undefined
+      ? null
+      : typeof row.quoteTweetId === 'string' &&
+          TWEET_ID_PATTERN.test(row.quoteTweetId)
+        ? row.quoteTweetId
+        : (() => {
+            throw new Error('ClickHouse returned an invalid quoted tweet ID')
+          })()
+  const quotedTweet =
+    row.quotedTweet === null || row.quotedTweet === undefined
+      ? null
+      : mapQuotedTweet(row.quotedTweet)
+  if (quotedTweet && quotedTweet.tweet_id !== quoteTweetId) {
+    throw new Error('ClickHouse returned mismatched quoted tweet content')
   }
   return {
     tweet_id: row.tweetId,
@@ -139,6 +223,8 @@ const mapBanger = (value: unknown, accountId: string): BangerTweet => {
       row.quotingAccounts,
       'banger quoting-account count',
     ),
+    quote_tweet_id: quoteTweetId,
+    quoted_tweet: quotedTweet,
   }
 }
 
@@ -237,7 +323,7 @@ export async function fetchProfileBangers(
 
 const getCachedProfileBangers = unstable_cache(
   fetchProfileBangers,
-  ['meta-twitter-profile-bangers-v1'],
+  ['meta-twitter-profile-bangers-v2'],
   { revalidate: 300 },
 )
 

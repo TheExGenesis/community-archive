@@ -111,11 +111,16 @@ test('shows the initial canonical banger cards with media and profile return lin
     name: 'How banger score works',
   })
   expect(scoreInfo).toBeVisible()
-  await user.hover(scoreInfo)
-  const scoreExplanations = await screen.findAllByText(BANGER_SCORE_EXPLANATION)
-  expect(
-    scoreExplanations.find((element) => element.getAttribute('role') === null),
-  ).toBeVisible()
+  const scoreExplanation = screen.getByRole('tooltip')
+  expect(scoreInfo).toHaveAttribute(
+    'aria-describedby',
+    'profile-banger-score-description',
+  )
+  expect(scoreExplanation).toHaveTextContent(BANGER_SCORE_EXPLANATION)
+  expect(scoreExplanation).toHaveClass(
+    'group-hover:opacity-100',
+    'group-focus-within:opacity-100',
+  )
 
   expect(
     screen.getByRole('link', {

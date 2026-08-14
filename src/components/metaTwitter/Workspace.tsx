@@ -5,12 +5,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Info } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { getSmallAvatarUrl } from '@/lib/avatar'
 import { formatNumber } from '@/lib/formatNumber'
 import { bangerPortalTweet } from '@/lib/metaTwitter/bangerPortalTweet'
@@ -84,22 +78,23 @@ export function Workspace({
           <h2 id="profile-bangers-heading" className="text-xl font-extrabold">
             {contextTitle}
           </h2>
-          <TooltipProvider delayDuration={150}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="How banger score works"
-                  className="inline-flex h-5 w-5 flex-none items-center justify-center rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                >
-                  <Info className="h-3 w-3" aria-hidden="true" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs text-xs">
-                {BANGER_SCORE_EXPLANATION}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <span className="group relative flex-none">
+            <button
+              type="button"
+              aria-label="How banger score works"
+              aria-describedby="profile-banger-score-description"
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              <Info className="h-3 w-3" aria-hidden="true" />
+            </button>
+            <span
+              id="profile-banger-score-description"
+              role="tooltip"
+              className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-72 max-w-[calc(100vw-3rem)] rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+            >
+              {BANGER_SCORE_EXPLANATION}
+            </span>
+          </span>
         </div>
         <label className="flex shrink-0 items-center gap-2 text-[13px] text-muted-foreground">
           <span className="sr-only">Sort bangers</span>

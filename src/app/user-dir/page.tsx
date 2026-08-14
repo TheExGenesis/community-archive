@@ -287,7 +287,7 @@ export default function UserDirectoryPage() {
                     <div className="flex min-w-0 items-center gap-3">
                       <Avatar className="h-11 w-11 border border-border">
                         <AvatarImage
-                          src={user.avatar_media_url || '/placeholder.jpg'}
+                          src={user.avatar_media_url || undefined}
                           alt={`${user.account_display_name}'s avatar`}
                         />
                         <AvatarFallback>

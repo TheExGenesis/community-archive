@@ -5,7 +5,6 @@ import {
   fetchAnalyticsGatewayJson,
   type AnalyticsGatewayFetcher,
 } from '@/lib/clickhouseGateway'
-import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 import { devLog } from '@/lib/devLog'
 import type { ArchiveMediaItem, ArchivePerson } from './types'
 
@@ -121,9 +120,9 @@ const personItem = (value: unknown): ArchivePerson | null => {
         : null,
     interactions,
     avatar_media_url:
-      getHighResolutionAvatarUrl(
-        typeof row.avatarUrl === 'string' ? row.avatarUrl : null,
-      ) ?? null,
+      typeof row.avatarUrl === 'string' && row.avatarUrl.trim()
+        ? row.avatarUrl
+        : null,
     in_archive: true,
   }
 }

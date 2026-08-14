@@ -223,6 +223,7 @@ export default function ClickHouseUserClient({
                 <AvatarImage
                   src={account.avatarUrl || undefined}
                   alt={`@${account.username}`}
+                  avatarSize="high"
                 />
                 <AvatarFallback className="text-3xl">
                   {(account.displayName || account.username || '?')

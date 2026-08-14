@@ -1,6 +1,8 @@
 import Image from 'next/image'
+import type { ReactNode } from 'react'
 import { formatNumber } from '@/lib/formatNumber'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
+import { ProfileAvatar } from './ProfileAvatar'
 
 const monthYear = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', {
@@ -20,9 +22,11 @@ const Stat = ({ value, label }: { value: number | null; label: string }) =>
 export function ProfileHeader({
   profile,
   archivedAt,
+  archivedAtSlot,
 }: {
   profile: ProfileHeaderData
   archivedAt: string | null
+  archivedAtSlot?: ReactNode
 }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const archiveUrl =
@@ -49,20 +53,11 @@ export function ProfileHeader({
       </div>
       <div className="px-4 pb-4 sm:px-6">
         <div className="flex items-start justify-between gap-3">
-          {profile.avatar_media_url ? (
-            <Image
-              src={profile.avatar_media_url}
-              alt={`${profile.account_display_name}'s avatar`}
-              width={132}
-              height={132}
-              priority
-              className="relative z-10 -mt-[66px] h-[132px] w-[132px] rounded-full border-4 border-card bg-muted object-cover"
-            />
-          ) : (
-            <div className="relative z-10 -mt-[66px] grid h-[132px] w-[132px] place-items-center rounded-full border-4 border-card bg-muted text-4xl font-bold">
-              {profile.account_display_name.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <ProfileAvatar
+            accountId={profile.account_id}
+            avatarUrl={profile.avatar_media_url}
+            displayName={profile.account_display_name}
+          />
           <div className="flex flex-wrap justify-end gap-2 pt-3.5">
             {archiveUrl && (
               <a
@@ -89,9 +84,11 @@ export function ProfileHeader({
           <h1 className="text-xl font-extrabold">
             {profile.account_display_name}
           </h1>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-            {profile.has_archive ? 'Archive contributor' : 'Community member'}
-          </span>
+          {(profile.has_archive || profile.is_opted_in) && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+              {profile.has_archive ? 'Archive contributor' : 'Community member'}
+            </span>
+          )}
         </div>
         <div className="text-[15px] text-muted-foreground">
           @{profile.username}
@@ -108,7 +105,11 @@ export function ProfileHeader({
           {profile.created_at && (
             <span>📅 Joined {monthYear(profile.created_at)}</span>
           )}
-          {archivedAt && <span>🗄️ Archived {monthYear(archivedAt)}</span>}
+          {archivedAt ? (
+            <span>🗄️ Archived {monthYear(archivedAt)}</span>
+          ) : (
+            archivedAtSlot
+          )}
         </div>
 
         <div className="mt-2.5 flex flex-wrap gap-[18px] text-sm">

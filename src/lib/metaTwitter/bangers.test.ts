@@ -48,6 +48,16 @@ const banger = (tweetId: string, quoteCount: string, year: number) => ({
       : null,
 })
 
+const queryScope = (sort: 'quotes' | 'likes' = 'quotes', year?: number) => ({
+  targetAccountId: '42',
+  minQuoteCount: 2,
+  excludeSelf: true,
+  targetCommunityUsersOnly: false,
+  quoteCommunityUsersOnly: true,
+  sort,
+  ...(year === undefined ? {} : { year }),
+})
+
 test('loads every scoped page of profile bangers above the quote threshold', async () => {
   const fetcher = jest.fn(async (_path: string[], params: URLSearchParams) => {
     const offset = params.get('offset')
@@ -64,11 +74,7 @@ test('loads every scoped page of profile bangers above the quote threshold', asy
             { year: 2024, count: 2 },
           ],
         },
-        query: {
-          targetAccountId: '42',
-          minQuoteCount: 2,
-          sort: 'quotes',
-        },
+        query: queryScope(),
       }
     }
     return {
@@ -83,11 +89,7 @@ test('loads every scoped page of profile bangers above the quote threshold', asy
           { year: 2024, count: 2 },
         ],
       },
-      query: {
-        targetAccountId: '42',
-        minQuoteCount: 2,
-        sort: 'quotes',
-      },
+      query: queryScope(),
     }
   }) as unknown as AnalyticsGatewayFetcher
 
@@ -144,7 +146,7 @@ test('loads every scoped page of profile bangers above the quote threshold', asy
       target_account_id: '42',
       min_quote_count: '2',
       exclude_self: 'true',
-      target_ca_users_only: 'true',
+      target_ca_users_only: 'false',
       quote_ca_users_only: 'true',
     }),
     { timeoutMs: 30_000 },
@@ -164,12 +166,7 @@ test('loads one year-scoped page with deterministic server sorting', async () =>
         { year: 2024, count: 2 },
       ],
     },
-    query: {
-      targetAccountId: '42',
-      minQuoteCount: 2,
-      sort: 'likes',
-      year: 2025,
-    },
+    query: queryScope('likes', 2025),
   })) as unknown as AnalyticsGatewayFetcher
 
   await expect(
@@ -192,7 +189,7 @@ test('loads one year-scoped page with deterministic server sorting', async () =>
       target_account_id: '42',
       min_quote_count: '2',
       exclude_self: 'true',
-      target_ca_users_only: 'true',
+      target_ca_users_only: 'false',
       quote_ca_users_only: 'true',
       year: '2025',
     }),
@@ -218,6 +215,27 @@ test('refuses an unscoped legacy gateway response', async () => {
   )
 })
 
+test('refuses a gateway that silently keeps the target member-only', async () => {
+  const fetcher = jest.fn(async () => ({
+    data: [banger('100', '8', 2025)],
+    pagination: {
+      limit: 100,
+      offset: 0,
+      nextOffset: null,
+      totalAvailable: 1,
+      yearCounts: [{ year: 2025, count: 1 }],
+    },
+    query: {
+      ...queryScope(),
+      targetCommunityUsersOnly: true,
+    },
+  })) as unknown as AnalyticsGatewayFetcher
+
+  await expect(fetchProfileBangers('42', fetcher)).rejects.toThrow(
+    'mismatched profile banger scope',
+  )
+})
+
 test('refuses a gateway response sorted differently from the requested page', async () => {
   const fetcher = jest.fn(async () => ({
     data: [banger('100', '8', 2025)],
@@ -228,12 +246,7 @@ test('refuses a gateway response sorted differently from the requested page', as
       totalAvailable: 1,
       yearCounts: [{ year: 2025, count: 1 }],
     },
-    query: {
-      targetAccountId: '42',
-      minQuoteCount: 2,
-      sort: 'quotes',
-      year: 2025,
-    },
+    query: queryScope('quotes', 2025),
   })) as unknown as AnalyticsGatewayFetcher
 
   await expect(
@@ -256,11 +269,7 @@ test('preserves a dangling quoted-tweet ID for the deleted-card placeholder', as
       totalAvailable: 1,
       yearCounts: [{ year: 2025, count: 1 }],
     },
-    query: {
-      targetAccountId: '42',
-      minQuoteCount: 2,
-      sort: 'quotes',
-    },
+    query: queryScope(),
   })) as unknown as AnalyticsGatewayFetcher
 
   await expect(fetchProfileBangers('42', fetcher)).resolves.toMatchObject({
@@ -284,11 +293,7 @@ test('rejects mismatched quoted-tweet content', async () => {
       totalAvailable: 1,
       yearCounts: [{ year: 2025, count: 1 }],
     },
-    query: {
-      targetAccountId: '42',
-      minQuoteCount: 2,
-      sort: 'quotes',
-    },
+    query: queryScope(),
   })) as unknown as AnalyticsGatewayFetcher
 
   await expect(fetchProfileBangers('42', fetcher)).rejects.toThrow(

@@ -56,12 +56,12 @@ describe('ClickHouse staging lab guard', () => {
     const target = analyticsGatewayRequestUrl(
       ['search'],
       new URLSearchParams(
-        'q=open+source&mode=phrase&from_user=alice&sort=likes&limit=20&offset=40&raw_sql=DROP',
+        'q=open+source&mode=phrase&from_user=alice&limit=1&offset=0&preview=true&exclude_retweets=true&raw_sql=DROP',
       ),
       'https://analytics.example',
     )
     expect(target.toString()).toBe(
-      'https://analytics.example/search?q=open+source&mode=phrase&from_user=alice&sort=likes&limit=20&offset=40',
+      'https://analytics.example/search?q=open+source&mode=phrase&from_user=alice&limit=1&offset=0&preview=true&exclude_retweets=true',
     )
   })
 

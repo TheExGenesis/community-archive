@@ -13,7 +13,11 @@ import {
   fetchTweets,
   type TweetSearchSort,
 } from '@/lib/queries/tweetQueries'
-import { AlertCircle } from 'lucide-react'
+import {
+  canPreviewTweetSearch,
+  searchTweetPreviewWithClickHouse,
+} from '@/lib/clickhouseSearch'
+import { AlertCircle, Loader2 } from 'lucide-react'
 import type { TweetOrigin } from '@/lib/navigation'
 
 interface TweetListProps {
@@ -48,6 +52,7 @@ export default function TweetList({
   const [tweets, setTweets] = useState<TimelineTweet[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [isCompletingPreview, setIsCompletingPreview] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState<number | null>(null)
@@ -64,6 +69,7 @@ export default function TweetList({
 
       if (pageToLoad === 1) {
         setIsLoading(true)
+        setIsCompletingPreview(false)
         setTweets([])
       } else {
         setIsLoadingMore(true)
@@ -71,6 +77,22 @@ export default function TweetList({
       setError(null)
 
       try {
+        if (pageToLoad === 1 && canPreviewTweetSearch(criteria)) {
+          try {
+            const preview = await searchTweetPreviewWithClickHouse(criteria)
+            if (preview) {
+              setTweets([preview])
+              setIsLoading(false)
+              setIsCompletingPreview(true)
+            }
+          } catch (previewError) {
+            console.warn(
+              'Could not load the progressive tweet preview:',
+              previewError,
+            )
+          }
+        }
+
         const {
           tweets: fetchedTweets,
           error: fetchError,
@@ -95,6 +117,7 @@ export default function TweetList({
       } finally {
         if (pageToLoad === 1) {
           setIsLoading(false)
+          setIsCompletingPreview(false)
         } else {
           setIsLoadingMore(false)
         }
@@ -199,7 +222,7 @@ export default function TweetList({
         isLoading={isLoading}
         emptyMessage="No tweets to display for the current filters."
         className="space-y-4"
-        showCsvExport={showCsvExportButton}
+        showCsvExport={showCsvExportButton && !isCompletingPreview}
         csvFilename={csvExportFilename}
         headerTitle={
           resultsHeading
@@ -216,6 +239,17 @@ export default function TweetList({
         searchSort={filterCriteria.sort}
         onSearchSortChange={onSearchSortChange}
       />
+
+      {isCompletingPreview && (
+        <div
+          className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading the remaining results…
+        </div>
+      )}
 
       {error && tweets.length > 0 && (
         <Alert variant="destructive">

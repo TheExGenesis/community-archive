@@ -27,55 +27,12 @@ interface ClickHouseSearchResponse {
   }
 }
 
-export async function searchTweetsWithClickHouse(
-  criteria: FilterCriteria,
-  page: number,
-  pageSize: number,
-  fetchImpl: typeof fetch = fetch,
-): Promise<TimelineTweet[]> {
-  const query = criteria.rawSearchQuery?.trim()
-  if (!query) {
-    throw new Error('ClickHouse text search requires the raw search query')
-  }
+interface ClickHouseSearchRequestOptions {
+  preview?: boolean
+  excludeRetweets?: boolean
+}
 
-  const offset = (page - 1) * pageSize
-  if (offset > 5_000) return []
-
-  const params = new URLSearchParams({
-    q: query,
-    mode: query.split(/\s+/).length > 1 ? 'phrase' : 'all',
-    limit: String(pageSize),
-    offset: String(offset),
-  })
-  if (criteria.fromUsername) params.set('from_user', criteria.fromUsername)
-  if (criteria.replyToUsername)
-    params.set('reply_to_user', criteria.replyToUsername)
-  if (criteria.startDate) params.set('since', criteria.startDate)
-  if (criteria.endDate) params.set('until', criteria.endDate)
-  if (criteria.sort && criteria.sort !== 'newest')
-    params.set('sort', criteria.sort)
-
-  const response = await fetchImpl(`/api/tweet-search?${params.toString()}`, {
-    cache: 'no-store',
-  })
-  const body = await response.text()
-  if (!response.ok) {
-    throw new Error(
-      `ClickHouse tweet search failed (${response.status}): ${body.slice(0, 300)}`,
-    )
-  }
-
-  let result: ClickHouseSearchResponse
-  try {
-    result = JSON.parse(body) as ClickHouseSearchResponse
-  } catch {
-    throw new Error('ClickHouse tweet search returned invalid JSON')
-  }
-
-  if (!Array.isArray(result.data?.tweets)) {
-    throw new Error('ClickHouse tweet search returned an invalid response')
-  }
-
+function mapSearchTweets(result: ClickHouseSearchResponse): TimelineTweet[] {
   return result.data.tweets.map((tweet) => ({
     tweet_id: tweet.tweetId,
     account_id: tweet.accountId,
@@ -100,4 +57,90 @@ export async function searchTweetsWithClickHouse(
       height: item.height ?? undefined,
     })),
   }))
+}
+
+async function requestClickHouseTweets(
+  criteria: FilterCriteria,
+  page: number,
+  pageSize: number,
+  fetchImpl: typeof fetch,
+  options: ClickHouseSearchRequestOptions = {},
+): Promise<TimelineTweet[]> {
+  const query = criteria.rawSearchQuery?.trim()
+  if (!query) {
+    throw new Error('ClickHouse text search requires the raw search query')
+  }
+
+  const offset = (page - 1) * pageSize
+  if (offset > 5_000) return []
+
+  const params = new URLSearchParams({
+    q: query,
+    mode: query.split(/\s+/).length > 1 ? 'phrase' : 'all',
+    limit: String(pageSize),
+    offset: String(offset),
+  })
+  if (criteria.fromUsername) params.set('from_user', criteria.fromUsername)
+  if (criteria.replyToUsername)
+    params.set('reply_to_user', criteria.replyToUsername)
+  if (criteria.startDate) params.set('since', criteria.startDate)
+  if (criteria.endDate) params.set('until', criteria.endDate)
+  if (criteria.sort && criteria.sort !== 'newest')
+    params.set('sort', criteria.sort)
+  if (options.preview) params.set('preview', 'true')
+  if (options.excludeRetweets) params.set('exclude_retweets', 'true')
+
+  const response = await fetchImpl(`/api/tweet-search?${params.toString()}`, {
+    cache: 'no-store',
+  })
+  const body = await response.text()
+  if (!response.ok) {
+    throw new Error(
+      `ClickHouse tweet search failed (${response.status}): ${body.slice(0, 300)}`,
+    )
+  }
+
+  let result: ClickHouseSearchResponse
+  try {
+    result = JSON.parse(body) as ClickHouseSearchResponse
+  } catch {
+    throw new Error('ClickHouse tweet search returned invalid JSON')
+  }
+
+  if (!Array.isArray(result.data?.tweets)) {
+    throw new Error('ClickHouse tweet search returned an invalid response')
+  }
+
+  return mapSearchTweets(result)
+}
+
+export async function searchTweetsWithClickHouse(
+  criteria: FilterCriteria,
+  page: number,
+  pageSize: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<TimelineTweet[]> {
+  return requestClickHouseTweets(criteria, page, pageSize, fetchImpl)
+}
+
+export function canPreviewTweetSearch(
+  criteria: FilterCriteria,
+  enabled = process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH,
+): boolean {
+  return (
+    enabled === 'true' &&
+    Boolean(criteria.rawSearchQuery?.trim()) &&
+    (!criteria.sort || criteria.sort === 'newest')
+  )
+}
+
+export async function searchTweetPreviewWithClickHouse(
+  criteria: FilterCriteria,
+  fetchImpl: typeof fetch = fetch,
+): Promise<TimelineTweet | null> {
+  const tweets = await requestClickHouseTweets(criteria, 1, 1, fetchImpl, {
+    preview: true,
+    excludeRetweets: criteria.excludeRetweets,
+  })
+  return tweets[0] || null
 }

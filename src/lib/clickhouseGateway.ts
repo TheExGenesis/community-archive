@@ -11,6 +11,8 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'sort',
     'limit',
     'offset',
+    'preview',
+    'exclude_retweets',
   ]),
   'word-trend': new Set(['q', 'bucket', 'match', 'from', 'to']),
   'stream-stats': new Set(['start', 'end', 'granularity', 'scope']),

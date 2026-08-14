@@ -250,12 +250,12 @@ export const getCachedProfileSidebarData = unstable_cache(
   async (accountId: string, year: number | undefined) => {
     const scope: SidebarScope = { accountId, year }
     const [media, people, mediaCount] = await Promise.all([
-      fetchMedia(scope, 18),
+      fetchMedia(scope, 6),
       fetchTopPeople(scope, 8),
       fetchMediaCount(scope),
     ])
     return { media, people, mediaCount }
   },
-  ['meta-twitter-profile-sidebar-v1'],
+  ['meta-twitter-profile-sidebar-v2'],
   { revalidate: DAY },
 )

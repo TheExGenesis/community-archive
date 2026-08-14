@@ -33,7 +33,7 @@ const response = (year: number | null) => ({
   query: {
     accountId: '42',
     year,
-    mediaLimit: 18,
+    mediaLimit: 6,
     peopleLimit: 8,
   },
 })
@@ -73,7 +73,7 @@ test('maps year-scoped ClickHouse media and interactions for the sidebar', async
   expect(fetcher).toHaveBeenCalledWith(
     ['user', '42', 'sidebar'],
     new URLSearchParams({
-      media_limit: '18',
+      media_limit: '6',
       people_limit: '8',
       year: '2025',
     }),
@@ -89,7 +89,7 @@ test('omits the year for the all-time sidebar and rejects scope drift', async ()
 
   expect(allTimeFetcher).toHaveBeenCalledWith(
     ['user', '42', 'sidebar'],
-    new URLSearchParams({ media_limit: '18', people_limit: '8' }),
+    new URLSearchParams({ media_limit: '6', people_limit: '8' }),
     { timeoutMs: 30_000 },
   )
 

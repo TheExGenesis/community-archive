@@ -10,7 +10,7 @@ import { devLog } from '@/lib/devLog'
 import type { ArchiveMediaItem, ArchivePerson } from './types'
 
 const DAY = 86_400
-const MEDIA_LIMIT = 18
+const MEDIA_LIMIT = 6
 const PEOPLE_LIMIT = 8
 const ID_PATTERN = /^\d{1,20}$/
 
@@ -172,7 +172,7 @@ export async function fetchClickHouseProfileSidebar(
 
 const getCachedClickHouseProfileSidebar = unstable_cache(
   fetchClickHouseProfileSidebar,
-  ['meta-twitter-clickhouse-profile-sidebar-v1'],
+  ['meta-twitter-clickhouse-profile-sidebar-v2'],
   { revalidate: DAY },
 )
 

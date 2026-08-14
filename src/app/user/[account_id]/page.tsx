@@ -110,7 +110,6 @@ export default async function UserPage({ params, searchParams }: PageProps) {
     return {
       year: y.year,
       count: y.count,
-      phrase: chapter?.phrase,
       topics: (chapter?.topics ?? []).map((t) => ({
         label: t.label,
         slug: t.slug,

@@ -109,6 +109,29 @@ ALTER TABLE ONLY "public"."tweet_media"
 
 ALTER TABLE ONLY "public"."tweet_urls"
     ADD CONSTRAINT "tweet_urls_pkey" PRIMARY KEY ("id");
+
+ALTER TABLE ONLY "public"."profile_settings"
+    ADD CONSTRAINT "profile_settings_pkey" PRIMARY KEY ("account_id");
+ALTER TABLE ONLY "public"."profile_settings"
+    ADD CONSTRAINT "profile_settings_account_id_check" CHECK (("account_id" ~ '^[0-9]{1,20}$'::text));
+
+ALTER TABLE ONLY "public"."profile_curation"
+    ADD CONSTRAINT "profile_curation_pkey" PRIMARY KEY ("account_id", "section", "item_id");
+ALTER TABLE ONLY "public"."profile_curation"
+    ADD CONSTRAINT "profile_curation_account_id_check" CHECK (("account_id" ~ '^[0-9]{1,20}$'::text));
+ALTER TABLE ONLY "public"."profile_curation"
+    ADD CONSTRAINT "profile_curation_section_check" CHECK (("section" = ANY (ARRAY['bangers'::text, 'people'::text])));
+ALTER TABLE ONLY "public"."profile_curation"
+    ADD CONSTRAINT "profile_curation_item_id_check" CHECK (("item_id" ~ '^[0-9]{1,20}$'::text));
+ALTER TABLE ONLY "public"."profile_curation"
+    ADD CONSTRAINT "profile_curation_position_check" CHECK ((("position" IS NULL) OR ("position" >= 0)));
+
+ALTER TABLE ONLY "public"."tweet_link_previews"
+    ADD CONSTRAINT "tweet_link_previews_pkey" PRIMARY KEY ("url_hash");
+ALTER TABLE ONLY "public"."tweet_link_previews"
+    ADD CONSTRAINT "tweet_link_previews_url_hash_check" CHECK (("url_hash" ~ '^[0-9a-f]{64}$'::text));
+ALTER TABLE ONLY "public"."tweet_link_previews"
+    ADD CONSTRAINT "tweet_link_previews_status_check" CHECK (("status" = ANY (ARRAY['pending'::text, 'ready'::text, 'unsafe'::text, 'failed'::text])));
 ALTER TABLE ONLY "public"."tweet_urls"
     ADD CONSTRAINT "tweet_urls_tweet_id_url_key" UNIQUE ("tweet_id", "url");
 

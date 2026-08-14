@@ -31,12 +31,18 @@ describe('Database Schema Validation', () => {
       'followers',
       'following',
       'tweet_urls',
+      'profile_settings',
+      'profile_curation',
+      'tweet_link_previews',
     ]
 
-    test.each(requiredTables)('table "%s" exists and is queryable', async (table) => {
-      const exists = await tableExists(supabase, table)
-      expect(exists).toBe(true)
-    })
+    test.each(requiredTables)(
+      'table "%s" exists and is queryable',
+      async (table) => {
+        const exists = await tableExists(supabase, table)
+        expect(exists).toBe(true)
+      },
+    )
   })
 
   describe('Views exist with expected columns', () => {
@@ -57,7 +63,11 @@ describe('Database Schema Validation', () => {
         'conversation_id',
         'avatar_media_url',
       ]
-      const result = await viewHasColumns(supabase, 'enriched_tweets', expectedColumns)
+      const result = await viewHasColumns(
+        supabase,
+        'enriched_tweets',
+        expectedColumns,
+      )
       expect(result.exists).toBe(true)
       expect(result.missingColumns).toEqual([])
     })

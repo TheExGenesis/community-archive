@@ -100,7 +100,7 @@ describe('OptInForm opted-in experience', () => {
     )
     expect(screen.getByRole('link', { name: /profile/i })).toHaveAttribute(
       'href',
-      '/profile',
+      '/settings',
     )
     expect(
       screen.getByRole('img', { name: /dashboard preview/i }),

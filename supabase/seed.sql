@@ -26,7 +26,8 @@ VALUES
   ('mock_eve',    'web', 'eve_data',    '2020-09-05T16:00:00Z', 'Eve Data',        2, 1, 1, 0),
   ('mock_frank',  'web', 'frank_ops',   '2022-02-14T09:00:00Z', 'Frank Ops',       1, 2, 0, 0),
   ('mock_quoted', 'web', 'quoteduser',  '2017-05-01T00:00:00Z', 'Quoted User',     1, 0, 0, 0),
-  ('mock_xiq',    'web', 'xiq_dev',     '2018-08-20T09:00:00Z', 'XIQ Dev',         3, 2, 3, 1);
+  ('mock_xiq',    'web', 'xiq_dev',     '2018-08-20T09:00:00Z', 'XIQ Dev',         3, 2, 3, 1)
+ON CONFLICT DO NOTHING;
 
 -- Most mock accounts are opted in so staging/admin flows have realistic rows.
 INSERT INTO "public"."optin" ("username", "twitter_user_id", "opted_in", "explicit_optout", "opt_out_reason", "terms_version", "created_at", "updated_at", "opted_in_at", "opted_out_at")
@@ -57,7 +58,8 @@ VALUES
   (105, 'mock_eve',    '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed'),
   (106, 'mock_frank',  '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed'),
   (107, 'mock_quoted', '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed'),
-  (108, 'mock_xiq',    '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed');
+  (108, 'mock_xiq',    '2024-12-01T00:00:00Z', '2024-12-01T00:00:00Z', 'completed')
+ON CONFLICT DO NOTHING;
 
 SELECT setval(pg_get_serial_sequence('public.archive_upload', 'id'), 200);
 
@@ -71,7 +73,8 @@ VALUES
   ('mock_eve',    'Data engineering all day',            'https://evedata.io',    'Tokyo',         'https://api.dicebear.com/7.x/avataaars/svg?seed=eve_data',    NULL, 105),
   ('mock_frank',  'DevOps and infrastructure',           NULL,                    'Austin',        'https://api.dicebear.com/7.x/avataaars/svg?seed=frank_ops',   NULL, 106),
   ('mock_quoted', 'Quotes and RTs',                      NULL,                    NULL,            'https://api.dicebear.com/7.x/avataaars/svg?seed=quoteduser',  NULL, 107),
-  ('mock_xiq',    'Distributed systems & formal methods',NULL,                    'Lisbon',        'https://api.dicebear.com/7.x/avataaars/svg?seed=xiq_dev',     NULL, 108);
+  ('mock_xiq',    'Distributed systems & formal methods',NULL,                    'Lisbon',        'https://api.dicebear.com/7.x/avataaars/svg?seed=xiq_dev',     NULL, 108)
+ON CONFLICT DO NOTHING;
 
 -- Tweets (with conversation threads)
 INSERT INTO "public"."tweets" ("tweet_id", "account_id", "created_at", "full_text", "retweet_count", "favorite_count", "reply_to_tweet_id", "reply_to_user_id", "reply_to_username", "archive_upload_id")
@@ -111,7 +114,8 @@ VALUES
   -- Alice quotes XIQ''s standalone tweet (separate tweet, not in the thread)
   ('t_alice_5', 'mock_alice', '2024-10-28T19:30:00Z', 'This — write your retry logic before you write your happy path.', 6, 28, NULL, NULL, NULL, 101),
   -- XIQ replies to Bob''s reply in Alice''s thread (continues the conversation_id)
-  ('t_xiq_3',   'mock_xiq',   '2024-11-02T08:00:00Z', '90%! Sharing the migration notes would be a gift to the rest of us @bob_writes.', 0, 6, 't_bob_1', 'mock_bob', 'bob_writes', 108);
+  ('t_xiq_3',   'mock_xiq',   '2024-11-02T08:00:00Z', '90%! Sharing the migration notes would be a gift to the rest of us @bob_writes.', 0, 6, 't_bob_1', 'mock_bob', 'bob_writes', 108)
+ON CONFLICT DO NOTHING;
 
 -- Conversations (link tweets to conversation threads)
 INSERT INTO "public"."conversations" ("conversation_id", "tweet_id")
@@ -123,14 +127,16 @@ VALUES
   ('t_alice_1', 't_bob_1'),
   ('t_alice_1', 't_xiq_2'),
   ('t_alice_1', 't_alice_4'),
-  ('t_alice_1', 't_xiq_3');
+  ('t_alice_1', 't_xiq_3')
+ON CONFLICT DO NOTHING;
 
 -- Tweet media
 INSERT INTO "public"."tweet_media" ("media_id", "tweet_id", "media_url", "media_type", "width", "height", "archive_upload_id")
 VALUES
   (1001, 't_carol_1', 'https://picsum.photos/seed/paper/800/400',    'photo', 800, 400, 103),
   (1002, 't_eve_1',   'https://picsum.photos/seed/pipeline/800/400', 'photo', 800, 400, 105),
-  (1003, 't_dave_1',  'https://picsum.photos/seed/design/800/400',   'photo', 800, 400, 104);
+  (1003, 't_dave_1',  'https://picsum.photos/seed/design/800/400',   'photo', 800, 400, 104)
+ON CONFLICT DO NOTHING;
 
 -- Mentioned users
 INSERT INTO "public"."mentioned_users" ("user_id", "name", "screen_name", "updated_at")
@@ -146,7 +152,8 @@ INSERT INTO "public"."user_mentions" ("id", "mentioned_user_id", "tweet_id") OVE
 VALUES
   (2001, 'mu_alice', 't_bob_1'),
   (2002, 'mu_xiq',   't_alice_4'),
-  (2003, 'mu_bob',   't_xiq_3');
+  (2003, 'mu_bob',   't_xiq_3')
+ON CONFLICT DO NOTHING;
 
 SELECT setval(pg_get_serial_sequence('public.user_mentions', 'id'), 3000);
 
@@ -154,7 +161,8 @@ SELECT setval(pg_get_serial_sequence('public.user_mentions', 'id'), 3000);
 INSERT INTO "public"."quote_tweets" ("tweet_id", "quoted_tweet_id")
 VALUES
   ('t_eve_2',   't_quoted_1'),
-  ('t_alice_5', 't_xiq_1');
+  ('t_alice_5', 't_xiq_1')
+ON CONFLICT DO NOTHING;
 
 -- Followers — also includes a few orphan rows with NULL archive_upload_id (simulating
 -- scraper/browser-extension inserts) so the delete_user_archive orphan fix can be exercised.
@@ -176,7 +184,8 @@ VALUES
   (3013, 'mock_xiq',   'mock_carol',  108),
   -- Orphan follower rows (scraper-inserted, NULL archive_upload_id)
   (3014, 'mock_xiq',   'mock_eve',    NULL),
-  (3015, 'mock_alice', 'mock_frank',  NULL);
+  (3015, 'mock_alice', 'mock_frank',  NULL)
+ON CONFLICT DO NOTHING;
 
 SELECT setval(pg_get_serial_sequence('public.followers', 'id'), 4000);
 
@@ -198,7 +207,8 @@ VALUES
   (5013, 'mock_alice',  'mock_xiq',   101),
   -- Orphan following rows (pairs must not collide with the in-archive rows above)
   (5014, 'mock_xiq',    'mock_bob',   NULL),
-  (5015, 'mock_alice',  'mock_eve',   NULL);
+  (5015, 'mock_alice',  'mock_eve',   NULL)
+ON CONFLICT DO NOTHING;
 
 SELECT setval(pg_get_serial_sequence('public.following', 'id'), 6000);
 
@@ -218,14 +228,16 @@ VALUES
   (7003, 'mock_xiq',   'liked_t_3', 108),
   -- Orphan likes
   (7004, 'mock_xiq',   'liked_t_1', NULL),
-  (7005, 'mock_alice', 'liked_t_3', NULL);
+  (7005, 'mock_alice', 'liked_t_3', NULL)
+ON CONFLICT DO NOTHING;
 
 SELECT setval(pg_get_serial_sequence('public.likes', 'id'), 8000);
 
 -- Tweet URLs
 INSERT INTO "public"."tweet_urls" ("id", "url", "expanded_url", "display_url", "tweet_id") OVERRIDING SYSTEM VALUE
 VALUES
-  (9001, 'https://t.co/abc123', 'https://github.com/community-archive', 'github.com/community-arc...', 't_alice_1');
+  (9001, 'https://t.co/abc123', 'https://github.com/community-archive', 'github.com/community-arc...', 't_alice_1')
+ON CONFLICT DO NOTHING;
 
 SELECT setval(pg_get_serial_sequence('public.tweet_urls', 'id'), 10000);
 
@@ -238,7 +250,8 @@ VALUES
   (3, 'mock_xiq',   'archive_upload', '{"archive_upload_id": 108, "archive_at": "2024-12-01T00:00:00Z"}'::jsonb, '2024-12-01T00:15:00Z'),
   -- Demonstration of settings-change events
   (4, 'mock_xiq',   'opt_in',         NULL,                                                                       '2024-12-02T08:00:00Z'),
-  (5, 'mock_alice', 'archive_upload', '{"archive_upload_id": 109, "archive_at": "2025-02-15T00:00:00Z", "note":"re-upload"}'::jsonb, '2025-02-15T00:00:00Z');
+  (5, 'mock_alice', 'archive_upload', '{"archive_upload_id": 109, "archive_at": "2025-02-15T00:00:00Z", "note":"re-upload"}'::jsonb, '2025-02-15T00:00:00Z')
+ON CONFLICT DO NOTHING;
 
 SELECT setval(pg_get_serial_sequence('public.user_action_log', 'id'), 1000);
 

@@ -252,3 +252,46 @@ CREATE TABLE IF NOT EXISTS "public"."user_action_log" (
     "created_at"  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE "public"."user_action_log" OWNER TO "postgres";
+
+-- Public profile preferences. PostgreSQL remains authoritative for this
+-- owner-controlled policy state; analytical stores only consume the result.
+CREATE TABLE IF NOT EXISTS "public"."profile_settings" (
+    "account_id" TEXT NOT NULL,
+    "download_archive_visible" BOOLEAN NOT NULL DEFAULT TRUE,
+    "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE "public"."profile_settings" OWNER TO "postgres";
+
+-- Sparse owner overrides for the generated sections on the overall profile.
+-- Year chapters remain entirely generated and are intentionally out of scope.
+CREATE TABLE IF NOT EXISTS "public"."profile_curation" (
+    "account_id" TEXT NOT NULL,
+    "section" TEXT NOT NULL,
+    "item_id" TEXT NOT NULL,
+    "is_hidden" BOOLEAN NOT NULL DEFAULT FALSE,
+    "is_featured" BOOLEAN NOT NULL DEFAULT FALSE,
+    "position" INTEGER,
+    "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE "public"."profile_curation" OWNER TO "postgres";
+
+-- Normalized, server-fetched link metadata shared by every tweet surface.
+-- Only service-role code writes this cache; public clients can read it.
+CREATE TABLE IF NOT EXISTS "public"."tweet_link_previews" (
+    "url_hash" TEXT NOT NULL,
+    "normalized_url" TEXT NOT NULL,
+    "canonical_url" TEXT,
+    "title" TEXT,
+    "description" TEXT,
+    "image_url" TEXT,
+    "site_name" TEXT,
+    "content_type" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "fetched_at" TIMESTAMPTZ,
+    "expires_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE "public"."tweet_link_previews" OWNER TO "postgres";

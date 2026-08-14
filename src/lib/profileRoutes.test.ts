@@ -57,9 +57,7 @@ test('serves a bounded profile banger page', async () => {
   )
 
   expect(response.status).toBe(200)
-  expect(response.headers.get('cache-control')).toBe(
-    'public, s-maxage=86400, stale-while-revalidate=604800',
-  )
+  expect(response.headers.get('cache-control')).toBe('private, no-store')
   expect(getProfileBangersPageMock).toHaveBeenCalledWith('42', {
     limit: 2,
     offset: 2,
@@ -140,7 +138,7 @@ test('serves independently cached profile media and interactions', async () => {
   expect(media.status).toBe(200)
   expect(interactions.status).toBe(200)
   expect(media.headers.get('cache-control')).toContain('s-maxage=86400')
-  expect(interactions.headers.get('cache-control')).toContain('s-maxage=86400')
+  expect(interactions.headers.get('cache-control')).toBe('private, no-store')
   expect(getClickHouseProfileMediaOrThrowMock).toHaveBeenCalledWith('42', 2024)
   expect(getClickHouseProfileInteractionsOrThrowMock).toHaveBeenCalledWith(
     '42',

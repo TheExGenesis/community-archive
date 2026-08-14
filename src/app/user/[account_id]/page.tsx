@@ -7,7 +7,11 @@ import { ProfileArchive } from '@/components/metaTwitter/ProfileArchive'
 import { ProfileArchiveSkeleton } from '@/components/metaTwitter/ProfilePageSkeleton'
 import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
 import { userProfileHref } from '@/lib/navigation'
-import { getProfileBangersPage } from '@/lib/metaTwitter/bangers'
+import {
+  getCuratedProfileBangersPage,
+  getPublicProfileSettings,
+} from '@/lib/profileCuration'
+import { getAuthenticatedAccountId } from '@/lib/authenticatedAccount'
 import {
   PROFILE_BANGERS_INITIAL_LIMIT,
   resolveProfileChapterYear,
@@ -82,14 +86,16 @@ async function ProfileArchiveContent({
   basePath,
   candidateYear,
   displayName,
+  isOwner,
 }: {
   accountId: string
   avatarUrl: string | null
   basePath: string
   candidateYear: number | null
   displayName: string
+  isOwner: boolean
 }) {
-  const candidatePage = await getProfileBangersPage(accountId, {
+  const candidatePage = await getCuratedProfileBangersPage(accountId, {
     limit: PROFILE_BANGERS_INITIAL_LIMIT,
     year: candidateYear ?? undefined,
   })
@@ -98,7 +104,7 @@ async function ProfileArchiveContent({
   const initialPage =
     year === candidateYear
       ? candidatePage
-      : await getProfileBangersPage(accountId, {
+      : await getCuratedProfileBangersPage(accountId, {
           limit: PROFILE_BANGERS_INITIAL_LIMIT,
         })
 
@@ -113,6 +119,7 @@ async function ProfileArchiveContent({
       displayName={displayName}
       initialYear={year}
       initialPage={initialPage}
+      isOwner={isOwner}
     />
   )
 }
@@ -137,6 +144,11 @@ export default async function UserPage({ params, searchParams }: PageProps) {
   if (!resolved) notFound()
 
   const { accountId, profile } = resolved
+  const [settings, authenticatedAccountId] = await Promise.all([
+    getPublicProfileSettings(accountId),
+    getAuthenticatedAccountId(),
+  ])
+  const isOwner = authenticatedAccountId === accountId
   const requestedYear = searchParams.chapter
     ? Number.parseInt(searchParams.chapter, 10)
     : null
@@ -163,6 +175,7 @@ export default async function UserPage({ params, searchParams }: PageProps) {
       <div className="h-fit w-full max-w-[1220px] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_2px_16px_rgba(0,0,0,0.06)]">
         <ProfileHeader
           profile={profile}
+          downloadArchiveVisible={settings.downloadArchiveVisible}
           archivedAt={null}
           archivedAtSlot={
             profile.has_archive ? (
@@ -179,6 +192,7 @@ export default async function UserPage({ params, searchParams }: PageProps) {
             basePath={canonicalProfilePath}
             candidateYear={candidateYear}
             displayName={profile.account_display_name}
+            isOwner={isOwner}
           />
         </Suspense>
       </div>

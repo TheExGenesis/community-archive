@@ -25,10 +25,12 @@ export function ProfileHeader({
   profile,
   archivedAt,
   archivedAtSlot,
+  downloadArchiveVisible = true,
 }: {
   profile: ProfileHeaderData
   archivedAt: string | null
   archivedAtSlot?: ReactNode
+  downloadArchiveVisible?: boolean
 }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const archiveUrl =
@@ -61,7 +63,7 @@ export function ProfileHeader({
             displayName={profile.account_display_name}
           />
           <div className="flex flex-wrap justify-end gap-2 pt-3.5">
-            {archiveUrl && (
+            {archiveUrl && downloadArchiveVisible && (
               <a
                 href={archiveUrl}
                 target="_blank"
@@ -124,7 +126,7 @@ export function ProfileHeader({
                   so we only have a selection of their tweets - ones that
                   Archive users interacted with. Is this your profile? You can{' '}
                   <Link
-                    href="/profile"
+                    href="/settings"
                     className="font-semibold text-foreground/80 underline decoration-border underline-offset-4 hover:text-foreground hover:decoration-foreground"
                   >
                     sign in and opt out

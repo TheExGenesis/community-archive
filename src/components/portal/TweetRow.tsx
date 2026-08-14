@@ -58,6 +58,7 @@ export const shortDate = (iso: string) =>
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+    timeZone: 'America/Los_Angeles',
   })
 
 export function TweetAvatar({
@@ -155,6 +156,7 @@ function QuotedTweet({
   compact,
   summary,
   noClamp,
+  showDate,
   origin,
   returnTo,
   onOpen,
@@ -163,6 +165,7 @@ function QuotedTweet({
   compact: boolean
   summary: boolean
   noClamp: boolean
+  showDate: boolean
   origin?: TweetOrigin
   returnTo?: string
   onOpen: () => void
@@ -199,7 +202,10 @@ function QuotedTweet({
             </span>
           </Link>{' '}
           <span className="text-zinc-500 dark:text-[#a7a7b4]">
-            · {relativeTime(tweet.createdAt)}
+            ·{' '}
+            {showDate
+              ? shortDate(tweet.createdAt)
+              : relativeTime(tweet.createdAt)}
           </span>
         </div>
       </div>
@@ -434,6 +440,7 @@ export function TweetRow({
           compact={compact}
           summary={quotedTweetDisplay === 'summary'}
           noClamp={noClamp}
+          showDate={showDate}
           origin={origin}
           returnTo={returnTo}
           onOpen={() => captureAction('open_quoted_tweet')}

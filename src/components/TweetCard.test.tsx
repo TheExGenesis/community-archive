@@ -165,4 +165,22 @@ describe('TweetCard', () => {
     ).toHaveClass('whitespace-pre-wrap', '[font-family:var(--font-petrona)]')
     expect(screen.getByText('The complete "quoted" tweet.')).toBeVisible()
   })
+
+  test('renders Pacific calendar dates consistently for editorial cards', () => {
+    render(
+      <TweetCard
+        tweet={{
+          ...tweet,
+          createdAt: '2026-08-12T05:03:12.000Z',
+          quotedTweet: {
+            ...tweet.quotedTweet!,
+            createdAt: '2026-08-12T06:30:00.000Z',
+          },
+        }}
+        showDate
+      />,
+    )
+
+    expect(screen.getAllByText(/11 Aug 2026/)).toHaveLength(2)
+  })
 })

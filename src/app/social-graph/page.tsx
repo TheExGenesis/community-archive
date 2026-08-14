@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { getIsMember } from '@/lib/portal/auth'
 import { getSocialGraphSnapshot } from '@/lib/socialGraph'
 import { MUTED, SERIF } from '@/components/portal/styles'
+import { checkIsAdmin } from '@/app/admin/data'
+import { SocialGraphAdminControls } from './SocialGraphAdminControls'
 
 const SocialGraphExplorer = dynamic(() => import('./SocialGraphExplorer'), {
   ssr: false,
@@ -14,7 +16,8 @@ const SocialGraphExplorer = dynamic(() => import('./SocialGraphExplorer'), {
 export const metadata = { title: 'Social graph · Community Archive' }
 
 export default async function SocialGraphPage() {
-  if (!(await getIsMember())) redirect('/login?redirect=/social-graph')
+  const [isMember, isAdmin] = await Promise.all([getIsMember(), checkIsAdmin()])
+  if (!isMember) redirect('/login?redirect=/social-graph')
 
   let snapshot
   try {
@@ -32,6 +35,11 @@ export default async function SocialGraphPage() {
             database query runs from this page, so it will recover when the next
             snapshot is published.
           </p>
+          {isAdmin ? (
+            <div className="mt-4 flex justify-start">
+              <SocialGraphAdminControls />
+            </div>
+          ) : null}
         </div>
       </main>
     )
@@ -51,9 +59,12 @@ export default async function SocialGraphPage() {
               interactions.
             </p>
           </div>
-          <p className={`text-[11px] ${MUTED}`}>
-            Snapshot {new Date(snapshot.generatedAt).toLocaleString()}
-          </p>
+          <div className="flex flex-col items-end gap-2">
+            <p className={`text-[11px] ${MUTED}`}>
+              Snapshot {new Date(snapshot.generatedAt).toLocaleString()}
+            </p>
+            {isAdmin ? <SocialGraphAdminControls /> : null}
+          </div>
         </div>
         <SocialGraphExplorer snapshot={snapshot} />
       </div>

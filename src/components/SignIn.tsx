@@ -114,7 +114,9 @@ export default function SignIn() {
   }
 
   return userMetadata ? null : (
-    <div className="inline-flex items-center gap-2">
+    <div
+      className={`${isStagingLogin ? 'hidden lg:inline-flex' : 'hidden sm:inline-flex'} items-center gap-2`}
+    >
       {isStagingLogin && (
         <select
           value={selectedUser.username}

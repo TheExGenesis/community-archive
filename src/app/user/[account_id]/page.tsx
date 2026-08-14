@@ -2,10 +2,7 @@ import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { ProfileHeader } from '@/components/metaTwitter/ProfileHeader'
 import { ArchiveNav, NavChapter } from '@/components/metaTwitter/ArchiveNav'
-import {
-  Workspace,
-  WorkspacePill,
-} from '@/components/metaTwitter/Workspace'
+import { Workspace } from '@/components/metaTwitter/Workspace'
 import {
   getCachedActiveYears,
   getCachedArchivedAt,
@@ -108,27 +105,18 @@ export default async function UserPage({ params, searchParams }: PageProps) {
         `The best of @${profile.username}'s archive.`)
       : (chapterConfig?.description ?? null)
 
-  const pills: WorkspacePill[] = availableTopics.map((t) => {
-    const active = topic?.slug === t.slug
-    const chapterParam = year ? `chapter=${year}&` : ''
+  const navChapters: NavChapter[] = activeYears.map((y) => {
+    const chapter = config?.chapters.find((c) => c.year === y.year)
     return {
-      label: t.label,
-      slug: t.slug,
-      active,
-      // Clicking the active pill deselects it (back to the bare chapter).
-      href: active
-        ? `${basePath}${year ? `?chapter=${year}` : ''}`
-        : `${basePath}?${chapterParam}topic=${t.slug}`,
+      year: y.year,
+      count: y.count,
+      phrase: chapter?.phrase,
+      topics: (chapter?.topics ?? []).map((t) => ({
+        label: t.label,
+        slug: t.slug,
+      })),
     }
   })
-
-  const navChapters: NavChapter[] = activeYears.map((y) => ({
-    year: y.year,
-    count: y.count,
-    topics: (config?.chapters.find((c) => c.year === y.year)?.topics ?? []).map(
-      (t) => ({ label: t.label, slug: t.slug }),
-    ),
-  }))
 
   return (
     <div className="flex justify-center px-4 py-8 sm:px-6">
@@ -149,7 +137,6 @@ export default async function UserPage({ params, searchParams }: PageProps) {
             isOverall={isOverall}
             contextTitle={contextTitle}
             contextDesc={contextDesc}
-            pills={pills}
             tweets={tweets}
             hofIds={hofIds}
             media={chapterData.media}

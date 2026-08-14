@@ -3,6 +3,7 @@ import Link from 'next/link'
 export interface NavChapter {
   year: number
   count: number
+  phrase?: string
   topics: { label: string; slug: string }[]
 }
 
@@ -43,13 +44,25 @@ export function ArchiveNav({
           <div key={chapter.year} className="contents lg:block">
             <Link
               href={`${basePath}?chapter=${chapter.year}`}
-              className={`block whitespace-nowrap px-3 pb-1 pt-3 text-sm font-extrabold lg:pt-3 ${
+              className={`block whitespace-nowrap px-3 pb-1 pt-3 text-sm lg:whitespace-normal ${
                 yearActive && !activeTopicSlug
-                  ? 'text-foreground underline decoration-2 underline-offset-4'
+                  ? 'text-foreground'
                   : 'text-foreground/80 hover:text-foreground'
               }`}
             >
-              {chapter.year}
+              <span
+                className={`font-extrabold ${yearActive && !activeTopicSlug ? 'underline decoration-2 underline-offset-4' : ''}`}
+              >
+                {chapter.year}
+              </span>
+              {chapter.phrase && (
+                <span
+                  className="hidden text-[13px] italic leading-snug text-muted-foreground lg:block"
+                  style={{ fontFamily: 'var(--font-petrona), Georgia, serif' }}
+                >
+                  {chapter.phrase}
+                </span>
+              )}
             </Link>
             {chapter.topics.map((topic) => {
               const topicActive = yearActive && activeTopicSlug === topic.slug

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { TweetText } from './TweetText'
+import { createBrowserClient } from '@/utils/supabase'
 import { formatNumber } from '@/lib/formatNumber'
 import type {
   ArchiveTweet,
@@ -11,16 +12,20 @@ import type {
   ArchivePerson,
 } from '@/lib/metaTwitter/types'
 
-export interface WorkspacePill {
-  label: string
-  slug: string
-  href: string
-  active: boolean
-}
-
 interface CurationState {
   pinned: Record<string, boolean>
   hidden: Record<string, boolean>
+  /** Tweet ids manually added to the Hall of Fame via link */
+  added: string[]
+  /** Explicit ordering for the Curated sort (tweet ids, first = top) */
+  order: string[]
+}
+
+const EMPTY_CURATION: CurationState = {
+  pinned: {},
+  hidden: {},
+  added: [],
+  order: [],
 }
 
 type SortMode = 'curated' | 'likes' | 'newest'
@@ -41,6 +46,16 @@ const personHue = (handle: string) => {
   return h
 }
 
+/** Accepts x.com/twitter.com status URLs or a raw numeric id. */
+const parseTweetId = (input: string): string | null => {
+  const trimmed = input.trim()
+  if (/^\d{5,25}$/.test(trimmed)) return trimmed
+  const match = trimmed.match(
+    /(?:twitter\.com|x\.com)\/[^/]+\/status(?:es)?\/(\d+)/i,
+  )
+  return match ? match[1] : null
+}
+
 export function Workspace({
   accountId,
   username,
@@ -49,7 +64,6 @@ export function Workspace({
   isOverall,
   contextTitle,
   contextDesc,
-  pills,
   tweets,
   hofIds,
   media,
@@ -64,7 +78,6 @@ export function Workspace({
   isOverall: boolean
   contextTitle: string
   contextDesc: string | null
-  pills: WorkspacePill[]
   tweets: ArchiveTweet[]
   hofIds: string[]
   media: ArchiveMediaItem[]
@@ -79,16 +92,17 @@ export function Workspace({
 
   const [sort, setSort] = useState<SortMode>('curated')
   const [edit, setEdit] = useState(false)
-  const [curation, setCuration] = useState<CurationState>({
-    pinned: {},
-    hidden: {},
-  })
+  const [curation, setCuration] = useState<CurationState>(EMPTY_CURATION)
+  const [addedTweets, setAddedTweets] = useState<ArchiveTweet[]>([])
+  const [addInput, setAddInput] = useState('')
+  const [addError, setAddError] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
   const storageKey = `meta-twitter-curation:${accountId}`
 
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(storageKey)
-      if (raw) setCuration(JSON.parse(raw))
+      if (raw) setCuration({ ...EMPTY_CURATION, ...JSON.parse(raw) })
     } catch {
       /* corrupted state — start fresh */
     }
@@ -103,26 +117,88 @@ export function Workspace({
     }
   }
 
+  /** Fetch a tweet from this account's archive, shaped like the server data. */
+  const fetchArchiveTweet = async (
+    tweetId: string,
+  ): Promise<ArchiveTweet | null> => {
+    const supabase = createBrowserClient()
+    const { data } = await supabase
+      .from('tweets')
+      .select(
+        'tweet_id, account_id, created_at, full_text, favorite_count, retweet_count, reply_to_username, media:tweet_media ( media_url, media_type, width, height )',
+      )
+      .eq('tweet_id', tweetId)
+      .eq('account_id', accountId)
+      .maybeSingle()
+    if (!data) return null
+    return {
+      ...data,
+      retweet_count: data.retweet_count ?? 0,
+      reply_to_username: data.reply_to_username ?? null,
+      username,
+      account_display_name: displayName,
+      avatar_media_url: avatarUrl,
+      media: (data.media ?? []) as ArchiveTweet['media'],
+    }
+  }
+
+  // Restore manually-added tweets that aren't in the server-provided list.
+  useEffect(() => {
+    const serverIds = new Set(tweets.map((t) => t.tweet_id))
+    const missing = curation.added.filter((id) => !serverIds.has(id))
+    if (missing.length === 0) return
+    let cancelled = false
+    Promise.all(missing.map(fetchArchiveTweet)).then((results) => {
+      if (cancelled) return
+      setAddedTweets((prev) => {
+        const have = new Set(prev.map((t) => t.tweet_id))
+        const fresh = results.filter(
+          (t): t is ArchiveTweet => !!t && !have.has(t.tweet_id),
+        )
+        return fresh.length > 0 ? [...prev, ...fresh] : prev
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curation.added, tweets])
+
+  const allTweets = useMemo(() => {
+    const seen = new Set<string>()
+    return [...tweets, ...addedTweets].filter((t) => {
+      if (seen.has(t.tweet_id)) return false
+      seen.add(t.tweet_id)
+      return true
+    })
+  }, [tweets, addedTweets])
+
   // A tweet is in the Hall of Fame if the owner pinned it, or it's a curated
   // default that hasn't been explicitly un-pinned.
-  const isPinned = (id: string) => curation.pinned[id] ?? hofIds.includes(id)
+  const isPinned = (id: string) =>
+    curation.pinned[id] ?? (hofIds.includes(id) || curation.added.includes(id))
 
   const visibleTweets = useMemo(() => {
-    let list = tweets.filter((t) => !curation.hidden[t.tweet_id])
+    let list = allTweets.filter((t) => !curation.hidden[t.tweet_id])
     if (sort === 'likes') {
       list = [...list].sort((a, b) => b.favorite_count - a.favorite_count)
     } else if (sort === 'newest') {
       list = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at))
     } else {
+      const orderIndex = (id: string) => {
+        const i = curation.order.indexOf(id)
+        return i === -1 ? Number.MAX_SAFE_INTEGER : i
+      }
       list = [...list].sort(
         (a, b) =>
+          orderIndex(a.tweet_id) - orderIndex(b.tweet_id) ||
           Number(isPinned(b.tweet_id)) - Number(isPinned(a.tweet_id)) ||
           b.favorite_count - a.favorite_count,
       )
     }
     return list.slice(0, MAX_TWEETS)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tweets, curation, sort, hofIds])
+  }, [allTweets, curation, sort, hofIds])
 
   const hiddenCount = Object.values(curation.hidden).filter(Boolean).length
 
@@ -138,14 +214,56 @@ export function Workspace({
     })
   const restoreAll = () => saveCuration({ ...curation, hidden: {} })
 
+  /** Swap a tweet with its neighbor in the current curated view. */
+  const moveTweet = (id: string, direction: -1 | 1) => {
+    const ids = visibleTweets.map((t) => t.tweet_id)
+    const from = ids.indexOf(id)
+    const to = from + direction
+    if (from === -1 || to < 0 || to >= ids.length) return
+    ;[ids[from], ids[to]] = [ids[to], ids[from]]
+    saveCuration({ ...curation, order: ids })
+  }
+
+  const addTweetByLink = async () => {
+    setAddError(null)
+    const tweetId = parseTweetId(addInput)
+    if (!tweetId) {
+      setAddError('Paste an x.com or twitter.com tweet link.')
+      return
+    }
+    if (curation.added.includes(tweetId) || hofIds.includes(tweetId)) {
+      setAddError('That tweet is already in the Hall of Fame.')
+      return
+    }
+    setAdding(true)
+    try {
+      const tweet = await fetchArchiveTweet(tweetId)
+      if (!tweet) {
+        setAddError(`Couldn't find that tweet in @${username}'s archive.`)
+        return
+      }
+      setAddedTweets((prev) => [...prev, tweet])
+      saveCuration({
+        ...curation,
+        added: [...curation.added, tweetId],
+        pinned: { ...curation.pinned, [tweetId]: true },
+        hidden: { ...curation.hidden, [tweetId]: false },
+      })
+      setAddInput('')
+    } finally {
+      setAdding(false)
+    }
+  }
+
   const mediaTiles = media.slice(0, 6)
   const mediaOverflow = Math.max(mediaCount - 5, 0)
+  const canReorder = edit && sort === 'curated'
 
   return (
     <main className="flex min-w-0 flex-col gap-[18px] px-6 py-5">
-      {/* Context header */}
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      {/* Context header with sort + edit controls */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <div className="text-xl font-extrabold">{contextTitle}</div>
           {contextDesc && (
             <div className="mt-0.5 text-[13px] text-muted-foreground">
@@ -153,45 +271,60 @@ export function Workspace({
             </div>
           )}
         </div>
-        {isOwner && (
-          <button
-            onClick={() => setEdit(!edit)}
-            className={`shrink-0 rounded-full border border-border px-3.5 py-1.5 text-[13px] font-semibold ${
-              edit
-                ? 'bg-foreground text-background'
-                : 'bg-card text-foreground hover:bg-muted'
-            }`}
+        <div className="flex shrink-0 items-center gap-2">
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortMode)}
+            className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[13px] text-muted-foreground"
           >
-            {edit ? 'Done editing' : '✎ Edit archive'}
-          </button>
-        )}
+            <option value="curated">Sort: Curated</option>
+            <option value="likes">Sort: Most liked</option>
+            <option value="newest">Sort: Newest</option>
+          </select>
+          {isOwner && (
+            <button
+              onClick={() => setEdit(!edit)}
+              className={`rounded-full border border-border px-3.5 py-1.5 text-[13px] font-semibold ${
+                edit
+                  ? 'bg-foreground text-background'
+                  : 'bg-card text-foreground hover:bg-muted'
+              }`}
+            >
+              {edit ? 'Done editing' : '✎ Edit archive'}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Pills + sort */}
-      <div className="flex flex-wrap items-center gap-2">
-        {pills.map((pill) => (
-          <Link
-            key={pill.slug}
-            href={pill.href}
-            className={`rounded-full border px-3.5 py-1.5 text-[13px] font-semibold ${
-              pill.active
-                ? 'border-foreground bg-foreground text-background'
-                : 'border-border bg-transparent text-muted-foreground hover:bg-muted'
-            }`}
-          >
-            {pill.label}
-          </Link>
-        ))}
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as SortMode)}
-          className="ml-auto rounded-lg border border-border bg-card px-2.5 py-1.5 text-[13px] text-muted-foreground"
-        >
-          <option value="curated">Sort: Curated</option>
-          <option value="likes">Sort: Most liked</option>
-          <option value="newest">Sort: Newest</option>
-        </select>
-      </div>
+      {/* Add-to-Hall-of-Fame by tweet link (owner, Overall view) */}
+      {edit && isOverall && (
+        <div className="rounded-[10px] border border-dashed border-border px-3.5 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={addInput}
+              onChange={(e) => {
+                setAddInput(e.target.value)
+                setAddError(null)
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && addTweetByLink()}
+              placeholder="Paste a tweet link to add it to the Hall of Fame — e.g. https://x.com/christineist/status/…"
+              className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-1.5 text-[13px] placeholder:text-muted-foreground/70"
+            />
+            <button
+              onClick={addTweetByLink}
+              disabled={adding || addInput.trim() === ''}
+              className="rounded-full bg-foreground px-4 py-1.5 text-[13px] font-semibold text-background disabled:opacity-50"
+            >
+              {adding ? 'Adding…' : '⭐ Add'}
+            </button>
+          </div>
+          {addError && (
+            <div className="mt-1.5 text-[13px] text-[hsl(var(--destructive))]">
+              {addError}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Hidden banner */}
       {edit && hiddenCount > 0 && (
@@ -216,12 +349,32 @@ export function Workspace({
               filtered out.
             </div>
           )}
-          {visibleTweets.map((tweet) => (
+          {visibleTweets.map((tweet, index) => (
             <div
               key={tweet.tweet_id}
               className="rounded-xl border border-border px-4 py-3.5"
             >
               <div className="flex gap-2.5">
+                {canReorder && (
+                  <div className="flex flex-col justify-center gap-1">
+                    <button
+                      title="Move up"
+                      onClick={() => moveTweet(tweet.tweet_id, -1)}
+                      disabled={index === 0}
+                      className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted disabled:opacity-30"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      title="Move down"
+                      onClick={() => moveTweet(tweet.tweet_id, 1)}
+                      disabled={index === visibleTweets.length - 1}
+                      className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted disabled:opacity-30"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                )}
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}

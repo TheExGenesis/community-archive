@@ -50,8 +50,9 @@ test('does not label a non-member or offer an archive download', () => {
   )
 
   expect(screen.queryByText('Archive contributor')).not.toBeInTheDocument()
-  expect(screen.queryByText('Archived tweets')).not.toBeInTheDocument()
-  expect(screen.queryByText('Opted in')).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('img', { name: /archive|opted in/i }),
+  ).not.toBeInTheDocument()
   expect(
     screen.queryByRole('link', { name: 'Download archive' }),
   ).not.toBeInTheDocument()
@@ -65,7 +66,7 @@ test('does not label a non-member or offer an archive download', () => {
   ).toHaveAttribute('href', '/settings')
 })
 
-test('labels an opted-in non-uploader without treating them as a contributor', () => {
+test('shows the opted-in icon without treating the user as a contributor', () => {
   render(
     <ProfileHeader
       profile={profile({ has_archive: false, is_opted_in: true })}
@@ -73,7 +74,7 @@ test('labels an opted-in non-uploader without treating them as a contributor', (
     />,
   )
 
-  expect(screen.getByText('Opted in')).toBeVisible()
+  expect(screen.getByRole('img', { name: 'Opted in' })).toBeVisible()
   expect(screen.queryByText('Archive contributor')).not.toBeInTheDocument()
   expect(
     screen.queryByRole('link', { name: 'Download archive' }),
@@ -83,7 +84,7 @@ test('labels an opted-in non-uploader without treating them as a contributor', (
   ).not.toBeInTheDocument()
 })
 
-test('labels an uploader without treating them as a contributor', () => {
+test('shows the archive icon without treating the user as a contributor', () => {
   render(
     <ProfileHeader
       profile={profile({ has_archive: true, is_opted_in: false })}
@@ -91,7 +92,7 @@ test('labels an uploader without treating them as a contributor', () => {
     />,
   )
 
-  expect(screen.getByText('Archived tweets')).toBeVisible()
+  expect(screen.getByRole('img', { name: 'Archive uploaded' })).toBeVisible()
   expect(screen.queryByText('Archive contributor')).not.toBeInTheDocument()
   expect(
     screen.getByRole('link', { name: 'Download archive' }),
@@ -120,7 +121,10 @@ test('gives rostered contributors a distinct blue award badge', () => {
     'bg-brand/10',
     'text-brand',
   )
-  expect(screen.getByText('Archived tweets')).toBeVisible()
+  expect(screen.getByRole('img', { name: 'Archive uploaded' })).toBeVisible()
+  expect(screen.getByText('Archive contributor').parentElement).toHaveClass(
+    'ml-2',
+  )
 })
 
 test('puts the owner edit control immediately before the subtle X link', async () => {

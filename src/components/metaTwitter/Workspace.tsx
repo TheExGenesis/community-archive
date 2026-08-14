@@ -35,9 +35,12 @@ export function Workspace({
   mediaCount,
   people,
   peopleTitle,
-  sidebarLoading,
-  sidebarFailed,
-  onRetrySidebar,
+  mediaLoading,
+  mediaFailed,
+  onRetryMedia,
+  peopleLoading,
+  peopleFailed,
+  onRetryPeople,
   sort,
   onSortChange,
   hasMore,
@@ -57,9 +60,12 @@ export function Workspace({
   mediaCount: number
   people: ArchivePerson[]
   peopleTitle: string
-  sidebarLoading: boolean
-  sidebarFailed: boolean
-  onRetrySidebar: () => void
+  mediaLoading: boolean
+  mediaFailed: boolean
+  onRetryMedia: () => void
+  peopleLoading: boolean
+  peopleFailed: boolean
+  onRetryPeople: () => void
   sort: ProfileBangerSort
   onSortChange: (sort: ProfileBangerSort) => void
   hasMore: boolean
@@ -176,17 +182,17 @@ export function Workspace({
             >
               Media
             </h3>
-            {sidebarLoading ? (
+            {mediaLoading ? (
               <div className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
                 Loading media…
               </div>
-            ) : sidebarFailed ? (
+            ) : mediaFailed ? (
               <button
                 type="button"
-                onClick={onRetrySidebar}
+                onClick={onRetryMedia}
                 className="w-full rounded-md border border-dashed border-border p-4 text-center text-xs font-semibold text-muted-foreground hover:bg-muted"
               >
-                Retry media and people
+                Retry media
               </button>
             ) : mediaTiles.length === 0 ? (
               <div className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
@@ -230,17 +236,21 @@ export function Workspace({
               {peopleTitle}
             </h3>
             <div className="flex flex-col gap-2.5">
-              {sidebarLoading && (
+              {peopleLoading && (
                 <div className="text-[13px] text-muted-foreground">
                   Loading people…
                 </div>
               )}
-              {!sidebarLoading && sidebarFailed && (
-                <div className="text-[13px] text-muted-foreground">
-                  Interactions are temporarily unavailable.
-                </div>
+              {!peopleLoading && peopleFailed && (
+                <button
+                  type="button"
+                  onClick={onRetryPeople}
+                  className="text-left text-[13px] font-semibold text-muted-foreground hover:text-foreground"
+                >
+                  Interactions are temporarily unavailable. Retry
+                </button>
               )}
-              {!sidebarLoading && !sidebarFailed && people.length === 0 && (
+              {!peopleLoading && !peopleFailed && people.length === 0 && (
                 <div className="text-[13px] text-muted-foreground">
                   No interactions found in this chapter.
                 </div>

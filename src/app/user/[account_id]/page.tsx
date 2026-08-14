@@ -12,7 +12,6 @@ import {
   PROFILE_BANGERS_INITIAL_LIMIT,
   resolveProfileChapterYear,
 } from '@/lib/metaTwitter/profilePagination'
-import { getClickHouseProfileSidebar } from '@/lib/metaTwitter/clickhouseSidebar'
 import {
   getCachedArchivedAt,
   getCachedProfileHeader,
@@ -88,24 +87,18 @@ async function ProfileArchiveContent({
   basePath: string
   candidateYear: number | null
 }) {
-  const [candidatePage, candidateSidebar] = await Promise.all([
-    getProfileBangersPage(accountId, {
-      limit: PROFILE_BANGERS_INITIAL_LIMIT,
-      year: candidateYear ?? undefined,
-    }),
-    getClickHouseProfileSidebar(accountId, candidateYear ?? undefined),
-  ])
+  const candidatePage = await getProfileBangersPage(accountId, {
+    limit: PROFILE_BANGERS_INITIAL_LIMIT,
+    year: candidateYear ?? undefined,
+  })
 
   const year = resolveProfileChapterYear(candidateYear, candidatePage)
-  const [initialPage, sidebar] =
+  const initialPage =
     year === candidateYear
-      ? [candidatePage, candidateSidebar]
-      : await Promise.all([
-          getProfileBangersPage(accountId, {
-            limit: PROFILE_BANGERS_INITIAL_LIMIT,
-          }),
-          getClickHouseProfileSidebar(accountId, undefined),
-        ])
+      ? candidatePage
+      : await getProfileBangersPage(accountId, {
+          limit: PROFILE_BANGERS_INITIAL_LIMIT,
+        })
 
   const navChapters: NavChapter[] = initialPage.yearCounts
 
@@ -117,7 +110,6 @@ async function ProfileArchiveContent({
       chapters={navChapters}
       initialYear={year}
       initialPage={initialPage}
-      initialSidebar={sidebar}
     />
   )
 }

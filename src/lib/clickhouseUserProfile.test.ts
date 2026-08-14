@@ -61,6 +61,14 @@ test('maps a corpus account into the public profile contract', async () => {
       ],
     }),
   )
+  expect(fetchGateway).toHaveBeenCalledWith(
+    ['user', '42'],
+    new URLSearchParams({
+      limit: '20',
+      include_interactions: 'false',
+    }),
+    { revalidate: 300, timeoutMs: 8_000 },
+  )
 })
 
 test('degrades to not found for an unavailable or invalid account', async () => {

@@ -84,9 +84,12 @@ test('shows the initial canonical banger cards with media and profile return lin
       mediaCount={0}
       people={[]}
       peopleTitle="Top people"
-      sidebarLoading={false}
-      sidebarFailed={false}
-      onRetrySidebar={jest.fn()}
+      mediaLoading={false}
+      mediaFailed={false}
+      onRetryMedia={jest.fn()}
+      peopleLoading={false}
+      peopleFailed={false}
+      onRetryPeople={jest.fn()}
       sort="quotes"
       onSortChange={jest.fn()}
       hasMore

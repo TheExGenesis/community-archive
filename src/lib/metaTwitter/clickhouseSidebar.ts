@@ -27,6 +27,29 @@ interface SidebarResponse {
   }
 }
 
+interface MediaResponse {
+  data?: {
+    media?: unknown
+    mediaCount?: unknown
+  }
+  query?: {
+    accountId?: unknown
+    year?: unknown
+    mediaLimit?: unknown
+  }
+}
+
+interface InteractionsResponse {
+  data?: {
+    people?: unknown
+  }
+  query?: {
+    accountId?: unknown
+    year?: unknown
+    peopleLimit?: unknown
+  }
+}
+
 interface SidebarMediaRow {
   tweetId?: unknown
   createdAt?: unknown
@@ -53,6 +76,24 @@ export interface ClickHouseProfileSidebar {
 
 export interface ClickHouseProfileSidebarState
   extends ClickHouseProfileSidebar {
+  available: boolean
+}
+
+export interface ClickHouseProfileMedia {
+  media: ArchiveMediaItem[]
+  mediaCount: number
+}
+
+export interface ClickHouseProfileMediaState extends ClickHouseProfileMedia {
+  available: boolean
+}
+
+export interface ClickHouseProfileInteractions {
+  people: ArchivePerson[]
+}
+
+export interface ClickHouseProfileInteractionsState
+  extends ClickHouseProfileInteractions {
   available: boolean
 }
 
@@ -127,6 +168,78 @@ const personItem = (value: unknown): ArchivePerson | null => {
   }
 }
 
+const profileParams = (year: number | undefined, limit: number) => {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (year !== undefined) params.set('year', String(year))
+  return params
+}
+
+export async function fetchClickHouseProfileMedia(
+  accountId: string,
+  year: number | undefined,
+  fetcher: AnalyticsGatewayFetcher = fetchAnalyticsGatewayJson,
+): Promise<ClickHouseProfileMedia> {
+  if (!ID_PATTERN.test(accountId)) {
+    throw new Error('Profile media requires a numeric account ID')
+  }
+  const response = await fetcher<MediaResponse>(
+    ['user', accountId, 'media'],
+    profileParams(year, MEDIA_LIMIT),
+    { timeoutMs: 30_000 },
+  )
+  if (
+    response.query?.accountId !== accountId ||
+    response.query?.year !== (year ?? null) ||
+    Number(response.query?.mediaLimit) !== MEDIA_LIMIT
+  ) {
+    throw new Error('ClickHouse returned mismatched profile media scope')
+  }
+  const media = response.data?.media
+  const mediaCount = safeCount(response.data?.mediaCount)
+  if (mediaCount === null || !Array.isArray(media)) {
+    throw new Error('ClickHouse returned invalid profile media')
+  }
+  return {
+    media: media.flatMap((value) => {
+      const item = mediaItem(value)
+      return item ? [item] : []
+    }),
+    mediaCount,
+  }
+}
+
+export async function fetchClickHouseProfileInteractions(
+  accountId: string,
+  year: number | undefined,
+  fetcher: AnalyticsGatewayFetcher = fetchAnalyticsGatewayJson,
+): Promise<ClickHouseProfileInteractions> {
+  if (!ID_PATTERN.test(accountId)) {
+    throw new Error('Profile interactions require a numeric account ID')
+  }
+  const response = await fetcher<InteractionsResponse>(
+    ['user', accountId, 'interactions'],
+    profileParams(year, PEOPLE_LIMIT),
+    { timeoutMs: 30_000 },
+  )
+  if (
+    response.query?.accountId !== accountId ||
+    response.query?.year !== (year ?? null) ||
+    Number(response.query?.peopleLimit) !== PEOPLE_LIMIT
+  ) {
+    throw new Error('ClickHouse returned mismatched profile interactions scope')
+  }
+  const people = response.data?.people
+  if (!Array.isArray(people)) {
+    throw new Error('ClickHouse returned invalid profile interactions')
+  }
+  return {
+    people: people.flatMap((value) => {
+      const item = personItem(value)
+      return item ? [item] : []
+    }),
+  }
+}
+
 export async function fetchClickHouseProfileSidebar(
   accountId: string,
   year: number | undefined,
@@ -180,11 +293,37 @@ const getCachedClickHouseProfileSidebar = unstable_cache(
   { revalidate: DAY },
 )
 
+const getCachedClickHouseProfileMedia = unstable_cache(
+  fetchClickHouseProfileMedia,
+  ['meta-twitter-clickhouse-profile-media-v1'],
+  { revalidate: DAY },
+)
+
+const getCachedClickHouseProfileInteractions = unstable_cache(
+  fetchClickHouseProfileInteractions,
+  ['meta-twitter-clickhouse-profile-interactions-v1'],
+  { revalidate: DAY },
+)
+
 export async function getClickHouseProfileSidebarOrThrow(
   accountId: string,
   year: number | undefined,
 ): Promise<ClickHouseProfileSidebar> {
   return getCachedClickHouseProfileSidebar(accountId, year)
+}
+
+export async function getClickHouseProfileMediaOrThrow(
+  accountId: string,
+  year: number | undefined,
+): Promise<ClickHouseProfileMedia> {
+  return getCachedClickHouseProfileMedia(accountId, year)
+}
+
+export async function getClickHouseProfileInteractionsOrThrow(
+  accountId: string,
+  year: number | undefined,
+): Promise<ClickHouseProfileInteractions> {
+  return getCachedClickHouseProfileInteractions(accountId, year)
 }
 
 export async function getClickHouseProfileSidebar(
@@ -203,5 +342,43 @@ export async function getClickHouseProfileSidebar(
       error,
     })
     return { media: [], mediaCount: 0, people: [], available: false }
+  }
+}
+
+export async function getClickHouseProfileMedia(
+  accountId: string,
+  year: number | undefined,
+): Promise<ClickHouseProfileMediaState> {
+  try {
+    return {
+      ...(await getClickHouseProfileMediaOrThrow(accountId, year)),
+      available: true,
+    }
+  } catch (error) {
+    devLog('metaTwitter getClickHouseProfileMedia error', {
+      accountId,
+      year,
+      error,
+    })
+    return { media: [], mediaCount: 0, available: false }
+  }
+}
+
+export async function getClickHouseProfileInteractions(
+  accountId: string,
+  year: number | undefined,
+): Promise<ClickHouseProfileInteractionsState> {
+  try {
+    return {
+      ...(await getClickHouseProfileInteractionsOrThrow(accountId, year)),
+      available: true,
+    }
+  } catch (error) {
+    devLog('metaTwitter getClickHouseProfileInteractions error', {
+      accountId,
+      year,
+      error,
+    })
+    return { people: [], available: false }
   }
 }

@@ -81,7 +81,7 @@ export function analyticsGatewayRequestUrl(
     cleanPath[0] === 'user' &&
     /^[A-Za-z0-9_@]{1,80}$/.test(cleanPath[1])
   ) {
-    allowedParams = new Set(['limit'])
+    allowedParams = new Set(['limit', 'include_interactions'])
   } else if (
     cleanPath.length === 3 &&
     cleanPath[0] === 'user' &&
@@ -89,6 +89,20 @@ export function analyticsGatewayRequestUrl(
     cleanPath[2] === 'sidebar'
   ) {
     allowedParams = new Set(['year', 'media_limit', 'people_limit'])
+  } else if (
+    cleanPath.length === 3 &&
+    cleanPath[0] === 'user' &&
+    /^\d{1,20}$/.test(cleanPath[1]) &&
+    cleanPath[2] === 'media'
+  ) {
+    allowedParams = new Set(['year', 'limit'])
+  } else if (
+    cleanPath.length === 3 &&
+    cleanPath[0] === 'user' &&
+    /^\d{1,20}$/.test(cleanPath[1]) &&
+    cleanPath[2] === 'interactions'
+  ) {
+    allowedParams = new Set(['year', 'limit'])
   } else if (
     cleanPath.length === 2 &&
     cleanPath[0] === 'tweet' &&

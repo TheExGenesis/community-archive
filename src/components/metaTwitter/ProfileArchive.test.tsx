@@ -144,10 +144,15 @@ test('switches chapters immediately while their small data requests are pending'
   await waitFor(() =>
     expect(
       fetchMock.mock.calls.some(([input]) =>
-        String(input).includes('/sidebar?year=2025'),
+        String(input).includes('/media?year=2025'),
       ),
     ).toBe(true),
   )
+  expect(
+    fetchMock.mock.calls.some(([input]) =>
+      String(input).includes('/interactions?year=2025'),
+    ),
+  ).toBe(true)
 })
 
 test('preserves modified-click behavior on chapter links', async () => {
@@ -308,8 +313,11 @@ test('stops automatic infinite-scroll retries after a failed page', async () => 
   const user = userEvent.setup()
   const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) => {
     const url = new URL(String(input), 'https://community-archive.org')
-    if (url.pathname.endsWith('/sidebar')) {
-      return Promise.resolve(jsonResponse(initialSidebar))
+    if (url.pathname.endsWith('/media')) {
+      return Promise.resolve(jsonResponse({ media: [], mediaCount: 0 }))
+    }
+    if (url.pathname.endsWith('/interactions')) {
+      return Promise.resolve(jsonResponse({ people: [] }))
     }
     if (!url.searchParams.has('year')) {
       return Promise.reject(new Error('gateway unavailable'))
@@ -363,8 +371,11 @@ test('can retry an unavailable initial banger page from offset zero', async () =
   const user = userEvent.setup()
   const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) => {
     const url = new URL(String(input), 'https://community-archive.org')
-    if (url.pathname.endsWith('/sidebar')) {
-      return Promise.resolve(jsonResponse(initialSidebar))
+    if (url.pathname.endsWith('/media')) {
+      return Promise.resolve(jsonResponse({ media: [], mediaCount: 0 }))
+    }
+    if (url.pathname.endsWith('/interactions')) {
+      return Promise.resolve(jsonResponse({ people: [] }))
     }
     return Promise.resolve(
       jsonResponse({
@@ -407,17 +418,20 @@ test('can retry an unavailable initial banger page from offset zero', async () =
   ).toBe(true)
 })
 
-test('does not remember a failed sidebar request as an empty result', async () => {
+test('retries failed media without blocking successful interactions', async () => {
   const user = userEvent.setup()
-  let sidebarCalls = 0
+  let mediaCalls = 0
   const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) => {
     const url = new URL(String(input), 'https://community-archive.org')
-    if (url.pathname.endsWith('/sidebar')) {
-      sidebarCalls += 1
-      if (sidebarCalls === 1) {
+    if (url.pathname.endsWith('/media')) {
+      mediaCalls += 1
+      if (mediaCalls === 1) {
         return Promise.reject(new Error('gateway unavailable'))
       }
-      return Promise.resolve(jsonResponse(initialSidebar))
+      return Promise.resolve(jsonResponse({ media: [], mediaCount: 0 }))
+    }
+    if (url.pathname.endsWith('/interactions')) {
+      return Promise.resolve(jsonResponse({ people: [] }))
     }
     return Promise.resolve(
       jsonResponse({
@@ -448,12 +462,13 @@ test('does not remember a failed sidebar request as an empty result', async () =
     />,
   )
 
-  await user.click(
-    await screen.findByRole('button', { name: 'Retry media and people' }),
-  )
+  await user.click(await screen.findByRole('button', { name: 'Retry media' }))
 
   await screen.findByText('No media in this chapter')
-  expect(sidebarCalls).toBe(2)
+  expect(
+    screen.getByText('No interactions found in this chapter.'),
+  ).toBeVisible()
+  expect(mediaCalls).toBe(2)
   expect(fetchMock).toHaveBeenCalled()
 })
 
@@ -463,8 +478,11 @@ test('does not start a stale chapter preload over an in-flight active feed', asy
   const activeChapter = deferredResponse()
   const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) => {
     const url = new URL(String(input), 'https://community-archive.org')
-    if (url.pathname.endsWith('/sidebar')) {
-      return Promise.resolve(jsonResponse(initialSidebar))
+    if (url.pathname.endsWith('/media')) {
+      return Promise.resolve(jsonResponse({ media: [], mediaCount: 0 }))
+    }
+    if (url.pathname.endsWith('/interactions')) {
+      return Promise.resolve(jsonResponse({ people: [] }))
     }
     const year = url.searchParams.get('year')
     const offset = Number(url.searchParams.get('offset') ?? 0)

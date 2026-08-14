@@ -22,6 +22,15 @@ interface SidebarData {
   available?: boolean
 }
 
+interface MediaData {
+  media: ArchiveMediaItem[]
+  mediaCount: number
+}
+
+interface PeopleData {
+  people: ArchivePerson[]
+}
+
 interface FeedState {
   tweets: BangerTweet[]
   total: number
@@ -67,35 +76,53 @@ export function ProfileArchive({
   chapters: NavChapter[]
   initialYear: number | null
   initialPage: ProfileBangersPageState
-  initialSidebar: SidebarData
+  initialSidebar?: SidebarData
 }) {
   const initialFeedKey = feedKey(initialYear, 'quotes')
+  const initialScopeKey = scopeKey(initialYear)
+  const hasInitialSidebar = initialSidebar?.available !== false
   const [activeYear, setActiveYear] = useState<number | null>(initialYear)
   const [sort, setSort] = useState<ProfileBangerSort>('quotes')
   const [feeds, setFeeds] = useState<Record<string, FeedState>>({
     [initialFeedKey]: initialPage,
   })
-  const [sidebars, setSidebars] = useState<Record<string, SidebarData>>(
-    initialSidebar.available === false
-      ? {}
-      : { [scopeKey(initialYear)]: initialSidebar },
+  const [mediaByScope, setMediaByScope] = useState<Record<string, MediaData>>(
+    initialSidebar && hasInitialSidebar
+      ? {
+          [initialScopeKey]: {
+            media: initialSidebar.media,
+            mediaCount: initialSidebar.mediaCount,
+          },
+        }
+      : {},
+  )
+  const [peopleByScope, setPeopleByScope] = useState<
+    Record<string, PeopleData>
+  >(
+    initialSidebar && hasInitialSidebar
+      ? { [initialScopeKey]: { people: initialSidebar.people } }
+      : {},
   )
   const [loadingFeeds, setLoadingFeeds] = useState<Record<string, boolean>>({})
   const [failedFeeds, setFailedFeeds] = useState<Record<string, boolean>>({
     [initialFeedKey]: !initialPage.available,
   })
-  const [failedSidebars, setFailedSidebars] = useState<Record<string, boolean>>(
-    {
-      [scopeKey(initialYear)]: initialSidebar.available === false,
-    },
+  const [failedMedia, setFailedMedia] = useState<Record<string, boolean>>({
+    [initialScopeKey]: initialSidebar?.available === false,
+  })
+  const [failedPeople, setFailedPeople] = useState<Record<string, boolean>>({
+    [initialScopeKey]: initialSidebar?.available === false,
+  })
+  const [loadingMedia, setLoadingMedia] = useState<Record<string, boolean>>({})
+  const [loadingPeople, setLoadingPeople] = useState<Record<string, boolean>>(
+    {},
   )
-  const [loadingSidebars, setLoadingSidebars] = useState<
-    Record<string, boolean>
-  >({})
   const feedsRef = useRef(feeds)
-  const sidebarsRef = useRef(sidebars)
+  const mediaRef = useRef(mediaByScope)
+  const peopleRef = useRef(peopleByScope)
   const feedRequests = useRef(new Map<string, Promise<void>>())
-  const sidebarRequests = useRef(new Map<string, Promise<void>>())
+  const mediaRequests = useRef(new Map<string, Promise<void>>())
+  const peopleRequests = useRef(new Map<string, Promise<void>>())
   const automaticallyFilledFeeds = useRef(new Set<string>())
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
@@ -114,15 +141,30 @@ export function ProfileArchive({
     [],
   )
 
-  const updateSidebars = useCallback(
+  const updateMedia = useCallback(
     (
       updater: (
-        current: Record<string, SidebarData>,
-      ) => Record<string, SidebarData>,
+        current: Record<string, MediaData>,
+      ) => Record<string, MediaData>,
     ) => {
-      setSidebars((current) => {
+      setMediaByScope((current) => {
         const next = updater(current)
-        sidebarsRef.current = next
+        mediaRef.current = next
+        return next
+      })
+    },
+    [],
+  )
+
+  const updatePeople = useCallback(
+    (
+      updater: (
+        current: Record<string, PeopleData>,
+      ) => Record<string, PeopleData>,
+    ) => {
+      setPeopleByScope((current) => {
+        const next = updater(current)
+        peopleRef.current = next
         return next
       })
     },
@@ -206,43 +248,81 @@ export function ProfileArchive({
     [loadFeedPage],
   )
 
-  const loadSidebar = useCallback(
+  const loadMedia = useCallback(
     (year: number | null) => {
       const key = scopeKey(year)
-      if (sidebarsRef.current[key]) return Promise.resolve()
-      const existing = sidebarRequests.current.get(key)
+      if (mediaRef.current[key]) return Promise.resolve()
+      const existing = mediaRequests.current.get(key)
       if (existing) return existing
 
       const params = new URLSearchParams()
       if (year !== null) params.set('year', String(year))
       const query = params.toString()
-      setLoadingSidebars((current) => ({ ...current, [key]: true }))
-      setFailedSidebars((current) => ({ ...current, [key]: false }))
+      setLoadingMedia((current) => ({ ...current, [key]: true }))
+      setFailedMedia((current) => ({ ...current, [key]: false }))
       const request = fetch(
-        `/api/profile/${encodeURIComponent(accountId)}/sidebar${query ? `?${query}` : ''}`,
+        `/api/profile/${encodeURIComponent(accountId)}/media${query ? `?${query}` : ''}`,
       )
         .then(async (response) => {
-          if (!response.ok) throw new Error('Profile sidebar request failed')
-          const sidebar = (await response.json()) as SidebarData
-          if (!Array.isArray(sidebar.media) || !Array.isArray(sidebar.people)) {
-            throw new Error('Profile sidebar response was invalid')
+          if (!response.ok) throw new Error('Profile media request failed')
+          const media = (await response.json()) as MediaData
+          if (!Array.isArray(media.media)) {
+            throw new Error('Profile media response was invalid')
           }
-          updateSidebars((current) => ({
+          updateMedia((current) => ({
             ...current,
-            [key]: { ...sidebar, available: true },
+            [key]: media,
           }))
         })
         .catch(() => {
-          setFailedSidebars((current) => ({ ...current, [key]: true }))
+          setFailedMedia((current) => ({ ...current, [key]: true }))
         })
         .finally(() => {
-          sidebarRequests.current.delete(key)
-          setLoadingSidebars((current) => ({ ...current, [key]: false }))
+          mediaRequests.current.delete(key)
+          setLoadingMedia((current) => ({ ...current, [key]: false }))
         })
-      sidebarRequests.current.set(key, request)
+      mediaRequests.current.set(key, request)
       return request
     },
-    [accountId, updateSidebars],
+    [accountId, updateMedia],
+  )
+
+  const loadPeople = useCallback(
+    (year: number | null) => {
+      const key = scopeKey(year)
+      if (peopleRef.current[key]) return Promise.resolve()
+      const existing = peopleRequests.current.get(key)
+      if (existing) return existing
+
+      const params = new URLSearchParams()
+      if (year !== null) params.set('year', String(year))
+      const query = params.toString()
+      setLoadingPeople((current) => ({ ...current, [key]: true }))
+      setFailedPeople((current) => ({ ...current, [key]: false }))
+      const request = fetch(
+        `/api/profile/${encodeURIComponent(accountId)}/interactions${query ? `?${query}` : ''}`,
+      )
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error('Profile interactions request failed')
+          }
+          const people = (await response.json()) as PeopleData
+          if (!Array.isArray(people.people)) {
+            throw new Error('Profile interactions response was invalid')
+          }
+          updatePeople((current) => ({ ...current, [key]: people }))
+        })
+        .catch(() => {
+          setFailedPeople((current) => ({ ...current, [key]: true }))
+        })
+        .finally(() => {
+          peopleRequests.current.delete(key)
+          setLoadingPeople((current) => ({ ...current, [key]: false }))
+        })
+      peopleRequests.current.set(key, request)
+      return request
+    },
+    [accountId, updatePeople],
   )
 
   const activeKey = feedKey(activeYear, sort)
@@ -251,9 +331,13 @@ export function ProfileArchive({
   const activeNextOffset = activeFeed?.nextOffset
   const activeFeedLoading = Boolean(loadingFeeds[activeKey])
   const activeFeedFailed = Boolean(failedFeeds[activeKey])
-  const activeSidebar = sidebars[scopeKey(activeYear)]
-  const activeSidebarLoading = Boolean(loadingSidebars[scopeKey(activeYear)])
-  const activeSidebarFailed = Boolean(failedSidebars[scopeKey(activeYear)])
+  const activeScopeKey = scopeKey(activeYear)
+  const activeMedia = mediaByScope[activeScopeKey]
+  const activePeople = peopleByScope[activeScopeKey]
+  const activeMediaLoading = Boolean(loadingMedia[activeScopeKey])
+  const activePeopleLoading = Boolean(loadingPeople[activeScopeKey])
+  const activeMediaFailed = Boolean(failedMedia[activeScopeKey])
+  const activePeopleFailed = Boolean(failedPeople[activeScopeKey])
   const hasMore = activeFeedLoaded && activeNextOffset !== null
 
   useEffect(() => {
@@ -289,8 +373,12 @@ export function ProfileArchive({
   ])
 
   useEffect(() => {
-    void loadSidebar(activeYear)
-  }, [activeYear, loadSidebar])
+    void loadMedia(activeYear)
+  }, [activeYear, loadMedia])
+
+  useEffect(() => {
+    void loadPeople(activeYear)
+  }, [activeYear, loadPeople])
 
   useEffect(() => {
     const initialFill = loadNextPage(initialYear, 'quotes')
@@ -389,15 +477,20 @@ export function ProfileArchive({
         totalTweets={context.total}
         bangersAvailable={activeFeed?.available !== false}
         bangersLoading={activeFeedLoading || (!activeFeed && !activeFeedFailed)}
-        media={activeSidebar?.media ?? []}
-        mediaCount={activeSidebar?.mediaCount ?? 0}
-        people={activeSidebar?.people ?? []}
+        media={activeMedia?.media ?? []}
+        mediaCount={activeMedia?.mediaCount ?? 0}
+        people={activePeople?.people ?? []}
         peopleTitle={activeYear ? `People in ${activeYear}` : 'Top people'}
-        sidebarLoading={
-          activeSidebarLoading || (!activeSidebar && !activeSidebarFailed)
+        mediaLoading={
+          activeMediaLoading || (!activeMedia && !activeMediaFailed)
         }
-        sidebarFailed={activeSidebarFailed}
-        onRetrySidebar={() => void loadSidebar(activeYear)}
+        mediaFailed={activeMediaFailed}
+        onRetryMedia={() => void loadMedia(activeYear)}
+        peopleLoading={
+          activePeopleLoading || (!activePeople && !activePeopleFailed)
+        }
+        peopleFailed={activePeopleFailed}
+        onRetryPeople={() => void loadPeople(activeYear)}
         sort={sort}
         onSortChange={selectSort}
         hasMore={

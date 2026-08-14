@@ -84,7 +84,10 @@ export async function getClickHouseUserProfile(
   try {
     const response = await fetchAnalyticsGatewayJson<ClickHouseUserResponse>(
       ['user', identifier],
-      new URLSearchParams({ limit: '20' }),
+      new URLSearchParams({
+        limit: '20',
+        include_interactions: 'false',
+      }),
       { revalidate: 300, timeoutMs: 8_000 },
     )
     const account = response.data?.account

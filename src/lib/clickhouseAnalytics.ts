@@ -39,7 +39,7 @@ export async function getTopFollowedAccounts(
         Accept: 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      next: { revalidate: 60 },
+      next: { revalidate: 86_400 },
     },
   )
 

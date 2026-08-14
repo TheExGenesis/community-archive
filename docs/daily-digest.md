@@ -18,6 +18,18 @@ and stage-by-stage trace needed to reproduce and compare generations.
 The global navigation and homepage digest card expose only published editions.
 Drafts, raw responses, prompts, and failures never cross the public RLS policy.
 
+### Preview fixture
+
+Vercel preview deployments and local development include a clearly labeled
+August 11, 2026 mock edition at `/digest/2026-08-11`. It is assembled from the
+August 11 banger-cluster research memo and uses hydrated tweet snapshots, but it
+never writes to `digest_editions` and is disabled in production. The edition
+view includes a calendar-style day selector; only dates with a real or preview
+edition are clickable.
+
+Set the server-only `DIGEST_MOCK_DATA=true` flag to show the fixture in another
+non-production environment. Do not set it in production.
+
 ## Data boundary
 
 - ClickHouse is the analytical source for candidates and archived quote-post

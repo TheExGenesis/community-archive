@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
 import { TweetRow } from '@/components/portal/TweetRow'
 import type { DigestEdition } from '@/lib/digest/types'
 import { CARD, MUTED, SERIF } from '@/components/portal/styles'
@@ -14,6 +15,14 @@ const longDate = (date: string) =>
     timeZone: 'UTC',
   }).format(new Date(`${date}T12:00:00Z`))
 
+const archivedQuoteCount = (
+  editionStory: DigestEdition['content']['stories'][number],
+) =>
+  editionStory.bangers.reduce(
+    (total, tweet) => total + (tweet.quoteCount ?? 0),
+    0,
+  )
+
 export function DigestEditionView({
   edition,
   archive,
@@ -27,13 +36,23 @@ export function DigestEditionView({
   return (
     <main className="min-h-screen bg-zinc-100/70 py-8 dark:bg-background sm:py-12">
       <article className="mx-auto w-full max-w-6xl rounded-lg border border-zinc-200 bg-white px-5 py-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 sm:px-10 sm:py-12">
+        {edition.isPreview ? (
+          <div className="mb-7 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+            <span className="font-semibold">Mock edition · preview only</span>
+            <span>
+              Assembled from the August 11 banger-cluster research memo; not
+              published.
+            </span>
+          </div>
+        ) : null}
         <header>
           <div className="flex flex-wrap items-end justify-between gap-5">
             <div>
               <div
                 className={`text-xs font-semibold uppercase tracking-[0.14em] ${MUTED}`}
               >
-                The Daily Digest · № {edition.issueNumber} · v{edition.version}
+                The Daily Digest · {edition.isPreview ? 'Prototype · ' : ''}№{' '}
+                {edition.issueNumber} · v{edition.version}
               </div>
               <h1
                 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl"
@@ -89,7 +108,13 @@ export function DigestEditionView({
                         {story.bangers.length} banger
                         {story.bangers.length === 1 ? '' : 's'}
                       </span>
-                      <span>· {story.replyCount} archived replies</span>
+                      <span>
+                        · {archivedQuoteCount(story)} archived quote
+                        {archivedQuoteCount(story) === 1 ? '' : 's'}
+                      </span>
+                      {story.replyCount > 0 ? (
+                        <span>· {story.replyCount} archived replies</span>
+                      ) : null}
                     </div>
                     <h2
                       className="mt-3 text-2xl font-semibold leading-tight sm:text-3xl"
@@ -129,6 +154,10 @@ export function DigestEditionView({
           </div>
 
           <aside className="space-y-5 lg:sticky lg:top-24">
+            <DigestDaySelector
+              currentDate={edition.digestDate}
+              editions={archive}
+            />
             <section className={`${CARD} p-5`}>
               <h2 className="font-semibold">Keywords in this edition</h2>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -144,9 +173,10 @@ export function DigestEditionView({
             </section>
             <section className={`${CARD} p-5 text-sm leading-6 ${MUTED}`}>
               <p>
-                Clustered from {content.source.selectedCount} selected bangers
-                in a frozen 24-hour snapshot. Keywords are required to occur in
-                the included posts.
+                {edition.isPreview
+                  ? `Five public stories selected from 20 discovered clusters across the top ${content.source.selectedCount} bangers in the August 11 research snapshot.`
+                  : `Clustered from ${content.source.selectedCount} selected bangers in a frozen 24-hour snapshot.`}{' '}
+                Keywords are required to occur in the included posts.
               </p>
               <Link
                 href="/bangers?period=today"
@@ -178,8 +208,9 @@ export function DigestEditionView({
         </div>
 
         <footer className={`mt-10 border-t pt-5 text-xs leading-5 ${MUTED}`}>
-          Curated automatically from the previous 24 hours of archive bangers
-          and reviewed through the Daily Digest lab before publication.
+          {edition.isPreview
+            ? 'Prototype assembled from a frozen research snapshot. Tweet text and engagement were hydrated for this preview; editorial summaries come from the cluster memo.'
+            : 'Curated automatically from the previous 24 hours of archive bangers and reviewed through the Daily Digest lab before publication.'}
         </footer>
       </article>
     </main>

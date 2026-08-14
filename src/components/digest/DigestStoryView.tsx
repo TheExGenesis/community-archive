@@ -23,6 +23,10 @@ export function DigestStoryView({
 }) {
   const returnTo = `/digest/${edition.digestDate}/${story.slug}`
   const ledeMedia = story.bangers.flatMap((tweet) => tweet.media ?? [])[0]
+  const archivedQuotes = story.bangers.reduce(
+    (total, tweet) => total + (tweet.quoteCount ?? 0),
+    0,
+  )
 
   return (
     <main className="min-h-screen bg-zinc-100/70 py-8 dark:bg-background sm:py-12">
@@ -33,13 +37,25 @@ export function DigestStoryView({
         >
           ← Daily Digest · {edition.digestDate}
         </Link>
+        {edition.isPreview ? (
+          <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+            Mock story assembled from the August 11 cluster memo. This edition
+            is preview-only and has not been published.
+          </div>
+        ) : null}
         <header className="mt-7 max-w-4xl">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
               {story.keyword}
             </span>
             <span>{story.bangers.length} bangers</span>
-            <span>· {story.replyCount} replies</span>
+            <span>
+              · {archivedQuotes} archived quote
+              {archivedQuotes === 1 ? '' : 's'}
+            </span>
+            {story.replyCount > 0 ? (
+              <span>· {story.replyCount} replies</span>
+            ) : null}
             {story.peakedAt ? (
               <span>· peaked {timeLabel(story.peakedAt)}</span>
             ) : null}
@@ -94,6 +110,11 @@ export function DigestStoryView({
 
           <aside className={`${CARD} p-4 lg:sticky lg:top-24`}>
             <h2 className="font-semibold">Commentary</h2>
+            {story.editorialNote ? (
+              <p className="mt-3 rounded-md bg-blue-50 p-3 text-sm leading-6 text-blue-950 dark:bg-blue-950/30 dark:text-blue-100">
+                {story.editorialNote}
+              </p>
+            ) : null}
             {story.commentary.length ? (
               <div className="mt-3 space-y-3">
                 {story.commentary.map((tweet) => (
@@ -108,11 +129,11 @@ export function DigestStoryView({
                   </blockquote>
                 ))}
               </div>
-            ) : (
+            ) : !story.editorialNote ? (
               <p className={`mt-3 text-sm ${MUTED}`}>
                 No commentary was selected for this story.
               </p>
-            )}
+            ) : null}
             <Link
               href={`/tweets/${story.bangers[0].id}?from=digest&returnTo=${encodeURIComponent(returnTo)}`}
               className="mt-4 inline-flex text-sm font-semibold text-brand hover:underline"

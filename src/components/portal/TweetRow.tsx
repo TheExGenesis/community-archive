@@ -421,7 +421,9 @@ export function TweetRow({
             />
           )}
           <span>♥ {formatCount(tweet.likes)}</span>
-          <span>⇄ {formatCount(tweet.rts)}</span>
+          {tweet.retweetCountAvailable !== false ? (
+            <span>⇄ {formatCount(tweet.rts)}</span>
+          ) : null}
           {showArchivedBadge && <span className="text-brand">archived</span>}
         </div>
       )}

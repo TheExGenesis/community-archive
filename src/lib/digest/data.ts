@@ -19,6 +19,7 @@ import {
   type DigestRun,
   type DigestRunStatus,
 } from './types'
+import { getPreviewDigestEdition } from './mock'
 
 const RUN_STATUSES = new Set<DigestRunStatus>([
   'candidates_ready',
@@ -156,6 +157,8 @@ export async function loadDigestLabState(runId?: string) {
 export async function getPublishedDigest(
   digestDate?: string,
 ): Promise<DigestEdition | null> {
+  const preview = getPreviewDigestEdition(digestDate)
+  if (preview) return preview
   const client = createDigestPublicClient(cookies())
   let query = client
     .from('digest_editions')
@@ -167,9 +170,9 @@ export async function getPublishedDigest(
   const { data, error } = await query.maybeSingle()
   if (error) {
     console.error('Published digest read failed:', error.message)
-    return null
+    return getPreviewDigestEdition(digestDate)
   }
-  return data ? mapDigestEdition(data) : null
+  return data ? mapDigestEdition(data) : getPreviewDigestEdition(digestDate)
 }
 
 export async function getLatestDigestPreview(): Promise<DigestPreview | null> {
@@ -181,12 +184,15 @@ export async function getLatestDigestPreview(): Promise<DigestPreview | null> {
     executiveSummary: edition.content.executiveSummary,
     storyCount: edition.content.stories.length,
     storyTitles: edition.content.stories.map((story) => story.title),
+    isPreview: edition.isPreview,
   }
 }
 
 export async function listPublishedDigests(
   limit = 14,
 ): Promise<DigestEdition[]> {
+  const preview = getPreviewDigestEdition()
+  if (preview) return [preview]
   const client = createDigestPublicClient(cookies())
   const safeLimit = Math.max(1, Math.min(60, Math.trunc(limit)))
   const { data, error } = await client
@@ -199,8 +205,11 @@ export async function listPublishedDigests(
     console.error('Digest archive read failed:', error.message)
     return []
   }
-  return (data ?? []).flatMap((row) => {
+  const editions = (data ?? []).flatMap((row) => {
     const edition = mapDigestEdition(row)
     return edition ? [edition] : []
   })
+  return editions
+    .sort((left, right) => right.digestDate.localeCompare(left.digestDate))
+    .slice(0, safeLimit)
 }

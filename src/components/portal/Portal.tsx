@@ -772,7 +772,9 @@ export default function Portal({
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-[15px] font-bold">
-                      Latest Daily Digest
+                      {digestPreview.isPreview
+                        ? 'Mock Daily Digest'
+                        : 'Latest Daily Digest'}
                     </span>
                     <span className="text-[12px] font-semibold text-brand">
                       Read →

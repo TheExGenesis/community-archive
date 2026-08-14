@@ -43,6 +43,7 @@ export interface DigestStory {
   title: string
   subtitle: string
   bullets: string[]
+  editorialNote?: string
   bangers: PortalTweet[]
   commentary: PortalTweet[]
   replyCount: number
@@ -103,6 +104,8 @@ export interface DigestEdition {
   createdAt: string
   publishedAt: string | null
   updatedAt: string
+  /** True only for local/preview fixtures that have not been published. */
+  isPreview?: boolean
 }
 
 export interface DigestPreview {
@@ -111,6 +114,7 @@ export interface DigestPreview {
   executiveSummary: string
   storyCount: number
   storyTitles: string[]
+  isPreview?: boolean
 }
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -195,6 +199,7 @@ export function parseDigestEditionContent(
       !isString(story.subtitle) ||
       !Array.isArray(story.bullets) ||
       !story.bullets.every(isString) ||
+      !(story.editorialNote === undefined || isString(story.editorialNote)) ||
       !Array.isArray(story.bangers) ||
       !story.bangers.every(isPortalTweet) ||
       !Array.isArray(story.commentary) ||

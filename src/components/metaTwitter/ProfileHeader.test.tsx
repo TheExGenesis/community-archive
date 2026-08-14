@@ -1,17 +1,19 @@
+import '@testing-library/jest-dom'
 import { render, screen } from '@testing-library/react'
 import { ProfileHeader } from './ProfileHeader'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 
+type MockImageProps = React.ComponentProps<'img'> & {
+  fill?: boolean
+  priority?: boolean
+}
+
 jest.mock('next/image', () => ({
   __esModule: true,
-  default: ({ alt = '', ...props }: { alt?: string }) => (
+  default: ({ fill, priority, alt = '', ...props }: MockImageProps) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img alt={alt} {...props} />
   ),
-}))
-
-jest.mock('./ProfileAvatar', () => ({
-  ProfileAvatar: () => <div data-testid="profile-avatar" />,
 }))
 
 const profile = (
@@ -20,7 +22,7 @@ const profile = (
   account_id: '42',
   username: 'alice',
   account_display_name: 'Alice',
-  created_at: null,
+  created_at: '2010-01-01T00:00:00.000Z',
   num_tweets: 10,
   num_followers: 20,
   num_following: 30,
@@ -28,7 +30,7 @@ const profile = (
   bio: null,
   website: null,
   location: null,
-  avatar_media_url: null,
+  avatar_media_url: 'https://pbs.twimg.com/profile_images/42/avatar_normal.jpg',
   header_media_url: null,
   ...membership,
 })
@@ -96,4 +98,18 @@ test('labels an uploader and exposes the archive download', () => {
   expect(
     screen.queryByRole('note', { name: 'Limited profile' }),
   ).not.toBeInTheDocument()
+})
+
+test('requests a high-resolution avatar for the profile header', () => {
+  render(
+    <ProfileHeader
+      profile={profile({ has_archive: false, is_opted_in: false })}
+      archivedAt={null}
+    />,
+  )
+
+  expect(screen.getByAltText("Alice's avatar")).toHaveAttribute(
+    'src',
+    'https://pbs.twimg.com/profile_images/42/avatar_400x400.jpg',
+  )
 })

@@ -6,7 +6,6 @@ import {
   type AnalyticsGatewayFetcher,
 } from '@/lib/clickhouseGateway'
 import { devLog } from '@/lib/devLog'
-import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 import type { BangerTweet } from './types'
 import {
   PROFILE_BANGERS_INITIAL_LIMIT,
@@ -183,11 +182,9 @@ const mapQuotedTweet = (
         ? row.accountDisplayName
         : row.username,
     avatar_media_url:
-      getHighResolutionAvatarUrl(
-        typeof row.avatarMediaUrl === 'string' && row.avatarMediaUrl
-          ? row.avatarMediaUrl
-          : null,
-      ) ?? null,
+      typeof row.avatarMediaUrl === 'string' && row.avatarMediaUrl.trim()
+        ? row.avatarMediaUrl
+        : null,
     media: Array.isArray(row.media) ? row.media.map(mapMedia) : [],
   }
 }
@@ -246,11 +243,9 @@ const mapBanger = (value: unknown, accountId: string): BangerTweet => {
         ? row.displayName
         : row.username,
     avatar_media_url:
-      getHighResolutionAvatarUrl(
-        typeof row.avatarMediaUrl === 'string' && row.avatarMediaUrl
-          ? row.avatarMediaUrl
-          : null,
-      ) ?? null,
+      typeof row.avatarMediaUrl === 'string' && row.avatarMediaUrl.trim()
+        ? row.avatarMediaUrl
+        : null,
     media: Array.isArray(row.media) ? row.media.map(mapMedia) : [],
     quote_count: quoteCount,
     quoting_accounts: safeCount(

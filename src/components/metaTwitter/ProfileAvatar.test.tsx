@@ -18,14 +18,14 @@ test('keeps a stored avatar without requesting syndication recovery', () => {
   render(
     <ProfileAvatar
       accountId="42"
-      avatarUrl="https://pbs.twimg.com/stored.jpg"
+      avatarUrl="https://pbs.twimg.com/profile_images/42/avatar_normal.jpg"
       displayName="Alice"
     />,
   )
 
   expect(screen.getByAltText("Alice's avatar")).toHaveAttribute(
     'src',
-    'https://pbs.twimg.com/stored.jpg',
+    'https://pbs.twimg.com/profile_images/42/avatar_400x400.jpg',
   )
   expect(fetchMock).not.toHaveBeenCalled()
 })

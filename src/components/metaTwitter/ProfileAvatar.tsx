@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 
 export function ProfileAvatar({
   accountId,
@@ -12,7 +13,9 @@ export function ProfileAvatar({
   avatarUrl: string | null
   displayName: string
 }) {
-  const [resolvedAvatarUrl, setResolvedAvatarUrl] = useState(avatarUrl)
+  const [resolvedAvatarUrl, setResolvedAvatarUrl] = useState(
+    getHighResolutionAvatarUrl(avatarUrl) ?? null,
+  )
   const attemptedRecovery = useRef(false)
   const mounted = useRef(true)
 
@@ -54,6 +57,7 @@ export function ProfileAvatar({
         alt={`${displayName}'s avatar`}
         width={132}
         height={132}
+        sizes="132px"
         priority
         onError={() => {
           setResolvedAvatarUrl(null)

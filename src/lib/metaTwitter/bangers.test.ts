@@ -99,7 +99,7 @@ test('loads every scoped page of profile bangers above the quote threshold', asy
         tweet_id: '100',
         quote_count: 8,
         avatar_media_url:
-          'https://pbs.twimg.com/profile_images/42/avatar_400x400.jpg',
+          'https://pbs.twimg.com/profile_images/42/avatar_normal.jpg',
         media: [
           {
             media_url: 'https://pbs.twimg.com/media/100.jpg',
@@ -114,7 +114,7 @@ test('loads every scoped page of profile bangers above the quote threshold', asy
           account_id: '77',
           username: 'quoted_member',
           avatar_media_url:
-            'https://pbs.twimg.com/profile_images/77/quoted_400x400.jpg',
+            'https://pbs.twimg.com/profile_images/77/quoted_normal.jpg',
           full_text: 'The quoted source',
           media: [
             {

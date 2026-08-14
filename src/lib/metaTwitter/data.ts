@@ -4,7 +4,6 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
 import { Database } from '@/database-types'
 import { devLog } from '@/lib/devLog'
-import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 import type {
   ArchiveMediaItem,
   ArchivePerson,
@@ -70,8 +69,7 @@ async function fetchProfileHeader(
     bio: profile?.bio ?? null,
     website: profile?.website ?? null,
     location: profile?.location ?? null,
-    avatar_media_url:
-      getHighResolutionAvatarUrl(profile?.avatar_media_url) ?? null,
+    avatar_media_url: profile?.avatar_media_url ?? null,
     header_media_url: profile?.header_media_url ?? null,
     has_archive: membership?.has_archive === true,
     is_opted_in: membership?.is_opted_in === true,

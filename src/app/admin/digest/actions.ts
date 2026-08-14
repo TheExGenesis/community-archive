@@ -18,6 +18,7 @@ import {
   DIGEST_STORY_CATEGORIES,
   parseDigestEditionContent,
   type DigestCandidate,
+  type DigestEditionContent,
   type DigestRunEvent,
 } from '@/lib/digest/types'
 import { generateDigestWorkflow } from '@/workflows/digestGeneration'
@@ -69,6 +70,82 @@ const revalidateDigestPaths = (digestDate?: string) => {
   revalidatePath('/digest')
   revalidatePath('/admin/digest')
   if (digestDate) revalidatePath(`/digest/${digestDate}`)
+}
+
+function parseEditedDigestContent(
+  formData: FormData,
+  baseContent: DigestEditionContent,
+  runId: string,
+): DigestEditionContent {
+  const executiveSummary = [0, 1, 2].map((index) =>
+    formString(formData, `summary_${index}`).slice(0, 300),
+  )
+  if (executiveSummary.some((bullet) => !bullet)) {
+    redirectToLab({ runId, error: 'All three summary bullets are required.' })
+  }
+  const stories = baseContent.stories.map((story, storyIndex) => {
+    const category = formString(formData, `story_${storyIndex}_category`)
+    const title = formString(formData, `story_${storyIndex}_title`).slice(
+      0,
+      300,
+    )
+    const subtitle = formString(formData, `story_${storyIndex}_subtitle`).slice(
+      0,
+      320,
+    )
+    const editorialNote = formString(
+      formData,
+      `story_${storyIndex}_editorial_note`,
+    ).slice(0, 360)
+    const bullets = story.bullets.map((_, bulletIndex) =>
+      formString(formData, `story_${storyIndex}_bullet_${bulletIndex}`).slice(
+        0,
+        220,
+      ),
+    )
+    if (
+      !DIGEST_STORY_CATEGORIES.some((item) => item === category) ||
+      !title ||
+      !subtitle ||
+      !editorialNote ||
+      bullets.some((bullet) => !bullet)
+    ) {
+      redirectToLab({
+        runId,
+        error: `Complete every editable field in story ${storyIndex + 1}.`,
+      })
+    }
+    return {
+      ...story,
+      category: category as (typeof DIGEST_STORY_CATEGORIES)[number],
+      title,
+      subtitle,
+      editorialNote,
+      bullets,
+    }
+  })
+  const keywords = Array.from(
+    new Set(
+      formString(formData, 'keywords')
+        .split(/[\n,]/)
+        .map((keyword) => keyword.trim().slice(0, 60))
+        .filter(Boolean),
+    ),
+  ).slice(0, 12)
+  if (keywords.length < 3) {
+    redirectToLab({ runId, error: 'Keep at least three edition keywords.' })
+  }
+
+  const content = parseDigestEditionContent({
+    ...baseContent,
+    executiveSummary,
+    stories,
+    keywords,
+  })
+  if (!content) {
+    redirectToLab({ runId, error: 'The edited draft did not pass validation.' })
+  }
+  return content
 }
 
 async function enqueueDigestGeneration(runId: string) {
@@ -777,6 +854,92 @@ export async function stageDigestEditionAction(formData: FormData) {
   redirectToLab({ runId, notice: `Staged digest edition v${version}.` })
 }
 
+export async function stageEditedDigestEditionAction(formData: FormData) {
+  const { user } = await requireAdmin()
+  const runId = formString(formData, 'run_id')
+  if (!UUID_PATTERN.test(runId)) redirectToLab({ error: 'Invalid run ID.' })
+
+  const admin = createDigestAdminClient()
+  const { data: runRow, error: runError } = await admin
+    .from('digest_runs')
+    .select('*')
+    .eq('id', runId)
+    .maybeSingle()
+  if (runError || !runRow) redirectToLab({ error: 'Run not found.' })
+  const run = mapDigestRun(runRow)
+  if (run.status !== 'completed' || !run.parsedOutput) {
+    redirectToLab({
+      runId,
+      error: 'Generate a valid digest before editing it.',
+    })
+  }
+
+  const content = parseEditedDigestContent(formData, run.parsedOutput, runId)
+  const { data: latest, error: latestError } = await admin
+    .from('digest_editions')
+    .select('version')
+    .eq('digest_date', run.digestDate)
+    .order('version', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (latestError) {
+    redirectToLab({
+      runId,
+      error: `Could not resolve draft version: ${latestError.message}`,
+    })
+  }
+  const version = (latest?.version ?? 0) + 1
+  const { error } = await admin.from('digest_editions').insert({
+    digest_date: run.digestDate,
+    version,
+    status: 'draft',
+    source_run_id: run.id,
+    content: toJson(content),
+    created_by: user.id,
+  })
+  if (error) {
+    redirectToLab({
+      runId,
+      error: `Could not save corrected draft: ${error.message}`,
+    })
+  }
+
+  const events = [
+    ...run.events,
+    event(
+      'edition',
+      'completed',
+      `Saved inline corrections as digest edition version ${version}.`,
+    ),
+  ]
+  const { error: eventError } = await admin
+    .from('digest_runs')
+    .update({ events: toJson(events), updated_at: new Date().toISOString() })
+    .eq('id', runId)
+  if (eventError) {
+    console.warn(
+      '[daily digest] saved corrected draft but could not append event',
+      { runId, version, error: eventError },
+    )
+  }
+  await captureDigestPostHogEvent(user.id, {
+    event: 'digest_page_created',
+    properties: {
+      source: 'manual_edit',
+      status: 'draft',
+      story_count: content.stories.length,
+      editorial_warning_count: content.editorialWarnings?.length ?? 0,
+    },
+  })
+  console.info('[daily digest] inline corrections saved', {
+    runId,
+    digestDate: run.digestDate,
+    version,
+  })
+  revalidateDigestPaths(run.digestDate)
+  redirectToLab({ runId, notice: `Saved corrections as draft v${version}.` })
+}
+
 export async function saveDigestEditionAction(formData: FormData) {
   const { user } = await requireAdmin()
   const editionId = formString(formData, 'edition_id')
@@ -799,74 +962,7 @@ export async function saveDigestEditionAction(formData: FormData) {
     redirectToLab({ runId, error: 'Only a draft edition can be edited.' })
   }
 
-  const executiveSummary = [0, 1, 2].map((index) =>
-    formString(formData, `summary_${index}`).slice(0, 300),
-  )
-  if (executiveSummary.some((bullet) => !bullet)) {
-    redirectToLab({ runId, error: 'All three summary bullets are required.' })
-  }
-  const stories = edition.content.stories.map((story, storyIndex) => {
-    const category = formString(formData, `story_${storyIndex}_category`)
-    const title = formString(formData, `story_${storyIndex}_title`).slice(
-      0,
-      300,
-    )
-    const subtitle = formString(formData, `story_${storyIndex}_subtitle`).slice(
-      0,
-      320,
-    )
-    const editorialNote = formString(
-      formData,
-      `story_${storyIndex}_editorial_note`,
-    ).slice(0, 360)
-    const bullets = story.bullets.map((_, bulletIndex) =>
-      formString(formData, `story_${storyIndex}_bullet_${bulletIndex}`).slice(
-        0,
-        220,
-      ),
-    )
-    if (
-      !DIGEST_STORY_CATEGORIES.some((item) => item === category) ||
-      !title ||
-      !subtitle ||
-      !editorialNote ||
-      bullets.some((bullet) => !bullet)
-    ) {
-      redirectToLab({
-        runId,
-        error: `Complete every editable field in story ${storyIndex + 1}.`,
-      })
-    }
-    return {
-      ...story,
-      category: category as (typeof DIGEST_STORY_CATEGORIES)[number],
-      title,
-      subtitle,
-      editorialNote,
-      bullets,
-    }
-  })
-  const keywords = Array.from(
-    new Set(
-      formString(formData, 'keywords')
-        .split(/[\n,]/)
-        .map((keyword) => keyword.trim().slice(0, 60))
-        .filter(Boolean),
-    ),
-  ).slice(0, 12)
-  if (keywords.length < 3) {
-    redirectToLab({ runId, error: 'Keep at least three edition keywords.' })
-  }
-
-  const content = parseDigestEditionContent({
-    ...edition.content,
-    executiveSummary,
-    stories,
-    keywords,
-  })
-  if (!content) {
-    redirectToLab({ runId, error: 'The edited draft did not pass validation.' })
-  }
+  const content = parseEditedDigestContent(formData, edition.content, runId)
   const { data: latest, error: latestError } = await admin
     .from('digest_editions')
     .select('version')

@@ -14,10 +14,11 @@ import {
   publishDigestEditionAction,
   reviseDigestRunAction,
   stageDigestEditionAction,
+  stageEditedDigestEditionAction,
   updateDigestSelectionAction,
 } from './actions'
 import { DigestJobProgress } from './DigestJobProgress'
-import { DigestEditionEditor } from './DigestEditionEditor'
+import { DigestContentFields, DigestEditionEditor } from './DigestEditionEditor'
 import { SubmitButton } from './SubmitButton'
 
 export const dynamic = 'force-dynamic'
@@ -569,7 +570,7 @@ export default async function DigestLabPage({
                         </div>
                         <h2 className="mt-1 text-xl font-semibold">
                           {state.activeRun.parsedOutput.stories.length} stories
-                          ready to review
+                          ready to edit
                         </h2>
                       </div>
                       <form action={stageDigestEditionAction}>
@@ -600,37 +601,37 @@ export default async function DigestLabPage({
                         </ul>
                       </div>
                     ) : null}
-                    <ul className="mt-5 list-disc space-y-2 rounded-md bg-blue-50 py-4 pl-9 pr-4 font-serif text-lg leading-7 text-blue-950 dark:bg-blue-950/30 dark:text-blue-100">
-                      {state.activeRun.parsedOutput.executiveSummary.map(
-                        (bullet) => (
-                          <li key={bullet}>{bullet}</li>
-                        ),
-                      )}
-                    </ul>
-                    <div className="mt-5 space-y-4">
-                      {state.activeRun.parsedOutput.stories.map((story) => (
-                        <article
-                          key={story.slug}
-                          className="rounded-md border p-4"
-                        >
-                          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            {story.bangers.length} bangers · {story.replyCount}{' '}
-                            context posts
-                          </div>
-                          <h3 className="mt-2 font-serif text-2xl font-semibold">
-                            {story.title}
-                          </h3>
-                          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                            {story.subtitle}
-                          </p>
-                          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
-                            {story.bullets.map((bullet) => (
-                              <li key={bullet}>{bullet}</li>
-                            ))}
-                          </ul>
-                        </article>
-                      ))}
-                    </div>
+                    <form
+                      action={stageEditedDigestEditionAction}
+                      className="mt-5 space-y-7 rounded-lg border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900 dark:bg-blue-950/20"
+                    >
+                      <input
+                        type="hidden"
+                        name="run_id"
+                        value={state.activeRun.id}
+                      />
+                      <div>
+                        <div className="font-semibold">
+                          Edit the validated copy inline
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          Correct typos or wording below. Saving creates a new
+                          private draft; the validated model run stays
+                          unchanged.
+                        </p>
+                      </div>
+                      <DigestContentFields
+                        content={state.activeRun.parsedOutput}
+                      />
+                      <div className="flex flex-wrap items-center gap-3 border-t border-blue-200 pt-4 dark:border-blue-900">
+                        <SubmitButton pendingLabel="Saving corrections…">
+                          Save corrections as new draft
+                        </SubmitButton>
+                        <span className="text-xs text-muted-foreground">
+                          This does not publish the edition.
+                        </span>
+                      </div>
+                    </form>
                     <form
                       action={reviseDigestRunAction}
                       className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/25"

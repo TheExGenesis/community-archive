@@ -147,6 +147,17 @@ Staging synchronization is automatic; production synchronization is not:
 - Normalize archive text with `src/lib/tweetText.ts`; do not add another local
   HTML-entity decoder to a tweet surface.
 
+### Progressive collection rendering
+
+- For large result sets, optimize the first screen rather than blocking on the
+  complete collection. Server-render only the first useful items and the small
+  supporting summaries visible above the fold, then immediately continue the
+  active result set in the background.
+- Preload a shallow first page for adjacent tabs, chapters, or filters after the
+  active view is useful. Fetch deeper pages only as the user scrolls. Preserve
+  shareable URLs, browser history, deterministic server-side sorting, and a
+  manual accessible load-more fallback alongside infinite scroll.
+
 Use Node 20 from `.nvmrc` and pnpm. Prefer the narrowest relevant check, then
 expand verification in proportion to risk.
 

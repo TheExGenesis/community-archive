@@ -1,0 +1,552 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { archiveChapterHref } from './ArchiveNav'
+import { ProfileArchive } from './ProfileArchive'
+import type { BangerTweet } from '@/lib/metaTwitter/types'
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn() }),
+}))
+jest.mock('next/image', () => ({
+  __esModule: true,
+  default: ({ alt = '', ...props }: { alt?: string }) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img alt={alt} {...props} />
+  ),
+}))
+jest.mock('@/components/TweetAvatarImage', () => ({
+  __esModule: true,
+  default: () => null,
+}))
+jest.mock('@/components/ImageLightbox', () => ({
+  __esModule: true,
+  default: ({ src, alt }: { src: string; alt: string }) => (
+    <span data-testid="tweet-image" data-src={src} aria-label={alt} />
+  ),
+}))
+
+const banger = (id: number, year: number): BangerTweet => ({
+  tweet_id: String(id),
+  account_id: '42',
+  created_at: `${year}-01-01T00:00:00.000Z`,
+  full_text: `Banger ${id}`,
+  favorite_count: 20,
+  retweet_count: 2,
+  reply_to_username: null,
+  username: 'alice',
+  account_display_name: 'Alice',
+  avatar_media_url: null,
+  media: [],
+  quote_count: 5,
+  quoting_accounts: 5,
+  quote_tweet_id: null,
+  quoted_tweet: null,
+})
+
+const chapters = [
+  { year: 2025, count: 4 },
+  { year: 2024, count: 3 },
+]
+
+const initialSidebar = { media: [], mediaCount: 0, people: [] }
+const jsonResponse = (body: unknown) =>
+  ({ ok: true, json: async () => body }) as Response
+
+const deferredResponse = () => {
+  let resolve!: (response: Response) => void
+  const promise = new Promise<Response>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
+class TestIntersectionObserver {
+  static callbacks: IntersectionObserverCallback[] = []
+  readonly root = null
+  readonly rootMargin = '0px'
+  readonly thresholds = [0]
+
+  constructor(callback: IntersectionObserverCallback) {
+    TestIntersectionObserver.callbacks.push(callback)
+  }
+
+  disconnect() {}
+  observe() {}
+  takeRecords() {
+    return []
+  }
+  unobserve() {}
+}
+
+beforeEach(() => {
+  TestIntersectionObserver.callbacks = []
+  window.history.replaceState(null, '', '/user/alice')
+  global.IntersectionObserver =
+    TestIntersectionObserver as unknown as typeof IntersectionObserver
+})
+
+afterEach(() => {
+  jest.restoreAllMocks()
+})
+
+test('preserves profile identity parameters while changing chapters', () => {
+  expect(archiveChapterHref('/user/42?username=alice', 2025)).toBe(
+    '/user/42?username=alice&chapter=2025',
+  )
+  expect(archiveChapterHref('/user/42?username=alice&chapter=2025', null)).toBe(
+    '/user/42?username=alice',
+  )
+})
+
+test('switches chapters immediately while their small data requests are pending', async () => {
+  const user = userEvent.setup()
+  const fetchMock = jest
+    .spyOn(global, 'fetch')
+    .mockImplementation(() => new Promise(() => {}))
+
+  render(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      initialYear={null}
+      initialPage={{
+        tweets: [banger(1, 2025), banger(2, 2024)],
+        yearCounts: chapters,
+        total: 7,
+        nextOffset: 2,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+
+  expect(screen.getAllByRole('article')).toHaveLength(2)
+  await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+
+  await user.click(screen.getByRole('link', { name: '2025 4' }))
+
+  expect(window.location.pathname + window.location.search).toBe(
+    '/user/alice?chapter=2025',
+  )
+  expect(screen.getByRole('heading', { name: '2025 bangers' })).toBeVisible()
+  expect(screen.getAllByRole('link', { current: 'page' })).toHaveLength(1)
+  expect(screen.queryByText('Banger 1')).not.toBeInTheDocument()
+  expect(screen.getByText('Loading bangers…')).toBeVisible()
+  expect(screen.getByText('Loading media…')).toBeVisible()
+  expect(screen.getByText('Loading people…')).toBeVisible()
+  expect(
+    fetchMock.mock.calls.some(([input]) =>
+      String(input).includes('/bangers?offset=0&limit=2&sort=quotes&year=2025'),
+    ),
+  ).toBe(true)
+  await waitFor(() =>
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        String(input).includes('/sidebar?year=2025'),
+      ),
+    ).toBe(true),
+  )
+})
+
+test('preserves modified-click behavior on chapter links', async () => {
+  const fetchMock = jest
+    .spyOn(global, 'fetch')
+    .mockImplementation(() => new Promise(() => {}))
+  render(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      initialYear={null}
+      initialPage={{
+        tweets: [banger(1, 2025), banger(2, 2024)],
+        yearCounts: chapters,
+        total: 7,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+
+  let defaultPrevented: boolean | undefined
+  document.addEventListener(
+    'click',
+    (event) => {
+      defaultPrevented = event.defaultPrevented
+      event.preventDefault()
+    },
+    { once: true },
+  )
+  fireEvent.click(screen.getByRole('link', { name: '2025 4' }), {
+    metaKey: true,
+  })
+
+  expect(defaultPrevented).toBe(false)
+  expect(window.location.pathname + window.location.search).toBe('/user/alice')
+  expect(
+    screen.getByRole('heading', { name: 'Overall — Bangers' }),
+  ).toBeVisible()
+})
+
+test('restores the selected chapter from browser history', async () => {
+  const user = userEvent.setup()
+  const fetchMock = jest
+    .spyOn(global, 'fetch')
+    .mockImplementation(() => new Promise(() => {}))
+  render(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      initialYear={null}
+      initialPage={{
+        tweets: [banger(1, 2025), banger(2, 2024)],
+        yearCounts: chapters,
+        total: 7,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+
+  await user.click(screen.getByRole('link', { name: '2025 4' }))
+  window.history.pushState(null, '', '/user/alice?chapter=2024')
+  act(() => window.dispatchEvent(new PopStateEvent('popstate')))
+
+  expect(screen.getByRole('heading', { name: '2024 bangers' })).toBeVisible()
+  expect(screen.getByRole('link', { name: '2024 3' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
+})
+
+test('fills the active feed, preloads shallow chapter pages, and continues at the scroll sentinel', async () => {
+  const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) => {
+    const url = new URL(String(input), 'https://community-archive.org')
+    const offset = Number(url.searchParams.get('offset') ?? 0)
+    const year = url.searchParams.get('year')
+    const page = year
+      ? {
+          tweets: [banger(Number(`${year}1`), Number(year))],
+          yearCounts: chapters,
+          total: Number(year) === 2025 ? 4 : 3,
+          nextOffset: 1,
+          available: true,
+        }
+      : offset === 2
+        ? {
+            tweets: [banger(3, 2025), banger(4, 2024)],
+            yearCounts: chapters,
+            total: 5,
+            nextOffset: 4,
+            available: true,
+          }
+        : {
+            tweets: [banger(5, 2023)],
+            yearCounts: chapters,
+            total: 5,
+            nextOffset: null,
+            available: true,
+          }
+    return Promise.resolve({ ok: true, json: async () => page } as Response)
+  })
+
+  render(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      initialYear={null}
+      initialPage={{
+        tweets: [banger(1, 2025), banger(2, 2024)],
+        yearCounts: chapters,
+        total: 5,
+        nextOffset: 2,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+
+  expect(screen.getAllByRole('article')).toHaveLength(2)
+  await screen.findByText('Banger 4')
+  await waitFor(() =>
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        String(input).includes('limit=2&sort=quotes&year='),
+      ),
+    ).toHaveLength(2),
+  )
+
+  const callback = TestIntersectionObserver.callbacks.at(-1)
+  expect(callback).toBeDefined()
+  act(() => {
+    callback?.(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    )
+  })
+
+  await screen.findByText('Banger 5')
+  expect(
+    fetchMock.mock.calls.some(([input]) =>
+      String(input).includes('/bangers?offset=4&limit=10&sort=quotes'),
+    ),
+  ).toBe(true)
+})
+
+test('stops automatic infinite-scroll retries after a failed page', async () => {
+  const user = userEvent.setup()
+  const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) => {
+    const url = new URL(String(input), 'https://community-archive.org')
+    if (url.pathname.endsWith('/sidebar')) {
+      return Promise.resolve(jsonResponse(initialSidebar))
+    }
+    if (!url.searchParams.has('year')) {
+      return Promise.reject(new Error('gateway unavailable'))
+    }
+    return Promise.resolve(
+      jsonResponse({
+        tweets: [],
+        yearCounts: chapters,
+        total: 0,
+        nextOffset: null,
+        available: true,
+      }),
+    )
+  })
+
+  render(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      initialYear={null}
+      initialPage={{
+        tweets: [banger(1, 2025), banger(2, 2024)],
+        yearCounts: chapters,
+        total: 7,
+        nextOffset: 2,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+
+  const retry = await screen.findByRole('button', {
+    name: 'Retry loading bangers',
+  })
+  const overallPageCalls = () =>
+    fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes('/bangers?offset=2&limit=10&sort=quotes'),
+    ).length
+
+  expect(overallPageCalls()).toBe(1)
+  await act(async () => Promise.resolve())
+  expect(overallPageCalls()).toBe(1)
+
+  await user.click(retry)
+  await waitFor(() => expect(overallPageCalls()).toBe(2))
+})
+
+test('can retry an unavailable initial banger page from offset zero', async () => {
+  const user = userEvent.setup()
+  const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) => {
+    const url = new URL(String(input), 'https://community-archive.org')
+    if (url.pathname.endsWith('/sidebar')) {
+      return Promise.resolve(jsonResponse(initialSidebar))
+    }
+    return Promise.resolve(
+      jsonResponse({
+        tweets: url.searchParams.has('year') ? [] : [banger(10, 2025)],
+        yearCounts: chapters,
+        total: url.searchParams.has('year') ? 0 : 1,
+        nextOffset: null,
+        available: true,
+      }),
+    )
+  })
+
+  render(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      initialYear={null}
+      initialPage={{
+        tweets: [],
+        yearCounts: chapters,
+        total: 0,
+        nextOffset: null,
+        available: false,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+
+  await user.click(
+    screen.getByRole('button', { name: 'Retry loading bangers' }),
+  )
+
+  await screen.findByText('Banger 10')
+  expect(
+    fetchMock.mock.calls.some(([input]) =>
+      String(input).includes('/bangers?offset=0&limit=2&sort=quotes'),
+    ),
+  ).toBe(true)
+})
+
+test('does not remember a failed sidebar request as an empty result', async () => {
+  const user = userEvent.setup()
+  let sidebarCalls = 0
+  const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) => {
+    const url = new URL(String(input), 'https://community-archive.org')
+    if (url.pathname.endsWith('/sidebar')) {
+      sidebarCalls += 1
+      if (sidebarCalls === 1) {
+        return Promise.reject(new Error('gateway unavailable'))
+      }
+      return Promise.resolve(jsonResponse(initialSidebar))
+    }
+    return Promise.resolve(
+      jsonResponse({
+        tweets: [],
+        yearCounts: chapters,
+        total: 0,
+        nextOffset: null,
+        available: true,
+      }),
+    )
+  })
+
+  render(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      initialYear={null}
+      initialPage={{
+        tweets: [],
+        yearCounts: chapters,
+        total: 0,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={{ ...initialSidebar, available: false }}
+    />,
+  )
+
+  await user.click(
+    await screen.findByRole('button', { name: 'Retry media and people' }),
+  )
+
+  await screen.findByText('No media in this chapter')
+  expect(sidebarCalls).toBe(2)
+  expect(fetchMock).toHaveBeenCalled()
+})
+
+test('does not start a stale chapter preload over an in-flight active feed', async () => {
+  const user = userEvent.setup()
+  const overallFill = deferredResponse()
+  const activeChapter = deferredResponse()
+  const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) => {
+    const url = new URL(String(input), 'https://community-archive.org')
+    if (url.pathname.endsWith('/sidebar')) {
+      return Promise.resolve(jsonResponse(initialSidebar))
+    }
+    const year = url.searchParams.get('year')
+    const offset = Number(url.searchParams.get('offset') ?? 0)
+    if (!year && offset === 2) return overallFill.promise
+    if (year === '2025' && offset === 0) return activeChapter.promise
+    return Promise.resolve(
+      jsonResponse({
+        tweets: [],
+        yearCounts: chapters,
+        total: year === '2024' ? 3 : 4,
+        nextOffset: null,
+        available: true,
+      }),
+    )
+  })
+
+  render(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      initialYear={null}
+      initialPage={{
+        tweets: [banger(1, 2025), banger(2, 2024)],
+        yearCounts: chapters,
+        total: 7,
+        nextOffset: 2,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+
+  await user.click(screen.getByRole('link', { name: '2025 4' }))
+  await waitFor(() =>
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        String(input).includes('offset=0&limit=2&sort=quotes&year=2025'),
+      ),
+    ).toHaveLength(1),
+  )
+
+  act(() => {
+    overallFill.resolve(
+      jsonResponse({
+        tweets: [banger(3, 2025)],
+        yearCounts: chapters,
+        total: 7,
+        nextOffset: null,
+        available: true,
+      }),
+    )
+  })
+  await waitFor(() =>
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        String(input).includes('year=2024'),
+      ),
+    ).toBe(true),
+  )
+  expect(
+    fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes('offset=0&limit=2&sort=quotes&year=2025'),
+    ),
+  ).toHaveLength(1)
+
+  act(() => {
+    activeChapter.resolve(
+      jsonResponse({
+        tweets: [banger(20251, 2025)],
+        yearCounts: chapters,
+        total: 4,
+        nextOffset: null,
+        available: true,
+      }),
+    )
+  })
+  await screen.findByText('Banger 20251')
+  expect(
+    fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes('offset=0&limit=2&sort=quotes&year=2025'),
+    ),
+  ).toHaveLength(1)
+})

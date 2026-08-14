@@ -2,13 +2,14 @@ import { cache } from 'react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { ProfileHeader } from '@/components/metaTwitter/ProfileHeader'
-import {
-  ArchiveNav,
-  type NavChapter,
-} from '@/components/metaTwitter/ArchiveNav'
-import { Workspace } from '@/components/metaTwitter/Workspace'
+import type { NavChapter } from '@/components/metaTwitter/ArchiveNav'
+import { ProfileArchive } from '@/components/metaTwitter/ProfileArchive'
 import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
-import { getProfileBangers } from '@/lib/metaTwitter/bangers'
+import { getProfileBangersPage } from '@/lib/metaTwitter/bangers'
+import {
+  PROFILE_BANGERS_INITIAL_LIMIT,
+  resolveProfileChapterYear,
+} from '@/lib/metaTwitter/profilePagination'
 import { getClickHouseProfileSidebar } from '@/lib/metaTwitter/clickhouseSidebar'
 import {
   getCachedArchivedAt,
@@ -19,7 +20,7 @@ import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 
 interface PageProps {
   params: { account_id: string }
-  searchParams: { chapter?: string }
+  searchParams: { chapter?: string; username?: string }
 }
 
 interface ResolvedProfile {
@@ -78,59 +79,57 @@ export default async function UserPage({ params, searchParams }: PageProps) {
   if (!resolved) notFound()
 
   const { accountId, profile } = resolved
-  const [archivedAt, bangers] = await Promise.all([
-    profile.has_archive ? getCachedArchivedAt(accountId) : null,
-    getProfileBangers(accountId),
-  ])
-
   const requestedYear = searchParams.chapter
     ? Number.parseInt(searchParams.chapter, 10)
     : null
-  const year =
+  const candidateYear =
     requestedYear &&
-    bangers.yearCounts.some((entry) => entry.year === requestedYear)
+    requestedYear >= 2006 &&
+    requestedYear <= new Date().getUTCFullYear() + 1
       ? requestedYear
       : null
-  const tweets = year
-    ? bangers.tweets.filter(
-        (tweet) => new Date(tweet.created_at).getUTCFullYear() === year,
-      )
-    : bangers.tweets
-  const sidebar = await getClickHouseProfileSidebar(
-    accountId,
-    year ?? undefined,
-  )
 
-  const basePath = `/user/${encodeURIComponent(params.account_id)}`
-  const navChapters: NavChapter[] = bangers.yearCounts
-  const contextTitle = year ? `${year} bangers` : 'Overall — Bangers'
-  const contextDesc = bangers.available
-    ? `${tweets.length} post${tweets.length === 1 ? '' : 's'} with at least two quote posts from Community Archive members${year ? ` in ${year}` : ''}. Self-quotes are excluded.`
-    : 'The Community Archive banger ranking is temporarily unavailable.'
+  const [archivedAt, candidatePage, candidateSidebar] = await Promise.all([
+    profile.has_archive ? getCachedArchivedAt(accountId) : null,
+    getProfileBangersPage(accountId, {
+      limit: PROFILE_BANGERS_INITIAL_LIMIT,
+      year: candidateYear ?? undefined,
+    }),
+    getClickHouseProfileSidebar(accountId, candidateYear ?? undefined),
+  ])
+
+  const year = resolveProfileChapterYear(candidateYear, candidatePage)
+  const [initialPage, sidebar] =
+    year === candidateYear
+      ? [candidatePage, candidateSidebar]
+      : await Promise.all([
+          getProfileBangersPage(accountId, {
+            limit: PROFILE_BANGERS_INITIAL_LIMIT,
+          }),
+          getClickHouseProfileSidebar(accountId, undefined),
+        ])
+
+  const baseParams = new URLSearchParams()
+  if (searchParams.username) {
+    baseParams.set('username', searchParams.username)
+  }
+  const baseQuery = baseParams.toString()
+  const basePath = `/user/${encodeURIComponent(params.account_id)}${baseQuery ? `?${baseQuery}` : ''}`
+  const navChapters: NavChapter[] = initialPage.yearCounts
 
   return (
     <div className="flex justify-center px-4 py-8 sm:px-6">
       <div className="h-fit w-full max-w-[1220px] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_2px_16px_rgba(0,0,0,0.06)]">
         <ProfileHeader profile={profile} archivedAt={archivedAt} />
-        <div className="grid grid-cols-1 items-start border-t border-border lg:grid-cols-[250px_1fr]">
-          <ArchiveNav
-            basePath={basePath}
-            chapters={navChapters}
-            activeYear={year}
-          />
-          <Workspace
-            key={year ?? 'overall'}
-            avatarUrl={profile.avatar_media_url}
-            contextTitle={contextTitle}
-            contextDesc={contextDesc}
-            tweets={tweets}
-            bangersAvailable={bangers.available}
-            media={sidebar.media}
-            mediaCount={sidebar.mediaCount}
-            people={sidebar.people}
-            peopleTitle={year ? `People in ${year}` : 'Top people'}
-          />
-        </div>
+        <ProfileArchive
+          accountId={accountId}
+          avatarUrl={profile.avatar_media_url}
+          basePath={basePath}
+          chapters={navChapters}
+          initialYear={year}
+          initialPage={initialPage}
+          initialSidebar={sidebar}
+        />
       </div>
     </div>
   )

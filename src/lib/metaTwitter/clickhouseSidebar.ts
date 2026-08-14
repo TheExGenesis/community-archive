@@ -52,6 +52,11 @@ export interface ClickHouseProfileSidebar {
   people: ArchivePerson[]
 }
 
+export interface ClickHouseProfileSidebarState
+  extends ClickHouseProfileSidebar {
+  available: boolean
+}
+
 const safeCount = (value: unknown): number | null => {
   const count = Number(value)
   return Number.isSafeInteger(count) && count >= 0 ? count : null
@@ -176,18 +181,28 @@ const getCachedClickHouseProfileSidebar = unstable_cache(
   { revalidate: DAY },
 )
 
-export async function getClickHouseProfileSidebar(
+export async function getClickHouseProfileSidebarOrThrow(
   accountId: string,
   year: number | undefined,
 ): Promise<ClickHouseProfileSidebar> {
+  return getCachedClickHouseProfileSidebar(accountId, year)
+}
+
+export async function getClickHouseProfileSidebar(
+  accountId: string,
+  year: number | undefined,
+): Promise<ClickHouseProfileSidebarState> {
   try {
-    return await getCachedClickHouseProfileSidebar(accountId, year)
+    return {
+      ...(await getClickHouseProfileSidebarOrThrow(accountId, year)),
+      available: true,
+    }
   } catch (error) {
     devLog('metaTwitter getClickHouseProfileSidebar error', {
       accountId,
       year,
       error,
     })
-    return { media: [], mediaCount: 0, people: [] }
+    return { media: [], mediaCount: 0, people: [], available: false }
   }
 }

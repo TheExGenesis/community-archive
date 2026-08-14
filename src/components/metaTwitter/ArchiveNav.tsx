@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import type { MouseEvent } from 'react'
 import { formatNumber } from '@/lib/formatNumber'
 
 export interface NavChapter {
@@ -6,15 +9,43 @@ export interface NavChapter {
   count: number
 }
 
+export const archiveChapterHref = (basePath: string, year: number | null) => {
+  const [pathname, query = ''] = basePath.split('?', 2)
+  const params = new URLSearchParams(query)
+  if (year === null) params.delete('chapter')
+  else params.set('chapter', String(year))
+  const serialized = params.toString()
+  return serialized ? `${pathname}?${serialized}` : pathname
+}
+
 export function ArchiveNav({
   basePath,
   chapters,
   activeYear,
+  onSelect,
 }: {
   basePath: string
   chapters: NavChapter[]
   activeYear: number | null
+  onSelect?: (year: number | null) => void
 }) {
+  const select = (
+    event: MouseEvent<HTMLAnchorElement>,
+    year: number | null,
+  ) => {
+    if (
+      !onSelect ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return
+    }
+    event.preventDefault()
+    onSelect(year)
+  }
   const isOverall = activeYear === null
   return (
     <nav
@@ -25,7 +56,9 @@ export function ArchiveNav({
         Chapters
       </div>
       <Link
-        href={basePath}
+        href={archiveChapterHref(basePath, null)}
+        prefetch={false}
+        onClick={(event) => select(event, null)}
         aria-current={isOverall ? 'page' : undefined}
         className={`whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-bold ${
           isOverall
@@ -40,7 +73,9 @@ export function ArchiveNav({
         return (
           <Link
             key={chapter.year}
-            href={`${basePath}?chapter=${chapter.year}`}
+            href={archiveChapterHref(basePath, chapter.year)}
+            prefetch={false}
+            onClick={(event) => select(event, chapter.year)}
             aria-current={active ? 'page' : undefined}
             className={`flex whitespace-nowrap rounded-lg px-3 py-2 text-sm lg:mt-1 lg:justify-between ${
               active

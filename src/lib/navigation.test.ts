@@ -96,6 +96,16 @@ describe('tweet detail navigation', () => {
     expect(
       getTweetBackLink({ from: 'search', returnTo: '/search?q=archive' }).label,
     ).toBe('Back to search')
+    expect(
+      getTweetBackLink({
+        from: 'profile',
+        returnTo: '/user/exgenesis?chapter=2025',
+      }),
+    ).toEqual({
+      href: '/user/exgenesis?chapter=2025',
+      label: 'Back to profile',
+      hasKnownOrigin: true,
+    })
   })
 
   it('rejects mismatched and external return targets', () => {
@@ -105,6 +115,9 @@ describe('tweet detail navigation', () => {
     expect(
       getTweetBackLink({ from: 'search', returnTo: '//example.com' }).href,
     ).toBe('/search')
+    expect(
+      getTweetBackLink({ from: 'profile', returnTo: '/tweets/123' }).href,
+    ).toBe('/user-dir')
     expect(getTweetBackLink()).toEqual({
       href: '/',
       label: 'Back to Community Archive',

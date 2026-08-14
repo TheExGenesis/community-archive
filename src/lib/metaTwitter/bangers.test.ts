@@ -1,5 +1,5 @@
 import type { AnalyticsGatewayFetcher } from '@/lib/clickhouseGateway'
-import { fetchProfileBangers } from './bangers'
+import { fetchProfileBangers, fetchProfileBangersPage } from './bangers'
 
 const banger = (tweetId: string, quoteCount: string, year: number) => ({
   tweetId,
@@ -55,6 +55,8 @@ test('loads every scoped page of profile bangers above the quote threshold', asy
       return {
         data: [banger('100', '8', 2025), banger('101', '5', 2024)],
         pagination: {
+          limit: 100,
+          offset: 0,
           nextOffset: 2,
           totalAvailable: 3,
           yearCounts: [
@@ -62,12 +64,18 @@ test('loads every scoped page of profile bangers above the quote threshold', asy
             { year: 2024, count: 2 },
           ],
         },
-        query: { targetAccountId: '42', minQuoteCount: 2 },
+        query: {
+          targetAccountId: '42',
+          minQuoteCount: 2,
+          sort: 'quotes',
+        },
       }
     }
     return {
       data: [banger('102', '2', 2024)],
       pagination: {
+        limit: 100,
+        offset: 2,
         nextOffset: null,
         totalAvailable: 3,
         yearCounts: [
@@ -75,7 +83,11 @@ test('loads every scoped page of profile bangers above the quote threshold', asy
           { year: 2024, count: 2 },
         ],
       },
-      query: { targetAccountId: '42', minQuoteCount: 2 },
+      query: {
+        targetAccountId: '42',
+        minQuoteCount: 2,
+        sort: 'quotes',
+      },
     }
   }) as unknown as AnalyticsGatewayFetcher
 
@@ -139,10 +151,61 @@ test('loads every scoped page of profile bangers above the quote threshold', asy
   )
 })
 
+test('loads one year-scoped page with deterministic server sorting', async () => {
+  const fetcher = jest.fn(async () => ({
+    data: [banger('100', '8', 2025)],
+    pagination: {
+      limit: 2,
+      offset: 2,
+      nextOffset: 3,
+      totalAvailable: 4,
+      yearCounts: [
+        { year: 2025, count: 4 },
+        { year: 2024, count: 2 },
+      ],
+    },
+    query: {
+      targetAccountId: '42',
+      minQuoteCount: 2,
+      sort: 'likes',
+      year: 2025,
+    },
+  })) as unknown as AnalyticsGatewayFetcher
+
+  await expect(
+    fetchProfileBangersPage(
+      '42',
+      { limit: 2, offset: 2, year: 2025, sort: 'likes' },
+      fetcher,
+    ),
+  ).resolves.toMatchObject({
+    tweets: [{ tweet_id: '100' }],
+    total: 4,
+    nextOffset: 3,
+  })
+  expect(fetcher).toHaveBeenCalledWith(
+    ['top-quotes'],
+    new URLSearchParams({
+      limit: '2',
+      offset: '2',
+      sort: 'likes',
+      target_account_id: '42',
+      min_quote_count: '2',
+      exclude_self: 'true',
+      target_ca_users_only: 'true',
+      quote_ca_users_only: 'true',
+      year: '2025',
+    }),
+    { timeoutMs: 30_000 },
+  )
+})
+
 test('refuses an unscoped legacy gateway response', async () => {
   const fetcher = jest.fn(async () => ({
     data: [banger('100', '8', 2025)],
     pagination: {
+      limit: 100,
+      offset: 0,
       nextOffset: null,
       totalAvailable: 1,
       yearCounts: [{ year: 2025, count: 1 }],
@@ -151,8 +214,35 @@ test('refuses an unscoped legacy gateway response', async () => {
   })) as unknown as AnalyticsGatewayFetcher
 
   await expect(fetchProfileBangers('42', fetcher)).rejects.toThrow(
-    'does not support scoped profile bangers yet',
+    'mismatched profile banger scope',
   )
+})
+
+test('refuses a gateway response sorted differently from the requested page', async () => {
+  const fetcher = jest.fn(async () => ({
+    data: [banger('100', '8', 2025)],
+    pagination: {
+      limit: 2,
+      offset: 0,
+      nextOffset: null,
+      totalAvailable: 1,
+      yearCounts: [{ year: 2025, count: 1 }],
+    },
+    query: {
+      targetAccountId: '42',
+      minQuoteCount: 2,
+      sort: 'quotes',
+      year: 2025,
+    },
+  })) as unknown as AnalyticsGatewayFetcher
+
+  await expect(
+    fetchProfileBangersPage(
+      '42',
+      { limit: 2, year: 2025, sort: 'likes' },
+      fetcher,
+    ),
+  ).rejects.toThrow('mismatched profile banger scope')
 })
 
 test('preserves a dangling quoted-tweet ID for the deleted-card placeholder', async () => {
@@ -160,11 +250,17 @@ test('preserves a dangling quoted-tweet ID for the deleted-card placeholder', as
   const fetcher = jest.fn(async () => ({
     data: [row],
     pagination: {
+      limit: 100,
+      offset: 0,
       nextOffset: null,
       totalAvailable: 1,
       yearCounts: [{ year: 2025, count: 1 }],
     },
-    query: { targetAccountId: '42', minQuoteCount: 2 },
+    query: {
+      targetAccountId: '42',
+      minQuoteCount: 2,
+      sort: 'quotes',
+    },
   })) as unknown as AnalyticsGatewayFetcher
 
   await expect(fetchProfileBangers('42', fetcher)).resolves.toMatchObject({
@@ -182,11 +278,17 @@ test('rejects mismatched quoted-tweet content', async () => {
       },
     ],
     pagination: {
+      limit: 100,
+      offset: 0,
       nextOffset: null,
       totalAvailable: 1,
       yearCounts: [{ year: 2025, count: 1 }],
     },
-    query: { targetAccountId: '42', minQuoteCount: 2 },
+    query: {
+      targetAccountId: '42',
+      minQuoteCount: 2,
+      sort: 'quotes',
+    },
   })) as unknown as AnalyticsGatewayFetcher
 
   await expect(fetchProfileBangers('42', fetcher)).rejects.toThrow(

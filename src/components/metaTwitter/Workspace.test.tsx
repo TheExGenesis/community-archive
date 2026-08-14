@@ -1,3 +1,4 @@
+import { createRef } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Workspace } from './Workspace'
@@ -67,19 +68,32 @@ const tweets: BangerTweet[] = Array.from({ length: 13 }, (_, index) => ({
       : null,
 }))
 
-test('shows canonical banger cards progressively with media and evidence', async () => {
+test('shows the initial canonical banger cards with media and profile return links', async () => {
   const user = userEvent.setup()
+  const onLoadMore = jest.fn()
   render(
     <Workspace
       avatarUrl={null}
       contextTitle="Overall — Bangers"
       contextDesc="Quoted at least twice."
-      tweets={tweets}
+      tweets={tweets.slice(0, 2)}
+      totalTweets={tweets.length}
       bangersAvailable
+      bangersLoading={false}
       media={[]}
       mediaCount={0}
       people={[]}
       peopleTitle="Top people"
+      sidebarLoading={false}
+      sidebarFailed={false}
+      onRetrySidebar={jest.fn()}
+      sort="quotes"
+      onSortChange={jest.fn()}
+      hasMore
+      loadMoreFailed={false}
+      onLoadMore={onLoadMore}
+      loadMoreRef={createRef<HTMLDivElement>()}
+      returnTo="/user/alice?chapter=2025"
     />,
   )
 
@@ -108,12 +122,17 @@ test('shows canonical banger cards progressively with media and evidence', async
     screen.queryByRole('link', { name: 'View tweet by @alice' }),
   ).not.toBeInTheDocument()
   expect(screen.queryByText(/❝|🔁|♥|↗/)).not.toBeInTheDocument()
-  expect(screen.queryByText('Banger 12')).not.toBeInTheDocument()
-
-  await user.click(screen.getByRole('button', { name: 'Show more bangers' }))
-
-  expect(screen.getByText('Banger 12')).toBeInTheDocument()
   expect(
-    screen.queryByRole('button', { name: 'Show more bangers' }),
-  ).not.toBeInTheDocument()
+    screen.getByRole('link', {
+      name: '20 archived quotes. Open tweet to see them.',
+    }),
+  ).toHaveAttribute(
+    'href',
+    '/tweets/100?from=profile&returnTo=%2Fuser%2Falice%3Fchapter%3D2025',
+  )
+  expect(screen.queryByText('Banger 2')).not.toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Load more bangers' }))
+
+  expect(onLoadMore).toHaveBeenCalledTimes(1)
 })

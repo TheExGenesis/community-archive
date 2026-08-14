@@ -1,20 +1,18 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import type { RefObject } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
 import { formatNumber } from '@/lib/formatNumber'
 import { bangerPortalTweet } from '@/lib/metaTwitter/bangerPortalTweet'
+import { tweetPermalinkHref } from '@/lib/navigation'
+import type { ProfileBangerSort } from '@/lib/metaTwitter/profilePagination'
 import type {
   ArchiveMediaItem,
   ArchivePerson,
   BangerTweet,
 } from '@/lib/metaTwitter/types'
-
-type SortMode = 'quotes' | 'likes' | 'newest'
-
-const PAGE_SIZE = 12
 
 const personHue = (handle: string) => {
   let hue = 0
@@ -29,50 +27,46 @@ export function Workspace({
   contextTitle,
   contextDesc,
   tweets,
+  totalTweets,
   bangersAvailable,
+  bangersLoading,
   media,
   mediaCount,
   people,
   peopleTitle,
+  sidebarLoading,
+  sidebarFailed,
+  onRetrySidebar,
+  sort,
+  onSortChange,
+  hasMore,
+  loadMoreFailed,
+  onLoadMore,
+  loadMoreRef,
+  returnTo,
 }: {
   avatarUrl: string | null
   contextTitle: string
   contextDesc: string
   tweets: BangerTweet[]
+  totalTweets: number
   bangersAvailable: boolean
+  bangersLoading: boolean
   media: ArchiveMediaItem[]
   mediaCount: number
   people: ArchivePerson[]
   peopleTitle: string
+  sidebarLoading: boolean
+  sidebarFailed: boolean
+  onRetrySidebar: () => void
+  sort: ProfileBangerSort
+  onSortChange: (sort: ProfileBangerSort) => void
+  hasMore: boolean
+  loadMoreFailed: boolean
+  onLoadMore: () => void
+  loadMoreRef: RefObject<HTMLDivElement>
+  returnTo: string
 }) {
-  const [sort, setSort] = useState<SortMode>('quotes')
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-
-  const orderedTweets = useMemo(() => {
-    const ordered = [...tweets]
-    if (sort === 'likes') {
-      return ordered.sort(
-        (left, right) =>
-          right.favorite_count - left.favorite_count ||
-          right.quote_count - left.quote_count,
-      )
-    }
-    if (sort === 'newest') {
-      return ordered.sort(
-        (left, right) =>
-          right.created_at.localeCompare(left.created_at) ||
-          right.quote_count - left.quote_count,
-      )
-    }
-    return ordered.sort(
-      (left, right) =>
-        right.quote_count - left.quote_count ||
-        right.quoting_accounts - left.quoting_accounts ||
-        right.created_at.localeCompare(left.created_at),
-    )
-  }, [sort, tweets])
-
-  const visibleTweets = orderedTweets.slice(0, visibleCount)
   const mediaTiles = media.slice(0, 6)
   const mediaOverflow = Math.max(mediaCount - 6, 0)
 
@@ -89,10 +83,9 @@ export function Workspace({
           <span className="sr-only">Sort bangers</span>
           <select
             value={sort}
-            onChange={(event) => {
-              setSort(event.target.value as SortMode)
-              setVisibleCount(PAGE_SIZE)
-            }}
+            onChange={(event) =>
+              onSortChange(event.target.value as ProfileBangerSort)
+            }
             className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[13px] text-muted-foreground"
           >
             <option value="quotes">Sort: Most quoted</option>
@@ -111,9 +104,9 @@ export function Workspace({
             <h3 id="bangers-heading" className="text-[15px] font-extrabold">
               Bangers
             </h3>
-            {bangersAvailable && tweets.length > 0 && (
+            {bangersAvailable && totalTweets > 0 && (
               <span className="text-xs text-muted-foreground">
-                {formatNumber(tweets.length)} total
+                {formatNumber(totalTweets)} total
               </span>
             )}
           </div>
@@ -124,32 +117,53 @@ export function Workspace({
               still here.
             </div>
           )}
-          {bangersAvailable && tweets.length === 0 && (
+          {bangersAvailable && bangersLoading && tweets.length === 0 && (
+            <div className="rounded-xl border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
+              Loading bangers…
+            </div>
+          )}
+          {bangersAvailable && !bangersLoading && tweets.length === 0 && (
             <div className="rounded-xl border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
               No posts in this chapter have at least two Community Archive
               quotes yet.
             </div>
           )}
 
-          {visibleTweets.map((tweet, index) => (
-            <TweetCard
+          {tweets.map((tweet, index) => (
+            <div
               key={tweet.tweet_id}
-              tweet={bangerPortalTweet(tweet, avatarUrl)}
-              featuredRank={index + 1}
-              clickable={false}
-              showDate
-              showExternalLink
-            />
+              style={{
+                contentVisibility: 'auto',
+                containIntrinsicSize: '0 320px',
+              }}
+            >
+              <TweetCard
+                tweet={bangerPortalTweet(tweet, avatarUrl)}
+                featuredRank={index + 1}
+                clickable={false}
+                showDate
+                showExternalLink
+                origin="profile"
+                returnTo={returnTo}
+              />
+            </div>
           ))}
 
-          {visibleCount < orderedTweets.length && (
-            <button
-              type="button"
-              onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
-              className="rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted"
-            >
-              Show more bangers
-            </button>
+          {hasMore && (
+            <div ref={loadMoreRef} className="flex justify-center py-1">
+              <button
+                type="button"
+                onClick={onLoadMore}
+                disabled={bangersLoading}
+                className="rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted disabled:cursor-wait disabled:opacity-60"
+              >
+                {bangersLoading
+                  ? 'Loading more bangers…'
+                  : loadMoreFailed
+                    ? 'Retry loading bangers'
+                    : 'Load more bangers'}
+              </button>
+            </div>
           )}
         </section>
 
@@ -161,7 +175,19 @@ export function Workspace({
             >
               Media
             </h3>
-            {mediaTiles.length === 0 ? (
+            {sidebarLoading ? (
+              <div className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                Loading media…
+              </div>
+            ) : sidebarFailed ? (
+              <button
+                type="button"
+                onClick={onRetrySidebar}
+                className="w-full rounded-md border border-dashed border-border p-4 text-center text-xs font-semibold text-muted-foreground hover:bg-muted"
+              >
+                Retry media and people
+              </button>
+            ) : mediaTiles.length === 0 ? (
               <div className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
                 No media in this chapter
               </div>
@@ -170,7 +196,11 @@ export function Workspace({
                 {mediaTiles.map((item, index) => (
                   <Link
                     key={item.media_url}
-                    href={`/tweets/${item.tweet_id}`}
+                    href={tweetPermalinkHref(
+                      item.tweet_id,
+                      'profile',
+                      returnTo,
+                    )}
                     className="relative block aspect-square overflow-hidden rounded-md bg-muted"
                   >
                     <Image
@@ -199,7 +229,17 @@ export function Workspace({
               {peopleTitle}
             </h3>
             <div className="flex flex-col gap-2.5">
-              {people.length === 0 && (
+              {sidebarLoading && (
+                <div className="text-[13px] text-muted-foreground">
+                  Loading people…
+                </div>
+              )}
+              {!sidebarLoading && sidebarFailed && (
+                <div className="text-[13px] text-muted-foreground">
+                  Interactions are temporarily unavailable.
+                </div>
+              )}
+              {!sidebarLoading && !sidebarFailed && people.length === 0 && (
                 <div className="text-[13px] text-muted-foreground">
                   No interactions found in this chapter.
                 </div>

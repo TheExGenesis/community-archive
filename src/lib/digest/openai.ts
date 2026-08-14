@@ -1,3 +1,5 @@
+import { DIGEST_STORY_CATEGORIES } from './types'
+
 const DIGEST_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -12,6 +14,7 @@ const DIGEST_JSON_SCHEMA = {
         type: 'object',
         additionalProperties: false,
         required: [
+          'category',
           'keyword',
           'title',
           'subtitle',
@@ -20,6 +23,10 @@ const DIGEST_JSON_SCHEMA = {
           'commentary_tweet_ids',
         ],
         properties: {
+          category: {
+            type: 'string',
+            enum: DIGEST_STORY_CATEGORIES,
+          },
           keyword: { type: 'string', minLength: 2, maxLength: 60 },
           title: { type: 'string', minLength: 12, maxLength: 140 },
           subtitle: { type: 'string', minLength: 20, maxLength: 280 },

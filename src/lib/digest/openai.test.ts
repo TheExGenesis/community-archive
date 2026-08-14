@@ -55,6 +55,13 @@ describe('OpenAI digest adapter', () => {
       metadata: { digest_run_id: 'run-123' },
       text: { format: { type: 'json_schema', strict: true } },
     })
+    expect(
+      request.text.format.schema.properties.stories.items.required,
+    ).toContain('category')
+    expect(
+      request.text.format.schema.properties.stories.items.properties.category
+        .enum,
+    ).toContain('participatory meme')
     expect(result).toMatchObject({
       responseId: 'resp_123',
       totalTokens: 125,

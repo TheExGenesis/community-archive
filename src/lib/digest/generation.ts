@@ -3,8 +3,9 @@ import type {
   DigestCandidate,
   DigestEditionContent,
   DigestStory,
+  DigestStoryCategory,
 } from './types'
-import { isRecord } from './types'
+import { DIGEST_STORY_CATEGORIES, isRecord } from './types'
 
 export interface EnrichedDigestCandidate {
   candidate: DigestCandidate
@@ -13,6 +14,7 @@ export interface EnrichedDigestCandidate {
 }
 
 interface ModelStory {
+  category: DigestStoryCategory
   keyword: string
   title: string
   subtitle: string
@@ -61,6 +63,12 @@ const normalizedCorpus = (candidates: EnrichedDigestCandidate[]) =>
     .join('\n')
     .toLocaleLowerCase('en-US')
 
+const cleanCategory = (value: unknown): DigestStoryCategory | null =>
+  typeof value === 'string' &&
+  DIGEST_STORY_CATEGORIES.some((category) => category === value)
+    ? (value as DigestStoryCategory)
+    : null
+
 function parseModelDigest(
   value: unknown,
   candidates: EnrichedDigestCandidate[],
@@ -90,6 +98,7 @@ function parseModelDigest(
 
   const stories = value.stories.map((story, index): ModelStory => {
     if (!isRecord(story)) throw new Error(`Story ${index + 1} is invalid`)
+    const category = cleanCategory(story.category)
     const keyword = cleanText(story.keyword, 60)
     const title = cleanText(story.title, 140)
     const subtitle = cleanText(story.subtitle, 280)
@@ -101,6 +110,7 @@ function parseModelDigest(
       20,
     )
     if (
+      !category ||
       !keyword ||
       !title ||
       !subtitle ||
@@ -126,6 +136,7 @@ function parseModelDigest(
       throw new Error(`Story ${index + 1} used an unknown commentary tweet ID`)
     }
     return {
+      category,
       keyword,
       title,
       subtitle,
@@ -224,6 +235,7 @@ export function assembleDigestEditionContent(input: {
 
     return {
       slug: occurrence === 1 ? baseSlug : `${baseSlug}-${occurrence}`,
+      category: story.category,
       keyword: story.keyword,
       title: story.title,
       subtitle: story.subtitle,

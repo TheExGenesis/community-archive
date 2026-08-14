@@ -1,7 +1,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { TweetRow } from '@/components/portal/TweetRow'
+import TweetCard from '@/components/TweetCard'
 import { CARD, MUTED, SERIF } from '@/components/portal/styles'
+import { firstStoryMedia } from '@/lib/digest/storyMedia'
 import type { DigestEdition, DigestStory } from '@/lib/digest/types'
 
 const timeLabel = (value: string | null) =>
@@ -22,7 +23,7 @@ export function DigestStoryView({
   story: DigestStory
 }) {
   const returnTo = `/digest/${edition.digestDate}/${story.slug}`
-  const ledeMedia = story.bangers.flatMap((tweet) => tweet.media ?? [])[0]
+  const ledeMedia = firstStoryMedia(story)
   const archivedQuotes = story.bangers.reduce(
     (total, tweet) => total + (tweet.quoteCount ?? 0),
     0,
@@ -45,9 +46,10 @@ export function DigestStoryView({
         ) : null}
         <header className="mt-7 max-w-4xl">
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
-              {story.keyword}
+            <span className="rounded-full bg-blue-100 px-2.5 py-1 font-semibold text-blue-950 dark:bg-blue-950 dark:text-blue-100">
+              {story.category ?? 'Story'}
             </span>
+            <span className="font-medium">{story.keyword}</span>
             <span>{story.bangers.length} bangers</span>
             <span>
               · {archivedQuotes} archived quote
@@ -82,64 +84,87 @@ export function DigestStoryView({
           </div>
         ) : null}
 
-        <ul className="mt-6 space-y-2 rounded-lg bg-blue-50 px-6 py-5 text-sm leading-6 text-blue-950 dark:bg-blue-950/30 dark:text-blue-100 sm:text-base">
-          {story.bullets.map((bullet) => (
-            <li key={bullet}>• {bullet}</li>
-          ))}
-        </ul>
-
         <div className="mt-8 grid items-start gap-7 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
-          <section className="min-w-0">
-            <h2
-              className={`mb-3 text-xs font-semibold uppercase tracking-[0.12em] ${MUTED}`}
-            >
-              The bangers
-            </h2>
-            <div className={`${CARD} overflow-hidden`}>
-              {story.bangers.map((tweet) => (
-                <TweetRow
-                  key={tweet.id}
-                  tweet={tweet}
-                  noClamp
-                  origin="digest"
-                  returnTo={returnTo}
-                />
-              ))}
-            </div>
-          </section>
-
-          <aside className={`${CARD} p-4 lg:sticky lg:top-24`}>
-            <h2 className="font-semibold">Commentary</h2>
-            {story.editorialNote ? (
-              <p className="mt-3 rounded-md bg-blue-50 p-3 text-sm leading-6 text-blue-950 dark:bg-blue-950/30 dark:text-blue-100">
-                {story.editorialNote}
-              </p>
-            ) : null}
-            {story.commentary.length ? (
-              <div className="mt-3 space-y-3">
-                {story.commentary.map((tweet) => (
-                  <blockquote
+          <div className="min-w-0 space-y-8">
+            <section>
+              <h2
+                className={`mb-3 text-xs font-semibold uppercase tracking-[0.12em] ${MUTED}`}
+              >
+                The bangers
+              </h2>
+              <div className={`${CARD} overflow-hidden`}>
+                {story.bangers.map((tweet) => (
+                  <TweetCard
                     key={tweet.id}
-                    className="rounded-md bg-zinc-100 p-3 text-sm leading-5 dark:bg-zinc-900"
-                  >
-                    <p>{tweet.text}</p>
-                    <footer className={`mt-2 text-xs ${MUTED}`}>
-                      @{tweet.username} · ♥ {tweet.likes.toLocaleString()}
-                    </footer>
-                  </blockquote>
+                    tweet={tweet}
+                    noClamp
+                    showDate
+                    origin="digest"
+                    returnTo={returnTo}
+                  />
                 ))}
               </div>
-            ) : !story.editorialNote ? (
-              <p className={`mt-3 text-sm ${MUTED}`}>
-                No commentary was selected for this story.
-              </p>
+            </section>
+
+            {story.commentary.length ? (
+              <section>
+                <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <h2
+                      className={`text-xs font-semibold uppercase tracking-[0.12em] ${MUTED}`}
+                    >
+                      Surrounding conversation
+                    </h2>
+                    <p className={`mt-1 text-sm ${MUTED}`}>
+                      Quote posts that extended, challenged, or remixed the
+                      featured bangers.
+                    </p>
+                  </div>
+                  <span className={`text-xs ${MUTED}`}>
+                    {story.commentary.length} selected
+                  </span>
+                </div>
+                <div className={`${CARD} overflow-hidden`}>
+                  {story.commentary.map((tweet) => (
+                    <TweetCard
+                      key={tweet.id}
+                      tweet={tweet}
+                      noClamp
+                      showDate
+                      origin="digest"
+                      returnTo={returnTo}
+                    />
+                  ))}
+                </div>
+              </section>
             ) : null}
-            <Link
-              href={`/tweets/${story.bangers[0].id}?from=digest&returnTo=${encodeURIComponent(returnTo)}`}
-              className="mt-4 inline-flex text-sm font-semibold text-brand hover:underline"
-            >
-              Open the lead banger and its archived replies →
-            </Link>
+          </div>
+
+          <aside className="space-y-5 lg:sticky lg:top-24">
+            <section className="rounded-lg bg-blue-50 px-5 py-4 text-sm leading-6 text-blue-950 dark:bg-blue-950/30 dark:text-blue-100">
+              <h2 className="font-semibold">In brief</h2>
+              <ul className="mt-2 space-y-2">
+                {story.bullets.map((bullet) => (
+                  <li key={bullet}>• {bullet}</li>
+                ))}
+              </ul>
+            </section>
+            {story.editorialNote ? (
+              <section className={`${CARD} p-4`}>
+                <h2 className="font-semibold">Editor&apos;s note</h2>
+                <p className={`mt-2 text-sm leading-6 ${MUTED}`}>
+                  {story.editorialNote}
+                </p>
+              </section>
+            ) : null}
+            <section className={`${CARD} p-4`}>
+              <Link
+                href={`/tweets/${story.bangers[0].id}?from=digest&returnTo=${encodeURIComponent(returnTo)}`}
+                className="inline-flex text-sm font-semibold text-brand hover:underline"
+              >
+                Open the lead banger and all archived replies →
+              </Link>
+            </section>
           </aside>
         </div>
       </article>

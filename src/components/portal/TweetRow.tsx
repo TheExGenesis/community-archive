@@ -88,7 +88,10 @@ export function TweetAvatar({
 
 function imageMedia(media: PortalMedia[] | undefined): PortalMedia[] {
   return (media ?? []).filter(
-    (item) => item.type === 'photo' || item.type.startsWith('image/'),
+    (item) =>
+      item.type === 'photo' ||
+      item.type === 'video' ||
+      item.type.startsWith('image/'),
   )
 }
 

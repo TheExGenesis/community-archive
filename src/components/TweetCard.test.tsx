@@ -60,6 +60,28 @@ describe('TweetCard', () => {
     ])
   })
 
+  test('renders an archived video thumbnail as card media', () => {
+    render(
+      <TweetCard
+        tweet={{
+          ...tweet,
+          media: [
+            {
+              url: 'https://example.com/video-thumbnail.jpg',
+              type: 'video',
+            },
+          ],
+          quotedTweet: undefined,
+        }}
+      />,
+    )
+
+    expect(screen.getByTestId('tweet-image')).toHaveAttribute(
+      'data-src',
+      'https://example.com/video-thumbnail.jpg',
+    )
+  })
+
   test('can summarize only the repeated quoted tweet marker', () => {
     render(<TweetCard tweet={tweet} quotedTweetDisplay="summary" />)
 

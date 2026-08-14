@@ -1,7 +1,9 @@
+import Image from 'next/image'
 import Link from 'next/link'
+import TweetCard from '@/components/TweetCard'
 import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
-import { TweetRow } from '@/components/portal/TweetRow'
 import type { DigestEdition } from '@/lib/digest/types'
+import { firstStoryMedia } from '@/lib/digest/storyMedia'
 import { CARD, MUTED, SERIF } from '@/components/portal/styles'
 
 const SUBSCRIBE_URL = 'https://xiqo.substack.com/subscribe'
@@ -87,9 +89,10 @@ export function DigestEditionView({
                 Top banger
               </div>
               <div className={`${CARD} overflow-hidden`}>
-                <TweetRow
+                <TweetCard
                   tweet={content.topBanger}
                   noClamp
+                  showDate
                   origin="digest"
                   returnTo={returnTo}
                 />
@@ -99,54 +102,80 @@ export function DigestEditionView({
             <div className="border-t border-zinc-950 pt-7 dark:border-zinc-100">
               <div className="space-y-6">
                 {content.stories.map((story) => (
-                  <article key={story.slug} className={`${CARD} p-5 sm:p-6`}>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
-                        {story.keyword}
-                      </span>
-                      <span>
-                        {story.bangers.length} banger
-                        {story.bangers.length === 1 ? '' : 's'}
-                      </span>
-                      <span>
-                        · {archivedQuoteCount(story)} archived quote
-                        {archivedQuoteCount(story) === 1 ? '' : 's'}
-                      </span>
-                      {story.replyCount > 0 ? (
-                        <span>· {story.replyCount} archived replies</span>
-                      ) : null}
-                    </div>
-                    <h2
-                      className="mt-3 text-2xl font-semibold leading-tight sm:text-3xl"
-                      style={SERIF}
-                    >
-                      {story.title}
-                    </h2>
-                    <p
-                      className={`mt-2 text-sm leading-6 sm:text-base ${MUTED}`}
-                    >
-                      {story.subtitle}
-                    </p>
-                    <div className="mt-4 space-y-2">
-                      {story.bangers.slice(0, 2).map((tweet) => (
-                        <blockquote
-                          key={tweet.id}
-                          className="rounded-md bg-zinc-100 px-4 py-3 text-sm leading-6 dark:bg-zinc-900"
+                  <article
+                    key={story.slug}
+                    className={`${CARD} overflow-hidden`}
+                  >
+                    {firstStoryMedia(story) ? (
+                      <Link
+                        href={`/digest/${edition.digestDate}/${story.slug}`}
+                        className="relative block aspect-[16/7] overflow-hidden border-b bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900"
+                        aria-label={`Read ${story.title}`}
+                      >
+                        <Image
+                          src={firstStoryMedia(story)!.url}
+                          alt={`Image from ${story.title}`}
+                          fill
+                          sizes="(max-width: 1024px) 100vw, 720px"
+                          className="object-cover transition duration-300 hover:scale-[1.01]"
+                        />
+                      </Link>
+                    ) : null}
+                    <div className="p-5 sm:p-6">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span className="rounded-full bg-blue-100 px-2.5 py-1 font-semibold text-blue-950 dark:bg-blue-950 dark:text-blue-100">
+                          {story.category ?? 'Story'}
+                        </span>
+                        <span className="font-medium">{story.keyword}</span>
+                        <span>
+                          · {story.bangers.length} banger
+                          {story.bangers.length === 1 ? '' : 's'}
+                        </span>
+                        <span>
+                          · {archivedQuoteCount(story)} archived quote
+                          {archivedQuoteCount(story) === 1 ? '' : 's'}
+                        </span>
+                        {story.replyCount > 0 ? (
+                          <span>· {story.replyCount} archived replies</span>
+                        ) : null}
+                      </div>
+                      <h2
+                        className="mt-3 text-2xl font-semibold leading-tight sm:text-3xl"
+                        style={SERIF}
+                      >
+                        <Link
+                          href={`/digest/${edition.digestDate}/${story.slug}`}
+                          className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                         >
-                          <p>{tweet.text}</p>
-                          <footer className={`mt-1 text-xs ${MUTED}`}>
-                            @{tweet.username} · ♥{' '}
-                            {tweet.likes.toLocaleString()}
-                          </footer>
-                        </blockquote>
+                          {story.title}
+                        </Link>
+                      </h2>
+                      <p
+                        className={`mt-2 text-sm leading-6 sm:text-base ${MUTED}`}
+                      >
+                        {story.subtitle}
+                      </p>
+                    </div>
+                    <div className="border-t dark:border-zinc-800">
+                      {story.bangers.slice(0, 2).map((tweet) => (
+                        <TweetCard
+                          key={tweet.id}
+                          tweet={tweet}
+                          noClamp
+                          showDate
+                          origin="digest"
+                          returnTo={returnTo}
+                        />
                       ))}
                     </div>
-                    <Link
-                      href={`/digest/${edition.digestDate}/${story.slug}`}
-                      className="mt-5 inline-flex text-sm font-semibold text-brand hover:underline"
-                    >
-                      Read the full story →
-                    </Link>
+                    <div className="border-t px-5 py-4 dark:border-zinc-800 sm:px-6">
+                      <Link
+                        href={`/digest/${edition.digestDate}/${story.slug}`}
+                        className="inline-flex text-sm font-semibold text-brand hover:underline"
+                      >
+                        Read the full story and surrounding conversation →
+                      </Link>
+                    </div>
                   </article>
                 ))}
               </div>

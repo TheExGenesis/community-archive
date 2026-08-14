@@ -8,6 +8,19 @@ export type DigestRunStatus =
 
 export type DigestEditionStatus = 'draft' | 'published' | 'archived'
 
+export const DIGEST_STORY_CATEGORIES = [
+  'AI',
+  'joke',
+  'participatory meme',
+  'culture',
+  'science',
+  'politics',
+  'opportunity',
+  'other',
+] as const
+
+export type DigestStoryCategory = (typeof DIGEST_STORY_CATEGORIES)[number]
+
 export interface DigestCandidate {
   tweet: PortalTweet
   sourceRank: number
@@ -39,6 +52,8 @@ export interface DigestPromptVersion {
 
 export interface DigestStory {
   slug: string
+  /** Broad editorial shelf; older saved editions may predate categories. */
+  category?: DigestStoryCategory
   keyword: string
   title: string
   subtitle: string
@@ -126,6 +141,9 @@ const isString = (value: unknown): value is string =>
 const isNonnegativeNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0
 
+const isDigestStoryCategory = (value: unknown): value is DigestStoryCategory =>
+  DIGEST_STORY_CATEGORIES.some((category) => category === value)
+
 export function isPortalTweet(value: unknown): value is PortalTweet {
   if (!isRecord(value)) return false
   return (
@@ -194,6 +212,9 @@ export function parseDigestEditionContent(
     if (
       !isRecord(story) ||
       !isString(story.slug) ||
+      !(
+        story.category === undefined || isDigestStoryCategory(story.category)
+      ) ||
       !isString(story.keyword) ||
       !isString(story.title) ||
       !isString(story.subtitle) ||

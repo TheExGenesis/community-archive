@@ -1,4 +1,4 @@
-import type { PortalTweet } from '@/lib/portal/types'
+import type { PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
 import type { DigestEdition } from './types'
 
 const DIGEST_DATE = '2026-08-11'
@@ -12,6 +12,28 @@ const mockTweet = (
   rts: 0,
   retweetCountAvailable: false,
 })
+
+const quotedSnapshot = (tweet: PortalTweet): PortalQuotedTweet => ({
+  id: tweet.id,
+  accountId: tweet.accountId,
+  username: tweet.username,
+  name: tweet.name,
+  avatar: tweet.avatar,
+  text: tweet.text,
+  createdAt: tweet.createdAt,
+  likes: tweet.likes,
+  rts: tweet.rts,
+  media: tweet.media ?? [],
+})
+
+const mockQuote = (
+  tweet: Omit<PortalTweet, 'observedAt' | 'rts' | 'quotedTweet'>,
+  target: PortalTweet,
+): PortalTweet =>
+  mockTweet({
+    ...tweet,
+    quotedTweet: quotedSnapshot(target),
+  })
 
 const moonPosting = mockTweet({
   id: '2087404512805855369',
@@ -38,6 +60,81 @@ const aiAmbitions = mockTweet({
   quoteCount: 7,
   media: [],
 })
+
+const moonCanConfirm = mockQuote(
+  {
+    id: '2087537677436367086',
+    username: 'RandomSprint',
+    name: 'RandomSprint🧭',
+    avatar:
+      'https://pbs.twimg.com/profile_images/1810341142820487168/x66APCTD_normal.jpg',
+    text: 'Can confirm. https://t.co/pineeHUcNS',
+    createdAt: '2026-08-12T13:52:21.000Z',
+    likes: 55,
+    media: [
+      {
+        url: 'https://pbs.twimg.com/media/HPhsci4WgAEv7Hx.jpg',
+        type: 'photo',
+      },
+      {
+        url: 'https://pbs.twimg.com/media/HPhscuJXkAAdiGc.jpg',
+        type: 'photo',
+      },
+      {
+        url: 'https://pbs.twimg.com/media/HPhsc6rXEAEA3v4.jpg',
+        type: 'photo',
+      },
+      {
+        url: 'https://pbs.twimg.com/media/HPhsdIWWcAAFm7H.jpg',
+        type: 'photo',
+      },
+    ],
+  },
+  moonPosting,
+)
+
+const moonPosers = mockQuote(
+  {
+    id: '2087561194332639591',
+    username: 'IaimforGOAT',
+    name: '🐜',
+    avatar:
+      'https://pbs.twimg.com/profile_images/1928932579782033408/wM_Cj4z2_normal.jpg',
+    text: "y'all are a bunch of POSERS; you should post about the moon bc you love the moon, not to attract women! wth?!",
+    createdAt: '2026-08-12T15:25:48.000Z',
+    likes: 2,
+    media: [],
+  },
+  moonPosting,
+)
+
+const moonCoincidence = mockQuote(
+  {
+    id: '2087416065152463303',
+    username: 'QiaochuYuan',
+    name: 'QC',
+    avatar:
+      'https://pbs.twimg.com/profile_images/1746687266947555328/OIMkOG55_normal.jpg',
+    text: "my contribution is that it's very weird that the sun and the moon are the same apparent size in the sky, the consensus appears to be that this is just a coincidence but that strikes me as wildly unsatisfying. seems to me there ought to be an anthropic explanation and my schizo theory is that eclipses are somehow necessary for the creation of civilization, like they provide some kind of crucial stimulus to insight or creativity or something. here's sol riffing off of this",
+    createdAt: '2026-08-12T05:49:06.000Z',
+    likes: 1143,
+    media: [
+      {
+        url: 'https://pbs.twimg.com/media/HPf9urIacAAjsO9.jpg',
+        type: 'photo',
+        width: 1320,
+        height: 1246,
+      },
+      {
+        url: 'https://pbs.twimg.com/media/HPf9urIawAAjms_.jpg',
+        type: 'photo',
+        width: 1330,
+        height: 1268,
+      },
+    ],
+  },
+  moonPosting,
+)
 
 const hiddenReasoning = mockTweet({
   id: '2087147042888114428',
@@ -99,6 +196,65 @@ const leakedTraces = mockTweet({
   ],
 })
 
+const hiddenPaperCaveat = mockQuote(
+  {
+    id: '2087519464665338357',
+    username: 'deedydas',
+    name: 'Deedy',
+    avatar:
+      'https://pbs.twimg.com/profile_images/2016718977960120320/a3F0LOz6_normal.jpg',
+    text: "Objectively one of the coolest papers in LLM jailbreak world but most people didn't read the actual paper to know that the encrypted reasoning trace hack doesn't affect Fable and doesn’t explain any purported distillation of that model. https://t.co/ke9yHtKuZL",
+    createdAt: '2026-08-12T12:39:59.000Z',
+    likes: 5,
+    media: [
+      {
+        url: 'https://pbs.twimg.com/media/HPhb4nsXgAAcM75.jpg',
+        type: 'photo',
+        width: 1072,
+        height: 697,
+      },
+    ],
+  },
+  hiddenReasoning,
+)
+
+const hiddenReproduced = mockQuote(
+  {
+    id: '2087371066020868164',
+    username: 'wunderwuzzi23',
+    name: 'Johann Rehberger',
+    avatar:
+      'https://pbs.twimg.com/profile_images/1225981388127490049/yLSA2SzN_normal.jpg',
+    text: 'wild. recovering encrypted llm thoughts! 🔥\n\ni was able repro this multiple times today with gpt-5.6 traces... until about an hour ago.\n\nwondering who else was able to repro to exchange notes?\n\nwhat a great piece of research. @kotekjedi_ml https://t.co/kuucd4L3Lv',
+    createdAt: '2026-08-12T02:50:18.000Z',
+    likes: 138,
+    media: [
+      {
+        url: 'https://pbs.twimg.com/media/HPfU7EZakAAlpSu.jpg',
+        type: 'photo',
+        width: 1200,
+        height: 516,
+      },
+    ],
+  },
+  hiddenReasoning,
+)
+
+const hiddenOperationalRisk = mockQuote(
+  {
+    id: '2087280672142749822',
+    username: 'vvvincent_c',
+    name: 'Vincent',
+    avatar:
+      'https://pbs.twimg.com/profile_images/1785684220423307264/Vx5m6FCA_normal.jpg',
+    text: "another down update on the execution/schlep competence of labs :( .\n\nadded to the list: leaking encrypted cot to attackers, accidentally training on cot, rouge agent message boards going unnoticed for months, insecure docker containers\n\nwe should also be thinking about scenarios where things go poorly, not because we can't crack the scary open problems, but we are simply incompetent and fail to execute on the long slew of operational details that are trivial in isolation, but hard to fully cover. it would be slightly embarrassing to fail because of these details.",
+    createdAt: '2026-08-11T20:51:06.000Z',
+    likes: 50,
+    media: [],
+  },
+  hiddenReasoning,
+)
+
 const grokBot = mockTweet({
   id: '2087224798078517251',
   username: 'bot',
@@ -131,6 +287,65 @@ const littleGuy = mockTweet({
   quoteCount: 2,
   media: [],
 })
+
+const grokForNormies = mockQuote(
+  {
+    id: '2087588205352665393',
+    username: 'GergelyOrosz',
+    name: 'Gergely Orosz',
+    avatar:
+      'https://pbs.twimg.com/profile_images/673095429748350976/ei5eeouV_normal.png',
+    text: 'I’ve been using it for ~2 hours and I’m absolutely blown away at how I could automate a bunch of my workflows. Cursor team built a way for “normies” to automate stuff. Feels like an OpenClaw 2.0 moment.\n\n(Zero affiliation, I upgraded to Ultra to use it and absolutely worth it.)',
+    createdAt: '2026-08-12T17:13:08.000Z',
+    likes: 2815,
+    media: [],
+  },
+  grokBot,
+)
+
+const grokNdaJoke = mockQuote(
+  {
+    id: '2087702878110536119',
+    username: 'quantian1',
+    name: 'Quantіan',
+    avatar:
+      'https://pbs.twimg.com/profile_images/1510062884096815107/psXqGcns_normal.jpg',
+    text: 'The very first application of Grok Bot mentioned in this ad is mass emailing NDAs to employees, amazing Freudian slip https://t.co/XbJCICo07x',
+    createdAt: '2026-08-13T00:48:48.000Z',
+    likes: 13,
+    media: [
+      {
+        url: 'https://pbs.twimg.com/media/HPkCs7VXQAA1ZdY.jpg',
+        type: 'photo',
+        width: 1170,
+        height: 1507,
+      },
+    ],
+  },
+  grokBot,
+)
+
+const grokOriginStory = mockQuote(
+  {
+    id: '2087698441568973129',
+    username: 'MTSlive',
+    name: 'MTS',
+    avatar:
+      'https://pbs.twimg.com/profile_images/2057947669281263616/aovpVL4b_normal.jpg',
+    text: 'Cursor engineer @poteto reveals the original inspiration for Grok Bot was her internal Slack bot called Benny that would automatically fix bug reports for Cursor while she slept:\n\n“I built this bot called Benny. I’m a fairly lazy person, and we were getting so many bug reports for Cursor, and I wanted to just fix them all.”\n\n“I started thinking about how would I make it so my agents could just automatically fix bugs for me while I sleep? That was the inspiration for some of our earlier experiments with building a more persistent bot.”\n\n“I got so many questions like how did you build Benny? How can I build my own? That inspired some of the thinking behind Grok Bot. What if everybody could define one of their own bots, give it an identity, and give it things like its own computer, plus routines and automations.”',
+    createdAt: '2026-08-13T00:31:10.000Z',
+    likes: 523,
+    media: [
+      {
+        url: 'https://pbs.twimg.com/amplify_video_thumb/2087698399927963648/img/6znsR-MrU3SxAqdo.jpg',
+        type: 'video',
+        width: 1280,
+        height: 720,
+      },
+    ],
+  },
+  grokBot,
+)
 
 const formativeWomenOne = mockTweet({
   id: '2087366202922557665',
@@ -236,6 +451,66 @@ const formativeWomenFour = mockTweet({
   ],
 })
 
+const formativeMage = mockQuote(
+  {
+    id: '2087335399479742895',
+    username: 'mage_ofaquarius',
+    name: 'Mage of Aquarius',
+    avatar:
+      'https://pbs.twimg.com/profile_images/2073736968509214720/_Zpycl6D_normal.jpg',
+    text: 'You have to understand, these were the women I looked up to in my formative years https://t.co/MH4WXEnF9j',
+    createdAt: '2026-08-12T00:28:34.000Z',
+    likes: 32,
+    media: [
+      {
+        url: 'https://pbs.twimg.com/media/HPerkB6XMAAPMt9.jpg',
+        type: 'photo',
+        width: 246,
+        height: 360,
+      },
+      {
+        url: 'https://pbs.twimg.com/media/HPezxiFXMAAWDFj.jpg',
+        type: 'photo',
+        width: 961,
+        height: 1200,
+      },
+      {
+        url: 'https://pbs.twimg.com/media/HPe0DKnWIAA-3MM.jpg',
+        type: 'photo',
+        width: 711,
+        height: 399,
+      },
+      {
+        url: 'https://pbs.twimg.com/media/HPe0bmzWsAAAlBV.jpg',
+        type: 'photo',
+        width: 385,
+        height: 1200,
+      },
+    ],
+  },
+  formativeWomenFour,
+)
+
+const formativeSkye = mockQuote(
+  {
+    id: '2087468420245881174',
+    username: 'SkyeSharkie',
+    name: 'Utah teapot 🫖',
+    avatar:
+      'https://pbs.twimg.com/profile_images/2015551276566884352/Db9gMFHq_normal.png',
+    text: 'You have to understand, these were the women I looked up to in my formative years https://t.co/Ghqpwa8gun',
+    createdAt: '2026-08-12T09:17:09.000Z',
+    likes: 72,
+    media: [
+      { url: 'https://pbs.twimg.com/media/HPgtNGbacAAzbQm.png', type: 'photo' },
+      { url: 'https://pbs.twimg.com/media/HPgtQZqboAAabDR.jpg', type: 'photo' },
+      { url: 'https://pbs.twimg.com/media/HPgtXQ-bIAAxFUc.jpg', type: 'photo' },
+      { url: 'https://pbs.twimg.com/media/HPgtbO-a0AAekBB.jpg', type: 'photo' },
+    ],
+  },
+  formativeWomenOne,
+)
+
 const geminiUsers = mockTweet({
   id: '2087222656819241292',
   username: 'sundarpichai',
@@ -269,6 +544,55 @@ const aiRace = mockTweet({
   ],
 })
 
+const geminiSkepticism = mockQuote(
+  {
+    id: '2087421577625538567',
+    username: 'ApriiSR',
+    name: 'Aprii *️⃣',
+    avatar:
+      'https://pbs.twimg.com/profile_images/2074355819580387329/-mkiSz-L_normal.jpg',
+    text: "there's no way this is true in a non misleading way right",
+    createdAt: '2026-08-12T06:11:01.000Z',
+    likes: 18112,
+    media: [],
+  },
+  geminiUsers,
+)
+
+const geminiFactCheck = mockQuote(
+  {
+    id: '2087319114583027828',
+    username: 'QiaochuYuan',
+    name: 'QC',
+    avatar:
+      'https://pbs.twimg.com/profile_images/1746687266947555328/OIMkOG55_normal.jpg',
+    text: 'computer, is sundar pichai, the CEO of google, lying to me https://t.co/5FJqt7wrre',
+    createdAt: '2026-08-11T23:23:52.000Z',
+    likes: 92,
+    media: [
+      { url: 'https://pbs.twimg.com/media/HPelrB-bcAEojSr.jpg', type: 'photo' },
+      { url: 'https://pbs.twimg.com/media/HPelrB_a8AAKVQ7.jpg', type: 'photo' },
+      { url: 'https://pbs.twimg.com/media/HPelrCCasAAKm_t.jpg', type: 'photo' },
+    ],
+  },
+  geminiUsers,
+)
+
+const geminiEighteenPlus = mockQuote(
+  {
+    id: '2087273266377523505',
+    username: 'cmuratori',
+    name: 'Casey Muratori',
+    avatar:
+      'https://pbs.twimg.com/profile_images/2070670629943349248/m8_kUGhm_normal.jpg',
+    text: 'My eyesight isn’t great, so I thought this said “18+ people are now using Gemini” and I was like “that’s weirdly precise, but it sounds about right because everyone I know uses OpenAI or Anthropic”.',
+    createdAt: '2026-08-11T20:21:41.000Z',
+    likes: 554,
+    media: [],
+  },
+  geminiUsers,
+)
+
 export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
   id: 'preview-2026-08-11-v1',
   issueNumber: 1,
@@ -283,103 +607,111 @@ export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
     windowEnd: '2026-08-12T07:00:00.000Z',
     generatedAt: OBSERVED_AT,
     executiveSummary:
-      'Hidden model reasoning became a security story, Grok arrived as both worker and mascot, and the timeline turned identity, courtship, and AI-market metrics into collective arguments.',
+      'Researchers said hidden AI reasoning traces could expose secrets. Elsewhere, Grok Bot launched, Gemini claimed one billion monthly users, moon-posting became dating strategy, and people shared the women who shaped them.',
     topBanger: moonPosting,
     stories: [
       {
         slug: 'hidden-reasoning-leaked-secrets',
+        category: 'AI',
         keyword: 'hidden reasoning',
-        title:
-          'Hidden reasoning was extractable—and encrypted traces leaked secrets',
+        title: 'Researchers say hidden AI reasoning traces can leak secrets',
         subtitle:
-          'A frontier-model API disclosure became more concrete when researchers reported credentials and personal data inside public Claude Code and Codex traces.',
+          'A reported API exploit exposed chain-of-thought—and credentials inside public Claude Code and Codex sessions.',
         bullets: [
           'Researchers said extracted token counts matched billed thinking tokens for most tested prompts.',
           'A scan of roughly 7,000 public traces reportedly found API keys, email addresses, passwords, and other sensitive data.',
           'The key distinction is between eliciting reasoning from your own prompt and recovering private material from somebody else’s shared trace.',
         ],
         editorialNote:
-          'This is the day’s clearest story, but eliciting chain of thought from your own prompt is not the same severity as recovering private material from somebody else’s published encrypted trace.',
+          'Two claims are bundled together here: extracting reasoning from your own prompts, and recovering private material from someone else’s shared trace. The second is the direct security risk.',
         bangers: [hiddenReasoning, deepThink, leakedTraces],
-        commentary: [],
+        commentary: [
+          hiddenPaperCaveat,
+          hiddenReproduced,
+          hiddenOperationalRisk,
+        ],
         replyCount: 0,
         peakedAt: '2026-08-11T17:23:13.000Z',
       },
       {
         slug: 'moon-posting-meets-ai-ambition',
+        category: 'joke',
         keyword: 'moon',
-        title: 'Moon-posting met the choice to put AI ambition before romance',
+        title: 'Moon-posting became dating bait',
         subtitle:
-          'Two high-ranked posts turned courtship into a participatory conversation about authenticity, ambition, and status on the timeline.',
+          'Two viral posts asked what online courtship looks like when people optimize for engagement—or put AI careers before romance.',
         bullets: [
           'One post described men adopting moon posts as engagement and DM bait after hearing that the tactic attracts women.',
           'Another sought people foregoing romantic relationships to pursue AI work.',
           'The cluster is cultural rather than merely about AI or astronomy: both posts ask how people narrate desire and status in public.',
         ],
         editorialNote:
-          'This is a loose but natural culture cluster: the shared subject is how people narrate courtship, ambition, and status on the timeline—not AI or astronomy by itself.',
+          'The joke spread because people immediately performed, criticized, and overthought the moon-posting strategy in public.',
         bangers: [moonPosting, aiAmbitions],
-        commentary: [],
+        commentary: [moonCanConfirm, moonPosers, moonCoincidence],
         replyCount: 0,
         peakedAt: '2026-08-12T05:03:12.000Z',
       },
       {
         slug: 'grok-bot-little-guy',
+        category: 'AI',
         keyword: 'little guy',
-        title: 'Grok Bot arrived as a worker—and as the newest AI “little guy”',
+        title: 'Grok Bot turns AI agents into branded coworkers',
         subtitle:
-          'The launch sold agents as persistent coworkers while the surrounding conversation read cuteness as a deliberate consumer-AI strategy.',
+          'The launch introduced a bot that signs into tools and returns finished work, wrapped in the industry’s latest cute mascot.',
         bullets: [
           'Grok Bot’s pitch was concrete: sign in to tools, do the work, and return with a finished result.',
           'Reactions mixed assistant enthusiasm with enterprise skepticism and vendor-lock-in concerns.',
           'Friendly mascot branding makes a high-agency system feel domestic and approachable.',
         ],
         editorialNote:
-          'The story is both product and packaging: agents are sold as coworkers while “little guy” aesthetics make a high-agency system feel domestic and approachable.',
+          'The launch conversation split cleanly between what the agent can do, who built the underlying product, and why powerful systems keep getting cute mascots.',
         bangers: [grokBot, littleGuy],
-        commentary: [],
+        commentary: [grokForNormies, grokNdaJoke, grokOriginStory],
         replyCount: 0,
         peakedAt: '2026-08-11T21:53:28.000Z',
       },
       {
         slug: 'formative-women-meme',
+        category: 'participatory meme',
         keyword: 'formative years',
-        title: '“Women I looked up to” became the day’s participatory canon',
+        title: 'People shared the women who shaped them',
         subtitle:
-          'Four image lists used the same phrase to turn fictional characters, writers, and influences into public autobiography.',
+          'One image prompt became a participatory meme about fictional characters, writers, performers, and role models.',
         bullets: [
           'The posts were iterations of one image-list format and sometimes quoted one another.',
           'The largest thread grew into a real discussion of formative writers and fictional characters.',
           'A reusable phrase let people publish autobiographical canons and recognize one another’s influences.',
         ],
         editorialNote:
-          'This is the strongest native social cluster of the day: a reusable phrase prompted people to publish autobiographical canons and recognize one another’s influences.',
+          'This is the day’s clearest native social story: the format itself is the thread, with each quote post adding a new autobiographical image set.',
         bangers: [
           formativeWomenOne,
           formativeWomenTwo,
           formativeWomenThree,
           formativeWomenFour,
         ],
-        commentary: [],
+        commentary: [formativeMage, formativeSkye],
         replyCount: 27,
         peakedAt: '2026-08-12T02:30:58.000Z',
       },
       {
         slug: 'gemini-ai-race-measurement',
+        category: 'AI',
         keyword: 'AI race',
         title:
-          'Gemini’s billion-user claim met a different measure of the AI race',
+          'Gemini says it reached 1B users. Another chart says OpenAI leads.',
         subtitle:
-          'A usage milestone and a classifier-derived market-share view showed how dramatically the answer changes with the denominator.',
+          'The posts measure different things—monthly users and detected AI-written text—so they tell different stories about the AI race.',
         bullets: [
           'Google announced more than one billion monthly Gemini users.',
           'Pangram used model-family attribution to estimate which systems produced observable AI-written text.',
           '“Users” and classified model output are different populations, and both measurements need sampling and attribution caveats.',
         ],
         editorialNote:
-          'Together these posts are about measurement rather than rivalry: “users” and observable model-generated text are different denominators, and both invite sampling and attribution caveats.',
+          'The billion-user announcement prompted disbelief. The useful comparison is not winner versus loser, but monthly reach versus a classifier’s sample of visible AI-written text.',
         bangers: [geminiUsers, aiRace],
-        commentary: [],
+        commentary: [geminiSkepticism, geminiFactCheck, geminiEighteenPlus],
         replyCount: 0,
         peakedAt: '2026-08-11T17:00:34.000Z',
       },

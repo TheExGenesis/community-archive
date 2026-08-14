@@ -1,5 +1,6 @@
 import { parseDigestEditionContent } from './types'
 import { AUGUST_11_MOCK_DIGEST, isDigestPreviewEnabled } from './mock'
+import { firstStoryMedia } from './storyMedia'
 
 describe('daily digest preview fixture', () => {
   test('is a valid five-story edition built from the August 11 snapshot', () => {
@@ -15,6 +16,19 @@ describe('daily digest preview fixture', () => {
       candidateCount: 252,
       selectedCount: 30,
     })
+    expect(
+      AUGUST_11_MOCK_DIGEST.content.stories.map((story) => story.category),
+    ).toEqual(['AI', 'joke', 'AI', 'participatory meme', 'AI'])
+    expect(
+      AUGUST_11_MOCK_DIGEST.content.stories.every((story) =>
+        Boolean(firstStoryMedia(story)),
+      ),
+    ).toBe(true)
+    expect(
+      AUGUST_11_MOCK_DIGEST.content.stories.every(
+        (story) => story.commentary.length >= 2,
+      ),
+    ).toBe(true)
   })
 
   test('is enabled for preview and development, but not production by default', () => {

@@ -58,6 +58,7 @@ const modelOutput = {
     'The archive debated taste, remembered a group house, and started mining a new parquet release.',
   stories: [
     {
+      category: 'AI',
       keyword: 'taste',
       title: 'Taste became a benchmark and a public argument',
       subtitle:
@@ -67,6 +68,7 @@ const modelOutput = {
       commentary_tweet_ids: ['11'],
     },
     {
+      category: 'culture',
       keyword: 'group house',
       title: 'A kitchen whiteboard became the group-house memorial',
       subtitle:
@@ -76,6 +78,7 @@ const modelOutput = {
       commentary_tweet_ids: ['22'],
     },
     {
+      category: 'science',
       keyword: 'parquet',
       title: 'Reply graphs arrived in the new parquet release',
       subtitle:
@@ -121,6 +124,7 @@ describe('daily digest generation contract', () => {
     expect(edition.stories).toHaveLength(3)
     expect(edition.stories[0]).toMatchObject({
       slug: 'taste',
+      category: 'AI',
       keyword: 'taste',
       replyCount: 12,
     })
@@ -170,5 +174,25 @@ describe('daily digest generation contract', () => {
         },
       }),
     ).toThrow('unknown banger tweet ID')
+  })
+
+  test('rejects categories outside the editorial taxonomy', () => {
+    expect(() =>
+      assembleDigestEditionContent({
+        runId: 'run-1',
+        digestDate: '2026-08-12',
+        windowStart: '2026-08-11T12:00:00.000Z',
+        windowEnd: '2026-08-12T12:00:00.000Z',
+        allCandidateCount: 3,
+        enrichedCandidates: candidates,
+        modelOutput: {
+          ...modelOutput,
+          stories: [
+            { ...modelOutput.stories[0], category: 'AI discourse' },
+            ...modelOutput.stories.slice(1),
+          ],
+        },
+      }),
+    ).toThrow('Story 1 is incomplete')
   })
 })

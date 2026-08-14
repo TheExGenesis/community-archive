@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { checkIsAdmin } from '@/app/admin/data'
 import { DigestEditionView } from '@/components/digest/DigestEditionView'
 import { getPublishedDigest, listPublishedDigests } from '@/lib/digest/data'
 
@@ -24,10 +25,13 @@ export default async function DatedDigestPage({
   params: { date: string }
 }) {
   if (!DATE_PATTERN.test(params.date)) notFound()
-  const [edition, archive] = await Promise.all([
+  const [edition, archive, isAdmin] = await Promise.all([
     getPublishedDigest(params.date),
     listPublishedDigests(),
+    checkIsAdmin(),
   ])
   if (!edition) notFound()
-  return <DigestEditionView edition={edition} archive={archive} />
+  return (
+    <DigestEditionView edition={edition} archive={archive} isAdmin={isAdmin} />
+  )
 }

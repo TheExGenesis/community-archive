@@ -22,9 +22,11 @@ const sectionLabel =
 export function DigestEditionView({
   edition,
   archive,
+  isAdmin = false,
 }: {
   edition: DigestEdition
   archive: DigestEdition[]
+  isAdmin?: boolean
 }) {
   const content = edition.content
   const returnTo = `/digest/${edition.digestDate}`
@@ -47,11 +49,21 @@ export function DigestEditionView({
         <header>
           <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-2.5 dark:border-zinc-200">
             <div className={sectionLabel}>The Daily Digest</div>
-            <div
-              className={`text-[11.5px] uppercase tracking-[0.18em] ${MUTED}`}
-            >
-              {edition.isPreview ? 'Prototype · ' : ''}№ {edition.issueNumber} ·
-              v{edition.version}
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {isAdmin ? (
+                <Link
+                  href="/admin/digest"
+                  className="rounded-full bg-zinc-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-brand transition-colors hover:bg-blue-100 hover:text-blue-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:bg-zinc-800 dark:hover:bg-blue-950 dark:hover:text-blue-100"
+                >
+                  Editorial lab →
+                </Link>
+              ) : null}
+              <div
+                className={`text-[11.5px] uppercase tracking-[0.18em] ${MUTED}`}
+              >
+                {edition.isPreview ? 'Prototype · ' : ''}№ {edition.issueNumber}{' '}
+                · v{edition.version}
+              </div>
             </div>
           </div>
 

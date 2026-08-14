@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { checkIsAdmin } from '@/app/admin/data'
 import { DigestEditionView } from '@/components/digest/DigestEditionView'
 import { getPublishedDigest, listPublishedDigests } from '@/lib/digest/data'
 
@@ -6,11 +7,20 @@ export const metadata = { title: 'Daily Digest · Community Archive' }
 export const revalidate = 300
 
 export default async function DigestPage() {
-  const [edition, archive] = await Promise.all([
+  const [edition, archive, isAdmin] = await Promise.all([
     getPublishedDigest(),
     listPublishedDigests(),
+    checkIsAdmin(),
   ])
-  if (edition) return <DigestEditionView edition={edition} archive={archive} />
+  if (edition) {
+    return (
+      <DigestEditionView
+        edition={edition}
+        archive={archive}
+        isAdmin={isAdmin}
+      />
+    )
+  }
 
   return (
     <main className="min-h-[70vh] bg-zinc-100/70 px-4 py-16 dark:bg-background">
@@ -26,12 +36,22 @@ export default async function DigestPage() {
           few readable stories. Editions are generated from a frozen 24-hour
           banger set and reviewed before publication.
         </p>
-        <Link
-          href="/bangers?period=today"
-          className="mt-6 inline-flex rounded-md bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:bg-white dark:text-zinc-950"
-        >
-          Explore today&apos;s bangers
-        </Link>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Link
+            href="/bangers?period=today"
+            className="inline-flex rounded-md bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white dark:bg-white dark:text-zinc-950"
+          >
+            Explore today&apos;s bangers
+          </Link>
+          {isAdmin ? (
+            <Link
+              href="/admin/digest"
+              className="inline-flex rounded-md border border-zinc-300 px-4 py-2.5 text-sm font-semibold text-brand transition-colors hover:border-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:border-zinc-500 dark:hover:bg-zinc-900"
+            >
+              Editorial lab →
+            </Link>
+          ) : null}
+        </div>
       </div>
     </main>
   )

@@ -16,6 +16,7 @@ import type {
 } from '@/lib/metaTwitter/types'
 import { mutateProfileCuration } from '@/app/user/[account_id]/actions'
 import type { ProfileCurationSection } from '@/lib/profileCurationState'
+import { useProfileEditing } from './ProfileEditingContext'
 
 interface SidebarData {
   media: ArchiveMediaItem[]
@@ -72,7 +73,6 @@ export function ProfileArchive({
   initialYear,
   initialPage,
   initialSidebar,
-  isOwner = false,
 }: {
   accountId: string
   avatarUrl: string | null
@@ -82,7 +82,6 @@ export function ProfileArchive({
   initialYear: number | null
   initialPage: ProfileBangersPageState
   initialSidebar?: SidebarData
-  isOwner?: boolean
 }) {
   const initialFeedKey = feedKey(initialYear, 'quotes')
   const initialScopeKey = scopeKey(initialYear)
@@ -123,8 +122,7 @@ export function ProfileArchive({
   const [loadingPeople, setLoadingPeople] = useState<Record<string, boolean>>(
     {},
   )
-  const [editing, setEditing] = useState(false)
-  const [editSaving, setEditSaving] = useState(false)
+  const { editing, editSaving, setEditing, setEditSaving } = useProfileEditing()
   const [editError, setEditError] = useState<string | null>(null)
   const feedsRef = useRef(feeds)
   const mediaRef = useRef(mediaByScope)
@@ -440,8 +438,15 @@ export function ProfileArchive({
       setActiveYear(year)
       window.history.pushState(null, '', archiveChapterHref(basePath, year))
     },
-    [activeYear, basePath],
+    [activeYear, basePath, setEditing],
   )
+
+  useEffect(() => {
+    if (!editing || activeYear === null) return
+    setSort('quotes')
+    setActiveYear(null)
+    window.history.pushState(null, '', archiveChapterHref(basePath, null))
+  }, [activeYear, basePath, editing])
 
   const selectSort = useCallback((nextSort: ProfileBangerSort) => {
     setSort(nextSort)
@@ -471,7 +476,7 @@ export function ProfileArchive({
         setEditSaving(false)
       }
     },
-    [],
+    [setEditSaving],
   )
 
   const dismissItem = useCallback(
@@ -751,11 +756,9 @@ export function ProfileArchive({
         onLoadMore={() => void loadMore()}
         loadMoreRef={loadMoreRef}
         returnTo={returnTo}
-        isOwner={isOwner && activeYear === null}
         editing={editing && activeYear === null}
         editSaving={editSaving}
         editError={editError}
-        onEditingChange={setEditing}
         onDismiss={(section, itemId) => void dismissItem(section, itemId)}
         onToggleFeature={(section, itemId) =>
           void toggleFeature(section, itemId)

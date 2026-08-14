@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ProfileHeader } from './ProfileHeader'
+import { ProfileEditingProvider } from './ProfileEditingContext'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 
 type MockImageProps = React.ComponentProps<'img'> & {
@@ -48,7 +50,8 @@ test('does not label a non-member or offer an archive download', () => {
   )
 
   expect(screen.queryByText('Archive contributor')).not.toBeInTheDocument()
-  expect(screen.queryByText('Community member')).not.toBeInTheDocument()
+  expect(screen.queryByText('Archived tweets')).not.toBeInTheDocument()
+  expect(screen.queryByText('Opted in')).not.toBeInTheDocument()
   expect(
     screen.queryByRole('link', { name: 'Download archive' }),
   ).not.toBeInTheDocument()
@@ -62,7 +65,7 @@ test('does not label a non-member or offer an archive download', () => {
   ).toHaveAttribute('href', '/settings')
 })
 
-test('labels an opted-in non-uploader without offering a download', () => {
+test('labels an opted-in non-uploader without treating them as a contributor', () => {
   render(
     <ProfileHeader
       profile={profile({ has_archive: false, is_opted_in: true })}
@@ -70,7 +73,7 @@ test('labels an opted-in non-uploader without offering a download', () => {
     />,
   )
 
-  expect(screen.getByText('Community member')).toBeVisible()
+  expect(screen.getByText('Opted in')).toBeVisible()
   expect(screen.queryByText('Archive contributor')).not.toBeInTheDocument()
   expect(
     screen.queryByRole('link', { name: 'Download archive' }),
@@ -80,7 +83,7 @@ test('labels an opted-in non-uploader without offering a download', () => {
   ).not.toBeInTheDocument()
 })
 
-test('labels an uploader and exposes the archive download', () => {
+test('labels an uploader without treating them as a contributor', () => {
   render(
     <ProfileHeader
       profile={profile({ has_archive: true, is_opted_in: false })}
@@ -88,7 +91,8 @@ test('labels an uploader and exposes the archive download', () => {
     />,
   )
 
-  expect(screen.getByText('Archive contributor')).toBeVisible()
+  expect(screen.getByText('Archived tweets')).toBeVisible()
+  expect(screen.queryByText('Archive contributor')).not.toBeInTheDocument()
   expect(
     screen.getByRole('link', { name: 'Download archive' }),
   ).toHaveAttribute(
@@ -98,6 +102,46 @@ test('labels an uploader and exposes the archive download', () => {
   expect(
     screen.queryByRole('note', { name: 'Limited profile' }),
   ).not.toBeInTheDocument()
+})
+
+test('gives rostered contributors a distinct blue award badge', () => {
+  render(
+    <ProfileHeader
+      profile={{
+        ...profile({ has_archive: true, is_opted_in: false }),
+        username: 'exgenesis',
+      }}
+      archivedAt={null}
+    />,
+  )
+
+  expect(screen.getByText('Archive contributor')).toHaveClass(
+    'border-brand/40',
+    'bg-brand/10',
+    'text-brand',
+  )
+  expect(screen.getByText('Archived tweets')).toBeVisible()
+})
+
+test('puts the owner edit control immediately before the subtle X link', async () => {
+  const user = userEvent.setup()
+  render(
+    <ProfileEditingProvider>
+      <ProfileHeader
+        profile={profile({ has_archive: true, is_opted_in: false })}
+        archivedAt={null}
+        isOwner
+      />
+    </ProfileEditingProvider>,
+  )
+
+  const editButton = screen.getByRole('button', { name: 'Edit profile' })
+  const xLink = screen.getByRole('link', { name: 'View on X' })
+  expect(editButton.nextElementSibling).toBe(xLink)
+  expect(xLink).toHaveClass('bg-transparent', 'text-muted-foreground')
+
+  await user.click(editButton)
+  expect(screen.getByRole('button', { name: 'Done editing' })).toBeVisible()
 })
 
 test('honors an owner setting that hides the archive download', () => {

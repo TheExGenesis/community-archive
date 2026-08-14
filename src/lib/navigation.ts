@@ -19,15 +19,8 @@ export function userProfileHref(
     !/^\d+$/.test(cleanUsername)
       ? cleanUsername
       : null
-  if (accountId) {
-    const pathname = `/user/${encodeURIComponent(accountId)}`
-    return validUsername
-      ? `${pathname}?username=${encodeURIComponent(validUsername)}`
-      : pathname
-  }
-  return validUsername
-    ? `/user/${encodeURIComponent(`@${validUsername}`)}`
-    : '/user-dir'
+  if (validUsername) return `/user/${encodeURIComponent(validUsername)}`
+  return accountId ? `/user/${encodeURIComponent(accountId)}` : '/user-dir'
 }
 
 export interface TweetBackLink {

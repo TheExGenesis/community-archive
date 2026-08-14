@@ -90,7 +90,7 @@ describe.each<PortalView>(['home', 'stream'])(
       jest.restoreAllMocks()
     })
 
-    test('checks immediately and then polls from the latest cursor each minute', async () => {
+    test('polls from the latest cursor without changing the corpus snapshot count', async () => {
       const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -125,7 +125,7 @@ describe.each<PortalView>(['home', 'stream'])(
         jest.advanceTimersByTime(30_000)
         await Promise.resolve()
       })
-      expect(screen.getByText('14,000,010 tweets')).toBeInTheDocument()
+      expect(screen.getByText('14,000,000 tweets')).toBeInTheDocument()
 
       await act(async () => {
         jest.advanceTimersByTime(29_999)
@@ -139,7 +139,7 @@ describe.each<PortalView>(['home', 'stream'])(
         await Promise.resolve()
       })
       expect(fetchMock).toHaveBeenCalledTimes(2)
-      expect(screen.getByText('14,000,024 tweets')).toBeInTheDocument()
+      expect(screen.getByText('14,000,000 tweets')).toBeInTheDocument()
       expect(String(fetchMock.mock.calls[1][0])).toContain(
         'after=2026-08-07T12%3A01%3A00.000Z&afterId=101',
       )
@@ -148,9 +148,9 @@ describe.each<PortalView>(['home', 'stream'])(
         jest.advanceTimersByTime(240_000)
         await Promise.resolve()
       })
-      expect(screen.getByText('14,000,100 tweets')).toBeInTheDocument()
+      expect(screen.getByText('14,000,000 tweets')).toBeInTheDocument()
       if (view === 'home') {
-        expect(screen.getByText('14,000,100')).toBeInTheDocument()
+        expect(screen.getByText('14,000,000')).toBeInTheDocument()
       }
 
       unmount()

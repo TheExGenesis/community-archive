@@ -9,24 +9,26 @@ const normalizeUserMetadata = (user: User | null) => {
   const userMeta = user.user_metadata ?? {}
   const appMeta = user.app_metadata ?? {}
   const identities = user.identities ?? []
-  const twitterIdentity = identities.find((identity) => identity.provider === 'twitter')
+  const twitterIdentity = identities.find(
+    (identity) => identity.provider === 'twitter',
+  )
   const identityData = twitterIdentity?.identity_data ?? {}
 
   const providerId =
-    userMeta.provider_id ??
     appMeta.provider_id ??
     identityData.provider_id ??
     identityData.sub ??
     identityData.user_id ??
-    identityData.id
+    identityData.id ??
+    userMeta.provider_id
 
   const userName =
-    userMeta.user_name ??
     appMeta.user_name ??
     identityData.user_name ??
     identityData.preferred_username ??
     identityData.username ??
-    identityData.screen_name
+    identityData.screen_name ??
+    userMeta.user_name
 
   const normalized = { ...userMeta, ...appMeta }
 

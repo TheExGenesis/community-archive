@@ -102,8 +102,8 @@ SUPABASE_SERVICE_ROLE=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # Performance Configuration (OPTIONAL)
 LOG_LEVEL=info
-PG_BATCH_SIZE=5000
-MEMORY_BATCH_SIZE=15000
+PG_BATCH_SIZE=1000
+MEMORY_BATCH_SIZE=3000
 MAX_MEMORY_MB=2000
 
 NODE_ENV=production
@@ -162,7 +162,7 @@ tail -f logs/process_archive.log
 [2024-01-15 14:30:01] Environment: NODE_ENV=production
 [2024-01-15 14:30:01] Memory limit: 2000MB
 [2024-01-15 14:30:01] Use COPY optimization: true
-[2024-01-15 14:30:01] Batch size: 5000
+[2024-01-15 14:30:01] Batch size: 1000
 [2024-01-15 14:35:23] ✅ Process completed successfully in 322s
 [2024-01-15 14:35:23] ---
 ```

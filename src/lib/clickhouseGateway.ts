@@ -1,4 +1,5 @@
 const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
+  'corpus-count': new Set(),
   summary: new Set(),
   search: new Set([
     'q',
@@ -10,7 +11,10 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'sort',
     'limit',
     'offset',
+    'preview',
+    'exclude_retweets',
   ]),
+  'trend-evidence': new Set(['q', 'mode', 'since', 'until', 'limit']),
   'word-trend': new Set(['q', 'bucket', 'match', 'from', 'to']),
   'stream-stats': new Set(['start', 'end', 'granularity', 'scope']),
   'recent-bangers': new Set(['limit', 'hours', 'end']),
@@ -28,6 +32,8 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'sort',
     'year',
     'q',
+    'target_account_id',
+    'min_quote_count',
     'exclude_self',
     'target_ca_users_only',
     'quote_ca_users_only',
@@ -75,7 +81,28 @@ export function analyticsGatewayRequestUrl(
     cleanPath[0] === 'user' &&
     /^[A-Za-z0-9_@]{1,80}$/.test(cleanPath[1])
   ) {
-    allowedParams = new Set(['limit'])
+    allowedParams = new Set(['limit', 'include_interactions'])
+  } else if (
+    cleanPath.length === 3 &&
+    cleanPath[0] === 'user' &&
+    /^\d{1,20}$/.test(cleanPath[1]) &&
+    cleanPath[2] === 'sidebar'
+  ) {
+    allowedParams = new Set(['year', 'media_limit', 'people_limit'])
+  } else if (
+    cleanPath.length === 3 &&
+    cleanPath[0] === 'user' &&
+    /^\d{1,20}$/.test(cleanPath[1]) &&
+    cleanPath[2] === 'media'
+  ) {
+    allowedParams = new Set(['year', 'limit'])
+  } else if (
+    cleanPath.length === 3 &&
+    cleanPath[0] === 'user' &&
+    /^\d{1,20}$/.test(cleanPath[1]) &&
+    cleanPath[2] === 'interactions'
+  ) {
+    allowedParams = new Set(['year', 'limit'])
   } else if (
     cleanPath.length === 2 &&
     cleanPath[0] === 'tweet' &&
@@ -164,3 +191,5 @@ export async function fetchAnalyticsGatewayJson<T>(
     throw new Error('ClickHouse analytics returned invalid JSON')
   }
 }
+
+export type AnalyticsGatewayFetcher = typeof fetchAnalyticsGatewayJson

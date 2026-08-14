@@ -1,13 +1,10 @@
 import React from 'react'
 import Link from 'next/link'
-import { FaTwitter, FaGithub, FaDiscord } from 'react-icons/fa'
-
-const pastContributors: Array<{ name: string; href?: string }> = [
-  { name: '@IaimforGOAT', href: 'https://x.com/IaimforGOAT' },
-  { name: 'Defender' },
-  { name: 'Alexandre Variengien' },
-  { name: 'Christine' },
-]
+import { FaGithub, FaDiscord } from 'react-icons/fa'
+import {
+  currentProjectContributors,
+  pastProjectContributors,
+} from '@/lib/projectContributors'
 
 export default function AboutPage() {
   return (
@@ -25,71 +22,64 @@ export default function AboutPage() {
           <strong>collect, host, and serve</strong> this data, empowering
           communities to use it for any purpose they choose.
         </p>
-        <p className="text-muted-foreground">
-          Twitter conversations represent a unique record of how ideas spread,
-          communities form, and culture evolves. By preserving this data openly,
-          we enable researchers, developers, and communities to learn from and
-          build upon this shared history.
-        </p>
       </section>
 
       <section className="mb-12">
-        <h2 className="mb-4 mt-8 text-2xl font-semibold">Current Team</h2>
+        <h2 className="mb-4 mt-8 text-2xl font-semibold">
+          Current Contributors
+        </h2>
 
         <div className="space-y-6">
-          <div className="flex items-start gap-4 rounded-lg bg-muted p-4 dark:bg-card">
-            <div className="flex-1">
+          {currentProjectContributors.map((contributor) => (
+            <div
+              key={contributor.username}
+              className="rounded-lg bg-muted p-4 dark:bg-card"
+            >
               <h3 className="mb-1 text-xl font-semibold">
                 <a
-                  href="https://x.com/exgenesis"
+                  href={`https://x.com/${contributor.username}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="transition-colors hover:text-brand"
                 >
-                  Xis
+                  {contributor.name}
+                  {contributor.qualifier ? (
+                    <span className="text-muted-foreground">
+                      {' '}
+                      ({contributor.qualifier})
+                    </span>
+                  ) : null}
                 </a>
               </h3>
-              <p className="text-muted-foreground">Creator & Lead</p>
+              {contributor.role && (
+                <p className="text-muted-foreground">{contributor.role}</p>
+              )}
             </div>
-            <a
-              href="https://x.com/exgenesis"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-2xl text-muted-foreground transition-colors hover:text-brand"
-            >
-              <FaTwitter />
-            </a>
-          </div>
+          ))}
         </div>
       </section>
 
       <section className="mb-12">
-        <h2 className="mb-2 mt-8 text-2xl font-semibold">
-          Contributor Hall of Fame
-        </h2>
+        <h2 className="mb-2 mt-8 text-2xl font-semibold">Past Contributors</h2>
         <p className="mb-4 text-muted-foreground">
           Past contributors whose work helped build Community Archive.
         </p>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          {pastContributors.map((contributor) => (
+          {pastProjectContributors.map((contributor) => (
             <div
-              key={contributor.name}
+              key={contributor.username}
               className="rounded-lg bg-muted p-4 dark:bg-card"
             >
               <h3 className="text-lg font-semibold">
-                {contributor.href ? (
-                  <a
-                    href={contributor.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="transition-colors hover:text-brand"
-                  >
-                    {contributor.name}
-                  </a>
-                ) : (
-                  contributor.name
-                )}
+                <a
+                  href={`https://x.com/${contributor.username}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="transition-colors hover:text-brand"
+                >
+                  {contributor.name}
+                </a>
               </h3>
             </div>
           ))}

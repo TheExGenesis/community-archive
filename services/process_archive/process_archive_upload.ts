@@ -14,8 +14,8 @@ import { createClient } from '@supabase/supabase-js'
 // Configuration
 const CONFIG = {
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
-  BATCH_SIZE: parseInt(process.env.PG_BATCH_SIZE || '5000', 10), // Optimized for parameter limits
-  MEMORY_BATCH_SIZE: parseInt(process.env.MEMORY_BATCH_SIZE || '15000', 10), // Optimized for memory
+  BATCH_SIZE: parseInt(process.env.PG_BATCH_SIZE || '1000', 10), // Conservative for large archives and pooler links
+  MEMORY_BATCH_SIZE: parseInt(process.env.MEMORY_BATCH_SIZE || '3000', 10), // Bounds per-chunk memory and write pressure
   DEV_ARCHIVE_PATH: process.env.DEV_ARCHIVE_PATH,
   POSTGRES_CONNECTION_STRING: process.env.POSTGRES_CONNECTION_STRING,
   MAX_MEMORY_MB: parseInt(process.env.MAX_MEMORY_MB || '1000', 10), // Memory limit

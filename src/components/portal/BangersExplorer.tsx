@@ -39,6 +39,10 @@ const activeSegmentClassName =
   'border-zinc-800 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-950'
 const idleSegmentClassName =
   'border-zinc-300 bg-transparent text-zinc-600 hover:border-zinc-500 hover:text-zinc-950 dark:border-[#3a3a40] dark:text-[#a7a7b4] dark:hover:border-zinc-500 dark:hover:text-white'
+const masonryBreakpoints = [
+  { query: '(min-width: 1280px)', columns: 3 },
+  { query: '(min-width: 1024px)', columns: 2 },
+] as const
 
 type BangersAction =
   | 'filters_cleared'
@@ -88,6 +92,33 @@ function matchesQuery(tweet: PortalTweet, query: string): boolean {
 
 function dedupeTweets(tweets: PortalTweet[]): PortalTweet[] {
   return Array.from(new Map(tweets.map((tweet) => [tweet.id, tweet])).values())
+}
+
+function useMasonryColumnCount(): number {
+  const [columnCount, setColumnCount] = useState(1)
+
+  useEffect(() => {
+    const mediaQueries = masonryBreakpoints.map(({ query, columns }) => ({
+      media: window.matchMedia(query),
+      columns,
+    }))
+    const updateColumnCount = () => {
+      setColumnCount(
+        mediaQueries.find(({ media }) => media.matches)?.columns ?? 1,
+      )
+    }
+
+    updateColumnCount()
+    mediaQueries.forEach(({ media }) =>
+      media.addEventListener('change', updateColumnCount),
+    )
+    return () =>
+      mediaQueries.forEach(({ media }) =>
+        media.removeEventListener('change', updateColumnCount),
+      )
+  }, [])
+
+  return columnCount
 }
 
 function bangersHeading({
@@ -180,6 +211,7 @@ export function BangersExplorer({
   const requestControllerRef = useRef<AbortController | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const isAllTime = allTime || (period === undefined && year === undefined)
+  const masonryColumnCount = useMasonryColumnCount()
 
   const availableYears = useMemo(() => {
     const years = page.pagination.yearCounts.map(({ year }) => year)
@@ -198,6 +230,17 @@ export function BangersExplorer({
   const visibleTweets = useMemo(
     () => page.tweets.filter((tweet) => matchesQuery(tweet, query)),
     [page.tweets, query],
+  )
+  const masonryColumns = useMemo(
+    () =>
+      visibleTweets.reduce<Array<Array<{ tweet: PortalTweet; order: number }>>>(
+        (columns, tweet, order) => {
+          columns[order % masonryColumnCount].push({ tweet, order })
+          return columns
+        },
+        Array.from({ length: masonryColumnCount }, () => []),
+      ),
+    [masonryColumnCount, visibleTweets],
   )
   const tweetRanks = useMemo(
     () =>
@@ -648,22 +691,34 @@ export function BangersExplorer({
       ) : (
         <div
           data-testid="bangers-masonry"
-          className="columns-1 gap-5 lg:columns-2 xl:columns-3"
+          className="grid items-start gap-5"
+          style={{
+            gridTemplateColumns: `repeat(${masonryColumnCount}, minmax(0, 1fr))`,
+          }}
         >
-          {visibleTweets.map((tweet, order) => (
+          {masonryColumns.map((column, columnIndex) => (
             <div
-              key={tweet.id}
-              data-masonry-order={order + 1}
-              className="mb-6 break-inside-avoid"
+              key={columnIndex}
+              data-testid={`bangers-masonry-column-${columnIndex}`}
+              className="contents lg:block lg:space-y-6"
             >
-              <TweetCard
-                tweet={tweet}
-                featuredRank={tweetRanks.get(tweet.id)}
-                showDate
-                collapsible
-                origin="bangers"
-                returnTo={currentReturnTo}
-              />
+              {column.map(({ tweet, order }) => (
+                <div
+                  key={tweet.id}
+                  data-masonry-order={order + 1}
+                  className="mb-6 lg:mb-0"
+                  style={{ order }}
+                >
+                  <TweetCard
+                    tweet={tweet}
+                    featuredRank={tweetRanks.get(tweet.id)}
+                    showDate
+                    collapsible
+                    origin="bangers"
+                    returnTo={currentReturnTo}
+                  />
+                </div>
+              ))}
             </div>
           ))}
         </div>

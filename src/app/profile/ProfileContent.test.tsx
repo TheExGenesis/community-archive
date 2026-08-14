@@ -5,6 +5,7 @@ import ProfileContent from './ProfileContent'
 const mockFetch = jest.fn()
 const originalFetch = global.fetch
 const mockLogInsert = jest.fn().mockResolvedValue({ error: null })
+const mockUpdateDownloadArchiveVisibility = jest.fn()
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: jest.fn() }),
@@ -32,6 +33,11 @@ jest.mock('@/lib/posthog', () => ({
   capturePostHogEvent: jest.fn(),
 }))
 
+jest.mock('@/app/user/[account_id]/actions', () => ({
+  updateDownloadArchiveVisibility: (...args: unknown[]) =>
+    mockUpdateDownloadArchiveVisibility(...args),
+}))
+
 const user = {
   id: 'auth-user-123',
   user_metadata: {
@@ -45,6 +51,7 @@ describe('ProfileContent opt-in preference', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     global.fetch = mockFetch
+    mockUpdateDownloadArchiveVisibility.mockResolvedValue({ ok: true })
   })
 
   afterAll(() => {
@@ -101,5 +108,34 @@ describe('ProfileContent opt-in preference', () => {
 
     await waitFor(() => expect(optInSwitch).toBeChecked())
     expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows Download Archive by default and lets the owner hide it', async () => {
+    render(
+      <ProfileContent
+        user={user}
+        accountId="42"
+        initialOptInData={null}
+        archives={[]}
+      />,
+    )
+
+    const visibilitySwitch = screen.getByRole('switch', {
+      name: /show download archive/i,
+    })
+    expect(visibilitySwitch).toBeChecked()
+
+    fireEvent.click(visibilitySwitch)
+
+    await waitFor(() =>
+      expect(mockUpdateDownloadArchiveVisibility).toHaveBeenCalledWith(
+        '42',
+        false,
+      ),
+    )
+    expect(visibilitySwitch).not.toBeChecked()
+    expect(
+      screen.getByText('Download Archive is hidden from your public profile'),
+    ).toBeVisible()
   })
 })

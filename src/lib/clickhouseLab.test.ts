@@ -41,16 +41,40 @@ describe('ClickHouse staging lab guard', () => {
     ).toThrow('Unsupported ClickHouse analytics endpoint')
   })
 
+  test('allows the parameterless corpus-count endpoint', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['corpus-count'],
+      new URLSearchParams('raw_sql=DROP'),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/corpus-count',
+    )
+  })
+
   test('allows only bounded tweet-search parameters', () => {
     const target = analyticsGatewayRequestUrl(
       ['search'],
       new URLSearchParams(
-        'q=open+source&mode=phrase&from_user=alice&sort=likes&limit=20&offset=40&raw_sql=DROP',
+        'q=open+source&mode=phrase&from_user=alice&limit=1&offset=0&preview=true&exclude_retweets=true&raw_sql=DROP',
       ),
       'https://analytics.example',
     )
     expect(target.toString()).toBe(
-      'https://analytics.example/search?q=open+source&mode=phrase&from_user=alice&sort=likes&limit=20&offset=40',
+      'https://analytics.example/search?q=open+source&mode=phrase&from_user=alice&limit=1&offset=0&preview=true&exclude_retweets=true',
+    )
+  })
+
+  test('allows only bounded trend-evidence parameters', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['trend-evidence'],
+      new URLSearchParams(
+        'q=tpot&mode=all&since=2024-01-01&until=2026-01-01&limit=50&offset=40',
+      ),
+      'https://analytics.example',
+    )
+    expect(target.toString()).toBe(
+      'https://analytics.example/trend-evidence?q=tpot&mode=all&since=2024-01-01&until=2026-01-01&limit=50',
     )
   })
 
@@ -88,12 +112,12 @@ describe('ClickHouse staging lab guard', () => {
     const target = analyticsGatewayRequestUrl(
       ['top-quotes'],
       new URLSearchParams(
-        'limit=25&offset=50&sort=recent&year=2024&q=archive&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot&raw_sql=DROP',
+        'limit=25&offset=50&sort=recent&year=2024&q=archive&target_account_id=42&min_quote_count=2&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot&raw_sql=DROP',
       ),
       'https://stream.example/analytics',
     )
     expect(target.toString()).toBe(
-      'https://stream.example/analytics/top-quotes?limit=25&offset=50&sort=recent&year=2024&q=archive&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot',
+      'https://stream.example/analytics/top-quotes?limit=25&offset=50&sort=recent&year=2024&q=archive&target_account_id=42&min_quote_count=2&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot',
     )
   })
 
@@ -161,6 +185,56 @@ describe('ClickHouse staging lab guard', () => {
         'https://stream.example/analytics',
       ),
     ).toThrow('Unsupported ClickHouse analytics endpoint')
+  })
+
+  test('allows only scoped profile-sidebar parameters for numeric accounts', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['user', '42', 'sidebar'],
+      new URLSearchParams(
+        'year=2025&media_limit=18&people_limit=8&raw_sql=DROP',
+      ),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/user/42/sidebar?year=2025&media_limit=18&people_limit=8',
+    )
+    expect(() =>
+      analyticsGatewayRequestUrl(
+        ['user', 'not-an-id', 'sidebar'],
+        new URLSearchParams(),
+        'https://stream.example/analytics',
+      ),
+    ).toThrow('Unsupported ClickHouse analytics endpoint')
+  })
+
+  test('allows a core user read to omit interactions', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['user', 'alice'],
+      new URLSearchParams('limit=20&include_interactions=false&raw_sql=DROP'),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/user/alice?limit=20&include_interactions=false',
+    )
+  })
+
+  test('allows independently scoped profile enrichment reads', () => {
+    const media = analyticsGatewayRequestUrl(
+      ['user', '42', 'media'],
+      new URLSearchParams('year=2025&limit=6&people_limit=8'),
+      'https://stream.example/analytics',
+    )
+    const interactions = analyticsGatewayRequestUrl(
+      ['user', '42', 'interactions'],
+      new URLSearchParams('year=2025&limit=8&media_limit=6'),
+      'https://stream.example/analytics',
+    )
+    expect(media.toString()).toBe(
+      'https://stream.example/analytics/user/42/media?year=2025&limit=6',
+    )
+    expect(interactions.toString()).toBe(
+      'https://stream.example/analytics/user/42/interactions?year=2025&limit=8',
+    )
   })
 
   test('allows bounded reverse-quote parameters for numeric tweet IDs', () => {

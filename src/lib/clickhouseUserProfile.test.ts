@@ -17,7 +17,7 @@ test('maps a corpus account into the public profile contract', async () => {
         username: 'alice',
         displayName: 'Alice',
         bio: 'Hello',
-        avatarUrl: 'https://example.com/avatar.jpg',
+        avatarUrl: 'https://pbs.twimg.com/profile_images/42/avatar_normal.jpg',
         headerUrl: 'https://example.com/header.jpg',
         followers: '12',
         following: '3',
@@ -42,6 +42,8 @@ test('maps a corpus account into the public profile contract', async () => {
         account_id: '42',
         username: 'alice',
         account_display_name: 'Alice',
+        avatar_media_url:
+          'https://pbs.twimg.com/profile_images/42/avatar_normal.jpg',
         num_followers: 12,
         num_tweets: 45,
         has_archive: false,
@@ -58,6 +60,14 @@ test('maps a corpus account into the public profile contract', async () => {
         },
       ],
     }),
+  )
+  expect(fetchGateway).toHaveBeenCalledWith(
+    ['user', '42'],
+    new URLSearchParams({
+      limit: '20',
+      include_interactions: 'false',
+    }),
+    { revalidate: 300, timeoutMs: 8_000 },
   )
 })
 

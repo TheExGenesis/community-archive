@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import type { KeyboardEvent, MouseEvent } from 'react'
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import { PiArrowSquareOut, PiHeart, PiQuotes, PiRepeat } from 'react-icons/pi'
 import ImageLightbox from '@/components/ImageLightbox'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
 import {
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/tooltip'
 import { PortalMedia, PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
 import { capturePostHogEvent } from '@/lib/posthog'
+import { TweetLinkPreviews } from '@/components/TweetLinkPreviews'
 
 const HUES = [262, 32, 145, 4, 155, 200, 217, 88, 240, 190, 340, 45, 280, 20]
 const FEATURED_CARD_HOVER =
@@ -60,6 +62,26 @@ export const shortDate = (iso: string) =>
     year: 'numeric',
     timeZone: 'America/Los_Angeles',
   })
+
+function CountMetric({
+  count,
+  label,
+  children,
+}: {
+  count: number
+  label: string
+  children: ReactNode
+}) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span aria-hidden="true" className="inline-flex">
+        {children}
+      </span>
+      <span aria-hidden="true">{formatCount(count)}</span>
+      <span className="sr-only">{`${formatCount(count)} ${label}`}</span>
+    </span>
+  )
+}
 
 export function TweetAvatar({
   tweet,
@@ -201,7 +223,10 @@ function QuotedTweet({
               @{tweet.username}
             </span>
           </Link>{' '}
-          <span className="text-zinc-500 dark:text-[#a7a7b4]">
+          <span
+            suppressHydrationWarning
+            className="text-zinc-500 dark:text-[#a7a7b4]"
+          >
             ·{' '}
             {showDate
               ? shortDate(tweet.createdAt)
@@ -221,16 +246,31 @@ function QuotedTweet({
         </div>
       </Link>
       {!summary && (
-        <TweetImages
-          media={tweet.media}
-          compact={compact}
-          label="Quoted tweet image"
-        />
+        <>
+          <TweetImages
+            media={tweet.media}
+            compact={compact}
+            label="Quoted tweet image"
+          />
+          {/https?:\/\//.test(tweet.text) && (
+            <TweetLinkPreviews tweetId={tweet.id} compact={compact} />
+          )}
+        </>
       )}
       {!condensed && (
         <div className="mt-1.5 flex gap-4 text-[11.5px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
-          <span>♥ {formatCount(tweet.likes)}</span>
-          <span>⇄ {formatCount(tweet.rts)}</span>
+          <CountMetric
+            count={tweet.likes}
+            label={tweet.likes === 1 ? 'like' : 'likes'}
+          >
+            <PiHeart />
+          </CountMetric>
+          <CountMetric
+            count={tweet.rts}
+            label={tweet.rts === 1 ? 'repost' : 'reposts'}
+          >
+            <PiRepeat />
+          </CountMetric>
         </div>
       )}
     </div>
@@ -248,6 +288,7 @@ export interface TweetCardProps {
   showDate?: boolean
   showArchivedBadge?: boolean
   clickable?: boolean
+  showExternalLink?: boolean
   quotedTweetDisplay?: 'full' | 'summary'
   origin?: TweetOrigin
   returnTo?: string
@@ -272,7 +313,7 @@ function ArchivedQuotesMetric({
             aria-label={`${count} archived quotes. Open tweet to see them.`}
             className="inline-flex items-center gap-1 rounded-sm text-zinc-500 transition-colors hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 dark:text-[#a7a7b4] dark:hover:text-zinc-200"
           >
-            <span aria-hidden="true">✦</span>
+            <PiQuotes aria-hidden="true" />
             <span>{formatCount(count)} archived quotes</span>
           </Link>
         </TooltipTrigger>
@@ -296,7 +337,8 @@ export function TweetRow({
   featuredRank,
   showDate = false,
   showArchivedBadge = false,
-  clickable = false,
+  clickable,
+  showExternalLink = false,
   quotedTweetDisplay = 'full',
   origin,
   returnTo,
@@ -308,13 +350,14 @@ export function TweetRow({
   const profileHref = userProfileHref(tweet.username, tweet.accountId)
   const isFeatured = featuredRank !== undefined
   const isEditorial = variant === 'editorial'
-  const isClickable = clickable || isFeatured
+  const isClickable = clickable ?? isFeatured
   const captureAction = (
     action:
       | 'collapse'
       | 'expand'
       | 'open'
       | 'open_archived_quotes'
+      | 'open_external'
       | 'open_quoted_tweet',
   ) => {
     capturePostHogEvent('tweet_card_action', {
@@ -406,7 +449,10 @@ export function TweetRow({
             @{tweet.username}
           </span>
         </Link>
-        <span className="flex-shrink-0 text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
+        <span
+          suppressHydrationWarning
+          className="flex-shrink-0 text-[12px] text-zinc-500 dark:text-[#a7a7b4]"
+        >
           ·{' '}
           {showDate
             ? shortDate(tweet.createdAt)
@@ -434,6 +480,9 @@ export function TweetRow({
         </button>
       )}
       <TweetImages media={tweet.media} compact={compact} label="Tweet image" />
+      {/https?:\/\//.test(tweet.text) && (
+        <TweetLinkPreviews tweetId={tweet.id} compact={compact} />
+      )}
       {tweet.quotedTweet && (
         <QuotedTweet
           tweet={tweet.quotedTweet}
@@ -455,11 +504,34 @@ export function TweetRow({
               onOpen={() => captureAction('open_archived_quotes')}
             />
           )}
-          <span>♥ {formatCount(tweet.likes)}</span>
+          <CountMetric
+            count={tweet.likes}
+            label={tweet.likes === 1 ? 'like' : 'likes'}
+          >
+            <PiHeart />
+          </CountMetric>
           {tweet.retweetCountAvailable !== false ? (
-            <span>⇄ {formatCount(tweet.rts)}</span>
+            <CountMetric
+              count={tweet.rts}
+              label={tweet.rts === 1 ? 'repost' : 'reposts'}
+            >
+              <PiRepeat />
+            </CountMetric>
           ) : null}
           {showArchivedBadge && <span className="text-brand">archived</span>}
+          {showExternalLink && (
+            <a
+              href={`https://x.com/${encodeURIComponent(tweet.username)}/status/${encodeURIComponent(tweet.id)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => captureAction('open_external')}
+              aria-label="View tweet on X (opens in a new tab)"
+              className="ml-auto inline-flex items-center gap-1 rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              <span>View on X</span>
+              <PiArrowSquareOut aria-hidden="true" />
+            </a>
+          )}
         </div>
       )}
     </div>
@@ -487,7 +559,12 @@ export function TweetRow({
       {details}
       {compact && (
         <div className="whitespace-nowrap text-[11.5px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
-          ♥ {formatCount(tweet.likes)}
+          <CountMetric
+            count={tweet.likes}
+            label={tweet.likes === 1 ? 'like' : 'likes'}
+          >
+            <PiHeart />
+          </CountMetric>
         </div>
       )}
     </article>

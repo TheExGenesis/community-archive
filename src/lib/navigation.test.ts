@@ -9,14 +9,14 @@ import {
 
 describe('user profile navigation', () => {
   it('prefers readable usernames while retaining account-ID compatibility', () => {
-    expect(userProfileHref('@archive_user', '123')).toBe(
-      '/user/123?username=archive_user',
-    )
+    expect(userProfileHref('exgenesis', '322603863')).toBe('/user/exgenesis')
+    expect(userProfileHref('@archive_user', '123')).toBe('/user/archive_user')
+    expect(userProfileHref('archive_user')).toBe('/user/archive_user')
     expect(userProfileHref(undefined, '123')).toBe('/user/123')
     expect(userProfileHref('not valid', '123')).toBe('/user/123')
     expect(userProfileHref('123', '456')).toBe('/user/456')
     expect(userProfileHref('a'.repeat(15), '456')).toBe(
-      `/user/456?username=${'a'.repeat(15)}`,
+      `/user/${'a'.repeat(15)}`,
     )
     expect(userProfileHref('a'.repeat(16), '456')).toBe('/user/456')
   })
@@ -88,7 +88,7 @@ describe('tweet detail navigation', () => {
     })
   })
 
-  it('maps homepage, stream, Trends, and Search origins to honest labels', () => {
+  it('maps homepage, stream, Trends, Search, Digest, and profile origins to honest labels', () => {
     expect(getTweetBackLink({ from: 'home', returnTo: '/' }).label).toBe(
       'Back to homepage',
     )
@@ -107,6 +107,16 @@ describe('tweet detail navigation', () => {
         returnTo: '/digest/2026-08-12/taste',
       }).label,
     ).toBe('Back to Daily Digest')
+    expect(
+      getTweetBackLink({
+        from: 'profile',
+        returnTo: '/user/exgenesis?chapter=2025',
+      }),
+    ).toEqual({
+      href: '/user/exgenesis?chapter=2025',
+      label: 'Back to profile',
+      hasKnownOrigin: true,
+    })
   })
 
   it('rejects mismatched and external return targets', () => {
@@ -116,6 +126,9 @@ describe('tweet detail navigation', () => {
     expect(
       getTweetBackLink({ from: 'search', returnTo: '//example.com' }).href,
     ).toBe('/search')
+    expect(
+      getTweetBackLink({ from: 'profile', returnTo: '/tweets/123' }).href,
+    ).toBe('/user-dir')
     expect(getTweetBackLink()).toEqual({
       href: '/',
       label: 'Back to Community Archive',

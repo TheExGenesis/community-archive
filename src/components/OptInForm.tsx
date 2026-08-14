@@ -201,7 +201,7 @@ export default function OptInForm({
           </Link>
           . You can opt out in your{' '}
           <Link
-            href="/profile"
+            href="/settings"
             className="font-medium text-foreground underline underline-offset-4"
           >
             profile

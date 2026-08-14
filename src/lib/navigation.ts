@@ -13,6 +13,7 @@ export type TweetOrigin =
   | 'digest'
   | 'trends'
   | 'search'
+  | 'profile'
 
 export function userProfileHref(
   username: string | null | undefined,
@@ -25,15 +26,8 @@ export function userProfileHref(
     !/^\d+$/.test(cleanUsername)
       ? cleanUsername
       : null
-  if (accountId) {
-    const pathname = `/user/${encodeURIComponent(accountId)}`
-    return validUsername
-      ? `${pathname}?username=${encodeURIComponent(validUsername)}`
-      : pathname
-  }
-  return validUsername
-    ? `/user/${encodeURIComponent(`@${validUsername}`)}`
-    : '/user-dir'
+  if (validUsername) return `/user/${encodeURIComponent(validUsername)}`
+  return accountId ? `/user/${encodeURIComponent(accountId)}` : '/user-dir'
 }
 
 export interface TweetBackLink {
@@ -75,6 +69,11 @@ const TWEET_ORIGINS: Record<
     href: '/search',
     label: 'Back to search',
     matches: (href) => href === '/search' || href.startsWith('/search?'),
+  },
+  profile: {
+    href: '/user-dir',
+    label: 'Back to profile',
+    matches: (href) => href.startsWith('/user/'),
   },
 }
 

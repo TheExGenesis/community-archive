@@ -47,6 +47,21 @@ interface PortalCorpusRange {
   currentYear: number
 }
 
+interface PortalCorpusStats {
+  totalTweets: number
+  generatedAt: string
+}
+
+interface ClickHouseCorpusCountResponse {
+  data: {
+    totalTweets: unknown
+    sourceUpdatedAt: unknown
+    collectedAt: unknown
+    source: 'clickhouse.tweet_content_versions'
+    countMode: 'unique_tweets_observed'
+  }
+}
+
 const PORTAL_READ_TIMEOUT_MS = 10_000
 export const PORTAL_BANGERS_PAGE_SIZE = 30
 const PORTAL_BANGERS_PERIOD_SCAN_PAGE_SIZE = 100
@@ -198,6 +213,92 @@ function exactCount(response: Response, label: string): number {
     throw new Error(`Portal ${label} count returned an invalid response`)
   }
   return count
+}
+
+function portalSnapshotCount(value: number | null, label: string): number {
+  if (value === null || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`Portal ${label} returned an invalid response`)
+  }
+  return value
+}
+
+function portalSnapshotTimestamp(value: string, label: string): string {
+  const timestamp = new Date(value)
+  if (Number.isNaN(timestamp.getTime())) {
+    throw new Error(`Portal ${label} returned an invalid response`)
+  }
+  return timestamp.toISOString()
+}
+
+function portalClickHouseTimestamp(value: string, label: string): string {
+  const normalized = /[zZ]$|[+-]\d\d:\d\d$/.test(value)
+    ? value
+    : `${value.replace(' ', 'T')}Z`
+  return portalSnapshotTimestamp(normalized, label)
+}
+
+function portalClickHouseCount(value: unknown, label: string): number {
+  if (
+    (typeof value !== 'string' && typeof value !== 'number') ||
+    (typeof value === 'string' && !/^\d+$/.test(value))
+  ) {
+    throw new Error(`Portal ${label} returned an invalid response`)
+  }
+  return portalSnapshotCount(Number(value), label)
+}
+
+async function fetchSupabasePortalCorpusStats(): Promise<PortalCorpusStats> {
+  const rows = await portalRestRows<{
+    total_tweets: number | null
+    last_updated: string
+  }>(
+    'global_activity_summary',
+    new URLSearchParams({ select: 'total_tweets,last_updated' }),
+  )
+  if (rows.length !== 1) {
+    throw new Error('Portal corpus summary returned an invalid response')
+  }
+  return {
+    totalTweets: portalSnapshotCount(
+      rows[0].total_tweets,
+      'corpus tweet count',
+    ),
+    generatedAt: portalSnapshotTimestamp(
+      rows[0].last_updated,
+      'corpus summary timestamp',
+    ),
+  }
+}
+
+/**
+ * ClickHouse owns the live analytical corpus count. Supabase's daily summary
+ * remains a last-known-good fallback during gateway or projection failures.
+ */
+export async function fetchPortalCorpusStats(): Promise<PortalCorpusStats> {
+  try {
+    const response =
+      await fetchAnalyticsGatewayJson<ClickHouseCorpusCountResponse>(
+        ['corpus-count'],
+        new URLSearchParams(),
+        { timeoutMs: PORTAL_READ_TIMEOUT_MS },
+      )
+    return {
+      totalTweets: portalClickHouseCount(
+        response.data.totalTweets,
+        'ClickHouse corpus tweet count',
+      ),
+      generatedAt: portalClickHouseTimestamp(
+        String(response.data.collectedAt),
+        'ClickHouse corpus count timestamp',
+      ),
+    }
+  } catch (error) {
+    console.error(
+      'Portal ClickHouse corpus count failed; falling back to Supabase:',
+      error,
+    )
+    return fetchSupabasePortalCorpusStats()
+  }
 }
 
 /** Archive uploaders plus opted-in members, deduplicated by production. */
@@ -634,6 +735,11 @@ const getCachedCorpusRange = unstable_cache(
   ['portal-corpus-range-v1'],
   { revalidate: 86_400 },
 )
+const getCachedCorpusStats = unstable_cache(
+  async (_sourceKey: string) => fetchPortalCorpusStats(),
+  ['portal-corpus-stats-v1'],
+  { revalidate: 300 },
+)
 const getCachedLiveAnalytics = unstable_cache(
   async (_sourceKey: string) => fetchPortalLiveAnalytics(),
   ['portal-live-analytics-v1'],
@@ -936,6 +1042,7 @@ export async function getPortalData(
   const [
     trends,
     corpusRange,
+    corpusStats,
     liveAnalytics,
     memberCount,
     joinedThisWeek,
@@ -955,12 +1062,15 @@ export async function getPortalData(
       { firstYear: 0, currentYear: 0 },
     ),
     loadPortalComponentData(
+      'corpus-stats',
+      () => getCachedCorpusStats(sourceKey),
+      { totalTweets: 0, generatedAt: new Date().toISOString() },
+    ),
+    loadPortalComponentData(
       'live-analytics',
       () => getCachedLiveAnalytics(sourceKey),
       {
-        totalTweets: 0,
         streamedLast24Hours: 0,
-        generatedAt: new Date().toISOString(),
         latestObservedAt: null,
       },
     ),
@@ -1005,20 +1115,20 @@ export async function getPortalData(
       : Promise.resolve({ data: [], failed: false }),
   ])
   const stats: PortalStats = {
-    totalTweets: liveAnalytics.data.totalTweets,
+    totalTweets: corpusStats.data.totalTweets,
     accountCount: memberCount.data,
     streamedLast24Hours: liveAnalytics.data.streamedLast24Hours,
     joinedThisWeek: joinedThisWeek.data,
     firstYear: corpusRange.data.firstYear,
     currentYear: corpusRange.data.currentYear,
-    generatedAt: liveAnalytics.data.generatedAt,
+    generatedAt: corpusStats.data.generatedAt,
   }
   const selectedStream =
     view === 'home'
       ? selectHomepageStream(
           [...initialStream.data, ...recentBangers.data],
           30,
-          new Date(liveAnalytics.data.generatedAt),
+          new Date(corpusStats.data.generatedAt),
         )
       : initialStream.data
   return {
@@ -1029,7 +1139,7 @@ export async function getPortalData(
     recentBangers: recentBangers.data,
     historicalBangers: historicalBangers.data,
     failures: {
-      liveAnalytics: liveAnalytics.failed,
+      liveAnalytics: corpusStats.failed || liveAnalytics.failed,
       memberCount: memberCount.failed,
       joinedThisWeek: joinedThisWeek.failed,
       corpusRange: corpusRange.failed,

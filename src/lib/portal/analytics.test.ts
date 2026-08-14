@@ -12,17 +12,8 @@ import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 type AnalyticsFetcher = typeof fetchAnalyticsGatewayJson
 
 describe('ClickHouse-backed portal analytics', () => {
-  test('maps the canonical summary and rolling 24-hour stream stats', async () => {
-    const fetcher = jest.fn(async (path: string[]) => {
-      if (path[0] === 'summary') {
-        return {
-          data: {
-            totalTweets: '14800000',
-            sourceUpdatedAt: '2026-08-07 11:55:00.000',
-            collectedAt: '2026-08-07 12:00:00.000',
-          },
-        }
-      }
+  test('maps the rolling 24-hour stream stats', async () => {
+    const fetcher = jest.fn(async () => {
       return {
         summary: {
           totalTweets: '1234',
@@ -36,16 +27,12 @@ describe('ClickHouse-backed portal analytics', () => {
     await expect(
       fetchPortalLiveAnalytics(new Date('2026-08-07T12:00:00.000Z'), fetcher),
     ).resolves.toEqual({
-      totalTweets: 14_800_000,
       streamedLast24Hours: 1234,
-      generatedAt: '2026-08-07T12:00:00.000Z',
       latestObservedAt: '2026-08-07T11:59:00.000Z',
     })
 
-    expect(fetcher).toHaveBeenCalledTimes(2)
-    const streamCall = (fetcher as jest.Mock).mock.calls.find(
-      ([path]) => path[0] === 'stream-stats',
-    )
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    const streamCall = (fetcher as jest.Mock).mock.calls[0]
     expect(streamCall?.[1].toString()).toBe(
       'start=2026-08-06T12%3A00%3A00.000Z&end=2026-08-07T12%3A00%3A00.000Z&granularity=hour&scope=firehose',
     )
@@ -282,6 +269,7 @@ describe('ClickHouse-backed portal analytics', () => {
     )
 
     expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(fetcherMock.mock.calls[0]?.[0]).toEqual(['trend-evidence'])
     expect(result.map(({ id }) => id)).toEqual(['102', '101', '100'])
     expect(fetcherMock.mock.calls[0]?.[1]?.toString()).toContain(
       'since=2024-01-01&until=2026-01-01',
@@ -294,29 +282,19 @@ describe('ClickHouse-backed portal analytics', () => {
     })
   })
 
-  test('rejects invalid ClickHouse counts instead of rendering false zeros', async () => {
-    const fetcher = jest.fn(async (path: string[]) =>
-      path[0] === 'summary'
-        ? {
-            data: {
-              totalTweets: 'not-a-count',
-              sourceUpdatedAt: '2026-08-07T12:00:00.000Z',
-              collectedAt: '2026-08-07T12:00:00.000Z',
-            },
-          }
-        : {
-            summary: {
-              totalTweets: '1',
-              latestObservedAt: null,
-              scope: 'firehose',
-              countMode: 'unique_tweets_observed',
-            },
-          },
-    ) as unknown as AnalyticsFetcher
+  test('rejects invalid ClickHouse stream counts instead of rendering false zeros', async () => {
+    const fetcher = jest.fn(async () => ({
+      summary: {
+        totalTweets: 'not-a-count',
+        latestObservedAt: null,
+        scope: 'firehose',
+        countMode: 'unique_tweets_observed',
+      },
+    })) as unknown as AnalyticsFetcher
 
     await expect(
       fetchPortalLiveAnalytics(new Date('2026-08-07T12:00:00.000Z'), fetcher),
-    ).rejects.toThrow('invalid tweet count')
+    ).rejects.toThrow('invalid last-24-hours streamed count')
   })
 
   test('maps recent member bangers and requests the 30-minute cache window', async () => {

@@ -91,7 +91,7 @@ describe('TweetCard', () => {
     expect(
       screen.getAllByTestId('tweet-image').map((image) => image.dataset.src),
     ).toEqual(['https://example.com/tweet.jpg'])
-    expect(screen.queryByText('♥ 8')).not.toBeInTheDocument()
+    expect(screen.queryByText('8 likes')).not.toBeInTheDocument()
   })
 
   test('can disable text clamping independently of the card layout', () => {
@@ -182,5 +182,33 @@ describe('TweetCard', () => {
     )
 
     expect(screen.getAllByText(/11 Aug 2026/)).toHaveLength(2)
+  })
+
+  test('uses accessible Phosphor metrics and an optional external link', () => {
+    const { container } = render(
+      <TweetCard tweet={{ ...tweet, quoteCount: 12 }} showExternalLink />,
+    )
+
+    expect(screen.getByText('12 likes')).toHaveClass('sr-only')
+    expect(
+      screen.getByText('12 likes').parentElement?.querySelector('svg'),
+    ).not.toBeNull()
+    expect(screen.getByText('3 reposts')).toHaveClass('sr-only')
+    expect(
+      screen.getByText('3 reposts').parentElement?.querySelector('svg'),
+    ).not.toBeNull()
+    expect(
+      screen
+        .getByRole('link', {
+          name: '12 archived quotes. Open tweet to see them.',
+        })
+        .querySelector('svg'),
+    ).not.toBeNull()
+    expect(container).not.toHaveTextContent(/[♥⇄✦🔁❝↗]/)
+    expect(
+      screen.getByRole('link', {
+        name: 'View tweet on X (opens in a new tab)',
+      }),
+    ).toHaveAttribute('href', 'https://x.com/alice/status/123')
   })
 })

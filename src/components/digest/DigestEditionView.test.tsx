@@ -34,6 +34,19 @@ jest.mock('@/components/digest/DigestMarkdown', () => ({
 }))
 
 describe('DigestEditionView', () => {
+  test('keeps the future weekly newsletter call to action hidden', () => {
+    render(
+      <DigestEditionView
+        edition={AUGUST_11_MOCK_DIGEST}
+        archive={[AUGUST_11_MOCK_DIGEST]}
+      />,
+    )
+
+    expect(
+      screen.queryByRole('link', { name: 'Get the weekly email' }),
+    ).not.toBeInTheDocument()
+  })
+
   test('shows the editorial lab shortcut only to admins', () => {
     const { rerender } = render(
       <DigestEditionView

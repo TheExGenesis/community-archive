@@ -147,4 +147,47 @@ describe('portal TweetRow media', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
     )
   })
+
+  test('renders cached X Article previews through the shared tweet card', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          previews: [
+            {
+              urlHash: 'a'.repeat(64),
+              url: 'https://x.com/i/article/123',
+              canonicalUrl: 'https://x.com/i/article/123',
+              title: 'The archived long-form story',
+              description: 'An article preview from X.',
+              imageUrl: null,
+              siteName: 'X',
+              isXArticle: true,
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+
+    render(
+      <TweetRow
+        tweet={{
+          ...tweet,
+          text: 'Long-form writing https://x.com/i/article/123',
+          media: [],
+          quotedTweet: undefined,
+        }}
+      />,
+    )
+
+    expect(await screen.findByText('X Article')).toBeVisible()
+    const preview = screen.getByRole('link', {
+      name: /the archived long-form story/i,
+    })
+    expect(preview).toHaveAttribute('href', 'https://x.com/i/article/123')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/tweets/42/link-previews',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    )
+  })
 })

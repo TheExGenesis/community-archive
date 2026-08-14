@@ -26,6 +26,24 @@ GRANT SELECT ON TABLE "public"."tweets" TO "readclient";
 GRANT SELECT ON TABLE "public"."tweets_w_conversation_id" TO "readclient";
 GRANT SELECT ON TABLE "public"."user_directory" TO "readclient";
 GRANT SELECT ON TABLE "public"."user_mentions" TO "readclient";
+GRANT SELECT ON TABLE "public"."profile_settings" TO "readclient";
+GRANT SELECT ON TABLE "public"."profile_curation" TO "readclient";
+GRANT SELECT ON TABLE "public"."tweet_link_previews" TO "readclient";
+
+-- Public profile projections are readable by everyone and owner-writable.
+REVOKE ALL PRIVILEGES ON TABLE "public"."profile_settings" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."profile_curation" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."tweet_link_previews" FROM "anon", "authenticated";
+GRANT SELECT ON TABLE "public"."profile_settings" TO "anon", "authenticated";
+GRANT INSERT, UPDATE ON TABLE "public"."profile_settings" TO "authenticated";
+GRANT SELECT ON TABLE "public"."profile_curation" TO "anon", "authenticated";
+GRANT INSERT, UPDATE, DELETE ON TABLE "public"."profile_curation" TO "authenticated";
+
+-- Link metadata is populated only by trusted server enrichment code.
+GRANT SELECT ON TABLE "public"."tweet_link_previews" TO "anon", "authenticated";
+GRANT ALL ON TABLE "public"."profile_settings" TO "service_role";
+GRANT ALL ON TABLE "public"."profile_curation" TO "service_role";
+GRANT ALL ON TABLE "public"."tweet_link_previews" TO "service_role";
 
 -- quote_tweets / retweets: read-only for anon/authenticated; writes via service_role
 -- only (firehose + worker). See #369. The blanket "GRANT ALL ON TABLE ... TO anon"

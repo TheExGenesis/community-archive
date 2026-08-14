@@ -139,6 +139,51 @@ ALTER TABLE "public"."quote_tweets" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."retweets" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "tes"."blocked_scraping_users" ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE "public"."profile_settings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."profile_curation" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."tweet_link_previews" ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Profile settings are publicly visible"
+  ON "public"."profile_settings" FOR SELECT
+  TO "anon", "authenticated" USING (true);
+CREATE POLICY "Owners can insert profile settings"
+  ON "public"."profile_settings" FOR INSERT
+  TO "authenticated" WITH CHECK (
+    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
+  );
+CREATE POLICY "Owners can update profile settings"
+  ON "public"."profile_settings" FOR UPDATE
+  TO "authenticated" USING (
+    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
+  ) WITH CHECK (
+    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
+  );
+
+CREATE POLICY "Profile curation is publicly visible"
+  ON "public"."profile_curation" FOR SELECT
+  TO "anon", "authenticated" USING (true);
+CREATE POLICY "Owners can insert profile curation"
+  ON "public"."profile_curation" FOR INSERT
+  TO "authenticated" WITH CHECK (
+    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
+  );
+CREATE POLICY "Owners can update profile curation"
+  ON "public"."profile_curation" FOR UPDATE
+  TO "authenticated" USING (
+    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
+  ) WITH CHECK (
+    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
+  );
+CREATE POLICY "Owners can delete profile curation"
+  ON "public"."profile_curation" FOR DELETE
+  TO "authenticated" USING (
+    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
+  );
+
+CREATE POLICY "Tweet link previews are publicly visible"
+  ON "public"."tweet_link_previews" FOR SELECT
+  TO "anon", "authenticated" USING (true);
+
 
 
 -- public.user_action_log: users can read and append their own action history.

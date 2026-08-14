@@ -47,7 +47,7 @@ export default function MemberSearchLanding({
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-background">
+    <main className="min-h-[calc(100vh-3.5rem)] bg-background">
       <section className="mx-auto flex w-full max-w-5xl flex-col items-center px-4 pb-16 pt-16 text-center sm:px-6 sm:pt-24 lg:px-8">
         <Image
           src="/images/logo.png"

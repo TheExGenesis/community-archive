@@ -6,8 +6,6 @@ import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
 import { buildSearchHref } from '@/lib/searchParams'
 import { MUTED, SERIF } from '@/components/portal/styles'
 
-const SUBSCRIBE_URL = 'https://xiqo.substack.com/subscribe'
-
 const longDate = (date: string) =>
   new Intl.DateTimeFormat('en-GB', {
     weekday: 'long',
@@ -68,21 +66,13 @@ export function DigestEditionView({
             </div>
           </div>
 
-          <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mt-5">
             <h1
               className="text-[42px] font-semibold leading-[1.02] tracking-[-0.01em] sm:text-[56px] lg:text-[66px]"
               style={SERIF}
             >
               {longDate(edition.digestDate)}
             </h1>
-            <a
-              href={SUBSCRIBE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex w-fit shrink-0 items-center rounded-[4px] border border-zinc-300 px-4 py-2.5 text-sm font-semibold transition-colors hover:border-zinc-500 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-zinc-700 dark:hover:border-zinc-500 dark:hover:bg-zinc-900 sm:mb-2"
-            >
-              Get the weekly email
-            </a>
           </div>
 
           <div className="mt-7 border-t-[3px] border-zinc-800 dark:border-zinc-200" />

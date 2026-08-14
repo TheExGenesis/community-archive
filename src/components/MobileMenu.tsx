@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { LogIn, LogOut, UserRound } from 'lucide-react'
+import { LogIn, LogOut, Settings, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { createBrowserClient } from '@/utils/supabase'
@@ -11,9 +11,22 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { userProfileHref } from '@/lib/navigation'
 
 export default function MobileMenu() {
   const { userMetadata } = useAuthAndArchive()
+  const profileHref = userProfileHref(
+    userMetadata?.user_name,
+    userMetadata?.provider_id,
+  )
+  const avatarUrl =
+    userMetadata?.avatar_url ??
+    userMetadata?.picture ??
+    userMetadata?.profile_image_url_https ??
+    userMetadata?.profile_image_url
+  const avatarFallback =
+    userMetadata?.user_name?.slice(0, 2).toUpperCase() ?? 'ME'
 
   const handleSignOut = async () => {
     const supabase = createBrowserClient()
@@ -27,8 +40,22 @@ export default function MobileMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon">
-          <UserRound className="h-5 w-5" />
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Open account menu"
+          className="overflow-hidden rounded-full"
+        >
+          {userMetadata ? (
+            <Avatar className="h-9 w-9">
+              <AvatarImage src={avatarUrl} alt="" className="object-cover" />
+              <AvatarFallback className="text-xs font-semibold">
+                {avatarFallback}
+              </AvatarFallback>
+            </Avatar>
+          ) : (
+            <UserRound className="h-5 w-5" />
+          )}
           <span className="sr-only">Open account menu</span>
         </Button>
       </DropdownMenuTrigger>
@@ -40,9 +67,15 @@ export default function MobileMenu() {
         {userMetadata ? (
           <>
             <DropdownMenuItem asChild>
-              <Link href="/profile" className="cursor-pointer gap-3 py-2.5">
+              <Link href={profileHref} className="cursor-pointer gap-3 py-2.5">
                 <UserRound className="h-4 w-4" />
                 Profile
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/settings" className="cursor-pointer gap-3 py-2.5">
+                <Settings className="h-4 w-4" />
+                Settings
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem

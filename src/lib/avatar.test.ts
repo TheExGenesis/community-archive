@@ -1,4 +1,8 @@
-import { getHighResolutionAvatarUrl, getLatestAvatarMediaUrl } from './avatar'
+import {
+  getHighResolutionAvatarUrl,
+  getLatestAvatarMediaUrl,
+  getSmallAvatarUrl,
+} from './avatar'
 
 describe('getHighResolutionAvatarUrl', () => {
   it('upgrades stored Twitter thumbnail suffixes', () => {
@@ -27,6 +31,38 @@ describe('getHighResolutionAvatarUrl', () => {
       'https://example.com/avatar.jpg',
     )
     expect(getHighResolutionAvatarUrl(null)).toBeUndefined()
+  })
+})
+
+describe('getSmallAvatarUrl', () => {
+  it('normalizes larger Twitter suffixes for compact avatars', () => {
+    expect(
+      getSmallAvatarUrl(
+        'https://pbs.twimg.com/profile_images/123/avatar_400x400.jpg',
+      ),
+    ).toBe('https://pbs.twimg.com/profile_images/123/avatar_normal.jpg')
+    expect(
+      getSmallAvatarUrl(
+        'https://pbs.twimg.com/profile_images/123/avatar_bigger.png',
+      ),
+    ).toBe('https://pbs.twimg.com/profile_images/123/avatar_normal.png')
+  })
+
+  it('normalizes a pbs.twimg.com query-size request', () => {
+    expect(
+      getSmallAvatarUrl(
+        'https://pbs.twimg.com/profile_images/123/avatar.jpg?format=jpg&name=400x400',
+      ),
+    ).toBe(
+      'https://pbs.twimg.com/profile_images/123/avatar.jpg?format=jpg&name=normal',
+    )
+  })
+
+  it('leaves unknown URLs unchanged', () => {
+    expect(getSmallAvatarUrl('https://example.com/avatar.jpg')).toBe(
+      'https://example.com/avatar.jpg',
+    )
+    expect(getSmallAvatarUrl(null)).toBeUndefined()
   })
 })
 

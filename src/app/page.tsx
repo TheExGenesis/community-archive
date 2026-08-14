@@ -5,6 +5,9 @@ import { getPortalData } from '@/lib/portal/data'
 
 // The first request after a daily analytics-cache rollover builds the bounded
 // ClickHouse snapshot; subsequent homepage requests reuse the shared Data Cache.
+// Force request-time rendering so the portal's component fallbacks do not catch
+// Next's static-render probe and freeze build-time fallback data into this route.
+export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 // Guests and members share one homepage/dashboard composition. Authentication

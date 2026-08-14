@@ -462,10 +462,12 @@ export type Database = {
           model: string | null
           model_request: Json | null
           output_tokens: number | null
+          parent_run_id: string | null
           parsed_output: Json | null
           prompt_version_id: string
           raw_response: Json | null
           response_id: string | null
+          revision_instruction: string | null
           started_at: string | null
           status: string
           total_tokens: number | null
@@ -488,10 +490,12 @@ export type Database = {
           model?: string | null
           model_request?: Json | null
           output_tokens?: number | null
+          parent_run_id?: string | null
           parsed_output?: Json | null
           prompt_version_id: string
           raw_response?: Json | null
           response_id?: string | null
+          revision_instruction?: string | null
           started_at?: string | null
           status?: string
           total_tokens?: number | null
@@ -514,10 +518,12 @@ export type Database = {
           model?: string | null
           model_request?: Json | null
           output_tokens?: number | null
+          parent_run_id?: string | null
           parsed_output?: Json | null
           prompt_version_id?: string
           raw_response?: Json | null
           response_id?: string | null
+          revision_instruction?: string | null
           started_at?: string | null
           status?: string
           total_tokens?: number | null
@@ -527,6 +533,13 @@ export type Database = {
           workflow_run_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "digest_runs_parent_run_id_fkey"
+            columns: ["parent_run_id"]
+            isOneToOne: false
+            referencedRelation: "digest_runs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "digest_runs_prompt_version_id_fkey"
             columns: ["prompt_version_id"]

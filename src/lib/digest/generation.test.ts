@@ -132,7 +132,7 @@ describe('daily digest generation contract', () => {
     expect(prompt).toContain('"index": 0')
     expect(prompt).toContain('"archived_ca_quote_count": 9')
     expect(prompt).toContain('"kind": "quote"')
-    expect(prompt).not.toContain('"id": "1"')
+    expect(prompt).toContain('"tweet_id": "1"')
   })
 
   test('indexes all bangers before reply and quote context', () => {
@@ -203,7 +203,7 @@ describe('daily digest generation contract', () => {
     ).toThrow('Fewer than three generated keywords occur in the posts')
   })
 
-  test('rejects an abstract that is not a three- to five-item bullet list', () => {
+  test('rejects an abstract that is not exactly a three-item bullet list', () => {
     expect(() =>
       assembleDigestEditionContent({
         runId: 'run-1',
@@ -217,7 +217,7 @@ describe('daily digest generation contract', () => {
           executive_summary: ['Only one summary item.'],
         },
       }),
-    ).toThrow('three to five summary bullets')
+    ).toThrow('exactly three summary bullets')
   })
 
   test('keeps a short subtitle as a non-fatal editorial warning', () => {

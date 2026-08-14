@@ -77,6 +77,8 @@ export function mapDigestRun(row: DigestRunRow): DigestRun {
     digestDate: row.digest_date,
     status,
     promptVersionId: row.prompt_version_id,
+    parentRunId: row.parent_run_id,
+    revisionInstruction: row.revision_instruction,
     windowStart: row.window_start,
     windowEnd: row.window_end,
     candidates: parseDigestCandidates(row.candidates),

@@ -23,6 +23,8 @@ export interface DigestRunRow {
   digest_date: string
   status: string
   prompt_version_id: string
+  parent_run_id: string | null
+  revision_instruction: string | null
   window_start: string
   window_end: string
   candidates: Json

@@ -6,10 +6,11 @@ import { createDigestAdminClient } from '@/lib/digest/database'
 import {
   assembleDigestEditionContent,
   renderDigestPrompt,
+  renderDigestRevisionPrompt,
   type EnrichedDigestCandidate,
 } from '@/lib/digest/generation'
 import { generateDigestWithModel } from '@/lib/digest/openai'
-import type { DigestRunEvent } from '@/lib/digest/types'
+import type { DigestEditionContent, DigestRunEvent } from '@/lib/digest/types'
 import type { PortalTweet } from '@/lib/portal/types'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { getWorkflowMetadata } from 'workflow'
@@ -115,6 +116,22 @@ async function executeDigestGeneration(runId: string) {
   if (promptError || !promptRow) throw new Error('Prompt version not found')
 
   const prompt = mapPromptVersion(promptRow)
+  let revisionBase: DigestEditionContent | null = null
+  if (run.parentRunId && run.revisionInstruction) {
+    const { data: parentRow, error: parentError } = await admin
+      .from('digest_runs')
+      .select('*')
+      .eq('id', run.parentRunId)
+      .maybeSingle()
+    if (parentError || !parentRow) {
+      throw new Error('Revision source run not found')
+    }
+    const parentRun = mapDigestRun(parentRow)
+    if (parentRun.status !== 'completed' || !parentRun.parsedOutput) {
+      throw new Error('Revision source must be a completed digest run')
+    }
+    revisionBase = parentRun.parsedOutput
+  }
   const startedAt = run.startedAt ? new Date(run.startedAt) : new Date()
   let events: DigestRunEvent[] = [
     ...run.events,
@@ -205,22 +222,47 @@ async function executeDigestGeneration(runId: string) {
     ),
   ]
 
-  const userPrompt = renderDigestPrompt(prompt.userPromptTemplate, {
+  const baseUserPrompt = renderDigestPrompt(prompt.userPromptTemplate, {
     digestDate: run.digestDate,
     windowStart: run.windowStart,
     windowEnd: run.windowEnd,
     candidates: enrichedCandidates,
   })
+  const userPrompt =
+    revisionBase && run.revisionInstruction
+      ? renderDigestRevisionPrompt({
+          basePrompt: baseUserPrompt,
+          instruction: run.revisionInstruction,
+          current: revisionBase,
+        })
+      : baseUserPrompt
   const modelRequest = {
     promptVersion: prompt,
     renderedUserPrompt: userPrompt,
     candidateSnapshot: enrichedCandidates,
+    ...(revisionBase && run.revisionInstruction
+      ? {
+          revision: {
+            parentRunId: run.parentRunId,
+            instruction: run.revisionInstruction,
+            baseContent: revisionBase,
+          },
+        }
+      : {}),
   }
   events.push(
-    event('generation', 'started', 'The model is clustering and writing.', {
-      model: prompt.model,
-      selected_count: selected.length,
-    }),
+    event(
+      'generation',
+      'started',
+      revisionBase
+        ? 'The model is applying the editorial revision.'
+        : 'The model is clustering and writing.',
+      {
+        model: prompt.model,
+        selected_count: selected.length,
+        revision: Boolean(revisionBase),
+      },
+    ),
   )
   const { error: requestSaveError } = await admin
     .from('digest_runs')

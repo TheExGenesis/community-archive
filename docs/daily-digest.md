@@ -36,14 +36,17 @@ they are useful shelves rather than a formal taxonomy. Edition keywords remain
 separate, must occur verbatim in the supplied posts, and link to the existing
 archive search.
 
-Story titles are not generated headlines. Each is a three- to eighteen-word
-contiguous excerpt copied verbatim from one supplied banger or quote post. The
-server validates that grounding before an edition can be staged. The generated
+Story titles borrow maximally from the supplied tweets rather than behaving
+like generated newsletter headlines. An exact three- to eighteen-word excerpt
+is preferred; a clear paraphrase is retained as an editorial warning instead
+of failing an otherwise grounded generation. The generated
 subtitle must supply the people, event, and significance that the source quote
 leaves unstated rather than merely restating it. The story page keeps
 source-grounded `In brief` bullets and a short editor's note for interpretation
-or caveats. The edition abstract is three to five concrete bullet sentences so
-a reader can scan the day's developments before opening a story.
+or caveats. The edition abstract is exactly three concrete bullet sentences so
+a reader can scan the day's developments before opening a story. When the
+stories do not reduce cleanly, bullet three briefly catches the remaining
+stories.
 
 ### Editorial presentation
 
@@ -100,24 +103,33 @@ projection, not a write authority.
    the frozen tweet ID before saving the completed run.
 4. Review the structured output and trace. A failed provider call or validation
    result remains a failed run rather than becoming a public draft.
-5. Stage a new edition version. Staging never replaces an existing published
-   version.
-6. Publish explicitly. `publish_digest_edition(uuid)` archives the old version
+5. Ask for a simple revision when needed. Each request creates a linked,
+   immutable run with the instruction, exact request, provider response, usage,
+   and validation trace; the source run remains unchanged.
+6. Stage a new edition version. Staging never replaces an existing published
+   version. Editors can then change summary, story copy, labels, notes, and
+   keywords inline; every save creates another draft version.
+7. Publish explicitly with the prominent **Publish Daily Digest** action.
+   `publish_digest_edition(uuid)` archives the old version
    and publishes the selected draft in one database transaction.
 
 A generation attempt is immutable once it starts. The lab polls the saved run
 while it is open and shows queued, context, model, and validation phases; the
 job itself does not depend on that browser connection. Use **Clone as new run**
 to reuse the exact frozen source snapshot with the same or a newer prompt
-version; this preserves failed and successful model responses for comparison.
+version. Finished-run checkboxes can also be changed directly; saving that
+selection forks an editable run. Both paths preserve failed and successful
+model responses for comparison.
 Generation never auto-stages or auto-publishes: those remain explicit editorial
 steps after a valid result is reviewed.
 
-Every edition keyword and story-title excerpt must occur verbatim in supplied
-posts. Every story must reference at least one indexed banger, and a banger
-cannot be assigned to multiple stories. These are executable guards against
-generic AI-derived topic labels, newsletter-style headlines, and fabricated
-tweet references. The loose editorial label is generated separately.
+Every edition keyword must occur verbatim in supplied posts. Exact story-title
+excerpts are preferred and checked, while a paraphrase becomes a non-fatal
+editorial warning. Every story must reference at least one indexed banger, and
+a banger cannot be assigned to multiple stories. These are executable guards
+against generic AI-derived topic labels, newsletter-style headlines, and
+fabricated tweet references. The loose editorial label is generated
+separately.
 
 ## Observability
 
@@ -155,15 +167,18 @@ SUPABASE_SERVICE_ROLE=<server-only-service-role>
 Do not expose any of these with a `NEXT_PUBLIC_` prefix. Public digest reads use
 the normal anonymous Supabase client and the `status = 'published'` RLS policy.
 
-The current experiment prompt uses `deepseek-v4-pro`, low reasoning effort, and
-a 6,000-token output ceiling. Its one-call structured output requires a
-three- to five-item abstract, a representative tweet index, three to five
-stories with loose labels and tweet-index lists, verbatim title excerpts,
-roughly 140-character explanatory subtitles, source-grounded `In brief`
-bullets, editor notes, and exact corpus keywords. The prompt explicitly prefers
-the top-ranked banger as representative while allowing a more iconic choice.
-The lab can fork this into a new immutable version; prior runs keep their exact
-prompt and provider configuration.
+The current experiment prompt uses `deepseek/deepseek-v4-flash-0731` through
+OpenRouter, high reasoning effort, and a 6,000-token output ceiling. Its
+one-call structured output requires exactly three summary bullets, a
+representative tweet index, three to five stories with loose labels and
+tweet-index lists, tweet-grounded titles, short explanatory subtitles,
+source-grounded `In brief` bullets, editor notes, and exact corpus keywords.
+The prompt explicitly checks tone, absurdity, source credibility, sarcasm, and
+reply/quote context before reporting a claim as news; likely satire and
+shitposts must be treated as jokes or memes. It prefers the top-ranked banger
+as representative while allowing a more iconic choice. The lab can fork this
+into a new immutable version; prior runs keep their exact prompt and provider
+configuration.
 
 ## Rollout gates
 
@@ -172,8 +187,10 @@ daily timer or weekly Substack send is enabled:
 
 1. Apply `20260813000650_add_daily_digest_editorial_workspace.sql` and
    the subsequent Daily Digest prompt-version migrations through
-   `20260814062256_add_single_call_indexed_deepseek_digest_prompt.sql`, plus
-   `20260814165156_add_digest_workflow_run_id.sql`, to staging.
+   `20260814062256_add_single_call_indexed_deepseek_digest_prompt.sql`,
+   `20260814165156_add_digest_workflow_run_id.sql`, and
+   `20260814180703_refine_daily_digest_editorial_workflow.sql` through
+   `20260814182657_index_digest_editions_source_run.sql` to staging.
 2. Run database security and performance advisors; verify anonymous users can
    read only published rows and cannot call `publish_digest_edition`.
 3. Produce representative weekday and weekend runs, including sparse and noisy

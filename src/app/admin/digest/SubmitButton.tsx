@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState, type MouseEvent, type ReactNode } from 'react'
 
 export function SubmitButton({
   children,
@@ -12,6 +12,10 @@ export function SubmitButton({
   variant?: 'primary' | 'secondary' | 'danger'
 }) {
   const [pending, setPending] = useState(false)
+  const startPendingAfterSubmit = (event: MouseEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.form?.checkValidity() === false) return
+    window.setTimeout(() => setPending(true), 0)
+  }
   const colors =
     variant === 'primary'
       ? 'bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200'
@@ -23,7 +27,7 @@ export function SubmitButton({
     <button
       type="submit"
       disabled={pending}
-      onClick={() => setPending(true)}
+      onClick={startPendingAfterSubmit}
       className={`inline-flex items-center justify-center rounded-md border border-transparent px-4 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${colors}`}
     >
       {pending ? (pendingLabel ?? 'Working…') : children}

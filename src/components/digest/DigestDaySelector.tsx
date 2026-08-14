@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { useState } from 'react'
 import type { DigestEdition } from '@/lib/digest/types'
 import { CARD, MUTED } from '@/components/portal/styles'
 import { DigestGenerationDayButton } from './DigestGenerationDayButton'
@@ -17,7 +20,6 @@ export function DigestDaySelector({
   editions,
   variant = 'card',
   generation,
-  navigation,
 }: {
   currentDate: string
   editions: DigestEdition[]
@@ -28,13 +30,25 @@ export function DigestDaySelector({
     promptVersionId: string
     runningRuns?: Array<{ date: string; id: string }>
   }
-  navigation?: {
-    previousHref?: string
-    nextHref?: string
-  }
 }) {
   const editorial = variant === 'editorial'
-  const [year, month] = currentDate.split('-').map(Number)
+  const availableMonths = Array.from(
+    new Set([
+      ...editions.map(({ digestDate }) => digestDate.slice(0, 7)),
+      ...(generation?.dates ?? []).map((date) => date.slice(0, 7)),
+    ]),
+  ).sort()
+  const initialMonth = currentDate.slice(0, 7)
+  const [visibleMonth, setVisibleMonth] = useState(initialMonth)
+  const [year, month] = visibleMonth.split('-').map(Number)
+  const firstMonth = availableMonths[0] ?? initialMonth
+  const lastMonth = availableMonths.at(-1) ?? initialMonth
+  const shiftVisibleMonth = (offset: number) => {
+    const shifted = new Date(Date.UTC(year, month - 1 + offset, 1))
+    setVisibleMonth(
+      `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}`,
+    )
+  }
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
   const firstWeekday =
     (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7
@@ -66,16 +80,17 @@ export function DigestDaySelector({
         >
           Choose a day
         </h2>
-        {navigation ? (
+        {availableMonths.length > 1 ? (
           <nav className="flex items-center gap-1" aria-label="Digest months">
-            {navigation.previousHref ? (
-              <Link
-                href={navigation.previousHref}
+            {visibleMonth > firstMonth ? (
+              <button
+                type="button"
+                onClick={() => shiftVisibleMonth(-1)}
                 aria-label="Previous month"
                 className="flex h-7 w-7 items-center justify-center rounded-md border text-sm text-muted-foreground transition hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
               >
                 ←
-              </Link>
+              </button>
             ) : (
               <span className="h-7 w-7" aria-hidden="true" />
             )}
@@ -84,14 +99,15 @@ export function DigestDaySelector({
             >
               {monthLabel(year, month)}
             </span>
-            {navigation.nextHref ? (
-              <Link
-                href={navigation.nextHref}
+            {visibleMonth < lastMonth ? (
+              <button
+                type="button"
+                onClick={() => shiftVisibleMonth(1)}
                 aria-label="Next month"
                 className="flex h-7 w-7 items-center justify-center rounded-md border text-sm text-muted-foreground transition hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
               >
                 →
-              </Link>
+              </button>
             ) : (
               <span className="h-7 w-7" aria-hidden="true" />
             )}

@@ -111,12 +111,12 @@ function parseModelDigest(
 ): ParsedModelDigest {
   if (!isRecord(value)) throw new Error('Digest output is not an object')
   const corpus = buildDigestPromptCorpus(candidates)
-  const executiveSummary = cleanStringArray(value.executive_summary, 5, 300)
+  const executiveSummary = cleanStringArray(value.executive_summary, 3, 300)
   const keywords = cleanStringArray(value.keywords, 12, 60)
   const representativeTweetIndex = value.representative_tweet_index
   if (
     !executiveSummary ||
-    executiveSummary.length < 3 ||
+    executiveSummary.length !== 3 ||
     !keywords ||
     typeof representativeTweetIndex !== 'number' ||
     !Number.isSafeInteger(representativeTweetIndex) ||
@@ -124,7 +124,7 @@ function parseModelDigest(
     representativeTweetIndex >= corpus.length
   ) {
     throw new Error(
-      'Digest output must have three to five summary bullets, a representative tweet index, and a valid keyword list',
+      'Digest output must have exactly three summary bullets, a representative tweet index, and a valid keyword list',
     )
   }
   if (
@@ -293,6 +293,7 @@ export function renderDigestPrompt(
         index: row.index,
         kind: row.kind,
         parent_banger_index: row.parentBangerIndex,
+        tweet_id: row.tweetId,
         ...(candidate
           ? {
               source_rank: candidate.sourceRank,
@@ -310,6 +311,28 @@ export function renderDigestPrompt(
     .replaceAll('{{window_start}}', input.windowStart)
     .replaceAll('{{window_end}}', input.windowEnd)
     .replaceAll('{{candidate_json}}', candidateJson)
+}
+
+export function renderDigestRevisionPrompt(input: {
+  basePrompt: string
+  instruction: string
+  current: DigestEditionContent
+}): string {
+  const currentEdition = {
+    executive_summary: input.current.executiveSummary,
+    representative_tweet_id: input.current.topBanger.id,
+    stories: input.current.stories.map((story) => ({
+      category: story.category,
+      title: story.title,
+      subtitle: story.subtitle,
+      bullets: story.bullets,
+      editorial_note: story.editorialNote,
+      tweet_ids: [...story.bangers, ...story.commentary].map(({ id }) => id),
+    })),
+    keywords: input.current.keywords,
+  }
+
+  return `${input.basePrompt}\n\nEDITORIAL REVISION REQUEST\n${input.instruction}\n\nCURRENT VALIDATED EDITION\n${JSON.stringify(currentEdition, null, 2)}\n\nRevise the current edition to satisfy the request while preserving everything the editor did not ask to change. Map the current tweet IDs back to zero-based indices in the supplied corpus. The revised response must still follow the full schema and source-grounding rules.`
 }
 
 export function assembleDigestEditionContent(input: {

@@ -4,7 +4,7 @@ type DigestPostHogEvent =
   | {
       event: 'digest_generation_requested'
       properties: {
-        source: 'admin_past_day' | 'admin_rolling_window'
+        source: 'admin_past_day' | 'admin_rolling_window' | 'admin_revision'
         candidate_count: number
         days_ago: number
       }
@@ -12,7 +12,7 @@ type DigestPostHogEvent =
   | {
       event: 'digest_page_created'
       properties: {
-        source: 'generated'
+        source: 'generated' | 'manual_edit'
         status: 'draft'
         story_count: number
         editorial_warning_count: number

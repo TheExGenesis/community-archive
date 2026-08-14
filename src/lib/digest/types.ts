@@ -91,6 +91,8 @@ export interface DigestRun {
   digestDate: string
   status: DigestRunStatus
   promptVersionId: string
+  parentRunId: string | null
+  revisionInstruction: string | null
   windowStart: string
   windowEnd: string
   candidates: DigestCandidate[]

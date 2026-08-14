@@ -15,7 +15,7 @@ export function DigestGenerationDayButton({
     <button
       type="submit"
       disabled={pending}
-      onClick={() => setPending(true)}
+      onClick={() => window.setTimeout(() => setPending(true), 0)}
       aria-label={
         pending
           ? `Generating digest for ${date}`

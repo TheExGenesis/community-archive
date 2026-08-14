@@ -12,10 +12,12 @@ import {
   duplicateDigestRunAction,
   generateDigestRunAction,
   publishDigestEditionAction,
+  reviseDigestRunAction,
   stageDigestEditionAction,
   updateDigestSelectionAction,
 } from './actions'
 import { DigestJobProgress } from './DigestJobProgress'
+import { DigestEditionEditor } from './DigestEditionEditor'
 import { SubmitButton } from './SubmitButton'
 
 export const dynamic = 'force-dynamic'
@@ -37,14 +39,6 @@ const formatDuration = (value: number | null) =>
     : value < 1_000
       ? `${value} ms`
       : `${(value / 1_000).toFixed(1)} s`
-
-const MONTH_PATTERN = /^\d{4}-\d{2}$/
-
-const shiftMonth = (month: string, offset: number) => {
-  const [year, monthNumber] = month.split('-').map(Number)
-  const shifted = new Date(Date.UTC(year, monthNumber - 1 + offset, 1))
-  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}`
-}
 
 function RunList({
   runs,
@@ -157,27 +151,18 @@ export default async function DigestLabPage({
   const state = await loadDigestLabState(searchParams?.run)
   const prompt = state.prompts[0]
   const pastDates = listPastDigestDates(365)
-  const availableMonths = new Set(pastDates.map((date) => date.slice(0, 7)))
-  const latestMonth = pastDates[0].slice(0, 7)
-  const requestedMonth = searchParams?.month
-  const calendarMonth =
-    requestedMonth &&
-    MONTH_PATTERN.test(requestedMonth) &&
-    availableMonths.has(requestedMonth)
-      ? requestedMonth
-      : latestMonth
-  const previousMonth = shiftMonth(calendarMonth, -1)
-  const nextMonth = shiftMonth(calendarMonth, 1)
-  const monthHref = (month: string) => {
-    const params = new URLSearchParams({ month })
-    if (state.activeRun) params.set('run', state.activeRun.id)
-    return `/admin/digest?${params}`
-  }
   const runningRuns = state.runs.filter(({ status }) => status === 'running')
   const activePrompt =
     state.prompts.find(
       (item) => item.id === state.activeRun?.promptVersionId,
     ) ?? prompt
+  const activeDraft = state.activeRun
+    ? (state.editions.find(
+        (edition) =>
+          edition.sourceRunId === state.activeRun?.id &&
+          edition.status === 'draft',
+      ) ?? null)
+    : null
 
   return (
     <main className="min-h-screen bg-zinc-50 dark:bg-background">
@@ -247,6 +232,30 @@ export default async function DigestLabPage({
           </div>
         ) : null}
 
+        {activeDraft && state.activeRun ? (
+          <section className="mb-6 flex flex-col gap-4 rounded-xl border-2 border-emerald-500 bg-emerald-50 p-5 shadow-sm dark:bg-emerald-950/25 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-800 dark:text-emerald-200">
+                Draft v{activeDraft.version} ready
+              </div>
+              <h2 className="mt-1 text-xl font-semibold text-emerald-950 dark:text-emerald-50">
+                Publish the {activeDraft.digestDate} Daily Digest
+              </h2>
+              <p className="mt-1 text-sm text-emerald-900/75 dark:text-emerald-100/75">
+                Publishing makes this exact draft the public edition. It never
+                happens automatically.
+              </p>
+            </div>
+            <form action={publishDigestEditionAction}>
+              <input type="hidden" name="edition_id" value={activeDraft.id} />
+              <input type="hidden" name="run_id" value={state.activeRun.id} />
+              <SubmitButton pendingLabel="Publishing Daily Digest…">
+                Publish Daily Digest
+              </SubmitButton>
+            </form>
+          </section>
+        ) : null}
+
         <div className="grid items-start gap-6 xl:grid-cols-[300px_minmax(0,1fr)_360px]">
           <aside className="space-y-6 xl:sticky xl:top-20">
             <section className="rounded-lg border bg-card p-4">
@@ -296,7 +305,7 @@ export default async function DigestLabPage({
               {prompt ? (
                 <div className="mt-4">
                   <DigestDaySelector
-                    currentDate={`${calendarMonth}-01`}
+                    currentDate={pastDates[0]}
                     editions={[]}
                     variant="editorial"
                     generation={{
@@ -307,14 +316,6 @@ export default async function DigestLabPage({
                         date: run.digestDate,
                         id: run.id,
                       })),
-                    }}
-                    navigation={{
-                      previousHref: availableMonths.has(previousMonth)
-                        ? monthHref(previousMonth)
-                        : undefined,
-                      nextHref: availableMonths.has(nextMonth)
-                        ? monthHref(nextMonth)
-                        : undefined,
                     }}
                   />
                 </div>
@@ -343,6 +344,15 @@ export default async function DigestLabPage({
                         {formatDateTime(state.activeRun.windowStart)} →{' '}
                         {formatDateTime(state.activeRun.windowEnd)}
                       </p>
+                      {state.activeRun.parentRunId ? (
+                        <p className="mt-2 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                          Revision of run{' '}
+                          {state.activeRun.parentRunId.slice(0, 8)}
+                          {state.activeRun.revisionInstruction
+                            ? ` · ${state.activeRun.revisionInstruction}`
+                            : ''}
+                        </p>
+                      ) : null}
                     </div>
                     <Badge
                       variant={
@@ -413,7 +423,11 @@ export default async function DigestLabPage({
                       </p>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      Save selection before generating
+                      {state.activeRun.status === 'candidates_ready'
+                        ? 'Save selection before generating'
+                        : state.activeRun.status === 'running'
+                          ? 'Locked while generation is running'
+                          : 'Changing this creates a new editable run'}
                     </span>
                   </div>
                   <form action={updateDigestSelectionAction}>
@@ -421,6 +435,11 @@ export default async function DigestLabPage({
                       type="hidden"
                       name="run_id"
                       value={state.activeRun.id}
+                    />
+                    <input
+                      type="hidden"
+                      name="prompt_version_id"
+                      value={prompt?.id ?? state.activeRun.promptVersionId}
                     />
                     <div className="max-h-[760px] divide-y overflow-y-auto rounded-md border">
                       {state.activeRun.candidates.map((candidate) => (
@@ -433,9 +452,7 @@ export default async function DigestLabPage({
                             name="selected_tweet_id"
                             value={candidate.tweet.id}
                             defaultChecked={candidate.selected}
-                            disabled={
-                              state.activeRun.status !== 'candidates_ready'
-                            }
+                            disabled={state.activeRun.status === 'running'}
                             className="mt-1 h-4 w-4 rounded border-zinc-300"
                           />
                           <span className="min-w-0 flex-1">
@@ -464,19 +481,21 @@ export default async function DigestLabPage({
                         </p>
                       ) : null}
                     </div>
-                    {state.activeRun.status === 'candidates_ready' ? (
+                    {state.activeRun.status !== 'running' ? (
                       <div className="mt-4 flex flex-wrap gap-3">
                         <SubmitButton
                           pendingLabel="Saving selection…"
                           variant="secondary"
                         >
-                          Save selection
+                          {state.activeRun.status === 'candidates_ready'
+                            ? 'Save selection'
+                            : 'Save selection as new run'}
                         </SubmitButton>
                       </div>
                     ) : (
                       <p className="mt-4 text-xs leading-5 text-muted-foreground">
-                        Finished run snapshots are immutable. Clone this run to
-                        change the selection or generate another output.
+                        This selection will unlock when the durable generation
+                        finishes.
                       </p>
                     )}
                   </form>
@@ -612,7 +631,49 @@ export default async function DigestLabPage({
                         </article>
                       ))}
                     </div>
+                    <form
+                      action={reviseDigestRunAction}
+                      className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/25"
+                    >
+                      <input
+                        type="hidden"
+                        name="run_id"
+                        value={state.activeRun.id}
+                      />
+                      <input
+                        type="hidden"
+                        name="prompt_version_id"
+                        value={prompt?.id ?? state.activeRun.promptVersionId}
+                      />
+                      <label className="block font-semibold">
+                        Ask for a simple revision
+                        <textarea
+                          name="revision_instruction"
+                          rows={3}
+                          maxLength={2000}
+                          required
+                          placeholder="For example: Treat the P vs. NP post as a viral joke, tighten the third summary bullet, and leave the other stories unchanged."
+                          className="mt-2 w-full rounded-md border bg-background px-3 py-2 text-sm leading-6"
+                        />
+                      </label>
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                        This makes a new versioned generation run and opens its
+                        result when it finishes. The current run stays intact.
+                      </p>
+                      <div className="mt-3">
+                        <SubmitButton pendingLabel="Starting revision…">
+                          Create revised version
+                        </SubmitButton>
+                      </div>
+                    </form>
                   </section>
+                ) : null}
+
+                {activeDraft ? (
+                  <DigestEditionEditor
+                    edition={activeDraft}
+                    runId={state.activeRun.id}
+                  />
                 ) : null}
               </>
             ) : (
@@ -667,7 +728,7 @@ export default async function DigestLabPage({
                       <select
                         name="reasoning_effort"
                         defaultValue={
-                          activePrompt.parameters.reasoning_effort ?? 'low'
+                          activePrompt.parameters.reasoning_effort ?? 'high'
                         }
                         className="mt-1 w-full rounded-md border bg-background px-2 py-2 text-sm"
                       >

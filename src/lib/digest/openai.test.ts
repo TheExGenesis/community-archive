@@ -98,7 +98,7 @@ describe('OpenAI digest adapter', () => {
     ).not.toContain('banger_tweet_ids')
     expect(
       request.text.format.schema.properties.executive_summary,
-    ).toMatchObject({ type: 'array', minItems: 3, maxItems: 5 })
+    ).toMatchObject({ type: 'array', minItems: 3, maxItems: 3 })
     expect(result).toMatchObject({
       responseId: 'resp_123',
       totalTokens: 125,

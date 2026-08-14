@@ -13,8 +13,13 @@ import {
 import { createDigestAdminClient } from '@/lib/digest/database'
 import { selectDailyDigestBangers } from '@/lib/digest/generation'
 import { captureDigestPostHogEvent } from '@/lib/digest/posthogServer'
-import { mapDigestRun, toJson } from '@/lib/digest/data'
-import type { DigestCandidate, DigestRunEvent } from '@/lib/digest/types'
+import { mapDigestEdition, mapDigestRun, toJson } from '@/lib/digest/data'
+import {
+  DIGEST_STORY_CATEGORIES,
+  parseDigestEditionContent,
+  type DigestCandidate,
+  type DigestRunEvent,
+} from '@/lib/digest/types'
 import { generateDigestWorkflow } from '@/workflows/digestGeneration'
 
 const UUID_PATTERN =
@@ -153,7 +158,7 @@ export async function createDigestPromptVersionAction(formData: FormData) {
   const model = formString(formData, 'model')
   const systemPrompt = formString(formData, 'system_prompt')
   const userPromptTemplate = formString(formData, 'user_prompt_template')
-  const reasoningEffort = formString(formData, 'reasoning_effort') || 'low'
+  const reasoningEffort = formString(formData, 'reasoning_effort') || 'high'
   const maxOutputTokens = Number(formString(formData, 'max_output_tokens'))
 
   if (!label || !MODEL_PATTERN.test(model)) {
@@ -464,7 +469,7 @@ export async function duplicateDigestRunAction(formData: FormData) {
 }
 
 export async function updateDigestSelectionAction(formData: FormData) {
-  await requireAdmin()
+  const { user } = await requireAdmin()
   const runId = formString(formData, 'run_id')
   if (!UUID_PATTERN.test(runId)) redirectToLab({ error: 'Invalid run ID.' })
   const selectedIds = new Set(
@@ -486,16 +491,61 @@ export async function updateDigestSelectionAction(formData: FormData) {
     .maybeSingle()
   if (error || !data) redirectToLab({ error: 'Run not found.' })
   const run = mapDigestRun(data)
-  if (run.status !== 'candidates_ready') {
+  if (run.status === 'running') {
     redirectToLab({
       runId,
-      error: 'Clone this snapshot before changing a finished generation run.',
+      error: 'Wait for the running generation before changing its selection.',
     })
   }
   const candidates = run.candidates.map((candidate) => ({
     ...candidate,
     selected: selectedIds.has(candidate.tweet.id),
   }))
+  if (run.status !== 'candidates_ready') {
+    const promptVersionId =
+      formString(formData, 'prompt_version_id') || run.promptVersionId
+    if (!UUID_PATTERN.test(promptVersionId)) {
+      redirectToLab({ runId, error: 'Choose a valid prompt version.' })
+    }
+    const { data: promptRow, error: promptError } = await admin
+      .from('digest_prompt_versions')
+      .select('id')
+      .eq('id', promptVersionId)
+      .maybeSingle()
+    if (promptError || !promptRow) {
+      redirectToLab({ runId, error: 'Prompt version not found.' })
+    }
+    const forkEvent = event(
+      'selection',
+      'completed',
+      `Forked the candidate selection from finished run ${run.id.slice(0, 8)}.`,
+      { selected_count: selectedIds.size },
+    )
+    const { data: fork, error: forkError } = await admin
+      .from('digest_runs')
+      .insert({
+        digest_date: run.digestDate,
+        prompt_version_id: promptVersionId,
+        window_start: run.windowStart,
+        window_end: run.windowEnd,
+        candidates: toJson(candidates),
+        events: toJson([forkEvent]),
+        created_by: user.id,
+      })
+      .select('id')
+      .single()
+    if (forkError) {
+      redirectToLab({
+        runId,
+        error: `Could not save editable selection: ${forkError.message}`,
+      })
+    }
+    revalidatePath('/admin/digest')
+    redirectToLab({
+      runId: fork.id,
+      notice: `Saved ${selectedIds.size} selected bangers as a new editable run.`,
+    })
+  }
   const events = [
     ...run.events,
     event('selection', 'completed', 'Saved the editor candidate selection.', {
@@ -549,10 +599,104 @@ export async function generateDigestRunAction(formData: FormData) {
   })
 }
 
+export async function reviseDigestRunAction(formData: FormData) {
+  const { user } = await requireAdmin()
+  const runId = formString(formData, 'run_id')
+  const promptVersionId = formString(formData, 'prompt_version_id')
+  const instruction = formString(formData, 'revision_instruction')
+  if (!UUID_PATTERN.test(runId) || !UUID_PATTERN.test(promptVersionId)) {
+    redirectToLab({ error: 'Choose a valid run and prompt version.' })
+  }
+  if (!instruction || instruction.length > 2_000) {
+    redirectToLab({
+      runId,
+      error: 'Describe the revision in 2,000 characters or fewer.',
+    })
+  }
+
+  const admin = createDigestAdminClient()
+  const [sourceResult, promptResult] = await Promise.all([
+    admin.from('digest_runs').select('*').eq('id', runId).maybeSingle(),
+    admin
+      .from('digest_prompt_versions')
+      .select('id')
+      .eq('id', promptVersionId)
+      .maybeSingle(),
+  ])
+  if (sourceResult.error || !sourceResult.data) {
+    redirectToLab({ error: 'Run not found.' })
+  }
+  if (promptResult.error || !promptResult.data) {
+    redirectToLab({ runId, error: 'Prompt version not found.' })
+  }
+  const source = mapDigestRun(sourceResult.data)
+  if (source.status !== 'completed' || !source.parsedOutput) {
+    redirectToLab({
+      runId,
+      error: 'Only a completed, validated run can be revised.',
+    })
+  }
+
+  const revisionEvent = event(
+    'selection',
+    'completed',
+    `Created an editorial revision of run ${source.id.slice(0, 8)}.`,
+    {
+      selected_count: source.candidates.filter(({ selected }) => selected)
+        .length,
+    },
+  )
+  const { data: revision, error } = await admin
+    .from('digest_runs')
+    .insert({
+      digest_date: source.digestDate,
+      prompt_version_id: promptVersionId,
+      parent_run_id: source.id,
+      revision_instruction: instruction,
+      window_start: source.windowStart,
+      window_end: source.windowEnd,
+      candidates: toJson(source.candidates),
+      events: toJson([revisionEvent]),
+      created_by: user.id,
+    })
+    .select('id')
+    .single()
+  if (error) {
+    redirectToLab({
+      runId,
+      error: `Could not create revision: ${error.message}`,
+    })
+  }
+
+  try {
+    await enqueueDigestGeneration(revision.id)
+  } catch (error) {
+    redirectToLab({
+      runId: revision.id,
+      error: `Could not start revision: ${describeError(error)}`,
+    })
+  }
+  await captureDigestPostHogEvent(user.id, {
+    event: 'digest_generation_requested',
+    properties: {
+      source: 'admin_revision',
+      candidate_count: source.candidates.filter(({ selected }) => selected)
+        .length,
+      days_ago: listPastDigestDates(365).indexOf(source.digestDate) + 1,
+    },
+  })
+  revalidatePath('/admin/digest')
+  redirectToLab({
+    runId: revision.id,
+    notice: 'Revision started. It will keep running if you leave this page.',
+  })
+}
+
 export async function stageDigestEditionAction(formData: FormData) {
   const { user } = await requireAdmin()
   const runId = formString(formData, 'run_id')
   if (!UUID_PATTERN.test(runId)) redirectToLab({ error: 'Invalid run ID.' })
+  console.info('[daily digest] staging edition started', { runId })
   const admin = createDigestAdminClient()
   const { data: runRow, error: runError } = await admin
     .from('digest_runs')
@@ -567,20 +711,34 @@ export async function stageDigestEditionAction(formData: FormData) {
       error: 'Generate a valid digest before staging it.',
     })
   }
-  const { data: latest } = await admin
+  const { data: latest, error: latestError } = await admin
     .from('digest_editions')
     .select('version')
     .eq('digest_date', run.digestDate)
     .order('version', { ascending: false })
     .limit(1)
     .maybeSingle()
+  if (latestError) {
+    console.error('[daily digest] could not resolve edition version', {
+      runId,
+      error: latestError,
+    })
+    redirectToLab({
+      runId,
+      error: `Could not resolve draft version: ${latestError.message}`,
+    })
+  }
   const version = (latest?.version ?? 0) + 1
+  const stagedContent = {
+    ...run.parsedOutput,
+    executiveSummary: run.parsedOutput.executiveSummary.slice(0, 3),
+  }
   const { error } = await admin.from('digest_editions').insert({
     digest_date: run.digestDate,
     version,
     status: 'draft',
     source_run_id: run.id,
-    content: toJson(run.parsedOutput),
+    content: toJson(stagedContent),
     created_by: user.id,
   })
   if (error) {
@@ -590,21 +748,161 @@ export async function stageDigestEditionAction(formData: FormData) {
     ...run.events,
     event('edition', 'completed', `Staged digest edition version ${version}.`),
   ]
-  await admin
+  const { error: eventError } = await admin
     .from('digest_runs')
     .update({ events: toJson(events), updated_at: new Date().toISOString() })
     .eq('id', runId)
+  if (eventError) {
+    console.warn('[daily digest] staged edition but could not append event', {
+      runId,
+      version,
+      error: eventError,
+    })
+  }
   await captureDigestPostHogEvent(user.id, {
     event: 'digest_page_created',
     properties: {
       source: 'generated',
       status: 'draft',
-      story_count: run.parsedOutput.stories.length,
-      editorial_warning_count: run.parsedOutput.editorialWarnings?.length ?? 0,
+      story_count: stagedContent.stories.length,
+      editorial_warning_count: stagedContent.editorialWarnings?.length ?? 0,
     },
+  })
+  console.info('[daily digest] staging edition completed', {
+    runId,
+    digestDate: run.digestDate,
+    version,
   })
   revalidateDigestPaths(run.digestDate)
   redirectToLab({ runId, notice: `Staged digest edition v${version}.` })
+}
+
+export async function saveDigestEditionAction(formData: FormData) {
+  const { user } = await requireAdmin()
+  const editionId = formString(formData, 'edition_id')
+  const runId = formString(formData, 'run_id')
+  if (!UUID_PATTERN.test(editionId)) {
+    redirectToLab({ runId, error: 'Invalid edition ID.' })
+  }
+
+  const admin = createDigestAdminClient()
+  const { data: editionRow, error: editionError } = await admin
+    .from('digest_editions')
+    .select('*')
+    .eq('id', editionId)
+    .maybeSingle()
+  if (editionError || !editionRow) {
+    redirectToLab({ runId, error: 'Draft edition not found.' })
+  }
+  const edition = mapDigestEdition(editionRow)
+  if (!edition || edition.status !== 'draft') {
+    redirectToLab({ runId, error: 'Only a draft edition can be edited.' })
+  }
+
+  const executiveSummary = [0, 1, 2].map((index) =>
+    formString(formData, `summary_${index}`).slice(0, 300),
+  )
+  if (executiveSummary.some((bullet) => !bullet)) {
+    redirectToLab({ runId, error: 'All three summary bullets are required.' })
+  }
+  const stories = edition.content.stories.map((story, storyIndex) => {
+    const category = formString(formData, `story_${storyIndex}_category`)
+    const title = formString(formData, `story_${storyIndex}_title`).slice(
+      0,
+      300,
+    )
+    const subtitle = formString(formData, `story_${storyIndex}_subtitle`).slice(
+      0,
+      320,
+    )
+    const editorialNote = formString(
+      formData,
+      `story_${storyIndex}_editorial_note`,
+    ).slice(0, 360)
+    const bullets = story.bullets.map((_, bulletIndex) =>
+      formString(formData, `story_${storyIndex}_bullet_${bulletIndex}`).slice(
+        0,
+        220,
+      ),
+    )
+    if (
+      !DIGEST_STORY_CATEGORIES.some((item) => item === category) ||
+      !title ||
+      !subtitle ||
+      !editorialNote ||
+      bullets.some((bullet) => !bullet)
+    ) {
+      redirectToLab({
+        runId,
+        error: `Complete every editable field in story ${storyIndex + 1}.`,
+      })
+    }
+    return {
+      ...story,
+      category: category as (typeof DIGEST_STORY_CATEGORIES)[number],
+      title,
+      subtitle,
+      editorialNote,
+      bullets,
+    }
+  })
+  const keywords = Array.from(
+    new Set(
+      formString(formData, 'keywords')
+        .split(/[\n,]/)
+        .map((keyword) => keyword.trim().slice(0, 60))
+        .filter(Boolean),
+    ),
+  ).slice(0, 12)
+  if (keywords.length < 3) {
+    redirectToLab({ runId, error: 'Keep at least three edition keywords.' })
+  }
+
+  const content = parseDigestEditionContent({
+    ...edition.content,
+    executiveSummary,
+    stories,
+    keywords,
+  })
+  if (!content) {
+    redirectToLab({ runId, error: 'The edited draft did not pass validation.' })
+  }
+  const { data: latest, error: latestError } = await admin
+    .from('digest_editions')
+    .select('version')
+    .eq('digest_date', edition.digestDate)
+    .order('version', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (latestError) {
+    redirectToLab({
+      runId,
+      error: `Could not resolve draft version: ${latestError.message}`,
+    })
+  }
+  const version = (latest?.version ?? 0) + 1
+  const { error } = await admin.from('digest_editions').insert({
+    digest_date: edition.digestDate,
+    version,
+    status: 'draft',
+    source_run_id: edition.sourceRunId,
+    content: toJson(content),
+    created_by: user.id,
+  })
+  if (error) {
+    redirectToLab({ runId, error: `Could not save draft: ${error.message}` })
+  }
+  await captureDigestPostHogEvent(user.id, {
+    event: 'digest_page_created',
+    properties: {
+      source: 'manual_edit',
+      status: 'draft',
+      story_count: content.stories.length,
+      editorial_warning_count: content.editorialWarnings?.length ?? 0,
+    },
+  })
+  revalidateDigestPaths(edition.digestDate)
+  redirectToLab({ runId, notice: `Saved edited draft v${version}.` })
 }
 
 export async function publishDigestEditionAction(formData: FormData) {
@@ -614,13 +912,26 @@ export async function publishDigestEditionAction(formData: FormData) {
   if (!UUID_PATTERN.test(editionId)) {
     redirectToLab({ runId, error: 'Invalid edition ID.' })
   }
+  console.info('[daily digest] publishing edition started', {
+    editionId,
+    runId: runId || null,
+  })
   const admin = createDigestAdminClient()
   const { data: edition, error } = await admin.rpc('publish_digest_edition', {
     p_edition_id: editionId,
   })
   if (error) {
+    console.error('[daily digest] publishing edition failed', {
+      editionId,
+      error,
+    })
     redirectToLab({ runId, error: `Publish failed: ${error.message}` })
   }
+  console.info('[daily digest] publishing edition completed', {
+    editionId,
+    digestDate: edition.digest_date,
+    version: edition.version,
+  })
   revalidateDigestPaths(edition.digest_date)
   redirectToLab({
     runId,

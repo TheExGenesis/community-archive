@@ -13,7 +13,7 @@ export const DIGEST_JSON_SCHEMA = {
     executive_summary: {
       type: 'array',
       minItems: 3,
-      maxItems: 5,
+      maxItems: 3,
       items: { type: 'string', minLength: 35, maxLength: 140 },
     },
     representative_tweet_index: {

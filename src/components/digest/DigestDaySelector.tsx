@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { DigestEdition } from '@/lib/digest/types'
 import { CARD, MUTED } from '@/components/portal/styles'
+import { DigestGenerationDayButton } from './DigestGenerationDayButton'
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
@@ -15,10 +16,16 @@ export function DigestDaySelector({
   currentDate,
   editions,
   variant = 'card',
+  generation,
 }: {
   currentDate: string
   editions: DigestEdition[]
   variant?: 'card' | 'editorial'
+  generation?: {
+    action: string | ((formData: FormData) => Promise<void>)
+    dates: string[]
+    promptVersionId: string
+  }
 }) {
   const editorial = variant === 'editorial'
   const [year, month] = currentDate.split('-').map(Number)
@@ -28,6 +35,7 @@ export function DigestDaySelector({
   const editionsByDate = new Map(
     editions.map((edition) => [edition.digestDate, edition]),
   )
+  const generationDates = new Set(generation?.dates ?? [])
   const cells = [
     ...Array.from({ length: firstWeekday }, () => null),
     ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
@@ -69,6 +77,19 @@ export function DigestDaySelector({
           const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
           const edition = editionsByDate.get(date)
           const isCurrent = date === currentDate
+          if (generation && generationDates.has(date)) {
+            return (
+              <form key={date} action={generation.action}>
+                <input
+                  type="hidden"
+                  name="prompt_version_id"
+                  value={generation.promptVersionId}
+                />
+                <input type="hidden" name="digest_date" value={date} />
+                <DigestGenerationDayButton date={date} day={day} />
+              </form>
+            )
+          }
           if (!edition) {
             return (
               <span
@@ -117,7 +138,9 @@ export function DigestDaySelector({
       <p
         className={`${editorial ? 'mt-4 text-xs leading-[1.6]' : 'mt-3 text-[11px] leading-4'} ${MUTED}`}
       >
-        Available days have an edition. A dot marks preview data.
+        {generation
+          ? 'Blue days are ready to generate. Each click creates an unpublished draft run.'
+          : 'Available days have an edition. A dot marks preview data.'}
       </p>
     </section>
   )

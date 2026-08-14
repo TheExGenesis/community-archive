@@ -37,4 +37,32 @@ describe('DigestDaySelector', () => {
     ).toHaveAttribute('href', '/digest/2026-08-11')
     expect(screen.getByText('10').closest('a')).toBeNull()
   })
+
+  test('turns configured past days into generation buttons', () => {
+    render(
+      <DigestDaySelector
+        currentDate="2026-08-13"
+        editions={[]}
+        variant="editorial"
+        generation={{
+          action: '/admin/digest',
+          dates: ['2026-08-11', '2026-08-12', '2026-08-13'],
+          promptVersionId: 'prompt-1',
+        }}
+      />,
+    )
+
+    const august11 = screen.getByRole('button', {
+      name: 'Generate digest for 2026-08-11',
+    })
+    expect(august11).toBeVisible()
+    expect(august11.closest('form')).toHaveFormValues({
+      prompt_version_id: 'prompt-1',
+      digest_date: '2026-08-11',
+    })
+    expect(screen.getByText('10').closest('button')).toBeNull()
+    expect(
+      screen.getByText(/Each click creates an unpublished draft run/),
+    ).toBeVisible()
+  })
 })

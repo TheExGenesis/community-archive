@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
+import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
 import { requireAdmin } from '@/app/admin/data'
 import { loadDigestLabState } from '@/lib/digest/data'
 import { listPastDigestDates } from '@/lib/digest/dateWindow'
@@ -249,34 +250,17 @@ export default async function DigestLabPage({
                 manual.
               </p>
               {prompt ? (
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  {pastDates.map((digestDate) => (
-                    <form
-                      key={digestDate}
-                      action={createAndGenerateDigestDateAction}
-                    >
-                      <input
-                        type="hidden"
-                        name="prompt_version_id"
-                        value={prompt.id}
-                      />
-                      <input
-                        type="hidden"
-                        name="digest_date"
-                        value={digestDate}
-                      />
-                      <SubmitButton
-                        pendingLabel="Generating…"
-                        variant="secondary"
-                      >
-                        {new Intl.DateTimeFormat('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          timeZone: 'UTC',
-                        }).format(new Date(`${digestDate}T12:00:00Z`))}
-                      </SubmitButton>
-                    </form>
-                  ))}
+                <div className="mt-4">
+                  <DigestDaySelector
+                    currentDate={pastDates[0]}
+                    editions={[]}
+                    variant="editorial"
+                    generation={{
+                      action: createAndGenerateDigestDateAction,
+                      dates: pastDates,
+                      promptVersionId: prompt.id,
+                    }}
+                  />
                 </div>
               ) : null}
             </section>

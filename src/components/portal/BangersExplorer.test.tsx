@@ -14,9 +14,14 @@ import type {
   PortalBangersPeriod,
   PortalTweet,
 } from '@/lib/portal/types'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 const push = jest.fn()
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
+jest.mock('@/lib/posthog', () => ({
+  capturePostHogEvent: jest.fn(),
+}))
+const mockCapturePostHogEvent = capturePostHogEvent as jest.Mock
 jest.mock('@/components/TweetCard', () => ({
   __esModule: true,
   default: ({
@@ -31,6 +36,26 @@ jest.mock('@/components/TweetCard', () => ({
     </article>
   ),
 }))
+
+function mockViewportWidth(width: number) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: jest.fn((query: string) => {
+      const minWidth = Number(query.match(/min-width: (\d+)px/)?.[1] ?? 0)
+      return {
+        matches: width >= minWidth,
+        media: query,
+        onchange: null,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      }
+    }),
+  })
+}
 
 class IntersectionObserverMock {
   static instances: IntersectionObserverMock[] = []
@@ -73,6 +98,12 @@ const tweets = [
   tweet('2', 'Older favorite', 2025, 9, 100),
   tweet('1', 'Newest thought', 2026, 3, 10),
 ]
+const masonryTweets = [
+  ...tweets,
+  tweet('4', 'Fourth thought', 2026, 2, 8),
+  tweet('5', 'Fifth thought', 2026, 1, 7),
+  tweet('6', 'Sixth thought', 2026, 1, 6),
+]
 
 function page(
   pageTweets = tweets,
@@ -111,7 +142,9 @@ function renderExplorer(initialPage = page(), period?: PortalBangersPeriod) {
 describe('BangersExplorer', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/bangers')
+    mockViewportWidth(1440)
     push.mockReset()
+    mockCapturePostHogEvent.mockReset()
     IntersectionObserverMock.instances = []
     Object.defineProperty(window, 'IntersectionObserver', {
       configurable: true,
@@ -130,7 +163,7 @@ describe('BangersExplorer', () => {
     jest.restoreAllMocks()
   })
 
-  test('defaults to Best of all time and orders the controls by intent', () => {
+  test('defaults to Best of all time without a separate rank control', () => {
     renderExplorer()
 
     const orderedMasonryItems = Array.from(
@@ -150,18 +183,14 @@ describe('BangersExplorer', () => {
         (item) => within(item).getByTestId('tweet-row').dataset.rank,
       ),
     ).toEqual(['1', '2', '3'])
-    expect(screen.getByRole('link', { name: 'Best' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    )
-    expect(screen.getByRole('link', { name: 'Best' })).toHaveAttribute(
-      'href',
-      '/bangers?period=all',
-    )
-    expect(screen.getByRole('link', { name: 'Recent' })).toHaveAttribute(
-      'href',
-      '/bangers?sort=recent&period=all',
-    )
+    expect(
+      screen.getByRole('heading', { name: 'Best of all time' }),
+    ).toBeVisible()
+    expect(screen.queryByText('Rank')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Best' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Recent' }),
+    ).not.toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: 'Archive members' }),
     ).toHaveAttribute('href', '/bangers?scope=members&period=all')
@@ -169,50 +198,97 @@ describe('BangersExplorer', () => {
       screen.getByRole('combobox', { name: 'Filter by time' }),
     ).toHaveTextContent('All time')
     const when = screen.getByText('When')
-    const rank = screen.getByText('Rank')
     const tweetsBy = screen.getByText('Tweets by')
     expect(
-      when.compareDocumentPosition(rank) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
-    expect(
-      rank.compareDocumentPosition(tweetsBy) & Node.DOCUMENT_POSITION_FOLLOWING,
+      when.compareDocumentPosition(tweetsBy) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
     expect(screen.queryByText('Likes')).not.toBeInTheDocument()
     expect(screen.queryByText('Reposts')).not.toBeInTheDocument()
     expect(screen.getByTestId('bangers-masonry')).toHaveClass(
-      'flex',
-      'lg:grid',
-      'lg:grid-cols-2',
+      'grid',
+      'items-start',
+      'gap-5',
     )
+    expect(screen.getByTestId('bangers-masonry')).toHaveStyle({
+      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    })
     expect(
       within(screen.getByTestId('bangers-masonry-column-0'))
         .getAllByTestId('tweet-row')
         .map((row) => row.dataset.rank),
-    ).toEqual(['1', '3'])
+    ).toEqual(['1'])
     expect(
       within(screen.getByTestId('bangers-masonry-column-1'))
         .getAllByTestId('tweet-row')
         .map((row) => row.dataset.rank),
     ).toEqual(['2'])
     expect(
+      within(screen.getByTestId('bangers-masonry-column-2'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['3'])
+    expect(
       orderedMasonryItems.map((item) => item.dataset.masonryOrder),
     ).toEqual(['1', '2', '3'])
   })
 
-  test('keeps today selected across ranking and author links', () => {
+  test('distributes ranked bangers left to right in the two-column layout', () => {
+    mockViewportWidth(1100)
+    renderExplorer(page(masonryTweets))
+
+    expect(screen.getByTestId('bangers-masonry')).toHaveStyle({
+      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    })
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-0'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['1', '3', '5'])
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-1'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['2', '4', '6'])
+  })
+
+  test('distributes ranked bangers left to right in the three-column layout', () => {
+    renderExplorer(page(masonryTweets))
+
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-0'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['1', '4'])
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-1'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['2', '5'])
+    expect(
+      within(screen.getByTestId('bangers-masonry-column-2'))
+        .getAllByTestId('tweet-row')
+        .map((row) => row.dataset.rank),
+    ).toEqual(['3', '6'])
+  })
+
+  test('keeps today selected across author links', () => {
     renderExplorer(page(), 'today')
 
     expect(
       screen.getByRole('combobox', { name: 'Filter by time' }),
     ).toHaveTextContent('Today')
-    expect(screen.getByRole('link', { name: 'Recent' })).toHaveAttribute(
-      'href',
-      '/bangers?sort=recent&period=today',
-    )
     expect(
       screen.getByRole('link', { name: 'Archive members' }),
     ).toHaveAttribute('href', '/bangers?scope=members&period=today')
     expect(screen.getByText(/from the last 24 hours/)).toBeVisible()
+  })
+
+  test('makes the active seven-day window unmistakable', () => {
+    renderExplorer(page(), 'week')
+
+    expect(
+      screen.getByRole('heading', { name: 'Best of the last 7 days' }),
+    ).toBeVisible()
   })
 
   test('orders all time above today and offers the last three months', async () => {
@@ -230,20 +306,59 @@ describe('BangersExplorer', () => {
     ])
   })
 
-  test('explains the Best ranking on hover and keyboard focus', async () => {
+  test('shows a pending state while navigating to another time range', async () => {
     const user = userEvent.setup()
     renderExplorer()
 
-    const best = screen.getByRole('link', { name: 'Best' })
-    await user.hover(best)
+    const timeFilter = screen.getByRole('combobox', {
+      name: 'Filter by time',
+    })
+    await user.click(timeFilter)
+    await user.click(screen.getByRole('option', { name: 'Last 7 days' }))
 
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      /Best means most quoted by distinct archive uploaders/i,
+    expect(push).toHaveBeenCalledWith('/bangers?period=week')
+    expect(screen.getByText('Loading bangers…')).toBeVisible()
+    expect(timeFilter).toBeDisabled()
+  })
+
+  test('preserves modified-click behavior on author scope links', () => {
+    renderExplorer()
+
+    let defaultPreventedBeforeTestCleanup: boolean | undefined
+    document.addEventListener(
+      'click',
+      (event) => {
+        defaultPreventedBeforeTestCleanup = event.defaultPrevented
+        event.preventDefault()
+      },
+      { once: true },
     )
+    fireEvent.click(screen.getByRole('link', { name: 'Archive members' }), {
+      metaKey: true,
+    })
 
-    await user.unhover(best)
-    best.focus()
-    expect(await screen.findByRole('tooltip')).toBeVisible()
+    expect(defaultPreventedBeforeTestCleanup).toBe(false)
+    expect(screen.queryByText('Loading bangers…')).not.toBeInTheDocument()
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  test('shows a pending state for ordinary author scope navigation', () => {
+    renderExplorer()
+
+    document.addEventListener('click', (event) => event.preventDefault(), {
+      once: true,
+    })
+    fireEvent.click(screen.getByRole('link', { name: 'Archive members' }))
+
+    expect(screen.getByText('Loading bangers…')).toBeVisible()
+    expect(mockCapturePostHogEvent).toHaveBeenCalledWith('bangers_action', {
+      action: 'scope_changed',
+      has_query: false,
+      time_range: 'all',
+      sort: 'quotes',
+      scope: 'members',
+      result_count: 3,
+    })
   })
 
   test('searches names and text and can clear the result', () => {
@@ -291,7 +406,7 @@ describe('BangersExplorer', () => {
     expect(screen.getByText('All 4 matching bangers loaded.')).toBeVisible()
   })
 
-  test('loads more when either masonry column reaches its end', async () => {
+  test('loads more when the masonry approaches its end', async () => {
     const nextTweet = tweet('4', 'Loaded from the short column', 2026, 2, 8)
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
@@ -300,13 +415,13 @@ describe('BangersExplorer', () => {
     renderExplorer(page(tweets, 3, 4))
 
     const observer = IntersectionObserverMock.instances.at(-1)
-    const shortColumnSentinel = screen.getByTestId('bangers-column-sentinel-1')
-    expect(observer?.observed).toContain(shortColumnSentinel)
+    const masonrySentinel = screen.getByTestId('bangers-load-more-sentinel')
+    expect(observer?.observed).toContain(masonrySentinel)
     act(() => {
       observer?.callback(
         [
           {
-            target: shortColumnSentinel,
+            target: masonrySentinel,
             isIntersecting: true,
           } as unknown as IntersectionObserverEntry,
         ],

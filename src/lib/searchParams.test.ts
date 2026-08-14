@@ -73,4 +73,17 @@ describe('search parameter helpers', () => {
       ).toString(),
     ).toBe('q=archive&fromUser=alice')
   })
+
+  it('preserves only supported server-side sort values', () => {
+    expect(
+      normalizeSearchParams(
+        new URLSearchParams('q=archive&sort=reposts'),
+      ).toString(),
+    ).toBe('q=archive&sort=reposts')
+    expect(
+      normalizeSearchParams(
+        new URLSearchParams('q=archive&sort=DROP+TABLE'),
+      ).toString(),
+    ).toBe('q=archive')
+  })
 })

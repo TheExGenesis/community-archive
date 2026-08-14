@@ -1,8 +1,10 @@
 import type { PortalTweet } from './types'
 
 export interface TrendEvidenceRange {
-  start: number
-  end: number
+  /** Inclusive UTC date in YYYY-MM-DD form. */
+  since: string
+  /** Exclusive UTC date in YYYY-MM-DD form. */
+  until: string
 }
 
 export interface TrendEvidenceCacheEntry {
@@ -20,8 +22,8 @@ function tweetFallsWithinRange(
   const createdAt = new Date(tweet.createdAt).getTime()
   return (
     Number.isFinite(createdAt) &&
-    createdAt >= Date.UTC(range.start, 0, 1) &&
-    createdAt < Date.UTC(range.end + 1, 0, 1)
+    createdAt >= new Date(`${range.since}T00:00:00.000Z`).getTime() &&
+    createdAt < new Date(`${range.until}T00:00:00.000Z`).getTime()
   )
 }
 
@@ -29,7 +31,7 @@ export function trendEvidenceCacheKey(
   term: string,
   range: TrendEvidenceRange | null,
 ): string {
-  return `${term}\u0000${range ? `${range.start}-${range.end}` : 'any'}`
+  return `${term}\u0000${range ? `${range.since}-${range.until}` : 'any'}`
 }
 
 export function storeTrendEvidence(
@@ -64,7 +66,7 @@ export function hasCompleteTrendEvidence(
     if (entry.term !== term) return false
     if (
       entry.range &&
-      (entry.range.start > range.start || entry.range.end < range.end)
+      (entry.range.since > range.since || entry.range.until < range.until)
     ) {
       return false
     }

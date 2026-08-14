@@ -3,10 +3,15 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import type { KeyboardEvent, MouseEvent } from 'react'
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import { PiArrowSquareOut, PiHeart, PiQuotes, PiRepeat } from 'react-icons/pi'
 import ImageLightbox from '@/components/ImageLightbox'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
-import { tweetPermalinkHref, type TweetOrigin } from '@/lib/navigation'
+import {
+  tweetPermalinkHref,
+  userProfileHref,
+  type TweetOrigin,
+} from '@/lib/navigation'
 import { decodeTweetText } from '@/lib/tweetText'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -16,6 +21,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { PortalMedia, PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
+import { capturePostHogEvent } from '@/lib/posthog'
+import { TweetLinkPreviews } from '@/components/TweetLinkPreviews'
 
 const HUES = [262, 32, 145, 4, 155, 200, 217, 88, 240, 190, 340, 45, 280, 20]
 const FEATURED_CARD_HOVER =
@@ -54,6 +61,26 @@ export const shortDate = (iso: string) =>
     month: 'short',
     year: 'numeric',
   })
+
+function CountMetric({
+  count,
+  label,
+  children,
+}: {
+  count: number
+  label: string
+  children: ReactNode
+}) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span aria-hidden="true" className="inline-flex">
+        {children}
+      </span>
+      <span aria-hidden="true">{formatCount(count)}</span>
+      <span className="sr-only">{`${formatCount(count)} ${label}`}</span>
+    </span>
+  )
+}
 
 export function TweetAvatar({
   tweet,
@@ -146,14 +173,18 @@ function QuotedTweet({
   tweet,
   compact,
   summary,
+  noClamp,
   origin,
   returnTo,
+  onOpen,
 }: {
   tweet: PortalQuotedTweet
   compact: boolean
   summary: boolean
+  noClamp: boolean
   origin?: TweetOrigin
   returnTo?: string
+  onOpen: () => void
 }) {
   if (tweet.isDeleted) {
     return (
@@ -164,39 +195,73 @@ function QuotedTweet({
   }
 
   const condensed = compact || summary
+  const profileHref = userProfileHref(tweet.username, tweet.accountId)
 
   return (
     <div className="mt-2 rounded-[4px] border border-zinc-200 bg-white p-2.5 dark:border-[#303036] dark:bg-[#18181b]">
-      <Link
-        href={tweetPermalinkHref(tweet.id, origin, returnTo)}
-        className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2">
+        <Link
+          href={profileHref}
+          aria-label={`View @${tweet.username}'s profile`}
+          className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
           <TweetAvatar tweet={tweet} size={condensed ? 24 : 28} />
-          <div className="min-w-0 text-[12px] leading-tight">
+        </Link>
+        <div className="min-w-0 text-[12px] leading-tight">
+          <Link
+            href={profileHref}
+            className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          >
             <span className="font-bold">{tweet.name}</span>{' '}
             <span className="text-zinc-500 dark:text-[#a7a7b4]">
-              @{tweet.username} · {relativeTime(tweet.createdAt)}
+              @{tweet.username}
             </span>
-          </div>
+          </Link>{' '}
+          <span
+            suppressHydrationWarning
+            className="text-zinc-500 dark:text-[#a7a7b4]"
+          >
+            · {relativeTime(tweet.createdAt)}
+          </span>
         </div>
+      </div>
+      <Link
+        href={tweetPermalinkHref(tweet.id, origin, returnTo)}
+        onClick={onOpen}
+        className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      >
         <div
-          className={`${condensed ? 'line-clamp-3' : ''} mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-zinc-700 dark:text-[#d9d9de]`}
+          className={`${condensed && !noClamp ? 'line-clamp-3' : ''} mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-zinc-700 dark:text-[#d9d9de]`}
         >
           {decodeTweetText(tweet.text)}
         </div>
       </Link>
       {!summary && (
-        <TweetImages
-          media={tweet.media}
-          compact={compact}
-          label="Quoted tweet image"
-        />
+        <>
+          <TweetImages
+            media={tweet.media}
+            compact={compact}
+            label="Quoted tweet image"
+          />
+          {/https?:\/\//.test(tweet.text) && (
+            <TweetLinkPreviews tweetId={tweet.id} compact={compact} />
+          )}
+        </>
       )}
       {!condensed && (
         <div className="mt-1.5 flex gap-4 text-[11.5px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
-          <span>♥ {formatCount(tweet.likes)}</span>
-          <span>⇄ {formatCount(tweet.rts)}</span>
+          <CountMetric
+            count={tweet.likes}
+            label={tweet.likes === 1 ? 'like' : 'likes'}
+          >
+            <PiHeart />
+          </CountMetric>
+          <CountMetric
+            count={tweet.rts}
+            label={tweet.rts === 1 ? 'repost' : 'reposts'}
+          >
+            <PiRepeat />
+          </CountMetric>
         </div>
       )}
     </div>
@@ -208,10 +273,12 @@ export interface TweetCardProps {
   animate?: boolean
   compact?: boolean
   collapsible?: boolean
+  noClamp?: boolean
   featuredRank?: number
   showDate?: boolean
   showArchivedBadge?: boolean
   clickable?: boolean
+  showExternalLink?: boolean
   quotedTweetDisplay?: 'full' | 'summary'
   origin?: TweetOrigin
   returnTo?: string
@@ -220,9 +287,11 @@ export interface TweetCardProps {
 function ArchivedQuotesMetric({
   count,
   href,
+  onOpen,
 }: {
   count: number
   href: string
+  onOpen: () => void
 }) {
   return (
     <TooltipProvider delayDuration={150}>
@@ -230,10 +299,11 @@ function ArchivedQuotesMetric({
         <TooltipTrigger asChild>
           <Link
             href={href}
+            onClick={onOpen}
             aria-label={`${count} archived quotes. Open tweet to see them.`}
             className="inline-flex items-center gap-1 rounded-sm text-zinc-500 transition-colors hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 dark:text-[#a7a7b4] dark:hover:text-zinc-200"
           >
-            <span aria-hidden="true">✦</span>
+            <PiQuotes aria-hidden="true" />
             <span>{formatCount(count)} archived quotes</span>
           </Link>
         </TooltipTrigger>
@@ -252,20 +322,40 @@ export function TweetRow({
   animate = false,
   compact = false,
   collapsible = false,
+  noClamp = false,
   featuredRank,
   showDate = false,
   showArchivedBadge = false,
-  clickable = false,
+  clickable,
+  showExternalLink = false,
   quotedTweetDisplay = 'full',
   origin,
   returnTo,
 }: TweetCardProps) {
   const router = useRouter()
   const [isExpanded, setIsExpanded] = useState(false)
-  const canExpand = collapsible && tweet.text.length > 280
+  const canExpand = collapsible && !noClamp && tweet.text.length > 280
   const href = tweetPermalinkHref(tweet.id, origin, returnTo)
+  const profileHref = userProfileHref(tweet.username, tweet.accountId)
   const isFeatured = featuredRank !== undefined
-  const isClickable = clickable || isFeatured
+  const isClickable = clickable ?? isFeatured
+  const captureAction = (
+    action:
+      | 'collapse'
+      | 'expand'
+      | 'open'
+      | 'open_archived_quotes'
+      | 'open_external'
+      | 'open_quoted_tweet',
+  ) => {
+    capturePostHogEvent('tweet_card_action', {
+      action,
+      origin: origin ?? 'unknown',
+      has_media: imageMedia(tweet.media).length > 0,
+      has_quoted_tweet: Boolean(tweet.quotedTweet),
+      is_featured: isFeatured,
+    })
+  }
   const rowClassName = isFeatured
     ? `relative flex min-w-0 gap-3 rounded-lg border border-zinc-200/75 bg-white p-4 shadow-sm dark:border-[#303036]/80 dark:bg-[#1b1b1e] sm:gap-3.5 sm:p-5 ${FEATURED_CARD_HOVER} ${
         animate ? 'portal-slide-in' : ''
@@ -274,7 +364,10 @@ export function TweetRow({
         animate ? 'portal-slide-in' : ''
       }`
 
-  const activateCard = () => router.push(href)
+  const activateCard = () => {
+    captureAction('open')
+    router.push(href)
+  }
   const handleCardClick = (event: MouseEvent<HTMLElement>) => {
     if (!isClickable) return
     const target = event.target as HTMLElement
@@ -289,38 +382,52 @@ export function TweetRow({
   }
 
   const tweetContent = (
-    <>
+    <div
+      className={`mt-0.5 leading-relaxed text-zinc-700 dark:text-[#d9d9de] ${
+        compact ? 'text-[13.5px]' : isFeatured ? 'text-[14.5px]' : 'text-[14px]'
+      } ${
+        noClamp
+          ? ''
+          : compact
+            ? 'line-clamp-2'
+            : canExpand && !isExpanded
+              ? 'line-clamp-5'
+              : ''
+      }`}
+    >
+      {decodeTweetText(tweet.text)}
+    </div>
+  )
+
+  const details = (
+    <div className="min-w-0 flex-1">
       <div className="flex items-baseline gap-2 overflow-hidden">
-        <span
-          className={`truncate font-bold ${compact ? 'text-[13px]' : 'text-[13.5px]'}`}
+        <Link
+          href={profileHref}
+          className="min-w-0 rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
-          {tweet.name}
-        </span>
-        <span className="flex-shrink-0 text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
-          @{tweet.username} ·{' '}
+          <span
+            className={`truncate font-bold ${compact ? 'text-[13px]' : 'text-[13.5px]'}`}
+          >
+            {tweet.name}
+          </span>{' '}
+          <span className="text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
+            @{tweet.username}
+          </span>
+        </Link>
+        <span
+          suppressHydrationWarning
+          className="flex-shrink-0 text-[12px] text-zinc-500 dark:text-[#a7a7b4]"
+        >
+          ·{' '}
           {showDate
             ? shortDate(tweet.createdAt)
             : relativeTime(tweet.createdAt)}
         </span>
       </div>
-      <div
-        className={`mt-0.5 leading-relaxed text-zinc-700 dark:text-[#d9d9de] ${
-          compact
-            ? 'line-clamp-2 text-[13.5px]'
-            : `${isFeatured ? 'text-[14.5px]' : 'text-[14px]'} ${
-                canExpand && !isExpanded ? 'line-clamp-5' : ''
-              }`
-        }`}
-      >
-        {decodeTweetText(tweet.text)}
-      </div>
-    </>
-  )
-
-  const details = (
-    <div className="min-w-0 flex-1">
       <Link
         href={href}
+        onClick={() => captureAction('open')}
         className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         {tweetContent}
@@ -329,30 +436,65 @@ export function TweetRow({
         <button
           type="button"
           aria-expanded={isExpanded}
-          onClick={() => setIsExpanded((expanded) => !expanded)}
+          onClick={() => {
+            captureAction(isExpanded ? 'collapse' : 'expand')
+            setIsExpanded((expanded) => !expanded)
+          }}
           className="mt-1 text-[12px] font-semibold text-brand hover:underline"
         >
           {isExpanded ? 'Show less' : 'Read more'}
         </button>
       )}
       <TweetImages media={tweet.media} compact={compact} label="Tweet image" />
+      {/https?:\/\//.test(tweet.text) && (
+        <TweetLinkPreviews tweetId={tweet.id} compact={compact} />
+      )}
       {tweet.quotedTweet && (
         <QuotedTweet
           tweet={tweet.quotedTweet}
           compact={compact}
           summary={quotedTweetDisplay === 'summary'}
+          noClamp={noClamp}
           origin={origin}
           returnTo={returnTo}
+          onOpen={() => captureAction('open_quoted_tweet')}
         />
       )}
       {!compact && (
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
           {tweet.quoteCount !== undefined && (
-            <ArchivedQuotesMetric count={tweet.quoteCount} href={href} />
+            <ArchivedQuotesMetric
+              count={tweet.quoteCount}
+              href={href}
+              onOpen={() => captureAction('open_archived_quotes')}
+            />
           )}
-          <span>♥ {formatCount(tweet.likes)}</span>
-          <span>⇄ {formatCount(tweet.rts)}</span>
+          <CountMetric
+            count={tweet.likes}
+            label={tweet.likes === 1 ? 'like' : 'likes'}
+          >
+            <PiHeart />
+          </CountMetric>
+          <CountMetric
+            count={tweet.rts}
+            label={tweet.rts === 1 ? 'repost' : 'reposts'}
+          >
+            <PiRepeat />
+          </CountMetric>
           {showArchivedBadge && <span className="text-brand">archived</span>}
+          {showExternalLink && (
+            <a
+              href={`https://x.com/${encodeURIComponent(tweet.username)}/status/${encodeURIComponent(tweet.id)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => captureAction('open_external')}
+              aria-label="View tweet on X (opens in a new tab)"
+              className="ml-auto inline-flex items-center gap-1 rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              <span>View on X</span>
+              <PiArrowSquareOut aria-hidden="true" />
+            </a>
+          )}
         </div>
       )}
     </div>
@@ -371,13 +513,18 @@ export function TweetRow({
       tabIndex={isClickable ? 0 : undefined}
       aria-label={isClickable ? `View tweet by @${tweet.username}` : undefined}
     >
-      <Link href={href} aria-label={`View tweet by @${tweet.username}`}>
+      <Link href={profileHref} aria-label={`View @${tweet.username}'s profile`}>
         <TweetAvatar tweet={tweet} size={isFeatured ? 38 : 34} />
       </Link>
       {details}
       {compact && (
         <div className="whitespace-nowrap text-[11.5px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
-          ♥ {formatCount(tweet.likes)}
+          <CountMetric
+            count={tweet.likes}
+            label={tweet.likes === 1 ? 'like' : 'likes'}
+          >
+            <PiHeart />
+          </CountMetric>
         </div>
       )}
     </article>

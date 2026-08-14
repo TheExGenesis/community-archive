@@ -63,8 +63,18 @@ describe('UnifiedTweetList compact view', () => {
       screen.getAllByRole('columnheader').map((header) => header.textContent),
     ).toEqual(['Author', 'Tweet', 'Date', 'Engagement', 'Links'])
     expect(screen.getByText('Archive User')).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('link', {
+        name: "View @archive_user's profile",
+      })[0],
+    ).toHaveAttribute('href', '/user/archive_user')
     expect(screen.getByAltText('Tweet image 1')).toBeInTheDocument()
     expect(screen.getByText('Quoted User')).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('link', {
+        name: "View @quoted_user's profile",
+      })[0],
+    ).toHaveAttribute('href', '/user/quoted_user')
     expect(
       screen.getByText(
         'The quoted tweet is visible in compact search results.',
@@ -92,5 +102,38 @@ describe('UnifiedTweetList compact view', () => {
     expect(
       screen.getByRole('button', { name: 'Show less' }),
     ).toBeInTheDocument()
+  })
+
+  it('sends table-header sort choices to the server-search owner', async () => {
+    const onSearchSortChange = jest.fn()
+    render(
+      <UnifiedTweetList
+        tweets={[tweet]}
+        compact
+        searchSort="newest"
+        onSearchSortChange={onSearchSortChange}
+      />,
+    )
+
+    expect(screen.getByRole('columnheader', { name: /Date/ })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    )
+    await userEvent.click(screen.getByRole('button', { name: /Date/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sort by likes' }))
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Sort by reposts' }),
+    )
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: 'Sort search results' }),
+      'likes',
+    )
+
+    expect(onSearchSortChange.mock.calls).toEqual([
+      ['oldest'],
+      ['likes'],
+      ['reposts'],
+      ['likes'],
+    ])
   })
 })

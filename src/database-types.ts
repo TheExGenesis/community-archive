@@ -611,6 +611,60 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_curation: {
+        Row: {
+          account_id: string
+          created_at: string
+          is_featured: boolean
+          is_hidden: boolean
+          item_id: string
+          position: number | null
+          section: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          is_featured?: boolean
+          is_hidden?: boolean
+          item_id: string
+          position?: number | null
+          section: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          is_featured?: boolean
+          is_hidden?: boolean
+          item_id?: string
+          position?: number | null
+          section?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profile_settings: {
+        Row: {
+          account_id: string
+          created_at: string
+          download_archive_visible: boolean
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          download_archive_visible?: boolean
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          download_archive_visible?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       quote_tweets: {
         Row: {
           quoted_tweet_id: string
@@ -715,6 +769,54 @@ export type Database = {
         }
         Update: {
           count?: number | null
+        }
+        Relationships: []
+      }
+      tweet_link_previews: {
+        Row: {
+          canonical_url: string | null
+          content_type: string | null
+          created_at: string
+          description: string | null
+          expires_at: string
+          fetched_at: string | null
+          image_url: string | null
+          normalized_url: string
+          site_name: string | null
+          status: string
+          title: string | null
+          updated_at: string
+          url_hash: string
+        }
+        Insert: {
+          canonical_url?: string | null
+          content_type?: string | null
+          created_at?: string
+          description?: string | null
+          expires_at?: string
+          fetched_at?: string | null
+          image_url?: string | null
+          normalized_url: string
+          site_name?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+          url_hash: string
+        }
+        Update: {
+          canonical_url?: string | null
+          content_type?: string | null
+          created_at?: string
+          description?: string | null
+          expires_at?: string
+          fetched_at?: string | null
+          image_url?: string | null
+          normalized_url?: string
+          site_name?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+          url_hash?: string
         }
         Relationships: []
       }

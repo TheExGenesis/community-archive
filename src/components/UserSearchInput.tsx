@@ -1,8 +1,11 @@
 'use client'
 
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { Search, UserRound } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input, InputProps } from '@/components/ui/input'
+import { userProfileHref } from '@/lib/navigation'
 import { fetchUserSuggestions } from '@/lib/queries/fetchUsers'
 import {
   getUsernameSearchToken,
@@ -34,6 +37,7 @@ export default function UserSearchInput({
   type = 'search',
   ...inputProps
 }: UserSearchInputProps) {
+  const router = useRouter()
   const supabase = useMemo(() => createBrowserClient(), [])
   const inputRef = useRef<HTMLInputElement>(null)
   const requestIdRef = useRef(0)
@@ -42,6 +46,7 @@ export default function UserSearchInput({
   const [suggestions, setSuggestions] = useState<UserSuggestion[]>([])
   const [token, setToken] = useState<UsernameSearchToken | null>(null)
   const isOpen = suggestions.length > 0 && token !== null
+  const optionCount = suggestions.length * 2
 
   const updateToken = (nextValue: string, caretPosition: number | null) => {
     setToken(getUsernameSearchToken(nextValue, caretPosition))
@@ -86,7 +91,12 @@ export default function UserSearchInput({
       ?.scrollIntoView?.({ block: 'nearest' })
   }, [activeIndex, listboxId])
 
-  const selectSuggestion = (suggestion: UserSuggestion) => {
+  const openProfile = (suggestion: UserSuggestion) => {
+    closeSuggestions()
+    router.push(userProfileHref(suggestion.username, suggestion.directory_id))
+  }
+
+  const selectFromFilter = (suggestion: UserSuggestion) => {
     if (!token) return
     const replacement = replaceUsernameTokenWithFromFilter(
       value,
@@ -162,15 +172,20 @@ export default function UserSearchInput({
 
           if (event.key === 'ArrowDown') {
             event.preventDefault()
-            setActiveIndex((current) => (current + 1) % suggestions.length)
+            setActiveIndex((current) => (current + 1) % optionCount)
           } else if (event.key === 'ArrowUp') {
             event.preventDefault()
             setActiveIndex((current) =>
-              current <= 0 ? suggestions.length - 1 : current - 1,
+              current <= 0 ? optionCount - 1 : current - 1,
             )
           } else if (event.key === 'Enter' && activeIndex >= 0) {
             event.preventDefault()
-            selectSuggestion(suggestions[activeIndex])
+            const suggestion = suggestions[Math.floor(activeIndex / 2)]
+            if (activeIndex % 2 === 0) {
+              openProfile(suggestion)
+            } else {
+              selectFromFilter(suggestion)
+            }
           } else if (event.key === 'Escape') {
             event.preventDefault()
             closeSuggestions()
@@ -188,46 +203,82 @@ export default function UserSearchInput({
           {suggestions.map((suggestion, index) => {
             const displayName =
               suggestion.account_display_name || suggestion.username
-            const isActive = index === activeIndex
+            const profileIndex = index * 2
+            const filterIndex = profileIndex + 1
+            const isProfileActive = profileIndex === activeIndex
+            const isFilterActive = filterIndex === activeIndex
 
             return (
-              <button
+              <div
                 key={suggestion.directory_id}
-                id={`${listboxId}-option-${index}`}
-                type="button"
-                role="option"
-                aria-selected={isActive}
-                onPointerDown={(event) => event.preventDefault()}
-                onMouseEnter={() => setActiveIndex(index)}
-                onClick={() => selectSuggestion(suggestion)}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors',
-                  isActive
-                    ? 'bg-accent text-accent-foreground'
-                    : 'hover:bg-accent',
-                )}
+                role="group"
+                aria-label={`@${suggestion.username}`}
+                className="border-b border-border py-1 last:border-b-0"
               >
-                <Avatar className="h-9 w-9 border border-border">
-                  <AvatarImage
-                    src={suggestion.avatar_media_url || undefined}
-                    alt=""
+                <button
+                  id={`${listboxId}-option-${profileIndex}`}
+                  type="button"
+                  role="option"
+                  aria-selected={isProfileActive}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setActiveIndex(profileIndex)}
+                  onClick={() => openProfile(suggestion)}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors',
+                    isProfileActive
+                      ? 'bg-accent text-accent-foreground'
+                      : 'hover:bg-accent',
+                  )}
+                >
+                  <Avatar className="h-9 w-9 border border-border">
+                    <AvatarImage
+                      src={suggestion.avatar_media_url || undefined}
+                      alt=""
+                    />
+                    <AvatarFallback className="text-xs font-semibold uppercase">
+                      {(displayName || '@').slice(0, 1)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">
+                      {displayName}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      @{suggestion.username}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <UserRound className="h-4 w-4" aria-hidden="true" />
+                    Profile
+                  </span>
+                </button>
+                <button
+                  id={`${listboxId}-option-${filterIndex}`}
+                  type="button"
+                  role="option"
+                  aria-selected={isFilterActive}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setActiveIndex(filterIndex)}
+                  onClick={() => selectFromFilter(suggestion)}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left outline-none transition-colors',
+                    isFilterActive
+                      ? 'bg-accent text-accent-foreground'
+                      : 'hover:bg-accent',
+                  )}
+                >
+                  <Search
+                    className="ml-2 h-4 w-4 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
                   />
-                  <AvatarFallback className="text-xs font-semibold uppercase">
-                    {(displayName || '@').slice(0, 1)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">
-                    {displayName}
+                  <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                    Search posts from @{suggestion.username}
                   </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    @{suggestion.username}
+                  <span className="shrink-0 rounded-md bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground">
+                    from:{suggestion.username}
                   </span>
-                </span>
-                <span className="shrink-0 rounded-md bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground">
-                  from:{suggestion.username}
-                </span>
-              </button>
+                </button>
+              </div>
             )
           })}
         </div>

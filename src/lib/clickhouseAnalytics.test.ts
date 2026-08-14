@@ -56,7 +56,7 @@ describe('getTopFollowedAccounts', () => {
           Accept: 'application/json',
           Authorization: 'Bearer test-token',
         },
-        next: { revalidate: 60 },
+        next: { revalidate: 86_400 },
       },
     )
   })

@@ -1,11 +1,33 @@
 import { BANGERS_ALL_TIME_HREF } from './portal/bangers'
+import { isTwitterUsername } from './apiInputValidation'
 
 export interface NavItem {
   href: string
   label: string
 }
 
-export type TweetOrigin = 'home' | 'bangers' | 'trends' | 'search'
+export type TweetOrigin =
+  | 'home'
+  | 'stream'
+  | 'bangers'
+  | 'trends'
+  | 'search'
+  | 'profile'
+
+export function userProfileHref(
+  username: string | null | undefined,
+  accountId?: string | null,
+): string {
+  const cleanUsername = username?.trim().replace(/^@/, '')
+  const validUsername =
+    cleanUsername &&
+    isTwitterUsername(cleanUsername) &&
+    !/^\d+$/.test(cleanUsername)
+      ? cleanUsername
+      : null
+  if (validUsername) return `/user/${encodeURIComponent(validUsername)}`
+  return accountId ? `/user/${encodeURIComponent(accountId)}` : '/user-dir'
+}
 
 export interface TweetBackLink {
   href: string
@@ -22,6 +44,11 @@ const TWEET_ORIGINS: Record<
     label: 'Back to homepage',
     matches: (href) => href === '/' || href.startsWith('/?'),
   },
+  stream: {
+    href: '/stream',
+    label: 'Back to live stream',
+    matches: (href) => href === '/stream' || href.startsWith('/stream?'),
+  },
   bangers: {
     href: '/bangers',
     label: 'Back to Bangers',
@@ -36,6 +63,11 @@ const TWEET_ORIGINS: Record<
     href: '/search',
     label: 'Back to search',
     matches: (href) => href === '/search' || href.startsWith('/search?'),
+  },
+  profile: {
+    href: '/user-dir',
+    label: 'Back to profile',
+    matches: (href) => href.startsWith('/user/'),
   },
 }
 
@@ -107,10 +139,9 @@ export const getPrimaryNav = (isMember: boolean): NavItem[] =>
         { href: '/trends', label: 'Trends' },
         { href: '/social-graph', label: 'Graph' },
         { href: '/research', label: 'Research' },
-        { href: '/tools', label: 'Tools' },
       ]
     : [
-        { href: '/#products', label: 'Tools' },
+        { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
         { href: '/user-dir', label: 'Library' },
         { href: '/docs', label: 'Docs' },
         { href: '/#upload-archive', label: 'Upload archive' },

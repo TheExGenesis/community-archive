@@ -73,6 +73,10 @@ Staging synchronization is automatic; production synchronization is not:
   pushes to `main` that touch `supabase/**` or the sync script.
 - The workflow serializes staging updates and regenerates database types on PR
   branches. Fork PRs are skipped because they cannot access staging secrets.
+- Supabase's managed PR preview may rerun `supabase/seed.sql` against the same
+  preview database after a new commit, including the workflow's generated-types
+  bot commit. Keep seed inserts idempotent and, when schema or seed data changes,
+  verify that the seed loads twice without a database reset.
 - Editing only `supabase/schemas/` is insufficient. Generate and commit the
   migration that the workflow can apply.
 - Before merging a PR with migrations, run the read-only
@@ -107,6 +111,12 @@ Staging synchronization is automatic; production synchronization is not:
   gateway lacks a required portal corpus endpoint, add a narrow endpoint rather
   than a production Supabase read fallback. Cache expensive snapshots at an
   interval appropriate to the UI.
+- Keep resilient page fallbacks separate from publicly cacheable analytical API
+  responses. A route that emits `s-maxage` must preserve upstream availability:
+  return a non-cacheable non-2xx response on upstream failure, and never turn a
+  failure into an empty successful payload that the CDN or client will remember
+  as real data. Clients may keep the last successful value, but retryable
+  failures must remain distinguishable from a legitimate empty result.
 - The control-plane query gateway permits only one authenticated `/search` or
   `/analytics/search` request at a time and returns `503` with `Retry-After: 1`
   for overlap. Serialize multi-search fan-out in server callers; this limit does
@@ -139,16 +149,31 @@ Staging synchronization is automatic; production synchronization is not:
 
 ### Tweet rendering
 
-- Use `src/components/TweetCard.tsx` as the canonical full-fidelity tweet card
-  for new product surfaces. Data adapters must preserve the complete text,
+- Always use `src/components/TweetCard.tsx` as the canonical full-fidelity
+  tweet renderer for product surfaces. Data adapters must preserve complete text,
   attached media, and quoted-tweet payload (including the quoted tweet's media)
   before rendering. Do not introduce a surface-specific partial tweet renderer;
   make intentionally compact variants explicit through the canonical component.
 - Normalize archive text with `src/lib/tweetText.ts`; do not add another local
   HTML-entity decoder to a tweet surface.
 
+### Progressive collection rendering
+
+- For large result sets, optimize the first screen rather than blocking on the
+  complete collection. Server-render only the first useful items and the small
+  supporting summaries visible above the fold, then immediately continue the
+  active result set in the background.
+- Preload a shallow first page for adjacent tabs, chapters, or filters after the
+  active view is useful. Fetch deeper pages only as the user scrolls. Preserve
+  shareable URLs, browser history, deterministic server-side sorting, and a
+  manual accessible load-more fallback alongside infinite scroll.
+
 Use Node 20 from `.nvmrc` and pnpm. Prefer the narrowest relevant check, then
 expand verification in proportion to risk.
+
+For non-interactive smoke checks against SSO-protected Vercel previews, follow
+`docs/staging.md`. Do not disable deployment protection to make a preview
+machine-readable.
 
 ```bash
 pnpm dev                 # Next.js with local Supabase

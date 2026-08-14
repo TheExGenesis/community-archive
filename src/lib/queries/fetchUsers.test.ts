@@ -35,7 +35,7 @@ describe('buildDirectorySearchFilter', () => {
 })
 
 describe('getDirectoryProfileHref', () => {
-  it('links account-backed members by account ID', () => {
+  it('uses a readable username for account-backed members', () => {
     expect(
       getDirectoryProfileHref(
         directoryUser({
@@ -43,15 +43,15 @@ describe('getDirectoryProfileHref', () => {
           account_id: '123456789',
         }),
       ),
-    ).toBe('/user/archive%3A123456789')
+    ).toBe('/user/archive_member')
   })
 
-  it('links opt-in-only members by their stable directory ID', () => {
+  it('uses the username for opt-in-only members too', () => {
     expect(
       getDirectoryProfileHref(
         directoryUser({ directory_id: 'optin:42', account_id: null }),
       ),
-    ).toBe('/user/optin%3A42')
+    ).toBe('/user/archive_member')
   })
 })
 
@@ -151,9 +151,10 @@ describe('getUserData', () => {
     }
 
     const result = await getUserData(
-      mockSupabase([row], [
-        { account_id: '123', header_media_url: 'https://example.com/header' },
-      ]) as any,
+      mockSupabase(
+        [row],
+        [{ account_id: '123', header_media_url: 'https://example.com/header' }],
+      ) as any,
       '123',
     )
 
@@ -162,5 +163,32 @@ describe('getUserData', () => {
       has_archive: true,
       header_media_url: 'https://example.com/header',
     })
+  })
+
+  it('uses the explicit username namespace even for numeric usernames', async () => {
+    const row = {
+      directory_id: 'archive:456',
+      account_id: '456',
+      username: '123',
+      account_display_name: 'Numeric Username',
+      created_at: null,
+      bio: null,
+      website: null,
+      location: null,
+      avatar_media_url: null,
+      archive_at: null,
+      archive_uploaded_at: null,
+      num_tweets: null,
+      num_followers: null,
+      num_following: null,
+      num_likes: null,
+      joined_at: null,
+      has_archive: true,
+      is_opted_in: false,
+    }
+
+    const result = await getUserData(mockSupabase([row]) as any, '%40123')
+
+    expect(result?.account_id).toBe('456')
   })
 })

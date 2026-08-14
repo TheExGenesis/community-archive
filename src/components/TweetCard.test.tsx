@@ -69,7 +69,18 @@ describe('TweetCard', () => {
     expect(
       screen.getAllByTestId('tweet-image').map((image) => image.dataset.src),
     ).toEqual(['https://example.com/tweet.jpg'])
-    expect(screen.queryByText('♥ 8')).not.toBeInTheDocument()
+    expect(screen.queryByText('8 likes')).not.toBeInTheDocument()
+  })
+
+  test('can disable text clamping independently of the card layout', () => {
+    render(<TweetCard tweet={tweet} compact noClamp />)
+
+    expect(
+      screen.getByText('A complete tweet & media with > one encoding layer.'),
+    ).not.toHaveClass('line-clamp-2')
+    expect(screen.getByText('The complete "quoted" tweet.')).not.toHaveClass(
+      'line-clamp-3',
+    )
   })
 
   test('makes the card clickable while preserving its origin', () => {
@@ -115,5 +126,33 @@ describe('TweetCard', () => {
       'motion-reduce:hover:translate-y-0',
     )
     expect(cards[0].className).not.toMatch(/blue/)
+  })
+
+  test('uses accessible Phosphor metrics and an optional external link', () => {
+    const { container } = render(
+      <TweetCard tweet={{ ...tweet, quoteCount: 12 }} showExternalLink />,
+    )
+
+    expect(screen.getByText('12 likes')).toHaveClass('sr-only')
+    expect(
+      screen.getByText('12 likes').parentElement?.querySelector('svg'),
+    ).not.toBeNull()
+    expect(screen.getByText('3 reposts')).toHaveClass('sr-only')
+    expect(
+      screen.getByText('3 reposts').parentElement?.querySelector('svg'),
+    ).not.toBeNull()
+    expect(
+      screen
+        .getByRole('link', {
+          name: '12 archived quotes. Open tweet to see them.',
+        })
+        .querySelector('svg'),
+    ).not.toBeNull()
+    expect(container).not.toHaveTextContent(/[♥⇄✦🔁❝↗]/)
+    expect(
+      screen.getByRole('link', {
+        name: 'View tweet on X (opens in a new tab)',
+      }),
+    ).toHaveAttribute('href', 'https://x.com/alice/status/123')
   })
 })

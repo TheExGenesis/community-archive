@@ -2,11 +2,14 @@
 
 import AdvancedSearchForm from '@/components/AdvancedSearchForm'
 import TweetList from '@/components/TweetList'
-import { FilterCriteria } from '@/lib/queries/tweetQueries'
+import {
+  FilterCriteria,
+  type TweetSearchSort,
+} from '@/lib/queries/tweetQueries'
 import { normalizeSearchParams } from '@/lib/searchParams'
 import { Search, SlidersHorizontal } from 'lucide-react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
 const starterSearches = [
@@ -18,6 +21,7 @@ const starterSearches = [
 // This wrapper is needed because useSearchParams can only be used in Client Components,
 // and Suspense is recommended for pages that use it.
 function SearchPageContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const normalizedSearchParams = normalizeSearchParams(
     new URLSearchParams(searchParams.toString()),
@@ -49,10 +53,19 @@ function SearchPageContent() {
     endDate: normalizedSearchParams.get('untilDate') || undefined,
     excludeRetweets: true,
     includeQuoteTweets: true,
+    sort: (normalizedSearchParams.get('sort') || 'newest') as TweetSearchSort,
+  }
+
+  const handleSortChange = (sort: TweetSearchSort) => {
+    const next = new URLSearchParams(normalizedSearchParams)
+    if (sort === 'newest') next.delete('sort')
+    else next.set('sort', sort)
+    router.replace(`/search?${next.toString()}`)
   }
 
   const tweetListKey = normalizedSearchParams.toString()
   const hasSearch = tweetListKey.length > 0
+  const canSortSearchResults = Boolean(cleanRawText)
   const searchDescription = cleanRawText
     ? `Matching “${cleanRawText}” and the filters above`
     : 'Matching the filters above'
@@ -100,6 +113,9 @@ function SearchPageContent() {
               compact
               permalinkOrigin="search"
               permalinkReturnTo={`/search?${tweetListKey}`}
+              onSearchSortChange={
+                canSortSearchResults ? handleSortChange : undefined
+              }
             />
           ) : (
             <div className="rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center sm:px-10">

@@ -2,13 +2,10 @@ import { act, render, screen } from '@testing-library/react'
 import Portal, { type PortalView } from './Portal'
 import type { PortalData, PortalTweet } from '@/lib/portal/types'
 
-jest.mock('@/components/HomepageSearch', () => ({
-  __esModule: true,
-  default: () => null,
-}))
-
 jest.mock('./TweetRow', () => ({
-  TweetRow: ({ tweet }: { tweet: PortalTweet }) => <div>{tweet.text}</div>,
+  TweetRow: ({ tweet, noClamp }: { tweet: PortalTweet; noClamp?: boolean }) => (
+    <div data-no-clamp={String(Boolean(noClamp))}>{tweet.text}</div>
+  ),
 }))
 
 const seedTweet: PortalTweet = {
@@ -93,7 +90,7 @@ describe.each<PortalView>(['home', 'stream'])(
       jest.restoreAllMocks()
     })
 
-    test('checks immediately and then polls from the latest cursor each minute', async () => {
+    test('polls from the latest cursor without changing the corpus snapshot count', async () => {
       const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -128,7 +125,7 @@ describe.each<PortalView>(['home', 'stream'])(
         jest.advanceTimersByTime(30_000)
         await Promise.resolve()
       })
-      expect(screen.getByText('14,000,010 tweets')).toBeInTheDocument()
+      expect(screen.getByText('14,000,000 tweets')).toBeInTheDocument()
 
       await act(async () => {
         jest.advanceTimersByTime(29_999)
@@ -142,7 +139,7 @@ describe.each<PortalView>(['home', 'stream'])(
         await Promise.resolve()
       })
       expect(fetchMock).toHaveBeenCalledTimes(2)
-      expect(screen.getByText('14,000,024 tweets')).toBeInTheDocument()
+      expect(screen.getByText('14,000,000 tweets')).toBeInTheDocument()
       expect(String(fetchMock.mock.calls[1][0])).toContain(
         'after=2026-08-07T12%3A01%3A00.000Z&afterId=101',
       )
@@ -151,9 +148,9 @@ describe.each<PortalView>(['home', 'stream'])(
         jest.advanceTimersByTime(240_000)
         await Promise.resolve()
       })
-      expect(screen.getByText('14,000,100 tweets')).toBeInTheDocument()
+      expect(screen.getByText('14,000,000 tweets')).toBeInTheDocument()
       if (view === 'home') {
-        expect(screen.getByText('14,000,100')).toBeInTheDocument()
+        expect(screen.getByText('14,000,000')).toBeInTheDocument()
       }
 
       unmount()
@@ -179,6 +176,10 @@ describe.each<PortalView>(['home', 'stream'])(
       expect(screen.getByText('preview tweet 5')).toBeInTheDocument()
       expect(screen.getByText('preview tweet 12')).toBeInTheDocument()
       if (view === 'home') {
+        expect(screen.getByText('preview tweet 1')).toHaveAttribute(
+          'data-no-clamp',
+          'true',
+        )
         const preview = screen.getByRole('region', {
           name: 'Live tweet stream',
         })
@@ -189,6 +190,10 @@ describe.each<PortalView>(['home', 'stream'])(
         )
         expect(screen.queryByText('preview tweet 13')).not.toBeInTheDocument()
       } else {
+        expect(screen.getByText('preview tweet 1')).toHaveAttribute(
+          'data-no-clamp',
+          'false',
+        )
         expect(
           screen.queryByRole('region', { name: 'Live tweet stream' }),
         ).not.toBeInTheDocument()
@@ -231,11 +236,6 @@ describe('portal component failures', () => {
     })
 
     expect(
-      screen.getByText(
-        'We preserve public conversations as open source infrastructure.',
-      ),
-    ).toBeInTheDocument()
-    expect(
       screen.getByText('Tweet totals are temporarily unavailable.'),
     ).toBeInTheDocument()
     expect(
@@ -259,6 +259,7 @@ describe('portal component failures', () => {
     expect(
       screen.getByText('Historical bangers are temporarily unavailable.'),
     ).toBeInTheDocument()
-    expect(screen.getByText('Explore the archive')).toBeInTheDocument()
+    expect(screen.getByText('Community Builds')).toBeInTheDocument()
+    expect(screen.queryByText('Explore the archive')).not.toBeInTheDocument()
   })
 })

@@ -5,6 +5,7 @@ import TweetComponent, { compactTweetGridClass } from './TweetComponent'
 import { Button } from '@/components/ui/button'
 import { Download, SearchX } from 'lucide-react'
 import type { TweetOrigin } from '@/lib/navigation'
+import type { TweetSearchSort } from '@/lib/queries/tweetQueries'
 
 interface UnifiedTweetListProps {
   tweets: any[]
@@ -19,6 +20,8 @@ interface UnifiedTweetListProps {
   compact?: boolean
   permalinkOrigin?: TweetOrigin
   permalinkReturnTo?: string
+  searchSort?: TweetSearchSort
+  onSearchSortChange?: (sort: TweetSearchSort) => void
 }
 
 /**
@@ -39,6 +42,8 @@ export default function UnifiedTweetList({
   compact = false,
   permalinkOrigin,
   permalinkReturnTo,
+  searchSort,
+  onSearchSortChange,
 }: UnifiedTweetListProps) {
   const handleExportCsv = () => {
     if (tweets.length === 0) {
@@ -150,41 +155,134 @@ export default function UnifiedTweetList({
       )}
 
       {compact ? (
-        <div
-          role="table"
-          aria-label={headerTitle || 'Tweets'}
-          className="overflow-hidden rounded-lg border border-border bg-card"
-        >
-          <div role="rowgroup" className="hidden bg-muted/60 md:block">
-            <div
-              role="row"
-              className={`${compactTweetGridClass} py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground`}
-            >
-              <div role="columnheader">Author</div>
-              <div role="columnheader">Tweet</div>
-              <div role="columnheader">Date</div>
-              <div role="columnheader">Engagement</div>
-              <div role="columnheader" className="text-right">
-                Links
+        <div className="space-y-3">
+          {searchSort && onSearchSortChange && (
+            <label className="flex items-center justify-between gap-3 text-sm font-medium text-foreground md:hidden">
+              Sort results
+              <select
+                aria-label="Sort search results"
+                value={searchSort}
+                onChange={(event) =>
+                  onSearchSortChange(event.target.value as TweetSearchSort)
+                }
+                className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="likes">Most likes</option>
+                <option value="reposts">Most reposts</option>
+              </select>
+            </label>
+          )}
+          <div
+            role="table"
+            aria-label={headerTitle || 'Tweets'}
+            className="overflow-hidden rounded-lg border border-border bg-card"
+          >
+            <div role="rowgroup" className="hidden bg-muted/60 md:block">
+              <div
+                role="row"
+                className={`${compactTweetGridClass} py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground`}
+              >
+                <div role="columnheader">Author</div>
+                <div role="columnheader">Tweet</div>
+                <div
+                  role="columnheader"
+                  aria-sort={
+                    searchSort === 'oldest'
+                      ? 'ascending'
+                      : searchSort === 'newest'
+                        ? 'descending'
+                        : 'none'
+                  }
+                >
+                  {onSearchSortChange ? (
+                    <button
+                      type="button"
+                      className="rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      onClick={() =>
+                        onSearchSortChange(
+                          searchSort === 'newest' ? 'oldest' : 'newest',
+                        )
+                      }
+                    >
+                      Date
+                      {searchSort === 'oldest'
+                        ? ' ↑'
+                        : searchSort === 'newest'
+                          ? ' ↓'
+                          : ''}
+                    </button>
+                  ) : (
+                    'Date'
+                  )}
+                </div>
+                <div
+                  role="columnheader"
+                  aria-sort={
+                    searchSort === 'likes' || searchSort === 'reposts'
+                      ? 'descending'
+                      : 'none'
+                  }
+                >
+                  {onSearchSortChange ? (
+                    <div className="flex flex-col items-start gap-0.5">
+                      <span className="sr-only">Engagement</span>
+                      <button
+                        type="button"
+                        aria-label={
+                          searchSort === 'likes'
+                            ? 'Sort by likes, currently descending'
+                            : 'Sort by likes'
+                        }
+                        className={`rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                          searchSort === 'likes' ? 'text-foreground' : ''
+                        }`}
+                        onClick={() => onSearchSortChange('likes')}
+                      >
+                        Likes{searchSort === 'likes' ? ' ↓' : ''}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={
+                          searchSort === 'reposts'
+                            ? 'Sort by reposts, currently descending'
+                            : 'Sort by reposts'
+                        }
+                        className={`rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                          searchSort === 'reposts' ? 'text-foreground' : ''
+                        }`}
+                        onClick={() => onSearchSortChange('reposts')}
+                      >
+                        Reposts{searchSort === 'reposts' ? ' ↓' : ''}
+                      </button>
+                    </div>
+                  ) : (
+                    'Engagement'
+                  )}
+                </div>
+                <div role="columnheader" className="text-right">
+                  Links
+                </div>
               </div>
             </div>
-          </div>
-          <div role="rowgroup" className="divide-y divide-border">
-            {tweets.map((tweet) => (
-              <div
-                key={tweet.tweet_id}
-                role="row"
-                className="hover:bg-muted/35 transition-colors"
-              >
-                <TweetComponent
-                  tweet={tweet}
-                  collapseLongText={collapseLongTweets}
-                  compact
-                  permalinkOrigin={permalinkOrigin}
-                  permalinkReturnTo={permalinkReturnTo}
-                />
-              </div>
-            ))}
+            <div role="rowgroup" className="divide-y divide-border">
+              {tweets.map((tweet) => (
+                <div
+                  key={tweet.tweet_id}
+                  role="row"
+                  className="hover:bg-muted/35 transition-colors"
+                >
+                  <TweetComponent
+                    tweet={tweet}
+                    collapseLongText={collapseLongTweets}
+                    compact
+                    permalinkOrigin={permalinkOrigin}
+                    permalinkReturnTo={permalinkReturnTo}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       ) : (

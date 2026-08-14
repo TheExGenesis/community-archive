@@ -10,7 +10,7 @@ import { enrichPortalTweets } from '@/lib/portal/data'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-const MAX_TERMS = 8
+const MAX_TERMS = 12
 const MAX_TERM_LENGTH = 80
 
 function normalizedTerms(values: string[]): string[] {
@@ -67,7 +67,18 @@ export async function GET(request: NextRequest) {
     if (view === 'series') {
       const terms = normalizedTerms(params.getAll('q'))
       if (terms.length === 0) throw new Error('Enter at least one term')
-      return privateJson(await fetchPortalTrendSeries(terms))
+      const requestedGranularity = params.get('granularity') ?? 'year'
+      if (requestedGranularity !== 'year' && requestedGranularity !== 'month') {
+        throw new Error('Choose year or month granularity')
+      }
+      return privateJson(
+        await fetchPortalTrendSeries(
+          terms,
+          new Date(),
+          undefined,
+          requestedGranularity,
+        ),
+      )
     }
 
     if (view === 'feed') {

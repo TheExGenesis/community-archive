@@ -15,6 +15,7 @@ jest.mock('./research', () => ({
 }))
 
 import {
+  fetchPortalCorpusStats,
   fetchPortalMemberCount,
   getInitialPortalBangersPage,
   getPortalBangersPage,
@@ -162,9 +163,7 @@ describe('portal page resilience', () => {
       computedAt: '2026-08-07T20:00:00.000Z',
     })
     fetchPortalLiveAnalyticsMock.mockResolvedValue({
-      totalTweets: 1_000,
       streamedLast24Hours: 25,
-      generatedAt: '2026-08-07T20:00:00.000Z',
       latestObservedAt: '2026-08-07T20:00:00.000Z',
     })
     fetchPortalRecentBangersMock.mockResolvedValue([])
@@ -173,6 +172,20 @@ describe('portal page resilience', () => {
 
     jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
       const url = new URL(String(input))
+      if (url.pathname.endsWith('/corpus-count')) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              totalTweets: '15334092',
+              sourceUpdatedAt: '2026-08-13 18:34:09.903',
+              collectedAt: '2026-08-13 18:34:20.907',
+              source: 'clickhouse.tweet_content_versions',
+              countMode: 'unique_tweets_observed',
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        )
+      }
       if (url.pathname.endsWith('/portal-stream')) {
         return new Response('gateway unavailable', { status: 503 })
       }
@@ -181,6 +194,20 @@ describe('portal page resilience', () => {
           status: 200,
           headers: { 'content-range': '0-0/42' },
         })
+      }
+      if (url.pathname.endsWith('/global_activity_summary')) {
+        return new Response(
+          JSON.stringify([
+            {
+              total_tweets: 15_100_732,
+              last_updated: '2026-08-07T20:00:00.000Z',
+            },
+          ]),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        )
       }
       if (url.pathname.endsWith('/tweets')) {
         const createdAt = url.searchParams.get('order')?.endsWith('.asc')
@@ -234,7 +261,7 @@ describe('portal page resilience', () => {
 
     await expect(getPortalData()).resolves.toMatchObject({
       stats: {
-        totalTweets: 1_000,
+        totalTweets: 15_334_092,
         accountCount: 42,
         firstYear: 2007,
         currentYear: 2026,
@@ -249,14 +276,14 @@ describe('portal page resilience', () => {
     })
   })
 
-  test('preserves member and corpus metrics when live analytics fails', async () => {
+  test('preserves the Supabase corpus total when live analytics fails', async () => {
     fetchPortalLiveAnalyticsMock.mockRejectedValueOnce(
       new Error('live analytics unavailable'),
     )
 
     await expect(getPortalData()).resolves.toMatchObject({
       stats: {
-        totalTweets: 0,
+        totalTweets: 15_334_092,
         accountCount: 42,
         firstYear: 2007,
         currentYear: 2026,
@@ -283,6 +310,75 @@ describe('portal reads', () => {
     process.env.CLICKHOUSE_ANALYTICS_API_URL =
       'https://analytics.community-archive.org/analytics'
     process.env.CLICKHOUSE_ANALYTICS_API_TOKEN = 'test-token'
+  })
+
+  test('reads the homepage corpus total from ClickHouse', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          data: {
+            totalTweets: '15334092',
+            sourceUpdatedAt: '2026-08-13 18:34:09.903',
+            collectedAt: '2026-08-13 18:34:20.907',
+            source: 'clickhouse.tweet_content_versions',
+            countMode: 'unique_tweets_observed',
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    )
+
+    await expect(fetchPortalCorpusStats()).resolves.toEqual({
+      totalTweets: 15_334_092,
+      generatedAt: '2026-08-13T18:34:20.907Z',
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL('https://analytics.community-archive.org/analytics/corpus-count'),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-token',
+        }),
+      }),
+    )
+  })
+
+  test('falls back to the Supabase summary when ClickHouse fails', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation()
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        new Response('gateway unavailable', { status: 503 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              total_tweets: 15_100_732,
+              last_updated: '2026-08-12T05:15:00.098756+00:00',
+            },
+          ]),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+
+    await expect(fetchPortalCorpusStats()).resolves.toEqual({
+      totalTweets: 15_100_732,
+      generatedAt: '2026-08-12T05:15:00.098Z',
+    })
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://prod-project.supabase.co/rest/v1/global_activity_summary?select=total_tweets%2Clast_updated',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          apikey: 'prod-public-anon',
+          'Accept-Profile': 'public',
+        }),
+      }),
+    )
+    expect(consoleError).toHaveBeenCalledWith(
+      'Portal ClickHouse corpus count failed; falling back to Supabase:',
+      expect.any(Error),
+    )
   })
 
   afterEach(() => {
@@ -350,6 +446,7 @@ describe('portal reads', () => {
     await expect(getPortalStreamPage(30)).resolves.toEqual([
       {
         id: '42',
+        accountId: '7',
         username: 'archive_member',
         name: 'Archive Member',
         avatar: 'https://example.com/avatar.jpg',

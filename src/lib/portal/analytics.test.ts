@@ -12,17 +12,8 @@ import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 type AnalyticsFetcher = typeof fetchAnalyticsGatewayJson
 
 describe('ClickHouse-backed portal analytics', () => {
-  test('maps the canonical summary and rolling 24-hour stream stats', async () => {
-    const fetcher = jest.fn(async (path: string[]) => {
-      if (path[0] === 'summary') {
-        return {
-          data: {
-            totalTweets: '14800000',
-            sourceUpdatedAt: '2026-08-07 11:55:00.000',
-            collectedAt: '2026-08-07 12:00:00.000',
-          },
-        }
-      }
+  test('maps the rolling 24-hour stream stats', async () => {
+    const fetcher = jest.fn(async () => {
       return {
         summary: {
           totalTweets: '1234',
@@ -36,16 +27,12 @@ describe('ClickHouse-backed portal analytics', () => {
     await expect(
       fetchPortalLiveAnalytics(new Date('2026-08-07T12:00:00.000Z'), fetcher),
     ).resolves.toEqual({
-      totalTweets: 14_800_000,
       streamedLast24Hours: 1234,
-      generatedAt: '2026-08-07T12:00:00.000Z',
       latestObservedAt: '2026-08-07T11:59:00.000Z',
     })
 
-    expect(fetcher).toHaveBeenCalledTimes(2)
-    const streamCall = (fetcher as jest.Mock).mock.calls.find(
-      ([path]) => path[0] === 'stream-stats',
-    )
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    const streamCall = (fetcher as jest.Mock).mock.calls[0]
     expect(streamCall?.[1].toString()).toBe(
       'start=2026-08-06T12%3A00%3A00.000Z&end=2026-08-07T12%3A00%3A00.000Z&granularity=hour&scope=firehose',
     )
@@ -167,15 +154,51 @@ describe('ClickHouse-backed portal analytics', () => {
     expect(result.series).toEqual([
       expect.objectContaining({
         term: 'alpha',
-        tweetsPerYear: [0, 0, 0, 0, 0, 0, 0, 20],
-        perYear: [0, 0, 0, 0, 0, 0, 0, 2000],
+        tweetsPerBucket: [0, 0, 0, 0, 0, 0, 0, 20],
+        perBucket: [0, 0, 0, 0, 0, 0, 0, 2000],
       }),
       expect.objectContaining({
         term: 'beta',
-        tweetsPerYear: [0, 0, 0, 0, 0, 0, 0, 5],
-        perYear: [0, 0, 0, 0, 0, 0, 0, 500],
+        tweetsPerBucket: [0, 0, 0, 0, 0, 0, 0, 5],
+        perBucket: [0, 0, 0, 0, 0, 0, 0, 500],
       }),
     ])
+    expect(result.granularity).toBe('year')
+    expect(result.buckets.at(-1)).toBe('2026')
+  })
+
+  test('returns bounded monthly buckets for month granularity', async () => {
+    const fetcher = jest.fn(async () => ({
+      data: [
+        {
+          bucket: '2026-08-01 00:00:00.000',
+          tweets: '4',
+          totalTweets: '200',
+          ratePerThousand: 0,
+        },
+      ],
+    })) as unknown as AnalyticsFetcher
+
+    const result = await fetchPortalTrendSeries(
+      ['alpha'],
+      new Date('2026-08-07T12:00:00.000Z'),
+      fetcher,
+      'month',
+    )
+
+    expect(result.granularity).toBe('month')
+    expect(result.buckets[0]).toBe('2019-01')
+    expect(result.buckets.at(-1)).toBe('2026-08')
+    expect(result.series[0].tweetsPerBucket.at(-1)).toBe(4)
+    expect(fetcher).toHaveBeenCalledWith(
+      ['word-trend'],
+      expect.objectContaining({}),
+      { timeoutMs: 30_000 },
+    )
+    const params = (fetcher as jest.Mock).mock.calls[0][1] as URLSearchParams
+    expect(params.get('bucket')).toBe('month')
+    expect(params.get('from')).toBe('2019-01-01')
+    expect(params.get('to')).toBe('2026-09-01')
   })
 
   test('caps concurrent trend scans at the two-query gateway budget', async () => {
@@ -245,6 +268,7 @@ describe('ClickHouse-backed portal analytics', () => {
     )
 
     expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(fetcherMock.mock.calls[0]?.[0]).toEqual(['trend-evidence'])
     expect(result.map(({ id }) => id)).toEqual(['102', '101', '100'])
     expect(fetcherMock.mock.calls[0]?.[1]?.toString()).toContain(
       'since=2024-01-01&until=2026-01-01',
@@ -257,29 +281,19 @@ describe('ClickHouse-backed portal analytics', () => {
     })
   })
 
-  test('rejects invalid ClickHouse counts instead of rendering false zeros', async () => {
-    const fetcher = jest.fn(async (path: string[]) =>
-      path[0] === 'summary'
-        ? {
-            data: {
-              totalTweets: 'not-a-count',
-              sourceUpdatedAt: '2026-08-07T12:00:00.000Z',
-              collectedAt: '2026-08-07T12:00:00.000Z',
-            },
-          }
-        : {
-            summary: {
-              totalTweets: '1',
-              latestObservedAt: null,
-              scope: 'firehose',
-              countMode: 'unique_tweets_observed',
-            },
-          },
-    ) as unknown as AnalyticsFetcher
+  test('rejects invalid ClickHouse stream counts instead of rendering false zeros', async () => {
+    const fetcher = jest.fn(async () => ({
+      summary: {
+        totalTweets: 'not-a-count',
+        latestObservedAt: null,
+        scope: 'firehose',
+        countMode: 'unique_tweets_observed',
+      },
+    })) as unknown as AnalyticsFetcher
 
     await expect(
       fetchPortalLiveAnalytics(new Date('2026-08-07T12:00:00.000Z'), fetcher),
-    ).rejects.toThrow('invalid tweet count')
+    ).rejects.toThrow('invalid last-24-hours streamed count')
   })
 
   test('maps recent member bangers and requests the 30-minute cache window', async () => {
@@ -304,6 +318,7 @@ describe('ClickHouse-backed portal analytics', () => {
     await expect(fetchPortalRecentBangers(500, 500, fetcher)).resolves.toEqual([
       {
         id: '2085365448686866863',
+        accountId: '14816854',
         username: 'katiebakes',
         name: 'Katie',
         avatar: 'https://pbs.twimg.com/katie.jpg',

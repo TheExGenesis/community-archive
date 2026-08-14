@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { FaDatabase, FaExternalLinkAlt } from 'react-icons/fa'
+import { FaDatabase, FaExternalLinkAlt, FaUsers } from 'react-icons/fa'
 import {
   PortalData,
   PortalTweet,
@@ -10,37 +10,53 @@ import {
   RESEARCH_SOURCE,
 } from '@/lib/portal/types'
 import { PORTAL_ARTICLES } from './articles'
-import { PORTAL_TOOLS } from './tools'
 import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
 import TweetCard from '@/components/TweetCard'
-import {
-  estimateLiveTweetGain,
-  interpolateLiveTweetCount,
-  liveCounterBurstDelay,
-  LIVE_COUNTER_CATCH_UP_BURST_BASE_MS,
-  LIVE_COUNTER_CATCH_UP_DURATION_MS,
-  liveTweetCatchUpRange,
-  liveCounterRefreshInterval,
-  PORTAL_STREAM_POLL_INTERVAL_MS,
-} from './live'
-import HomepageSearch from '@/components/HomepageSearch'
+import { PORTAL_STREAM_POLL_INTERVAL_MS } from './live'
 import {
   comparePortalTweetChronology,
   selectHomepageStream,
 } from '@/lib/portal/stream'
 import { BANGERS_ALL_TIME_HREF, BANGERS_WEEK_HREF } from '@/lib/portal/bangers'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 export type PortalView = 'home' | 'stream'
 
 const HOME_LIVE_STREAM_LIMIT = 12
 const ARCHIVE_EXPORT_URL =
   'https://github.com/TheExGenesis/community-archive/releases/tag/data_export'
+const COMMUNITY_BUILDS_URL = '/tweets/1835411943735140798'
+
+type DashboardDestination =
+  | 'all_time_bangers'
+  | 'community_builds'
+  | 'data_export'
+  | 'live_stream'
+  | 'recent_bangers'
+  | 'research'
+  | 'research_article'
+  | 'trends'
+
+function captureDashboardDestination(
+  destination: DashboardDestination,
+  surface: 'card' | 'list' | 'panel_header',
+  external: boolean,
+) {
+  capturePostHogEvent('dashboard_destination_opened', {
+    destination,
+    surface,
+    external,
+  })
+}
 
 const compact = (n: number) =>
   new Intl.NumberFormat('en', {
     notation: 'compact',
     maximumFractionDigits: 1,
   }).format(n)
+
+const signInHref = (returnTo: string) =>
+  `/login?redirect=${encodeURIComponent(returnTo)}`
 
 const fmtDelta = (term: TermWeek) => {
   if (term.status === 'new') return 'new'
@@ -107,7 +123,12 @@ function PanelHeader({
   divider = true,
 }: {
   title: string
-  action?: { label: string; href: string; external?: boolean }
+  action?: {
+    label: string
+    href: string
+    analyticsDestination: DashboardDestination
+    external?: boolean
+  }
   live?: boolean
   divider?: boolean
 }) {
@@ -129,6 +150,13 @@ function PanelHeader({
             href={action.href}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() =>
+              captureDashboardDestination(
+                action.analyticsDestination,
+                'panel_header',
+                true,
+              )
+            }
             className="text-[12.5px] font-semibold text-brand hover:underline"
           >
             {action.label} →
@@ -136,6 +164,13 @@ function PanelHeader({
         ) : (
           <Link
             href={action.href}
+            onClick={() =>
+              captureDashboardDestination(
+                action.analyticsDestination,
+                'panel_header',
+                false,
+              )
+            }
             className="text-[12.5px] font-semibold text-brand hover:underline"
           >
             {action.label} →
@@ -156,115 +191,11 @@ function PanelUnavailable({ message }: { message: string }) {
   )
 }
 
-function useLiveTweetCount({
-  count,
-  gain,
-  generatedAt,
-}: {
-  count: number
-  gain: number
-  generatedAt: string
-}): number {
-  // Keep the server and first client render identical, then begin projecting
-  // from the analytics snapshot after hydration.
-  const [displayCount, setDisplayCount] = useState(count)
-  const displayCountRef = useRef(count)
-
-  useEffect(() => {
-    let timer: number | null = null
-    let cancelled = false
-    let animationBurstIndex = 0
-    let liveBurstIndex = 0
-    const animationStartedAt = Date.now()
-    const catchUp = liveTweetCatchUpRange({
-      totalTweets: count,
-      streamedLast24Hours: gain,
-      generatedAt,
-      now: animationStartedAt,
-    })
-    const startCount = Math.max(catchUp.startCount, displayCountRef.current)
-    const targetCount = Math.max(catchUp.targetCount, startCount)
-
-    const updateDisplayCount = (nextCount: number) => {
-      const monotonicCount = Math.max(displayCountRef.current, nextCount)
-      if (monotonicCount === displayCountRef.current) return
-      displayCountRef.current = monotonicCount
-      setDisplayCount(monotonicCount)
-    }
-
-    const startLiveUpdates = () => {
-      const intervalMs = liveCounterRefreshInterval(gain)
-      if (intervalMs === null) return
-      const liveStartedAt = Date.now()
-      const liveStartCount = displayCountRef.current
-      const tick = () => {
-        if (cancelled) return
-        updateDisplayCount(
-          liveStartCount +
-            estimateLiveTweetGain(gain, Date.now() - liveStartedAt),
-        )
-        timer = window.setTimeout(
-          tick,
-          liveCounterBurstDelay(intervalMs, liveBurstIndex++),
-        )
-      }
-      timer = window.setTimeout(
-        tick,
-        liveCounterBurstDelay(intervalMs, liveBurstIndex++),
-      )
-    }
-
-    const prefersReducedMotion =
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-    updateDisplayCount(startCount)
-    if (prefersReducedMotion || targetCount <= startCount) {
-      updateDisplayCount(targetCount)
-      startLiveUpdates()
-    } else {
-      const animate = () => {
-        const elapsedMs = Date.now() - animationStartedAt
-        updateDisplayCount(
-          interpolateLiveTweetCount({
-            startCount,
-            targetCount,
-            elapsedMs,
-          }),
-        )
-        if (elapsedMs >= LIVE_COUNTER_CATCH_UP_DURATION_MS) {
-          startLiveUpdates()
-          return
-        }
-        const baseDelay = Math.min(
-          LIVE_COUNTER_CATCH_UP_BURST_BASE_MS,
-          liveCounterRefreshInterval(gain) ??
-            LIVE_COUNTER_CATCH_UP_BURST_BASE_MS,
-        )
-        const remainingMs = LIVE_COUNTER_CATCH_UP_DURATION_MS - elapsedMs
-        timer = window.setTimeout(
-          animate,
-          Math.min(
-            remainingMs,
-            liveCounterBurstDelay(baseDelay, animationBurstIndex++),
-          ),
-        )
-      }
-      animate()
-    }
-
-    return () => {
-      cancelled = true
-      if (timer !== null) window.clearTimeout(timer)
-    }
-  }, [count, gain, generatedAt])
-
-  return displayCount
-}
-
-function LiveCounter({ count, gain }: { count: number; gain: number }) {
+function LiveCounter({ count }: { count: number }) {
   return (
     <span
       className={`inline-flex items-center gap-[7px] text-[12px] ${MUTED}`}
-      title={`Estimated live total, paced by ${gain.toLocaleString('en-US')} tweets streamed in the last 24 hours`}
+      title="Archived tweet total from the latest corpus snapshot"
     >
       <span className="h-[7px] w-[7px] animate-pulse rounded-full bg-[#2acf80]" />
       <span className="tabular-nums">
@@ -286,12 +217,6 @@ function ArchiveOverview({
     'liveAnalytics' | 'memberCount' | 'joinedThisWeek' | 'corpusRange'
   >
 }) {
-  const count = useLiveTweetCount({
-    count: stats.totalTweets,
-    gain: stats.streamedLast24Hours,
-    generatedAt: stats.generatedAt,
-  })
-
   return (
     <>
       <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-2">
@@ -300,7 +225,7 @@ function ArchiveOverview({
         </h2>
         {!failures.liveAnalytics && (
           <span className="flex items-baseline gap-3">
-            <LiveCounter count={count} gain={stats.streamedLast24Hours} />
+            <LiveCounter count={stats.totalTweets} />
             <span className={`text-[12.5px] ${MUTED}`}>{generatedDate}</span>
           </span>
         )}
@@ -312,7 +237,7 @@ function ArchiveOverview({
           value={
             failures.liveAnalytics
               ? 'Unavailable'
-              : count.toLocaleString('en-US')
+              : stats.totalTweets.toLocaleString('en-US')
           }
           note={
             failures.liveAnalytics
@@ -367,19 +292,12 @@ function LiveStreamHeading({
   stats: PortalData['stats']
   unavailable: boolean
 }) {
-  const count = useLiveTweetCount({
-    count: stats.totalTweets,
-    gain: stats.streamedLast24Hours,
-    generatedAt: stats.generatedAt,
-  })
   return (
     <div className="mb-1.5 flex items-baseline gap-3">
       <h1 className="text-[26px] font-semibold" style={SERIF}>
         Live stream
       </h1>
-      {!unavailable && (
-        <LiveCounter count={count} gain={stats.streamedLast24Hours} />
-      )}
+      {!unavailable && <LiveCounter count={stats.totalTweets} />}
     </div>
   )
 }
@@ -387,9 +305,13 @@ function LiveStreamHeading({
 export default function Portal({
   data,
   view,
+  isMember = true,
+  embedded = false,
 }: {
   data: PortalData
   view: PortalView
+  isMember?: boolean
+  embedded?: boolean
 }) {
   const { stats, trends } = data
 
@@ -445,7 +367,12 @@ export default function Portal({
         )
       }
       pageCursor.current = nextCursor
-      setHasMore(nextHasMore && nextCursor !== null)
+      const canLoadMore = nextHasMore && nextCursor !== null
+      setHasMore(canLoadMore)
+      capturePostHogEvent('portal_stream_loaded_more', {
+        loaded_tweet_count: older.length,
+        has_more: canLoadMore,
+      })
     } catch {
       // Keep the sentinel active so scrolling can retry after a network hiccup.
     } finally {
@@ -565,7 +492,6 @@ export default function Portal({
     [withDelta],
   )
 
-  const bestStrands = PORTAL_TOOLS.find((t) => t.name === 'Best Strands')
   const recentBanger = data.recentBangers[0] ?? null
   const historicalBanger = data.historicalBangers[0] ?? null
 
@@ -582,65 +508,13 @@ export default function Portal({
     ).padStart(2, '0')} UTC`
   }, [stats.generatedAt])
 
+  const Root = embedded ? 'div' : 'main'
+
   return (
-    <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
+    <Root className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
       {/* ------------------------------------------------ Home ---------- */}
       {view === 'home' && (
         <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
-          {/* Hero: same gist as the logged-out homepage */}
-          <div className="mx-auto mb-40 mt-36 w-full max-w-[48rem] space-y-3 text-center">
-            <h1
-              className="text-6xl font-bold tracking-tight text-foreground"
-              style={SERIF}
-            >
-              Community Archive
-            </h1>
-            <p className="text-xl leading-8 text-zinc-500 dark:text-[#a7a7b4]">
-              {data.failures.liveAnalytics || data.failures.memberCount ? (
-                <>
-                  We preserve public conversations as open source
-                  infrastructure.
-                </>
-              ) : (
-                <>
-                  We preserve{' '}
-                  <strong className="font-semibold text-foreground">
-                    {compact(stats.totalTweets)} public tweets
-                  </strong>{' '}
-                  from{' '}
-                  <strong className="font-semibold text-foreground">
-                    {stats.accountCount.toLocaleString('en-US')} community
-                    members
-                  </strong>
-                  .
-                </>
-              )}
-            </p>
-            <p className={`text-xs ${FAINT}`}>
-              Backed by{' '}
-              <a
-                href="https://survivalandflourishing.fund/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`font-medium ${MUTED} transition-colors hover:text-brand hover:underline`}
-              >
-                Survival and Flourishing Fund
-              </a>{' '}
-              and{' '}
-              <a
-                href="https://x.com/VitalikButerin"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`font-medium ${MUTED} transition-colors hover:text-brand hover:underline`}
-              >
-                Vitalik Buterin
-              </a>
-            </p>
-            <div className="pt-4">
-              <HomepageSearch />
-            </div>
-          </div>
-
           <ArchiveOverview
             stats={stats}
             generatedDate={generatedDate}
@@ -655,7 +529,11 @@ export default function Portal({
                 <PanelHeader
                   title="Live stream"
                   live
-                  action={{ label: 'Open firehose', href: '/stream' }}
+                  action={{
+                    label: 'Open firehose',
+                    href: '/stream',
+                    analyticsDestination: 'live_stream',
+                  }}
                 />
                 <div
                   role="region"
@@ -668,6 +546,7 @@ export default function Portal({
                       key={t.id}
                       tweet={t}
                       compact
+                      noClamp
                       animate={i === 0}
                       clickable
                       origin="home"
@@ -690,7 +569,11 @@ export default function Portal({
               <div className={`${CARD} flex flex-col`}>
                 <PanelHeader
                   title="Trending terms · 7 days"
-                  action={{ label: 'Trends explorer', href: '/trends' }}
+                  action={{
+                    label: isMember ? 'Trends explorer' : 'Sign in for Trends',
+                    href: isMember ? '/trends' : signInHref('/trends'),
+                    analyticsDestination: 'trends',
+                  }}
                 />
                 <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
                   {data.failures.trends ? (
@@ -764,6 +647,7 @@ export default function Portal({
                         action={{
                           label: 'Recent bangers',
                           href: BANGERS_WEEK_HREF,
+                          analyticsDestination: 'recent_bangers',
                         }}
                       />
                       {recentBanger ? (
@@ -791,6 +675,7 @@ export default function Portal({
                         action={{
                           label: 'All-time bangers',
                           href: BANGERS_ALL_TIME_HREF,
+                          analyticsDestination: 'all_time_bangers',
                         }}
                       />
                       {historicalBanger ? (
@@ -817,7 +702,11 @@ export default function Portal({
               <div className={CARD}>
                 <PanelHeader
                   title="Featured research"
-                  action={{ label: 'All research', href: '/research' }}
+                  action={{
+                    label: 'All research',
+                    href: '/research',
+                    analyticsDestination: 'research',
+                  }}
                 />
                 <div className="flex flex-col">
                   {data.failures.research ? (
@@ -829,6 +718,13 @@ export default function Portal({
                         href={post.url}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() =>
+                          captureDashboardDestination(
+                            'research_article',
+                            'list',
+                            true,
+                          )
+                        }
                         className="group flex items-start gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
                       >
                         <div className="min-w-0 flex-1">
@@ -869,6 +765,13 @@ export default function Portal({
                       href={RESEARCH_SOURCE.url}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() =>
+                        captureDashboardDestination(
+                          'research_article',
+                          'list',
+                          true,
+                        )
+                      }
                       className={`px-4 py-6 text-center text-[13px] ${MUTED} hover:text-brand`}
                     >
                       Read the latest research at {RESEARCH_SOURCE.name} →
@@ -876,42 +779,13 @@ export default function Portal({
                   )}
                 </div>
               </div>
-              {bestStrands && (
-                <a
-                  href={bestStrands.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`${CARD} group overflow-hidden transition-colors hover:border-brand/60`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={bestStrands.image}
-                    alt={`${bestStrands.name} preview`}
-                    loading="lazy"
-                    className="aspect-[2/1] w-full border-b border-zinc-200 object-cover dark:border-[#26262a]"
-                  />
-                  <div className="flex items-start gap-2.5 px-4 py-3">
-                    <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
-                      {bestStrands.icon}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-[13.5px] font-bold">
-                        {bestStrands.name}
-                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
-                      </span>
-                      <span
-                        className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
-                      >
-                        {bestStrands.description}
-                      </span>
-                    </span>
-                  </div>
-                </a>
-              )}
               <a
                 href={ARCHIVE_EXPORT_URL}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() =>
+                  captureDashboardDestination('data_export', 'card', true)
+                }
                 className={`${CARD} group flex items-center gap-3 px-4 py-4 transition-colors hover:border-brand/60`}
               >
                 <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[4px] border border-zinc-200 bg-zinc-50 text-brand dark:border-[#2a2a2e] dark:bg-[#121214]">
@@ -931,47 +805,30 @@ export default function Portal({
                   Download →
                 </span>
               </a>
-            </div>
-          </div>
-
-          {/* Tools */}
-          <div id="products" className={`${CARD} mt-4 scroll-mt-32`}>
-            <PanelHeader
-              title="Explore the archive"
-              action={{ label: 'All tools', href: '/tools' }}
-              divider={false}
-            />
-            <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 lg:grid-cols-4">
-              {PORTAL_TOOLS.filter(
-                (t) =>
-                  !t.image &&
-                  !['Banger Bot', 'Highlights Bot'].includes(t.name),
-              ).map((tool) => (
-                <a
-                  key={tool.name}
-                  href={tool.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group rounded-[4px] border border-zinc-200 bg-zinc-50 px-3 py-2.5 transition-colors hover:border-brand/60 dark:border-[#26262a] dark:bg-[#121214] dark:hover:border-brand/60"
-                >
-                  <div className="flex items-start gap-2.5">
-                    <span className="mt-0.5 flex-shrink-0 text-[15px] text-brand">
-                      {tool.icon}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-[13px] font-bold">
-                        {tool.name}
-                        <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
-                      </span>
-                      <span
-                        className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
-                      >
-                        {tool.description}
-                      </span>
-                    </span>
-                  </div>
-                </a>
-              ))}
+              <a
+                href={COMMUNITY_BUILDS_URL}
+                onClick={() =>
+                  captureDashboardDestination('community_builds', 'card', false)
+                }
+                className={`${CARD} group flex items-center gap-3 px-4 py-4 transition-colors hover:border-brand/60`}
+              >
+                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[4px] border border-zinc-200 bg-zinc-50 text-brand dark:border-[#2a2a2e] dark:bg-[#121214]">
+                  <FaUsers className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13.5px] font-bold">
+                    Community Builds
+                  </span>
+                  <span
+                    className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
+                  >
+                    Projects made with Community Archive data
+                  </span>
+                </span>
+                <span className="flex-shrink-0 text-[12px] font-semibold text-brand">
+                  Explore →
+                </span>
+              </a>
             </div>
           </div>
         </div>
@@ -1003,6 +860,8 @@ export default function Portal({
                     tweet={t}
                     animate={i === 0}
                     showArchivedBadge
+                    origin="stream"
+                    returnTo="/stream"
                   />
                 ))}
                 {visible.length === 0 && streamUnavailable && (
@@ -1045,7 +904,7 @@ export default function Portal({
           </div>
         </div>
       )}
-    </main>
+    </Root>
   )
 }
 

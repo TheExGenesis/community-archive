@@ -56,7 +56,8 @@ describe('portal trends route', () => {
 
   test('normalizes and deduplicates concurrent series terms', async () => {
     fetchPortalTrendSeriesMock.mockResolvedValue({
-      years: [2026],
+      granularity: 'year',
+      buckets: ['2026'],
       series: [],
       computedAt: '2026-08-07T12:00:00.000Z',
     })
@@ -68,10 +69,35 @@ describe('portal trends route', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(fetchPortalTrendSeriesMock).toHaveBeenCalledWith([
-      'alpha',
-      'ai agents',
-    ])
+    expect(fetchPortalTrendSeriesMock).toHaveBeenCalledWith(
+      ['alpha', 'ai agents'],
+      expect.any(Date),
+      undefined,
+      'year',
+    )
+  })
+
+  test('forwards month granularity to the bounded series query', async () => {
+    fetchPortalTrendSeriesMock.mockResolvedValue({
+      granularity: 'month',
+      buckets: ['2026-08'],
+      series: [],
+      computedAt: '2026-08-07T12:00:00.000Z',
+    })
+
+    const response = await GET(
+      new NextRequest(
+        'https://community-archive.org/api/portal/trends?view=series&q=tpot&granularity=month',
+      ),
+    )
+
+    expect(response.status).toBe(200)
+    expect(fetchPortalTrendSeriesMock).toHaveBeenCalledWith(
+      ['tpot'],
+      expect.any(Date),
+      undefined,
+      'month',
+    )
   })
 
   test('forwards included terms and a selected date range to evidence search', async () => {

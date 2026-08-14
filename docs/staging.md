@@ -67,6 +67,15 @@ The default staging login identity is configured via env:
 
 The staging UI shows a dropdown of seeded mock users (currently `alice_dev` and `xiq_dev`, see `supabase/seed.sql`) plus a sign-in button. Picking a user posts `{ username, providerId, displayName }` to the dev-login route; the server uses `STAGING_DEV_LOGIN_PASSWORD` from the environment as the shared password and derives the email as `<username>@staging.local`. No password is sent from the client. You can also deep-link to a specific user with `?as=<username>` on the sign-in page.
 
+### Mocking the opt-in completion UI
+
+While signed in through staging dev login, open `/opt-in?mockOptIn=1` to test
+the completed opt-in experience without reading or writing an opt-in record.
+The regular opt-in button updates only the current page; refresh to reset and
+repeat the flow. The query parameter is ignored unless staging dev login is
+enabled against a definitively non-production Supabase project. Open
+`/opt-in` without the query parameter to exercise the real staging write path.
+
 Do not commit the real password. The bootstrap script below writes it to an ignored `.env.staging.generated` file so it can be copied into Vercel's Preview environment.
 
 The server route always refuses staging dev login against the known production
@@ -158,6 +167,49 @@ For PR-created Vercel Preview deployments, add the values from `.env.staging.gen
   should try ClickHouse text search)
 
 After updating Preview env vars, redeploy the PR preview so the new values are picked up.
+
+### Programmatic smoke checks for protected previews
+
+The project's Vercel Preview deployments require SSO. For a non-interactive
+smoke check, run `vercel curl` from a checkout linked to the project through
+`.vercel/project.json`; it supplies deployment-protection access without
+disabling the protection setting.
+
+In Codex desktop, treat the connected Vercel app and the in-app browser as
+separate authenticated surfaces. Use the Vercel connection first for deployment
+status and build logs, then use the in-app browser's existing signed-in Vercel
+session for interactive preview QA. A temporary Vercel share URL can still be
+rejected by Community Archive's request middleware when opened in standalone
+Playwright; that does not mean the Codex Vercel connection is logged out. Fall
+back to the signed-in in-app browser or the `vercel curl` flow below, and never
+disable deployment protection for verification.
+
+Treat any URL containing `_vercel_share` as a temporary credential: do not
+print, persist, or commit it.
+
+Community Archive's request middleware blocks the default curl user agent and
+JavaScript-challenges ordinary first-time page requests. Use one of the
+middleware's intentional social-preview user agents when checking rendered
+HTML or archive permalinks:
+
+```bash
+PREVIEW_URL=https://example-preview.vercel.app
+
+npx --yes vercel@latest curl / \
+  --deployment "$PREVIEW_URL" \
+  -- --silent --show-error --user-agent Twitterbot/1.0 \
+  --write-out '\nHTTP_STATUS:%{http_code}\n'
+
+npx --yes vercel@latest curl /tweets/<tweet-id> \
+  --deployment "$PREVIEW_URL" \
+  -- --silent --show-error --user-agent Twitterbot/1.0 \
+  --write-out '\nHTTP_STATUS:%{http_code}\n'
+```
+
+This verifies deployed server-rendered HTML and route availability. It does not
+replace a visual browser check; use an authenticated Vercel browser session for
+interactive preview QA, or perform the responsive visual pass locally before
+the remote smoke check.
 
 ## Keeping Staging Schema Current
 

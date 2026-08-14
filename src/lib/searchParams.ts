@@ -9,6 +9,8 @@ export interface ParsedSearchExpression {
   words: string[]
 }
 
+const SEARCH_SORTS = new Set(['newest', 'oldest', 'likes', 'reposts'])
+
 export function parseSearchExpression(input: string): ParsedSearchExpression {
   const options: SearchFilters = {}
   const words: string[] = []
@@ -79,5 +81,8 @@ export function buildSearchExpression(searchParams: URLSearchParams): string {
 export function normalizeSearchParams(
   searchParams: URLSearchParams,
 ): URLSearchParams {
-  return buildSearchParams(buildSearchExpression(searchParams))
+  const normalized = buildSearchParams(buildSearchExpression(searchParams))
+  const sort = searchParams.get('sort')
+  if (sort && SEARCH_SORTS.has(sort)) normalized.set('sort', sort)
+  return normalized
 }

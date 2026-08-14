@@ -6,6 +6,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TweetRow } from '@/components/portal/TweetRow'
 import type { PortalTweet } from '@/lib/portal/types'
+import { capturePostHogEvent } from '@/lib/posthog'
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
 
 jest.mock('next/image', () => ({
@@ -36,6 +37,10 @@ jest.mock('next/link', () => ({
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }))
+jest.mock('@/lib/posthog', () => ({
+  capturePostHogEvent: jest.fn(),
+}))
+const mockCapturePostHogEvent = capturePostHogEvent as jest.Mock
 
 const tweet: PortalTweet = {
   id: '42',
@@ -75,6 +80,10 @@ const tweet: PortalTweet = {
 }
 
 describe('portal TweetRow media', () => {
+  beforeEach(() => {
+    mockCapturePostHogEvent.mockReset()
+  })
+
   test('uses a neutral card and explains its archived-quote evidence', async () => {
     const user = userEvent.setup()
     const { container } = render(<TweetRow tweet={tweet} featuredRank={1} />)
@@ -98,6 +107,16 @@ describe('portal TweetRow media', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       /Bangers uses this count for its Best ranking/i,
     )
+
+    archivedQuotes.addEventListener('click', (event) => event.preventDefault())
+    await user.click(archivedQuotes)
+    expect(mockCapturePostHogEvent).toHaveBeenCalledWith('tweet_card_action', {
+      action: 'open_archived_quotes',
+      origin: 'unknown',
+      has_media: true,
+      has_quoted_tweet: true,
+      is_featured: true,
+    })
   })
 
   test('renders quotes and closes an enlarged image when the backdrop is clicked', async () => {
@@ -126,6 +145,49 @@ describe('portal TweetRow media', () => {
 
     await waitFor(() =>
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    )
+  })
+
+  test('renders cached X Article previews through the shared tweet card', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          previews: [
+            {
+              urlHash: 'a'.repeat(64),
+              url: 'https://x.com/i/article/123',
+              canonicalUrl: 'https://x.com/i/article/123',
+              title: 'The archived long-form story',
+              description: 'An article preview from X.',
+              imageUrl: null,
+              siteName: 'X',
+              isXArticle: true,
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+
+    render(
+      <TweetRow
+        tweet={{
+          ...tweet,
+          text: 'Long-form writing https://x.com/i/article/123',
+          media: [],
+          quotedTweet: undefined,
+        }}
+      />,
+    )
+
+    expect(await screen.findByText('X Article')).toBeVisible()
+    const preview = screen.getByRole('link', {
+      name: /the archived long-form story/i,
+    })
+    expect(preview).toHaveAttribute('href', 'https://x.com/i/article/123')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/tweets/42/link-previews',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
   })
 })

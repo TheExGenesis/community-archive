@@ -187,7 +187,7 @@ export default function HomeOptInWidget() {
             <CheckCircle className="mr-2 h-4 w-4" />@{twitterUsername} is
             contributing to the archive
           </div>
-          <Link href="/profile">
+          <Link href="/settings">
             <Button
               variant="outline"
               size="sm"

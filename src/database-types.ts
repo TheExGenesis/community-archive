@@ -772,6 +772,54 @@ export type Database = {
         }
         Relationships: []
       }
+      tweet_link_previews: {
+        Row: {
+          canonical_url: string | null
+          content_type: string | null
+          created_at: string
+          description: string | null
+          expires_at: string
+          fetched_at: string | null
+          image_url: string | null
+          normalized_url: string
+          site_name: string | null
+          status: string
+          title: string | null
+          updated_at: string
+          url_hash: string
+        }
+        Insert: {
+          canonical_url?: string | null
+          content_type?: string | null
+          created_at?: string
+          description?: string | null
+          expires_at?: string
+          fetched_at?: string | null
+          image_url?: string | null
+          normalized_url: string
+          site_name?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+          url_hash: string
+        }
+        Update: {
+          canonical_url?: string | null
+          content_type?: string | null
+          created_at?: string
+          description?: string | null
+          expires_at?: string
+          fetched_at?: string | null
+          image_url?: string | null
+          normalized_url?: string
+          site_name?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+          url_hash?: string
+        }
+        Relationships: []
+      }
       tweet_media: {
         Row: {
           archive_upload_id: number | null
@@ -833,54 +881,6 @@ export type Database = {
             referencedColumns: ["tweet_id"]
           },
         ]
-      }
-      tweet_link_previews: {
-        Row: {
-          canonical_url: string | null
-          content_type: string | null
-          created_at: string
-          description: string | null
-          expires_at: string
-          fetched_at: string | null
-          image_url: string | null
-          normalized_url: string
-          site_name: string | null
-          status: string
-          title: string | null
-          updated_at: string
-          url_hash: string
-        }
-        Insert: {
-          canonical_url?: string | null
-          content_type?: string | null
-          created_at?: string
-          description?: string | null
-          expires_at?: string
-          fetched_at?: string | null
-          image_url?: string | null
-          normalized_url: string
-          site_name?: string | null
-          status?: string
-          title?: string | null
-          updated_at?: string
-          url_hash: string
-        }
-        Update: {
-          canonical_url?: string | null
-          content_type?: string | null
-          created_at?: string
-          description?: string | null
-          expires_at?: string
-          fetched_at?: string | null
-          image_url?: string | null
-          normalized_url?: string
-          site_name?: string | null
-          status?: string
-          title?: string | null
-          updated_at?: string
-          url_hash?: string
-        }
-        Relationships: []
       }
       tweet_urls: {
         Row: {
@@ -2241,3 +2241,4 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+

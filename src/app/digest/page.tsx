@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { checkIsAdmin } from '@/app/admin/data'
 import { DigestEditionView } from '@/components/digest/DigestEditionView'
-import { getPublishedDigest, listPublishedDigests } from '@/lib/digest/data'
+import { getPublishedDigest, listPublishedDigestDays } from '@/lib/digest/data'
 
 export const metadata = { title: 'Daily Digest · Community Archive' }
 export const revalidate = 300
@@ -9,7 +9,7 @@ export const revalidate = 300
 export default async function DigestPage() {
   const [edition, archive, isAdmin] = await Promise.all([
     getPublishedDigest(),
-    listPublishedDigests(),
+    listPublishedDigestDays(),
     checkIsAdmin(),
   ])
   if (edition) {

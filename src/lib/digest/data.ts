@@ -12,6 +12,7 @@ import {
   parseDigestCandidates,
   parseDigestEditionContent,
   parseDigestRunEvents,
+  type DigestCalendarDay,
   type DigestEdition,
   type DigestEditionStatus,
   type DigestPreview,
@@ -20,6 +21,7 @@ import {
   type DigestRunStatus,
 } from './types'
 import { getPreviewDigestEdition } from './mock'
+import { mergeDigestCalendarDays } from './archive'
 
 const RUN_STATUSES = new Set<DigestRunStatus>([
   'candidates_ready',
@@ -203,28 +205,37 @@ export async function getLatestDigestPreview(): Promise<DigestPreview | null> {
   }
 }
 
-export async function listPublishedDigests(
-  limit = 14,
-): Promise<DigestEdition[]> {
+export async function listPublishedDigestDays(): Promise<DigestCalendarDay[]> {
   const preview = getPreviewDigestEdition()
-  if (preview) return [preview]
   const client = createDigestPublicClient(cookies())
-  const safeLimit = Math.max(1, Math.min(60, Math.trunc(limit)))
-  const { data, error } = await client
-    .from('digest_editions')
-    .select('*')
-    .eq('status', 'published')
-    .order('digest_date', { ascending: false })
-    .limit(safeLimit)
-  if (error) {
-    console.error('Digest archive read failed:', error.message)
-    return []
+  const published: DigestCalendarDay[] = []
+  const pageSize = 1_000
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await client
+      .from('digest_editions')
+      .select('digest_date')
+      .eq('status', 'published')
+      .order('digest_date', { ascending: false })
+      .range(from, from + pageSize - 1)
+
+    if (error) {
+      console.error('Digest calendar read failed:', error.message)
+      return mergeDigestCalendarDays(
+        published,
+        preview ? { digestDate: preview.digestDate, isPreview: true } : null,
+      )
+    }
+
+    const rows = data ?? []
+    published.push(
+      ...rows.map(({ digest_date }) => ({ digestDate: digest_date })),
+    )
+    if (rows.length < pageSize) break
   }
-  const editions = (data ?? []).flatMap((row) => {
-    const edition = mapDigestEdition(row)
-    return edition ? [edition] : []
-  })
-  return editions
-    .sort((left, right) => right.digestDate.localeCompare(left.digestDate))
-    .slice(0, safeLimit)
+
+  return mergeDigestCalendarDays(
+    published,
+    preview ? { digestDate: preview.digestDate, isPreview: true } : null,
+  )
 }

@@ -39,6 +39,31 @@ describe('DigestDaySelector', () => {
     expect(screen.getByText('10').closest('a')).toBeNull()
   })
 
+  test('makes every supplied public digest day clickable', () => {
+    const august12 = {
+      ...AUGUST_11_MOCK_DIGEST,
+      id: 'published-august-12',
+      digestDate: '2026-08-12',
+      isPreview: false,
+    }
+
+    render(
+      <DigestDaySelector
+        currentDate="2026-08-12"
+        editions={[AUGUST_11_MOCK_DIGEST, august12]}
+        variant="editorial"
+      />,
+    )
+
+    expect(
+      screen.getByRole('link', { name: '2026-08-11, preview edition' }),
+    ).toHaveAttribute('href', '/digest/2026-08-11')
+    expect(screen.getByRole('link', { name: '2026-08-12' })).toHaveAttribute(
+      'href',
+      '/digest/2026-08-12',
+    )
+  })
+
   test('turns configured past days into generation buttons and changes months in place', async () => {
     const user = userEvent.setup()
     render(

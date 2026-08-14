@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import type { DigestEdition } from '@/lib/digest/types'
+import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
 import { CARD, MUTED } from '@/components/portal/styles'
 import { DigestGenerationDayButton } from './DigestGenerationDayButton'
 
@@ -17,12 +17,14 @@ const monthLabel = (year: number, month: number) =>
 
 export function DigestDaySelector({
   currentDate,
-  editions,
+  editions = [],
+  availableDays = [],
   variant = 'card',
   generation,
 }: {
   currentDate: string
-  editions: DigestEdition[]
+  editions?: DigestEdition[]
+  availableDays?: DigestCalendarDay[]
   variant?: 'card' | 'editorial'
   generation?: {
     action: string | ((formData: FormData) => Promise<void>)
@@ -32,9 +34,16 @@ export function DigestDaySelector({
   }
 }) {
   const editorial = variant === 'editorial'
+  const calendarDays = [
+    ...availableDays,
+    ...editions.map(({ digestDate, isPreview }) => ({
+      digestDate,
+      isPreview,
+    })),
+  ]
   const availableMonths = Array.from(
     new Set([
-      ...editions.map(({ digestDate }) => digestDate.slice(0, 7)),
+      ...calendarDays.map(({ digestDate }) => digestDate.slice(0, 7)),
       ...(generation?.dates ?? []).map((date) => date.slice(0, 7)),
     ]),
   ).sort()
@@ -52,9 +61,7 @@ export function DigestDaySelector({
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
   const firstWeekday =
     (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7
-  const editionsByDate = new Map(
-    editions.map((edition) => [edition.digestDate, edition]),
-  )
+  const daysByDate = new Map(calendarDays.map((day) => [day.digestDate, day]))
   const generationDates = new Set(generation?.dates ?? [])
   const runningByDate = new Map(
     (generation?.runningRuns ?? []).map((run) => [run.date, run.id]),
@@ -134,7 +141,7 @@ export function DigestDaySelector({
           if (day === null)
             return <span key={`empty-${index}`} aria-hidden="true" />
           const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-          const edition = editionsByDate.get(date)
+          const availableDay = daysByDate.get(date)
           const isCurrent = date === currentDate
           const runningRunId = runningByDate.get(date)
           if (runningRunId) {
@@ -163,7 +170,7 @@ export function DigestDaySelector({
               </form>
             )
           }
-          if (!edition) {
+          if (!availableDay) {
             return (
               <span
                 key={date}
@@ -179,7 +186,7 @@ export function DigestDaySelector({
             <Link
               key={date}
               href={`/digest/${date}`}
-              aria-label={`${date}${edition.isPreview ? ', preview edition' : ''}`}
+              aria-label={`${date}${availableDay.isPreview ? ', preview edition' : ''}`}
               aria-current={isCurrent ? 'date' : undefined}
               className={`relative flex aspect-square items-center justify-center rounded-[6px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
                 editorial
@@ -196,7 +203,7 @@ export function DigestDaySelector({
               }`}
             >
               {day}
-              {edition.isPreview ? (
+              {availableDay.isPreview ? (
                 <span
                   className={`absolute bottom-1 h-1 w-1 rounded-full ${
                     isCurrent ? 'bg-blue-300 dark:bg-blue-700' : 'bg-brand'

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
 import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
-import type { DigestEdition } from '@/lib/digest/types'
+import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
 import { buildSearchHref } from '@/lib/searchParams'
 import { MUTED, SERIF } from '@/components/portal/styles'
 
@@ -25,7 +25,7 @@ export function DigestEditionView({
   isAdmin = false,
 }: {
   edition: DigestEdition
-  archive: DigestEdition[]
+  archive: DigestCalendarDay[]
   isAdmin?: boolean
 }) {
   const content = edition.content
@@ -190,7 +190,7 @@ export function DigestEditionView({
           <aside className="mt-2 border-zinc-200 pt-10 dark:border-zinc-800 lg:sticky lg:top-24 lg:mt-0 lg:border-l lg:py-0 lg:pl-10">
             <DigestDaySelector
               currentDate={edition.digestDate}
-              editions={archive}
+              availableDays={archive}
               variant="editorial"
             />
 
@@ -236,11 +236,11 @@ export function DigestEditionView({
                 </h2>
                 <div className="mt-4 space-y-2">
                   {archive
-                    .filter((item) => item.id !== edition.id)
+                    .filter((item) => item.digestDate !== edition.digestDate)
                     .slice(0, 6)
                     .map((item) => (
                       <Link
-                        key={item.id}
+                        key={item.digestDate}
                         href={`/digest/${item.digestDate}`}
                         className="block text-sm text-muted-foreground hover:text-brand hover:underline"
                       >

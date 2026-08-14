@@ -131,6 +131,11 @@ export interface DigestEdition {
   isPreview?: boolean
 }
 
+export interface DigestCalendarDay {
+  digestDate: string
+  isPreview?: boolean
+}
+
 export interface DigestPreview {
   href: string
   digestDate: string

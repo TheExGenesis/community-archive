@@ -73,6 +73,10 @@ Staging synchronization is automatic; production synchronization is not:
   pushes to `main` that touch `supabase/**` or the sync script.
 - The workflow serializes staging updates and regenerates database types on PR
   branches. Fork PRs are skipped because they cannot access staging secrets.
+- Supabase's managed PR preview may rerun `supabase/seed.sql` against the same
+  preview database after a new commit, including the workflow's generated-types
+  bot commit. Keep seed inserts idempotent and, when schema or seed data changes,
+  verify that the seed loads twice without a database reset.
 - Editing only `supabase/schemas/` is insufficient. Generate and commit the
   migration that the workflow can apply.
 - Before merging a PR with migrations, run the read-only

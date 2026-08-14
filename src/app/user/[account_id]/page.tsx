@@ -1,9 +1,10 @@
-import { cache } from 'react'
+import { cache, Suspense } from 'react'
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { ProfileHeader } from '@/components/metaTwitter/ProfileHeader'
 import type { NavChapter } from '@/components/metaTwitter/ArchiveNav'
 import { ProfileArchive } from '@/components/metaTwitter/ProfileArchive'
+import { ProfileArchiveSkeleton } from '@/components/metaTwitter/ProfilePageSkeleton'
 import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
 import { userProfileHref } from '@/lib/navigation'
 import { getProfileBangersPage } from '@/lib/metaTwitter/bangers'
@@ -53,6 +54,7 @@ const resolveProfile = cache(
         num_following: user.num_following,
         num_likes: user.num_likes,
         has_archive: user.has_archive,
+        is_opted_in: user.is_opted_in,
         bio: user.bio,
         website: user.website,
         location: user.location,
@@ -73,6 +75,69 @@ export async function generateMetadata({
     title: `${profile.account_display_name} (@${profile.username}) — Community Archive`,
     description: profile.bio ?? undefined,
   }
+}
+
+async function ProfileArchiveContent({
+  accountId,
+  avatarUrl,
+  basePath,
+  candidateYear,
+  displayName,
+}: {
+  accountId: string
+  avatarUrl: string | null
+  basePath: string
+  candidateYear: number | null
+  displayName: string
+}) {
+  const [candidatePage, candidateSidebar] = await Promise.all([
+    getProfileBangersPage(accountId, {
+      limit: PROFILE_BANGERS_INITIAL_LIMIT,
+      year: candidateYear ?? undefined,
+    }),
+    getClickHouseProfileSidebar(accountId, candidateYear ?? undefined),
+  ])
+
+  const year = resolveProfileChapterYear(candidateYear, candidatePage)
+  const [initialPage, sidebar] =
+    year === candidateYear
+      ? [candidatePage, candidateSidebar]
+      : await Promise.all([
+          getProfileBangersPage(accountId, {
+            limit: PROFILE_BANGERS_INITIAL_LIMIT,
+          }),
+          getClickHouseProfileSidebar(accountId, undefined),
+        ])
+
+  const navChapters: NavChapter[] = initialPage.yearCounts
+
+  return (
+    <ProfileArchive
+      accountId={accountId}
+      avatarUrl={avatarUrl}
+      basePath={basePath}
+      chapters={navChapters}
+      displayName={displayName}
+      initialYear={year}
+      initialPage={initialPage}
+      initialSidebar={sidebar}
+    />
+  )
+}
+
+async function ProfileArchivedAt({ accountId }: { accountId: string }) {
+  const archivedAt = await getCachedArchivedAt(accountId)
+  if (!archivedAt) return null
+  return (
+    <span>
+      🗄️ Archived{' '}
+      {new Date(archivedAt).toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'UTC',
+      })}
+    </span>
+  )
 }
 
 export default async function UserPage({ params, searchParams }: PageProps) {
@@ -101,42 +166,29 @@ export default async function UserPage({ params, searchParams }: PageProps) {
     )
   }
 
-  const [archivedAt, candidatePage, candidateSidebar] = await Promise.all([
-    profile.has_archive ? getCachedArchivedAt(accountId) : null,
-    getProfileBangersPage(accountId, {
-      limit: PROFILE_BANGERS_INITIAL_LIMIT,
-      year: candidateYear ?? undefined,
-    }),
-    getClickHouseProfileSidebar(accountId, candidateYear ?? undefined),
-  ])
-
-  const year = resolveProfileChapterYear(candidateYear, candidatePage)
-  const [initialPage, sidebar] =
-    year === candidateYear
-      ? [candidatePage, candidateSidebar]
-      : await Promise.all([
-          getProfileBangersPage(accountId, {
-            limit: PROFILE_BANGERS_INITIAL_LIMIT,
-          }),
-          getClickHouseProfileSidebar(accountId, undefined),
-        ])
-
-  const navChapters: NavChapter[] = initialPage.yearCounts
-
   return (
     <div className="flex justify-center px-4 pb-8 pt-4 sm:px-6">
       <div className="h-fit w-full max-w-[1220px] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_2px_16px_rgba(0,0,0,0.06)]">
-        <ProfileHeader profile={profile} archivedAt={archivedAt} />
-        <ProfileArchive
-          accountId={accountId}
-          avatarUrl={profile.avatar_media_url}
-          basePath={canonicalProfilePath}
-          chapters={navChapters}
-          displayName={profile.account_display_name}
-          initialYear={year}
-          initialPage={initialPage}
-          initialSidebar={sidebar}
+        <ProfileHeader
+          profile={profile}
+          archivedAt={null}
+          archivedAtSlot={
+            profile.has_archive ? (
+              <Suspense fallback={null}>
+                <ProfileArchivedAt accountId={accountId} />
+              </Suspense>
+            ) : null
+          }
         />
+        <Suspense fallback={<ProfileArchiveSkeleton />}>
+          <ProfileArchiveContent
+            accountId={accountId}
+            avatarUrl={profile.avatar_media_url}
+            basePath={canonicalProfilePath}
+            candidateYear={candidateYear}
+            displayName={profile.account_display_name}
+          />
+        </Suspense>
       </div>
     </div>
   )

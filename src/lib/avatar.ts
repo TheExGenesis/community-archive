@@ -3,8 +3,56 @@ export type AvatarProfile = {
   archive_upload_id?: number | null
 }
 
+export type AvatarSize = 'small' | 'high'
+
 const TWITTER_AVATAR_SIZE_SUFFIX =
-  /_(?:normal|bigger|mini|200x200)(?=\.[a-z0-9]+(?:[?#]|$))/i
+  /_(?:normal|bigger|mini|200x200|400x400)(?=\.[a-z0-9]+(?:[?#]|$))/i
+const TWITTER_AVATAR_QUERY_SIZES = new Set([
+  'mini',
+  'normal',
+  'bigger',
+  'small',
+  'medium',
+  'large',
+  '200x200',
+  '400x400',
+])
+
+/**
+ * Selects a Twitter/X avatar variant for the display context. Unknown and
+ * non-Twitter URLs are left intact so stored relative or proxied URLs keep
+ * working.
+ */
+export function getAvatarUrl(
+  avatarMediaUrl: string | null | undefined,
+  size: AvatarSize,
+): string | undefined {
+  if (!avatarMediaUrl) return undefined
+
+  const sizeName = size === 'high' ? '400x400' : 'normal'
+  const resizedSuffix = avatarMediaUrl.replace(
+    TWITTER_AVATAR_SIZE_SUFFIX,
+    `_${sizeName}`,
+  )
+  if (resizedSuffix !== avatarMediaUrl) return resizedSuffix
+
+  try {
+    const url = new URL(avatarMediaUrl)
+    const requestedSize = url.searchParams.get('name')
+    if (
+      url.hostname === 'pbs.twimg.com' &&
+      requestedSize &&
+      TWITTER_AVATAR_QUERY_SIZES.has(requestedSize.toLowerCase())
+    ) {
+      url.searchParams.set('name', sizeName)
+      return url.toString()
+    }
+  } catch {
+    // Stored avatar values can be relative URLs. Leave unknown forms intact.
+  }
+
+  return avatarMediaUrl
+}
 
 /**
  * Requests Twitter's larger profile image variant when the stored URL points
@@ -14,30 +62,13 @@ const TWITTER_AVATAR_SIZE_SUFFIX =
 export function getHighResolutionAvatarUrl(
   avatarMediaUrl: string | null | undefined,
 ): string | undefined {
-  if (!avatarMediaUrl) return undefined
+  return getAvatarUrl(avatarMediaUrl, 'high')
+}
 
-  const upgradedSuffix = avatarMediaUrl.replace(
-    TWITTER_AVATAR_SIZE_SUFFIX,
-    '_400x400',
-  )
-  if (upgradedSuffix !== avatarMediaUrl) return upgradedSuffix
-
-  try {
-    const url = new URL(avatarMediaUrl)
-    const requestedSize = url.searchParams.get('name')
-    if (
-      url.hostname === 'pbs.twimg.com' &&
-      requestedSize &&
-      ['normal', 'small', 'medium', '200x200'].includes(requestedSize)
-    ) {
-      url.searchParams.set('name', '400x400')
-      return url.toString()
-    }
-  } catch {
-    // Stored avatar values can be relative URLs. Leave unknown forms intact.
-  }
-
-  return avatarMediaUrl
+export function getSmallAvatarUrl(
+  avatarMediaUrl: string | null | undefined,
+): string | undefined {
+  return getAvatarUrl(avatarMediaUrl, 'small')
 }
 
 export function getLatestAvatarMediaUrl(

@@ -3,6 +3,7 @@
 import * as React from 'react'
 import * as AvatarPrimitive from '@radix-ui/react-avatar'
 
+import { getAvatarUrl, type AvatarSize } from '@/lib/avatar'
 import { cn } from '@/utils/tailwind'
 
 const Avatar = React.forwardRef<
@@ -22,10 +23,13 @@ Avatar.displayName = AvatarPrimitive.Root.displayName
 
 const AvatarImage = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Image>,
-  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>
->(({ className, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image> & {
+    avatarSize?: AvatarSize
+  }
+>(({ avatarSize = 'small', className, src, ...props }, ref) => (
   <AvatarPrimitive.Image
     ref={ref}
+    src={getAvatarUrl(src, avatarSize)}
     className={cn('aspect-square h-full w-full', className)}
     {...props}
   />

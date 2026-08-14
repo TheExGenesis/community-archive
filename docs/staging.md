@@ -172,6 +172,18 @@ smoke check, run `vercel curl` from a checkout linked to the project through
 `.vercel/project.json`; it supplies deployment-protection access without
 disabling the protection setting.
 
+In Codex desktop, treat the connected Vercel app and the in-app browser as
+separate authenticated surfaces. Use the Vercel connection first for deployment
+status and build logs, then use the in-app browser's existing signed-in Vercel
+session for interactive preview QA. A temporary Vercel share URL can still be
+rejected by Community Archive's request middleware when opened in standalone
+Playwright; that does not mean the Codex Vercel connection is logged out. Fall
+back to the signed-in in-app browser or the `vercel curl` flow below, and never
+disable deployment protection for verification.
+
+Treat any URL containing `_vercel_share` as a temporary credential: do not
+print, persist, or commit it.
+
 Community Archive's request middleware blocks the default curl user agent and
 JavaScript-challenges ordinary first-time page requests. Use one of the
 middleware's intentional social-preview user agents when checking rendered

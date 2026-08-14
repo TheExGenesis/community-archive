@@ -1,4 +1,4 @@
-import StreamPage from '@/app/stream/page'
+import StreamPage, { dynamic as streamRenderingMode } from '@/app/stream/page'
 import { getPortalData } from '@/lib/portal/data'
 import type { PortalData } from '@/lib/portal/types'
 
@@ -14,6 +14,10 @@ jest.mock('@/components/portal/Portal', () => ({
 const getPortalDataMock = getPortalData as jest.MockedFunction<
   typeof getPortalData
 >
+
+test('renders at request time so portal fallback data is not frozen at build time', () => {
+  expect(streamRenderingMode).toBe('force-dynamic')
+})
 
 test('renders the public stream without a membership check', async () => {
   const data = {} as PortalData

@@ -6,7 +6,6 @@ import {
   type AnalyticsGatewayFetcher,
 } from '@/lib/clickhouseGateway'
 import { devLog } from '@/lib/devLog'
-import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 import type { BangerTweet } from './types'
 import {
   PROFILE_BANGERS_INITIAL_LIMIT,
@@ -77,6 +76,9 @@ interface TopQuotesResponse {
   query?: {
     targetAccountId?: unknown
     minQuoteCount?: unknown
+    excludeSelf?: unknown
+    targetCommunityUsersOnly?: unknown
+    quoteCommunityUsersOnly?: unknown
     sort?: unknown
     year?: unknown
   }
@@ -180,11 +182,9 @@ const mapQuotedTweet = (
         ? row.accountDisplayName
         : row.username,
     avatar_media_url:
-      getHighResolutionAvatarUrl(
-        typeof row.avatarMediaUrl === 'string' && row.avatarMediaUrl
-          ? row.avatarMediaUrl
-          : null,
-      ) ?? null,
+      typeof row.avatarMediaUrl === 'string' && row.avatarMediaUrl.trim()
+        ? row.avatarMediaUrl
+        : null,
     media: Array.isArray(row.media) ? row.media.map(mapMedia) : [],
   }
 }
@@ -243,11 +243,9 @@ const mapBanger = (value: unknown, accountId: string): BangerTweet => {
         ? row.displayName
         : row.username,
     avatar_media_url:
-      getHighResolutionAvatarUrl(
-        typeof row.avatarMediaUrl === 'string' && row.avatarMediaUrl
-          ? row.avatarMediaUrl
-          : null,
-      ) ?? null,
+      typeof row.avatarMediaUrl === 'string' && row.avatarMediaUrl.trim()
+        ? row.avatarMediaUrl
+        : null,
     media: Array.isArray(row.media) ? row.media.map(mapMedia) : [],
     quote_count: quoteCount,
     quoting_accounts: safeCount(
@@ -319,7 +317,7 @@ export async function fetchProfileBangersPage(
     target_account_id: accountId,
     min_quote_count: String(MIN_QUOTE_COUNT),
     exclude_self: 'true',
-    target_ca_users_only: 'true',
+    target_ca_users_only: 'false',
     quote_ca_users_only: 'true',
   })
   if (options.year !== undefined) params.set('year', String(options.year))
@@ -334,6 +332,9 @@ export async function fetchProfileBangersPage(
   if (
     response.query?.targetAccountId !== accountId ||
     Number(response.query?.minQuoteCount) !== MIN_QUOTE_COUNT ||
+    response.query?.excludeSelf !== true ||
+    response.query?.targetCommunityUsersOnly !== false ||
+    response.query?.quoteCommunityUsersOnly !== true ||
     response.query?.sort !== gatewaySort(sort) ||
     response.query?.year !== options.year ||
     Number(response.pagination.limit) !== limit ||
@@ -420,7 +421,7 @@ export async function fetchProfileBangers(
 
 const getCachedProfileBangers = unstable_cache(
   fetchProfileBangers,
-  ['meta-twitter-profile-bangers-v2'],
+  ['meta-twitter-profile-bangers-v3'],
   { revalidate: 300 },
 )
 
@@ -432,7 +433,7 @@ const getCachedProfileBangersPage = unstable_cache(
     year: number | undefined,
     sort: ProfileBangerSort,
   ) => fetchProfileBangersPage(accountId, { limit, offset, year, sort }),
-  ['meta-twitter-profile-bangers-page-v1'],
+  ['meta-twitter-profile-bangers-page-v2'],
   { revalidate: 300 },
 )
 

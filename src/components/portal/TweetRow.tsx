@@ -216,7 +216,10 @@ function QuotedTweet({
               @{tweet.username}
             </span>
           </Link>{' '}
-          <span className="text-zinc-500 dark:text-[#a7a7b4]">
+          <span
+            suppressHydrationWarning
+            className="text-zinc-500 dark:text-[#a7a7b4]"
+          >
             · {relativeTime(tweet.createdAt)}
           </span>
         </div>
@@ -406,7 +409,10 @@ export function TweetRow({
             @{tweet.username}
           </span>
         </Link>
-        <span className="flex-shrink-0 text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
+        <span
+          suppressHydrationWarning
+          className="flex-shrink-0 text-[12px] text-zinc-500 dark:text-[#a7a7b4]"
+        >
           ·{' '}
           {showDate
             ? shortDate(tweet.createdAt)

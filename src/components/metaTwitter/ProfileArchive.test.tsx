@@ -110,6 +110,7 @@ test('switches chapters immediately while their small data requests are pending'
       avatarUrl={null}
       basePath="/user/alice"
       chapters={chapters}
+      displayName="Alice"
       initialYear={null}
       initialPage={{
         tweets: [banger(1, 2025), banger(2, 2024)],
@@ -130,7 +131,7 @@ test('switches chapters immediately while their small data requests are pending'
   expect(window.location.pathname + window.location.search).toBe(
     '/user/alice?chapter=2025',
   )
-  expect(screen.getByRole('heading', { name: '2025 bangers' })).toBeVisible()
+  expect(screen.getByRole('heading', { name: 'Best of 2025' })).toBeVisible()
   expect(screen.getAllByRole('link', { current: 'page' })).toHaveLength(1)
   expect(screen.queryByText('Banger 1')).not.toBeInTheDocument()
   expect(screen.getByText('Loading bangers…')).toBeVisible()
@@ -165,6 +166,7 @@ test('preserves modified-click behavior on chapter links', async () => {
       avatarUrl={null}
       basePath="/user/alice"
       chapters={chapters}
+      displayName="Alice"
       initialYear={null}
       initialPage={{
         tweets: [banger(1, 2025), banger(2, 2024)],
@@ -193,9 +195,7 @@ test('preserves modified-click behavior on chapter links', async () => {
 
   expect(defaultPrevented).toBe(false)
   expect(window.location.pathname + window.location.search).toBe('/user/alice')
-  expect(
-    screen.getByRole('heading', { name: 'Overall — Bangers' }),
-  ).toBeVisible()
+  expect(screen.getByRole('heading', { name: 'Best of Alice' })).toBeVisible()
 })
 
 test('restores the selected chapter from browser history', async () => {
@@ -209,6 +209,7 @@ test('restores the selected chapter from browser history', async () => {
       avatarUrl={null}
       basePath="/user/alice"
       chapters={chapters}
+      displayName="Alice"
       initialYear={null}
       initialPage={{
         tweets: [banger(1, 2025), banger(2, 2024)],
@@ -226,7 +227,7 @@ test('restores the selected chapter from browser history', async () => {
   window.history.pushState(null, '', '/user/alice?chapter=2024')
   act(() => window.dispatchEvent(new PopStateEvent('popstate')))
 
-  expect(screen.getByRole('heading', { name: '2024 bangers' })).toBeVisible()
+  expect(screen.getByRole('heading', { name: 'Best of 2024' })).toBeVisible()
   expect(screen.getByRole('link', { name: '2024 3' })).toHaveAttribute(
     'aria-current',
     'page',
@@ -270,6 +271,7 @@ test('fills the active feed, preloads shallow chapter pages, and continues at th
       avatarUrl={null}
       basePath="/user/alice"
       chapters={chapters}
+      displayName="Alice"
       initialYear={null}
       initialPage={{
         tweets: [banger(1, 2025), banger(2, 2024)],
@@ -339,6 +341,7 @@ test('stops automatic infinite-scroll retries after a failed page', async () => 
       avatarUrl={null}
       basePath="/user/alice"
       chapters={chapters}
+      displayName="Alice"
       initialYear={null}
       initialPage={{
         tweets: [banger(1, 2025), banger(2, 2024)],
@@ -394,6 +397,7 @@ test('can retry an unavailable initial banger page from offset zero', async () =
       avatarUrl={null}
       basePath="/user/alice"
       chapters={chapters}
+      displayName="Alice"
       initialYear={null}
       initialPage={{
         tweets: [],
@@ -450,6 +454,7 @@ test('retries failed media without blocking successful interactions', async () =
       avatarUrl={null}
       basePath="/user/alice"
       chapters={chapters}
+      displayName="Alice"
       initialYear={null}
       initialPage={{
         tweets: [],
@@ -505,6 +510,7 @@ test('does not start a stale chapter preload over an in-flight active feed', asy
       avatarUrl={null}
       basePath="/user/alice"
       chapters={chapters}
+      displayName="Alice"
       initialYear={null}
       initialPage={{
         tweets: [banger(1, 2025), banger(2, 2024)],

@@ -1,7 +1,7 @@
 import { createRef } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Workspace } from './Workspace'
+import { BANGER_SCORE_EXPLANATION, Workspace } from './Workspace'
 import type { BangerTweet } from '@/lib/metaTwitter/types'
 
 jest.mock('next/navigation', () => ({
@@ -74,10 +74,8 @@ test('shows the initial canonical banger cards with media and profile return lin
   render(
     <Workspace
       avatarUrl={null}
-      contextTitle="Overall — Bangers"
-      contextDesc="Quoted at least twice."
+      contextTitle="Best of Alice"
       tweets={tweets.slice(0, 2)}
-      totalTweets={tweets.length}
       bangersAvailable
       bangersLoading={false}
       media={[]}
@@ -98,6 +96,33 @@ test('shows the initial canonical banger cards with media and profile return lin
       loadMoreRef={createRef<HTMLDivElement>()}
       returnTo="/user/alice?chapter=2025"
     />,
+  )
+
+  expect(
+    screen.getAllByRole('heading', { name: 'Best of Alice' }),
+  ).toHaveLength(1)
+  expect(
+    screen.queryByRole('heading', { name: 'Bangers' }),
+  ).not.toBeInTheDocument()
+  expect(
+    screen.queryByText(
+      '167 bangers · 2+ Community Archive member quote posts · self-quotes excluded',
+    ),
+  ).not.toBeInTheDocument()
+
+  const scoreInfo = screen.getByRole('button', {
+    name: 'How banger score works',
+  })
+  expect(scoreInfo).toBeVisible()
+  const scoreExplanation = screen.getByRole('tooltip')
+  expect(scoreInfo).toHaveAttribute(
+    'aria-describedby',
+    'profile-banger-score-description',
+  )
+  expect(scoreExplanation).toHaveTextContent(BANGER_SCORE_EXPLANATION)
+  expect(scoreExplanation).toHaveClass(
+    'group-hover:opacity-100',
+    'group-focus-within:opacity-100',
   )
 
   expect(

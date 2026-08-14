@@ -19,7 +19,7 @@ export default function AuthCodeErrorPage({
   const supportCode = searchParams.error_code || searchParams.error
 
   return (
-    <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-16">
+    <main className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-4 py-16">
       <section className="w-full max-w-lg rounded-lg border border-border bg-card p-8 text-center shadow-lg">
         <AlertTriangle className="mx-auto mb-5 h-10 w-10 text-amber-500" />
         <h1 className="mb-3 text-3xl font-bold text-foreground">

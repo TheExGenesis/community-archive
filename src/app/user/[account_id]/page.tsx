@@ -81,11 +81,13 @@ async function ProfileArchiveContent({
   avatarUrl,
   basePath,
   candidateYear,
+  displayName,
 }: {
   accountId: string
   avatarUrl: string | null
   basePath: string
   candidateYear: number | null
+  displayName: string
 }) {
   const candidatePage = await getProfileBangersPage(accountId, {
     limit: PROFILE_BANGERS_INITIAL_LIMIT,
@@ -108,6 +110,7 @@ async function ProfileArchiveContent({
       avatarUrl={avatarUrl}
       basePath={basePath}
       chapters={navChapters}
+      displayName={displayName}
       initialYear={year}
       initialPage={initialPage}
     />
@@ -156,7 +159,7 @@ export default async function UserPage({ params, searchParams }: PageProps) {
   }
 
   return (
-    <div className="flex justify-center px-4 py-8 sm:px-6">
+    <div className="flex justify-center px-4 pb-8 pt-4 sm:px-6">
       <div className="h-fit w-full max-w-[1220px] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_2px_16px_rgba(0,0,0,0.06)]">
         <ProfileHeader
           profile={profile}
@@ -175,6 +178,7 @@ export default async function UserPage({ params, searchParams }: PageProps) {
             avatarUrl={profile.avatar_media_url}
             basePath={canonicalProfilePath}
             candidateYear={candidateYear}
+            displayName={profile.account_display_name}
           />
         </Suspense>
       </div>

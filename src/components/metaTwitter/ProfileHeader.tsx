@@ -53,7 +53,7 @@ export function ProfileHeader({
           />
         )}
       </div>
-      <div className="px-4 pb-4 sm:px-6">
+      <div className="px-4 pb-3 sm:px-6">
         <div className="flex items-start justify-between gap-3">
           <ProfileAvatar
             accountId={profile.account_id}
@@ -96,55 +96,65 @@ export function ProfileHeader({
           @{profile.username}
         </div>
 
-        {profile.bio && (
-          <div className="mt-2.5 whitespace-pre-line text-[15px] leading-[1.45]">
-            {profile.bio}
-          </div>
-        )}
+        <div className="mt-2.5 grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-x-8">
+          <div className="min-w-0">
+            <div
+              className={
+                profile.bio
+                  ? 'whitespace-pre-line text-sm leading-[1.4]'
+                  : 'hidden lg:block'
+              }
+            >
+              {profile.bio}
+            </div>
 
-        {!profile.has_archive && !profile.is_opted_in ? (
-          <div
-            role="note"
-            aria-label="Limited profile"
-            className="mt-3 flex max-w-5xl items-start gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-2 text-xs leading-5 text-muted-foreground/80 sm:text-[13px]"
-          >
-            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <PiInfo className="h-3 w-3" aria-hidden="true" />
-            </span>
-            <p>
-              <span className="font-semibold text-foreground/80">
-                This user is not a Community Archive user,
-              </span>{' '}
-              so we only have a selection of their tweets - ones that Archive
-              users interacted with. Is this your profile? You can{' '}
-              <Link
-                href="/profile"
-                className="font-semibold text-foreground/80 underline decoration-border underline-offset-4 hover:text-foreground hover:decoration-foreground"
+            {!profile.has_archive && !profile.is_opted_in ? (
+              <div
+                role="note"
+                aria-label="Limited profile"
+                className="mt-3 flex max-w-5xl items-start gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-2 text-xs leading-5 text-muted-foreground/80 sm:text-[13px]"
               >
-                sign in and opt out
-              </Link>{' '}
-              at any time.
-            </p>
+                <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                  <PiInfo className="h-3 w-3" aria-hidden="true" />
+                </span>
+                <p>
+                  <span className="font-semibold text-foreground/80">
+                    This user is not a Community Archive user,
+                  </span>{' '}
+                  so we only have a selection of their tweets - ones that
+                  Archive users interacted with. Is this your profile? You can{' '}
+                  <Link
+                    href="/profile"
+                    className="font-semibold text-foreground/80 underline decoration-border underline-offset-4 hover:text-foreground hover:decoration-foreground"
+                  >
+                    sign in and opt out
+                  </Link>{' '}
+                  at any time.
+                </p>
+              </div>
+            ) : null}
           </div>
-        ) : null}
 
-        <div className="mt-2.5 flex flex-wrap gap-4 text-sm text-muted-foreground">
-          {profile.location && <span>📍 {profile.location}</span>}
-          {profile.created_at && (
-            <span>📅 Joined {monthYear(profile.created_at)}</span>
-          )}
-          {archivedAt ? (
-            <span>🗄️ Archived {monthYear(archivedAt)}</span>
-          ) : (
-            archivedAtSlot
-          )}
-        </div>
+          <div className="flex min-w-0 flex-col gap-2 text-sm lg:items-end lg:text-right">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground lg:justify-end">
+              {profile.location && <span>📍 {profile.location}</span>}
+              {profile.created_at && (
+                <span>📅 Joined {monthYear(profile.created_at)}</span>
+              )}
+              {archivedAt ? (
+                <span>🗄️ Archived {monthYear(archivedAt)}</span>
+              ) : (
+                archivedAtSlot
+              )}
+            </div>
 
-        <div className="mt-2.5 flex flex-wrap gap-[18px] text-sm">
-          <Stat value={profile.num_tweets} label="Posts" />
-          <Stat value={profile.num_followers} label="Followers" />
-          <Stat value={profile.num_following} label="Following" />
-          <Stat value={profile.num_likes} label="Likes" />
+            <div className="flex flex-wrap gap-x-4 gap-y-1 lg:justify-end">
+              <Stat value={profile.num_tweets} label="Posts" />
+              <Stat value={profile.num_followers} label="Followers" />
+              <Stat value={profile.num_following} label="Following" />
+              <Stat value={profile.num_likes} label="Likes" />
+            </div>
+          </div>
         </div>
       </div>
     </header>

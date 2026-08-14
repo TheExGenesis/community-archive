@@ -3,6 +3,7 @@
 import type { RefObject } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { Info } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
 import { getSmallAvatarUrl } from '@/lib/avatar'
 import { formatNumber } from '@/lib/formatNumber'
@@ -15,6 +16,9 @@ import type {
   BangerTweet,
 } from '@/lib/metaTwitter/types'
 
+export const BANGER_SCORE_EXPLANATION =
+  'Banger score is the number of archived quote posts from Community Archive members, excluding self-quotes.'
+
 const personHue = (handle: string) => {
   let hue = 0
   for (let index = 0; index < handle.length; index += 1) {
@@ -26,9 +30,7 @@ const personHue = (handle: string) => {
 export function Workspace({
   avatarUrl,
   contextTitle,
-  contextDesc,
   tweets,
-  totalTweets,
   bangersAvailable,
   bangersLoading,
   media,
@@ -51,9 +53,7 @@ export function Workspace({
 }: {
   avatarUrl: string | null
   contextTitle: string
-  contextDesc: string
   tweets: BangerTweet[]
-  totalTweets: number
   bangersAvailable: boolean
   bangersLoading: boolean
   media: ArchiveMediaItem[]
@@ -78,13 +78,29 @@ export function Workspace({
   const mediaOverflow = Math.max(mediaCount - 6, 0)
 
   return (
-    <main className="flex min-w-0 flex-col gap-[18px] px-4 py-5 sm:px-6">
+    <main className="flex min-w-0 flex-col gap-4 px-4 py-4 sm:px-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-xl font-extrabold">{contextTitle}</h2>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-muted-foreground">
-            {contextDesc}
-          </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 id="profile-bangers-heading" className="text-xl font-extrabold">
+            {contextTitle}
+          </h2>
+          <span className="group relative flex-none">
+            <button
+              type="button"
+              aria-label="How banger score works"
+              aria-describedby="profile-banger-score-description"
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              <Info className="h-3 w-3" aria-hidden="true" />
+            </button>
+            <span
+              id="profile-banger-score-description"
+              role="tooltip"
+              className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-72 max-w-[calc(100vw-3rem)] rounded-md border bg-popover px-3 py-1.5 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+            >
+              {BANGER_SCORE_EXPLANATION}
+            </span>
+          </span>
         </div>
         <label className="flex shrink-0 items-center gap-2 text-[13px] text-muted-foreground">
           <span className="sr-only">Sort bangers</span>
@@ -102,22 +118,11 @@ export function Workspace({
         </label>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[1fr_280px]">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_280px]">
         <section
-          aria-labelledby="bangers-heading"
+          aria-labelledby="profile-bangers-heading"
           className="flex flex-col gap-3"
         >
-          <div className="flex items-baseline justify-between gap-3">
-            <h3 id="bangers-heading" className="text-[15px] font-extrabold">
-              Bangers
-            </h3>
-            {bangersAvailable && totalTweets > 0 && (
-              <span className="text-xs text-muted-foreground">
-                {formatNumber(totalTweets)} total
-              </span>
-            )}
-          </div>
-
           {!bangersAvailable && (
             <div className="rounded-xl border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
               Bangers are temporarily unavailable. The rest of this profile is

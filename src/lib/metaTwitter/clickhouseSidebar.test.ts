@@ -1,5 +1,9 @@
 import type { AnalyticsGatewayFetcher } from '@/lib/clickhouseGateway'
-import { fetchClickHouseProfileSidebar } from './clickhouseSidebar'
+import {
+  fetchClickHouseProfileInteractions,
+  fetchClickHouseProfileMedia,
+  fetchClickHouseProfileSidebar,
+} from './clickhouseSidebar'
 
 const response = (year: number | null) => ({
   data: {
@@ -77,6 +81,32 @@ test('maps year-scoped ClickHouse media and interactions for the sidebar', async
       people_limit: '8',
       year: '2025',
     }),
+    { timeoutMs: 30_000 },
+  )
+})
+
+test('loads media and interactions through independent gateway resources', async () => {
+  const fetcher = jest.fn(async () =>
+    response(2025),
+  ) as unknown as AnalyticsGatewayFetcher
+
+  const [media, interactions] = await Promise.all([
+    fetchClickHouseProfileMedia('42', 2025, fetcher),
+    fetchClickHouseProfileInteractions('42', 2025, fetcher),
+  ])
+
+  expect(media).toMatchObject({ mediaCount: 7, media: [{ tweet_id: '501' }] })
+  expect(interactions).toMatchObject({
+    people: [{ user_id: '7', screen_name: 'bob', interactions: 9 }],
+  })
+  expect(fetcher).toHaveBeenCalledWith(
+    ['user', '42', 'media'],
+    new URLSearchParams({ limit: '6', year: '2025' }),
+    { timeoutMs: 30_000 },
+  )
+  expect(fetcher).toHaveBeenCalledWith(
+    ['user', '42', 'interactions'],
+    new URLSearchParams({ limit: '8', year: '2025' }),
     { timeoutMs: 30_000 },
   )
 })

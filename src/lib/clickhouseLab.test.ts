@@ -207,6 +207,36 @@ describe('ClickHouse staging lab guard', () => {
     ).toThrow('Unsupported ClickHouse analytics endpoint')
   })
 
+  test('allows a core user read to omit interactions', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['user', 'alice'],
+      new URLSearchParams('limit=20&include_interactions=false&raw_sql=DROP'),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/user/alice?limit=20&include_interactions=false',
+    )
+  })
+
+  test('allows independently scoped profile enrichment reads', () => {
+    const media = analyticsGatewayRequestUrl(
+      ['user', '42', 'media'],
+      new URLSearchParams('year=2025&limit=6&people_limit=8'),
+      'https://stream.example/analytics',
+    )
+    const interactions = analyticsGatewayRequestUrl(
+      ['user', '42', 'interactions'],
+      new URLSearchParams('year=2025&limit=8&media_limit=6'),
+      'https://stream.example/analytics',
+    )
+    expect(media.toString()).toBe(
+      'https://stream.example/analytics/user/42/media?year=2025&limit=6',
+    )
+    expect(interactions.toString()).toBe(
+      'https://stream.example/analytics/user/42/interactions?year=2025&limit=8',
+    )
+  })
+
   test('allows bounded reverse-quote parameters for numeric tweet IDs', () => {
     const target = analyticsGatewayRequestUrl(
       ['quote-posts', '2085375983708692599'],

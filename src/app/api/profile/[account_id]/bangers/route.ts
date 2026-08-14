@@ -31,7 +31,7 @@ const publicJson = (body: unknown, status = 200) =>
     headers: {
       'Cache-Control':
         status === 200
-          ? 'public, s-maxage=300, stale-while-revalidate=3600'
+          ? 'public, s-maxage=86400, stale-while-revalidate=604800'
           : 'private, no-store',
     },
   })

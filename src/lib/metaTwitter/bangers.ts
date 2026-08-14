@@ -23,6 +23,7 @@ export type { ProfileBangerSort } from './profilePagination'
 
 const PAGE_SIZE = 100
 const MIN_QUOTE_COUNT = 2
+const PROFILE_BANGERS_REVALIDATE_SECONDS = 86_400
 const ACCOUNT_ID_PATTERN = /^\d{1,20}$/
 const TWEET_ID_PATTERN = /^\d{1,20}$/
 
@@ -422,7 +423,7 @@ export async function fetchProfileBangers(
 const getCachedProfileBangers = unstable_cache(
   fetchProfileBangers,
   ['meta-twitter-profile-bangers-v3'],
-  { revalidate: 300 },
+  { revalidate: PROFILE_BANGERS_REVALIDATE_SECONDS },
 )
 
 const getCachedProfileBangersPage = unstable_cache(
@@ -434,7 +435,7 @@ const getCachedProfileBangersPage = unstable_cache(
     sort: ProfileBangerSort,
   ) => fetchProfileBangersPage(accountId, { limit, offset, year, sort }),
   ['meta-twitter-profile-bangers-page-v2'],
-  { revalidate: 300 },
+  { revalidate: PROFILE_BANGERS_REVALIDATE_SECONDS },
 )
 
 export async function getProfileBangersPage(

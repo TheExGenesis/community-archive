@@ -1,5 +1,6 @@
 import 'server-only'
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
+import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 import type { FormattedUser } from '@/lib/types'
 
 interface ClickHouseUserResponse {
@@ -102,7 +103,8 @@ export async function getClickHouseUserProfile(
         bio: optionalText(account?.bio),
         website: null,
         location: null,
-        avatar_media_url: optionalText(account?.avatarUrl),
+        avatar_media_url:
+          getHighResolutionAvatarUrl(optionalText(account?.avatarUrl)) ?? null,
         header_media_url: optionalText(account?.headerUrl),
         archive_at: null,
         num_tweets: optionalCount(account?.statusCount),

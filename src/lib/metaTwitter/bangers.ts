@@ -6,6 +6,7 @@ import {
   type AnalyticsGatewayFetcher,
 } from '@/lib/clickhouseGateway'
 import { devLog } from '@/lib/devLog'
+import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 import type { BangerTweet } from './types'
 
 const PAGE_SIZE = 100
@@ -25,6 +26,14 @@ interface TopQuoteRow {
   fullText?: unknown
   favoriteCount?: unknown
   retweetCount?: unknown
+  media?: unknown
+}
+
+interface TopQuoteMediaRow {
+  mediaUrl?: unknown
+  mediaType?: unknown
+  width?: unknown
+  height?: unknown
 }
 
 interface TopQuotesResponse {
@@ -70,6 +79,24 @@ const safeTimestamp = (value: unknown): string => {
   return date.toISOString()
 }
 
+const mapMedia = (value: unknown): BangerTweet['media'][number] => {
+  const row = value as TopQuoteMediaRow
+  if (
+    typeof row.mediaUrl !== 'string' ||
+    !row.mediaUrl.trim() ||
+    typeof row.mediaType !== 'string' ||
+    !row.mediaType.trim()
+  ) {
+    throw new Error('ClickHouse returned invalid banger media')
+  }
+  return {
+    media_url: row.mediaUrl,
+    media_type: row.mediaType,
+    width: safeCount(row.width ?? 0, 'banger media width'),
+    height: safeCount(row.height ?? 0, 'banger media height'),
+  }
+}
+
 const mapBanger = (value: unknown, accountId: string): BangerTweet => {
   const row = value as TopQuoteRow
   if (
@@ -101,11 +128,12 @@ const mapBanger = (value: unknown, accountId: string): BangerTweet => {
       typeof row.displayName === 'string' && row.displayName
         ? row.displayName
         : row.username,
-    avatar_media_url:
+    avatar_media_url: getHighResolutionAvatarUrl(
       typeof row.avatarMediaUrl === 'string' && row.avatarMediaUrl
         ? row.avatarMediaUrl
         : null,
-    media: [],
+    ) ?? null,
+    media: Array.isArray(row.media) ? row.media.map(mapMedia) : [],
     quote_count: quoteCount,
     quoting_accounts: safeCount(
       row.quotingAccounts,

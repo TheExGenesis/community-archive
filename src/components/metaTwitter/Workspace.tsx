@@ -3,8 +3,9 @@
 import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { TweetText } from './TweetText'
+import TweetCard from '@/components/TweetCard'
 import { formatNumber } from '@/lib/formatNumber'
+import { bangerPortalTweet } from '@/lib/metaTwitter/bangerPortalTweet'
 import type {
   ArchiveMediaItem,
   ArchivePerson,
@@ -15,14 +16,6 @@ type SortMode = 'quotes' | 'likes' | 'newest'
 
 const PAGE_SIZE = 12
 
-const tweetDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  })
-
 const personHue = (handle: string) => {
   let hue = 0
   for (let index = 0; index < handle.length; index += 1) {
@@ -32,8 +25,6 @@ const personHue = (handle: string) => {
 }
 
 export function Workspace({
-  username,
-  displayName,
   avatarUrl,
   contextTitle,
   contextDesc,
@@ -44,8 +35,6 @@ export function Workspace({
   people,
   peopleTitle,
 }: {
-  username: string
-  displayName: string
   avatarUrl: string | null
   contextTitle: string
   contextDesc: string
@@ -142,88 +131,15 @@ export function Workspace({
             </div>
           )}
 
-          {visibleTweets.map((tweet) => (
-            <article
+          {visibleTweets.map((tweet, index) => (
+            <TweetCard
               key={tweet.tweet_id}
-              className="rounded-xl border border-border px-4 py-3.5"
-            >
-              <div className="flex gap-2.5">
-                {avatarUrl ? (
-                  <Image
-                    src={avatarUrl}
-                    alt=""
-                    width={40}
-                    height={40}
-                    className="h-10 w-10 flex-none rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-muted font-bold">
-                    {displayName.charAt(0).toUpperCase()}
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5 text-sm">
-                    <b>{displayName}</b>
-                    <span className="text-muted-foreground">
-                      @{username} ·{' '}
-                      <Link
-                        href={`/tweets/${tweet.tweet_id}`}
-                        className="hover:underline"
-                      >
-                        {tweetDate(tweet.created_at)}
-                      </Link>
-                    </span>
-                    <span
-                      className="ml-auto rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-foreground"
-                      title={`${tweet.quoting_accounts} distinct Community Archive member${tweet.quoting_accounts === 1 ? '' : 's'} quoted this post`}
-                    >
-                      ❝ {formatNumber(tweet.quote_count)} archive quote
-                      {tweet.quote_count === 1 ? '' : 's'}
-                    </span>
-                  </div>
-                  <TweetText
-                    text={tweet.full_text}
-                    hasMedia={tweet.media.some(
-                      (item) => item.media_type === 'photo',
-                    )}
-                  />
-                  {tweet.media.length > 0 && (
-                    <div
-                      className={`mt-2 grid gap-1 ${
-                        tweet.media.length > 1 ? 'grid-cols-2' : 'grid-cols-1'
-                      }`}
-                    >
-                      {tweet.media
-                        .filter((item) => item.media_type === 'photo')
-                        .slice(0, 4)
-                        .map((item) => (
-                          <Image
-                            key={item.media_url}
-                            src={item.media_url}
-                            alt=""
-                            width={Math.max(item.width, 1)}
-                            height={Math.max(item.height, 1)}
-                            sizes="(max-width: 768px) 100vw, 640px"
-                            className="max-h-[420px] w-full rounded-lg border border-border object-cover"
-                          />
-                        ))}
-                    </div>
-                  )}
-                  <div className="mt-2 flex gap-5 text-[13px] text-muted-foreground">
-                    <span>🔁 {formatNumber(tweet.retweet_count ?? 0)}</span>
-                    <span>♥ {formatNumber(tweet.favorite_count)}</span>
-                    <a
-                      href={`https://x.com/${username}/status/${tweet.tweet_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-auto hover:underline"
-                    >
-                      View on X ↗
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </article>
+              tweet={bangerPortalTweet(tweet, avatarUrl)}
+              featuredRank={index + 1}
+              clickable={false}
+              showDate
+              showExternalLink
+            />
           ))}
 
           {visibleCount < orderedTweets.length && (

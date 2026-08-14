@@ -9,10 +9,10 @@ import {
 import { Workspace } from '@/components/metaTwitter/Workspace'
 import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
 import { getProfileBangers } from '@/lib/metaTwitter/bangers'
+import { getClickHouseProfileSidebar } from '@/lib/metaTwitter/clickhouseSidebar'
 import {
   getCachedArchivedAt,
   getCachedProfileHeader,
-  getCachedProfileSidebarData,
   resolveAccountId,
 } from '@/lib/metaTwitter/data'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
@@ -96,9 +96,10 @@ export default async function UserPage({ params, searchParams }: PageProps) {
         (tweet) => new Date(tweet.created_at).getUTCFullYear() === year,
       )
     : bangers.tweets
-  const sidebar = profile.has_archive
-    ? await getCachedProfileSidebarData(accountId, year ?? undefined)
-    : { media: [], mediaCount: 0, people: [] }
+  const sidebar = await getClickHouseProfileSidebar(
+    accountId,
+    year ?? undefined,
+  )
 
   const basePath = `/user/${encodeURIComponent(params.account_id)}`
   const navChapters: NavChapter[] = bangers.yearCounts
@@ -119,8 +120,6 @@ export default async function UserPage({ params, searchParams }: PageProps) {
           />
           <Workspace
             key={year ?? 'overall'}
-            username={profile.username}
-            displayName={profile.account_display_name}
             avatarUrl={profile.avatar_media_url}
             contextTitle={contextTitle}
             contextDesc={contextDesc}

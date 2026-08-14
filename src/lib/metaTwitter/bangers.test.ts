@@ -8,11 +8,19 @@ const banger = (tweetId: string, quoteCount: string, year: number) => ({
   accountId: '42',
   username: 'alice',
   displayName: 'Alice',
-  avatarMediaUrl: 'https://pbs.twimg.com/profile_images/alice.jpg',
+  avatarMediaUrl: 'https://pbs.twimg.com/profile_images/42/avatar_normal.jpg',
   createdAt: `${year}-01-02 03:04:05.000`,
   fullText: `Banger ${tweetId}`,
   favoriteCount: '25',
   retweetCount: '4',
+  media: [
+    {
+      mediaUrl: `https://pbs.twimg.com/media/${tweetId}.jpg`,
+      mediaType: 'photo',
+      width: '1200',
+      height: '800',
+    },
+  ],
 })
 
 test('loads every scoped page of profile bangers above the quote threshold', async () => {
@@ -48,7 +56,20 @@ test('loads every scoped page of profile bangers above the quote threshold', asy
 
   await expect(fetchProfileBangers('42', fetcher)).resolves.toEqual({
     tweets: [
-      expect.objectContaining({ tweet_id: '100', quote_count: 8 }),
+      expect.objectContaining({
+        tweet_id: '100',
+        quote_count: 8,
+        avatar_media_url:
+          'https://pbs.twimg.com/profile_images/42/avatar_400x400.jpg',
+        media: [
+          {
+            media_url: 'https://pbs.twimg.com/media/100.jpg',
+            media_type: 'photo',
+            width: 1200,
+            height: 800,
+          },
+        ],
+      }),
       expect.objectContaining({ tweet_id: '101', quote_count: 5 }),
       expect.objectContaining({ tweet_id: '102', quote_count: 2 }),
     ],

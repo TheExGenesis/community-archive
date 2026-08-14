@@ -1,31 +1,72 @@
-import { Metadata } from 'next'
+import { cache } from 'react'
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { ProfileHeader } from '@/components/metaTwitter/ProfileHeader'
-import { ArchiveNav, NavChapter } from '@/components/metaTwitter/ArchiveNav'
-import { Workspace } from '@/components/metaTwitter/Workspace'
 import {
-  getCachedActiveYears,
+  ArchiveNav,
+  type NavChapter,
+} from '@/components/metaTwitter/ArchiveNav'
+import { Workspace } from '@/components/metaTwitter/Workspace'
+import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
+import { getProfileBangers } from '@/lib/metaTwitter/bangers'
+import {
   getCachedArchivedAt,
-  getCachedChapterData,
   getCachedProfileHeader,
-  getCachedTweetsByIds,
+  getCachedProfileSidebarData,
   resolveAccountId,
-  type ArchiveTweet,
 } from '@/lib/metaTwitter/data'
-import { getMetaTwitterConfig, type TopicConfig } from '@/lib/metaTwitter/config'
+import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 
 interface PageProps {
   params: { account_id: string }
-  searchParams: { chapter?: string; topic?: string }
+  searchParams: { chapter?: string }
 }
+
+interface ResolvedProfile {
+  accountId: string
+  profile: ProfileHeaderData
+}
+
+const resolveProfile = cache(
+  async (param: string): Promise<ResolvedProfile | null> => {
+    const archiveAccountId = await resolveAccountId(param)
+    if (archiveAccountId) {
+      const profile = await getCachedProfileHeader(archiveAccountId)
+      if (profile) return { accountId: archiveAccountId, profile }
+    }
+
+    const clickHouseProfile = await getClickHouseUserProfile(param)
+    const accountId = clickHouseProfile?.user.account_id
+    if (!clickHouseProfile || !accountId) return null
+    const user = clickHouseProfile.user
+    return {
+      accountId,
+      profile: {
+        account_id: accountId,
+        username: user.username,
+        account_display_name: user.account_display_name,
+        created_at: user.created_at,
+        num_tweets: user.num_tweets,
+        num_followers: user.num_followers,
+        num_following: user.num_following,
+        num_likes: user.num_likes,
+        has_archive: user.has_archive,
+        bio: user.bio,
+        website: user.website,
+        location: user.location,
+        avatar_media_url: user.avatar_media_url,
+        header_media_url: user.header_media_url ?? null,
+      },
+    }
+  },
+)
 
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const accountId = await resolveAccountId(params.account_id)
-  if (!accountId) return { title: 'User not found' }
-  const profile = await getCachedProfileHeader(accountId)
-  if (!profile) return { title: 'User not found' }
+  const resolved = await resolveProfile(params.account_id)
+  if (!resolved) return { title: 'User not found' }
+  const { profile } = resolved
   return {
     title: `${profile.account_display_name} (@${profile.username}) — Community Archive`,
     description: profile.bio ?? undefined,
@@ -33,89 +74,38 @@ export async function generateMetadata({
 }
 
 export default async function UserPage({ params, searchParams }: PageProps) {
-  const accountId = await resolveAccountId(params.account_id)
-  if (!accountId) notFound()
+  const resolved = await resolveProfile(params.account_id)
+  if (!resolved) notFound()
 
-  const [profile, archivedAt, activeYears] = await Promise.all([
-    getCachedProfileHeader(accountId),
-    getCachedArchivedAt(accountId),
-    getCachedActiveYears(accountId),
+  const { accountId, profile } = resolved
+  const [archivedAt, bangers] = await Promise.all([
+    profile.has_archive ? getCachedArchivedAt(accountId) : null,
+    getProfileBangers(accountId),
   ])
-  if (!profile) notFound()
 
-  const config = getMetaTwitterConfig(accountId)
-  const basePath = `/user/${encodeURIComponent(params.account_id)}`
-
-  // --- Resolve the selected chapter/topic from the URL ---
   const requestedYear = searchParams.chapter
-    ? parseInt(searchParams.chapter, 10)
+    ? Number.parseInt(searchParams.chapter, 10)
     : null
   const year =
-    requestedYear && activeYears.some((y) => y.year === requestedYear)
+    requestedYear &&
+    bangers.yearCounts.some((entry) => entry.year === requestedYear)
       ? requestedYear
       : null
-  const isOverall = year === null
+  const tweets = year
+    ? bangers.tweets.filter(
+        (tweet) => new Date(tweet.created_at).getUTCFullYear() === year,
+      )
+    : bangers.tweets
+  const sidebar = profile.has_archive
+    ? await getCachedProfileSidebarData(accountId, year ?? undefined)
+    : { media: [], mediaCount: 0, people: [] }
 
-  const chapterConfig = year
-    ? (config?.chapters.find((c) => c.year === year) ?? null)
-    : null
-  const availableTopics: TopicConfig[] = isOverall
-    ? (config?.overallTopics ?? [])
-    : (chapterConfig?.topics ?? [])
-  const topic =
-    (searchParams.topic &&
-      availableTopics.find((t) => t.slug === searchParams.topic)) ||
-    null
-
-  // --- Fetch workspace data for the selected scope ---
-  const chapterData = await getCachedChapterData(
-    accountId,
-    year ?? undefined,
-    topic?.terms,
-  )
-  const hofIds = config?.hallOfFamePinned ?? []
-  const pinnedTweets: ArchiveTweet[] =
-    isOverall && !topic && hofIds.length > 0
-      ? await getCachedTweetsByIds(accountId, hofIds)
-      : []
-
-  const seen = new Set<string>()
-  const tweets = [
-    ...pinnedTweets,
-    ...chapterData.topTweets,
-    ...chapterData.newestTweets,
-  ].filter((t) => {
-    if (seen.has(t.tweet_id)) return false
-    seen.add(t.tweet_id)
-    return true
-  })
-
-  // --- Presentation strings ---
-  const contextTitle = isOverall
-    ? topic
-      ? `Overall → ${topic.label}`
-      : 'Hall of Fame'
-    : topic
-      ? `${year} → ${topic.label}`
-      : String(year)
-  const contextDesc = topic
-    ? (topic.description ?? null)
-    : isOverall
-      ? (config?.overallDescription ??
-        `The best of @${profile.username}'s archive.`)
-      : (chapterConfig?.description ?? null)
-
-  const navChapters: NavChapter[] = activeYears.map((y) => {
-    const chapter = config?.chapters.find((c) => c.year === y.year)
-    return {
-      year: y.year,
-      count: y.count,
-      topics: (chapter?.topics ?? []).map((t) => ({
-        label: t.label,
-        slug: t.slug,
-      })),
-    }
-  })
+  const basePath = `/user/${encodeURIComponent(params.account_id)}`
+  const navChapters: NavChapter[] = bangers.yearCounts
+  const contextTitle = year ? `${year} bangers` : 'Overall — Bangers'
+  const contextDesc = bangers.available
+    ? `${tweets.length} post${tweets.length === 1 ? '' : 's'} with at least two quote posts from Community Archive members${year ? ` in ${year}` : ''}. Self-quotes are excluded.`
+    : 'The Community Archive banger ranking is temporarily unavailable.'
 
   return (
     <div className="flex justify-center px-4 py-8 sm:px-6">
@@ -126,22 +116,20 @@ export default async function UserPage({ params, searchParams }: PageProps) {
             basePath={basePath}
             chapters={navChapters}
             activeYear={year}
-            activeTopicSlug={topic?.slug ?? null}
           />
           <Workspace
-            accountId={accountId}
+            key={year ?? 'overall'}
             username={profile.username}
             displayName={profile.account_display_name}
             avatarUrl={profile.avatar_media_url}
-            isOverall={isOverall}
             contextTitle={contextTitle}
             contextDesc={contextDesc}
             tweets={tweets}
-            hofIds={hofIds}
-            media={chapterData.media}
-            mediaCount={chapterData.mediaCount}
-            people={chapterData.people}
-            peopleTitle={isOverall ? 'Top mutuals' : 'People in this chapter'}
+            bangersAvailable={bangers.available}
+            media={sidebar.media}
+            mediaCount={sidebar.mediaCount}
+            people={sidebar.people}
+            peopleTitle={year ? `People in ${year}` : 'Top people'}
           />
         </div>
       </div>

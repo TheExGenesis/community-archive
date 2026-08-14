@@ -11,7 +11,17 @@ export interface ArchiveTweet {
   username: string
   account_display_name: string
   avatar_media_url: string | null
-  media: { media_url: string; media_type: string; width: number; height: number }[]
+  media: {
+    media_url: string
+    media_type: string
+    width: number
+    height: number
+  }[]
+}
+
+export interface BangerTweet extends ArchiveTweet {
+  quote_count: number
+  quoting_accounts: number
 }
 
 export interface ArchiveMediaItem {
@@ -37,11 +47,12 @@ export interface ProfileHeaderData {
   account_id: string
   username: string
   account_display_name: string
-  created_at: string
-  num_tweets: number
-  num_followers: number
-  num_following: number
-  num_likes: number
+  created_at: string | null
+  num_tweets: number | null
+  num_followers: number | null
+  num_following: number | null
+  num_likes: number | null
+  has_archive: boolean
   bio: string | null
   website: string | null
   location: string | null

@@ -32,6 +32,8 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'sort',
     'year',
     'q',
+    'target_account_id',
+    'min_quote_count',
     'exclude_self',
     'target_ca_users_only',
     'quote_ca_users_only',
@@ -168,3 +170,5 @@ export async function fetchAnalyticsGatewayJson<T>(
     throw new Error('ClickHouse analytics returned invalid JSON')
   }
 }
+
+export type AnalyticsGatewayFetcher = typeof fetchAnalyticsGatewayJson

@@ -1,0 +1,226 @@
+import 'server-only'
+
+import { unstable_cache } from 'next/cache'
+import {
+  fetchAnalyticsGatewayJson,
+  type AnalyticsGatewayFetcher,
+} from '@/lib/clickhouseGateway'
+import { devLog } from '@/lib/devLog'
+import type { BangerTweet } from './types'
+
+const PAGE_SIZE = 100
+const MIN_QUOTE_COUNT = 2
+const ACCOUNT_ID_PATTERN = /^\d{1,20}$/
+const TWEET_ID_PATTERN = /^\d{1,20}$/
+
+interface TopQuoteRow {
+  tweetId?: unknown
+  quoteCount?: unknown
+  quotingAccounts?: unknown
+  accountId?: unknown
+  username?: unknown
+  displayName?: unknown
+  avatarMediaUrl?: unknown
+  createdAt?: unknown
+  fullText?: unknown
+  favoriteCount?: unknown
+  retweetCount?: unknown
+}
+
+interface TopQuotesResponse {
+  data?: unknown
+  pagination?: {
+    nextOffset?: unknown
+    totalAvailable?: unknown
+    yearCounts?: unknown
+  }
+  query?: {
+    targetAccountId?: unknown
+    minQuoteCount?: unknown
+  }
+}
+
+export interface ProfileBangers {
+  tweets: BangerTweet[]
+  yearCounts: { year: number; count: number }[]
+  total: number
+}
+
+export interface ProfileBangersState extends ProfileBangers {
+  available: boolean
+}
+
+const safeCount = (value: unknown, label: string): number => {
+  const count = Number(value)
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new Error(`ClickHouse returned an invalid ${label}`)
+  }
+  return count
+}
+
+const safeTimestamp = (value: unknown): string => {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error('ClickHouse returned an invalid banger timestamp')
+  }
+  const normalized = value.includes('T') ? value : `${value.replace(' ', 'T')}Z`
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('ClickHouse returned an invalid banger timestamp')
+  }
+  return date.toISOString()
+}
+
+const mapBanger = (value: unknown, accountId: string): BangerTweet => {
+  const row = value as TopQuoteRow
+  if (
+    typeof row.tweetId !== 'string' ||
+    !TWEET_ID_PATTERN.test(row.tweetId) ||
+    row.accountId !== accountId ||
+    typeof row.username !== 'string' ||
+    !row.username ||
+    typeof row.fullText !== 'string'
+  ) {
+    throw new Error('ClickHouse returned an invalid profile banger')
+  }
+  const quoteCount = safeCount(row.quoteCount, 'banger quote count')
+  if (quoteCount < MIN_QUOTE_COUNT) {
+    throw new Error(
+      'ClickHouse returned a banger below the requested threshold',
+    )
+  }
+  return {
+    tweet_id: row.tweetId,
+    account_id: accountId,
+    created_at: safeTimestamp(row.createdAt),
+    full_text: row.fullText,
+    favorite_count: safeCount(row.favoriteCount, 'banger favorite count'),
+    retweet_count: safeCount(row.retweetCount, 'banger repost count'),
+    reply_to_username: null,
+    username: row.username,
+    account_display_name:
+      typeof row.displayName === 'string' && row.displayName
+        ? row.displayName
+        : row.username,
+    avatar_media_url:
+      typeof row.avatarMediaUrl === 'string' && row.avatarMediaUrl
+        ? row.avatarMediaUrl
+        : null,
+    media: [],
+    quote_count: quoteCount,
+    quoting_accounts: safeCount(
+      row.quotingAccounts,
+      'banger quoting-account count',
+    ),
+  }
+}
+
+const parseYearCounts = (value: unknown): { year: number; count: number }[] => {
+  if (!Array.isArray(value)) {
+    throw new Error('ClickHouse returned invalid profile banger years')
+  }
+  return value.map((entry) => {
+    const row = entry as { year?: unknown; count?: unknown }
+    const year = Number(row.year)
+    if (!Number.isInteger(year) || year < 2006 || year > 2200) {
+      throw new Error('ClickHouse returned an invalid profile banger year')
+    }
+    return { year, count: safeCount(row.count, 'profile banger year count') }
+  })
+}
+
+export async function fetchProfileBangers(
+  accountId: string,
+  fetcher: AnalyticsGatewayFetcher = fetchAnalyticsGatewayJson,
+): Promise<ProfileBangers> {
+  if (!ACCOUNT_ID_PATTERN.test(accountId)) {
+    throw new Error('Profile bangers require a numeric account ID')
+  }
+
+  const tweets: BangerTweet[] = []
+  const seenTweetIds = new Set<string>()
+  const seenOffsets = new Set<number>()
+  let offset = 0
+  let yearCounts: { year: number; count: number }[] | null = null
+  let total: number | null = null
+
+  while (true) {
+    if (seenOffsets.has(offset)) {
+      throw new Error('ClickHouse returned a repeated banger page cursor')
+    }
+    seenOffsets.add(offset)
+
+    const response = await fetcher<TopQuotesResponse>(
+      ['top-quotes'],
+      new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: String(offset),
+        sort: 'quotes',
+        target_account_id: accountId,
+        min_quote_count: String(MIN_QUOTE_COUNT),
+        exclude_self: 'true',
+        target_ca_users_only: 'true',
+        quote_ca_users_only: 'true',
+      }),
+      { timeoutMs: 30_000 },
+    )
+
+    if (
+      response.query?.targetAccountId !== accountId ||
+      Number(response.query?.minQuoteCount) !== MIN_QUOTE_COUNT
+    ) {
+      throw new Error('ClickHouse does not support scoped profile bangers yet')
+    }
+    if (!Array.isArray(response.data) || !response.pagination) {
+      throw new Error('ClickHouse returned invalid profile banger pagination')
+    }
+
+    if (yearCounts === null) {
+      yearCounts = parseYearCounts(response.pagination.yearCounts)
+      total = safeCount(
+        response.pagination.totalAvailable,
+        'profile banger total',
+      )
+    }
+
+    for (const value of response.data) {
+      const tweet = mapBanger(value, accountId)
+      if (seenTweetIds.has(tweet.tweet_id)) {
+        throw new Error('ClickHouse repeated a profile banger')
+      }
+      seenTweetIds.add(tweet.tweet_id)
+      tweets.push(tweet)
+    }
+
+    const nextOffset = response.pagination.nextOffset
+    if (nextOffset === null) break
+    const parsedOffset = safeCount(nextOffset, 'profile banger next offset')
+    if (parsedOffset <= offset) {
+      throw new Error('ClickHouse returned an invalid banger page cursor')
+    }
+    offset = parsedOffset
+  }
+
+  if (total !== tweets.length) {
+    throw new Error('ClickHouse profile banger pages did not match their total')
+  }
+
+  return { tweets, yearCounts: yearCounts ?? [], total: total ?? 0 }
+}
+
+const getCachedProfileBangers = unstable_cache(
+  fetchProfileBangers,
+  ['meta-twitter-profile-bangers-v1'],
+  { revalidate: 300 },
+)
+
+export async function getProfileBangers(
+  accountId: string,
+): Promise<ProfileBangersState> {
+  try {
+    const result = await getCachedProfileBangers(accountId)
+    return { ...result, available: true }
+  } catch (error) {
+    devLog('metaTwitter getProfileBangers error', { accountId, error })
+    return { tweets: [], yearCounts: [], total: 0, available: false }
+  }
+}

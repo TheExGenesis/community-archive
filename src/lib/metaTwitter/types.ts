@@ -55,6 +55,7 @@ export interface ProfileHeaderData {
   num_following: number | null
   num_likes: number | null
   has_archive: boolean
+  is_opted_in: boolean
   bio: string | null
   website: string | null
   location: string | null

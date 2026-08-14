@@ -1,7 +1,10 @@
 import Image from 'next/image'
-import { getHighResolutionAvatarUrl } from '@/lib/avatar'
+import Link from 'next/link'
+import type { ReactNode } from 'react'
+import { PiInfo } from 'react-icons/pi'
 import { formatNumber } from '@/lib/formatNumber'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
+import { ProfileAvatar } from './ProfileAvatar'
 
 const monthYear = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', {
@@ -21,9 +24,11 @@ const Stat = ({ value, label }: { value: number | null; label: string }) =>
 export function ProfileHeader({
   profile,
   archivedAt,
+  archivedAtSlot,
 }: {
   profile: ProfileHeaderData
   archivedAt: string | null
+  archivedAtSlot?: ReactNode
 }) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const archiveUrl =
@@ -33,7 +38,6 @@ export function ProfileHeader({
   const headerUrl = profile.header_media_url
     ? `${profile.header_media_url.replace(/\/$/, '')}/1500x500`
     : null
-  const avatarUrl = getHighResolutionAvatarUrl(profile.avatar_media_url)
 
   return (
     <header>
@@ -51,21 +55,11 @@ export function ProfileHeader({
       </div>
       <div className="px-4 pb-4 sm:px-6">
         <div className="flex items-start justify-between gap-3">
-          {avatarUrl ? (
-            <Image
-              src={avatarUrl}
-              alt={`${profile.account_display_name}'s avatar`}
-              width={132}
-              height={132}
-              sizes="132px"
-              priority
-              className="relative z-10 -mt-[66px] h-[132px] w-[132px] rounded-full border-4 border-card bg-muted object-cover"
-            />
-          ) : (
-            <div className="relative z-10 -mt-[66px] grid h-[132px] w-[132px] place-items-center rounded-full border-4 border-card bg-muted text-4xl font-bold">
-              {profile.account_display_name.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <ProfileAvatar
+            accountId={profile.account_id}
+            avatarUrl={profile.avatar_media_url}
+            displayName={profile.account_display_name}
+          />
           <div className="flex flex-wrap justify-end gap-2 pt-3.5">
             {archiveUrl && (
               <a
@@ -92,9 +86,11 @@ export function ProfileHeader({
           <h1 className="text-xl font-extrabold">
             {profile.account_display_name}
           </h1>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-            {profile.has_archive ? 'Archive contributor' : 'Community member'}
-          </span>
+          {(profile.has_archive || profile.is_opted_in) && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+              {profile.has_archive ? 'Archive contributor' : 'Community member'}
+            </span>
+          )}
         </div>
         <div className="text-[15px] text-muted-foreground">
           @{profile.username}
@@ -106,12 +102,42 @@ export function ProfileHeader({
           </div>
         )}
 
+        {!profile.has_archive && !profile.is_opted_in ? (
+          <div
+            role="note"
+            aria-label="Limited profile"
+            className="mt-3 flex max-w-5xl items-start gap-2 rounded-md border border-border/60 bg-muted/20 px-2.5 py-2 text-xs leading-5 text-muted-foreground/80 sm:text-[13px]"
+          >
+            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <PiInfo className="h-3 w-3" aria-hidden="true" />
+            </span>
+            <p>
+              <span className="font-semibold text-foreground/80">
+                This user is not a Community Archive user,
+              </span>{' '}
+              so we only have a selection of their tweets - ones that Archive
+              users interacted with. Is this your profile? You can{' '}
+              <Link
+                href="/profile"
+                className="font-semibold text-foreground/80 underline decoration-border underline-offset-4 hover:text-foreground hover:decoration-foreground"
+              >
+                sign in and opt out
+              </Link>{' '}
+              at any time.
+            </p>
+          </div>
+        ) : null}
+
         <div className="mt-2.5 flex flex-wrap gap-4 text-sm text-muted-foreground">
           {profile.location && <span>📍 {profile.location}</span>}
           {profile.created_at && (
             <span>📅 Joined {monthYear(profile.created_at)}</span>
           )}
-          {archivedAt && <span>🗄️ Archived {monthYear(archivedAt)}</span>}
+          {archivedAt ? (
+            <span>🗄️ Archived {monthYear(archivedAt)}</span>
+          ) : (
+            archivedAtSlot
+          )}
         </div>
 
         <div className="mt-2.5 flex flex-wrap gap-[18px] text-sm">

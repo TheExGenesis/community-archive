@@ -34,7 +34,11 @@ async function fetchProfileHeader(
   accountId: string,
 ): Promise<ProfileHeaderData | null> {
   const supabase = getMetaClient()
-  const [{ data: account }, { data: profile }] = await Promise.all([
+  const [
+    { data: account, error: accountError },
+    { data: profile, error: profileError },
+    { data: membership, error: membershipError },
+  ] = await Promise.all([
     supabase
       .from('all_account')
       .select(
@@ -49,7 +53,15 @@ async function fetchProfileHeader(
       .order('archive_upload_id', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from('user_directory')
+      .select('has_archive, is_opted_in')
+      .eq('account_id', accountId)
+      .maybeSingle(),
   ])
+  if (accountError) throw accountError
+  if (profileError) throw profileError
+  if (membershipError) throw membershipError
   if (!account) return null
   return {
     ...account,
@@ -59,7 +71,8 @@ async function fetchProfileHeader(
     location: profile?.location ?? null,
     avatar_media_url: profile?.avatar_media_url ?? null,
     header_media_url: profile?.header_media_url ?? null,
-    has_archive: true,
+    has_archive: membership?.has_archive === true,
+    is_opted_in: membership?.is_opted_in === true,
   }
 }
 
@@ -201,7 +214,7 @@ async function fetchMediaCount(scope: SidebarScope): Promise<number> {
 
 export const getCachedProfileHeader = unstable_cache(
   fetchProfileHeader,
-  ['meta-twitter-profile-header-v2'],
+  ['meta-twitter-profile-header-v3'],
   { revalidate: 3600 },
 )
 
@@ -216,12 +229,13 @@ export const resolveAccountId = unstable_cache(
     decoded = decoded.replace(/^(archive|optin):/, '')
     if (/^\d+$/.test(decoded)) return decoded
     const supabase = getMetaClient()
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('all_account')
       .select('account_id')
       .ilike('username', decoded)
       .limit(1)
       .maybeSingle()
+    if (error) throw error
     return data?.account_id ?? null
   },
   ['meta-twitter-resolve-account-v1'],

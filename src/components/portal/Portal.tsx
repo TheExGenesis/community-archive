@@ -94,30 +94,6 @@ function oldestPageCursor(tweets: PortalTweet[]) {
   return oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null
 }
 
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-[5px] text-[12.5px] font-semibold transition-colors ${
-        active
-          ? 'bg-brand/15 border-brand text-blue-600 dark:text-blue-300'
-          : `border-zinc-300 bg-white dark:border-[#2c2c30] dark:bg-[#1b1b1e] ${MUTED} hover:border-zinc-400 dark:hover:border-[#3f3f46]`
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
-
 function PanelHeader({
   title,
   action,
@@ -388,11 +364,41 @@ export default function Portal({
   useEffect(() => {
     const controller = new AbortController()
     let polling = false
+    const applyHead = (tweets: PortalTweet[], nextHasMore: boolean) => {
+      const head = [...tweets].sort(comparePortalTweetChronology)
+      updateCursor.current = newestCursor(head)
+      pageCursor.current = oldestPageCursor(head)
+      if (view === 'stream') {
+        setHasMore(nextHasMore && pageCursor.current !== null)
+      }
+      setVisible((current) => {
+        const next =
+          view === 'home'
+            ? selectHomepageStream([...head, ...current], 30)
+            : head
+        seenIds.current = new Set(next.map((tweet) => tweet.id))
+        return next
+      })
+    }
+    const fetchHead = async () => {
+      const response = await fetch('/api/portal/stream', {
+        signal: controller.signal,
+        cache: 'no-store',
+      })
+      if (!response.ok) return false
+      const payload = (await response.json()) as {
+        tweets: PortalTweet[]
+        hasMore?: boolean
+      }
+      applyHead(payload.tweets, payload.hasMore ?? false)
+      return true
+    }
     const poll = async () => {
       if (polling) return
       polling = true
       try {
         const params = new URLSearchParams()
+        const requestedHead = updateCursor.current === null
         if (updateCursor.current) {
           params.set('after', updateCursor.current.observedAt)
           params.set('afterId', updateCursor.current.id)
@@ -406,11 +412,25 @@ export default function Portal({
           return
         }
         setStreamUnavailable(false)
-        const { tweets, updateCursor: nextUpdateCursor } =
-          (await res.json()) as {
-            tweets: PortalTweet[]
-            updateCursor?: { observedAt: string; id: string } | null
-          }
+        const {
+          tweets,
+          updateCursor: nextUpdateCursor,
+          hasMore: nextHasMore,
+          backlogTruncated,
+        } = (await res.json()) as {
+          tweets: PortalTweet[]
+          updateCursor?: { observedAt: string; id: string } | null
+          hasMore?: boolean
+          backlogTruncated?: boolean
+        }
+        if (requestedHead) {
+          applyHead(tweets, nextHasMore ?? false)
+          return
+        }
+        if (backlogTruncated) {
+          if (!(await fetchHead())) setStreamUnavailable(true)
+          return
+        }
         const responseCursor = nextUpdateCursor ?? newestCursor(tweets)
         if (responseCursor) updateCursor.current = responseCursor
         const fresh = tweets
@@ -470,31 +490,6 @@ export default function Portal({
   )
   const weeklyBars = weeklyRanked.slice(0, 6)
   const maxWeekly = Math.max(...weeklyBars.map((w) => w.last7), 1)
-  const withDelta = useMemo(
-    () =>
-      trends.weekly.filter(
-        (w) => w.deltaPct !== null && w.prev7 >= 5,
-      ) as (TermWeek & {
-        deltaPct: number
-      })[],
-    [trends.weekly],
-  )
-  const risers = useMemo(
-    () =>
-      [...withDelta]
-        .filter((w) => w.deltaPct > 0)
-        .sort((a, b) => b.deltaPct - a.deltaPct)
-        .slice(0, 4),
-    [withDelta],
-  )
-  const fallers = useMemo(
-    () =>
-      [...withDelta]
-        .filter((w) => w.deltaPct < 0)
-        .sort((a, b) => a.deltaPct - b.deltaPct)
-        .slice(0, 4),
-    [withDelta],
-  )
 
   const recentBanger = data.recentBangers[0] ?? null
   const historicalBanger = data.historicalBangers[0] ?? null
@@ -869,71 +864,53 @@ export default function Portal({
 
       {/* ------------------------------------------------ Stream -------- */}
       {view === 'stream' && (
-        <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1.5fr_1fr]">
-            <div>
-              <Link
-                href="/"
-                className={`mb-2 inline-flex items-center text-[12.5px] font-semibold ${MUTED} hover:text-brand`}
-              >
-                ← Dashboard
-              </Link>
-              <LiveStreamHeading
-                stats={stats}
-                unavailable={data.failures.liveAnalytics}
+        <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
+          <Link
+            href="/"
+            className={`mb-2 inline-flex items-center text-[12.5px] font-semibold ${MUTED} hover:text-brand`}
+          >
+            ← Dashboard
+          </Link>
+          <LiveStreamHeading
+            stats={stats}
+            unavailable={data.failures.liveAnalytics}
+          />
+          <div className={`mb-3.5 text-[13px] ${MUTED}`}>
+            Tweets arriving from the browser-extension firehose, as contributors
+            read their timelines.
+          </div>
+          <div className={`${CARD} overflow-hidden`}>
+            {visible.map((t, i) => (
+              <TweetCard
+                key={t.id}
+                tweet={t}
+                animate={i === 0}
+                showArchivedBadge
+                origin="stream"
+                returnTo="/stream"
               />
-              <div className={`mb-3.5 text-[13px] ${MUTED}`}>
-                Tweets arriving from the browser-extension firehose, as
-                contributors read their timelines.
+            ))}
+            {visible.length === 0 && streamUnavailable && (
+              <PanelUnavailable message="Live stream is temporarily unavailable." />
+            )}
+            {visible.length === 0 && !streamUnavailable && (
+              <div className={`px-4 py-8 text-center text-[13px] ${MUTED}`}>
+                Waiting for the firehose…
               </div>
-              <div className={`${CARD} overflow-hidden`}>
-                {visible.map((t, i) => (
-                  <TweetCard
-                    key={t.id}
-                    tweet={t}
-                    animate={i === 0}
-                    showArchivedBadge
-                    origin="stream"
-                    returnTo="/stream"
-                  />
-                ))}
-                {visible.length === 0 && streamUnavailable && (
-                  <PanelUnavailable message="Live stream is temporarily unavailable." />
-                )}
-                {visible.length === 0 && !streamUnavailable && (
-                  <div className={`px-4 py-8 text-center text-[13px] ${MUTED}`}>
-                    Waiting for the firehose…
-                  </div>
-                )}
-              </div>
-              <div
-                ref={loadMoreTarget}
-                aria-live="polite"
-                className={`py-5 text-center text-[12.5px] ${MUTED}`}
-              >
-                {isLoadingMore
-                  ? 'Loading older tweets…'
-                  : hasMore
-                    ? 'Scroll for older tweets'
-                    : visible.length > 0
-                      ? 'You’ve reached the end.'
-                      : ''}
-              </div>
-            </div>
-            <div id="trends" className="scroll-mt-32">
-              {data.failures.trends ? (
-                <>
-                  <h2 className="mb-3 text-[18px] font-semibold" style={SERIF}>
-                    Trends in ideas
-                  </h2>
-                  <div className={CARD}>
-                    <PanelUnavailable message="Trends are temporarily unavailable." />
-                  </div>
-                </>
-              ) : (
-                <TrendsView trends={trends} risers={risers} fallers={fallers} />
-              )}
-            </div>
+            )}
+          </div>
+          <div
+            ref={loadMoreTarget}
+            aria-live="polite"
+            className={`py-5 text-center text-[12.5px] ${MUTED}`}
+          >
+            {isLoadingMore
+              ? 'Loading older tweets…'
+              : hasMore
+                ? 'Scroll for older tweets'
+                : visible.length > 0
+                  ? 'You’ve reached the end.'
+                  : ''}
           </div>
         </div>
       )}
@@ -963,164 +940,6 @@ function StatCard({
         {value}
       </div>
       <div className={`mt-0.5 text-[12px] ${noteClass ?? MUTED}`}>{note}</div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Trends view
-// ---------------------------------------------------------------------------
-
-function TrendsView({
-  trends,
-  risers,
-  fallers,
-}: {
-  trends: PortalData['trends']
-  risers: (TermWeek & { deltaPct: number })[]
-  fallers: (TermWeek & { deltaPct: number })[]
-}) {
-  const [enabled, setEnabled] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(trends.series.map((s, i) => [s.term, i < 4])),
-  )
-
-  const activeSeries = trends.series.filter((s) => enabled[s.term])
-  const maxVal = Math.max(5, ...activeSeries.flatMap((s) => s.perYear))
-  const niceMax = Math.ceil(maxVal / 3) * 3
-
-  const W = 480
-  const H = 270
-  const X0 = 44
-  const X1 = 448
-  const Y0 = 244
-  const Y1 = 24
-  const xs = trends.years.map(
-    (_, i) => X0 + (i * (X1 - X0)) / Math.max(trends.years.length - 1, 1),
-  )
-  const yOf = (v: number) => Y0 - (v / niceMax) * (Y0 - Y1)
-  const gridVals = [0, niceMax / 3, (2 * niceMax) / 3, niceMax]
-
-  return (
-    <div>
-      <h2 className="mb-3 text-[18px] font-semibold" style={SERIF}>
-        Trends in ideas
-      </h2>
-      <div className={`${CARD} mb-4 p-4`}>
-        <svg viewBox={`0 0 ${W} ${H}`} className="block w-full">
-          {gridVals.map((v) => (
-            <g key={v}>
-              <line
-                x1={X0 - 4}
-                y1={yOf(v)}
-                x2={X1}
-                y2={yOf(v)}
-                className="stroke-zinc-200 dark:stroke-[#202023]"
-                strokeWidth={1}
-              />
-              <text
-                x={X0 - 8}
-                y={yOf(v) + 4}
-                textAnchor="end"
-                fontSize={10}
-                className="fill-zinc-400 dark:fill-[#6d6d78]"
-              >
-                {Math.round(v)}
-              </text>
-            </g>
-          ))}
-          {trends.years.map((y, i) => (
-            <text
-              key={y}
-              x={xs[i]}
-              y={262}
-              textAnchor="middle"
-              fontSize={11}
-              className="fill-zinc-400 dark:fill-[#6d6d78]"
-            >
-              {y}
-            </text>
-          ))}
-          {activeSeries.map((s) => (
-            <polyline
-              key={s.term}
-              fill="none"
-              stroke={s.color}
-              strokeWidth={2.5}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              points={s.perYear
-                .map((v, i) => `${xs[i]},${yOf(v).toFixed(1)}`)
-                .join(' ')}
-            />
-          ))}
-        </svg>
-      </div>
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {trends.series.map((s) => (
-          <Chip
-            key={s.term}
-            active={!!enabled[s.term]}
-            onClick={() => setEnabled((e) => ({ ...e, [s.term]: !e[s.term] }))}
-          >
-            <span
-              className="h-[9px] w-[9px] rounded-full"
-              style={{
-                background: s.color,
-                opacity: enabled[s.term] ? 1 : 0.35,
-              }}
-            />
-            {s.term}
-          </Chip>
-        ))}
-      </div>
-      <div className={`mb-4 text-[13px] leading-normal ${BODY}`}>
-        Term frequency per 100k tweets, {trends.years[0]}–
-        {trends.years[trends.years.length - 1]}. An ngram viewer for the
-        vocabulary of one corner of the internet. Recomputed daily from the full
-        corpus.
-      </div>
-      <div className="grid grid-cols-1 gap-4">
-        <DeltaPanel title="Rising this week" items={risers} positive />
-        <DeltaPanel title="Cooling this week" items={fallers} />
-      </div>
-    </div>
-  )
-}
-
-function DeltaPanel({
-  title,
-  items,
-  positive,
-}: {
-  title: string
-  items: (TermWeek & { deltaPct: number })[]
-  positive?: boolean
-}) {
-  return (
-    <div className={CARD}>
-      <PanelHeader title={title} />
-      {items.length === 0 && (
-        <div className={`px-4 py-6 text-center text-[13px] ${MUTED}`}>
-          Nothing moving fast this week.
-        </div>
-      )}
-      {items.map((m) => (
-        <div
-          key={m.term}
-          className="flex items-center justify-between border-b border-zinc-100 px-4 py-2.5 last:border-b-0 dark:border-[#202023]"
-        >
-          <span className="text-[13.5px] font-semibold">{m.term}</span>
-          <span
-            className={`text-[13px] font-bold tabular-nums ${
-              positive
-                ? 'text-[#16a34a] dark:text-[#2acf80]'
-                : 'text-[#dc2626] dark:text-[#f87171]'
-            }`}
-          >
-            {fmtDelta(m)}
-          </span>
-        </div>
-      ))}
     </div>
   )
 }

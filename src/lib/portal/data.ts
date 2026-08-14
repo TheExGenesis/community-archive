@@ -755,11 +755,6 @@ const getCachedJoinedThisWeek = unstable_cache(
   ['portal-joined-this-week-v1'],
   { revalidate: 300 },
 )
-const getCachedInitialStream = unstable_cache(
-  async (_sourceKey: string) => getPortalStreamPage(30),
-  ['portal-initial-stream-v6'],
-  { revalidate: 60 },
-)
 const getCachedHomepageStreamCandidates = unstable_cache(
   async (_sourceKey: string) => getPortalStreamPage(100),
   ['portal-home-stream-candidates-v1'],
@@ -1051,45 +1046,64 @@ export async function getPortalData(
     recentBangers,
     historicalBangers,
   ] = await Promise.all([
-    loadPortalComponentData(
-      'trends',
-      () => getCachedTrendsSnapshot(sourceKey),
-      { years: [], series: [], weekly: [], computedAt: '' },
-    ),
-    loadPortalComponentData(
-      'corpus-range',
-      () => getCachedCorpusRange(sourceKey),
-      { firstYear: 0, currentYear: 0 },
-    ),
+    view === 'home'
+      ? loadPortalComponentData(
+          'trends',
+          () => getCachedTrendsSnapshot(sourceKey),
+          { years: [], series: [], weekly: [], computedAt: '' },
+        )
+      : Promise.resolve({
+          data: { years: [], series: [], weekly: [], computedAt: '' },
+          failed: false,
+        }),
+    view === 'home'
+      ? loadPortalComponentData(
+          'corpus-range',
+          () => getCachedCorpusRange(sourceKey),
+          { firstYear: 0, currentYear: 0 },
+        )
+      : Promise.resolve({
+          data: { firstYear: 0, currentYear: 0 },
+          failed: false,
+        }),
     loadPortalComponentData(
       'corpus-stats',
       () => getCachedCorpusStats(sourceKey),
       { totalTweets: 0, generatedAt: new Date().toISOString() },
     ),
-    loadPortalComponentData(
-      'live-analytics',
-      () => getCachedLiveAnalytics(sourceKey),
-      {
-        streamedLast24Hours: 0,
-        latestObservedAt: null,
-      },
-    ),
-    loadPortalComponentData(
-      'member-count',
-      () => getCachedMemberCount(sourceKey),
-      0,
-    ),
-    loadPortalComponentData(
-      'joined-this-week',
-      () => getCachedJoinedThisWeek(sourceKey),
-      0,
-    ),
+    view === 'home'
+      ? loadPortalComponentData(
+          'live-analytics',
+          () => getCachedLiveAnalytics(sourceKey),
+          {
+            streamedLast24Hours: 0,
+            latestObservedAt: null,
+          },
+        )
+      : Promise.resolve({
+          data: { streamedLast24Hours: 0, latestObservedAt: null },
+          failed: false,
+        }),
+    view === 'home'
+      ? loadPortalComponentData(
+          'member-count',
+          () => getCachedMemberCount(sourceKey),
+          0,
+        )
+      : Promise.resolve({ data: 0, failed: false }),
+    view === 'home'
+      ? loadPortalComponentData(
+          'joined-this-week',
+          () => getCachedJoinedThisWeek(sourceKey),
+          0,
+        )
+      : Promise.resolve({ data: 0, failed: false }),
     loadPortalComponentData(
       'initial-stream',
       () =>
         view === 'home'
           ? getCachedHomepageStreamCandidates(sourceKey)
-          : getCachedInitialStream(sourceKey),
+          : getPortalStreamPage(30),
       [],
     ),
     view === 'home'

@@ -263,3 +263,88 @@ describe('portal component failures', () => {
     expect(screen.queryByText('Explore the archive')).not.toBeInTheDocument()
   })
 })
+
+describe('portal stream page', () => {
+  beforeEach(() => {
+    jest.useFakeTimers()
+    jest.setSystemTime(Date.parse('2026-08-07T13:00:00.000Z'))
+    Object.defineProperty(global, 'IntersectionObserver', {
+      configurable: true,
+      value: jest.fn(() => ({
+        disconnect: jest.fn(),
+        observe: jest.fn(),
+        takeRecords: jest.fn(),
+        unobserve: jest.fn(),
+      })),
+    })
+  })
+
+  afterEach(() => {
+    jest.clearAllTimers()
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+    Reflect.deleteProperty(global, 'IntersectionObserver')
+  })
+
+  test('keeps trend analysis off the live stream page', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ tweets: [], updateCursor: null }),
+    } as Response)
+
+    const { unmount } = render(<Portal data={data} view="stream" />)
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByText('Trends in ideas')).not.toBeInTheDocument()
+    expect(screen.queryByText('Rising this week')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cooling this week')).not.toBeInTheDocument()
+
+    unmount()
+  })
+
+  test('jumps a truncated update backlog to the current stream head', async () => {
+    const backlog = Array.from({ length: 100 }, (_, index) => ({
+      ...seedTweet,
+      id: String(500 + index),
+      text: `backlog tweet ${index + 1}`,
+      observedAt: new Date(
+        Date.parse('2026-08-07T12:00:01.000Z') + index,
+      ).toISOString(),
+    }))
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          tweets: backlog,
+          backlogTruncated: true,
+          updateCursor: {
+            observedAt: backlog.at(-1)?.observedAt,
+            id: backlog.at(-1)?.id,
+          },
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ tweets: [freshTweet], hasMore: true }),
+      } as Response)
+
+    const { unmount } = render(<Portal data={data} view="stream" />)
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(String(fetchMock.mock.calls[1][0])).toBe('/api/portal/stream')
+    expect(screen.getByText('fresh tweet')).toBeInTheDocument()
+    expect(screen.queryByText('seed tweet')).not.toBeInTheDocument()
+    expect(screen.queryByText('backlog tweet 1')).not.toBeInTheDocument()
+
+    unmount()
+  })
+})

@@ -1,5 +1,46 @@
 export type YearRangeHandle = 'start' | 'end'
 
+export const SOCIAL_GRAPH_DEFAULTS = {
+  minimumFollowers: 517,
+  startYear: 2021,
+  endYear: 2026,
+  minimumStrength: 0.3,
+  maximumNodes: 720,
+  labelPercentage: 20,
+  clustering: 'louvain',
+  layout: 'clustered-force',
+} as const
+
+export function getSocialGraphDefaultSettings(bounds: {
+  minYear: number
+  maxYear: number
+  maxFollowers: number
+  nodeCount: number
+}) {
+  const startYear = Math.max(
+    bounds.minYear,
+    Math.min(bounds.maxYear, SOCIAL_GRAPH_DEFAULTS.startYear),
+  )
+  const endYear = Math.max(
+    startYear,
+    Math.min(bounds.maxYear, SOCIAL_GRAPH_DEFAULTS.endYear),
+  )
+
+  return {
+    ...SOCIAL_GRAPH_DEFAULTS,
+    minimumFollowers: Math.min(
+      SOCIAL_GRAPH_DEFAULTS.minimumFollowers,
+      Math.max(0, bounds.maxFollowers),
+    ),
+    startYear,
+    endYear,
+    maximumNodes: Math.min(
+      SOCIAL_GRAPH_DEFAULTS.maximumNodes,
+      Math.max(0, bounds.nodeCount),
+    ),
+  }
+}
+
 export function updateYearRange(
   startYear: number,
   endYear: number,

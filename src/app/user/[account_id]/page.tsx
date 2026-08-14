@@ -132,6 +132,7 @@ export default async function UserPage({ params, searchParams }: PageProps) {
           avatarUrl={profile.avatar_media_url}
           basePath={canonicalProfilePath}
           chapters={navChapters}
+          displayName={profile.account_display_name}
           initialYear={year}
           initialPage={initialPage}
           initialSidebar={sidebar}

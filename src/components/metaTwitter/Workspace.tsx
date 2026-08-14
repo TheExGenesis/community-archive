@@ -3,7 +3,14 @@
 import type { RefObject } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { Info } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { formatNumber } from '@/lib/formatNumber'
 import { bangerPortalTweet } from '@/lib/metaTwitter/bangerPortalTweet'
 import { tweetPermalinkHref } from '@/lib/navigation'
@@ -13,6 +20,9 @@ import type {
   ArchivePerson,
   BangerTweet,
 } from '@/lib/metaTwitter/types'
+
+export const BANGER_SCORE_EXPLANATION =
+  'Banger score is the number of archived quote posts from Community Archive members, excluding self-quotes.'
 
 const personHue = (handle: string) => {
   let hue = 0
@@ -25,7 +35,6 @@ const personHue = (handle: string) => {
 export function Workspace({
   avatarUrl,
   contextTitle,
-  contextDesc,
   tweets,
   bangersAvailable,
   bangersLoading,
@@ -46,7 +55,6 @@ export function Workspace({
 }: {
   avatarUrl: string | null
   contextTitle: string
-  contextDesc: string
   tweets: BangerTweet[]
   bangersAvailable: boolean
   bangersLoading: boolean
@@ -71,13 +79,26 @@ export function Workspace({
   return (
     <main className="flex min-w-0 flex-col gap-4 px-4 py-4 sm:px-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+        <div className="flex min-w-0 items-center gap-2">
           <h2 id="profile-bangers-heading" className="text-xl font-extrabold">
             {contextTitle}
           </h2>
-          <p className="max-w-2xl text-[13px] text-muted-foreground">
-            {contextDesc}
-          </p>
+          <TooltipProvider delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="How banger score works"
+                  className="inline-flex h-5 w-5 flex-none items-center justify-center rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  <Info className="h-3 w-3" aria-hidden="true" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                {BANGER_SCORE_EXPLANATION}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
         <label className="flex shrink-0 items-center gap-2 text-[13px] text-muted-foreground">
           <span className="sr-only">Sort bangers</span>

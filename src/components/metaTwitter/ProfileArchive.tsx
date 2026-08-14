@@ -57,6 +57,7 @@ export function ProfileArchive({
   avatarUrl,
   basePath,
   chapters,
+  displayName,
   initialYear,
   initialPage,
   initialSidebar,
@@ -65,6 +66,7 @@ export function ProfileArchive({
   avatarUrl: string | null
   basePath: string
   chapters: NavChapter[]
+  displayName: string
   initialYear: number | null
   initialPage: ProfileBangersPageState
   initialSidebar: SidebarData
@@ -356,18 +358,9 @@ export function ProfileArchive({
     return loadNextPage(activeYear, sort)
   }, [activeFeed, activeYear, loadFeedPage, loadNextPage, sort])
 
-  const total =
-    activeFeed?.total ??
-    (activeYear === null
-      ? chapters.reduce((sum, chapter) => sum + chapter.count, 0)
-      : (chapters.find((chapter) => chapter.year === activeYear)?.count ?? 0))
-  const context = {
-    title: activeYear ? `${activeYear} bangers` : 'Overall — Bangers',
-    description:
-      activeFeed?.available === false
-        ? 'The Community Archive banger ranking is temporarily unavailable.'
-        : `${total} banger${total === 1 ? '' : 's'}${activeYear ? ` in ${activeYear}` : ''} · 2+ Community Archive member quote posts · self-quotes excluded`,
-  }
+  const contextTitle = activeYear
+    ? `Best of ${activeYear}`
+    : `Best of ${displayName}`
 
   const returnTo = archiveChapterHref(basePath, activeYear)
 
@@ -382,8 +375,7 @@ export function ProfileArchive({
       <Workspace
         key={`${activeKey}:${activeFeed ? 'ready' : 'loading'}`}
         avatarUrl={avatarUrl}
-        contextTitle={context.title}
-        contextDesc={context.description}
+        contextTitle={contextTitle}
         tweets={activeFeed?.tweets ?? []}
         bangersAvailable={activeFeed?.available !== false}
         bangersLoading={activeFeedLoading || (!activeFeed && !activeFeedFailed)}

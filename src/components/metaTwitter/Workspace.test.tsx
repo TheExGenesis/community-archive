@@ -1,7 +1,7 @@
 import { createRef } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Workspace } from './Workspace'
+import { BANGER_SCORE_EXPLANATION, Workspace } from './Workspace'
 import type { BangerTweet } from '@/lib/metaTwitter/types'
 
 jest.mock('next/navigation', () => ({
@@ -74,8 +74,7 @@ test('shows the initial canonical banger cards with media and profile return lin
   render(
     <Workspace
       avatarUrl={null}
-      contextTitle="Overall — Bangers"
-      contextDesc="Quoted at least twice."
+      contextTitle="Best of Alice"
       tweets={tweets.slice(0, 2)}
       bangersAvailable
       bangersLoading={false}
@@ -97,12 +96,26 @@ test('shows the initial canonical banger cards with media and profile return lin
   )
 
   expect(
-    screen.getAllByRole('heading', { name: 'Overall — Bangers' }),
+    screen.getAllByRole('heading', { name: 'Best of Alice' }),
   ).toHaveLength(1)
   expect(
     screen.queryByRole('heading', { name: 'Bangers' }),
   ).not.toBeInTheDocument()
-  expect(screen.getByText('Quoted at least twice.')).toBeVisible()
+  expect(
+    screen.queryByText(
+      '167 bangers · 2+ Community Archive member quote posts · self-quotes excluded',
+    ),
+  ).not.toBeInTheDocument()
+
+  const scoreInfo = screen.getByRole('button', {
+    name: 'How banger score works',
+  })
+  expect(scoreInfo).toBeVisible()
+  await user.hover(scoreInfo)
+  const scoreExplanations = await screen.findAllByText(BANGER_SCORE_EXPLANATION)
+  expect(
+    scoreExplanations.find((element) => element.getAttribute('role') === null),
+  ).toBeVisible()
 
   expect(
     screen.getByRole('link', {

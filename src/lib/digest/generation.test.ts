@@ -58,32 +58,38 @@ const modelOutput = {
     'The archive debated taste, remembered a group house, and started mining a new parquet release.',
   stories: [
     {
-      category: 'AI',
+      category: 'AI news',
       keyword: 'taste',
-      title: 'Taste became a benchmark and a public argument',
+      title: 'taste benchmarks are becoming public rituals',
       subtitle:
         'A forecasting claim turned into a disagreement about prediction, endorsement, and embarrassment.',
       bullets: ['The strongest counterpoint separated prediction from taste.'],
+      editorial_note:
+        'The disagreement matters more than treating one post as a settled verdict.',
       banger_tweet_ids: ['1'],
       commentary_tweet_ids: ['11'],
     },
     {
-      category: 'culture',
+      category: 'Culture',
       keyword: 'group house',
-      title: 'A kitchen whiteboard became the group-house memorial',
+      title: 'the group house kitchen whiteboard deserves an archive',
       subtitle:
         'A small shared object carried the day’s larger conversation about communal memory.',
       bullets: ['Posts used shared objects to tell the story of a house.'],
+      editorial_note:
+        'The object is useful because it anchors a broader conversation in something concrete.',
       banger_tweet_ids: ['2'],
       commentary_tweet_ids: ['22'],
     },
     {
-      category: 'science',
+      category: 'News',
       keyword: 'parquet',
-      title: 'Reply graphs arrived in the new parquet release',
+      title: 'the parquet release now contains reply graphs',
       subtitle:
         'Researchers immediately connected the release format to new ways of studying archived conversations.',
       bullets: ['The release made reply-graph analysis easier to begin.'],
+      editorial_note:
+        'This is a release story, with the surrounding posts showing how researchers might use it.',
       banger_tweet_ids: ['3'],
       commentary_tweet_ids: ['33'],
     },
@@ -124,11 +130,12 @@ describe('daily digest generation contract', () => {
     expect(edition.stories).toHaveLength(3)
     expect(edition.stories[0]).toMatchObject({
       slug: 'taste',
-      category: 'AI',
+      category: 'AI news',
       keyword: 'taste',
       replyCount: 12,
     })
     expect(edition.stories[0].commentary[0].id).toBe('11')
+    expect(edition.stories[0].editorialNote).toContain('settled verdict')
     expect(edition.source).toEqual({
       candidateCount: 12,
       selectedCount: 3,
@@ -194,5 +201,28 @@ describe('daily digest generation contract', () => {
         },
       }),
     ).toThrow('Story 1 is incomplete')
+  })
+
+  test('rejects generated headlines that are not excerpts from a supplied post', () => {
+    expect(() =>
+      assembleDigestEditionContent({
+        runId: 'run-1',
+        digestDate: '2026-08-12',
+        windowStart: '2026-08-11T12:00:00.000Z',
+        windowEnd: '2026-08-12T12:00:00.000Z',
+        allCandidateCount: 3,
+        enrichedCandidates: candidates,
+        modelOutput: {
+          ...modelOutput,
+          stories: [
+            {
+              ...modelOutput.stories[0],
+              title: 'Taste became the benchmark of the day',
+            },
+            ...modelOutput.stories.slice(1),
+          ],
+        },
+      }),
+    ).toThrow('title must be a three- to eighteen-word excerpt')
   })
 })

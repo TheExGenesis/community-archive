@@ -19,6 +19,7 @@ interface ModelStory {
   title: string
   subtitle: string
   bullets: string[]
+  editorialNote: string
   bangerTweetIds: string[]
   commentaryTweetIds: string[]
 }
@@ -63,6 +64,22 @@ const normalizedCorpus = (candidates: EnrichedDigestCandidate[]) =>
     .join('\n')
     .toLocaleLowerCase('en-US')
 
+const normalizedExcerpt = (value: string) =>
+  value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-US')
+
+const titleOccursInOnePost = (
+  title: string,
+  candidates: EnrichedDigestCandidate[],
+) => {
+  const excerpt = normalizedExcerpt(title)
+  return candidates
+    .flatMap(({ candidate, commentary }) => [
+      candidate.tweet.text,
+      ...commentary.map((tweet) => tweet.text),
+    ])
+    .some((text) => normalizedExcerpt(text).includes(excerpt))
+}
+
 const cleanCategory = (value: unknown): DigestStoryCategory | null =>
   typeof value === 'string' &&
   DIGEST_STORY_CATEGORIES.some((category) => category === value)
@@ -103,6 +120,7 @@ function parseModelDigest(
     const title = cleanText(story.title, 140)
     const subtitle = cleanText(story.subtitle, 280)
     const bullets = cleanStringArray(story.bullets, 3, 220)
+    const editorialNote = cleanText(story.editorial_note, 360)
     const bangerTweetIds = cleanStringArray(story.banger_tweet_ids, 6, 20)
     const commentaryTweetIds = cleanStringArray(
       story.commentary_tweet_ids,
@@ -115,10 +133,21 @@ function parseModelDigest(
       !title ||
       !subtitle ||
       !bullets?.length ||
+      !editorialNote ||
       !bangerTweetIds?.length ||
       !commentaryTweetIds
     ) {
       throw new Error(`Story ${index + 1} is incomplete`)
+    }
+    const titleWordCount = title.split(/\s+/).length
+    if (
+      titleWordCount < 3 ||
+      titleWordCount > 18 ||
+      !titleOccursInOnePost(title, candidates)
+    ) {
+      throw new Error(
+        `Story ${index + 1} title must be a three- to eighteen-word excerpt from one supplied post`,
+      )
     }
     if (!corpus.includes(keyword.toLocaleLowerCase('en-US'))) {
       throw new Error(`Story keyword “${keyword}” does not occur in the posts`)
@@ -141,6 +170,7 @@ function parseModelDigest(
       title,
       subtitle,
       bullets,
+      editorialNote,
       bangerTweetIds,
       commentaryTweetIds,
     }
@@ -240,6 +270,7 @@ export function assembleDigestEditionContent(input: {
       title: story.title,
       subtitle: story.subtitle,
       bullets: story.bullets,
+      editorialNote: story.editorialNote,
       bangers: storyBangers,
       commentary: storyCommentary,
       replyCount: related.reduce(

@@ -66,7 +66,7 @@ export function DigestStoryView({
             className="mt-4 text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl"
             style={SERIF}
           >
-            {story.title}
+            “{story.title}”
           </h1>
           <p className={`mt-4 text-lg leading-8 ${MUTED}`}>{story.subtitle}</p>
         </header>

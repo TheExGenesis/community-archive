@@ -29,9 +29,17 @@ edition are clickable.
 
 Story cards use the canonical full-fidelity `TweetCard`: text is never clamped,
 and archived media, video thumbnails, and quoted tweets remain visible. Every
-story also carries a broad editorial category alongside its exact corpus
-keyword. The category may be AI-generated from a fixed taxonomy; the keyword
-must still occur verbatim in the supplied posts.
+story carries one intentionally loose editorial label alongside its exact corpus
+keyword. Current labels include `AI news`, `News`, `Viral joke`, `Meme`,
+`Culture`, `Opportunity`, and `Other`; they are useful shelves rather than a
+formal taxonomy. The keyword must still occur verbatim in the supplied posts.
+Keyword pills link to the existing archive search.
+
+Story titles are not generated headlines. Each is a three- to eighteen-word
+contiguous excerpt copied verbatim from one supplied banger or quote post. The
+server validates that grounding before an edition can be staged. The generated
+subtitle supplies connective context; the story page keeps source-grounded
+`In brief` bullets and a short editor's note for interpretation or caveats.
 
 Set the server-only `DIGEST_MOCK_DATA=true` flag to show the fixture in another
 non-production environment. Do not set it in production.
@@ -71,10 +79,9 @@ A generation attempt is immutable once it starts. Use **Clone as new run** to
 reuse the exact frozen source snapshot with the same or a newer prompt version;
 this preserves failed and successful model responses for comparison.
 
-Every story keyword must occur verbatim in a supplied banger or commentary
-post. This is an executable guard against generic AI-derived topic labels. The
-separate category is selected from `AI`, `joke`, `participatory meme`,
-`culture`, `science`, `politics`, `opportunity`, or `other`.
+Every story keyword and title excerpt must occur verbatim in supplied posts.
+These are executable guards against generic AI-derived topic labels and
+newsletter-style headlines. The loose editorial label is generated separately.
 
 ## Observability
 
@@ -108,10 +115,10 @@ Do not expose any of these with a `NEXT_PUBLIC_` prefix. Public digest reads use
 the normal anonymous Supabase client and the `status = 'published'` RLS policy.
 
 The current prompt uses `gpt-5.6-terra`, low reasoning effort, and a 5,000-token
-output ceiling. Its structured output requires the category taxonomy and asks
-for plain-language headlines plus useful quote-post context. The lab can fork
-this into a new immutable version. It does not modify a prompt referenced by
-prior runs.
+output ceiling. Its structured output requires one loose editorial label, a
+verbatim title excerpt, source-grounded `In brief` bullets, an editor's note,
+and useful quote-post context. The lab can fork this into a new immutable
+version. It does not modify a prompt referenced by prior runs.
 
 ## Rollout gates
 
@@ -119,7 +126,9 @@ Automation is deliberately disabled during the editorial experiment. Before a
 daily timer or weekly Substack send is enabled:
 
 1. Apply `20260813000650_add_daily_digest_editorial_workspace.sql` and
-   `20260814034817_add_daily_digest_story_categories.sql` to staging.
+   the subsequent Daily Digest prompt-version migrations through
+   `20260814044019_refine_daily_digest_editorial_labels_and_headlines.sql` to
+   staging.
 2. Run database security and performance advisors; verify anonymous users can
    read only published rows and cannot call `publish_digest_edition`.
 3. Produce representative weekday and weekend runs, including sparse and noisy

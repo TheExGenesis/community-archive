@@ -19,6 +19,7 @@ const DIGEST_JSON_SCHEMA = {
           'title',
           'subtitle',
           'bullets',
+          'editorial_note',
           'banger_tweet_ids',
           'commentary_tweet_ids',
         ],
@@ -28,13 +29,18 @@ const DIGEST_JSON_SCHEMA = {
             enum: DIGEST_STORY_CATEGORIES,
           },
           keyword: { type: 'string', minLength: 2, maxLength: 60 },
-          title: { type: 'string', minLength: 12, maxLength: 140 },
+          title: { type: 'string', minLength: 8, maxLength: 140 },
           subtitle: { type: 'string', minLength: 20, maxLength: 280 },
           bullets: {
             type: 'array',
             minItems: 1,
             maxItems: 3,
             items: { type: 'string', minLength: 12, maxLength: 220 },
+          },
+          editorial_note: {
+            type: 'string',
+            minLength: 30,
+            maxLength: 360,
           },
           banger_tweet_ids: {
             type: 'array',

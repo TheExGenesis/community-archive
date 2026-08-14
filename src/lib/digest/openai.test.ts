@@ -61,7 +61,10 @@ describe('OpenAI digest adapter', () => {
     expect(
       request.text.format.schema.properties.stories.items.properties.category
         .enum,
-    ).toContain('participatory meme')
+    ).toContain('Viral joke')
+    expect(
+      request.text.format.schema.properties.stories.items.required,
+    ).toContain('editorial_note')
     expect(result).toMatchObject({
       responseId: 'resp_123',
       totalTokens: 125,

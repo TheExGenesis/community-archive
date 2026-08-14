@@ -4,6 +4,7 @@ import TweetCard from '@/components/TweetCard'
 import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
 import type { DigestEdition } from '@/lib/digest/types'
 import { firstStoryMedia } from '@/lib/digest/storyMedia'
+import { buildSearchHref } from '@/lib/searchParams'
 import { CARD, MUTED, SERIF } from '@/components/portal/styles'
 
 const SUBSCRIBE_URL = 'https://xiqo.substack.com/subscribe'
@@ -16,14 +17,6 @@ const longDate = (date: string) =>
     year: 'numeric',
     timeZone: 'UTC',
   }).format(new Date(`${date}T12:00:00Z`))
-
-const archivedQuoteCount = (
-  editionStory: DigestEdition['content']['stories'][number],
-) =>
-  editionStory.bangers.reduce(
-    (total, tweet) => total + (tweet.quoteCount ?? 0),
-    0,
-  )
 
 export function DigestEditionView({
   edition,
@@ -88,15 +81,14 @@ export function DigestEditionView({
               >
                 Top banger
               </div>
-              <div className={`${CARD} overflow-hidden`}>
-                <TweetCard
-                  tweet={content.topBanger}
-                  noClamp
-                  showDate
-                  origin="digest"
-                  returnTo={returnTo}
-                />
-              </div>
+              <TweetCard
+                tweet={content.topBanger}
+                featuredRank={1}
+                noClamp
+                showDate
+                origin="digest"
+                returnTo={returnTo}
+              />
             </section>
 
             <div className="border-t border-zinc-950 pt-7 dark:border-zinc-100">
@@ -126,18 +118,12 @@ export function DigestEditionView({
                         <span className="rounded-full bg-blue-100 px-2.5 py-1 font-semibold text-blue-950 dark:bg-blue-950 dark:text-blue-100">
                           {story.category ?? 'Story'}
                         </span>
-                        <span className="font-medium">{story.keyword}</span>
-                        <span>
-                          · {story.bangers.length} banger
-                          {story.bangers.length === 1 ? '' : 's'}
-                        </span>
-                        <span>
-                          · {archivedQuoteCount(story)} archived quote
-                          {archivedQuoteCount(story) === 1 ? '' : 's'}
-                        </span>
-                        {story.replyCount > 0 ? (
-                          <span>· {story.replyCount} archived replies</span>
-                        ) : null}
+                        <Link
+                          href={buildSearchHref(story.keyword)}
+                          className="rounded-sm font-medium hover:text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                        >
+                          {story.keyword}
+                        </Link>
                       </div>
                       <h2
                         className="mt-3 text-2xl font-semibold leading-tight sm:text-3xl"
@@ -147,7 +133,7 @@ export function DigestEditionView({
                           href={`/digest/${edition.digestDate}/${story.slug}`}
                           className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                         >
-                          {story.title}
+                          “{story.title}”
                         </Link>
                       </h2>
                       <p
@@ -191,12 +177,14 @@ export function DigestEditionView({
               <h2 className="font-semibold">Keywords in this edition</h2>
               <div className="mt-3 flex flex-wrap gap-2">
                 {content.keywords.map((keyword) => (
-                  <span
+                  <Link
                     key={keyword}
-                    className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs dark:bg-zinc-800"
+                    href={buildSearchHref(keyword)}
+                    aria-label={`Search Community Archive for ${keyword}`}
+                    className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs transition-colors hover:bg-blue-100 hover:text-blue-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:bg-zinc-800 dark:hover:bg-blue-950 dark:hover:text-blue-100"
                   >
                     {keyword}
-                  </span>
+                  </Link>
                 ))}
               </div>
             </section>

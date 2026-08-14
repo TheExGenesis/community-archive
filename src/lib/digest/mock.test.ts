@@ -18,7 +18,22 @@ describe('daily digest preview fixture', () => {
     })
     expect(
       AUGUST_11_MOCK_DIGEST.content.stories.map((story) => story.category),
-    ).toEqual(['AI', 'joke', 'AI', 'participatory meme', 'AI'])
+    ).toEqual(['AI news', 'Viral joke', 'AI news', 'Meme', 'AI news'])
+    expect(AUGUST_11_MOCK_DIGEST.content.topBanger.text).toContain(
+      'True and pure moon-posting is done from reverence and love.',
+    )
+    expect(
+      AUGUST_11_MOCK_DIGEST.content.stories.every((story) =>
+        [...story.bangers, ...story.commentary].some((tweet) =>
+          tweet.text
+            .replace(/\s+/g, ' ')
+            .toLocaleLowerCase('en-US')
+            .includes(
+              story.title.replace(/\s+/g, ' ').toLocaleLowerCase('en-US'),
+            ),
+        ),
+      ),
+    ).toBe(true)
     expect(
       AUGUST_11_MOCK_DIGEST.content.stories.every((story) =>
         Boolean(firstStoryMedia(story)),
@@ -41,5 +56,19 @@ describe('daily digest preview fixture', () => {
         DIGEST_MOCK_DATA: 'true',
       }),
     ).toBe(true)
+  })
+
+  test('normalizes labels from editions saved under the prior taxonomy', () => {
+    const legacy = structuredClone(AUGUST_11_MOCK_DIGEST.content)
+    legacy.stories[0].category =
+      'AI' as (typeof legacy.stories)[number]['category']
+    legacy.stories[1].category =
+      'joke' as (typeof legacy.stories)[number]['category']
+
+    expect(
+      parseDigestEditionContent(legacy)
+        ?.stories.slice(0, 2)
+        .map((story) => story.category),
+    ).toEqual(['AI news', 'Viral joke'])
   })
 })

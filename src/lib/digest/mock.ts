@@ -41,7 +41,7 @@ const moonPosting = mockTweet({
   name: 'lune',
   avatar:
     'https://pbs.twimg.com/profile_images/2077176550525452288/qLX7Y1Hu_normal.jpg',
-  text: 'Oh my god I casually mentioned to a chat that I’m in that if men want to attract women to their posts and DMs, they basically just have to post about the moon. Multiple guys are trying it. One of the men mentioned it in another chat he’s in and the moon-posting-fishing is',
+  text: 'Oh my god I casually mentioned to a chat that I’m in that if men want to attract women to their posts and DMs, they basically just have to post about the moon. Multiple guys are trying it. One of the men mentioned it in another chat he’s in and the moon-posting-fishing is SPREADING\n\nStay vigilant ladies, they are NOT posting from the heart! True and pure moon-posting is done from reverence and love.',
   createdAt: '2026-08-12T05:03:12.000Z',
   likes: 416,
   quoteCount: 7,
@@ -612,9 +612,9 @@ export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
     stories: [
       {
         slug: 'hidden-reasoning-leaked-secrets',
-        category: 'AI',
+        category: 'AI news',
         keyword: 'hidden reasoning',
-        title: 'Researchers say hidden AI reasoning traces can leak secrets',
+        title: 'We found a way to extract hidden reasoning of frontier models',
         subtitle:
           'A reported API exploit exposed chain-of-thought—and credentials inside public Claude Code and Codex sessions.',
         bullets: [
@@ -635,9 +635,9 @@ export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
       },
       {
         slug: 'moon-posting-meets-ai-ambition',
-        category: 'joke',
+        category: 'Viral joke',
         keyword: 'moon',
-        title: 'Moon-posting became dating bait',
+        title: 'True and pure moon-posting is done from reverence and love',
         subtitle:
           'Two viral posts asked what online courtship looks like when people optimize for engagement—or put AI careers before romance.',
         bullets: [
@@ -654,9 +654,9 @@ export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
       },
       {
         slug: 'grok-bot-little-guy',
-        category: 'AI',
+        category: 'AI news',
         keyword: 'little guy',
-        title: 'Grok Bot turns AI agents into branded coworkers',
+        title: 'Bots are AI teammates that do real work for you',
         subtitle:
           'The launch introduced a bot that signs into tools and returns finished work, wrapped in the industry’s latest cute mascot.',
         bullets: [
@@ -673,9 +673,10 @@ export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
       },
       {
         slug: 'formative-women-meme',
-        category: 'participatory meme',
+        category: 'Meme',
         keyword: 'formative years',
-        title: 'People shared the women who shaped them',
+        title:
+          'You have to understand, these were the women I looked up to in my formative years',
         subtitle:
           'One image prompt became a participatory meme about fictional characters, writers, performers, and role models.',
         bullets: [
@@ -697,10 +698,10 @@ export const AUGUST_11_MOCK_DIGEST: DigestEdition = {
       },
       {
         slug: 'gemini-ai-race-measurement',
-        category: 'AI',
+        category: 'AI news',
         keyword: 'AI race',
         title:
-          'Gemini says it reached 1B users. Another chart says OpenAI leads.',
+          'Using this emergent behavior, we can watch the shifting market share in the AI race',
         subtitle:
           'The posts measure different things—monthly users and detected AI-written text—so they tell different stories about the AI race.',
         bullets: [

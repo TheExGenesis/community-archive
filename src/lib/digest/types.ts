@@ -9,14 +9,13 @@ export type DigestRunStatus =
 export type DigestEditionStatus = 'draft' | 'published' | 'archived'
 
 export const DIGEST_STORY_CATEGORIES = [
-  'AI',
-  'joke',
-  'participatory meme',
-  'culture',
-  'science',
-  'politics',
-  'opportunity',
-  'other',
+  'AI news',
+  'News',
+  'Viral joke',
+  'Meme',
+  'Culture',
+  'Opportunity',
+  'Other',
 ] as const
 
 export type DigestStoryCategory = (typeof DIGEST_STORY_CATEGORIES)[number]
@@ -52,7 +51,7 @@ export interface DigestPromptVersion {
 
 export interface DigestStory {
   slug: string
-  /** Broad editorial shelf; older saved editions may predate categories. */
+  /** Loose editorial label; older saved editions may predate categories. */
   category?: DigestStoryCategory
   keyword: string
   title: string
@@ -144,6 +143,27 @@ const isNonnegativeNumber = (value: unknown): value is number =>
 const isDigestStoryCategory = (value: unknown): value is DigestStoryCategory =>
   DIGEST_STORY_CATEGORIES.some((category) => category === value)
 
+const LEGACY_DIGEST_STORY_CATEGORIES: Record<string, DigestStoryCategory> = {
+  AI: 'AI news',
+  joke: 'Viral joke',
+  'participatory meme': 'Meme',
+  culture: 'Culture',
+  science: 'News',
+  politics: 'News',
+  opportunity: 'Opportunity',
+  other: 'Other',
+}
+
+const normalizeDigestStoryCategory = (
+  value: unknown,
+): DigestStoryCategory | undefined => {
+  if (value === undefined) return undefined
+  if (isDigestStoryCategory(value)) return value
+  return typeof value === 'string'
+    ? LEGACY_DIGEST_STORY_CATEGORIES[value]
+    : undefined
+}
+
 export function isPortalTweet(value: unknown): value is PortalTweet {
   if (!isRecord(value)) return false
   return (
@@ -209,12 +229,13 @@ export function parseDigestEditionContent(
   }
 
   const stories = value.stories.flatMap((story) => {
+    const category = isRecord(story)
+      ? normalizeDigestStoryCategory(story.category)
+      : undefined
     if (
       !isRecord(story) ||
       !isString(story.slug) ||
-      !(
-        story.category === undefined || isDigestStoryCategory(story.category)
-      ) ||
+      !(story.category === undefined || category !== undefined) ||
       !isString(story.keyword) ||
       !isString(story.title) ||
       !isString(story.subtitle) ||
@@ -230,7 +251,12 @@ export function parseDigestEditionContent(
     ) {
       return []
     }
-    return [story as unknown as DigestStory]
+    return [
+      {
+        ...story,
+        ...(category ? { category } : {}),
+      } as unknown as DigestStory,
+    ]
   })
 
   if (stories.length !== value.stories.length || stories.length === 0) {

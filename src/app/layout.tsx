@@ -55,9 +55,9 @@ export default async function RootLayout({
 }) {
   const [isAdmin, isMember] = await Promise.all([checkIsAdmin(), getIsMember()])
   const showClickHouseLab = isAdmin && isClickHouseLabEnvironmentEnabled()
-  const primaryNav = getPrimaryNav(isMember)
+  const primaryNav = getPrimaryNav(isMember, isAdmin)
   const utilityNav = getUtilityNav(isMember)
-  const mobileNav = getMobileNav(isMember)
+  const mobileNav = getMobileNav(isMember, isAdmin)
   return (
     <html
       lang="en"

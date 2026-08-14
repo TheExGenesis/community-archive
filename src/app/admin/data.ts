@@ -191,13 +191,15 @@ export async function checkIsAdmin(): Promise<boolean> {
   return isAdminUser(user)
 }
 
-export async function requireAdmin() {
+export async function requireAdmin(
+  loginReturnPath: '/admin' | '/social-graph' = '/admin',
+) {
   // getCurrentUser is request-cached, so the root layout, page, and streamed
   // admin sections share one Supabase Auth round trip.
   const user = await getCurrentUser()
 
   if (!user) {
-    redirect('/login?redirect=/admin')
+    redirect(`/login?redirect=${loginReturnPath}`)
   }
 
   // The staging allowance is now baked into isAdminUser (specific

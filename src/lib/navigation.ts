@@ -4,6 +4,7 @@ import { isTwitterUsername } from './apiInputValidation'
 export interface NavItem {
   href: string
   label: string
+  tone?: 'muted'
 }
 
 export type TweetOrigin =
@@ -135,16 +136,18 @@ export function getTweetBackLink(searchParams?: {
  * built on it, and how to contribute.
  * Logged in: the portal workspace — the member's daily views of the data.
  */
-export const getPrimaryNav = (isMember: boolean): NavItem[] =>
-  isMember
+export const getPrimaryNav = (isMember: boolean, isAdmin = false): NavItem[] =>
+  isMember || isAdmin
     ? [
-        { href: '/', label: 'Home' },
-        { href: '/user-dir', label: 'Users' },
-        { href: '/stream', label: 'Live stream' },
         { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
-        { href: '/digest', label: 'Digest' },
+        { href: '/user-dir', label: 'Users' },
         { href: '/trends', label: 'Trends' },
-        { href: '/social-graph', label: 'Graph' },
+        { href: '/stream', label: 'Live stream' },
+        ...(isAdmin
+          ? ([
+              { href: '/social-graph', label: 'Graph', tone: 'muted' },
+            ] satisfies NavItem[])
+          : []),
         { href: '/research', label: 'Research' },
       ]
     : [
@@ -160,8 +163,8 @@ export const getUtilityNav = (isMember: boolean): NavItem[] =>
   isMember ? [{ href: '/docs', label: 'Docs' }] : []
 
 /** Everything the mobile hamburger shows: primary + utilities + search. */
-export const getMobileNav = (isMember: boolean): NavItem[] => [
-  ...getPrimaryNav(isMember),
+export const getMobileNav = (isMember: boolean, isAdmin = false): NavItem[] => [
+  ...getPrimaryNav(isMember, isAdmin),
   ...getUtilityNav(isMember),
   { href: '/search', label: 'Search' },
 ]

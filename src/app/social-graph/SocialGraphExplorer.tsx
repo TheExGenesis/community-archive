@@ -1,6 +1,13 @@
 'use client'
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { UndirectedGraph } from 'graphology'
 import Sigma from 'sigma'
 import type { NodeHoverDrawingFunction } from 'sigma/rendering'
@@ -23,6 +30,7 @@ import type {
 } from '@/lib/socialGraph'
 import {
   filterSocialGraph,
+  followerCountToSlider,
   followerSliderToCount,
 } from '@/lib/socialGraphFilter'
 import type { AdaptiveGraphResult } from '@/lib/socialGraphAdaptive'
@@ -30,7 +38,12 @@ import type {
   SocialGraphWorkerRequest,
   SocialGraphWorkerResponse,
 } from '@/workers/socialGraph.worker'
-import { nodeIdsForLabelCoverage, updateYearRange } from '@/lib/socialGraphView'
+import {
+  getSocialGraphDefaultSettings,
+  nodeIdsForLabelCoverage,
+  SOCIAL_GRAPH_DEFAULTS,
+  updateYearRange,
+} from '@/lib/socialGraphView'
 import { MUTED, SERIF } from '@/components/portal/styles'
 
 interface NodeAttributes {
@@ -51,8 +64,6 @@ interface EdgeAttributes {
   strength: number
 }
 
-const DEFAULT_MAX_VISIBLE_NODES = 650
-const DEFAULT_LABEL_PERCENTAGE = 20
 const NODE_HOVER_DELAY_MS = 1_000
 const STRENGTH_SLIDER_MAX = 3
 const ADAPTIVE_PALETTE = [
@@ -368,27 +379,34 @@ export default function SocialGraphExplorer({
   const hoverCandidateRef = useRef<string | null>(null)
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme !== 'light'
+  const defaultSettings = useMemo(
+    () =>
+      getSocialGraphDefaultSettings({
+        minYear: snapshot.temporal.minYear,
+        maxYear: snapshot.temporal.maxYear,
+        maxFollowers: snapshot.stats.maxFollowers,
+        nodeCount: snapshot.stats.nodeCount,
+      }),
+    [snapshot.stats, snapshot.temporal],
+  )
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(
     null,
   )
   const [query, setQuery] = useState('')
-  const [labelPercentage, setLabelPercentage] = useState(
-    DEFAULT_LABEL_PERCENTAGE,
+  const [labelPercentage, setLabelPercentage] = useState<number>(
+    defaultSettings.labelPercentage,
   )
-  const [followerSlider, setFollowerSlider] = useState(0)
-  const [startYear, setStartYear] = useState(snapshot.temporal.minYear)
-  const [endYear, setEndYear] = useState(snapshot.temporal.maxYear)
-  const [minimumStrength, setMinimumStrength] = useState(
-    Math.min(
-      STRENGTH_SLIDER_MAX,
-      Math.round(snapshot.stats.suggestedMinStrength / 0.05) * 0.05,
-    ),
+  const [minimumFollowers, setMinimumFollowers] = useState(
+    defaultSettings.minimumFollowers,
   )
-  const [maximumNodes, setMaximumNodes] = useState(
-    Math.min(DEFAULT_MAX_VISIBLE_NODES, snapshot.stats.nodeCount),
+  const [startYear, setStartYear] = useState(defaultSettings.startYear)
+  const [endYear, setEndYear] = useState(defaultSettings.endYear)
+  const [minimumStrength, setMinimumStrength] = useState<number>(
+    defaultSettings.minimumStrength,
   )
+  const [maximumNodes, setMaximumNodes] = useState(defaultSettings.maximumNodes)
   const [adaptiveResult, setAdaptiveResult] =
     useState<AdaptiveGraphResult | null>(null)
   const [adaptiveSignature, setAdaptiveSignature] = useState<string | null>(
@@ -396,19 +414,15 @@ export default function SocialGraphExplorer({
   )
   const [isAdapting, setIsAdapting] = useState(false)
   const [adaptiveError, setAdaptiveError] = useState<string | null>(null)
-  const deferredFollowerSlider = useDeferredValue(followerSlider)
+  const deferredMinimumFollowers = useDeferredValue(minimumFollowers)
   const deferredMinimumStrength = useDeferredValue(minimumStrength)
   const deferredMaximumNodes = useDeferredValue(maximumNodes)
-  const minimumFollowers = followerSliderToCount(
-    followerSlider,
-    snapshot.stats.maxFollowers,
-  )
-  const appliedMinimumFollowers = followerSliderToCount(
-    deferredFollowerSlider,
+  const followerSlider = followerCountToSlider(
+    minimumFollowers,
     snapshot.stats.maxFollowers,
   )
   const isPending =
-    deferredFollowerSlider !== followerSlider ||
+    deferredMinimumFollowers !== minimumFollowers ||
     deferredMinimumStrength !== minimumStrength ||
     deferredMaximumNodes !== maximumNodes
   const clusters = useMemo(() => clusterMap(snapshot.clusters), [snapshot])
@@ -419,7 +433,7 @@ export default function SocialGraphExplorer({
   const filtered = useMemo(
     () =>
       filterSocialGraph(snapshot, {
-        minimumFollowers: appliedMinimumFollowers,
+        minimumFollowers: deferredMinimumFollowers,
         minimumStrength: deferredMinimumStrength,
         maximumNodes: deferredMaximumNodes,
         startYear,
@@ -427,7 +441,7 @@ export default function SocialGraphExplorer({
       }),
     [
       snapshot,
-      appliedMinimumFollowers,
+      deferredMinimumFollowers,
       deferredMinimumStrength,
       deferredMaximumNodes,
       endYear,
@@ -439,7 +453,37 @@ export default function SocialGraphExplorer({
       `${filtered.nodes.map((node) => node.id).join(',')}|${filtered.edges.map((edge) => `${edge.source}:${edge.target}:${edge.strength}`).join(',')}`,
     [filtered.edges, filtered.nodes],
   )
-  const adaptiveRunSignature = `${filteredSignature}|louvain|clustered-force`
+  const adaptiveRunSignature = `${filteredSignature}|${SOCIAL_GRAPH_DEFAULTS.clustering}|${SOCIAL_GRAPH_DEFAULTS.layout}`
+  const adaptiveInputRef = useRef({
+    signature: adaptiveRunSignature,
+    nodes: filtered.nodes,
+    edges: filtered.edges,
+  })
+  adaptiveInputRef.current = {
+    signature: adaptiveRunSignature,
+    nodes: filtered.nodes,
+    edges: filtered.edges,
+  }
+  const requestAdaptiveGraph = useCallback((workerOverride?: Worker) => {
+    const worker = workerOverride ?? workerRef.current
+    const input = adaptiveInputRef.current
+    if (!worker || input.nodes.length < 2) return
+    const id = workerRequestRef.current + 1
+    workerRequestRef.current = id
+    workerSignatureRef.current = input.signature
+    setIsAdapting(true)
+    setAdaptiveError(null)
+    const request: SocialGraphWorkerRequest = {
+      id,
+      nodes: input.nodes,
+      edges: input.edges,
+      options: {
+        clustering: SOCIAL_GRAPH_DEFAULTS.clustering,
+        layout: SOCIAL_GRAPH_DEFAULTS.layout,
+      },
+    }
+    worker.postMessage(request)
+  }, [])
   const adaptiveIsCurrent = adaptiveSignature === adaptiveRunSignature
   const adaptiveLegendClusters = useMemo(() => {
     if (!adaptiveResult) return []
@@ -662,11 +706,12 @@ export default function SocialGraphExplorer({
       setIsAdapting(false)
       setAdaptiveError('Adaptive graph worker failed')
     })
+    requestAdaptiveGraph(worker)
     return () => {
       worker.terminate()
-      workerRef.current = null
+      if (workerRef.current === worker) workerRef.current = null
     }
-  }, [])
+  }, [requestAdaptiveGraph])
 
   useEffect(() => {
     const renderer = rendererRef.current
@@ -795,26 +840,6 @@ export default function SocialGraphExplorer({
     })
   }
 
-  const adaptGraph = () => {
-    const worker = workerRef.current
-    if (!worker) return
-    const id = workerRequestRef.current + 1
-    workerRequestRef.current = id
-    workerSignatureRef.current = adaptiveRunSignature
-    setIsAdapting(true)
-    setAdaptiveError(null)
-    const request: SocialGraphWorkerRequest = {
-      id,
-      nodes: filtered.nodes,
-      edges: filtered.edges,
-      options: {
-        clustering: 'louvain',
-        layout: 'clustered-force',
-      },
-    }
-    worker.postMessage(request)
-  }
-
   return (
     <div className="grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)]">
       <aside className="space-y-4 rounded-[4px] border border-zinc-200 bg-white p-4 dark:border-[#26262a] dark:bg-[#1b1b1e]">
@@ -859,7 +884,11 @@ export default function SocialGraphExplorer({
           min={0}
           max={100}
           step={1}
-          onChange={setFollowerSlider}
+          onChange={(nextSlider) =>
+            setMinimumFollowers(
+              followerSliderToCount(nextSlider, snapshot.stats.maxFollowers),
+            )
+          }
         />
         <DualRangeSlider
           label="Interaction years"
@@ -919,8 +948,8 @@ export default function SocialGraphExplorer({
                   Adaptive structure
                 </h2>
                 <p className={`mt-1 text-[10px] leading-relaxed ${MUTED}`}>
-                  Recluster and lay out only the graph that survives these
-                  filters.
+                  Applied automatically on first load. Rerun after changing
+                  filters to adapt the surviving graph.
                 </p>
               </div>
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
@@ -931,7 +960,7 @@ export default function SocialGraphExplorer({
               </dl>
               <button
                 type="button"
-                onClick={adaptGraph}
+                onClick={() => requestAdaptiveGraph()}
                 disabled={isAdapting || filtered.nodes.length < 2}
                 className="flex h-8 w-full items-center justify-center gap-1.5 rounded-[3px] bg-brand px-3 text-[11px] font-semibold text-zinc-950 disabled:cursor-wait disabled:opacity-60"
               >
@@ -1117,8 +1146,9 @@ export default function SocialGraphExplorer({
             all replies + quotes from that account, then multiplied by 100. The
             edge uses the weaker direction. Counts and denominators are
             recomputed for the selected years. The node limit keeps the highest
-            weighted-degree accounts in that active graph. The stable server
-            layout stays fixed until you explicitly run an adaptive layout.
+            weighted-degree accounts in that active graph. The default filters
+            are reclustered and laid out automatically; after filter changes,
+            the current layout stays fixed until you rerun it.
           </p>
         </details>
 

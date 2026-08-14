@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 import { isNavItemActive, NavItem } from '@/lib/navigation'
+import { cn } from '@/utils/tailwind'
 
 export default function MobileNavigation({ items }: { items: NavItem[] }) {
   const pathname = usePathname()
@@ -41,9 +42,13 @@ export default function MobileNavigation({ items }: { items: NavItem[] }) {
               <Link
                 href={item.href}
                 aria-current={isActive ? 'page' : undefined}
-                className={`cursor-pointer py-2.5 ${
-                  isActive ? 'bg-muted font-medium' : ''
-                }`}
+                className={cn(
+                  'cursor-pointer py-2.5',
+                  item.tone === 'muted'
+                    ? 'bg-muted/70 text-muted-foreground focus:bg-muted focus:text-foreground'
+                    : '',
+                  isActive ? 'bg-muted font-medium' : '',
+                )}
               >
                 {item.label}
               </Link>

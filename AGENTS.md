@@ -145,13 +145,24 @@ Staging synchronization is automatic; production synchronization is not:
 
 ### Tweet rendering
 
-- Use `src/components/TweetCard.tsx` as the canonical full-fidelity tweet card
-  for new product surfaces. Data adapters must preserve the complete text,
+- Always use `src/components/TweetCard.tsx` as the canonical full-fidelity
+  tweet renderer for product surfaces. Data adapters must preserve complete text,
   attached media, and quoted-tweet payload (including the quoted tweet's media)
   before rendering. Do not introduce a surface-specific partial tweet renderer;
   make intentionally compact variants explicit through the canonical component.
 - Normalize archive text with `src/lib/tweetText.ts`; do not add another local
   HTML-entity decoder to a tweet surface.
+
+### Progressive collection rendering
+
+- For large result sets, optimize the first screen rather than blocking on the
+  complete collection. Server-render only the first useful items and the small
+  supporting summaries visible above the fold, then immediately continue the
+  active result set in the background.
+- Preload a shallow first page for adjacent tabs, chapters, or filters after the
+  active view is useful. Fetch deeper pages only as the user scrolls. Preserve
+  shareable URLs, browser history, deterministic server-side sorting, and a
+  manual accessible load-more fallback alongside infinite scroll.
 
 Use Node 20 from `.nvmrc` and pnpm. Prefer the narrowest relevant check, then
 expand verification in proportion to risk.

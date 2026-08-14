@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import type { KeyboardEvent, MouseEvent } from 'react'
+import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import { PiArrowSquareOut, PiHeart, PiQuotes, PiRepeat } from 'react-icons/pi'
 import ImageLightbox from '@/components/ImageLightbox'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
 import {
@@ -59,6 +60,26 @@ export const shortDate = (iso: string) =>
     month: 'short',
     year: 'numeric',
   })
+
+function CountMetric({
+  count,
+  label,
+  children,
+}: {
+  count: number
+  label: string
+  children: ReactNode
+}) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span aria-hidden="true" className="inline-flex">
+        {children}
+      </span>
+      <span aria-hidden="true">{formatCount(count)}</span>
+      <span className="sr-only">{`${formatCount(count)} ${label}`}</span>
+    </span>
+  )
+}
 
 export function TweetAvatar({
   tweet,
@@ -220,8 +241,18 @@ function QuotedTweet({
       )}
       {!condensed && (
         <div className="mt-1.5 flex gap-4 text-[11.5px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
-          <span>♥ {formatCount(tweet.likes)}</span>
-          <span>⇄ {formatCount(tweet.rts)}</span>
+          <CountMetric
+            count={tweet.likes}
+            label={tweet.likes === 1 ? 'like' : 'likes'}
+          >
+            <PiHeart />
+          </CountMetric>
+          <CountMetric
+            count={tweet.rts}
+            label={tweet.rts === 1 ? 'repost' : 'reposts'}
+          >
+            <PiRepeat />
+          </CountMetric>
         </div>
       )}
     </div>
@@ -238,6 +269,7 @@ export interface TweetCardProps {
   showDate?: boolean
   showArchivedBadge?: boolean
   clickable?: boolean
+  showExternalLink?: boolean
   quotedTweetDisplay?: 'full' | 'summary'
   origin?: TweetOrigin
   returnTo?: string
@@ -262,7 +294,7 @@ function ArchivedQuotesMetric({
             aria-label={`${count} archived quotes. Open tweet to see them.`}
             className="inline-flex items-center gap-1 rounded-sm text-zinc-500 transition-colors hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 dark:text-[#a7a7b4] dark:hover:text-zinc-200"
           >
-            <span aria-hidden="true">✦</span>
+            <PiQuotes aria-hidden="true" />
             <span>{formatCount(count)} archived quotes</span>
           </Link>
         </TooltipTrigger>
@@ -285,7 +317,8 @@ export function TweetRow({
   featuredRank,
   showDate = false,
   showArchivedBadge = false,
-  clickable = false,
+  clickable,
+  showExternalLink = false,
   quotedTweetDisplay = 'full',
   origin,
   returnTo,
@@ -296,13 +329,14 @@ export function TweetRow({
   const href = tweetPermalinkHref(tweet.id, origin, returnTo)
   const profileHref = userProfileHref(tweet.username, tweet.accountId)
   const isFeatured = featuredRank !== undefined
-  const isClickable = clickable || isFeatured
+  const isClickable = clickable ?? isFeatured
   const captureAction = (
     action:
       | 'collapse'
       | 'expand'
       | 'open'
       | 'open_archived_quotes'
+      | 'open_external'
       | 'open_quoted_tweet',
   ) => {
     capturePostHogEvent('tweet_card_action', {
@@ -420,9 +454,32 @@ export function TweetRow({
               onOpen={() => captureAction('open_archived_quotes')}
             />
           )}
-          <span>♥ {formatCount(tweet.likes)}</span>
-          <span>⇄ {formatCount(tweet.rts)}</span>
+          <CountMetric
+            count={tweet.likes}
+            label={tweet.likes === 1 ? 'like' : 'likes'}
+          >
+            <PiHeart />
+          </CountMetric>
+          <CountMetric
+            count={tweet.rts}
+            label={tweet.rts === 1 ? 'repost' : 'reposts'}
+          >
+            <PiRepeat />
+          </CountMetric>
           {showArchivedBadge && <span className="text-brand">archived</span>}
+          {showExternalLink && (
+            <a
+              href={`https://x.com/${encodeURIComponent(tweet.username)}/status/${encodeURIComponent(tweet.id)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => captureAction('open_external')}
+              aria-label="View tweet on X (opens in a new tab)"
+              className="ml-auto inline-flex items-center gap-1 rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              <span>View on X</span>
+              <PiArrowSquareOut aria-hidden="true" />
+            </a>
+          )}
         </div>
       )}
     </div>
@@ -447,7 +504,12 @@ export function TweetRow({
       {details}
       {compact && (
         <div className="whitespace-nowrap text-[11.5px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
-          ♥ {formatCount(tweet.likes)}
+          <CountMetric
+            count={tweet.likes}
+            label={tweet.likes === 1 ? 'like' : 'likes'}
+          >
+            <PiHeart />
+          </CountMetric>
         </div>
       )}
     </article>

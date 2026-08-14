@@ -112,12 +112,12 @@ describe('ClickHouse staging lab guard', () => {
     const target = analyticsGatewayRequestUrl(
       ['top-quotes'],
       new URLSearchParams(
-        'limit=25&offset=50&sort=recent&year=2024&q=archive&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot&raw_sql=DROP',
+        'limit=25&offset=50&sort=recent&year=2024&q=archive&target_account_id=42&min_quote_count=2&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot&raw_sql=DROP',
       ),
       'https://stream.example/analytics',
     )
     expect(target.toString()).toBe(
-      'https://stream.example/analytics/top-quotes?limit=25&offset=50&sort=recent&year=2024&q=archive&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot',
+      'https://stream.example/analytics/top-quotes?limit=25&offset=50&sort=recent&year=2024&q=archive&target_account_id=42&min_quote_count=2&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot',
     )
   })
 
@@ -181,6 +181,26 @@ describe('ClickHouse staging lab guard', () => {
     expect(() =>
       analyticsGatewayRequestUrl(
         ['tweet', 'not-a-tweet'],
+        new URLSearchParams(),
+        'https://stream.example/analytics',
+      ),
+    ).toThrow('Unsupported ClickHouse analytics endpoint')
+  })
+
+  test('allows only scoped profile-sidebar parameters for numeric accounts', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['user', '42', 'sidebar'],
+      new URLSearchParams(
+        'year=2025&media_limit=18&people_limit=8&raw_sql=DROP',
+      ),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/user/42/sidebar?year=2025&media_limit=18&people_limit=8',
+    )
+    expect(() =>
+      analyticsGatewayRequestUrl(
+        ['user', 'not-an-id', 'sidebar'],
         new URLSearchParams(),
         'https://stream.example/analytics',
       ),

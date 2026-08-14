@@ -6,7 +6,13 @@ export interface NavItem {
   label: string
 }
 
-export type TweetOrigin = 'home' | 'stream' | 'bangers' | 'trends' | 'search'
+export type TweetOrigin =
+  | 'home'
+  | 'stream'
+  | 'bangers'
+  | 'trends'
+  | 'search'
+  | 'profile'
 
 export function userProfileHref(
   username: string | null | undefined,
@@ -57,6 +63,11 @@ const TWEET_ORIGINS: Record<
     href: '/search',
     label: 'Back to search',
     matches: (href) => href === '/search' || href.startsWith('/search?'),
+  },
+  profile: {
+    href: '/user-dir',
+    label: 'Back to profile',
+    matches: (href) => href.startsWith('/user/'),
   },
 }
 

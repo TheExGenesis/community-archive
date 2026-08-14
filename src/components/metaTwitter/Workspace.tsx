@@ -31,8 +31,7 @@ const sharesFeaturedGroup = (
   left: { curation?: { is_featured: boolean } } | undefined,
   right: { curation?: { is_featured: boolean } } | undefined,
 ) =>
-  Boolean(left?.curation?.is_featured) ===
-  Boolean(right?.curation?.is_featured)
+  Boolean(left?.curation?.is_featured) === Boolean(right?.curation?.is_featured)
 
 export function Workspace({
   avatarUrl,
@@ -57,11 +56,9 @@ export function Workspace({
   onLoadMore,
   loadMoreRef,
   returnTo,
-  isOwner = false,
   editing = false,
   editSaving = false,
   editError = null,
-  onEditingChange,
   onDismiss,
   onToggleFeature,
   onMove,
@@ -89,11 +86,9 @@ export function Workspace({
   onLoadMore: () => void
   loadMoreRef: RefObject<HTMLDivElement>
   returnTo: string
-  isOwner?: boolean
   editing?: boolean
   editSaving?: boolean
   editError?: string | null
-  onEditingChange?: (editing: boolean) => void
   onDismiss?: (section: 'bangers' | 'people', itemId: string) => void
   onToggleFeature?: (section: 'bangers' | 'people', itemId: string) => void
   onMove?: (
@@ -141,16 +136,6 @@ export function Workspace({
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               Restore Bangers
-            </button>
-          )}
-          {isOwner && (
-            <button
-              type="button"
-              onClick={() => onEditingChange?.(!editing)}
-              disabled={editSaving}
-              className="rounded-full border border-border px-3 py-1.5 text-[13px] font-semibold hover:bg-muted disabled:opacity-60"
-            >
-              {editing ? 'Done editing' : 'Edit profile'}
             </button>
           )}
           <label className="flex shrink-0 items-center gap-2 text-[13px] text-muted-foreground">

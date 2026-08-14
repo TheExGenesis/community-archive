@@ -1,7 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import userEvent from '@testing-library/user-event'
 import { archiveChapterHref } from './ArchiveNav'
 import { ProfileArchive } from './ProfileArchive'
+import { ProfileEditButton } from './ProfileEditButton'
+import { ProfileEditingProvider } from './ProfileEditingContext'
 import type { BangerTweet } from '@/lib/metaTwitter/types'
 import { mutateProfileCuration } from '@/app/user/[account_id]/actions'
 
@@ -68,6 +71,17 @@ const deferredResponse = () => {
   return { promise, resolve }
 }
 
+const renderProfileArchive = (
+  archive: ReactElement,
+  { withEditButton = false }: { withEditButton?: boolean } = {},
+) =>
+  render(
+    <ProfileEditingProvider>
+      {withEditButton ? <ProfileEditButton /> : null}
+      {archive}
+    </ProfileEditingProvider>,
+  )
+
 class TestIntersectionObserver {
   static callbacks: IntersectionObserverCallback[] = []
   readonly root = null
@@ -126,7 +140,7 @@ test('shows owner-only curation controls and persists section edits', async () =
     return Promise.resolve(jsonResponse({ people: [] }))
   })
 
-  render(
+  renderProfileArchive(
     <ProfileArchive
       accountId="42"
       avatarUrl={null}
@@ -153,10 +167,13 @@ test('shows owner-only curation controls and persists section edits', async () =
           },
         ],
       }}
-      isOwner
     />,
+    { withEditButton: true },
   )
 
+  expect(
+    screen.getByRole('link', { name: 'All time', current: 'page' }),
+  ).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Edit profile' }))
   expect(screen.getByRole('button', { name: 'Restore Bangers' })).toBeVisible()
   expect(screen.getByRole('button', { name: 'Restore' })).toBeVisible()
@@ -194,12 +211,65 @@ test('shows owner-only curation controls and persists section edits', async () =
   expect(fetchMock).toHaveBeenCalledWith('/api/profile/42/interactions')
 
   await user.click(screen.getByRole('link', { name: '2025 4' }))
-  expect(
-    screen.queryByRole('button', { name: 'Edit profile' }),
-  ).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Edit profile' })).toBeVisible()
   expect(
     screen.queryByRole('button', { name: /dismiss banger/i }),
   ).not.toBeInTheDocument()
+})
+
+test('returns to all time when edit mode starts from a year chapter', async () => {
+  const user = userEvent.setup()
+  jest.spyOn(global, 'fetch').mockImplementation((input) => {
+    const url = new URL(String(input), 'https://community-archive.org')
+    if (url.pathname.endsWith('/bangers')) {
+      return Promise.resolve(
+        jsonResponse({
+          tweets: [banger(1, 2025)],
+          yearCounts: chapters,
+          total: 1,
+          nextOffset: null,
+          available: true,
+        }),
+      )
+    }
+    if (url.pathname.endsWith('/media')) {
+      return Promise.resolve(jsonResponse({ media: [], mediaCount: 0 }))
+    }
+    return Promise.resolve(jsonResponse({ people: [] }))
+  })
+
+  renderProfileArchive(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      displayName="Alice"
+      initialYear={2025}
+      initialPage={{
+        tweets: [banger(1, 2025)],
+        yearCounts: chapters,
+        total: 1,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+    { withEditButton: true },
+  )
+
+  expect(
+    screen.getByRole('link', { name: '2025 4', current: 'page' }),
+  ).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Edit profile' }))
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole('link', { name: 'All time', current: 'page' }),
+    ).toBeVisible(),
+  )
+  expect(window.location.pathname + window.location.search).toBe('/user/alice')
+  expect(screen.getByRole('button', { name: 'Restore Bangers' })).toBeVisible()
 })
 
 test('switches chapters immediately while their small data requests are pending', async () => {
@@ -208,7 +278,7 @@ test('switches chapters immediately while their small data requests are pending'
     .spyOn(global, 'fetch')
     .mockImplementation(() => new Promise(() => {}))
 
-  render(
+  renderProfileArchive(
     <ProfileArchive
       accountId="42"
       avatarUrl={null}
@@ -264,7 +334,7 @@ test('preserves modified-click behavior on chapter links', async () => {
   const fetchMock = jest
     .spyOn(global, 'fetch')
     .mockImplementation(() => new Promise(() => {}))
-  render(
+  renderProfileArchive(
     <ProfileArchive
       accountId="42"
       avatarUrl={null}
@@ -307,7 +377,7 @@ test('restores the selected chapter from browser history', async () => {
   const fetchMock = jest
     .spyOn(global, 'fetch')
     .mockImplementation(() => new Promise(() => {}))
-  render(
+  renderProfileArchive(
     <ProfileArchive
       accountId="42"
       avatarUrl={null}
@@ -369,7 +439,7 @@ test('fills the active feed, preloads shallow chapter pages, and continues at th
     return Promise.resolve({ ok: true, json: async () => page } as Response)
   })
 
-  render(
+  renderProfileArchive(
     <ProfileArchive
       accountId="42"
       avatarUrl={null}
@@ -439,7 +509,7 @@ test('stops automatic infinite-scroll retries after a failed page', async () => 
     )
   })
 
-  render(
+  renderProfileArchive(
     <ProfileArchive
       accountId="42"
       avatarUrl={null}
@@ -495,7 +565,7 @@ test('can retry an unavailable initial banger page from offset zero', async () =
     )
   })
 
-  render(
+  renderProfileArchive(
     <ProfileArchive
       accountId="42"
       avatarUrl={null}
@@ -552,7 +622,7 @@ test('retries failed media without blocking successful interactions', async () =
     )
   })
 
-  render(
+  renderProfileArchive(
     <ProfileArchive
       accountId="42"
       avatarUrl={null}
@@ -608,7 +678,7 @@ test('does not start a stale chapter preload over an in-flight active feed', asy
     )
   })
 
-  render(
+  renderProfileArchive(
     <ProfileArchive
       accountId="42"
       avatarUrl={null}

@@ -144,6 +144,7 @@ export const getPrimaryNav = (isMember: boolean): NavItem[] =>
         { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
         { href: '/trends', label: 'Trends' },
+        { href: '/social-graph', label: 'Graph' },
         { href: '/research', label: 'Research' },
       ]
     : [

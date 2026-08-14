@@ -66,7 +66,7 @@ export function ArchiveNav({
             : 'text-foreground hover:bg-muted'
         }`}
       >
-        Overall — Bangers
+        All time
       </Link>
       {chapters.map((chapter) => {
         const active = activeYear === chapter.year

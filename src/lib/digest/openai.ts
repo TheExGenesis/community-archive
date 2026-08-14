@@ -95,9 +95,35 @@ export interface DigestGenerationResponse {
   totalTokens: number | null
 }
 
+const MODEL_REQUEST_TIMEOUT_MS = 240_000
+
 const safeTokenCount = (value: unknown): number | null => {
   const parsed = Number(value)
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null
+}
+
+const fetchModelResponse = async (
+  fetchImpl: typeof fetch,
+  input: Parameters<typeof fetch>[0],
+  init: RequestInit,
+  provider: string,
+): Promise<Response> => {
+  try {
+    return await fetchImpl(input, {
+      ...init,
+      signal: AbortSignal.timeout(MODEL_REQUEST_TIMEOUT_MS),
+    })
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.name === 'AbortError' || error.name === 'TimeoutError')
+    ) {
+      throw new Error(
+        `${provider} generation timed out after ${MODEL_REQUEST_TIMEOUT_MS / 1_000} seconds`,
+      )
+    }
+    throw error
+  }
 }
 
 export function extractResponseText(response: Record<string, unknown>): string {
@@ -173,17 +199,21 @@ export async function generateDigestWithModel(
       body.temperature = request.temperature
     }
 
-    const response = await fetchImpl(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://community-archive.org',
-        'X-Title': 'Community Archive Daily Digest',
+    const response = await fetchModelResponse(
+      fetchImpl,
+      `${baseUrl}/chat/completions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://community-archive.org',
+          'X-Title': 'Community Archive Daily Digest',
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(90_000),
-    })
+      provider,
+    )
     const responseText = await response.text()
     if (!response.ok) {
       throw new Error(
@@ -280,15 +310,19 @@ export async function generateDigestWithModel(
     body.max_output_tokens = request.maxOutputTokens
   }
 
-  const response = await fetchImpl(`${baseUrl}/responses`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
+  const response = await fetchModelResponse(
+    fetchImpl,
+    `${baseUrl}/responses`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(90_000),
-  })
+    provider,
+  )
   const responseText = await response.text()
   if (!response.ok) {
     throw new Error(

@@ -250,4 +250,25 @@ describe('OpenAI digest adapter', () => {
       outputError: null,
     })
   })
+
+  test('reports model timeouts with a durable, readable error', async () => {
+    process.env.OPENROUTER_API_KEY = 'openrouter-test-key'
+    const timeoutError = new Error('The operation was aborted due to timeout')
+    timeoutError.name = 'TimeoutError'
+    const fetcher = jest
+      .fn()
+      .mockRejectedValue(timeoutError) as jest.MockedFunction<typeof fetch>
+
+    await expect(
+      generateDigestWithModel(
+        {
+          runId: 'run-timeout',
+          model: 'deepseek/deepseek-v4-flash-0731',
+          systemPrompt: 'Return the digest schema.',
+          userPrompt: 'Indexed corpus',
+        },
+        fetcher,
+      ),
+    ).rejects.toThrow('OpenRouter generation timed out after 240 seconds')
+  })
 })

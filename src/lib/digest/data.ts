@@ -67,6 +67,11 @@ export function mapDigestRun(row: DigestRunRow): DigestRun {
   const status = RUN_STATUSES.has(row.status as DigestRunStatus)
     ? (row.status as DigestRunStatus)
     : 'failed'
+  const events = parseDigestRunEvents(row.events)
+  const eventWorkflowRunId = [...events]
+    .reverse()
+    .map(({ metadata }) => metadata?.workflow_run_id)
+    .find((value): value is string => typeof value === 'string')
   return {
     id: row.id,
     digestDate: row.digest_date,
@@ -78,9 +83,9 @@ export function mapDigestRun(row: DigestRunRow): DigestRun {
     modelRequest: isRecord(row.model_request) ? row.model_request : null,
     rawResponse: isRecord(row.raw_response) ? row.raw_response : null,
     parsedOutput: parseDigestEditionContent(row.parsed_output),
-    events: parseDigestRunEvents(row.events),
+    events,
     responseId: row.response_id,
-    workflowRunId: row.workflow_run_id,
+    workflowRunId: row.workflow_run_id ?? eventWorkflowRunId ?? null,
     model: row.model,
     inputTokens: row.input_tokens,
     outputTokens: row.output_tokens,

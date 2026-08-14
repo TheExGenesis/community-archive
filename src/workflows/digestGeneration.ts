@@ -12,6 +12,7 @@ import { generateDigestWithModel } from '@/lib/digest/openai'
 import type { DigestRunEvent } from '@/lib/digest/types'
 import type { PortalTweet } from '@/lib/portal/types'
 import { createServerServiceRoleClient } from '@/utils/supabase'
+import { getWorkflowMetadata } from 'workflow'
 
 const event = (
   stage: DigestRunEvent['stage'],
@@ -233,15 +234,26 @@ async function executeDigestGeneration(runId: string) {
     .eq('status', 'running')
   if (requestSaveError) throw requestSaveError
 
-  const generated = await generateDigestWithModel({
-    runId,
-    model: prompt.model,
-    systemPrompt: prompt.systemPrompt,
-    userPrompt,
-    reasoningEffort: prompt.parameters.reasoning_effort,
-    maxOutputTokens: prompt.parameters.max_output_tokens,
-    temperature: prompt.parameters.temperature,
-  })
+  let generated
+  try {
+    generated = await generateDigestWithModel({
+      runId,
+      model: prompt.model,
+      systemPrompt: prompt.systemPrompt,
+      userPrompt,
+      reasoningEffort: prompt.parameters.reasoning_effort,
+      maxOutputTokens: prompt.parameters.max_output_tokens,
+      temperature: prompt.parameters.temperature,
+    })
+  } catch (error) {
+    console.error('[daily digest workflow] model generation failed', {
+      runId,
+      model: prompt.model,
+      error: describeError(error),
+      ...(error instanceof Error ? { stack: error.stack } : {}),
+    })
+    throw error instanceof Error ? error : new Error(describeError(error))
+  }
   const completedAt = new Date()
   const durationMs = completedAt.getTime() - startedAt.getTime()
   const { error: responseSaveError } = await admin
@@ -307,6 +319,56 @@ async function executeDigestGeneration(runId: string) {
 
 executeDigestGeneration.maxRetries = 0
 
+async function recordDigestWorkflowRun(runId: string, workflowRunId: string) {
+  'use step'
+
+  const admin = createDigestAdminClient()
+  const { data: runRow } = await admin
+    .from('digest_runs')
+    .select('*')
+    .eq('id', runId)
+    .maybeSingle()
+  if (!runRow) return
+
+  const run = mapDigestRun(runRow)
+  if (run.status !== 'running') return
+  const events = [
+    ...run.events,
+    event(
+      'selection',
+      'completed',
+      'The durable workflow accepted this generation job.',
+      { workflow_run_id: workflowRunId },
+    ),
+  ]
+  const updatedAt = new Date().toISOString()
+  const { error } = await admin
+    .from('digest_runs')
+    .update({
+      workflow_run_id: workflowRunId,
+      events: toJson(events),
+      updated_at: updatedAt,
+    })
+    .eq('id', runId)
+    .eq('status', 'running')
+
+  if (!error) return
+
+  console.warn(
+    '[daily digest workflow] could not save workflow run ID column',
+    {
+      runId,
+      workflowRunId,
+      error,
+    },
+  )
+  await admin
+    .from('digest_runs')
+    .update({ events: toJson(events), updated_at: updatedAt })
+    .eq('id', runId)
+    .eq('status', 'running')
+}
+
 async function markDigestGenerationFailed(runId: string, message: string) {
   'use step'
 
@@ -345,6 +407,8 @@ export async function generateDigestWorkflow(runId: string) {
   'use workflow'
 
   try {
+    const { workflowRunId } = getWorkflowMetadata()
+    await recordDigestWorkflowRun(runId, workflowRunId)
     await executeDigestGeneration(runId)
   } catch (error) {
     await markDigestGenerationFailed(runId, describeError(error))

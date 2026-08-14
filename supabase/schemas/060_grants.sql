@@ -74,3 +74,15 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE EXECUTE O
 
 -- Default privileges for readclient on future tables.
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT ON TABLES  TO "readclient";
+
+-- Daily Digest: generation traces and prompts are service-role only. Public
+-- clients can read only published edition rows, with RLS enforcing status.
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_prompt_versions" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_runs" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_editions" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_prompt_versions" TO "service_role";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_runs" TO "service_role";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_editions" TO "service_role";
+GRANT USAGE, SELECT ON SEQUENCE "public"."digest_prompt_versions_version_seq" TO "service_role";
+GRANT USAGE, SELECT ON SEQUENCE "public"."digest_editions_issue_number_seq" TO "service_role";
+GRANT SELECT ON TABLE "public"."digest_editions" TO "anon", "authenticated";

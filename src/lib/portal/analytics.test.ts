@@ -195,6 +195,7 @@ describe('ClickHouse-backed portal analytics', () => {
       expect.objectContaining({}),
       { timeoutMs: 30_000 },
     )
+
     const params = (fetcher as jest.Mock).mock.calls[0][1] as URLSearchParams
     expect(params.get('bucket')).toBe('month')
     expect(params.get('from')).toBe('2019-01-01')
@@ -333,6 +334,21 @@ describe('ClickHouse-backed portal analytics', () => {
     expect(fetcher).toHaveBeenCalledWith(
       ['recent-bangers'],
       new URLSearchParams({ limit: '50', hours: '168' }),
+      { timeoutMs: 30_000, revalidate: 1_800 },
+    )
+    await fetchPortalRecentBangers(
+      50,
+      24,
+      fetcher,
+      '2026-08-12T07:00:00.000Z',
+    )
+    expect(fetcher).toHaveBeenLastCalledWith(
+      ['recent-bangers'],
+      new URLSearchParams({
+        limit: '50',
+        hours: '24',
+        end: '2026-08-12T07:00:00.000Z',
+      }),
       { timeoutMs: 30_000, revalidate: 1_800 },
     )
   })

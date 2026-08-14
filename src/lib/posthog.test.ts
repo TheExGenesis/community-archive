@@ -94,16 +94,16 @@ describe('sanitizePostHogEvent', () => {
     [
       'dashboard_destination_opened',
       {
-        destination: 'data_export',
+        destination: 'daily_digest',
         surface: 'card',
-        external: true,
+        external: false,
       },
     ],
     [
       'tweet_card_action',
       {
         action: 'expand',
-        origin: 'bangers',
+        origin: 'digest',
         has_media: true,
         has_quoted_tweet: false,
         is_featured: true,

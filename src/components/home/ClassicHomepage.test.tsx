@@ -4,6 +4,7 @@ import ClassicHomepage from './ClassicHomepage'
 import type { PortalData } from '@/lib/portal/types'
 import { getTopFollowedAccounts } from '@/lib/clickhouseAnalytics'
 import { createServerClient } from '@/utils/supabase'
+import { getLatestDigestPreview } from '@/lib/digest/data'
 
 jest.mock('next/headers', () => ({ cookies: jest.fn(() => ({})) }))
 jest.mock('next/dynamic', () => {
@@ -37,6 +38,9 @@ jest.mock('@/components/portal/Portal', () => ({
 }))
 jest.mock('@/lib/clickhouseAnalytics', () => ({
   getTopFollowedAccounts: jest.fn(),
+}))
+jest.mock('@/lib/digest/data', () => ({
+  getLatestDigestPreview: jest.fn(),
 }))
 jest.mock('@/utils/supabase', () => ({ createServerClient: jest.fn() }))
 
@@ -72,6 +76,7 @@ describe('ClassicHomepage audience actions', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     ;(getTopFollowedAccounts as jest.Mock).mockResolvedValue([])
+    ;(getLatestDigestPreview as jest.Mock).mockResolvedValue(null)
     ;(createServerClient as jest.Mock).mockReturnValue({})
   })
 

@@ -1,0 +1,196 @@
+{
+  "evaluatedAt": "2026-08-14T07:07:06.941Z",
+  "model": "deepseek/deepseek-v4-flash-0731",
+  "corpus": {
+    "bangers": 13,
+    "contextPosts": 14,
+    "promptCharacters": 18093
+  },
+  "passed": 0,
+  "total": 5,
+  "trials": [
+    {
+      "trial": 1,
+      "passed": false,
+      "durationMs": 24256,
+      "responseId": null,
+      "model": null,
+      "provider": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "outputHash": "1d506811939381102abf68379a887bdd752bdb0fd358c86d92c127635435d5e4",
+      "storyCount": null,
+      "representativeTweetId": null,
+      "error": "Story 1 title must be a three- to eighteen-word excerpt from one indexed story post",
+      "output": {
+        "executive_summary": [
+          "Researchers claim a vulnerability in frontier AI APIs exposes hidden reasoning tokens, verified 1:1 against billed thinking tokens.",
+          "A scan of ~7,000 public traces found 62 unique API keys, 33 emails, and 33 passwords leaked from encrypted reasoning blobs.",
+          "Grok Bot launches in early beta as AI teammates that sign into tools and return finished work, with mixed reactions.",
+          "Gemini hits 1B+ monthly users, but skeptics question the claim's accuracy and precision.",
+          "A viral meme about moon-posting to attract women spreads, with purists insisting true moon-posting comes from reverence."
+        ],
+        "representative_tweet_index": 0,
+        "stories": [
+          {
+            "category": "AI news",
+            "title": "We found a way to extract hidden reasoning of frontier models using a vulnerability in the APIs of every frontier AI company.",
+            "subtitle": "Researchers expose encrypted reasoning tokens across frontier APIs, with a scan of public traces leaking keys, emails, and passwords.",
+            "bullets": [
+              "Verified reasoning token count matches billed API thinking tokens 1:1 for most prompts queried.",
+              "Preliminary scan of ~7,000 public traces found 62 unique API keys, 33 email addresses, 33 passwords, and other sensitive data.",
+              "Replies note the hack doesn't affect Fable and question whether it explains distillation of that model."
+            ],
+            "editorial_note": "The claim of extracting hidden reasoning is verified by the researchers, but Deedy's reply clarifies it doesn't affect Fable, and Johann's repro stopped working recently, suggesting a patch. The leak scan is a separate but related finding.",
+            "tweet_indices": [
+              0,
+              2,
+              13,
+              14,
+              15
+            ]
+          },
+          {
+            "category": "AI news",
+            "title": "guys you do know you can just disable thinking, and instead give it a \"deep_think\" tool, and it will call it with internal CoT reasoning format right?",
+            "subtitle": "A simpler method to access chain-of-thought reasoning is highlighted, with a fix already in progress.",
+            "bullets": [
+              "Disabling thinking and providing a deep_think tool lets the model call it with internal CoT reasoning format.",
+              "The author notes they are fixing that, implying a patch is underway.",
+              "This offers an alternative to the API vulnerability, potentially easier for some users."
+            ],
+            "editorial_note": "This tweet suggests a more accessible workaround than the API hack, but it's unclear if it's patched or if it works across all models. The author's 'gl fixing that' indicates awareness and action.",
+            "tweet_indices": [
+              1
+            ]
+          },
+          {
+            "category": "AI news",
+            "title": "Introducing Grok Bot, now in early beta.",
+            "subtitle": "Grok Bot launches as AI teammates that automate workflows, with early praise and a Freudian slip noted.",
+            "bullets": [
+              "Bots sign in to your tools, use them like you do, and come back with finished work.",
+              "Gergely Orosz calls it an 'OpenClaw 2.0 moment' after automating workflows in 2 hours.",
+              "A critic notes the first application in the ad is mass emailing NDAs, calling it a 'Freudian slip'."
+            ],
+            "editorial_note": "The launch is generating buzz, but the NDA email example highlights potential corporate control concerns. The 'OpenClaw 2.0' comparison suggests it's a significant step for automation.",
+            "tweet_indices": [
+              5,
+              19,
+              20,
+              21
+            ]
+          },
+          {
+            "category": "AI news",
+            "title": "1B+ people are now using @Geminiapp every month to spark new ideas and get things done.",
+            "subtitle": "Gemini hits 1B monthly users, but skeptics question the claim's accuracy and precision.",
+            "bullets": [
+              "Sundar Pichai announces Gemini as the fastest growing product ever and 14th to hit 1B users.",
+              "A reply asks 'there's no way this is true in a non misleading way right'.",
+              "Casey Muratori jokes he misread it as '18+ people' because everyone he knows uses OpenAI or Anthropic."
+            ],
+            "editorial_note": "The 1B figure is a company claim, not independently verified. The skepticism in replies suggests possible counting methods (e.g., including all Google AI features) that may inflate the number.",
+            "tweet_indices": [
+              11,
+              24,
+              25,
+              26
+            ]
+          },
+          {
+            "category": "Meme",
+            "title": "Oh my god I casually mentioned to a chat that I’m in that if men want to attract women to their posts and DMs, they basically just have to post about the moon.",
+            "subtitle": "A viral tip about moon-posting to attract women spreads, with purists insisting it must come from reverence.",
+            "bullets": [
+              "Multiple guys are trying moon-posting after the tip, and it's spreading across chats.",
+              "A reply confirms the tactic works, while another calls moon-posting posers 'POSERS'.",
+              "QC adds a tangent about the sun and moon's apparent size, suggesting an anthropic explanation."
+            ],
+            "editorial_note": "The meme is playful, but the purist backlash (e.g., 'post about the moon bc you love the moon') highlights a social dynamic where authenticity is valued over strategy. QC's tangent is a humorous digression.",
+            "tweet_indices": [
+              3,
+              16,
+              17,
+              18
+            ]
+          }
+        ],
+        "keywords": [
+          "hidden reasoning",
+          "vulnerability",
+          "API thinking tokens",
+          "encrypted reasoning blobs",
+          "API keys",
+          "Grok Bot",
+          "AI teammates",
+          "1B+ people",
+          "Gemini",
+          "moon-posting",
+          "little guy-ism",
+          "deep_think tool"
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "passed": false,
+      "durationMs": 119929,
+      "responseId": null,
+      "model": null,
+      "provider": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "outputHash": null,
+      "storyCount": null,
+      "representativeTweetId": null,
+      "error": "The operation was aborted due to timeout",
+      "output": null
+    },
+    {
+      "trial": 3,
+      "passed": false,
+      "durationMs": 16,
+      "responseId": null,
+      "model": null,
+      "provider": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "outputHash": null,
+      "storyCount": null,
+      "representativeTweetId": null,
+      "error": "fetch failed",
+      "output": null
+    },
+    {
+      "trial": 4,
+      "passed": false,
+      "durationMs": 3,
+      "responseId": null,
+      "model": null,
+      "provider": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "outputHash": null,
+      "storyCount": null,
+      "representativeTweetId": null,
+      "error": "fetch failed",
+      "output": null
+    },
+    {
+      "trial": 5,
+      "passed": false,
+      "durationMs": 3,
+      "responseId": null,
+      "model": null,
+      "provider": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "outputHash": null,
+      "storyCount": null,
+      "representativeTweetId": null,
+      "error": "fetch failed",
+      "output": null
+    }
+  ]
+}

@@ -60,6 +60,28 @@ describe('TweetCard', () => {
     ])
   })
 
+  test('renders an archived video thumbnail as card media', () => {
+    render(
+      <TweetCard
+        tweet={{
+          ...tweet,
+          media: [
+            {
+              url: 'https://example.com/video-thumbnail.jpg',
+              type: 'video',
+            },
+          ],
+          quotedTweet: undefined,
+        }}
+      />,
+    )
+
+    expect(screen.getByTestId('tweet-image')).toHaveAttribute(
+      'data-src',
+      'https://example.com/video-thumbnail.jpg',
+    )
+  })
+
   test('can summarize only the repeated quoted tweet marker', () => {
     render(<TweetCard tweet={tweet} quotedTweetDisplay="summary" />)
 
@@ -126,6 +148,40 @@ describe('TweetCard', () => {
       'motion-reduce:hover:translate-y-0',
     )
     expect(cards[0].className).not.toMatch(/blue/)
+  })
+
+  test('supports a flat editorial treatment without changing tweet fidelity', () => {
+    const { container } = render(
+      <TweetCard tweet={tweet} variant="editorial" featuredRank={1} noClamp />,
+    )
+
+    const card = container.querySelector('article')
+    expect(card).not.toBeNull()
+    expect(card?.className).not.toMatch(
+      /rounded-lg|border-zinc-200\/75|shadow-sm/,
+    )
+    expect(
+      screen.getByText('A complete tweet & media with > one encoding layer.'),
+    ).toHaveClass('whitespace-pre-wrap', '[font-family:var(--font-petrona)]')
+    expect(screen.getByText('The complete "quoted" tweet.')).toBeVisible()
+  })
+
+  test('renders Pacific calendar dates consistently for editorial cards', () => {
+    render(
+      <TweetCard
+        tweet={{
+          ...tweet,
+          createdAt: '2026-08-12T05:03:12.000Z',
+          quotedTweet: {
+            ...tweet.quotedTweet!,
+            createdAt: '2026-08-12T06:30:00.000Z',
+          },
+        }}
+        showDate
+      />,
+    )
+
+    expect(screen.getAllByText(/11 Aug 2026/)).toHaveLength(2)
   })
 
   test('uses accessible Phosphor metrics and an optional external link', () => {

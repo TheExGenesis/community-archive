@@ -530,7 +530,8 @@ export const config = {
      * - favicon.ico (favicon file)
      * - robots.txt (crawler rules)
      * - sitemap.xml (sitemap)
+     * - .well-known/workflow/ (authenticated Workflow queue delivery)
      */
-    '/((?!_next/static|_next/image|images/|icon\\.png|apple-icon\\.png|favicon\\.ico|robots\\.txt|sitemap\\.xml).*)',
+    '/((?!_next/static|_next/image|images/|icon\\.png|apple-icon\\.png|favicon\\.ico|robots\\.txt|sitemap\\.xml|\\.well-known/workflow/).*)',
   ],
 }

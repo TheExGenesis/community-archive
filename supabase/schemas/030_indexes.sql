@@ -100,3 +100,16 @@ CREATE INDEX IF NOT EXISTS "idx_all_account_username_trgm"
 -- private.tweet_user: every get_streaming_stats_* function filters on created_at.
 CREATE INDEX IF NOT EXISTS "idx_tweet_user_created_at"
   ON "private"."tweet_user" USING "btree" ("created_at");
+CREATE INDEX IF NOT EXISTS "digest_runs_date_created_idx"
+  ON "public"."digest_runs" ("digest_date" DESC, "created_at" DESC);
+
+CREATE INDEX IF NOT EXISTS "digest_runs_prompt_version_idx"
+  ON "public"."digest_runs" ("prompt_version_id");
+
+CREATE UNIQUE INDEX IF NOT EXISTS "digest_editions_one_published_per_date_idx"
+  ON "public"."digest_editions" ("digest_date")
+  WHERE "status" = 'published';
+
+CREATE INDEX IF NOT EXISTS "digest_editions_public_archive_idx"
+  ON "public"."digest_editions" ("digest_date" DESC, "published_at" DESC)
+  WHERE "status" = 'published';

@@ -53,6 +53,7 @@ const isSearchSurface = isOneOf(['advanced', 'homepage'])
 const isDashboardDestination = isOneOf([
   'all_time_bangers',
   'best_strands',
+  'daily_digest',
   'data_export',
   'live_stream',
   'recent_bangers',
@@ -72,6 +73,7 @@ const isTweetCardAction = isOneOf([
 ])
 const isTweetOrigin = isOneOf([
   'bangers',
+  'digest',
   'home',
   'search',
   'stream',

@@ -41,6 +41,7 @@ describe('member navigation', () => {
         { href: '/user-dir', label: 'Users' },
         { href: '/stream', label: 'Live stream' },
         { href: '/bangers?period=all', label: 'Bangers' },
+        { href: '/digest', label: 'Digest' },
         { href: '/search', label: 'Search' },
       ]),
     )
@@ -57,6 +58,10 @@ describe('member navigation', () => {
     expect(getPrimaryNav(false)).not.toContainEqual({
       href: '/trends',
       label: 'Trends',
+    })
+    expect(getPrimaryNav(false)).toContainEqual({
+      href: '/digest',
+      label: 'Digest',
     })
     expect(getPrimaryNav(true)).toContainEqual({
       href: '/trends',
@@ -83,7 +88,7 @@ describe('tweet detail navigation', () => {
     })
   })
 
-  it('maps homepage, stream, Trends, and Search origins to honest labels', () => {
+  it('maps homepage, stream, Trends, Search, Digest, and profile origins to honest labels', () => {
     expect(getTweetBackLink({ from: 'home', returnTo: '/' }).label).toBe(
       'Back to homepage',
     )
@@ -96,6 +101,12 @@ describe('tweet detail navigation', () => {
     expect(
       getTweetBackLink({ from: 'search', returnTo: '/search?q=archive' }).label,
     ).toBe('Back to search')
+    expect(
+      getTweetBackLink({
+        from: 'digest',
+        returnTo: '/digest/2026-08-12/taste',
+      }).label,
+    ).toBe('Back to Daily Digest')
     expect(
       getTweetBackLink({
         from: 'profile',

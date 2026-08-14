@@ -253,6 +253,82 @@ CREATE TABLE IF NOT EXISTS "public"."user_action_log" (
 );
 ALTER TABLE "public"."user_action_log" OWNER TO "postgres";
 
+-- Daily Digest editorial state. Analytical candidates come from ClickHouse,
+-- while PostgreSQL owns prompt/run history and publication status.
+CREATE TABLE IF NOT EXISTS "public"."digest_prompt_versions" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "version" bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
+    "label" text NOT NULL,
+    "system_prompt" text NOT NULL,
+    "user_prompt_template" text NOT NULL,
+    "model" text NOT NULL,
+    "parameters" jsonb NOT NULL DEFAULT '{}'::jsonb,
+    "created_by" uuid,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "digest_prompt_versions_label_length" CHECK (char_length(label) BETWEEN 1 AND 120),
+    CONSTRAINT "digest_prompt_versions_system_prompt_length" CHECK (char_length(system_prompt) BETWEEN 1 AND 20000),
+    CONSTRAINT "digest_prompt_versions_user_prompt_length" CHECK (char_length(user_prompt_template) BETWEEN 1 AND 20000),
+    CONSTRAINT "digest_prompt_versions_model_length" CHECK (char_length(model) BETWEEN 1 AND 120),
+    CONSTRAINT "digest_prompt_versions_parameters_object" CHECK (jsonb_typeof(parameters) = 'object')
+);
+ALTER TABLE "public"."digest_prompt_versions" OWNER TO "postgres";
+
+CREATE TABLE IF NOT EXISTS "public"."digest_runs" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "digest_date" date NOT NULL,
+    "status" text NOT NULL DEFAULT 'candidates_ready',
+    "prompt_version_id" uuid NOT NULL REFERENCES "public"."digest_prompt_versions"("id"),
+    "window_start" timestamptz NOT NULL,
+    "window_end" timestamptz NOT NULL,
+    "candidates" jsonb NOT NULL DEFAULT '[]'::jsonb,
+    "model_request" jsonb,
+    "raw_response" jsonb,
+    "parsed_output" jsonb,
+    "events" jsonb NOT NULL DEFAULT '[]'::jsonb,
+    "response_id" text,
+    "model" text,
+    "input_tokens" integer,
+    "output_tokens" integer,
+    "total_tokens" integer,
+    "duration_ms" integer,
+    "error" text,
+    "created_by" uuid,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "started_at" timestamptz,
+    "completed_at" timestamptz,
+    "updated_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "digest_runs_status_check" CHECK (status IN ('candidates_ready', 'running', 'completed', 'failed')),
+    CONSTRAINT "digest_runs_window_check" CHECK (window_end > window_start),
+    CONSTRAINT "digest_runs_candidates_array" CHECK (jsonb_typeof(candidates) = 'array'),
+    CONSTRAINT "digest_runs_events_array" CHECK (jsonb_typeof(events) = 'array'),
+    CONSTRAINT "digest_runs_model_request_object" CHECK (model_request IS NULL OR jsonb_typeof(model_request) = 'object'),
+    CONSTRAINT "digest_runs_raw_response_object" CHECK (raw_response IS NULL OR jsonb_typeof(raw_response) = 'object'),
+    CONSTRAINT "digest_runs_parsed_output_object" CHECK (parsed_output IS NULL OR jsonb_typeof(parsed_output) = 'object'),
+    CONSTRAINT "digest_runs_token_counts_nonnegative" CHECK (coalesce(input_tokens, 0) >= 0 AND coalesce(output_tokens, 0) >= 0 AND coalesce(total_tokens, 0) >= 0),
+    CONSTRAINT "digest_runs_duration_nonnegative" CHECK (duration_ms IS NULL OR duration_ms >= 0)
+);
+ALTER TABLE "public"."digest_runs" OWNER TO "postgres";
+
+CREATE TABLE IF NOT EXISTS "public"."digest_editions" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "issue_number" bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
+    "digest_date" date NOT NULL,
+    "version" integer NOT NULL,
+    "status" text NOT NULL DEFAULT 'draft',
+    "source_run_id" uuid NOT NULL REFERENCES "public"."digest_runs"("id"),
+    "content" jsonb NOT NULL,
+    "created_by" uuid,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "published_at" timestamptz,
+    "updated_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "digest_editions_date_version_key" UNIQUE ("digest_date", "version"),
+    CONSTRAINT "digest_editions_version_positive" CHECK (version > 0),
+    CONSTRAINT "digest_editions_status_check" CHECK (status IN ('draft', 'published', 'archived')),
+    CONSTRAINT "digest_editions_content_object" CHECK (jsonb_typeof(content) = 'object'),
+    CONSTRAINT "digest_editions_publication_time_check" CHECK ((status = 'published' AND published_at IS NOT NULL) OR status <> 'published')
+);
+ALTER TABLE "public"."digest_editions" OWNER TO "postgres";
+
 -- Public profile preferences. PostgreSQL remains authoritative for this
 -- owner-controlled policy state; analytical stores only consume the result.
 CREATE TABLE IF NOT EXISTS "public"."profile_settings" (

@@ -83,6 +83,12 @@ interface ClickHouseRecentBanger {
   username: string | null
   accountDisplayName: string | null
   avatarMediaUrl: string | null
+  media?: Array<{
+    mediaUrl: string
+    mediaType: string
+    width: number | null
+    height: number | null
+  }>
 }
 
 interface ClickHouseRecentBangersResponse {
@@ -430,6 +436,7 @@ export async function fetchPortalRecentBangers(
   limit = 50,
   hours = 48,
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+  end?: string,
 ): Promise<PortalTweet[]> {
   const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
   const safeHours = Math.max(1, Math.min(168, Math.trunc(hours)))
@@ -438,6 +445,7 @@ export async function fetchPortalRecentBangers(
     new URLSearchParams({
       limit: String(safeLimit),
       hours: String(safeHours),
+      ...(end ? { end: safeTimestamp(end, 'window end') } : {}),
     }),
     { timeoutMs: 30_000, revalidate: 1_800 },
   )
@@ -454,6 +462,20 @@ export async function fetchPortalRecentBangers(
       throw new Error('ClickHouse recent-bangers returned an invalid tweet')
     }
     const username = row.username || 'unknown'
+    const media = (row.media ?? []).flatMap((item) =>
+      typeof item.mediaUrl === 'string' && typeof item.mediaType === 'string'
+        ? [
+            {
+              url: item.mediaUrl,
+              type: item.mediaType,
+              ...(typeof item.width === 'number' ? { width: item.width } : {}),
+              ...(typeof item.height === 'number'
+                ? { height: item.height }
+                : {}),
+            },
+          ]
+        : [],
+    )
     return {
       id: row.tweetId,
       accountId: row.accountId,
@@ -469,6 +491,7 @@ export async function fetchPortalRecentBangers(
       likes: safeCount(row.favoriteCount, 'banger favorite count'),
       rts: safeCount(row.retweetCount, 'banger repost count'),
       quoteCount: safeCount(row.quoteCount, 'banger quote count'),
+      ...(media.length ? { media } : {}),
     }
   })
 }

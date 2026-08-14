@@ -18,7 +18,7 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
   'trend-evidence': new Set(['q', 'mode', 'since', 'until', 'limit']),
   'word-trend': new Set(['q', 'bucket', 'match', 'from', 'to']),
   'stream-stats': new Set(['start', 'end', 'granularity', 'scope']),
-  'recent-bangers': new Set(['limit', 'hours']),
+  'recent-bangers': new Set(['limit', 'hours', 'end']),
   'portal-stream': new Set([
     'limit',
     'before',

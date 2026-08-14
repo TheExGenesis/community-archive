@@ -1,0 +1,265 @@
+{
+  "evaluatedAt": "2026-08-14T07:17:23.752Z",
+  "model": "deepseek/deepseek-v4-flash-0731",
+  "corpus": {
+    "bangers": 13,
+    "contextPosts": 14,
+    "promptCharacters": 18331
+  },
+  "passed": 1,
+  "total": 2,
+  "trials": [
+    {
+      "trial": 1,
+      "passed": false,
+      "durationMs": 16498,
+      "responseId": "gen-1786691767-9hxIdyJNzQzH5uxvw3YW",
+      "model": "deepseek/deepseek-v4-flash-0731",
+      "provider": "Morph",
+      "inputTokens": 5917,
+      "outputTokens": 1305,
+      "outputHash": "dae16fbabe3126c191db4ed38ec8d7a5dfde7912daf051c75b80ef223632bd3a",
+      "storyCount": null,
+      "representativeTweetId": null,
+      "error": "Story 1 is incomplete",
+      "output": {
+        "executive_summary": [
+          "Researchers claim a vulnerability in frontier AI APIs exposes hidden reasoning tokens, verified 1:1 against billed thinking tokens.",
+          "A scan of ~7,000 public traces found 62 unique API keys, 33 emails, and 33 passwords leaked from encrypted reasoning blobs.",
+          "Grok Bot launches in early beta as AI teammates that sign in to tools and return finished work, with mixed reactions.",
+          "Sundar Pichai announces 1B+ monthly Gemini users, but skeptics question the claim's accuracy.",
+          "A viral meme spreads about men posting about the moon to attract women, with calls to stay vigilant."
+        ],
+        "representative_tweet_index": 0,
+        "stories": [
+          {
+            "category": "AI news",
+            "title": "We found a way to extract hidden reasoning of frontier models using a vulnerability in the APIs",
+            "subtitle": "Researchers claim to recover encrypted reasoning tokens from frontier AI APIs, verified 1:1 against billed thinking tokens, sparking security concerns.",
+            "bullets": [
+              "The team verified reasoning token counts match billed API thinking tokens 1:1 for most prompts queried.",
+              "A scan of ~7,000 public traces found 62 unique API keys, 33 email addresses, and 33 passwords leaked from encrypted reasoning blobs.",
+              "Replies note the hack doesn't affect Fable and question its role in distillation claims."
+            ],
+            "editorial_note": "While the research is celebrated as cool, some experts caution that the encrypted reasoning trace hack doesn't affect all models and may not explain distillation claims. The leak of personal data from public traces is a separate but serious operational concern.",
+            "tweet_indices": [
+              0,
+              2,
+              13,
+              14,
+              15
+            ]
+          },
+          {
+            "category": "AI news",
+            "title": "guys you do know you can just disable thinking, and instead give it a \"deep_think\" tool",
+            "subtitle": "A simpler method to access internal CoT reasoning is highlighted, suggesting the vulnerability may be trivially exploitable.",
+            "bullets": [
+              "The tweet suggests disabling thinking and using a deep_think tool to call internal CoT reasoning format.",
+              "This implies the vulnerability might be even easier to exploit than the main research suggests.",
+              "The response 'gl fixing that' indicates a quick fix is needed."
+            ],
+            "editorial_note": "This tweet offers a practical alternative to the main research, but it's unclear if it's a joke or a real exploit. It highlights the need for labs to secure reasoning processes.",
+            "tweet_indices": [
+              1
+            ]
+          },
+          {
+            "category": "AI news",
+            "title": "Introducing Grok Bot, now in early beta",
+            "subtitle": "Grok Bot launches as AI teammates that automate workflows, with early users praising its potential and critics noting the irony of NDA emailing.",
+            "bullets": [
+              "Grok Bot is described as AI teammates that sign in to tools and return finished work.",
+              "Gergely Orosz calls it an 'OpenClaw 2.0 moment' after automating workflows in 2 hours.",
+              "A critic notes the first application shown is mass emailing NDAs, calling it a 'Freudian slip'."
+            ],
+            "editorial_note": "The launch is met with enthusiasm for its automation potential, but the NDA emailing example raises questions about the intended use cases. The 'little guy'-ism branding strategy is also noted as a trend.",
+            "tweet_indices": [
+              5,
+              6,
+              19,
+              20,
+              21
+            ]
+          },
+          {
+            "category": "AI news",
+            "title": "1B+ people are now using @Geminiapp every month",
+            "subtitle": "Sundar Pichai announces Gemini hits 1B monthly users, but skeptics question the claim's accuracy and precision.",
+            "bullets": [
+              "Pichai calls Gemini the fastest growing product ever and the 14th to hit the 1B-user mark.",
+              "A reply questions 'there's no way this is true in a non misleading way right'.",
+              "Casey Muratori jokes about misreading '1B+' as '18+' due to eyesight."
+            ],
+            "editorial_note": "The announcement is met with skepticism, with some questioning the metric's definition. The '18+' misread joke highlights the ambiguity of the claim.",
+            "tweet_indices": [
+              11,
+              24,
+              25,
+              26
+            ]
+          },
+          {
+            "category": "Meme",
+            "title": "Oh my god I casually mentioned to a chat that I’m in that if men want to attract women to their posts and DMs, they basically just have to post about the moon",
+            "subtitle": "A viral meme claims men post about the moon to attract women, spreading across chats and prompting calls for 'true and pure moon-posting'.",
+            "bullets": [
+              "The meme spreads as multiple men try moon-posting, with one mentioning it in another chat.",
+              "A reply confirms the trend, while another calls out 'POSERS' who don't post from love.",
+              "QC adds a philosophical take on the sun and moon's apparent size, suggesting an anthropic explanation."
+            ],
+            "editorial_note": "The meme blends humor with a social commentary on authenticity. The 'true and pure moon-posting' call distinguishes genuine reverence from strategic posting, adding depth to the joke.",
+            "tweet_indices": [
+              3,
+              16,
+              17,
+              18
+            ]
+          }
+        ],
+        "keywords": [
+          "hidden reasoning",
+          "reasoning token count",
+          "encrypted reasoning blobs",
+          "Grok Bot",
+          "early beta",
+          "1B+ people",
+          "Geminiapp",
+          "moon-posting",
+          "attract women",
+          "deep_think tool",
+          "OpenClaw 2.0",
+          "Freudian slip"
+        ]
+      }
+    },
+    {
+      "trial": 2,
+      "passed": true,
+      "durationMs": 59956,
+      "responseId": "gen-1786691784-UAXXS8odbeW3SMPFCjYN",
+      "model": "deepseek/deepseek-v4-flash-0731",
+      "provider": "Decart",
+      "inputTokens": 6009,
+      "outputTokens": 1446,
+      "outputHash": "d3ec832cf114921953e25360e0f4ee1b7feb053ed0110680dede1a9af35f4c2a",
+      "storyCount": 5,
+      "representativeTweetId": "2087147042888114428",
+      "error": null,
+      "output": {
+        "executive_summary": [
+          "Researchers claim a way to extract hidden reasoning of frontier models via API vulnerabilities, verified 1:1 against billed thinking tokens.",
+          "A scan of ~7,000 public traces found 62 unique API keys, 33 email addresses, and 33 passwords leaked from encrypted reasoning blobs.",
+          "Grok Bot launches in early beta as AI teammates that sign in to your tools and come back with finished work.",
+          "Sundar Pichai says 1B+ people use Gemini monthly, its fastest growing product ever and 14th to hit the 1B-user mark.",
+          "A joke about posting about the moon to attract women spreads across chats, with men trying it and the moon-posting-fishing spreading."
+        ],
+        "representative_tweet_index": 0,
+        "stories": [
+          {
+            "category": "AI news",
+            "title": "We found a way to extract hidden reasoning of frontier models",
+            "subtitle": "Alexander Panfilov's team claims an API vulnerability exposes encrypted reasoning tokens, verified 1:1 against billed thinking tokens across frontier.",
+            "bullets": [
+              "The team verified that their reasoning token count matches billed API thinking tokens 1:1 for most prompts queried.",
+              "A preliminary scan of ~7,000 public traces found 62 unique API keys, 33 email addresses, 33 passwords, and other sensitive data.",
+              "Deedy notes the encrypted reasoning trace hack doesn't affect Fable and doesn't explain any purported distillation of that model."
+            ],
+            "editorial_note": "The claim is significant but contested: Deedy cautions that the hack doesn't affect Fable, and Johann Rehberger reports repro success with gpt-5.6 traces until about an hour ago, suggesting mitigations are rolling out. The scan findings are preliminary and based on public traces.",
+            "tweet_indices": [
+              0,
+              2,
+              13,
+              14,
+              15
+            ]
+          },
+          {
+            "category": "AI news",
+            "title": "Introducing Grok Bot, now in early beta",
+            "subtitle": "Grok Bot launches as AI teammates that sign in to tools and return finished work; Cursor engineer reveals inspiration from her internal bot Benny.",
+            "bullets": [
+              "Gergely Orosz says he's been using it for ~2 hours and is blown away at automating workflows, calling it an OpenClaw 2.0 moment.",
+              "Cursor engineer @poteto reveals the original inspiration was her internal Slack bot called Benny that fixed bug reports while she slept.",
+              "Quantian notes the first application mentioned in the ad is mass emailing NDAs to employees, calling it an amazing Freudian slip."
+            ],
+            "editorial_note": "The launch is framed as a 'normie' automation tool, but the NDA-emailing example and the 'little guy' branding critique suggest a mix of enthusiasm and skepticism about the product's positioning.",
+            "tweet_indices": [
+              5,
+              19,
+              20,
+              21
+            ]
+          },
+          {
+            "category": "AI news",
+            "title": "1B+ people are now using @Geminiapp every month",
+            "subtitle": "Sundar Pichai announces Gemini hits 1B monthly users, its fastest growing product ever and 14th to reach the mark.",
+            "bullets": [
+              "Pichai credits Josh Woodward and the entire Gemini team for the milestone.",
+              "Aprii asks 'there's no way this is true in a non misleading way right', and QC jokes 'computer, is sundar pichai, the CEO of google, lying to me'.",
+              "Casey Muratori misreads the number as '18+ people' and notes everyone he knows uses OpenAI or Anthropic."
+            ],
+            "editorial_note": "The 1B-user claim is met with widespread skepticism on the feed, with users questioning its accuracy and whether it's misleading. The quote responses highlight a trust gap between the announcement and community perception.",
+            "tweet_indices": [
+              11,
+              24,
+              25,
+              26
+            ]
+          },
+          {
+            "category": "Viral joke",
+            "title": "post about the moon to attract women",
+            "subtitle": "A joke about moon-posting to attract women spreads across chats, with men trying it and the moon-posting-fishing spreading.",
+            "bullets": [
+              "lune says multiple guys are trying it and the moon-posting-fishing is SPREADING, warning 'they are NOT posting from the heart!'",
+              "RandomSprint confirms the trend, and IaimforGOAT calls out 'POSERS' who post about the moon for attention rather than love.",
+              "QC contributes a tangent about the sun and moon being the same apparent size, suggesting an anthropic explanation involving eclipses."
+            ],
+            "editorial_note": "The joke is spreading as a meme, with participants riffing on the absurdity of performative moon-posting. QC's tangent adds a pseudo-philosophical layer, but the core is clearly a viral joke about social dynamics.",
+            "tweet_indices": [
+              3,
+              16,
+              17,
+              18
+            ]
+          },
+          {
+            "category": "Meme",
+            "title": "You have to understand, these were the women I looked up to in my formative years",
+            "subtitle": "A copypasta about formative-year role models spreads across multiple accounts, each attaching their own image to the same text.",
+            "bullets": [
+              "The exact phrase appears across at least five accounts, including @Impish_Bunny, @goblinodds, @breaking2morrow, @_space_punk_, and @SkyeSharkie.",
+              "Each instance pairs the text with a different image, suggesting a visual meme format.",
+              "The repetition of the identical sentence indicates a copypasta or template meme circulating in the feed."
+            ],
+            "editorial_note": "This is a classic copypasta meme where the text is fixed but the attached image varies, creating a shared joke about nostalgic role models. The lack of context in the text makes it a flexible template for different images.",
+            "tweet_indices": [
+              7,
+              8,
+              9,
+              10,
+              22,
+              23
+            ]
+          }
+        ],
+        "keywords": [
+          "extract hidden reasoning",
+          "reasoning token count",
+          "billed API thinking tokens",
+          "Grok Bot",
+          "AI teammates",
+          "1B+ people",
+          "Geminiapp",
+          "moon-posting-fishing",
+          "formative years",
+          "OpenClaw 2.0",
+          "encrypted reasoning blobs",
+          "little guy"
+        ]
+      }
+    }
+  ]
+}

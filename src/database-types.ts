@@ -361,6 +361,194 @@ export type Database = {
           },
         ]
       }
+      digest_editions: {
+        Row: {
+          content: Json
+          created_at: string
+          created_by: string | null
+          digest_date: string
+          id: string
+          issue_number: number
+          published_at: string | null
+          source_run_id: string
+          status: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          content: Json
+          created_at?: string
+          created_by?: string | null
+          digest_date: string
+          id?: string
+          issue_number?: never
+          published_at?: string | null
+          source_run_id: string
+          status?: string
+          updated_at?: string
+          version: number
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          digest_date?: string
+          id?: string
+          issue_number?: never
+          published_at?: string | null
+          source_run_id?: string
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_editions_source_run_id_fkey"
+            columns: ["source_run_id"]
+            isOneToOne: false
+            referencedRelation: "digest_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      digest_prompt_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          label: string
+          model: string
+          parameters: Json
+          system_prompt: string
+          user_prompt_template: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label: string
+          model: string
+          parameters?: Json
+          system_prompt: string
+          user_prompt_template: string
+          version?: never
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string
+          model?: string
+          parameters?: Json
+          system_prompt?: string
+          user_prompt_template?: string
+          version?: never
+        }
+        Relationships: []
+      }
+      digest_runs: {
+        Row: {
+          candidates: Json
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          digest_date: string
+          duration_ms: number | null
+          error: string | null
+          events: Json
+          id: string
+          input_tokens: number | null
+          model: string | null
+          model_request: Json | null
+          output_tokens: number | null
+          parent_run_id: string | null
+          parsed_output: Json | null
+          prompt_version_id: string
+          raw_response: Json | null
+          response_id: string | null
+          revision_instruction: string | null
+          started_at: string | null
+          status: string
+          total_tokens: number | null
+          updated_at: string
+          window_end: string
+          window_start: string
+          workflow_run_id: string | null
+        }
+        Insert: {
+          candidates?: Json
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          digest_date: string
+          duration_ms?: number | null
+          error?: string | null
+          events?: Json
+          id?: string
+          input_tokens?: number | null
+          model?: string | null
+          model_request?: Json | null
+          output_tokens?: number | null
+          parent_run_id?: string | null
+          parsed_output?: Json | null
+          prompt_version_id: string
+          raw_response?: Json | null
+          response_id?: string | null
+          revision_instruction?: string | null
+          started_at?: string | null
+          status?: string
+          total_tokens?: number | null
+          updated_at?: string
+          window_end: string
+          window_start: string
+          workflow_run_id?: string | null
+        }
+        Update: {
+          candidates?: Json
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          digest_date?: string
+          duration_ms?: number | null
+          error?: string | null
+          events?: Json
+          id?: string
+          input_tokens?: number | null
+          model?: string | null
+          model_request?: Json | null
+          output_tokens?: number | null
+          parent_run_id?: string | null
+          parsed_output?: Json | null
+          prompt_version_id?: string
+          raw_response?: Json | null
+          response_id?: string | null
+          revision_instruction?: string | null
+          started_at?: string | null
+          status?: string
+          total_tokens?: number | null
+          updated_at?: string
+          window_end?: string
+          window_start?: string
+          workflow_run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_runs_parent_run_id_fkey"
+            columns: ["parent_run_id"]
+            isOneToOne: false
+            referencedRelation: "digest_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "digest_runs_prompt_version_id_fkey"
+            columns: ["prompt_version_id"]
+            isOneToOne: false
+            referencedRelation: "digest_prompt_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       followers: {
         Row: {
           account_id: string
@@ -2020,6 +2208,24 @@ export type Database = {
           archive_data: Json
         }
         Returns: undefined
+      }
+      publish_digest_edition: {
+        Args: {
+          p_edition_id: string
+        }
+        Returns: {
+          content: Json
+          created_at: string
+          created_by: string | null
+          digest_date: string
+          id: string
+          issue_number: number
+          published_at: string | null
+          source_run_id: string
+          status: string
+          updated_at: string
+          version: number
+        }
       }
       refresh_global_activity_summary: {
         Args: Record<PropertyKey, never>

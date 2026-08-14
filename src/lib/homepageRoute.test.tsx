@@ -1,6 +1,6 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import Homepage from '@/app/page'
+import Homepage, { dynamic as homepageRenderingMode } from '@/app/page'
 import { getIsMember } from '@/lib/portal/auth'
 import { getPortalData } from '@/lib/portal/data'
 
@@ -28,6 +28,10 @@ describe('Homepage OAuth actions', () => {
     getPortalDataMock.mockResolvedValue(
       {} as Awaited<ReturnType<typeof getPortalData>>,
     )
+  })
+
+  it('renders at request time so portal fallback data is not frozen at build time', () => {
+    expect(homepageRenderingMode).toBe('force-dynamic')
   })
 
   it('keeps an authenticated OAuth return on the opt-in completion surface', async () => {

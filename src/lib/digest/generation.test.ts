@@ -98,17 +98,22 @@ const modelOutput = {
 }
 
 describe('daily digest generation contract', () => {
-  test('selects at most 50 bangers with more than two CA quote posts', () => {
+  test('selects at most 50 posts with a banger score of at least two', () => {
     const ranked = Array.from({ length: 60 }, (_, index) =>
-      tweet(String(index + 100), `rank ${index}`, index < 55 ? 3 : 2),
+      tweet(
+        String(index + 100),
+        `rank ${index}`,
+        index < 49 ? 3 : index < 55 ? 2 : 1,
+      ),
     )
 
     const selected = selectDailyDigestBangers(ranked)
 
     expect(selected).toHaveLength(50)
-    expect(selected.every((item) => (item.quoteCount ?? 0) > 2)).toBe(true)
+    expect(selected.every((item) => (item.quoteCount ?? 0) >= 2)).toBe(true)
     expect(selected[0].id).toBe('100')
     expect(selected.at(-1)?.id).toBe('149')
+    expect(selected.at(-1)?.quoteCount).toBe(2)
   })
 
   test('renders a reproducible prompt from the frozen candidate snapshot', () => {

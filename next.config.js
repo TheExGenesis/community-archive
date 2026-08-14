@@ -1,6 +1,7 @@
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 })
+const { withWorkflow } = require('workflow/next')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -56,4 +57,4 @@ const nextConfig = {
   },
 }
 
-module.exports = withBundleAnalyzer(nextConfig)
+module.exports = withWorkflow(withBundleAnalyzer(nextConfig))

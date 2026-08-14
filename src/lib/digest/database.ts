@@ -31,6 +31,7 @@ export interface DigestRunRow {
   parsed_output: Json | null
   events: Json
   response_id: string | null
+  workflow_run_id: string | null
   model: string | null
   input_tokens: number | null
   output_tokens: number | null

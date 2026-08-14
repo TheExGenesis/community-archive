@@ -17,6 +17,7 @@ export function DigestDaySelector({
   editions,
   variant = 'card',
   generation,
+  navigation,
 }: {
   currentDate: string
   editions: DigestEdition[]
@@ -25,6 +26,11 @@ export function DigestDaySelector({
     action: string | ((formData: FormData) => Promise<void>)
     dates: string[]
     promptVersionId: string
+    runningRuns?: Array<{ date: string; id: string }>
+  }
+  navigation?: {
+    previousHref?: string
+    nextHref?: string
   }
 }) {
   const editorial = variant === 'editorial'
@@ -36,6 +42,9 @@ export function DigestDaySelector({
     editions.map((edition) => [edition.digestDate, edition]),
   )
   const generationDates = new Set(generation?.dates ?? [])
+  const runningByDate = new Map(
+    (generation?.runningRuns ?? []).map((run) => [run.date, run.id]),
+  )
   const cells = [
     ...Array.from({ length: firstWeekday }, () => null),
     ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
@@ -57,9 +66,43 @@ export function DigestDaySelector({
         >
           Choose a day
         </h2>
-        <span className={`${editorial ? 'text-[12.5px]' : 'text-xs'} ${MUTED}`}>
-          {monthLabel(year, month)}
-        </span>
+        {navigation ? (
+          <nav className="flex items-center gap-1" aria-label="Digest months">
+            {navigation.previousHref ? (
+              <Link
+                href={navigation.previousHref}
+                aria-label="Previous month"
+                className="flex h-7 w-7 items-center justify-center rounded-md border text-sm text-muted-foreground transition hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
+              >
+                ←
+              </Link>
+            ) : (
+              <span className="h-7 w-7" aria-hidden="true" />
+            )}
+            <span
+              className={`min-w-[112px] text-center ${editorial ? 'text-[12.5px]' : 'text-xs'} ${MUTED}`}
+            >
+              {monthLabel(year, month)}
+            </span>
+            {navigation.nextHref ? (
+              <Link
+                href={navigation.nextHref}
+                aria-label="Next month"
+                className="flex h-7 w-7 items-center justify-center rounded-md border text-sm text-muted-foreground transition hover:bg-zinc-100 hover:text-foreground dark:hover:bg-zinc-900"
+              >
+                →
+              </Link>
+            ) : (
+              <span className="h-7 w-7" aria-hidden="true" />
+            )}
+          </nav>
+        ) : (
+          <span
+            className={`${editorial ? 'text-[12.5px]' : 'text-xs'} ${MUTED}`}
+          >
+            {monthLabel(year, month)}
+          </span>
+        )}
       </div>
       <div className="mt-4 grid grid-cols-7 gap-1 text-center">
         {WEEKDAYS.map((weekday, index) => (
@@ -77,6 +120,20 @@ export function DigestDaySelector({
           const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
           const edition = editionsByDate.get(date)
           const isCurrent = date === currentDate
+          const runningRunId = runningByDate.get(date)
+          if (runningRunId) {
+            return (
+              <Link
+                key={date}
+                href={`/admin/digest?run=${runningRunId}`}
+                aria-label={`View running digest job for ${date}`}
+                className="dark:bg-amber-950/35 flex aspect-square items-center justify-center rounded-[6px] border border-amber-300 bg-amber-50 text-[12.5px] font-semibold text-amber-900 ring-1 ring-amber-200 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-800 dark:text-amber-100 dark:ring-amber-900"
+              >
+                <span className="mr-1 h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+                {day}
+              </Link>
+            )
+          }
           if (generation && generationDates.has(date)) {
             return (
               <form key={date} action={generation.action}>
@@ -139,7 +196,7 @@ export function DigestDaySelector({
         className={`${editorial ? 'mt-4 text-xs leading-[1.6]' : 'mt-3 text-[11px] leading-4'} ${MUTED}`}
       >
         {generation
-          ? 'Blue days are ready to generate. Each click creates an unpublished draft run.'
+          ? 'Blue days are ready to generate. Amber days are running and safe to leave.'
           : 'Available days have an edition. A dot marks preview data.'}
       </p>
     </section>

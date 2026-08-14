@@ -99,6 +99,7 @@ export interface DigestRun {
   parsedOutput: DigestEditionContent | null
   events: DigestRunEvent[]
   responseId: string | null
+  workflowRunId: string | null
   model: string | null
   inputTokens: number | null
   outputTokens: number | null

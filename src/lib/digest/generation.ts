@@ -43,7 +43,7 @@ export interface DigestPromptCorpusRow {
 }
 
 export function selectDailyDigestBangers(tweets: PortalTweet[]): PortalTweet[] {
-  return tweets.filter((tweet) => (tweet.quoteCount ?? 0) > 2).slice(0, 50)
+  return tweets.filter((tweet) => (tweet.quoteCount ?? 0) >= 2).slice(0, 50)
 }
 
 const cleanText = (value: unknown, max: number): string | null => {

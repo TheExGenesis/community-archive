@@ -80,6 +80,7 @@ export function mapDigestRun(row: DigestRunRow): DigestRun {
     parsedOutput: parseDigestEditionContent(row.parsed_output),
     events: parseDigestRunEvents(row.events),
     responseId: row.response_id,
+    workflowRunId: row.workflow_run_id,
     model: row.model,
     inputTokens: row.input_tokens,
     outputTokens: row.output_tokens,

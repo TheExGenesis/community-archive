@@ -472,6 +472,7 @@ export type Database = {
           updated_at: string
           window_end: string
           window_start: string
+          workflow_run_id: string | null
         }
         Insert: {
           candidates?: Json
@@ -497,6 +498,7 @@ export type Database = {
           updated_at?: string
           window_end: string
           window_start: string
+          workflow_run_id?: string | null
         }
         Update: {
           candidates?: Json
@@ -522,6 +524,7 @@ export type Database = {
           updated_at?: string
           window_end?: string
           window_start?: string
+          workflow_run_id?: string | null
         }
         Relationships: [
           {
@@ -2329,4 +2332,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-

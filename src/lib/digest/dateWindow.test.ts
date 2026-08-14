@@ -32,4 +32,10 @@ describe('digest date windows', () => {
     expect(isRecentPastDigestDate('2026-08-11', now)).toBe(true)
     expect(isRecentPastDigestDate('2026-08-14', now)).toBe(false)
   })
+
+  test('allows completed days across the twelve-month generation calendar', () => {
+    const now = new Date('2026-08-14T12:00:00.000Z')
+    expect(isRecentPastDigestDate('2025-08-14', now, 365)).toBe(true)
+    expect(isRecentPastDigestDate('2025-08-13', now, 365)).toBe(false)
+  })
 })

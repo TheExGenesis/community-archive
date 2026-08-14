@@ -15,6 +15,7 @@ import {
   stageDigestEditionAction,
   updateDigestSelectionAction,
 } from './actions'
+import { DigestJobProgress } from './DigestJobProgress'
 import { SubmitButton } from './SubmitButton'
 
 export const dynamic = 'force-dynamic'
@@ -36,6 +37,14 @@ const formatDuration = (value: number | null) =>
     : value < 1_000
       ? `${value} ms`
       : `${(value / 1_000).toFixed(1)} s`
+
+const MONTH_PATTERN = /^\d{4}-\d{2}$/
+
+const shiftMonth = (month: string, offset: number) => {
+  const [year, monthNumber] = month.split('-').map(Number)
+  const shifted = new Date(Date.UTC(year, monthNumber - 1 + offset, 1))
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}`
+}
 
 function RunList({
   runs,
@@ -137,12 +146,34 @@ function EditionList({
 export default async function DigestLabPage({
   searchParams,
 }: {
-  searchParams?: { run?: string; notice?: string; error?: string }
+  searchParams?: {
+    run?: string
+    month?: string
+    notice?: string
+    error?: string
+  }
 }) {
   await requireAdmin()
   const state = await loadDigestLabState(searchParams?.run)
   const prompt = state.prompts[0]
-  const pastDates = listPastDigestDates(7)
+  const pastDates = listPastDigestDates(365)
+  const availableMonths = new Set(pastDates.map((date) => date.slice(0, 7)))
+  const latestMonth = pastDates[0].slice(0, 7)
+  const requestedMonth = searchParams?.month
+  const calendarMonth =
+    requestedMonth &&
+    MONTH_PATTERN.test(requestedMonth) &&
+    availableMonths.has(requestedMonth)
+      ? requestedMonth
+      : latestMonth
+  const previousMonth = shiftMonth(calendarMonth, -1)
+  const nextMonth = shiftMonth(calendarMonth, 1)
+  const monthHref = (month: string) => {
+    const params = new URLSearchParams({ month })
+    if (state.activeRun) params.set('run', state.activeRun.id)
+    return `/admin/digest?${params}`
+  }
+  const runningRuns = state.runs.filter(({ status }) => status === 'running')
   const activePrompt =
     state.prompts.find(
       (item) => item.id === state.activeRun?.promptVersionId,
@@ -170,6 +201,19 @@ export default async function DigestLabPage({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {runningRuns[0] ? (
+              <Link
+                href={`/admin/digest?run=${runningRuns[0].id}`}
+                className="dark:bg-amber-950/35 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 dark:border-amber-800 dark:text-amber-100"
+              >
+                <span
+                  className="h-2 w-2 animate-pulse rounded-full bg-amber-500"
+                  aria-hidden="true"
+                />
+                {runningRuns.length} {runningRuns.length === 1 ? 'job' : 'jobs'}{' '}
+                running
+              </Link>
+            ) : null}
             <Badge
               variant={state.generationConfigured ? 'default' : 'destructive'}
             >
@@ -245,20 +289,32 @@ export default async function DigestLabPage({
             <section className="rounded-lg border bg-card p-4">
               <h2 className="font-semibold">Generate a past day</h2>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                One click freezes that Pacific calendar day, fetches its
-                context, and sends one model request. Publication remains
+                One click starts a durable job for that Pacific calendar day. It
+                keeps running after refresh or navigation; publication remains
                 manual.
               </p>
               {prompt ? (
                 <div className="mt-4">
                   <DigestDaySelector
-                    currentDate={pastDates[0]}
+                    currentDate={`${calendarMonth}-01`}
                     editions={[]}
                     variant="editorial"
                     generation={{
                       action: createAndGenerateDigestDateAction,
                       dates: pastDates,
                       promptVersionId: prompt.id,
+                      runningRuns: runningRuns.map((run) => ({
+                        date: run.digestDate,
+                        id: run.id,
+                      })),
+                    }}
+                    navigation={{
+                      previousHref: availableMonths.has(previousMonth)
+                        ? monthHref(previousMonth)
+                        : undefined,
+                      nextHref: availableMonths.has(nextMonth)
+                        ? monthHref(nextMonth)
+                        : undefined,
                     }}
                   />
                 </div>
@@ -336,6 +392,15 @@ export default async function DigestLabPage({
                   ) : null}
                 </section>
 
+                {state.activeRun.status === 'running' ? (
+                  <DigestJobProgress
+                    runId={state.activeRun.id}
+                    startedAt={state.activeRun.startedAt}
+                    workflowRunId={state.activeRun.workflowRunId}
+                    events={state.activeRun.events}
+                  />
+                ) : null}
+
                 <section className="rounded-lg border bg-card p-5">
                   <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                     <div>
@@ -343,7 +408,8 @@ export default async function DigestLabPage({
                         Candidate selection
                       </h2>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Ranked by distinct non-self archive-member quote posts.
+                        Up to 50 posts with a Community Archive banger score of
+                        at least two, ranked strongest first.
                       </p>
                     </div>
                     <span className="text-xs text-muted-foreground">
@@ -438,7 +504,7 @@ export default async function DigestLabPage({
                       </form>
                     ) : state.activeRun.status === 'running' ? (
                       <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-                        Generation in progress…
+                        Durable job in progress…
                       </span>
                     ) : (
                       <form

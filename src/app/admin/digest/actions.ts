@@ -2,29 +2,20 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import type { TweetData } from '@/components/TweetComponent'
+import { start } from 'workflow/api'
 import { requireAdmin } from '@/app/admin/data'
-import { fetchClickHouseQuotePosts } from '@/lib/clickhouseQuotePosts'
 import { fetchPortalRecentBangers } from '@/lib/portal/analytics'
-import type { PortalTweet } from '@/lib/portal/types'
-import { fetchDigestReplies } from '@/lib/digest/context'
 import {
   getDigestDateWindow,
   isRecentPastDigestDate,
   listPastDigestDates,
 } from '@/lib/digest/dateWindow'
 import { createDigestAdminClient } from '@/lib/digest/database'
-import {
-  assembleDigestEditionContent,
-  renderDigestPrompt,
-  selectDailyDigestBangers,
-  type EnrichedDigestCandidate,
-} from '@/lib/digest/generation'
-import { generateDigestWithModel } from '@/lib/digest/openai'
+import { selectDailyDigestBangers } from '@/lib/digest/generation'
 import { captureDigestPostHogEvent } from '@/lib/digest/posthogServer'
-import { mapDigestRun, mapPromptVersion, toJson } from '@/lib/digest/data'
+import { mapDigestRun, toJson } from '@/lib/digest/data'
 import type { DigestCandidate, DigestRunEvent } from '@/lib/digest/types'
-import { createServerServiceRoleClient } from '@/utils/supabase'
+import { generateDigestWorkflow } from '@/workflows/digestGeneration'
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -68,61 +59,92 @@ function describeError(error: unknown): string {
   return String(error)
 }
 
-const quoteTweetToPortalTweet = (
-  tweet: TweetData,
-  banger: PortalTweet,
-): PortalTweet => ({
-  id: tweet.tweet_id,
-  accountId: tweet.account_id,
-  username: tweet.username,
-  name: tweet.account_display_name,
-  avatar: tweet.avatar_media_url ?? null,
-  text: tweet.full_text,
-  observedAt: tweet.created_at,
-  createdAt: tweet.created_at,
-  likes: Math.max(0, tweet.favorite_count ?? 0),
-  rts: Math.max(0, tweet.retweet_count ?? 0),
-  media: (tweet.media ?? []).map((media) => ({
-    url: media.media_url,
-    type: media.media_type,
-    ...(media.width ? { width: media.width } : {}),
-    ...(media.height ? { height: media.height } : {}),
-  })),
-  quotedTweet: {
-    id: banger.id,
-    accountId: banger.accountId,
-    username: banger.username,
-    name: banger.name,
-    avatar: banger.avatar,
-    text: banger.text,
-    createdAt: banger.createdAt,
-    likes: banger.likes,
-    rts: banger.rts,
-    media: banger.media ?? [],
-  },
-})
-
-async function mapWithConcurrency<T, R>(
-  values: T[],
-  concurrency: number,
-  worker: (value: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = []
-  for (let index = 0; index < values.length; index += concurrency) {
-    results.push(
-      ...(await Promise.all(
-        values.slice(index, index + concurrency).map(worker),
-      )),
-    )
-  }
-  return results
-}
-
 const revalidateDigestPaths = (digestDate?: string) => {
   revalidatePath('/')
   revalidatePath('/digest')
   revalidatePath('/admin/digest')
   if (digestDate) revalidatePath(`/digest/${digestDate}`)
+}
+
+async function enqueueDigestGeneration(runId: string) {
+  const admin = createDigestAdminClient()
+  const { data: runRow, error: runError } = await admin
+    .from('digest_runs')
+    .select('*')
+    .eq('id', runId)
+    .maybeSingle()
+  if (runError || !runRow) throw new Error('Digest run not found')
+
+  const run = mapDigestRun(runRow)
+  if (run.status !== 'candidates_ready') {
+    throw new Error('This run was already claimed by another generation job')
+  }
+  if (run.candidates.filter(({ selected }) => selected).length < 3) {
+    throw new Error('Select at least three bangers first')
+  }
+
+  const startedAt = new Date()
+  const events = [
+    ...run.events,
+    event(
+      'generation',
+      'started',
+      'Queued a durable generation job. It is safe to leave this page.',
+    ),
+  ]
+  const { data: claimedRun, error: claimError } = await admin
+    .from('digest_runs')
+    .update({
+      status: 'running',
+      started_at: startedAt.toISOString(),
+      completed_at: null,
+      error: null,
+      events: toJson(events),
+      updated_at: startedAt.toISOString(),
+    })
+    .eq('id', runId)
+    .eq('status', 'candidates_ready')
+    .select('id')
+    .maybeSingle()
+  if (claimError || !claimedRun) {
+    throw new Error('This run was already claimed by another generation job')
+  }
+
+  try {
+    const workflowRun = await start(generateDigestWorkflow, [runId])
+    const { error: workflowIdError } = await admin
+      .from('digest_runs')
+      .update({
+        workflow_run_id: workflowRun.runId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', runId)
+    if (workflowIdError) {
+      console.warn('[daily digest] could not save workflow run ID:', {
+        runId,
+        error: workflowIdError,
+      })
+    }
+  } catch (error) {
+    const message = describeError(error)
+    const completedAt = new Date()
+    await admin
+      .from('digest_runs')
+      .update({
+        status: 'failed',
+        error: message.slice(0, 4_000),
+        completed_at: completedAt.toISOString(),
+        duration_ms: completedAt.getTime() - startedAt.getTime(),
+        updated_at: completedAt.toISOString(),
+        events: toJson([
+          ...events,
+          event('generation', 'failed', `Could not start job: ${message}`),
+        ]),
+      })
+      .eq('id', runId)
+      .eq('status', 'running')
+    throw error
+  }
 }
 
 export async function createDigestPromptVersionAction(formData: FormData) {
@@ -211,11 +233,11 @@ export async function createDigestRunAction(formData: FormData) {
     const initialEvent = event(
       'candidates',
       'completed',
-      'Saved up to 50 rolling 24-hour bangers with more than two Community Archive quote posts.',
+      'Saved up to 50 rolling 24-hour posts with a Community Archive banger score of at least two.',
       {
         candidate_count: candidates.length,
         default_selected_count: candidates.length,
-        minimum_ca_quote_count: 3,
+        minimum_ca_quote_count: 2,
       },
     )
     const { data: run, error } = await admin
@@ -261,8 +283,8 @@ export async function createAndGenerateDigestDateAction(formData: FormData) {
   if (!UUID_PATTERN.test(promptVersionId)) {
     redirectToLab({ error: 'Choose a prompt version.' })
   }
-  if (!isRecentPastDigestDate(digestDate)) {
-    redirectToLab({ error: 'Choose one of the previous 30 completed days.' })
+  if (!isRecentPastDigestDate(digestDate, new Date(), 365)) {
+    redirectToLab({ error: 'Choose a completed day from the past 12 months.' })
   }
 
   const admin = createDigestAdminClient()
@@ -315,7 +337,7 @@ export async function createAndGenerateDigestDateAction(formData: FormData) {
       {
         candidate_count: candidates.length,
         default_selected_count: candidates.length,
-        minimum_ca_quote_count: 3,
+        minimum_ca_quote_count: 2,
         historical_window: true,
       },
     )
@@ -336,7 +358,7 @@ export async function createAndGenerateDigestDateAction(formData: FormData) {
     createdRunId = run.id
     candidateCount = candidates.length
 
-    const daysAgo = listPastDigestDates(30).indexOf(digestDate) + 1
+    const daysAgo = listPastDigestDates(365).indexOf(digestDate) + 1
     await captureDigestPostHogEvent(user.id, {
       event: 'digest_generation_requested',
       properties: {
@@ -360,9 +382,20 @@ export async function createAndGenerateDigestDateAction(formData: FormData) {
     })
   }
 
-  const generationForm = new FormData()
-  generationForm.set('run_id', createdRunId)
-  return generateDigestRunAction(generationForm)
+  try {
+    await enqueueDigestGeneration(createdRunId)
+  } catch (error) {
+    redirectToLab({
+      runId: createdRunId,
+      error: `Could not start generation: ${describeError(error)}`,
+    })
+  }
+
+  revalidatePath('/admin/digest')
+  redirectToLab({
+    runId: createdRunId,
+    notice: 'Generation started. You can refresh or leave this page safely.',
+  })
 }
 
 export async function duplicateDigestRunAction(formData: FormData) {
@@ -499,258 +532,20 @@ export async function generateDigestRunAction(formData: FormData) {
   await requireAdmin()
   const runId = formString(formData, 'run_id')
   if (!UUID_PATTERN.test(runId)) redirectToLab({ error: 'Invalid run ID.' })
-  const admin = createDigestAdminClient()
-  const { data: runRow, error: runError } = await admin
-    .from('digest_runs')
-    .select('*')
-    .eq('id', runId)
-    .maybeSingle()
-  if (runError || !runRow) redirectToLab({ error: 'Run not found.' })
-  const run = mapDigestRun(runRow)
-  if (run.status !== 'candidates_ready') {
-    redirectToLab({
-      runId,
-      error: 'Clone this snapshot to create another generation attempt.',
-    })
-  }
-  const selected = run.candidates.filter(({ selected }) => selected)
-  if (selected.length < 3) {
-    redirectToLab({ runId, error: 'Select at least three bangers first.' })
-  }
-  const { data: promptRow, error: promptError } = await admin
-    .from('digest_prompt_versions')
-    .select('*')
-    .eq('id', run.promptVersionId)
-    .maybeSingle()
-  if (promptError || !promptRow) {
-    redirectToLab({ runId, error: 'Prompt version not found.' })
-  }
-  const prompt = mapPromptVersion(promptRow)
-  const startedAt = new Date()
-  let events: DigestRunEvent[] = [
-    ...run.events,
-    event(
-      'commentary',
-      'started',
-      'Fetching archived replies and quote-post commentary.',
-    ),
-  ]
-  const { data: claimedRun, error: claimError } = await admin
-    .from('digest_runs')
-    .update({
-      status: 'running',
-      started_at: startedAt.toISOString(),
-      completed_at: null,
-      error: null,
-      events: toJson(events),
-      updated_at: startedAt.toISOString(),
-    })
-    .eq('id', runId)
-    .eq('status', 'candidates_ready')
-    .select('id')
-    .maybeSingle()
-  if (claimError || !claimedRun) {
-    redirectToLab({
-      runId,
-      error: 'This run was already claimed by another generation request.',
-    })
-  }
 
   try {
-    const contextClient = createServerServiceRoleClient()
-    const windowStartMs = Date.parse(run.windowStart)
-    const windowEndMs = Date.parse(run.windowEnd)
-    const contextResults = await mapWithConcurrency(
-      selected,
-      8,
-      async (candidate) => {
-        const [quotesResult, repliesResult] = await Promise.allSettled([
-          fetchClickHouseQuotePosts(candidate.tweet.id, 100),
-          fetchDigestReplies(contextClient, {
-            bangerTweetId: candidate.tweet.id,
-            windowStart: run.windowStart,
-            windowEnd: run.windowEnd,
-            limit: 8,
-          }),
-        ])
-        const quotes =
-          quotesResult.status === 'fulfilled'
-            ? quotesResult.value.tweets
-                .filter((tweet) => {
-                  const createdAt = Date.parse(tweet.created_at)
-                  return createdAt >= windowStartMs && createdAt < windowEndMs
-                })
-                .slice(0, 12)
-                .map((tweet) => quoteTweetToPortalTweet(tweet, candidate.tweet))
-            : []
-        const replies =
-          repliesResult.status === 'fulfilled' ? repliesResult.value.tweets : []
-        const commentary = Array.from(
-          new Map(
-            [...quotes, ...replies].map((tweet) => [tweet.id, tweet] as const),
-          ).values(),
-        )
-        return {
-          enriched: {
-            candidate,
-            commentary,
-            replyTweetIds: replies.map(({ id }) => id),
-            totalReplyCount:
-              quotes.length +
-              (repliesResult.status === 'fulfilled'
-                ? repliesResult.value.totalCount
-                : 0),
-          } satisfies EnrichedDigestCandidate,
-          failedFetches:
-            Number(quotesResult.status === 'rejected') +
-            Number(repliesResult.status === 'rejected'),
-        }
-      },
-    )
-    const enrichedCandidates = contextResults.map(({ enriched }) => enriched)
-    const failedCommentary = contextResults.reduce(
-      (sum, result) => sum + result.failedFetches,
-      0,
-    )
-    events = [
-      ...events,
-      event(
-        'commentary',
-        'completed',
-        'Saved reply and quote-post context for the selected bangers.',
-        {
-          selected_count: selected.length,
-          failed_fetches: failedCommentary,
-          commentary_count: enrichedCandidates.reduce(
-            (sum, candidate) => sum + candidate.commentary.length,
-            0,
-          ),
-        },
-      ),
-    ]
-    const userPrompt = renderDigestPrompt(prompt.userPromptTemplate, {
-      digestDate: run.digestDate,
-      windowStart: run.windowStart,
-      windowEnd: run.windowEnd,
-      candidates: enrichedCandidates,
-    })
-    const modelRequest = {
-      promptVersion: prompt,
-      renderedUserPrompt: userPrompt,
-      candidateSnapshot: enrichedCandidates,
-    }
-    events.push(
-      event(
-        'generation',
-        'started',
-        'Sent the saved prompt and snapshot to the model.',
-        {
-          model: prompt.model,
-          selected_count: selected.length,
-        },
-      ),
-    )
-    await admin
-      .from('digest_runs')
-      .update({
-        model_request: toJson(modelRequest),
-        model: prompt.model,
-        events: toJson(events),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', runId)
-
-    const generated = await generateDigestWithModel({
-      runId,
-      model: prompt.model,
-      systemPrompt: prompt.systemPrompt,
-      userPrompt,
-      reasoningEffort: prompt.parameters.reasoning_effort,
-      maxOutputTokens: prompt.parameters.max_output_tokens,
-      temperature: prompt.parameters.temperature,
-    })
-    const completedAt = new Date()
-    const durationMs = completedAt.getTime() - startedAt.getTime()
-    const { error: responseSaveError } = await admin
-      .from('digest_runs')
-      .update({
-        raw_response: toJson(generated.response),
-        response_id: generated.responseId,
-        model: generated.model,
-        input_tokens: generated.inputTokens,
-        output_tokens: generated.outputTokens,
-        total_tokens: generated.totalTokens,
-        duration_ms: durationMs,
-        updated_at: completedAt.toISOString(),
-      })
-      .eq('id', runId)
-    if (responseSaveError) throw responseSaveError
-    if (generated.outputError) throw new Error(generated.outputError)
-    const content = assembleDigestEditionContent({
-      runId,
-      digestDate: run.digestDate,
-      windowStart: run.windowStart,
-      windowEnd: run.windowEnd,
-      allCandidateCount: run.candidates.length,
-      enrichedCandidates,
-      modelOutput: generated.output,
-      generatedAt: completedAt.toISOString(),
-    })
-    events.push(
-      event(
-        'generation',
-        'completed',
-        'Validated and saved structured digest output.',
-        {
-          duration_ms: durationMs,
-          story_count: content.stories.length,
-          total_tokens: generated.totalTokens,
-        },
-      ),
-    )
-    const { error: updateError } = await admin
-      .from('digest_runs')
-      .update({
-        status: 'completed',
-        raw_response: toJson(generated.response),
-        parsed_output: toJson(content),
-        response_id: generated.responseId,
-        model: generated.model,
-        input_tokens: generated.inputTokens,
-        output_tokens: generated.outputTokens,
-        total_tokens: generated.totalTokens,
-        duration_ms: durationMs,
-        error: null,
-        completed_at: completedAt.toISOString(),
-        updated_at: completedAt.toISOString(),
-        events: toJson(events),
-      })
-      .eq('id', runId)
-    if (updateError) throw updateError
+    await enqueueDigestGeneration(runId)
   } catch (error) {
-    const completedAt = new Date()
-    const message = describeError(error)
-    console.error('[daily digest] generation failed:', { runId, error })
-    events.push(event('generation', 'failed', message))
-    await admin
-      .from('digest_runs')
-      .update({
-        status: 'failed',
-        error: message.slice(0, 4_000),
-        duration_ms: completedAt.getTime() - startedAt.getTime(),
-        completed_at: completedAt.toISOString(),
-        updated_at: completedAt.toISOString(),
-        events: toJson(events),
-      })
-      .eq('id', runId)
-    revalidatePath('/admin/digest')
-    redirectToLab({ runId, error: `Generation failed: ${message}` })
+    redirectToLab({
+      runId,
+      error: `Could not start generation: ${describeError(error)}`,
+    })
   }
 
   revalidatePath('/admin/digest')
   redirectToLab({
     runId,
-    notice: 'Generation completed and passed validation.',
+    notice: 'Generation started. You can refresh or leave this page safely.',
   })
 }
 

@@ -104,7 +104,8 @@
     "tailwind-merge": "^2.6.0",
     "tsx": "^4.19.2",
     "undici": "^5.28.5",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "workflow": "4.8.2"
   },
   "devDependencies": {
     "@swc/core": "^1.10.12",

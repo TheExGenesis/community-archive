@@ -48,6 +48,10 @@ describe('DigestDaySelector', () => {
           action: '/admin/digest',
           dates: ['2026-08-11', '2026-08-12', '2026-08-13'],
           promptVersionId: 'prompt-1',
+          runningRuns: [{ date: '2026-08-12', id: 'run-12' }],
+        }}
+        navigation={{
+          previousHref: '/admin/digest?month=2026-07',
         }}
       />,
     )
@@ -62,7 +66,15 @@ describe('DigestDaySelector', () => {
     })
     expect(screen.getByText('10').closest('button')).toBeNull()
     expect(
-      screen.getByText(/Each click creates an unpublished draft run/),
+      screen.getByRole('link', {
+        name: 'View running digest job for 2026-08-12',
+      }),
+    ).toHaveAttribute('href', '/admin/digest?run=run-12')
+    expect(
+      screen.getByRole('link', { name: 'Previous month' }),
+    ).toHaveAttribute('href', '/admin/digest?month=2026-07')
+    expect(
+      screen.getByText(/Amber days are running and safe to leave/),
     ).toBeVisible()
   })
 })

@@ -6,6 +6,10 @@ import { BlockList, isIP, type LookupFunction } from 'net'
 import { Agent, fetch as undiciFetch } from 'undici'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import type { TweetLinkPreview } from './linkPreviewTypes'
+import {
+  fetchSyndicatedTweet,
+  type SyndicatedArticle,
+} from './twitterSyndication'
 
 const MAX_URL_LENGTH = 2048
 const MAX_HTML_BYTES = 512 * 1024
@@ -135,16 +139,21 @@ export const previewUrlHash = (url: string) =>
   createHash('sha256').update(normalizePreviewUrl(url)).digest('hex')
 
 export function isXArticleUrl(rawUrl: string): boolean {
+  return xArticleIdFromUrl(rawUrl) !== null
+}
+
+export function xArticleIdFromUrl(rawUrl: string): string | null {
   try {
     const url = new URL(rawUrl)
     const host = url.hostname.toLowerCase().replace(/^www\./, '')
+    if (host !== 'x.com' && host !== 'twitter.com') return null
     return (
-      (host === 'x.com' || host === 'twitter.com') &&
-      (/^\/i\/article(?:\/|$)/.test(url.pathname) ||
-        /^\/[^/]+\/article\//.test(url.pathname))
+      url.pathname.match(/^\/i\/article\/(\d+)(?:\/|$)/)?.[1] ??
+      url.pathname.match(/^\/[^/]+\/article\/(\d+)(?:\/|$)/)?.[1] ??
+      null
     )
   } catch {
-    return false
+    return null
   }
 }
 
@@ -425,6 +434,46 @@ export async function fetchLinkPreviewMetadata(
   }
 }
 
+type SyndicatedArticleFetcher = (
+  tweetId: string,
+) => Promise<{ article?: SyndicatedArticle } | null>
+
+export async function fetchXArticleSyndicationMetadata(
+  rawUrl: string,
+  tweetId: string,
+  fetcher: SyndicatedArticleFetcher = fetchSyndicatedTweet,
+): Promise<PreviewMetadata | null> {
+  const expectedArticleId = xArticleIdFromUrl(rawUrl)
+  if (!expectedArticleId) return null
+
+  const syndicated = await fetcher(tweetId)
+  const article = syndicated?.article
+  if (!article || article.article_id !== expectedArticleId) return null
+
+  const title = cleanText(article.title, 240)
+  if (!title) return null
+
+  let imageUrl: string | null = null
+  if (article.cover_media_url) {
+    try {
+      imageUrl = normalizePreviewUrl(article.cover_media_url)
+    } catch {
+      imageUrl = null
+    }
+  }
+
+  return {
+    canonicalUrl: `https://x.com/i/article/${expectedArticleId}`,
+    title,
+    description:
+      cleanText(article.preview_text, 500) ?? 'Read the full article on X.',
+    imageUrl,
+    siteName: 'X',
+    contentType: 'application/json',
+    isXArticle: true,
+  }
+}
+
 const fallbackXArticle = (url: string): PreviewMetadata => ({
   canonicalUrl: normalizePreviewUrl(url),
   title: 'X Article',
@@ -451,6 +500,25 @@ function rowToPreview(row: CachedPreviewRow): TweetLinkPreview | null {
   }
 }
 
+export function shouldRefreshCachedPreview(
+  url: string,
+  cached: Pick<CachedPreviewRow, 'expires_at' | 'title' | 'image_url'>,
+  now = Date.now(),
+) {
+  const expiresAt = new Date(cached.expires_at).getTime()
+  if (expiresAt <= now) return true
+
+  // Article fallbacks created before syndication enrichment shipped were
+  // cached for 30 days. Refresh those once immediately; new fallbacks get
+  // the shorter failed-preview TTL and therefore remain bounded.
+  return (
+    isXArticleUrl(url) &&
+    cached.title === 'X Article' &&
+    !cached.image_url &&
+    expiresAt > now + FAILED_TTL_MS
+  )
+}
+
 const previewCandidate = (rawUrl: string) => {
   const normalized = normalizePreviewUrl(rawUrl)
   const url = new URL(normalized)
@@ -467,7 +535,10 @@ const previewCandidate = (rawUrl: string) => {
   return normalized
 }
 
-async function refreshPreview(url: string): Promise<CachedPreviewRow | null> {
+async function refreshPreview(
+  url: string,
+  tweetId?: string,
+): Promise<CachedPreviewRow | null> {
   const supabase = createServerServiceRoleClient()
   const urlHash = previewUrlHash(url)
   const fetchedAt = new Date()
@@ -475,10 +546,14 @@ async function refreshPreview(url: string): Promise<CachedPreviewRow | null> {
   let metadata: PreviewMetadata | null = null
   let expiresAt = new Date(fetchedAt.getTime() + READY_TTL_MS)
   try {
-    metadata = await fetchLinkPreviewMetadata(url)
+    if (tweetId && isXArticleUrl(url)) {
+      metadata = await fetchXArticleSyndicationMetadata(url, tweetId)
+    }
+    metadata ??= await fetchLinkPreviewMetadata(url)
   } catch (error) {
     if (isXArticleUrl(url)) {
       metadata = fallbackXArticle(url)
+      expiresAt = new Date(fetchedAt.getTime() + FAILED_TTL_MS)
     } else if (error instanceof UnsafePreviewUrlError) {
       status = 'unsafe'
       expiresAt = new Date(fetchedAt.getTime() + UNSAFE_TTL_MS)
@@ -536,6 +611,7 @@ export async function getTweetLinkPreviews(tweetIds: string[]) {
 
   const candidatesByTweet = new Map<string, string[]>()
   const allCandidates = new Set<string>()
+  const sourceTweetByCandidate = new Map<string, string>()
   for (const row of urlRows ?? []) {
     try {
       const candidate = previewCandidate(row.expanded_url || row.url)
@@ -548,6 +624,9 @@ export async function getTweetLinkPreviews(tweetIds: string[]) {
         current.push(candidate)
         candidatesByTweet.set(row.tweet_id, current)
         allCandidates.add(candidate)
+        if (!sourceTweetByCandidate.has(candidate)) {
+          sourceTweetByCandidate.set(candidate, row.tweet_id)
+        }
       }
     } catch {
       // Invalid archive URL: retain the ordinary tweet text and omit the card.
@@ -574,11 +653,13 @@ export async function getTweetLinkPreviews(tweetIds: string[]) {
   const refreshCandidates = Array.from(allCandidates)
     .filter((url) => {
       const cached = rowsByUrl.get(url)
-      return !cached || new Date(cached.expires_at).getTime() <= now
+      return !cached || shouldRefreshCachedPreview(url, cached, now)
     })
     .slice(0, MAX_ENRICHMENTS_PER_REQUEST)
   const refreshed = await Promise.allSettled(
-    refreshCandidates.map(refreshPreview),
+    refreshCandidates.map((url) =>
+      refreshPreview(url, sourceTweetByCandidate.get(url)),
+    ),
   )
   refreshed.forEach((entry, index) => {
     if (entry.status === 'fulfilled' && entry.value) {

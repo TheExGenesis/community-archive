@@ -6,7 +6,9 @@
  * stale.
  *
  * Hard rules:
- * - Never persist the response to our DB.
+ * - Never persist hydrated tweet content to our DB. The link-preview subsystem may
+ *   separately cache the bounded title, teaser, and cover image that X publishes for
+ *   an Article linked by an archived tweet.
  * - Never include hydrated tweet content in search results, profile listings, or any
  *   other query path. Avatar recovery is render-only and is never persisted.
  * - Caller decides whether to render with a "(from Twitter)" marker.
@@ -19,15 +21,20 @@
 const SYNDICATION_BASE = 'https://cdn.syndication.twimg.com/tweet-result'
 
 const computeToken = (id: string): string =>
-  ((Number(id) / 1e15) * Math.PI)
-    .toString(6 ** 2)
-    .replace(/(0+|\.)/g, '')
+  ((Number(id) / 1e15) * Math.PI).toString(6 ** 2).replace(/(0+|\.)/g, '')
 
 export interface SyndicatedMedia {
   media_url: string
   media_type: string
   width?: number
   height?: number
+}
+
+export interface SyndicatedArticle {
+  article_id: string
+  title: string
+  preview_text?: string
+  cover_media_url?: string
 }
 
 export interface SyndicatedTweet {
@@ -41,6 +48,7 @@ export interface SyndicatedTweet {
   favorite_count: number
   avatar_media_url?: string
   media?: SyndicatedMedia[]
+  article?: SyndicatedArticle
   reply_to_tweet_id: string | null
   reply_to_username: string | null
   reply_to_user_id: string | null
@@ -103,6 +111,28 @@ export async function fetchSyndicatedTweet(
       }))
     : []
 
+  const rawArticle = data.article
+  const article: SyndicatedArticle | undefined =
+    rawArticle &&
+    typeof rawArticle.rest_id === 'string' &&
+    /^\d+$/.test(rawArticle.rest_id) &&
+    typeof rawArticle.title === 'string' &&
+    rawArticle.title.trim()
+      ? {
+          article_id: rawArticle.rest_id,
+          title: rawArticle.title,
+          preview_text:
+            typeof rawArticle.preview_text === 'string'
+              ? rawArticle.preview_text
+              : undefined,
+          cover_media_url:
+            typeof rawArticle.cover_media?.media_info?.original_img_url ===
+            'string'
+              ? rawArticle.cover_media.media_info.original_img_url
+              : undefined,
+        }
+      : undefined
+
   return {
     tweet_id: data.id_str,
     account_id: data.user?.id_str ?? '',
@@ -111,11 +141,14 @@ export async function fetchSyndicatedTweet(
     created_at: data.created_at ?? '',
     full_text: data.text ?? '',
     retweet_count:
-      typeof data.conversation_count === 'number' ? data.conversation_count : null,
+      typeof data.conversation_count === 'number'
+        ? data.conversation_count
+        : null,
     favorite_count:
       typeof data.favorite_count === 'number' ? data.favorite_count : 0,
     avatar_media_url: data.user?.profile_image_url_https,
     media: media.length > 0 ? media : undefined,
+    article,
     reply_to_tweet_id: data.in_reply_to_status_id_str ?? null,
     reply_to_username: data.in_reply_to_screen_name ?? null,
     reply_to_user_id: data.in_reply_to_user_id_str ?? null,
@@ -133,6 +166,8 @@ export async function fetchSyndicatedTweets(
   { limit = 12 }: { limit?: number } = {},
 ): Promise<Map<string, SyndicatedTweet | null>> {
   const unique = Array.from(new Set(ids)).slice(0, limit)
-  const results = await Promise.all(unique.map((id) => fetchSyndicatedTweet(id)))
+  const results = await Promise.all(
+    unique.map((id) => fetchSyndicatedTweet(id)),
+  )
   return new Map(unique.map((id, i) => [id, results[i]]))
 }

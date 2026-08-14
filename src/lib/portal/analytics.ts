@@ -345,8 +345,8 @@ export async function fetchPortalTrendEvidence(
           { timeoutMs: 30_000 },
         ),
     ),
-    // The gateway composes cached calendar shards but still serializes a cold
-    // ClickHouse search. Keep multi-term evidence requests ordered.
+    // The gateway caches exact term/range searches and serializes cold
+    // ClickHouse work. Keep multi-term evidence requests ordered.
     1,
   )
 

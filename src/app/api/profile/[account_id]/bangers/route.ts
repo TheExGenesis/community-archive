@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
-  getProfileBangersPage,
   PROFILE_BANGERS_PAGE_LIMIT,
   type ProfileBangerSort,
 } from '@/lib/metaTwitter/bangers'
+import { getCuratedProfileBangersPage } from '@/lib/profileCuration'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -25,14 +25,11 @@ const boundedInteger = (
   return parsed
 }
 
-const publicJson = (body: unknown, status = 200) =>
+const profileJson = (body: unknown, status = 200) =>
   NextResponse.json(body, {
     status,
     headers: {
-      'Cache-Control':
-        status === 200
-          ? 'public, s-maxage=86400, stale-while-revalidate=604800'
-          : 'private, no-store',
+      'Cache-Control': 'private, no-store',
     },
   })
 
@@ -72,24 +69,24 @@ export async function GET(
     const sort: ProfileBangerSort =
       sortValue === 'likes' || sortValue === 'newest' ? sortValue : 'quotes'
 
-    const page = await getProfileBangersPage(params.account_id, {
+    const page = await getCuratedProfileBangersPage(params.account_id, {
       limit,
       offset,
       year,
       sort,
     })
     if (!page.available) {
-      return publicJson(
+      return profileJson(
         { error: 'Profile bangers are temporarily unavailable' },
         502,
       )
     }
-    return publicJson(page)
+    return profileJson(page)
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
     const isInputError = message.startsWith('Invalid profile')
     if (!isInputError) console.error('Profile bangers request failed:', error)
-    return publicJson(
+    return profileJson(
       {
         error: isInputError
           ? message

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { archiveChapterHref } from './ArchiveNav'
 import { ProfileArchive } from './ProfileArchive'
 import type { BangerTweet } from '@/lib/metaTwitter/types'
+import { mutateProfileCuration } from '@/app/user/[account_id]/actions'
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
@@ -24,6 +25,13 @@ jest.mock('@/components/ImageLightbox', () => ({
     <span data-testid="tweet-image" data-src={src} aria-label={alt} />
   ),
 }))
+jest.mock('@/app/user/[account_id]/actions', () => ({
+  mutateProfileCuration: jest.fn(),
+}))
+
+const mockMutateProfileCuration = mutateProfileCuration as jest.MockedFunction<
+  typeof mutateProfileCuration
+>
 
 const banger = (id: number, year: number): BangerTweet => ({
   tweet_id: String(id),
@@ -83,6 +91,8 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/user/alice')
   global.IntersectionObserver =
     TestIntersectionObserver as unknown as typeof IntersectionObserver
+  mockMutateProfileCuration.mockReset()
+  mockMutateProfileCuration.mockResolvedValue({ ok: true })
 })
 
 afterEach(() => {
@@ -96,6 +106,100 @@ test('preserves profile identity parameters while changing chapters', () => {
   expect(archiveChapterHref('/user/42?username=alice&chapter=2025', null)).toBe(
     '/user/42?username=alice',
   )
+})
+
+test('shows owner-only curation controls and persists section edits', async () => {
+  const user = userEvent.setup()
+  const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) => {
+    const url = new URL(String(input), 'https://community-archive.org')
+    if (url.pathname.endsWith('/bangers')) {
+      return Promise.resolve(
+        jsonResponse({
+          tweets: [banger(1, 2025), banger(2, 2025)],
+          yearCounts: [],
+          total: 2,
+          nextOffset: null,
+          available: true,
+        }),
+      )
+    }
+    return Promise.resolve(jsonResponse({ people: [] }))
+  })
+
+  render(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      displayName="Alice"
+      initialYear={null}
+      initialPage={{
+        tweets: [banger(1, 2025), banger(2, 2025)],
+        yearCounts: [],
+        total: 2,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={{
+        media: [],
+        mediaCount: 0,
+        people: [
+          {
+            user_id: '77',
+            screen_name: 'bob',
+            name: 'Bob',
+            interactions: 12,
+          },
+        ],
+      }}
+      isOwner
+    />,
+  )
+
+  await user.click(screen.getByRole('button', { name: 'Edit profile' }))
+  expect(screen.getByRole('button', { name: 'Restore Bangers' })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Restore' })).toBeVisible()
+
+  await user.click(screen.getByRole('button', { name: 'Dismiss banger 1' }))
+  await waitFor(() =>
+    expect(mockMutateProfileCuration).toHaveBeenCalledWith({
+      action: 'dismiss',
+      accountId: '42',
+      section: 'bangers',
+      itemId: '1',
+    }),
+  )
+  expect(screen.queryByText('Banger 1')).not.toBeInTheDocument()
+
+  mockMutateProfileCuration.mockResolvedValueOnce({
+    ok: true,
+    isFeatured: true,
+  })
+  await user.click(screen.getByRole('button', { name: 'Feature banger 2' }))
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: 'Unfeature banger 2' }),
+    ).toHaveAttribute('aria-pressed', 'true'),
+  )
+
+  await user.click(screen.getByRole('button', { name: 'Restore' }))
+  await waitFor(() =>
+    expect(mockMutateProfileCuration).toHaveBeenCalledWith({
+      action: 'restore',
+      accountId: '42',
+      section: 'people',
+    }),
+  )
+  expect(fetchMock).toHaveBeenCalledWith('/api/profile/42/interactions')
+
+  await user.click(screen.getByRole('link', { name: '2025 4' }))
+  expect(
+    screen.queryByRole('button', { name: 'Edit profile' }),
+  ).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: /dismiss banger/i }),
+  ).not.toBeInTheDocument()
 })
 
 test('switches chapters immediately while their small data requests are pending', async () => {

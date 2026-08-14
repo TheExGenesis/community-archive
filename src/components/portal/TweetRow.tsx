@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/tooltip'
 import { PortalMedia, PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
 import { capturePostHogEvent } from '@/lib/posthog'
+import { TweetLinkPreviews } from '@/components/TweetLinkPreviews'
 
 const HUES = [262, 32, 145, 4, 155, 200, 217, 88, 240, 190, 340, 45, 280, 20]
 const FEATURED_CARD_HOVER =
@@ -236,11 +237,16 @@ function QuotedTweet({
         </div>
       </Link>
       {!summary && (
-        <TweetImages
-          media={tweet.media}
-          compact={compact}
-          label="Quoted tweet image"
-        />
+        <>
+          <TweetImages
+            media={tweet.media}
+            compact={compact}
+            label="Quoted tweet image"
+          />
+          {/https?:\/\//.test(tweet.text) && (
+            <TweetLinkPreviews tweetId={tweet.id} compact={compact} />
+          )}
+        </>
       )}
       {!condensed && (
         <div className="mt-1.5 flex gap-4 text-[11.5px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
@@ -440,6 +446,9 @@ export function TweetRow({
         </button>
       )}
       <TweetImages media={tweet.media} compact={compact} label="Tweet image" />
+      {/https?:\/\//.test(tweet.text) && (
+        <TweetLinkPreviews tweetId={tweet.id} compact={compact} />
+      )}
       {tweet.quotedTweet && (
         <QuotedTweet
           tweet={tweet.quotedTweet}

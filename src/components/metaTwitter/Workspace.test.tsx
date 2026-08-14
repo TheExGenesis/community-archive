@@ -102,6 +102,9 @@ test('shows the initial canonical banger cards with media and profile return lin
     screen.getAllByRole('heading', { name: 'Best of Alice' }),
   ).toHaveLength(1)
   expect(
+    screen.queryByRole('button', { name: 'Edit profile' }),
+  ).not.toBeInTheDocument()
+  expect(
     screen.queryByRole('heading', { name: 'Bangers' }),
   ).not.toBeInTheDocument()
   expect(

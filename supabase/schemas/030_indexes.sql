@@ -40,6 +40,11 @@ CREATE INDEX "idx_optin_username" ON "public"."optin" USING "btree" ("username")
 CREATE INDEX "idx_tweet_urls_expanded_url_gin" ON "public"."tweet_urls" USING "gin" ("expanded_url" "public"."gin_trgm_ops");
 CREATE INDEX "idx_tweet_urls_tweet_id" ON "public"."tweet_urls" USING "btree" ("tweet_id");
 
+-- public.profile_curation / public.tweet_link_previews
+CREATE INDEX "profile_curation_scope_idx" ON "public"."profile_curation" USING "btree" ("account_id", "section", "position");
+CREATE UNIQUE INDEX "tweet_link_previews_normalized_url_key" ON "public"."tweet_link_previews" USING "btree" ("normalized_url");
+CREATE INDEX "tweet_link_previews_expires_at_idx" ON "public"."tweet_link_previews" USING "btree" ("expires_at");
+
 -- public.tweets
 CREATE INDEX "idx_tweets_account_id" ON "public"."tweets" USING "btree" ("account_id");
 CREATE INDEX "idx_tweets_archive_upload_id" ON "public"."tweets" USING "btree" ("archive_upload_id");

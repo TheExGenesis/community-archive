@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getClickHouseProfileInteractionsOrThrow } from '@/lib/metaTwitter/clickhouseSidebar'
+import { applyPeopleCuration } from '@/lib/profileCuration'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -33,12 +34,21 @@ export async function GET(
   }
 
   try {
+    const generated = await getClickHouseProfileInteractionsOrThrow(
+      params.account_id,
+      year,
+    )
     return NextResponse.json(
-      await getClickHouseProfileInteractionsOrThrow(params.account_id, year),
+      {
+        people: await applyPeopleCuration(
+          params.account_id,
+          year,
+          generated.people,
+        ),
+      },
       {
         headers: {
-          'Cache-Control':
-            'public, s-maxage=86400, stale-while-revalidate=604800',
+          'Cache-Control': 'private, no-store',
         },
       },
     )

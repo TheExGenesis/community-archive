@@ -24,6 +24,10 @@ export interface BangerTweet extends ArchiveTweet {
   quoting_accounts: number
   quote_tweet_id?: string | null
   quoted_tweet?: ArchiveTweet | null
+  curation?: {
+    is_featured: boolean
+    position: number | null
+  }
 }
 
 export interface ArchiveMediaItem {
@@ -43,6 +47,10 @@ export interface ArchivePerson {
   interactions: number
   avatar_media_url?: string | null
   in_archive?: boolean
+  curation?: {
+    is_featured: boolean
+    position: number | null
+  }
 }
 
 export interface ProfileHeaderData {

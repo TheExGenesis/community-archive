@@ -14,6 +14,8 @@ import type {
   ArchivePerson,
   BangerTweet,
 } from '@/lib/metaTwitter/types'
+import { mutateProfileCuration } from '@/app/user/[account_id]/actions'
+import type { ProfileCurationSection } from '@/lib/profileCurationState'
 
 interface SidebarData {
   media: ArchiveMediaItem[]
@@ -70,6 +72,7 @@ export function ProfileArchive({
   initialYear,
   initialPage,
   initialSidebar,
+  isOwner = false,
 }: {
   accountId: string
   avatarUrl: string | null
@@ -79,6 +82,7 @@ export function ProfileArchive({
   initialYear: number | null
   initialPage: ProfileBangersPageState
   initialSidebar?: SidebarData
+  isOwner?: boolean
 }) {
   const initialFeedKey = feedKey(initialYear, 'quotes')
   const initialScopeKey = scopeKey(initialYear)
@@ -119,6 +123,9 @@ export function ProfileArchive({
   const [loadingPeople, setLoadingPeople] = useState<Record<string, boolean>>(
     {},
   )
+  const [editing, setEditing] = useState(false)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
   const feedsRef = useRef(feeds)
   const mediaRef = useRef(mediaByScope)
   const peopleRef = useRef(peopleByScope)
@@ -428,6 +435,7 @@ export function ProfileArchive({
   const selectChapter = useCallback(
     (year: number | null) => {
       if (year === activeYear) return
+      setEditing(false)
       setSort('quotes')
       setActiveYear(year)
       window.history.pushState(null, '', archiveChapterHref(basePath, year))
@@ -445,6 +453,258 @@ export function ProfileArchive({
     }
     return loadNextPage(activeYear, sort)
   }, [activeFeed, activeYear, loadFeedPage, loadNextPage, sort])
+
+  const runEditMutation = useCallback(
+    async (mutation: Parameters<typeof mutateProfileCuration>[0]) => {
+      setEditSaving(true)
+      setEditError(null)
+      try {
+        return await mutateProfileCuration(mutation)
+      } catch (error) {
+        setEditError(
+          error instanceof Error
+            ? error.message
+            : 'That profile change could not be saved.',
+        )
+        return null
+      } finally {
+        setEditSaving(false)
+      }
+    },
+    [],
+  )
+
+  const dismissItem = useCallback(
+    async (section: ProfileCurationSection, itemId: string) => {
+      const result = await runEditMutation({
+        action: 'dismiss',
+        accountId,
+        section,
+        itemId,
+      })
+      if (!result) return
+
+      if (section === 'bangers') {
+        const prefix = `${activeScopeKey}:`
+        updateFeeds((current) =>
+          Object.fromEntries(
+            Object.entries(current).map(([key, feed]) => [
+              key,
+              key.startsWith(prefix)
+                ? {
+                    ...feed,
+                    tweets: feed.tweets.filter(
+                      (tweet) => tweet.tweet_id !== itemId,
+                    ),
+                    total: Math.max(0, feed.total - 1),
+                  }
+                : feed,
+            ]),
+          ),
+        )
+        return
+      }
+
+      updatePeople((current) => ({
+        ...current,
+        [activeScopeKey]: {
+          people: (current[activeScopeKey]?.people ?? []).filter(
+            (person) => person.user_id !== itemId,
+          ),
+        },
+      }))
+    },
+    [accountId, activeScopeKey, runEditMutation, updateFeeds, updatePeople],
+  )
+
+  const toggleFeature = useCallback(
+    async (section: ProfileCurationSection, itemId: string) => {
+      const result = await runEditMutation({
+        action: 'toggle-feature',
+        accountId,
+        section,
+        itemId,
+      })
+      if (!result || !('isFeatured' in result)) return
+
+      const updateItem = <
+        T extends {
+          curation?: { is_featured: boolean; position: number | null }
+        },
+      >(
+        item: T,
+        matches: boolean,
+      ) =>
+        matches
+          ? {
+              ...item,
+              curation: {
+                position: item.curation?.position ?? null,
+                is_featured: result.isFeatured,
+              },
+            }
+          : item
+      const featureFirst = <
+        T extends {
+          curation?: { is_featured: boolean; position: number | null }
+        },
+      >(
+        items: T[],
+      ) =>
+        items
+          .map((item, index) => ({ item, index }))
+          .sort(
+            (left, right) =>
+              Number(right.item.curation?.is_featured ?? false) -
+                Number(left.item.curation?.is_featured ?? false) ||
+              left.index - right.index,
+          )
+          .map(({ item }) => item)
+
+      if (section === 'bangers') {
+        const prefix = `${activeScopeKey}:`
+        updateFeeds((current) =>
+          Object.fromEntries(
+            Object.entries(current).map(([key, feed]) => [
+              key,
+              key.startsWith(prefix)
+                ? {
+                    ...feed,
+                    tweets: featureFirst(
+                      feed.tweets.map((tweet) =>
+                        updateItem(tweet, tweet.tweet_id === itemId),
+                      ),
+                    ),
+                  }
+                : feed,
+            ]),
+          ),
+        )
+        return
+      }
+
+      updatePeople((current) => ({
+        ...current,
+        [activeScopeKey]: {
+          people: featureFirst(
+            (current[activeScopeKey]?.people ?? []).map((person) =>
+              updateItem(person, person.user_id === itemId),
+            ),
+          ),
+        },
+      }))
+    },
+    [accountId, activeScopeKey, runEditMutation, updateFeeds, updatePeople],
+  )
+
+  const moveItem = useCallback(
+    async (
+      section: ProfileCurationSection,
+      itemId: string,
+      direction: -1 | 1,
+    ) => {
+      const items: Array<BangerTweet | ArchivePerson> =
+        section === 'bangers'
+          ? (feedsRef.current[activeKey]?.tweets ?? [])
+          : (peopleRef.current[activeScopeKey]?.people ?? [])
+      const getId = (item: BangerTweet | ArchivePerson) =>
+        'tweet_id' in item ? item.tweet_id : item.user_id
+      const index = items.findIndex((item) => getId(item) === itemId)
+      const destination = index + direction
+      if (index < 0 || destination < 0 || destination >= items.length) return
+
+      const reordered = [...items]
+      const [moved] = reordered.splice(index, 1)
+      reordered.splice(destination, 0, moved)
+      const result = await runEditMutation({
+        action: 'reorder',
+        accountId,
+        section,
+        itemIds: reordered.map(getId),
+      })
+      if (!result) return
+
+      if (section === 'bangers') {
+        const positioned = (reordered as BangerTweet[]).map(
+          (item, position) => ({
+            ...item,
+            curation: {
+              is_featured: item.curation?.is_featured ?? false,
+              position,
+            },
+          }),
+        )
+        updateFeeds((current) => ({
+          ...current,
+          [activeKey]: { ...current[activeKey], tweets: positioned },
+        }))
+      } else {
+        const positioned = (reordered as ArchivePerson[]).map(
+          (item, position) => ({
+            ...item,
+            curation: {
+              is_featured: item.curation?.is_featured ?? false,
+              position,
+            },
+          }),
+        )
+        updatePeople((current) => ({
+          ...current,
+          [activeScopeKey]: { people: positioned },
+        }))
+      }
+    },
+    [
+      accountId,
+      activeKey,
+      activeScopeKey,
+      runEditMutation,
+      updateFeeds,
+      updatePeople,
+    ],
+  )
+
+  const restoreSection = useCallback(
+    async (section: ProfileCurationSection) => {
+      const result = await runEditMutation({
+        action: 'restore',
+        accountId,
+        section,
+      })
+      if (!result) return
+
+      if (section === 'bangers') {
+        const prefix = `${activeScopeKey}:`
+        const nextFeeds = Object.fromEntries(
+          Object.entries(feedsRef.current).filter(
+            ([key]) => !key.startsWith(prefix),
+          ),
+        )
+        feedsRef.current = nextFeeds
+        setFeeds(nextFeeds)
+        automaticallyFilledFeeds.current.delete(activeKey)
+        await loadFeedPage(activeYear, sort, 0, PROFILE_BANGERS_PRELOAD_LIMIT)
+        return
+      }
+
+      const nextPeople = { ...peopleRef.current }
+      delete nextPeople[activeScopeKey]
+      peopleRef.current = nextPeople
+      setPeopleByScope(nextPeople)
+      peopleRequests.current.delete(activeScopeKey)
+      await loadPeople(activeYear)
+    },
+    [
+      accountId,
+      activeKey,
+      activeScopeKey,
+      activeYear,
+      loadFeedPage,
+      loadPeople,
+      runEditMutation,
+      sort,
+    ],
+  )
 
   const contextTitle = activeYear
     ? `Best of ${activeYear}`
@@ -491,6 +751,19 @@ export function ProfileArchive({
         onLoadMore={() => void loadMore()}
         loadMoreRef={loadMoreRef}
         returnTo={returnTo}
+        isOwner={isOwner && activeYear === null}
+        editing={editing && activeYear === null}
+        editSaving={editSaving}
+        editError={editError}
+        onEditingChange={setEditing}
+        onDismiss={(section, itemId) => void dismissItem(section, itemId)}
+        onToggleFeature={(section, itemId) =>
+          void toggleFeature(section, itemId)
+        }
+        onMove={(section, itemId, direction) =>
+          void moveItem(section, itemId, direction)
+        }
+        onRestore={(section) => void restoreSection(section)}
       />
     </div>
   )

@@ -32,15 +32,20 @@ import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { ArchiveUploadButton } from '@/components/ArchiveUploadButton'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { updateOptIn } from '@/lib/optInApi'
+import { updateDownloadArchiveVisibility } from '@/app/user/[account_id]/actions'
 
 interface ProfileContentProps {
   user: User
+  accountId?: string | null
+  initialDownloadArchiveVisible?: boolean
   initialOptInData: any
   archives: any[]
 }
 
 export default function ProfileContent({
   user,
+  accountId = null,
+  initialDownloadArchiveVisible = true,
   initialOptInData,
   archives,
 }: ProfileContentProps) {
@@ -53,6 +58,9 @@ export default function ProfileContent({
   )
   const [explicitOptOut, setExplicitOptOut] = useState(
     initialOptInData?.explicit_optout || false,
+  )
+  const [downloadArchiveVisible, setDownloadArchiveVisible] = useState(
+    initialDownloadArchiveVisible,
   )
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -119,6 +127,25 @@ export default function ProfileContent({
     } catch (err: any) {
       setError(err.message || 'Failed to update opt-in status')
       setOptInStatus(!checked) // Revert on error
+    } finally {
+      endPreferenceMutation()
+    }
+  }
+
+  const handleDownloadVisibility = async (checked: boolean) => {
+    if (!accountId || !beginPreferenceMutation()) return
+    setError(null)
+    setSuccess(null)
+    try {
+      await updateDownloadArchiveVisibility(accountId, checked)
+      setDownloadArchiveVisible(checked)
+      setSuccess(
+        checked
+          ? 'Download Archive is visible on your public profile'
+          : 'Download Archive is hidden from your public profile',
+      )
+    } catch (err: any) {
+      setError(err.message || 'Failed to update profile visibility')
     } finally {
       endPreferenceMutation()
     }
@@ -340,7 +367,7 @@ export default function ProfileContent({
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Profile Settings</CardTitle>
+          <CardTitle className="text-2xl">Settings</CardTitle>
           <CardDescription>
             Manage your account settings, privacy preferences, and archived data
           </CardDescription>
@@ -364,6 +391,34 @@ export default function ProfileContent({
         </TabsList>
 
         <TabsContent value="privacy" className="space-y-4">
+          <Card>
+            <CardHeader className="space-y-1.5">
+              <CardTitle>Public Profile</CardTitle>
+              <CardDescription>
+                Choose which owner actions appear to visitors
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="download-archive-visible">
+                    Show Download Archive
+                  </Label>
+                  <div className="text-sm text-muted-foreground">
+                    Visible by default. Turn this off to hide the button from
+                    your public profile.
+                  </div>
+                </div>
+                <Switch
+                  id="download-archive-visible"
+                  checked={downloadArchiveVisible}
+                  onCheckedChange={handleDownloadVisibility}
+                  disabled={isPreferenceSaving || !accountId}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="space-y-1.5">
               <CardTitle>Tweet Streaming Settings</CardTitle>

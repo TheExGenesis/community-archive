@@ -59,7 +59,7 @@ test('does not label a non-member or offer an archive download', () => {
   expect(notice.querySelector('svg')).toBeInTheDocument()
   expect(
     screen.getByRole('link', { name: 'sign in and opt out' }),
-  ).toHaveAttribute('href', '/profile')
+  ).toHaveAttribute('href', '/settings')
 })
 
 test('labels an opted-in non-uploader without offering a download', () => {
@@ -97,6 +97,20 @@ test('labels an uploader and exposes the archive download', () => {
   )
   expect(
     screen.queryByRole('note', { name: 'Limited profile' }),
+  ).not.toBeInTheDocument()
+})
+
+test('honors an owner setting that hides the archive download', () => {
+  render(
+    <ProfileHeader
+      profile={profile({ has_archive: true, is_opted_in: false })}
+      archivedAt="2025-01-02T00:00:00.000Z"
+      downloadArchiveVisible={false}
+    />,
+  )
+
+  expect(
+    screen.queryByRole('link', { name: 'Download archive' }),
   ).not.toBeInTheDocument()
 })
 

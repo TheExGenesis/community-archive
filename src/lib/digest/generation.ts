@@ -10,24 +10,39 @@ import { DIGEST_STORY_CATEGORIES, isRecord } from './types'
 export interface EnrichedDigestCandidate {
   candidate: DigestCandidate
   commentary: PortalTweet[]
+  /** IDs within commentary that are replies; every other commentary row is a quote post. */
+  replyTweetIds?: string[]
   totalReplyCount: number
 }
 
 interface ModelStory {
   category: DigestStoryCategory
-  keyword: string
   title: string
   subtitle: string
   bullets: string[]
   editorialNote: string
-  bangerTweetIds: string[]
-  commentaryTweetIds: string[]
+  tweetIndices: number[]
 }
 
 interface ParsedModelDigest {
   executiveSummary: string[]
+  representativeTweetIndex: number
   stories: ModelStory[]
-  trendingKeywords: string[]
+  keywords: string[]
+}
+
+export type DigestPromptTweetKind = 'banger' | 'quote' | 'reply'
+
+export interface DigestPromptCorpusRow {
+  index: number
+  kind: DigestPromptTweetKind
+  parentBangerIndex: number | null
+  tweetId: string
+  tweet: PortalTweet
+}
+
+export function selectDailyDigestBangers(tweets: PortalTweet[]): PortalTweet[] {
+  return tweets.filter((tweet) => (tweet.quoteCount ?? 0) > 2).slice(0, 50)
 }
 
 const cleanText = (value: unknown, max: number): string | null => {
@@ -46,6 +61,15 @@ const cleanStringArray = (
   return cleaned.every((item): item is string => item !== null) ? cleaned : null
 }
 
+const cleanIndexArray = (value: unknown, maxItems: number): number[] | null => {
+  if (!Array.isArray(value) || value.length > maxItems) return null
+  return value.every(
+    (item): item is number => Number.isSafeInteger(item) && item >= 0,
+  )
+    ? value
+    : null
+}
+
 const slugify = (value: string): string =>
   value
     .toLowerCase()
@@ -55,12 +79,9 @@ const slugify = (value: string): string =>
     .replace(/^-|-$/g, '')
     .slice(0, 80) || 'story'
 
-const normalizedCorpus = (candidates: EnrichedDigestCandidate[]) =>
-  candidates
-    .flatMap(({ candidate, commentary }) => [
-      candidate.tweet.text,
-      ...commentary.map((tweet) => tweet.text),
-    ])
+const normalizedCorpus = (corpus: DigestPromptCorpusRow[]) =>
+  corpus
+    .map(({ tweet }) => tweet.text)
     .join('\n')
     .toLocaleLowerCase('en-US')
 
@@ -69,15 +90,12 @@ const normalizedExcerpt = (value: string) =>
 
 const titleOccursInOnePost = (
   title: string,
-  candidates: EnrichedDigestCandidate[],
+  corpus: DigestPromptCorpusRow[],
 ) => {
   const excerpt = normalizedExcerpt(title)
-  return candidates
-    .flatMap(({ candidate, commentary }) => [
-      candidate.tweet.text,
-      ...commentary.map((tweet) => tweet.text),
-    ])
-    .some((text) => normalizedExcerpt(text).includes(excerpt))
+  return corpus.some(({ tweet }) =>
+    normalizedExcerpt(tweet.text).includes(excerpt),
+  )
 }
 
 const cleanCategory = (value: unknown): DigestStoryCategory | null =>
@@ -91,11 +109,21 @@ function parseModelDigest(
   candidates: EnrichedDigestCandidate[],
 ): ParsedModelDigest {
   if (!isRecord(value)) throw new Error('Digest output is not an object')
+  const corpus = buildDigestPromptCorpus(candidates)
   const executiveSummary = cleanStringArray(value.executive_summary, 5, 220)
-  const trendingKeywords = cleanStringArray(value.trending_keywords, 12, 60)
-  if (!executiveSummary || executiveSummary.length < 3 || !trendingKeywords) {
+  const keywords = cleanStringArray(value.keywords, 12, 60)
+  const representativeTweetIndex = value.representative_tweet_index
+  if (
+    !executiveSummary ||
+    executiveSummary.length < 3 ||
+    !keywords ||
+    typeof representativeTweetIndex !== 'number' ||
+    !Number.isSafeInteger(representativeTweetIndex) ||
+    representativeTweetIndex < 0 ||
+    representativeTweetIndex >= corpus.length
+  ) {
     throw new Error(
-      'Digest output must have three to five summary bullets and a valid keyword list',
+      'Digest output must have three to five summary bullets, a representative tweet index, and a valid keyword list',
     )
   }
   if (
@@ -106,92 +134,136 @@ function parseModelDigest(
     throw new Error('Digest output must contain three to five stories')
   }
 
-  const allowedBangers = new Set(
-    candidates.map(({ candidate }) => candidate.tweet.id),
-  )
-  const allowedCommentary = new Set(
-    candidates.flatMap(({ commentary }) => commentary.map((tweet) => tweet.id)),
-  )
   const usedBangers = new Set<string>()
-  const corpus = normalizedCorpus(candidates)
+  const normalizedAllPosts = normalizedCorpus(corpus)
 
   const stories = value.stories.map((story, index): ModelStory => {
     if (!isRecord(story)) throw new Error(`Story ${index + 1} is invalid`)
     const category = cleanCategory(story.category)
-    const keyword = cleanText(story.keyword, 60)
     const title = cleanText(story.title, 140)
-    const subtitle = cleanText(story.subtitle, 320)
+    const subtitle = cleanText(story.subtitle, 190)
     const bullets = cleanStringArray(story.bullets, 3, 220)
     const editorialNote = cleanText(story.editorial_note, 360)
-    const bangerTweetIds = cleanStringArray(story.banger_tweet_ids, 6, 20)
-    const commentaryTweetIds = cleanStringArray(
-      story.commentary_tweet_ids,
-      5,
-      20,
-    )
+    const tweetIndices = cleanIndexArray(story.tweet_indices, 18)
     if (
       !category ||
-      !keyword ||
       !title ||
       !subtitle ||
       !bullets?.length ||
       !editorialNote ||
-      !bangerTweetIds?.length ||
-      !commentaryTweetIds
+      !tweetIndices?.length
     ) {
       throw new Error(`Story ${index + 1} is incomplete`)
     }
-    if (subtitle.split(/\s+/).length < 12) {
+    if (subtitle.length < 80 || subtitle.split(/\s+/).length < 12) {
       throw new Error(
-        `Story ${index + 1} subtitle must provide at least twelve words of explanatory context`,
+        `Story ${index + 1} subtitle must provide about 140 characters of explanatory context`,
+      )
+    }
+    const indexedTweets = tweetIndices.map((tweetIndex) => {
+      const row = corpus[tweetIndex]
+      if (!row) {
+        throw new Error(`Story ${index + 1} used an unknown tweet index`)
+      }
+      return row
+    })
+    if (new Set(tweetIndices).size !== tweetIndices.length) {
+      throw new Error(`Story ${index + 1} repeated a tweet index`)
+    }
+    const bangerRows = indexedTweets.filter(({ kind }) => kind === 'banger')
+    if (!bangerRows.length) {
+      throw new Error(
+        `Story ${index + 1} must include at least one banger index`,
       )
     }
     const titleWordCount = title.split(/\s+/).length
     if (
       titleWordCount < 3 ||
       titleWordCount > 18 ||
-      !titleOccursInOnePost(title, candidates)
+      !titleOccursInOnePost(title, indexedTweets)
     ) {
       throw new Error(
-        `Story ${index + 1} title must be a three- to eighteen-word excerpt from one supplied post`,
+        `Story ${index + 1} title must be a three- to eighteen-word excerpt from one indexed story post`,
       )
     }
-    if (!corpus.includes(keyword.toLocaleLowerCase('en-US'))) {
-      throw new Error(`Story keyword “${keyword}” does not occur in the posts`)
-    }
-    for (const id of bangerTweetIds) {
-      if (!allowedBangers.has(id)) {
-        throw new Error(`Story ${index + 1} used an unknown banger tweet ID`)
+    for (const { tweetId } of bangerRows) {
+      if (usedBangers.has(tweetId)) {
+        throw new Error(`Banger ${tweetId} was assigned to more than one story`)
       }
-      if (usedBangers.has(id)) {
-        throw new Error(`Banger ${id} was assigned to more than one story`)
-      }
-      usedBangers.add(id)
-    }
-    if (commentaryTweetIds.some((id) => !allowedCommentary.has(id))) {
-      throw new Error(`Story ${index + 1} used an unknown commentary tweet ID`)
+      usedBangers.add(tweetId)
     }
     return {
       category,
-      keyword,
       title,
       subtitle,
       bullets,
       editorialNote,
-      bangerTweetIds,
-      commentaryTweetIds,
+      tweetIndices,
     }
   })
 
-  const exactKeywords = trendingKeywords.filter((keyword) =>
-    corpus.includes(keyword.toLocaleLowerCase('en-US')),
+  const exactKeywords = keywords.filter((keyword) =>
+    normalizedAllPosts.includes(keyword.toLocaleLowerCase('en-US')),
   )
   if (exactKeywords.length < 3) {
     throw new Error('Fewer than three generated keywords occur in the posts')
   }
 
-  return { executiveSummary, stories, trendingKeywords: exactKeywords }
+  return {
+    executiveSummary,
+    representativeTweetIndex,
+    stories,
+    keywords: exactKeywords,
+  }
 }
+
+/**
+ * Build the deterministic, zero-indexed corpus shared by the prompt renderer
+ * and output receiver. Bangers always occupy the first N indices, so index 0 is
+ * the highest-ranked banger. Context follows in candidate order.
+ */
+export function buildDigestPromptCorpus(
+  candidates: EnrichedDigestCandidate[],
+): DigestPromptCorpusRow[] {
+  const bangerRows = candidates.map(
+    ({ candidate }, index): DigestPromptCorpusRow => ({
+      index,
+      kind: 'banger',
+      parentBangerIndex: null,
+      tweetId: candidate.tweet.id,
+      tweet: candidate.tweet,
+    }),
+  )
+  const seenTweetIds = new Set(bangerRows.map(({ tweetId }) => tweetId))
+  const contextRows: DigestPromptCorpusRow[] = []
+
+  candidates.forEach(({ commentary, replyTweetIds }, parentBangerIndex) => {
+    const replies = new Set(replyTweetIds ?? [])
+    commentary.forEach((tweet) => {
+      if (seenTweetIds.has(tweet.id)) return
+      seenTweetIds.add(tweet.id)
+      contextRows.push({
+        index: bangerRows.length + contextRows.length,
+        kind: replies.has(tweet.id) ? 'reply' : 'quote',
+        parentBangerIndex,
+        tweetId: tweet.id,
+        tweet,
+      })
+    })
+  })
+
+  return [...bangerRows, ...contextRows]
+}
+
+const promptTweet = (tweet: PortalTweet) => ({
+  author: `@${tweet.username}`,
+  display_name: tweet.name,
+  created_at: tweet.createdAt,
+  text: tweet.text,
+  likes: tweet.likes,
+  reposts: tweet.rts,
+  has_media: Boolean(tweet.media?.length),
+})
 
 export function renderDigestPrompt(
   template: string,
@@ -202,13 +274,26 @@ export function renderDigestPrompt(
     candidates: EnrichedDigestCandidate[]
   },
 ): string {
+  const corpus = buildDigestPromptCorpus(input.candidates)
   const candidateJson = JSON.stringify(
-    input.candidates.map(({ candidate, commentary, totalReplyCount }) => ({
-      banger: candidate.tweet,
-      source_rank: candidate.sourceRank,
-      archived_reply_count: totalReplyCount,
-      commentary,
-    })),
+    corpus.map((row) => {
+      const candidate =
+        row.kind === 'banger'
+          ? input.candidates[row.index]?.candidate
+          : undefined
+      return {
+        index: row.index,
+        kind: row.kind,
+        parent_banger_index: row.parentBangerIndex,
+        ...(candidate
+          ? {
+              source_rank: candidate.sourceRank,
+              archived_ca_quote_count: candidate.tweet.quoteCount ?? 0,
+            }
+          : {}),
+        tweet: promptTweet(row.tweet),
+      }
+    }),
     null,
     2,
   )
@@ -230,17 +315,7 @@ export function assembleDigestEditionContent(input: {
   generatedAt?: string
 }): DigestEditionContent {
   const parsed = parseModelDigest(input.modelOutput, input.enrichedCandidates)
-  const bangers = new Map(
-    input.enrichedCandidates.map(({ candidate }) => [
-      candidate.tweet.id,
-      candidate.tweet,
-    ]),
-  )
-  const commentary = new Map(
-    input.enrichedCandidates.flatMap((candidate) =>
-      candidate.commentary.map((tweet) => [tweet.id, tweet] as const),
-    ),
-  )
+  const corpus = buildDigestPromptCorpus(input.enrichedCandidates)
   const enrichedByBanger = new Map(
     input.enrichedCandidates.map((candidate) => [
       candidate.candidate.tweet.id,
@@ -250,14 +325,24 @@ export function assembleDigestEditionContent(input: {
   const slugCounts = new Map<string, number>()
 
   const stories: DigestStory[] = parsed.stories.map((story) => {
-    const baseSlug = slugify(story.keyword || story.title)
+    const indexedTweets = story.tweetIndices.map((index) => corpus[index])
+    const storyBangers = indexedTweets
+      .filter(({ kind }) => kind === 'banger')
+      .map(({ tweet }) => tweet)
+    const storyCommentary = indexedTweets
+      .filter(({ kind }) => kind !== 'banger')
+      .map(({ tweet }) => tweet)
+    const keyword =
+      parsed.keywords.find((item) =>
+        indexedTweets.some(({ tweet }) =>
+          normalizedExcerpt(tweet.text).includes(normalizedExcerpt(item)),
+        ),
+      ) ?? story.title.slice(0, 60)
+    const baseSlug = slugify(story.title)
     const occurrence = (slugCounts.get(baseSlug) ?? 0) + 1
     slugCounts.set(baseSlug, occurrence)
-    const storyBangers = story.bangerTweetIds.map((id) => bangers.get(id)!)
-    const storyCommentary = story.commentaryTweetIds.map(
-      (id) => commentary.get(id)!,
-    )
-    const related = story.bangerTweetIds
+    const related = storyBangers
+      .map(({ id }) => id)
       .map((id) => enrichedByBanger.get(id))
       .filter((candidate): candidate is EnrichedDigestCandidate =>
         Boolean(candidate),
@@ -273,7 +358,7 @@ export function assembleDigestEditionContent(input: {
     return {
       slug: occurrence === 1 ? baseSlug : `${baseSlug}-${occurrence}`,
       category: story.category,
-      keyword: story.keyword,
+      keyword,
       title: story.title,
       subtitle: story.subtitle,
       bullets: story.bullets,
@@ -288,13 +373,8 @@ export function assembleDigestEditionContent(input: {
     }
   })
 
-  const topBanger = [...input.enrichedCandidates].sort(
-    (a, b) =>
-      (b.candidate.tweet.quoteCount ?? 0) -
-        (a.candidate.tweet.quoteCount ?? 0) ||
-      b.candidate.tweet.likes - a.candidate.tweet.likes,
-  )[0]?.candidate.tweet
-  if (!topBanger) throw new Error('Digest has no selected bangers')
+  const topBanger = corpus[parsed.representativeTweetIndex]?.tweet
+  if (!topBanger) throw new Error('Digest has no representative tweet')
 
   return {
     digestDate: input.digestDate,
@@ -304,12 +384,7 @@ export function assembleDigestEditionContent(input: {
     executiveSummary: parsed.executiveSummary,
     topBanger,
     stories,
-    keywords: Array.from(
-      new Set([
-        ...stories.map((story) => story.keyword),
-        ...parsed.trendingKeywords,
-      ]),
-    ).slice(0, 12),
+    keywords: parsed.keywords,
     source: {
       candidateCount: input.allCandidateCount,
       selectedCount: input.enrichedCandidates.length,

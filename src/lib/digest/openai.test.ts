@@ -1,11 +1,15 @@
-import { extractResponseText, generateDigestWithOpenAI } from './openai'
+import { extractResponseText, generateDigestWithModel } from './openai'
 
 describe('OpenAI digest adapter', () => {
   const originalApiKey = process.env.OPENAI_API_KEY
+  const originalDeepSeekApiKey = process.env.DEEPSEEK_API_KEY
 
   afterEach(() => {
     if (originalApiKey === undefined) delete process.env.OPENAI_API_KEY
     else process.env.OPENAI_API_KEY = originalApiKey
+    if (originalDeepSeekApiKey === undefined)
+      delete process.env.DEEPSEEK_API_KEY
+    else process.env.DEEPSEEK_API_KEY = originalDeepSeekApiKey
   })
 
   test('extracts structured output text from a Responses API message', () => {
@@ -19,6 +23,23 @@ describe('OpenAI digest adapter', () => {
         ],
       }),
     ).toBe('{"stories":[]}')
+  })
+
+  test('skips DeepSeek reasoning items when extracting structured output', () => {
+    expect(
+      extractResponseText({
+        output: [
+          {
+            type: 'reasoning',
+            content: [{ type: 'reasoning_text', text: 'private reasoning' }],
+          },
+          {
+            type: 'message',
+            content: [{ type: 'output_text', text: '{"keywords":[]}' }],
+          },
+        ],
+      }),
+    ).toBe('{"keywords":[]}')
   })
 
   test('sends a non-stored strict schema request and records usage', async () => {
@@ -36,7 +57,7 @@ describe('OpenAI digest adapter', () => {
       ),
     ) as jest.MockedFunction<typeof fetch>
 
-    const result = await generateDigestWithOpenAI(
+    const result = await generateDigestWithModel(
       {
         runId: 'run-123',
         model: 'gpt-test',
@@ -55,9 +76,9 @@ describe('OpenAI digest adapter', () => {
       metadata: { digest_run_id: 'run-123' },
       text: { format: { type: 'json_schema', strict: true } },
     })
-    expect(
-      request.text.format.schema.properties.stories.items.required,
-    ).toContain('category')
+    expect(request.text.format.schema.required).toContain(
+      'representative_tweet_index',
+    )
     expect(
       request.text.format.schema.properties.stories.items.properties.category
         .enum,
@@ -65,6 +86,12 @@ describe('OpenAI digest adapter', () => {
     expect(
       request.text.format.schema.properties.stories.items.required,
     ).toContain('editorial_note')
+    expect(
+      request.text.format.schema.properties.stories.items.required,
+    ).toContain('tweet_indices')
+    expect(
+      request.text.format.schema.properties.stories.items.required,
+    ).not.toContain('banger_tweet_ids')
     expect(
       request.text.format.schema.properties.executive_summary,
     ).toMatchObject({ type: 'array', minItems: 3, maxItems: 5 })
@@ -89,7 +116,7 @@ describe('OpenAI digest adapter', () => {
       ),
     ) as jest.MockedFunction<typeof fetch>
 
-    const result = await generateDigestWithOpenAI(
+    const result = await generateDigestWithModel(
       {
         runId: 'run-invalid',
         model: 'gpt-test',
@@ -104,5 +131,58 @@ describe('OpenAI digest adapter', () => {
     expect(result.outputError).toBe(
       'OpenAI structured output was not valid JSON',
     )
+  })
+
+  test('uses the DeepSeek Responses API with provider-neutral schema fields', async () => {
+    process.env.DEEPSEEK_API_KEY = 'deepseek-test-key'
+    const fetcher = jest.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'resp_deepseek',
+          model: 'deepseek-v4-pro',
+          output: [
+            {
+              type: 'message',
+              content: [
+                {
+                  type: 'output_text',
+                  text: '{"executive_summary":[],"representative_tweet_index":0,"stories":[],"keywords":[]}',
+                },
+              ],
+            },
+          ],
+          usage: { input_tokens: 90, output_tokens: 10, total_tokens: 100 },
+        }),
+        { status: 200 },
+      ),
+    ) as jest.MockedFunction<typeof fetch>
+
+    const result = await generateDigestWithModel(
+      {
+        runId: 'run-deepseek',
+        model: 'deepseek-v4-pro',
+        systemPrompt: 'Return the digest schema.',
+        userPrompt: 'Indexed corpus',
+        reasoningEffort: 'low',
+        maxOutputTokens: 6_000,
+      },
+      fetcher,
+    )
+
+    expect(fetcher.mock.calls[0][0]).toBe('https://api.deepseek.com/responses')
+    const request = JSON.parse(String(fetcher.mock.calls[0][1]?.body))
+    expect(request).toMatchObject({
+      model: 'deepseek-v4-pro',
+      reasoning: { effort: 'low' },
+      max_output_tokens: 6_000,
+      text: { format: { type: 'json_schema' } },
+    })
+    expect(request).not.toHaveProperty('metadata')
+    expect(request).not.toHaveProperty('store')
+    expect(request.text.format).not.toHaveProperty('strict')
+    expect(result).toMatchObject({
+      totalTokens: 100,
+      responseId: 'resp_deepseek',
+    })
   })
 })

@@ -70,6 +70,7 @@ export interface DigestEditionContent {
   windowEnd: string
   generatedAt: string
   executiveSummary: string[]
+  /** Model-selected representative tweet. The legacy key preserves saved-edition compatibility. */
   topBanger: PortalTweet
   stories: DigestStory[]
   keywords: string[]

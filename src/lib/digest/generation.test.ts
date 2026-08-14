@@ -1,7 +1,9 @@
 import type { PortalTweet } from '@/lib/portal/types'
 import {
   assembleDigestEditionContent,
+  buildDigestPromptCorpus,
   renderDigestPrompt,
+  selectDailyDigestBangers,
   type EnrichedDigestCandidate,
 } from './generation'
 
@@ -59,48 +61,56 @@ const modelOutput = {
     'A group-house whiteboard prompted a conversation about memory carried by shared objects.',
     'Researchers began discussing how a new parquet release could support reply-graph analysis.',
   ],
+  representative_tweet_index: 0,
   stories: [
     {
       category: 'AI news',
-      keyword: 'taste',
       title: 'taste benchmarks are becoming public rituals',
       subtitle:
         'A forecasting claim turned into a disagreement about prediction, endorsement, and embarrassment.',
       bullets: ['The strongest counterpoint separated prediction from taste.'],
       editorial_note:
         'The disagreement matters more than treating one post as a settled verdict.',
-      banger_tweet_ids: ['1'],
-      commentary_tweet_ids: ['11'],
+      tweet_indices: [0, 3],
     },
     {
       category: 'Culture',
-      keyword: 'group house',
       title: 'the group house kitchen whiteboard deserves an archive',
       subtitle:
         'A small shared object carried the day’s larger conversation about communal memory.',
       bullets: ['Posts used shared objects to tell the story of a house.'],
       editorial_note:
         'The object is useful because it anchors a broader conversation in something concrete.',
-      banger_tweet_ids: ['2'],
-      commentary_tweet_ids: ['22'],
+      tweet_indices: [1, 4],
     },
     {
       category: 'News',
-      keyword: 'parquet',
       title: 'the parquet release now contains reply graphs',
       subtitle:
         'Researchers immediately connected the release format to new ways of studying archived conversations.',
       bullets: ['The release made reply-graph analysis easier to begin.'],
       editorial_note:
         'This is a release story, with the surrounding posts showing how researchers might use it.',
-      banger_tweet_ids: ['3'],
-      commentary_tweet_ids: ['33'],
+      tweet_indices: [2, 5],
     },
   ],
-  trending_keywords: ['taste', 'group house', 'parquet'],
+  keywords: ['taste', 'group house', 'parquet'],
 }
 
 describe('daily digest generation contract', () => {
+  test('selects at most 50 bangers with more than two CA quote posts', () => {
+    const ranked = Array.from({ length: 60 }, (_, index) =>
+      tweet(String(index + 100), `rank ${index}`, index < 55 ? 3 : 2),
+    )
+
+    const selected = selectDailyDigestBangers(ranked)
+
+    expect(selected).toHaveLength(50)
+    expect(selected.every((item) => (item.quoteCount ?? 0) > 2)).toBe(true)
+    expect(selected[0].id).toBe('100')
+    expect(selected.at(-1)?.id).toBe('149')
+  })
+
   test('renders a reproducible prompt from the frozen candidate snapshot', () => {
     const prompt = renderDigestPrompt(
       '{{digest_date}}|{{window_start}}|{{window_end}}|{{candidate_json}}',
@@ -114,7 +124,31 @@ describe('daily digest generation contract', () => {
 
     expect(prompt).toContain('2026-08-12|2026-08-11T12:00:00.000Z')
     expect(prompt).toContain('taste benchmarks are becoming public rituals')
-    expect(prompt).toContain('"archived_reply_count": 12')
+    expect(prompt).toContain('"index": 0')
+    expect(prompt).toContain('"archived_ca_quote_count": 9')
+    expect(prompt).toContain('"kind": "quote"')
+    expect(prompt).not.toContain('"id": "1"')
+  })
+
+  test('indexes all bangers before reply and quote context', () => {
+    const corpus = buildDigestPromptCorpus([
+      { ...candidates[0], replyTweetIds: ['11'] },
+      ...candidates.slice(1),
+    ])
+
+    expect(corpus.map(({ tweetId }) => tweetId)).toEqual([
+      '1',
+      '2',
+      '3',
+      '11',
+      '22',
+      '33',
+    ])
+    expect(corpus[3]).toMatchObject({
+      index: 3,
+      kind: 'reply',
+      parentBangerIndex: 0,
+    })
   })
 
   test('assembles validated story and tweet snapshots for publication', () => {
@@ -133,7 +167,7 @@ describe('daily digest generation contract', () => {
     expect(edition.executiveSummary).toHaveLength(3)
     expect(edition.stories).toHaveLength(3)
     expect(edition.stories[0]).toMatchObject({
-      slug: 'taste',
+      slug: 'taste-benchmarks-are-becoming-public-rituals',
       category: 'AI news',
       keyword: 'taste',
       replyCount: 12,
@@ -147,7 +181,7 @@ describe('daily digest generation contract', () => {
     })
   })
 
-  test('rejects AI-derived topic labels that do not occur in the posts', () => {
+  test('rejects generated keywords that do not occur in the posts', () => {
     expect(() =>
       assembleDigestEditionContent({
         runId: 'run-1',
@@ -158,13 +192,10 @@ describe('daily digest generation contract', () => {
         enrichedCandidates: candidates,
         modelOutput: {
           ...modelOutput,
-          stories: [
-            { ...modelOutput.stories[0], keyword: 'agentic discourse' },
-            ...modelOutput.stories.slice(1),
-          ],
+          keywords: ['agentic discourse', 'invented label', 'fake topic'],
         },
       }),
-    ).toThrow('does not occur in the posts')
+    ).toThrow('Fewer than three generated keywords occur in the posts')
   })
 
   test('rejects an abstract that is not a three- to five-item bullet list', () => {
@@ -201,10 +232,10 @@ describe('daily digest generation contract', () => {
           ],
         },
       }),
-    ).toThrow('at least twelve words of explanatory context')
+    ).toThrow('about 140 characters of explanatory context')
   })
 
-  test('rejects fabricated tweet IDs before publication', () => {
+  test('rejects fabricated tweet indices before publication', () => {
     expect(() =>
       assembleDigestEditionContent({
         runId: 'run-1',
@@ -216,12 +247,64 @@ describe('daily digest generation contract', () => {
         modelOutput: {
           ...modelOutput,
           stories: [
-            { ...modelOutput.stories[0], banger_tweet_ids: ['999'] },
+            { ...modelOutput.stories[0], tweet_indices: [999] },
             ...modelOutput.stories.slice(1),
           ],
         },
       }),
-    ).toThrow('unknown banger tweet ID')
+    ).toThrow('unknown tweet index')
+  })
+
+  test('requires each story to select at least one indexed banger', () => {
+    expect(() =>
+      assembleDigestEditionContent({
+        runId: 'run-1',
+        digestDate: '2026-08-12',
+        windowStart: '2026-08-11T12:00:00.000Z',
+        windowEnd: '2026-08-12T12:00:00.000Z',
+        allCandidateCount: 3,
+        enrichedCandidates: candidates,
+        modelOutput: {
+          ...modelOutput,
+          stories: [
+            { ...modelOutput.stories[0], tweet_indices: [3] },
+            ...modelOutput.stories.slice(1),
+          ],
+        },
+      }),
+    ).toThrow('must include at least one banger index')
+  })
+
+  test('rejects repeated indices and non-numeric representative references', () => {
+    expect(() =>
+      assembleDigestEditionContent({
+        runId: 'run-1',
+        digestDate: '2026-08-12',
+        windowStart: '2026-08-11T12:00:00.000Z',
+        windowEnd: '2026-08-12T12:00:00.000Z',
+        allCandidateCount: 3,
+        enrichedCandidates: candidates,
+        modelOutput: {
+          ...modelOutput,
+          stories: [
+            { ...modelOutput.stories[0], tweet_indices: [0, 0] },
+            ...modelOutput.stories.slice(1),
+          ],
+        },
+      }),
+    ).toThrow('repeated a tweet index')
+
+    expect(() =>
+      assembleDigestEditionContent({
+        runId: 'run-1',
+        digestDate: '2026-08-12',
+        windowStart: '2026-08-11T12:00:00.000Z',
+        windowEnd: '2026-08-12T12:00:00.000Z',
+        allCandidateCount: 3,
+        enrichedCandidates: candidates,
+        modelOutput: { ...modelOutput, representative_tweet_index: '0' },
+      }),
+    ).toThrow('representative tweet index')
   })
 
   test('rejects categories outside the editorial taxonomy', () => {
@@ -265,5 +348,19 @@ describe('daily digest generation contract', () => {
         },
       }),
     ).toThrow('title must be a three- to eighteen-word excerpt')
+  })
+
+  test('uses the model-selected representative tweet instead of forcing rank one', () => {
+    const edition = assembleDigestEditionContent({
+      runId: 'run-1',
+      digestDate: '2026-08-12',
+      windowStart: '2026-08-11T12:00:00.000Z',
+      windowEnd: '2026-08-12T12:00:00.000Z',
+      allCandidateCount: 3,
+      enrichedCandidates: candidates,
+      modelOutput: { ...modelOutput, representative_tweet_index: 3 },
+    })
+
+    expect(edition.topBanger.id).toBe('11')
   })
 })

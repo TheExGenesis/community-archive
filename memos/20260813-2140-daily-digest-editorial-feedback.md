@@ -34,8 +34,11 @@ Date: 2026-08-13
 
 ## Prompt draft
 
-The executable version is inserted by
-`20260814055701_refine_daily_digest_summary_and_subtitles.sql`.
+This draft was first made executable by
+`20260814055701_refine_daily_digest_summary_and_subtitles.sql`. The later
+single-call, zero-indexed DeepSeek revision is documented in
+`20260813-2322-single-call-digest-generation.md` and inserted by
+`20260814062256_add_single_call_indexed_deepseek_digest_prompt.sql`.
 
 ### System prompt
 

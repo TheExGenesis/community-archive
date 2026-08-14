@@ -3,13 +3,24 @@ import { DIGEST_STORY_CATEGORIES } from './types'
 const DIGEST_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['executive_summary', 'stories', 'trending_keywords'],
+  required: [
+    'executive_summary',
+    'representative_tweet_index',
+    'stories',
+    'keywords',
+  ],
   properties: {
     executive_summary: {
       type: 'array',
       minItems: 3,
       maxItems: 5,
       items: { type: 'string', minLength: 30, maxLength: 220 },
+    },
+    representative_tweet_index: {
+      type: 'integer',
+      minimum: 0,
+      description:
+        'The zero-based corpus index of the most representative or iconic tweet.',
     },
     stories: {
       type: 'array',
@@ -20,22 +31,19 @@ const DIGEST_JSON_SCHEMA = {
         additionalProperties: false,
         required: [
           'category',
-          'keyword',
           'title',
           'subtitle',
           'bullets',
           'editorial_note',
-          'banger_tweet_ids',
-          'commentary_tweet_ids',
+          'tweet_indices',
         ],
         properties: {
           category: {
             type: 'string',
             enum: DIGEST_STORY_CATEGORIES,
           },
-          keyword: { type: 'string', minLength: 2, maxLength: 60 },
           title: { type: 'string', minLength: 8, maxLength: 140 },
-          subtitle: { type: 'string', minLength: 50, maxLength: 320 },
+          subtitle: { type: 'string', minLength: 80, maxLength: 190 },
           bullets: {
             type: 'array',
             minItems: 1,
@@ -47,21 +55,17 @@ const DIGEST_JSON_SCHEMA = {
             minLength: 30,
             maxLength: 360,
           },
-          banger_tweet_ids: {
+          tweet_indices: {
             type: 'array',
             minItems: 1,
-            maxItems: 6,
-            items: { type: 'string', pattern: '^\\d{1,20}$' },
-          },
-          commentary_tweet_ids: {
-            type: 'array',
-            maxItems: 5,
-            items: { type: 'string', pattern: '^\\d{1,20}$' },
+            maxItems: 18,
+            uniqueItems: true,
+            items: { type: 'integer', minimum: 0 },
           },
         },
       },
     },
-    trending_keywords: {
+    keywords: {
       type: 'array',
       minItems: 3,
       maxItems: 12,
@@ -98,7 +102,7 @@ const safeTokenCount = (value: unknown): number | null => {
 export function extractResponseText(response: Record<string, unknown>): string {
   if (typeof response.output_text === 'string') return response.output_text
   if (!Array.isArray(response.output)) {
-    throw new Error('OpenAI response did not include output text')
+    throw new Error('Model response did not include output text')
   }
   for (const item of response.output) {
     if (!item || typeof item !== 'object') continue
@@ -108,42 +112,61 @@ export function extractResponseText(response: Record<string, unknown>): string {
       if (
         part &&
         typeof part === 'object' &&
+        (part as { type?: unknown }).type === 'output_text' &&
         typeof (part as { text?: unknown }).text === 'string'
       ) {
         return (part as { text: string }).text
       }
     }
   }
-  throw new Error('OpenAI response did not include output text')
+  throw new Error('Model response did not include output text')
 }
 
-export async function generateDigestWithOpenAI(
+export async function generateDigestWithModel(
   request: DigestGenerationRequest,
   fetchImpl: typeof fetch = fetch,
 ): Promise<DigestGenerationResponse> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured')
+  const isDeepSeek = request.model.startsWith('deepseek-')
+  const provider = isDeepSeek ? 'DeepSeek' : 'OpenAI'
+  const apiKey = isDeepSeek
+    ? process.env.DEEPSEEK_API_KEY
+    : process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error(
+      `${isDeepSeek ? 'DEEPSEEK_API_KEY' : 'OPENAI_API_KEY'} is not configured`,
+    )
+  }
 
   const baseUrl = (
-    process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1'
+    isDeepSeek
+      ? process.env.DEEPSEEK_API_BASE_URL || 'https://api.deepseek.com'
+      : process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1'
   ).replace(/\/$/, '')
   const body: Record<string, unknown> = {
     model: request.model,
-    store: false,
     instructions: request.systemPrompt,
     input: request.userPrompt,
-    metadata: { digest_run_id: request.runId },
     text: {
-      verbosity: 'low',
       format: {
         type: 'json_schema',
         name: 'community_archive_daily_digest',
-        description:
-          'A concise daily digest assembled only from supplied tweet snapshots.',
-        strict: true,
         schema: DIGEST_JSON_SCHEMA,
       },
     },
+  }
+  if (!isDeepSeek) {
+    body.store = false
+    body.metadata = { digest_run_id: request.runId }
+    body.text = {
+      ...(body.text as Record<string, unknown>),
+      verbosity: 'low',
+      format: {
+        ...((body.text as { format: Record<string, unknown> }).format ?? {}),
+        description:
+          'A concise daily digest assembled only from supplied tweet snapshots.',
+        strict: true,
+      },
+    }
   }
   if (request.reasoningEffort) {
     body.reasoning = { effort: request.reasoningEffort }
@@ -164,7 +187,7 @@ export async function generateDigestWithOpenAI(
   const responseText = await response.text()
   if (!response.ok) {
     throw new Error(
-      `OpenAI generation failed (${response.status}): ${responseText.slice(0, 500)}`,
+      `${provider} generation failed (${response.status}): ${responseText.slice(0, 500)}`,
     )
   }
 
@@ -172,7 +195,7 @@ export async function generateDigestWithOpenAI(
   try {
     payload = JSON.parse(responseText) as Record<string, unknown>
   } catch {
-    throw new Error('OpenAI generation returned invalid JSON')
+    throw new Error(`${provider} generation returned invalid JSON`)
   }
   let outputText: string
   try {
@@ -183,13 +206,13 @@ export async function generateDigestWithOpenAI(
   let output: unknown = null
   let outputError: string | null = null
   if (!outputText) {
-    outputError = 'OpenAI response did not include output text'
+    outputError = `${provider} response did not include output text`
   } else {
     try {
       output = JSON.parse(outputText)
     } catch {
       output = outputText
-      outputError = 'OpenAI structured output was not valid JSON'
+      outputError = `${provider} structured output was not valid JSON`
     }
   }
   const usage =

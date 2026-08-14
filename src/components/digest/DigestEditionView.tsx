@@ -91,7 +91,7 @@ export function DigestEditionView({
           <div className="min-w-0">
             <section>
               <div className="flex items-center gap-3.5">
-                <span className={sectionLabel}>Top banger</span>
+                <span className={sectionLabel}>Representative tweet</span>
                 <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
               </div>
               <div className="mt-6">

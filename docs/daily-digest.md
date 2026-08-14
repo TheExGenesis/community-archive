@@ -29,11 +29,11 @@ edition are clickable.
 
 Story cards use the canonical full-fidelity `TweetCard`: text is never clamped,
 and archived media, video thumbnails, and quoted tweets remain visible. Every
-story carries one intentionally loose editorial label alongside its exact corpus
-keyword. Current labels include `AI news`, `News`, `Viral joke`, `Meme`,
-`Culture`, `Opportunity`, and `Other`; they are useful shelves rather than a
-formal taxonomy. The keyword must still occur verbatim in the supplied posts.
-Keyword pills link to the existing archive search.
+story carries one intentionally loose editorial label. Current labels include
+`AI news`, `News`, `Viral joke`, `Meme`, `Culture`, `Opportunity`, and `Other`;
+they are useful shelves rather than a formal taxonomy. Edition keywords remain
+separate, must occur verbatim in the supplied posts, and link to the existing
+archive search.
 
 Story titles are not generated headlines. Each is a three- to eighteen-word
 contiguous excerpt copied verbatim from one supplied banger or quote post. The
@@ -67,7 +67,13 @@ non-production environment. Do not set it in production.
 - ClickHouse is the analytical source for candidates and archived quote-post
   commentary. The current `recent-bangers` ranking counts distinct non-self
   quote tweets from Community Archive members against targets authored in the
-  selected time window.
+  selected time window. A run keeps only the top `min(50,
+num_bangers_over_2_ca_quotes)` rows: every included banger has at least three
+  Community Archive quote posts, and there are never more than 50.
+- The existing Supabase tweet-page RPC supplies in-window conversation replies
+  while the experiment is manual. Quote posts remain filtered to Community
+  Archive members through ClickHouse. Both are frozen into the run before the
+  model is called.
 - Supabase/PostgreSQL is authoritative for editorial state:
   `digest_prompt_versions`, `digest_runs`, and `digest_editions`.
 - Published content contains immutable tweet snapshots. Reading a digest does
@@ -80,12 +86,15 @@ projection, not a write authority.
 ## Lab workflow
 
 1. Choose an immutable prompt version and pull the last 24 hours.
-2. Review the saved candidate snapshot. The top 18 are selected by default;
-   save any inclusion or exclusion changes.
-3. Generate. The action fetches up to four archived quote posts per selected
-   banger with independent failure handling, renders the exact prompt, calls
-   the OpenAI Responses API with a strict JSON schema, and validates every
-   returned tweet ID and keyword.
+2. Review the saved candidate snapshot. Every qualifying banger is selected by
+   default, up to 50; save any inclusion or exclusion changes.
+3. Generate. The action fetches up to twelve archived Community Archive quote
+   posts and eight in-window replies per selected banger with independent
+   failure handling. It flattens bangers and context into one deterministic
+   zero-indexed corpus, then makes exactly one Responses API call. Bangers
+   occupy the first indices in rank order, so index `0` is the default
+   representative tweet. The receiver validates the JSON schema and converts
+   every returned index back to the frozen tweet ID before publication.
 4. Review the structured output and trace. A failed provider call or validation
    result remains a failed run rather than becoming a public draft.
 5. Stage a new edition version. Staging never replaces an existing published
@@ -97,9 +106,11 @@ A generation attempt is immutable once it starts. Use **Clone as new run** to
 reuse the exact frozen source snapshot with the same or a newer prompt version;
 this preserves failed and successful model responses for comparison.
 
-Every story keyword and title excerpt must occur verbatim in supplied posts.
-These are executable guards against generic AI-derived topic labels and
-newsletter-style headlines. The loose editorial label is generated separately.
+Every edition keyword and story-title excerpt must occur verbatim in supplied
+posts. Every story must reference at least one indexed banger, and a banger
+cannot be assigned to multiple stories. These are executable guards against
+generic AI-derived topic labels, newsletter-style headlines, and fabricated
+tweet references. The loose editorial label is generated separately.
 
 ## Observability
 
@@ -124,6 +135,8 @@ Required server-only values:
 ```env
 OPENAI_API_KEY=<secret>
 OPENAI_API_BASE_URL=https://api.openai.com/v1
+DEEPSEEK_API_KEY=<secret>
+DEEPSEEK_API_BASE_URL=https://api.deepseek.com
 CLICKHOUSE_ANALYTICS_API_URL=https://analytics.community-archive.org/analytics
 CLICKHOUSE_ANALYTICS_API_TOKEN=<shared-gateway-token>
 SUPABASE_SERVICE_ROLE=<server-only-service-role>
@@ -132,12 +145,15 @@ SUPABASE_SERVICE_ROLE=<server-only-service-role>
 Do not expose any of these with a `NEXT_PUBLIC_` prefix. Public digest reads use
 the normal anonymous Supabase client and the `status = 'published'` RLS policy.
 
-The current prompt uses `gpt-5.6-terra`, low reasoning effort, and a 5,000-token
-output ceiling. Its structured output requires a three- to five-item abstract,
-one loose editorial label, a verbatim title excerpt, an explanatory subtitle,
-source-grounded `In brief` bullets, an editor's note, and useful quote-post
-context. The lab can fork this into a new immutable version. It does not modify
-a prompt referenced by prior runs.
+The current experiment prompt uses `deepseek-v4-pro`, low reasoning effort, and
+a 6,000-token output ceiling. Its one-call structured output requires a
+three- to five-item abstract, a representative tweet index, three to five
+stories with loose labels and tweet-index lists, verbatim title excerpts,
+roughly 140-character explanatory subtitles, source-grounded `In brief`
+bullets, editor notes, and exact corpus keywords. The prompt explicitly prefers
+the top-ranked banger as representative while allowing a more iconic choice.
+The lab can fork this into a new immutable version; prior runs keep their exact
+prompt and provider configuration.
 
 ## Rollout gates
 
@@ -146,7 +162,7 @@ daily timer or weekly Substack send is enabled:
 
 1. Apply `20260813000650_add_daily_digest_editorial_workspace.sql` and
    the subsequent Daily Digest prompt-version migrations through
-   `20260814055701_refine_daily_digest_summary_and_subtitles.sql` to
+   `20260814062256_add_single_call_indexed_deepseek_digest_prompt.sql` to
    staging.
 2. Run database security and performance advisors; verify anonymous users can
    read only published rows and cannot call `publish_digest_edition`.
@@ -165,7 +181,8 @@ daily timer or weekly Substack send is enabled:
 
 ## Rollback
 
-- Stop generation by removing `OPENAI_API_KEY`; public editions remain readable.
+- Stop DeepSeek generation by removing `DEEPSEEK_API_KEY` (and OpenAI
+  experiments by removing `OPENAI_API_KEY`); public editions remain readable.
 - Archive a bad edition and republish a previously staged version through the
   service-role publication function.
 - Roll back the frontend independently of the tables. The migration is additive

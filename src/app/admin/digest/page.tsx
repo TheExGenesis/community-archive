@@ -488,8 +488,8 @@ export default async function DigestLabPage({
                           className="rounded-md border p-4"
                         >
                           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            {story.keyword} · {story.bangers.length} bangers ·{' '}
-                            {story.replyCount} replies
+                            {story.bangers.length} bangers · {story.replyCount}{' '}
+                            context posts
                           </div>
                           <h3 className="mt-2 font-serif text-2xl font-semibold">
                             {story.title}

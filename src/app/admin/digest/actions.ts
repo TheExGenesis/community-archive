@@ -7,15 +7,18 @@ import { requireAdmin } from '@/app/admin/data'
 import { fetchClickHouseQuotePosts } from '@/lib/clickhouseQuotePosts'
 import { fetchPortalRecentBangers } from '@/lib/portal/analytics'
 import type { PortalTweet } from '@/lib/portal/types'
+import { fetchDigestReplies } from '@/lib/digest/context'
 import { createDigestAdminClient } from '@/lib/digest/database'
 import {
   assembleDigestEditionContent,
   renderDigestPrompt,
+  selectDailyDigestBangers,
   type EnrichedDigestCandidate,
 } from '@/lib/digest/generation'
-import { generateDigestWithOpenAI } from '@/lib/digest/openai'
+import { generateDigestWithModel } from '@/lib/digest/openai'
 import { mapDigestRun, mapPromptVersion, toJson } from '@/lib/digest/data'
 import type { DigestCandidate, DigestRunEvent } from '@/lib/digest/types'
+import { createServerServiceRoleClient } from '@/utils/supabase'
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -59,7 +62,10 @@ function describeError(error: unknown): string {
   return String(error)
 }
 
-const quoteTweetToPortalTweet = (tweet: TweetData): PortalTweet => ({
+const quoteTweetToPortalTweet = (
+  tweet: TweetData,
+  banger: PortalTweet,
+): PortalTweet => ({
   id: tweet.tweet_id,
   accountId: tweet.account_id,
   username: tweet.username,
@@ -76,7 +82,35 @@ const quoteTweetToPortalTweet = (tweet: TweetData): PortalTweet => ({
     ...(media.width ? { width: media.width } : {}),
     ...(media.height ? { height: media.height } : {}),
   })),
+  quotedTweet: {
+    id: banger.id,
+    accountId: banger.accountId,
+    username: banger.username,
+    name: banger.name,
+    avatar: banger.avatar,
+    text: banger.text,
+    createdAt: banger.createdAt,
+    likes: banger.likes,
+    rts: banger.rts,
+    media: banger.media ?? [],
+  },
 })
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  concurrency: number,
+  worker: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = []
+  for (let index = 0; index < values.length; index += concurrency) {
+    results.push(
+      ...(await Promise.all(
+        values.slice(index, index + concurrency).map(worker),
+      )),
+    )
+  }
+  return results
+}
 
 const revalidateDigestPaths = (digestDate?: string) => {
   revalidatePath('/')
@@ -161,19 +195,21 @@ export async function createDigestRunAction(formData: FormData) {
     const windowEnd = new Date()
     const windowStart = new Date(windowEnd.getTime() - 24 * 60 * 60 * 1_000)
     const tweets = await fetchPortalRecentBangers(50, 24)
-    const candidates: DigestCandidate[] = tweets.map((tweet, index) => ({
-      tweet,
-      sourceRank: index + 1,
-      selected: index < 18,
-    }))
+    const candidates: DigestCandidate[] = selectDailyDigestBangers(tweets).map(
+      (tweet, index) => ({
+        tweet,
+        sourceRank: index + 1,
+        selected: true,
+      }),
+    )
     const initialEvent = event(
       'candidates',
       'completed',
-      'Saved the exact rolling 24-hour ClickHouse candidate snapshot.',
+      'Saved up to 50 rolling 24-hour bangers with more than two Community Archive quote posts.',
       {
         candidate_count: candidates.length,
-        default_selected_count: candidates.filter(({ selected }) => selected)
-          .length,
+        default_selected_count: candidates.length,
+        minimum_ca_quote_count: 3,
       },
     )
     const { data: run, error } = await admin
@@ -200,7 +236,7 @@ export async function createDigestRunAction(formData: FormData) {
   revalidatePath('/admin/digest')
   redirectToLab({
     runId: createdRunId,
-    notice: `Loaded ${candidateCount} banger candidates from the last 24 hours.`,
+    notice: `Loaded ${candidateCount} qualifying bangers from the last 24 hours.`,
   })
 }
 
@@ -368,7 +404,11 @@ export async function generateDigestRunAction(formData: FormData) {
   const startedAt = new Date()
   let events: DigestRunEvent[] = [
     ...run.events,
-    event('commentary', 'started', 'Fetching archived quote-post commentary.'),
+    event(
+      'commentary',
+      'started',
+      'Fetching archived replies and quote-post commentary.',
+    ),
   ]
   const { data: claimedRun, error: claimError } = await admin
     .from('digest_runs')
@@ -392,34 +432,63 @@ export async function generateDigestRunAction(formData: FormData) {
   }
 
   try {
-    const commentaryResults = await Promise.allSettled(
-      selected.map(async (candidate): Promise<EnrichedDigestCandidate> => {
-        const result = await fetchClickHouseQuotePosts(candidate.tweet.id, 4)
+    const contextClient = createServerServiceRoleClient()
+    const contextResults = await mapWithConcurrency(
+      selected,
+      8,
+      async (candidate) => {
+        const [quotesResult, repliesResult] = await Promise.allSettled([
+          fetchClickHouseQuotePosts(candidate.tweet.id, 12),
+          fetchDigestReplies(contextClient, {
+            bangerTweetId: candidate.tweet.id,
+            windowStart: run.windowStart,
+            windowEnd: run.windowEnd,
+            limit: 8,
+          }),
+        ])
+        const quotes =
+          quotesResult.status === 'fulfilled'
+            ? quotesResult.value.tweets.map((tweet) =>
+                quoteTweetToPortalTweet(tweet, candidate.tweet),
+              )
+            : []
+        const replies =
+          repliesResult.status === 'fulfilled' ? repliesResult.value.tweets : []
+        const commentary = Array.from(
+          new Map(
+            [...quotes, ...replies].map((tweet) => [tweet.id, tweet] as const),
+          ).values(),
+        )
         return {
-          candidate,
-          commentary: result.tweets.map(quoteTweetToPortalTweet),
-          totalReplyCount: result.totalCount,
+          enriched: {
+            candidate,
+            commentary,
+            replyTweetIds: replies.map(({ id }) => id),
+            totalReplyCount:
+              (quotesResult.status === 'fulfilled'
+                ? quotesResult.value.totalCount
+                : (candidate.tweet.quoteCount ?? 0)) +
+              (repliesResult.status === 'fulfilled'
+                ? repliesResult.value.totalCount
+                : 0),
+          } satisfies EnrichedDigestCandidate,
+          failedFetches:
+            Number(quotesResult.status === 'rejected') +
+            Number(repliesResult.status === 'rejected'),
         }
-      }),
+      },
     )
-    const enrichedCandidates = commentaryResults.map((result, index) =>
-      result.status === 'fulfilled'
-        ? result.value
-        : {
-            candidate: selected[index],
-            commentary: [],
-            totalReplyCount: selected[index].tweet.quoteCount ?? 0,
-          },
+    const enrichedCandidates = contextResults.map(({ enriched }) => enriched)
+    const failedCommentary = contextResults.reduce(
+      (sum, result) => sum + result.failedFetches,
+      0,
     )
-    const failedCommentary = commentaryResults.filter(
-      (result) => result.status === 'rejected',
-    ).length
     events = [
       ...events,
       event(
         'commentary',
         'completed',
-        'Saved commentary context for the selected bangers.',
+        'Saved reply and quote-post context for the selected bangers.',
         {
           selected_count: selected.length,
           failed_fetches: failedCommentary,
@@ -462,7 +531,7 @@ export async function generateDigestRunAction(formData: FormData) {
       })
       .eq('id', runId)
 
-    const generated = await generateDigestWithOpenAI({
+    const generated = await generateDigestWithModel({
       runId,
       model: prompt.model,
       systemPrompt: prompt.systemPrompt,

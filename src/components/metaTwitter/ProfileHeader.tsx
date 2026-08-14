@@ -47,7 +47,7 @@ export function ProfileHeader({
           />
         )}
       </div>
-      <div className="px-4 pb-4 sm:px-6">
+      <div className="px-4 pb-3 sm:px-6">
         <div className="flex items-start justify-between gap-3">
           {profile.avatar_media_url ? (
             <Image
@@ -97,25 +97,33 @@ export function ProfileHeader({
           @{profile.username}
         </div>
 
-        {profile.bio && (
-          <div className="mt-2.5 whitespace-pre-line text-[15px] leading-[1.45]">
+        <div className="mt-2.5 grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-x-8">
+          <div
+            className={
+              profile.bio
+                ? 'whitespace-pre-line text-sm leading-[1.4]'
+                : 'hidden lg:block'
+            }
+          >
             {profile.bio}
           </div>
-        )}
 
-        <div className="mt-2.5 flex flex-wrap gap-4 text-sm text-muted-foreground">
-          {profile.location && <span>📍 {profile.location}</span>}
-          {profile.created_at && (
-            <span>📅 Joined {monthYear(profile.created_at)}</span>
-          )}
-          {archivedAt && <span>🗄️ Archived {monthYear(archivedAt)}</span>}
-        </div>
+          <div className="flex min-w-0 flex-col gap-2 text-sm lg:items-end lg:text-right">
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground lg:justify-end">
+              {profile.location && <span>📍 {profile.location}</span>}
+              {profile.created_at && (
+                <span>📅 Joined {monthYear(profile.created_at)}</span>
+              )}
+              {archivedAt && <span>🗄️ Archived {monthYear(archivedAt)}</span>}
+            </div>
 
-        <div className="mt-2.5 flex flex-wrap gap-[18px] text-sm">
-          <Stat value={profile.num_tweets} label="Posts" />
-          <Stat value={profile.num_followers} label="Followers" />
-          <Stat value={profile.num_following} label="Following" />
-          <Stat value={profile.num_likes} label="Likes" />
+            <div className="flex flex-wrap gap-x-4 gap-y-1 lg:justify-end">
+              <Stat value={profile.num_tweets} label="Posts" />
+              <Stat value={profile.num_followers} label="Followers" />
+              <Stat value={profile.num_following} label="Following" />
+              <Stat value={profile.num_likes} label="Likes" />
+            </div>
+          </div>
         </div>
       </div>
     </header>

@@ -27,7 +27,6 @@ export function Workspace({
   contextTitle,
   contextDesc,
   tweets,
-  totalTweets,
   bangersAvailable,
   bangersLoading,
   media,
@@ -49,7 +48,6 @@ export function Workspace({
   contextTitle: string
   contextDesc: string
   tweets: BangerTweet[]
-  totalTweets: number
   bangersAvailable: boolean
   bangersLoading: boolean
   media: ArchiveMediaItem[]
@@ -71,11 +69,13 @@ export function Workspace({
   const mediaOverflow = Math.max(mediaCount - 6, 0)
 
   return (
-    <main className="flex min-w-0 flex-col gap-[18px] px-4 py-5 sm:px-6">
+    <main className="flex min-w-0 flex-col gap-4 px-4 py-4 sm:px-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-xl font-extrabold">{contextTitle}</h2>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-muted-foreground">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <h2 id="profile-bangers-heading" className="text-xl font-extrabold">
+            {contextTitle}
+          </h2>
+          <p className="max-w-2xl text-[13px] text-muted-foreground">
             {contextDesc}
           </p>
         </div>
@@ -95,22 +95,11 @@ export function Workspace({
         </label>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[1fr_280px]">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_280px]">
         <section
-          aria-labelledby="bangers-heading"
+          aria-labelledby="profile-bangers-heading"
           className="flex flex-col gap-3"
         >
-          <div className="flex items-baseline justify-between gap-3">
-            <h3 id="bangers-heading" className="text-[15px] font-extrabold">
-              Bangers
-            </h3>
-            {bangersAvailable && totalTweets > 0 && (
-              <span className="text-xs text-muted-foreground">
-                {formatNumber(totalTweets)} total
-              </span>
-            )}
-          </div>
-
           {!bangersAvailable && (
             <div className="rounded-xl border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
               Bangers are temporarily unavailable. The rest of this profile is

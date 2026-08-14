@@ -366,8 +366,7 @@ export function ProfileArchive({
     description:
       activeFeed?.available === false
         ? 'The Community Archive banger ranking is temporarily unavailable.'
-        : `${total} post${total === 1 ? '' : 's'} with at least two quote posts from Community Archive members${activeYear ? ` in ${activeYear}` : ''}. Self-quotes are excluded.`,
-    total,
+        : `${total} banger${total === 1 ? '' : 's'}${activeYear ? ` in ${activeYear}` : ''} · 2+ Community Archive member quote posts · self-quotes excluded`,
   }
 
   const returnTo = archiveChapterHref(basePath, activeYear)
@@ -386,7 +385,6 @@ export function ProfileArchive({
         contextTitle={context.title}
         contextDesc={context.description}
         tweets={activeFeed?.tweets ?? []}
-        totalTweets={context.total}
         bangersAvailable={activeFeed?.available !== false}
         bangersLoading={activeFeedLoading || (!activeFeed && !activeFeedFailed)}
         media={activeSidebar?.media ?? []}

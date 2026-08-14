@@ -76,7 +76,7 @@ export default async function RootLayout({
             <ReactQueryProvider>
               <HashScrollHandler />
               <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
-                <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+                <div className="flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
                   <div className="flex min-w-0 items-center gap-3">
                     <MobileNavigation items={mobileNav} />
                     <Link
@@ -136,7 +136,7 @@ export default async function RootLayout({
                   </div>
                 </div>
               </header>
-              <div className="flex min-h-[calc(100vh-4rem)] flex-col">
+              <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
                 {children}
                 <Analytics />
                 <Footer />

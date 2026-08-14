@@ -77,7 +77,6 @@ test('shows the initial canonical banger cards with media and profile return lin
       contextTitle="Overall — Bangers"
       contextDesc="Quoted at least twice."
       tweets={tweets.slice(0, 2)}
-      totalTweets={tweets.length}
       bangersAvailable
       bangersLoading={false}
       media={[]}
@@ -96,6 +95,14 @@ test('shows the initial canonical banger cards with media and profile return lin
       returnTo="/user/alice?chapter=2025"
     />,
   )
+
+  expect(
+    screen.getAllByRole('heading', { name: 'Overall — Bangers' }),
+  ).toHaveLength(1)
+  expect(
+    screen.queryByRole('heading', { name: 'Bangers' }),
+  ).not.toBeInTheDocument()
+  expect(screen.getByText('Quoted at least twice.')).toBeVisible()
 
   expect(
     screen.getByRole('link', {

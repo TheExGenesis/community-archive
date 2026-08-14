@@ -1,10 +1,11 @@
 import { cache } from 'react'
 import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { ProfileHeader } from '@/components/metaTwitter/ProfileHeader'
 import type { NavChapter } from '@/components/metaTwitter/ArchiveNav'
 import { ProfileArchive } from '@/components/metaTwitter/ProfileArchive'
 import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
+import { userProfileHref } from '@/lib/navigation'
 import { getProfileBangersPage } from '@/lib/metaTwitter/bangers'
 import {
   PROFILE_BANGERS_INITIAL_LIMIT,
@@ -89,6 +90,17 @@ export default async function UserPage({ params, searchParams }: PageProps) {
       ? requestedYear
       : null
 
+  const requestedProfilePath = `/user/${encodeURIComponent(params.account_id)}`
+  const canonicalProfilePath = userProfileHref(profile.username, accountId)
+  if (canonicalProfilePath !== requestedProfilePath) {
+    const canonicalParams = new URLSearchParams()
+    if (candidateYear) canonicalParams.set('chapter', String(candidateYear))
+    const canonicalQuery = canonicalParams.toString()
+    redirect(
+      `${canonicalProfilePath}${canonicalQuery ? `?${canonicalQuery}` : ''}`,
+    )
+  }
+
   const [archivedAt, candidatePage, candidateSidebar] = await Promise.all([
     profile.has_archive ? getCachedArchivedAt(accountId) : null,
     getProfileBangersPage(accountId, {
@@ -109,12 +121,6 @@ export default async function UserPage({ params, searchParams }: PageProps) {
           getClickHouseProfileSidebar(accountId, undefined),
         ])
 
-  const baseParams = new URLSearchParams()
-  if (searchParams.username) {
-    baseParams.set('username', searchParams.username)
-  }
-  const baseQuery = baseParams.toString()
-  const basePath = `/user/${encodeURIComponent(params.account_id)}${baseQuery ? `?${baseQuery}` : ''}`
   const navChapters: NavChapter[] = initialPage.yearCounts
 
   return (
@@ -124,7 +130,7 @@ export default async function UserPage({ params, searchParams }: PageProps) {
         <ProfileArchive
           accountId={accountId}
           avatarUrl={profile.avatar_media_url}
-          basePath={basePath}
+          basePath={canonicalProfilePath}
           chapters={navChapters}
           initialYear={year}
           initialPage={initialPage}

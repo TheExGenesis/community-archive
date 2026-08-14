@@ -23,25 +23,19 @@ describe('user profile navigation', () => {
 })
 
 describe('member navigation', () => {
-  it('uses explicit Users, Live stream, Bangers, and Search destinations', () => {
-    expect(getPrimaryNav(true)).toContainEqual({
-      href: '/user-dir',
-      label: 'Users',
-    })
-    expect(getPrimaryNav(true)).toContainEqual({
-      href: '/stream',
-      label: 'Live stream',
-    })
-    expect(getPrimaryNav(true)).toContainEqual({
-      href: '/bangers?period=all',
-      label: 'Bangers',
-    })
+  it('uses the requested primary order without a redundant Home link', () => {
+    expect(getPrimaryNav(true)).toEqual([
+      { href: '/bangers?period=all', label: 'Bangers' },
+      { href: '/user-dir', label: 'Users' },
+      { href: '/trends', label: 'Trends' },
+      { href: '/stream', label: 'Live stream' },
+      { href: '/research', label: 'Research' },
+    ])
     expect(getMobileNav(true)).toEqual(
       expect.arrayContaining([
         { href: '/user-dir', label: 'Users' },
         { href: '/stream', label: 'Live stream' },
         { href: '/bangers?period=all', label: 'Bangers' },
-        { href: '/digest', label: 'Digest' },
         { href: '/search', label: 'Search' },
       ]),
     )
@@ -67,6 +61,31 @@ describe('member navigation', () => {
       href: '/trends',
       label: 'Trends',
     })
+  })
+
+  it('shows the muted Graph shortcut only to admins', () => {
+    expect(getPrimaryNav(true)).not.toContainEqual(
+      expect.objectContaining({ href: '/social-graph' }),
+    )
+    expect(getMobileNav(true)).not.toContainEqual(
+      expect.objectContaining({ href: '/social-graph' }),
+    )
+
+    const adminGraphItem = {
+      href: '/social-graph',
+      label: 'Graph',
+      tone: 'muted',
+    }
+    expect(getPrimaryNav(true, true)).toEqual([
+      { href: '/bangers?period=all', label: 'Bangers' },
+      { href: '/user-dir', label: 'Users' },
+      { href: '/trends', label: 'Trends' },
+      { href: '/stream', label: 'Live stream' },
+      adminGraphItem,
+      { href: '/research', label: 'Research' },
+    ])
+    expect(getMobileNav(true, true)).toContainEqual(adminGraphItem)
+    expect(getPrimaryNav(false, true)).toContainEqual(adminGraphItem)
   })
 })
 

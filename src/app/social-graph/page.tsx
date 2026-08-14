@@ -1,9 +1,7 @@
 import dynamic from 'next/dynamic'
-import { redirect } from 'next/navigation'
-import { getIsMember } from '@/lib/portal/auth'
 import { getSocialGraphSnapshot } from '@/lib/socialGraph'
 import { MUTED, SERIF } from '@/components/portal/styles'
-import { checkIsAdmin } from '@/app/admin/data'
+import { requireAdmin } from '@/app/admin/data'
 import { SocialGraphAdminControls } from './SocialGraphAdminControls'
 
 const SocialGraphExplorer = dynamic(() => import('./SocialGraphExplorer'), {
@@ -16,8 +14,7 @@ const SocialGraphExplorer = dynamic(() => import('./SocialGraphExplorer'), {
 export const metadata = { title: 'Social graph · Community Archive' }
 
 export default async function SocialGraphPage() {
-  const [isMember, isAdmin] = await Promise.all([getIsMember(), checkIsAdmin()])
-  if (!isMember) redirect('/login?redirect=/social-graph')
+  await requireAdmin('/social-graph')
 
   let snapshot
   try {
@@ -35,11 +32,9 @@ export default async function SocialGraphPage() {
             database query runs from this page, so it will recover when the next
             snapshot is published.
           </p>
-          {isAdmin ? (
-            <div className="mt-4 flex justify-start">
-              <SocialGraphAdminControls />
-            </div>
-          ) : null}
+          <div className="mt-4 flex justify-start">
+            <SocialGraphAdminControls />
+          </div>
         </div>
       </main>
     )
@@ -63,7 +58,7 @@ export default async function SocialGraphPage() {
             <p className={`text-[11px] ${MUTED}`}>
               Snapshot {new Date(snapshot.generatedAt).toLocaleString()}
             </p>
-            {isAdmin ? <SocialGraphAdminControls /> : null}
+            <SocialGraphAdminControls />
           </div>
         </div>
         <SocialGraphExplorer snapshot={snapshot} />

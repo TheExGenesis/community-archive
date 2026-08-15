@@ -26,6 +26,7 @@ describe('member navigation', () => {
   it('uses the requested primary order without a redundant Home link', () => {
     expect(getPrimaryNav(true)).toEqual([
       { href: '/bangers?period=all', label: 'Bangers' },
+      { href: '/digest', label: 'Digest' },
       { href: '/user-dir', label: 'Users' },
       { href: '/trends', label: 'Trends' },
       { href: '/stream', label: 'Live stream' },
@@ -36,6 +37,7 @@ describe('member navigation', () => {
         { href: '/user-dir', label: 'Users' },
         { href: '/stream', label: 'Live stream' },
         { href: '/bangers?period=all', label: 'Bangers' },
+        { href: '/digest', label: 'Digest' },
         { href: '/search', label: 'Search' },
       ]),
     )
@@ -78,6 +80,7 @@ describe('member navigation', () => {
     }
     expect(getPrimaryNav(true, true)).toEqual([
       { href: '/bangers?period=all', label: 'Bangers' },
+      { href: '/digest', label: 'Digest' },
       { href: '/user-dir', label: 'Users' },
       { href: '/trends', label: 'Trends' },
       { href: '/stream', label: 'Live stream' },

@@ -857,6 +857,7 @@ export async function stageDigestEditionAction(formData: FormData) {
 export async function stageEditedDigestEditionAction(formData: FormData) {
   const { user } = await requireAdmin()
   const runId = formString(formData, 'run_id')
+  const publishImmediately = formString(formData, 'intent') === 'publish'
   if (!UUID_PATTERN.test(runId)) redirectToLab({ error: 'Invalid run ID.' })
 
   const admin = createDigestAdminClient()
@@ -889,19 +890,39 @@ export async function stageEditedDigestEditionAction(formData: FormData) {
     })
   }
   const version = (latest?.version ?? 0) + 1
-  const { error } = await admin.from('digest_editions').insert({
-    digest_date: run.digestDate,
-    version,
-    status: 'draft',
-    source_run_id: run.id,
-    content: toJson(content),
-    created_by: user.id,
-  })
-  if (error) {
+  const { data: savedEdition, error } = await admin
+    .from('digest_editions')
+    .insert({
+      digest_date: run.digestDate,
+      version,
+      status: 'draft',
+      source_run_id: run.id,
+      content: toJson(content),
+      created_by: user.id,
+    })
+    .select('*')
+    .single()
+  if (error || !savedEdition) {
     redirectToLab({
       runId,
-      error: `Could not save corrected draft: ${error.message}`,
+      error: `Could not save corrected draft: ${error?.message ?? 'No edition was returned.'}`,
     })
+  }
+
+  let publishedEdition: typeof savedEdition | null = null
+  if (publishImmediately) {
+    const { data, error: publishError } = await admin.rpc(
+      'publish_digest_edition',
+      { p_edition_id: savedEdition.id },
+    )
+    if (publishError || !data) {
+      revalidateDigestPaths(run.digestDate)
+      redirectToLab({
+        runId,
+        error: `Saved draft v${version}, but publish failed: ${publishError?.message ?? 'No published edition was returned.'}`,
+      })
+    }
+    publishedEdition = data
   }
 
   const events = [
@@ -909,35 +930,49 @@ export async function stageEditedDigestEditionAction(formData: FormData) {
     event(
       'edition',
       'completed',
-      `Saved inline corrections as digest edition version ${version}.`,
+      publishImmediately
+        ? `Saved inline corrections and published digest edition version ${version}.`
+        : `Saved inline corrections as digest edition version ${version}.`,
     ),
   ]
-  const { error: eventError } = await admin
-    .from('digest_runs')
-    .update({ events: toJson(events), updated_at: new Date().toISOString() })
-    .eq('id', runId)
+  const [eventResult] = await Promise.allSettled([
+    admin
+      .from('digest_runs')
+      .update({ events: toJson(events), updated_at: new Date().toISOString() })
+      .eq('id', runId),
+    captureDigestPostHogEvent(user.id, {
+      event: 'digest_page_created',
+      properties: {
+        source: 'manual_edit',
+        status: publishImmediately ? 'published' : 'draft',
+        story_count: content.stories.length,
+        editorial_warning_count: content.editorialWarnings?.length ?? 0,
+      },
+    }),
+  ])
+  const eventError =
+    eventResult.status === 'fulfilled'
+      ? eventResult.value.error
+      : eventResult.reason
   if (eventError) {
     console.warn(
       '[daily digest] saved corrected draft but could not append event',
       { runId, version, error: eventError },
     )
   }
-  await captureDigestPostHogEvent(user.id, {
-    event: 'digest_page_created',
-    properties: {
-      source: 'manual_edit',
-      status: 'draft',
-      story_count: content.stories.length,
-      editorial_warning_count: content.editorialWarnings?.length ?? 0,
-    },
-  })
   console.info('[daily digest] inline corrections saved', {
     runId,
     digestDate: run.digestDate,
     version,
+    published: publishImmediately,
   })
-  revalidateDigestPaths(run.digestDate)
-  redirectToLab({ runId, notice: `Saved corrections as draft v${version}.` })
+  revalidateDigestPaths(publishedEdition?.digest_date ?? run.digestDate)
+  redirectToLab({
+    runId,
+    notice: publishImmediately
+      ? `Saved corrections and published ${run.digestDate} edition v${version}.`
+      : `Saved corrections as draft v${version}.`,
+  })
 }
 
 export async function saveDigestEditionAction(formData: FormData) {

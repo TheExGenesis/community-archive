@@ -1,6 +1,9 @@
 'use client'
 
-import { useState, type MouseEvent, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
+// Next.js 14 supplies React DOM's canary form hook at runtime.
+// @ts-expect-error The installed stable React DOM types do not expose it yet.
+import { useFormStatus } from 'react-dom'
 
 export function SubmitButton({
   children,
@@ -15,11 +18,9 @@ export function SubmitButton({
   name?: string
   value?: string
 }) {
-  const [pending, setPending] = useState(false)
-  const startPendingAfterSubmit = (event: MouseEvent<HTMLButtonElement>) => {
-    if (event.currentTarget.form?.checkValidity() === false) return
-    window.setTimeout(() => setPending(true), 0)
-  }
+  const { data, pending: formPending } = useFormStatus()
+  const pending =
+    formPending && (name && value ? data?.get(name) === value : true)
   const colors =
     variant === 'primary'
       ? 'bg-zinc-950 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200'
@@ -32,8 +33,7 @@ export function SubmitButton({
       type="submit"
       name={name}
       value={value}
-      disabled={pending}
-      onClick={startPendingAfterSubmit}
+      disabled={formPending}
       className={`inline-flex items-center justify-center rounded-md border border-transparent px-4 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60 ${colors}`}
     >
       {pending ? (pendingLabel ?? 'Working…') : children}

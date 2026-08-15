@@ -14,11 +14,13 @@ import {
   publishDigestEditionAction,
   reviseDigestRunAction,
   stageDigestEditionAction,
-  stageEditedDigestEditionAction,
   updateDigestSelectionAction,
 } from './actions'
 import { DigestJobProgress } from './DigestJobProgress'
-import { DigestContentFields, DigestEditionEditor } from './DigestEditionEditor'
+import {
+  DigestEditionEditor,
+  DigestValidatedOutputEditor,
+} from './DigestEditionEditor'
 import { SubmitButton } from './SubmitButton'
 
 export const dynamic = 'force-dynamic'
@@ -632,37 +634,10 @@ export default async function DigestLabPage({
                         </ul>
                       </div>
                     ) : null}
-                    <form
-                      action={stageEditedDigestEditionAction}
-                      className="mt-5 space-y-7 rounded-lg border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900 dark:bg-blue-950/20"
-                    >
-                      <input
-                        type="hidden"
-                        name="run_id"
-                        value={state.activeRun.id}
-                      />
-                      <div>
-                        <div className="font-semibold">
-                          Edit the validated copy inline
-                        </div>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          Correct typos or wording below. Saving creates a new
-                          private draft; the validated model run stays
-                          unchanged.
-                        </p>
-                      </div>
-                      <DigestContentFields
-                        content={state.activeRun.parsedOutput}
-                      />
-                      <div className="flex flex-wrap items-center gap-3 border-t border-blue-200 pt-4 dark:border-blue-900">
-                        <SubmitButton pendingLabel="Saving corrections…">
-                          Save corrections as new draft
-                        </SubmitButton>
-                        <span className="text-xs text-muted-foreground">
-                          This does not publish the edition.
-                        </span>
-                      </div>
-                    </form>
+                    <DigestValidatedOutputEditor
+                      content={state.activeRun.parsedOutput}
+                      runId={state.activeRun.id}
+                    />
                     <form
                       action={reviseDigestRunAction}
                       className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/25"

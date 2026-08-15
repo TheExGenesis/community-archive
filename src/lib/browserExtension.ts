@@ -2,37 +2,30 @@ export const CHROME_EXTENSION_ID = 'igclpobjpjlphgllncjcgaookmncegbk'
 
 export const CHROME_EXTENSION_URL = `https://chromewebstore.google.com/detail/community-archive-stream/${CHROME_EXTENSION_ID}`
 
-export const EXTENSION_STATUS_REQUEST =
-  'community-archive:extension-status' as const
+export const CHROME_EXTENSION_PROBE_URL = `chrome-extension://${CHROME_EXTENSION_ID}/assets/custom/nopfp2_4832.jpg`
 
 export type BrowserExtensionStatus = 'checking' | 'installed' | 'not-installed'
 
-export interface BrowserExtensionRuntime {
-  lastError?: { message?: string }
-  sendMessage: (
-    extensionId: string,
-    message: { type: typeof EXTENSION_STATUS_REQUEST },
-    callback: (response?: unknown) => void,
-  ) => void
+export interface BrowserExtensionProbeImage {
+  onload: ((event: Event) => void) | null
+  onerror: ((event: Event) => void) | null
+  src: string
 }
 
 let sharedStatusRequest:
   | Promise<Exclude<BrowserExtensionStatus, 'checking'>>
   | undefined
 
-function browserRuntime(): BrowserExtensionRuntime | undefined {
-  return (
-    globalThis as typeof globalThis & {
-      chrome?: { runtime?: BrowserExtensionRuntime }
-    }
-  ).chrome?.runtime
+function createProbeImage(): BrowserExtensionProbeImage | undefined {
+  if (typeof Image === 'undefined') return undefined
+  return new Image()
 }
 
 export function detectBrowserExtension(
-  runtime = browserRuntime(),
+  image = createProbeImage(),
   timeoutMs = 800,
 ): Promise<Exclude<BrowserExtensionStatus, 'checking'>> {
-  if (!runtime?.sendMessage) return Promise.resolve('not-installed')
+  if (!image) return Promise.resolve('not-installed')
 
   return new Promise((resolve) => {
     let settled = false
@@ -40,26 +33,19 @@ export function detectBrowserExtension(
       if (settled) return
       settled = true
       clearTimeout(timeout)
+      image.onload = null
+      image.onerror = null
       resolve(status)
     }
     const timeout = setTimeout(() => finish('not-installed'), timeoutMs)
 
+    image.onload = () => finish('installed')
+    image.onerror = () => finish('not-installed')
+
     try {
-      runtime.sendMessage(
-        CHROME_EXTENSION_ID,
-        { type: EXTENSION_STATUS_REQUEST },
-        (response) => {
-          // Reading lastError prevents Chrome from logging an expected error
-          // when the extension is absent or predates the status handshake.
-          void runtime.lastError
-          const installed =
-            typeof response === 'object' &&
-            response !== null &&
-            'installed' in response &&
-            response.installed === true
-          finish(installed ? 'installed' : 'not-installed')
-        },
-      )
+      // Version 0.0.3 already exposes this image as a web-accessible resource.
+      // A successful load is a positive signal without messaging the extension.
+      image.src = CHROME_EXTENSION_PROBE_URL
     } catch {
       finish('not-installed')
     }

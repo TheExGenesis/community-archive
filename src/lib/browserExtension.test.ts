@@ -1,39 +1,49 @@
 import {
-  CHROME_EXTENSION_ID,
-  EXTENSION_STATUS_REQUEST,
-  type BrowserExtensionRuntime,
+  CHROME_EXTENSION_PROBE_URL,
+  type BrowserExtensionProbeImage,
   detectBrowserExtension,
 } from '@/lib/browserExtension'
 
-describe('browser extension detection', () => {
-  test('recognizes the extension status response', async () => {
-    const runtime: BrowserExtensionRuntime = {
-      sendMessage: (extensionId, message, callback) => {
-        expect(extensionId).toBe(CHROME_EXTENSION_ID)
-        expect(message).toEqual({ type: EXTENSION_STATUS_REQUEST })
-        callback({ installed: true, version: '0.0.4' })
-      },
-    }
+function createProbe(): BrowserExtensionProbeImage {
+  return { onload: null, onerror: null, src: '' }
+}
 
-    await expect(detectBrowserExtension(runtime)).resolves.toBe('installed')
+describe('browser extension detection', () => {
+  afterEach(() => {
+    jest.useRealTimers()
   })
 
-  test('treats a missing browser messaging API as not installed', async () => {
+  test('recognizes the published web-accessible resource', async () => {
+    const image = createProbe()
+    const status = detectBrowserExtension(image)
+
+    expect(image.src).toBe(CHROME_EXTENSION_PROBE_URL)
+    image.onload?.(new Event('load'))
+
+    await expect(status).resolves.toBe('installed')
+  })
+
+  test('treats a failed resource load as not installed', async () => {
+    const image = createProbe()
+    const status = detectBrowserExtension(image)
+    image.onerror?.(new Event('error'))
+
+    await expect(status).resolves.toBe('not-installed')
+  })
+
+  test('treats a missing browser image API as not installed', async () => {
     await expect(detectBrowserExtension(undefined)).resolves.toBe(
       'not-installed',
     )
   })
 
-  test('times out when an older extension cannot answer', async () => {
+  test('times out when the resource probe does not settle', async () => {
     jest.useFakeTimers()
-    const runtime: BrowserExtensionRuntime = {
-      sendMessage: () => undefined,
-    }
+    const image = createProbe()
 
-    const status = detectBrowserExtension(runtime, 50)
+    const status = detectBrowserExtension(image, 50)
     jest.advanceTimersByTime(50)
 
     await expect(status).resolves.toBe('not-installed')
-    jest.useRealTimers()
   })
 })

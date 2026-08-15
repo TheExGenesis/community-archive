@@ -1,10 +1,15 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { checkIsAdmin } from '@/app/admin/data'
 import { DigestEditionView } from '@/components/digest/DigestEditionView'
 import { getPublishedDigest, listPublishedDigestDays } from '@/lib/digest/data'
+import { getDigestMetadata } from '@/lib/digest/metadata'
 
-export const metadata = { title: 'What Happened Yesterday · Community Archive' }
 export const revalidate = 300
+
+export async function generateMetadata(): Promise<Metadata> {
+  return getDigestMetadata(await getPublishedDigest(), '/digest', 'website')
+}
 
 export default async function DigestPage() {
   const [edition, archive, isAdmin] = await Promise.all([

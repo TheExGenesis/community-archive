@@ -9,6 +9,13 @@ CREATE INDEX "idx_archive_upload_username" ON "public"."archive_upload" USING "b
 
 -- public.conversations
 CREATE INDEX "idx_conversation_id" ON "public"."conversations" USING "btree" ("conversation_id");
+CREATE INDEX "conversations_pending_resolution_idx"
+  ON "public"."conversations" USING "btree" ("next_attempt_at", "tweet_id")
+  WHERE ("resolution_status" = 'pending');
+
+-- public.conversation_resolution_runs
+CREATE INDEX "conversation_resolution_runs_finished_at_idx"
+  ON "public"."conversation_resolution_runs" USING "btree" ("finished_at" DESC);
 
 -- public.followers
 CREATE INDEX "idx_followers_account_id" ON "public"."followers" USING "btree" ("account_id");

@@ -82,6 +82,14 @@ ALTER TABLE ONLY "public"."archive_upload"
 
 ALTER TABLE ONLY "public"."conversations"
     ADD CONSTRAINT "conversations_pkey" PRIMARY KEY ("tweet_id");
+ALTER TABLE ONLY "public"."conversations"
+    ADD CONSTRAINT "conversations_resolution_status_check" CHECK (
+      "resolution_status" = ANY (
+        ARRAY['legacy'::text, 'authoritative'::text, 'root'::text, 'pending'::text, 'inherited'::text]
+      )
+    );
+ALTER TABLE ONLY "public"."conversations"
+    ADD CONSTRAINT "conversations_attempt_count_check" CHECK ("attempt_count" >= 0);
 
 ALTER TABLE ONLY "public"."followers"
     ADD CONSTRAINT "followers_account_id_follower_account_id_key" UNIQUE ("account_id", "follower_account_id");
@@ -138,13 +146,21 @@ ALTER TABLE ONLY "public"."tweet_urls"
 ALTER TABLE ONLY "public"."tweets"
     ADD CONSTRAINT "tweets_pkey" PRIMARY KEY ("tweet_id");
 
+ALTER TABLE ONLY "public"."all_account"
+    ADD CONSTRAINT "all_account_policy_tombstone_is_minimal" CHECK ((("is_tombstone" IS NOT TRUE) OR ((("created_via" = 'policy_tombstone'::"text") AND ("username" = ''::"text") AND ("account_display_name" = ''::"text") AND (COALESCE("num_tweets", 0) = 0) AND (COALESCE("num_following", 0) = 0) AND (COALESCE("num_followers", 0) = 0) AND (COALESCE("num_likes", 0) = 0)))));
+
+ALTER TABLE ONLY "public"."tweets"
+    ADD CONSTRAINT "tweets_policy_tombstone_is_minimal" CHECK ((("is_tombstone" IS NOT TRUE) OR ((("full_text" = ''::"text") AND ("favorite_count" = 0) AND (COALESCE("retweet_count", 0) = 0) AND ("reply_to_tweet_id" IS NULL) AND ("reply_to_user_id" IS NULL) AND ("reply_to_username" IS NULL) AND ("archive_upload_id" IS NULL)))));
+
 ALTER TABLE ONLY "public"."user_mentions"
     ADD CONSTRAINT "user_mentions_mentioned_user_id_tweet_id_key" UNIQUE ("mentioned_user_id", "tweet_id");
 ALTER TABLE ONLY "public"."user_mentions"
     ADD CONSTRAINT "user_mentions_pkey" PRIMARY KEY ("id");
 
 ALTER TABLE ONLY "tes"."blocked_scraping_users"
-    ADD CONSTRAINT "blocked_scraping_users_pkey" PRIMARY KEY ("account_id");
+    ADD CONSTRAINT "blocked_scraping_users_block_source_check" CHECK (("block_source" = ANY (ARRAY['admin'::"text", 'explicit_optout'::"text"])));
+ALTER TABLE ONLY "tes"."blocked_scraping_users"
+    ADD CONSTRAINT "blocked_scraping_users_pkey" PRIMARY KEY ("account_id", "block_source");
 
 -- Foreign keys
 ALTER TABLE ONLY "public"."all_profile"

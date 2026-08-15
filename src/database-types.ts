@@ -168,6 +168,7 @@ export type Database = {
           account_id: string
           created_at: string
           created_via: string
+          is_tombstone: boolean
           num_followers: number | null
           num_following: number | null
           num_likes: number | null
@@ -180,6 +181,7 @@ export type Database = {
           account_id: string
           created_at: string
           created_via: string
+          is_tombstone?: boolean
           num_followers?: number | null
           num_following?: number | null
           num_likes?: number | null
@@ -192,6 +194,7 @@ export type Database = {
           account_id?: string
           created_at?: string
           created_via?: string
+          is_tombstone?: boolean
           num_followers?: number | null
           num_following?: number | null
           num_likes?: number | null
@@ -324,17 +327,140 @@ export type Database = {
           },
         ]
       }
+      conversation_resolution_coverage_snapshots: {
+        Row: {
+          latest_observed_at: string | null
+          latest_resolved_at: string | null
+          max_attempt_count: number | null
+          oldest_ready_at: string | null
+          producer_source: string
+          resolution_status: string
+          row_count: number
+          snapshot_at: string
+        }
+        Insert: {
+          latest_observed_at?: string | null
+          latest_resolved_at?: string | null
+          max_attempt_count?: number | null
+          oldest_ready_at?: string | null
+          producer_source: string
+          resolution_status: string
+          row_count: number
+          snapshot_at?: string
+        }
+        Update: {
+          latest_observed_at?: string | null
+          latest_resolved_at?: string | null
+          max_attempt_count?: number | null
+          oldest_ready_at?: string | null
+          producer_source?: string
+          resolution_status?: string
+          row_count?: number
+          snapshot_at?: string
+        }
+        Relationships: []
+      }
+      conversation_resolution_reconciliation: {
+        Row: {
+          cursor_tweet_id: string | null
+          examined_count: number
+          high_watermark_tweet_id: string | null
+          id: boolean
+          last_error: string | null
+          queued_count: number
+          root_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cursor_tweet_id?: string | null
+          examined_count?: number
+          high_watermark_tweet_id?: string | null
+          id?: boolean
+          last_error?: string | null
+          queued_count?: number
+          root_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cursor_tweet_id?: string | null
+          examined_count?: number
+          high_watermark_tweet_id?: string | null
+          id?: boolean
+          last_error?: string | null
+          queued_count?: number
+          root_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      conversation_resolution_runs: {
+        Row: {
+          attempted: number
+          deferred: number
+          finished_at: string
+          id: number
+          ready_after: number
+          resolved: number
+          started_at: string
+        }
+        Insert: {
+          attempted: number
+          deferred: number
+          finished_at?: string
+          id?: number
+          ready_after: number
+          resolved: number
+          started_at?: string
+        }
+        Update: {
+          attempted?: number
+          deferred?: number
+          finished_at?: string
+          id?: number
+          ready_after?: number
+          resolved?: number
+          started_at?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
+          attempt_count: number
           conversation_id: string | null
+          first_observed_at: string
+          last_error: string | null
+          next_attempt_at: string
+          producer_source: string
+          resolution_status: string
+          resolved_at: string | null
           tweet_id: string
         }
         Insert: {
+          attempt_count?: number
           conversation_id?: string | null
+          first_observed_at?: string
+          last_error?: string | null
+          next_attempt_at?: string
+          producer_source?: string
+          resolution_status?: string
+          resolved_at?: string | null
           tweet_id: string
         }
         Update: {
+          attempt_count?: number
           conversation_id?: string | null
+          first_observed_at?: string
+          last_error?: string | null
+          next_attempt_at?: string
+          producer_source?: string
+          resolution_status?: string
+          resolved_at?: string | null
           tweet_id?: string
         }
         Relationships: [
@@ -1127,6 +1253,7 @@ export type Database = {
           favorite_count: number
           fts: unknown | null
           full_text: string
+          is_tombstone: boolean
           reply_to_tweet_id: string | null
           reply_to_user_id: string | null
           reply_to_username: string | null
@@ -1141,6 +1268,7 @@ export type Database = {
           favorite_count: number
           fts?: unknown | null
           full_text: string
+          is_tombstone?: boolean
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
@@ -1155,6 +1283,7 @@ export type Database = {
           favorite_count?: number
           fts?: unknown | null
           full_text?: string
+          is_tombstone?: boolean
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
@@ -1302,6 +1431,18 @@ export type Database = {
           total_likes: number | null
           total_mentions: number | null
           username: string | null
+        }
+        Relationships: []
+      }
+      conversation_resolution_health: {
+        Row: {
+          latest_observed_at: string | null
+          latest_resolved_at: string | null
+          max_attempt_count: number | null
+          oldest_ready_at: string | null
+          producer_source: string | null
+          resolution_status: string | null
+          row_count: number | null
         }
         Relationships: []
       }
@@ -2328,6 +2469,12 @@ export type Database = {
           "": string
         }
         Returns: string[]
+      }
+      tombstone_policy_account: {
+        Args: {
+          p_account_id: string
+        }
+        Returns: undefined
       }
       update_foreign_keys: {
         Args: {

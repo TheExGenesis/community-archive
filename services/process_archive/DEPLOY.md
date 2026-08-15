@@ -155,6 +155,27 @@ tail -f logs/execution.log
 tail -f logs/process_archive.log
 ```
 
+### Verify the explicit opt-out gate
+
+Before promoting a new worker image, exercise the privacy gate with a staging
+account whose `public.optin.explicit_optout` value is true. Move one of that
+account's uploads to `ready_for_commit`, run the worker once, and verify:
+
+- the upload moves to `failed`, not `completed`;
+- the worker logs `explicitly opted out; refusing all archive writes`;
+- no account, profile, tweet, media, URL, mention, like, follower, or following
+  rows from that upload were written.
+
+Repeat with an account present only in `tes.blocked_scraping_users`. Keep the
+previous worker available for rollback, but do not roll back past this privacy
+gate after it has been verified unless ingestion is paused first.
+
+Then clear only the test account's explicit opt-out and opt it in. Confirm its
+`explicit_optout` block-source row disappears while an independent `admin`
+block-source row, when present, remains. Re-run the archive and verify the
+existing policy tombstones are hydrated in place (`is_tombstone = false`) with
+their text and child rows restored from the authorized upload.
+
 **Expected output in `logs/execution.log`:**
 ```
 [2024-01-15 14:30:01] Starting process-archive execution

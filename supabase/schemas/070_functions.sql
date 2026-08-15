@@ -107,35 +107,57 @@ $$;
 ALTER FUNCTION "public"."update_optin_updated_at"() OWNER TO "postgres";
 
 
--- Explicit opt-outs are a hard scrape deny. Resolve username-only legacy rows
--- when possible, and never remove a block automatically because the same table
--- also contains administrator-managed blocks.
+-- Explicit opt-outs are a hard scrape deny. Consent-derived and administrator
+-- blocks have separate source rows so a later opt-in removes only the former.
 CREATE OR REPLACE FUNCTION "public"."propagate_explicit_optout_scrape_block"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 DECLARE
-    v_account_id text;
+    v_new_account_id text;
+    v_old_account_id text;
 BEGIN
-    IF NEW.explicit_optout IS NOT TRUE THEN
-        RETURN NEW;
-    END IF;
+    v_new_account_id := NULLIF(BTRIM(NEW.twitter_user_id), '');
 
-    v_account_id := NULLIF(BTRIM(NEW.twitter_user_id), '');
-
-    IF v_account_id IS NULL AND NULLIF(BTRIM(NEW.username), '') IS NOT NULL THEN
+    IF v_new_account_id IS NULL AND NULLIF(BTRIM(NEW.username), '') IS NOT NULL THEN
         SELECT a.account_id
-        INTO v_account_id
+        INTO v_new_account_id
         FROM public.all_account AS a
         WHERE LOWER(a.username) = LOWER(BTRIM(NEW.username))
         ORDER BY a.updated_at DESC NULLS LAST
         LIMIT 1;
     END IF;
 
-    IF v_account_id IS NOT NULL THEN
-        INSERT INTO tes.blocked_scraping_users (account_id)
-        VALUES (v_account_id)
-        ON CONFLICT (account_id) DO NOTHING;
+    IF TG_OP = 'UPDATE' THEN
+        v_old_account_id := NULLIF(BTRIM(OLD.twitter_user_id), '');
+        IF v_old_account_id IS NULL AND NULLIF(BTRIM(OLD.username), '') IS NOT NULL THEN
+            SELECT a.account_id
+            INTO v_old_account_id
+            FROM public.all_account AS a
+            WHERE LOWER(a.username) = LOWER(BTRIM(OLD.username))
+            ORDER BY a.updated_at DESC NULLS LAST
+            LIMIT 1;
+        END IF;
+
+        IF v_old_account_id IS NOT NULL
+           AND (
+               NEW.explicit_optout IS NOT TRUE
+               OR v_old_account_id IS DISTINCT FROM v_new_account_id
+           ) THEN
+            DELETE FROM tes.blocked_scraping_users
+            WHERE account_id = v_old_account_id
+              AND block_source = 'explicit_optout';
+        END IF;
+    END IF;
+
+    IF NEW.explicit_optout IS TRUE AND v_new_account_id IS NOT NULL THEN
+        INSERT INTO tes.blocked_scraping_users (account_id, block_source)
+        VALUES (v_new_account_id, 'explicit_optout')
+        ON CONFLICT (account_id, block_source) DO NOTHING;
+    ELSIF v_new_account_id IS NOT NULL THEN
+        DELETE FROM tes.blocked_scraping_users
+        WHERE account_id = v_new_account_id
+          AND block_source = 'explicit_optout';
     END IF;
 
     RETURN NEW;
@@ -1409,6 +1431,119 @@ $_$;
 
 ALTER FUNCTION "public"."delete_user_archive"("p_account_id" "text") OWNER TO "postgres";
 
+
+CREATE OR REPLACE FUNCTION public.tombstone_policy_account(p_account_id text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET statement_timeout TO '20min'
+SET search_path = ''
+AS $$
+DECLARE
+  v_provider_id text;
+  v_archive_upload_ids bigint[];
+  v_tweet_ids text[];
+BEGIN
+  IF p_account_id IS NULL OR BTRIM(p_account_id) = '' THEN
+    RAISE EXCEPTION 'p_account_id is required';
+  END IF;
+
+  SELECT auth.jwt()->'app_metadata'->>'provider_id'
+  INTO v_provider_id;
+
+  IF current_role NOT IN ('postgres', 'service_role')
+     AND (v_provider_id IS NULL OR v_provider_id <> p_account_id) THEN
+    RAISE EXCEPTION
+      'Unauthorized: provider_id % does not match account_id %',
+      v_provider_id,
+      p_account_id;
+  END IF;
+
+  SELECT COALESCE(array_agg(id), ARRAY[]::bigint[])
+  INTO v_archive_upload_ids
+  FROM public.archive_upload
+  WHERE account_id = p_account_id;
+
+  SELECT COALESCE(array_agg(tweet_id), ARRAY[]::text[])
+  INTO v_tweet_ids
+  FROM public.tweets
+  WHERE account_id = p_account_id;
+
+  DELETE FROM public.conversations
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.tweet_media
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.user_mentions
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.tweet_urls
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.quote_tweets
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.retweets
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM private.tweet_user
+  WHERE tweet_id = ANY(v_tweet_ids);
+
+  DELETE FROM public.likes
+  WHERE account_id = p_account_id
+     OR archive_upload_id = ANY(v_archive_upload_ids);
+  DELETE FROM public.followers
+  WHERE account_id = p_account_id
+     OR archive_upload_id = ANY(v_archive_upload_ids);
+  DELETE FROM public.following
+  WHERE account_id = p_account_id
+     OR archive_upload_id = ANY(v_archive_upload_ids);
+  DELETE FROM public.all_profile
+  WHERE account_id = p_account_id;
+
+  UPDATE public.tweet_media
+  SET archive_upload_id = NULL
+  WHERE archive_upload_id = ANY(v_archive_upload_ids);
+  UPDATE public.all_profile
+  SET archive_upload_id = NULL
+  WHERE archive_upload_id = ANY(v_archive_upload_ids);
+  UPDATE public.tweets
+  SET archive_upload_id = NULL
+  WHERE archive_upload_id = ANY(v_archive_upload_ids);
+
+  DELETE FROM public.archive_upload
+  WHERE id = ANY(v_archive_upload_ids);
+  DELETE FROM ca_autorefresh.account_refresh_log
+  WHERE account_id = p_account_id;
+
+  UPDATE public.tweets
+  SET
+    created_at = '1970-01-01 00:00:00+00',
+    full_text = '',
+    favorite_count = 0,
+    retweet_count = 0,
+    reply_to_tweet_id = NULL,
+    reply_to_user_id = NULL,
+    reply_to_username = NULL,
+    archive_upload_id = NULL,
+    is_tombstone = true
+  WHERE account_id = p_account_id;
+
+  UPDATE public.all_account
+  SET
+    created_via = 'policy_tombstone',
+    username = '',
+    created_at = '1970-01-01 00:00:00+00',
+    account_display_name = '',
+    num_tweets = 0,
+    num_following = 0,
+    num_followers = 0,
+    num_likes = 0,
+    is_tombstone = true
+  WHERE account_id = p_account_id;
+END;
+$$;
+
+ALTER FUNCTION public.tombstone_policy_account(text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.tombstone_policy_account(text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.tombstone_policy_account(text)
+  TO service_role;
 
 CREATE OR REPLACE FUNCTION "public"."delete_single_archive"("p_account_id" "text", "p_archive_upload_id" bigint) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -3022,7 +3157,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
   SELECT COALESCE(
-    array_agg(b.account_id),
+    array_agg(DISTINCT b.account_id),
     ARRAY[]::text[]
   )
   FROM tes.blocked_scraping_users b
@@ -3045,11 +3180,13 @@ BEGIN
   END IF;
 
   IF p_blocked THEN
-    INSERT INTO tes.blocked_scraping_users (account_id)
-    VALUES (p_account_id)
-    ON CONFLICT (account_id) DO NOTHING;
+    INSERT INTO tes.blocked_scraping_users (account_id, block_source)
+    VALUES (p_account_id, 'admin')
+    ON CONFLICT (account_id, block_source) DO NOTHING;
   ELSE
-    DELETE FROM tes.blocked_scraping_users WHERE account_id = p_account_id;
+    DELETE FROM tes.blocked_scraping_users
+    WHERE account_id = p_account_id
+      AND block_source = 'admin';
   END IF;
 END;
 $$;
@@ -3184,3 +3321,587 @@ REVOKE EXECUTE ON FUNCTION "public"."publish_digest_edition"(uuid)
   FROM PUBLIC, "anon", "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."publish_digest_edition"(uuid)
   TO "service_role";
+
+
+-- Incremental conversation resolution. Producers persist authoritative IDs
+-- when available; this trigger/worker pair resolves the remaining roots and
+-- replies in bounded batches.
+CREATE OR REPLACE FUNCTION "private"."queue_incremental_conversation"()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_is_root boolean := NEW.reply_to_tweet_id IS NULL;
+  v_source text := CASE
+    WHEN NEW.archive_upload_id IS NOT NULL THEN 'archive_upload'
+    ELSE 'database_trigger'
+  END;
+BEGIN
+  INSERT INTO public.conversations (
+    tweet_id,
+    conversation_id,
+    producer_source,
+    resolution_status,
+    resolved_at,
+    attempt_count,
+    next_attempt_at,
+    last_error
+  )
+  VALUES (
+    NEW.tweet_id,
+    CASE WHEN v_is_root THEN NEW.tweet_id ELSE NULL END,
+    v_source,
+    CASE WHEN v_is_root THEN 'root' ELSE 'pending' END,
+    CASE WHEN v_is_root THEN now() ELSE NULL END,
+    0,
+    now(),
+    NULL
+  )
+  ON CONFLICT (tweet_id) DO UPDATE
+  SET
+    conversation_id = CASE
+      WHEN public.conversations.resolution_status = 'authoritative'
+        THEN public.conversations.conversation_id
+      WHEN v_is_root THEN EXCLUDED.conversation_id
+      ELSE NULL
+    END,
+    producer_source = CASE
+      WHEN public.conversations.resolution_status = 'authoritative'
+        THEN public.conversations.producer_source
+      ELSE EXCLUDED.producer_source
+    END,
+    resolution_status = CASE
+      WHEN public.conversations.resolution_status = 'authoritative'
+        THEN 'authoritative'
+      ELSE EXCLUDED.resolution_status
+    END,
+    resolved_at = CASE
+      WHEN public.conversations.resolution_status = 'authoritative'
+        THEN public.conversations.resolved_at
+      ELSE EXCLUDED.resolved_at
+    END,
+    attempt_count = CASE
+      WHEN public.conversations.resolution_status = 'authoritative'
+        THEN public.conversations.attempt_count
+      ELSE 0
+    END,
+    next_attempt_at = CASE
+      WHEN public.conversations.resolution_status = 'authoritative'
+        THEN public.conversations.next_attempt_at
+      ELSE now()
+    END,
+    last_error = NULL;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION "private"."queue_incremental_conversation"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "private"."queue_incremental_conversation"() FROM PUBLIC;
+
+
+CREATE OR REPLACE FUNCTION "private"."process_conversation_resolution_batch"(
+  "p_limit" integer DEFAULT 500,
+  "p_now" timestamp with time zone DEFAULT now()
+)
+RETURNS TABLE (
+  "attempted" integer,
+  "resolved" integer,
+  "deferred" integer,
+  "ready_after" integer
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_started_at timestamptz := clock_timestamp();
+  v_attempted integer := 0;
+  v_resolved integer := 0;
+  v_deferred integer := 0;
+  v_ready_after integer := 0;
+BEGIN
+  IF p_limit < 1 OR p_limit > 5000 THEN
+    RAISE EXCEPTION 'conversation resolution batch must be between 1 and 5000';
+  END IF;
+
+  WITH candidates AS MATERIALIZED (
+    SELECT
+      c.tweet_id,
+      parent.conversation_id AS parent_conversation_id
+    FROM public.conversations AS c
+    INNER JOIN public.tweets AS t ON t.tweet_id = c.tweet_id
+    LEFT JOIN public.conversations AS parent
+      ON parent.tweet_id = t.reply_to_tweet_id
+    WHERE c.resolution_status = 'pending'
+      AND c.next_attempt_at <= p_now
+      AND t.reply_to_tweet_id IS NOT NULL
+    ORDER BY c.next_attempt_at, c.tweet_id
+    LIMIT p_limit
+    FOR UPDATE OF c SKIP LOCKED
+  ),
+  updated_rows AS (
+    UPDATE public.conversations AS child
+    SET
+      conversation_id = candidate.parent_conversation_id,
+      resolution_status = CASE
+        WHEN candidate.parent_conversation_id IS NOT NULL THEN 'inherited'
+        ELSE 'pending'
+      END,
+      resolved_at = CASE
+        WHEN candidate.parent_conversation_id IS NOT NULL THEN p_now
+        ELSE NULL
+      END,
+      attempt_count = child.attempt_count + 1,
+      next_attempt_at = CASE
+        WHEN candidate.parent_conversation_id IS NOT NULL THEN p_now
+        ELSE p_now + make_interval(
+          secs => least(3600, power(2, least(child.attempt_count, 11)))
+        )
+      END,
+      last_error = CASE
+        WHEN candidate.parent_conversation_id IS NOT NULL THEN NULL
+        ELSE 'parent conversation is not available yet'
+      END
+    FROM candidates AS candidate
+    WHERE child.tweet_id = candidate.tweet_id
+    RETURNING child.resolution_status
+  )
+  SELECT
+    (SELECT count(*)::integer FROM candidates),
+    count(*) FILTER (
+      WHERE resolution_status = 'inherited'
+    )::integer,
+    count(*) FILTER (
+      WHERE resolution_status = 'pending'
+    )::integer
+  FROM updated_rows
+  INTO v_attempted, v_resolved, v_deferred;
+
+  SELECT count(*)::integer
+  INTO v_ready_after
+  FROM public.conversations
+  WHERE resolution_status = 'pending'
+    AND next_attempt_at <= p_now;
+
+  INSERT INTO public.conversation_resolution_runs (
+    started_at,
+    finished_at,
+    attempted,
+    resolved,
+    deferred,
+    ready_after
+  ) VALUES (
+    v_started_at,
+    clock_timestamp(),
+    v_attempted,
+    v_resolved,
+    v_deferred,
+    v_ready_after
+  );
+
+  DELETE FROM public.conversation_resolution_runs
+  WHERE finished_at < p_now - interval '7 days';
+
+  RETURN QUERY SELECT v_attempted, v_resolved, v_deferred, v_ready_after;
+END;
+$$;
+
+ALTER FUNCTION "private"."process_conversation_resolution_batch"(integer, timestamp with time zone) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "private"."process_conversation_resolution_batch"(integer, timestamp with time zone)
+  FROM PUBLIC, "anon", "authenticated";
+GRANT EXECUTE ON FUNCTION "private"."process_conversation_resolution_batch"(integer, timestamp with time zone)
+  TO "service_role";
+
+
+CREATE OR REPLACE FUNCTION "private"."configure_conversation_resolution_reconciliation"(
+  "p_run" boolean DEFAULT false,
+  "p_reset" boolean DEFAULT false
+)
+RETURNS TABLE (
+  "status" text,
+  "cursor_tweet_id" text,
+  "high_watermark_tweet_id" text,
+  "examined_count" bigint,
+  "queued_count" bigint,
+  "root_count" bigint
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_high_watermark text;
+BEGIN
+  SELECT max(tweets.tweet_id)
+  INTO v_high_watermark
+  FROM public.tweets;
+
+  RETURN QUERY
+  UPDATE public.conversation_resolution_reconciliation AS state
+  SET
+    status = CASE WHEN p_run THEN 'running' ELSE 'paused' END,
+    cursor_tweet_id = CASE WHEN p_reset THEN NULL ELSE state.cursor_tweet_id END,
+    high_watermark_tweet_id = CASE
+      WHEN p_reset OR state.high_watermark_tweet_id IS NULL
+        THEN v_high_watermark
+      ELSE state.high_watermark_tweet_id
+    END,
+    examined_count = CASE WHEN p_reset THEN 0 ELSE state.examined_count END,
+    queued_count = CASE WHEN p_reset THEN 0 ELSE state.queued_count END,
+    root_count = CASE WHEN p_reset THEN 0 ELSE state.root_count END,
+    started_at = CASE
+      WHEN p_reset OR state.started_at IS NULL THEN now()
+      ELSE state.started_at
+    END,
+    updated_at = now(),
+    last_error = NULL
+  WHERE state.id
+  RETURNING
+    state.status,
+    state.cursor_tweet_id,
+    state.high_watermark_tweet_id,
+    state.examined_count,
+    state.queued_count,
+    state.root_count;
+END;
+$$;
+
+ALTER FUNCTION "private"."configure_conversation_resolution_reconciliation"(boolean, boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "private"."process_conversation_resolution_reconciliation_batch"(
+  "p_limit" integer DEFAULT 500,
+  "p_dry_run" boolean DEFAULT false
+)
+RETURNS TABLE (
+  "examined" integer,
+  "queued" integer,
+  "roots" integer,
+  "next_cursor" text,
+  "complete" boolean
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_state public.conversation_resolution_reconciliation%ROWTYPE;
+  v_examined integer := 0;
+  v_queued integer := 0;
+  v_roots integer := 0;
+  v_next_cursor text;
+  v_complete boolean := false;
+BEGIN
+  IF p_limit < 1 OR p_limit > 5000 THEN
+    RAISE EXCEPTION 'conversation reconciliation batch must be between 1 and 5000';
+  END IF;
+
+  SELECT *
+  INTO v_state
+  FROM public.conversation_resolution_reconciliation
+  WHERE id
+  FOR UPDATE;
+
+  IF v_state.high_watermark_tweet_id IS NULL THEN
+    RAISE EXCEPTION 'configure conversation reconciliation before processing';
+  END IF;
+
+  IF NOT p_dry_run AND v_state.status <> 'running' THEN
+    RAISE EXCEPTION 'conversation reconciliation is %', v_state.status;
+  END IF;
+
+  IF p_dry_run THEN
+    WITH candidates AS MATERIALIZED (
+      SELECT tweets.tweet_id, tweets.reply_to_tweet_id
+      FROM public.tweets AS tweets
+      WHERE (
+        v_state.cursor_tweet_id IS NULL
+        OR tweets.tweet_id > v_state.cursor_tweet_id
+      )
+        AND tweets.tweet_id <= v_state.high_watermark_tweet_id
+      ORDER BY tweets.tweet_id
+      LIMIT p_limit
+    )
+    SELECT
+      count(*)::integer,
+      count(*) FILTER (
+        WHERE existing.tweet_id IS NULL
+          OR (
+            existing.conversation_id IS NULL
+            AND existing.resolution_status <> 'authoritative'
+          )
+      )::integer,
+      count(*) FILTER (
+        WHERE candidate.reply_to_tweet_id IS NULL
+          AND (
+            existing.tweet_id IS NULL
+            OR (
+              existing.conversation_id IS NULL
+              AND existing.resolution_status <> 'authoritative'
+            )
+          )
+      )::integer,
+      max(candidate.tweet_id)
+    INTO v_examined, v_queued, v_roots, v_next_cursor
+    FROM candidates AS candidate
+    LEFT JOIN public.conversations AS existing
+      ON existing.tweet_id = candidate.tweet_id;
+  ELSE
+    WITH candidates AS MATERIALIZED (
+      SELECT tweets.tweet_id, tweets.reply_to_tweet_id
+      FROM public.tweets AS tweets
+      WHERE (
+        v_state.cursor_tweet_id IS NULL
+        OR tweets.tweet_id > v_state.cursor_tweet_id
+      )
+        AND tweets.tweet_id <= v_state.high_watermark_tweet_id
+      ORDER BY tweets.tweet_id
+      LIMIT p_limit
+    ), changed_rows AS (
+      INSERT INTO public.conversations (
+        tweet_id,
+        conversation_id,
+        producer_source,
+        resolution_status,
+        resolved_at,
+        attempt_count,
+        next_attempt_at,
+        last_error
+      )
+      SELECT
+        candidate.tweet_id,
+        CASE
+          WHEN candidate.reply_to_tweet_id IS NULL THEN candidate.tweet_id
+          ELSE NULL
+        END,
+        'historical_reconciliation',
+        CASE
+          WHEN candidate.reply_to_tweet_id IS NULL THEN 'root'
+          ELSE 'pending'
+        END,
+        CASE
+          WHEN candidate.reply_to_tweet_id IS NULL THEN now()
+          ELSE NULL
+        END,
+        0,
+        now(),
+        NULL
+      FROM candidates AS candidate
+      ON CONFLICT (tweet_id) DO UPDATE
+      SET
+        conversation_id = EXCLUDED.conversation_id,
+        producer_source = EXCLUDED.producer_source,
+        resolution_status = EXCLUDED.resolution_status,
+        resolved_at = EXCLUDED.resolved_at,
+        attempt_count = 0,
+        next_attempt_at = now(),
+        last_error = NULL
+      WHERE public.conversations.conversation_id IS NULL
+        AND public.conversations.resolution_status <> 'authoritative'
+      RETURNING resolution_status
+    )
+    SELECT
+      (SELECT count(*)::integer FROM candidates),
+      count(*)::integer,
+      count(*) FILTER (WHERE resolution_status = 'root')::integer,
+      (SELECT max(tweet_id) FROM candidates)
+    INTO v_examined, v_queued, v_roots, v_next_cursor
+    FROM changed_rows;
+  END IF;
+
+  v_complete := v_examined < p_limit
+    OR v_next_cursor >= v_state.high_watermark_tweet_id;
+
+  IF NOT p_dry_run THEN
+    UPDATE public.conversation_resolution_reconciliation AS state
+    SET
+      status = CASE WHEN v_complete THEN 'complete' ELSE 'running' END,
+      cursor_tweet_id = COALESCE(v_next_cursor, state.cursor_tweet_id),
+      examined_count = state.examined_count + v_examined,
+      queued_count = state.queued_count + v_queued,
+      root_count = state.root_count + v_roots,
+      updated_at = now(),
+      last_error = NULL
+    WHERE state.id;
+  END IF;
+
+  RETURN QUERY
+  SELECT v_examined, v_queued, v_roots, v_next_cursor, v_complete;
+END;
+$$;
+
+ALTER FUNCTION "private"."process_conversation_resolution_reconciliation_batch"(integer, boolean) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "private"."configure_conversation_resolution_reconciliation"(boolean, boolean)
+  FROM PUBLIC, "anon", "authenticated";
+REVOKE ALL ON FUNCTION "private"."process_conversation_resolution_reconciliation_batch"(integer, boolean)
+  FROM PUBLIC, "anon", "authenticated";
+GRANT EXECUTE ON FUNCTION "private"."configure_conversation_resolution_reconciliation"(boolean, boolean)
+  TO "service_role";
+GRANT EXECUTE ON FUNCTION "private"."process_conversation_resolution_reconciliation_batch"(integer, boolean)
+  TO "service_role";
+
+
+CREATE OR REPLACE FUNCTION "private"."refresh_conversation_resolution_coverage"()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_rows integer;
+BEGIN
+  DELETE FROM public.conversation_resolution_coverage_snapshots;
+
+  INSERT INTO public.conversation_resolution_coverage_snapshots (
+    producer_source,
+    resolution_status,
+    row_count,
+    latest_observed_at,
+    latest_resolved_at,
+    oldest_ready_at,
+    max_attempt_count,
+    snapshot_at
+  )
+  SELECT
+    health.producer_source,
+    health.resolution_status,
+    health.row_count,
+    health.latest_observed_at,
+    health.latest_resolved_at,
+    health.oldest_ready_at,
+    health.max_attempt_count,
+    now()
+  FROM public.conversation_resolution_health AS health;
+
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  RETURN v_rows;
+END;
+$$;
+
+ALTER FUNCTION "private"."refresh_conversation_resolution_coverage"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "private"."refresh_conversation_resolution_coverage"()
+  FROM PUBLIC, "anon", "authenticated";
+GRANT EXECUTE ON FUNCTION "private"."refresh_conversation_resolution_coverage"()
+  TO "service_role";
+
+
+CREATE OR REPLACE FUNCTION "private"."community_archive_monitoring_conversation_resolution_health"()
+RETURNS TABLE (
+  "producer_source" text,
+  "resolution_status" text,
+  "row_count" bigint,
+  "latest_observed_at" timestamp with time zone,
+  "latest_resolved_at" timestamp with time zone,
+  "oldest_ready_at" timestamp with time zone,
+  "max_attempt_count" integer,
+  "snapshot_at" timestamp with time zone
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT
+    health.producer_source,
+    health.resolution_status,
+    health.row_count,
+    health.latest_observed_at,
+    health.latest_resolved_at,
+    health.oldest_ready_at,
+    health.max_attempt_count,
+    health.snapshot_at
+  FROM public.conversation_resolution_coverage_snapshots AS health;
+$$;
+
+ALTER FUNCTION "private"."community_archive_monitoring_conversation_resolution_health"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "private"."community_archive_monitoring_conversation_resolution_worker"()
+RETURNS TABLE (
+  "finished_at" timestamp with time zone,
+  "attempted" integer,
+  "resolved" integer,
+  "deferred" integer,
+  "ready_after" integer
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT
+    latest.finished_at,
+    COALESCE(latest.attempted, 0),
+    COALESCE(latest.resolved, 0),
+    COALESCE(latest.deferred, 0),
+    COALESCE(latest.ready_after, 0)
+  FROM (VALUES (true)) AS sentinel(include_row)
+  LEFT JOIN LATERAL (
+    SELECT
+      runs.finished_at,
+      runs.attempted,
+      runs.resolved,
+      runs.deferred,
+      runs.ready_after
+    FROM public.conversation_resolution_runs AS runs
+    ORDER BY runs.finished_at DESC
+    LIMIT 1
+  ) AS latest ON sentinel.include_row;
+$$;
+
+ALTER FUNCTION "private"."community_archive_monitoring_conversation_resolution_worker"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "private"."community_archive_monitoring_conversation_reconciliation"()
+RETURNS TABLE (
+  "status" text,
+  "examined_count" bigint,
+  "queued_count" bigint,
+  "root_count" bigint,
+  "started_at" timestamp with time zone,
+  "updated_at" timestamp with time zone
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT
+    state.status,
+    state.examined_count,
+    state.queued_count,
+    state.root_count,
+    state.started_at,
+    state.updated_at
+  FROM public.conversation_resolution_reconciliation AS state
+  WHERE state.id;
+$$;
+
+ALTER FUNCTION "private"."community_archive_monitoring_conversation_reconciliation"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "private"."community_archive_monitoring_conversation_resolution_health"()
+  FROM PUBLIC, "anon", "authenticated";
+REVOKE ALL ON FUNCTION "private"."community_archive_monitoring_conversation_resolution_worker"()
+  FROM PUBLIC, "anon", "authenticated";
+REVOKE ALL ON FUNCTION "private"."community_archive_monitoring_conversation_reconciliation"()
+  FROM PUBLIC, "anon", "authenticated";
+GRANT EXECUTE ON FUNCTION "private"."community_archive_monitoring_conversation_resolution_health"()
+  TO "service_role";
+GRANT EXECUTE ON FUNCTION "private"."community_archive_monitoring_conversation_resolution_worker"()
+  TO "service_role";
+GRANT EXECUTE ON FUNCTION "private"."community_archive_monitoring_conversation_reconciliation"()
+  TO "service_role";
+
+
+COMMENT ON TABLE "public"."conversation_resolution_runs" IS
+  'Seven-day telemetry for the bounded incremental conversation resolver.';
+COMMENT ON TABLE "public"."conversation_resolution_reconciliation" IS
+  'Durable cursor and progress for an explicitly enabled bounded historical reconciliation.';
+COMMENT ON VIEW "public"."conversation_resolution_health" IS
+  'Live conversation coverage grouped by ingestion source and resolution status; refresh only through the daily monitoring snapshot.';
+COMMENT ON TABLE "public"."conversation_resolution_coverage_snapshots" IS
+  'Daily per-source coverage snapshot used by monitoring without repeatedly scanning the serving table.';
+COMMENT ON FUNCTION "private"."process_conversation_resolution_batch"(integer, timestamp with time zone) IS
+  'Resolves a bounded SKIP LOCKED batch of pending replies. Safe to rerun; does not perform historical discovery.';

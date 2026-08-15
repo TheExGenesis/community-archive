@@ -76,12 +76,12 @@ counts, export prefix), and `duration_ms`. This is the canonical
 via the direct `DATABASE_URL` connection (postgres role); nothing else
 should touch this table.
 
-## Tables the worker *exports from and then deletes*
+## Tables the worker exports before content removal
 
 These are public-schema tables. The worker dumps each one's rows
 (filtered to the target account) to JSON in the
-`admin-deleted-user-data/<prefix>/` bucket *before* the destructive
-delete, so there's always a recovery path.
+`admin-deleted-user-data/<prefix>/` bucket before content removal, so there is
+an operational recovery path in addition to later user-authorized hydration.
 
 Filter column noted below:
 
@@ -100,9 +100,10 @@ Filter column noted below:
 | `public.user_mentions` | JOIN `tweets` on `tweet_id` | `user_mentions.json` |
 
 After the exports land, the worker calls
-`public.delete_user_archive(account_id)` — a SECURITY DEFINER function
-with a 20-minute statement timeout that cascades through every
-per-account table in the right FK order.
+`public.tombstone_policy_account(account_id)` — a SECURITY DEFINER function
+with a 20-minute statement timeout. It removes profile, graph, media, URL,
+mention, archive, and interaction rows, while retaining content-free account
+and tweet placeholders at the original primary keys.
 
 **`public.optin` is deliberately NOT exported or deleted.** The Vercel
 action sets `explicit_optout=true` on the optin row *before* enqueuing
@@ -114,7 +115,7 @@ later.
 
 | Bucket | Direction | Notes |
 | ------ | --------- | ----- |
-| `archives` | **read + delete** | Source of the user's uploaded archive zip(s). Worker copies every object under `archives/<username>/` into the export bucket (step 2), then deletes the source folder at the very end (step 7) once `delete_user_archive` succeeds. |
+| `archives` | **read + delete** | Source of the user's uploaded archive zip(s). Worker copies every object under `archives/<username>/` into the export bucket, then deletes the source folder after `tombstone_policy_account` succeeds. |
 | `admin-deleted-user-data` | **write** | The forensic dump. One subfolder per job, named `<enqueued_at>-<account_id>/`. Contains the copied archive files under `archives/`, the 11 per-table JSON dumps, and `manifest.json` (written last so its presence means "everything before completed"). Private bucket, service-role only. |
 
 ## Tables Vercel still touches (not the worker)
@@ -134,6 +135,6 @@ For completeness, since these are part of the admin opt-out path:
 - For the architecture / contract description (what the worker MUST do
   and why), see [`docs/admin-delete-worker.md`](../../docs/admin-delete-worker.md).
 - The job lifecycle (QUEUED → PROCESSING → DONE | FAILED) is implemented
-  in [`src/index.ts`](src/index.ts); the export+delete pipeline in
+  in [`src/index.ts`](src/index.ts); the export+tombstone pipeline in
   [`src/exporter.ts`](src/exporter.ts); the worker_runs writes in
   [`src/runRecorder.ts`](src/runRecorder.ts).

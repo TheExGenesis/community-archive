@@ -1,10 +1,8 @@
 # Admin delete-with-export Hetzner worker
 
-The "Opt out and delete data" action runs **inline from Vercel** today.
-That works for small accounts but times out around the 100k-tweet mark
-even with the parallelized export. For genuinely large accounts the
-right home for the work is a long-running process on the
-community-archive Hetzner machine.
+The "Opt out and delete data" action queues a long-running export and
+content-removal job on the community-archive Hetzner machine. Stable account
+and tweet IDs are retained as reversible policy tombstones.
 
 This doc is the architectural plan + observability story for that worker.
 
@@ -39,8 +37,9 @@ for the rationale: the existing `job_queue` is consumed by `pg_cron`'s
    arrays.
 4. **Write `manifest.json`** with metadata + row counts + phase
    timings.
-5. **Call `public.delete_user_archive(account_id)`** over the
-   service-role connection.
+5. **Call `public.tombstone_policy_account(account_id)`** over the
+   service-role connection. This removes authored content and dependent rows
+   but preserves the account/tweet primary keys.
 6. **Delete the original `archives/{username}/` files** from storage
    (the DB function doesn't touch storage).
 7. **Mark `DONE`** with completion timestamp in `args`.
@@ -68,7 +67,7 @@ even if the worker fails.
 │ - polls every N seconds (or LISTEN/NOTIFY)
 │ - processes one job at a time (concurrency = 1)
 │ - claims atomically
-│ - runs export + delete
+│ - runs export + reversible tombstones
 │ - emits logs to stdout + writes per-job log file
 │   to admin-deleted-user-data/<prefix>/worker.log
 └─────────────────────────────────────────────────┘
@@ -84,9 +83,9 @@ later.
 
 ### Why concurrency = 1
 
-The destructive operations are heavy on the DB (cascading deletes
-touch every per-account table + indexes). One job at a time keeps the
-DB load predictable and means we never delete two accounts in
+The cleanup operations are heavy on the DB (dependent-row deletes and
+tombstone updates touch every per-account table + indexes). One job at a time
+keeps the DB load predictable and means we never process two accounts in
 parallel — easier reasoning about failure modes. Throughput limit:
 maybe one large delete per minute. That's fine: admin clicks are
 rare.
@@ -286,7 +285,7 @@ audit). 15 min is comfortably longer than any sane single job.
 
 ## Error handling and idempotency
 
-The export → delete flow is *not* a single atomic transaction. If
+The export → tombstone flow is *not* a single atomic transaction. If
 the worker crashes mid-way the next run needs to pick up where it
 left off OR safely redo work. Idempotency rules:
 
@@ -295,8 +294,8 @@ left off OR safely redo work. Idempotency rules:
   exist in the export prefix. So a crashed export can be re-run
   against the same prefix without duplicating storage cost.
 - **NDJSON dumps**: re-running overwrites; that's fine.
-- **`delete_user_archive`**: idempotent — re-calling against an
-  already-deleted account is a no-op (zero rows match).
+- **`tombstone_policy_account`**: idempotent — re-calling it keeps the same
+  minimal rows and removes no additional stable IDs.
 - **Storage delete**: `storage.remove` on a non-existent file
   returns success.
 

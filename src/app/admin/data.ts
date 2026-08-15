@@ -306,6 +306,7 @@ async function fetchArchivedTweetCounts(
           .from('tweets')
           .select('tweet_id', { count: 'exact', head: true })
           .eq('account_id', id)
+          .eq('is_tombstone', false)
         return { id, count: error ? 0 : (count ?? 0) }
       }),
     )

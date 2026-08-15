@@ -68,7 +68,7 @@ CREATE POLICY "Data is modifiable by their users" ON "public"."likes" TO "authen
 CREATE POLICY "Data is modifiable by their users" ON "public"."tweets" TO "authenticated" USING (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))) WITH CHECK (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")));
 
 -- Public read policies
-CREATE POLICY "Data is publicly visible" ON "public"."all_account" FOR SELECT USING (true);
+CREATE POLICY "Data is publicly visible" ON "public"."all_account" FOR SELECT USING (("is_tombstone" IS NOT TRUE));
 CREATE POLICY "Data is publicly visible" ON "public"."all_profile" FOR SELECT USING (true);
 CREATE POLICY "Data is publicly visible" ON "public"."archive_upload" FOR SELECT USING (true);
 CREATE POLICY "Data is publicly visible" ON "public"."followers" FOR SELECT USING (true);
@@ -115,7 +115,7 @@ CREATE POLICY "Users can update own opt-in status" ON "public"."optin" FOR UPDAT
 CREATE POLICY "Users can view own opt-in status" ON "public"."optin" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 -- Tweets public read policy
-CREATE POLICY "anyone can read tweets" ON "public"."tweets" FOR SELECT USING (true);
+CREATE POLICY "anyone can read tweets" ON "public"."tweets" FOR SELECT USING (("is_tombstone" IS NOT TRUE));
 
 -- TES schema policy
 CREATE POLICY "Allow select for all" ON "tes"."blocked_scraping_users" FOR SELECT USING (true);
@@ -125,6 +125,9 @@ ALTER TABLE "public"."all_account" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."all_profile" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."archive_upload" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."conversations" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."conversation_resolution_runs" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."conversation_resolution_reconciliation" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."conversation_resolution_coverage_snapshots" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."followers" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."following" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."liked_tweets" ENABLE ROW LEVEL SECURITY;

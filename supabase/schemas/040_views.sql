@@ -30,6 +30,22 @@ CREATE OR REPLACE VIEW "public"."enriched_tweets" AS
          LIMIT 1) "p" ON (true));
 ALTER TABLE "public"."enriched_tweets" OWNER TO "postgres";
 
+-- public.conversation_resolution_health
+CREATE OR REPLACE VIEW "public"."conversation_resolution_health"
+WITH (security_invoker = true) AS
+ SELECT "conversations"."producer_source",
+    "conversations"."resolution_status",
+    count(*)::bigint AS "row_count",
+    max("conversations"."first_observed_at") AS "latest_observed_at",
+    max("conversations"."resolved_at") AS "latest_resolved_at",
+    min("conversations"."next_attempt_at") FILTER (
+      WHERE ("conversations"."resolution_status" = 'pending')
+    ) AS "oldest_ready_at",
+    max("conversations"."attempt_count") AS "max_attempt_count"
+   FROM "public"."conversations"
+  GROUP BY "conversations"."producer_source", "conversations"."resolution_status";
+ALTER TABLE "public"."conversation_resolution_health" OWNER TO "postgres";
+
 -- public.global_monthly_tweet_counts
 CREATE OR REPLACE VIEW "public"."global_monthly_tweet_counts" AS
  SELECT "monthly_tweet_counts_mv"."month",

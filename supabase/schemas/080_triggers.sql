@@ -27,6 +27,10 @@ CREATE OR REPLACE TRIGGER "update_tweet_link_previews_updated_at" BEFORE UPDATE 
 
 CREATE OR REPLACE TRIGGER "update_tweets_updated_at" BEFORE UPDATE ON "public"."tweets" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
+CREATE OR REPLACE TRIGGER "queue_incremental_conversation"
+  AFTER INSERT OR UPDATE OF "reply_to_tweet_id" ON "public"."tweets"
+  FOR EACH ROW EXECUTE FUNCTION "private"."queue_incremental_conversation"();
+
 CREATE OR REPLACE TRIGGER "update_user_mentions_updated_at" BEFORE UPDATE ON "public"."user_mentions" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 CREATE OR REPLACE TRIGGER "update_tes_blocked_scraping_timestamp" BEFORE UPDATE ON "tes"."blocked_scraping_users" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();

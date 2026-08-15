@@ -44,13 +44,6 @@ export const FEATURED_ARCHIVE_GROUPS = [
         'https://pbs.twimg.com/profile_images/1638646637710147584/odiqsmwE_normal.jpg',
       num_tweets: 48_973,
     },
-    {
-      account_id: '713094195955830785',
-      username: 'm1guelpf',
-      avatar_media_url:
-        'https://pbs.twimg.com/profile_images/1905044735112486912/-P-N0qfO_normal.jpg',
-      num_tweets: 70_816,
-    },
   ],
   [
     {
@@ -96,6 +89,13 @@ export const FEATURED_ARCHIVE_GROUPS = [
       avatar_media_url:
         'https://pbs.twimg.com/profile_images/1597473359926767621/O6K5gtN2_normal.jpg',
       num_tweets: 56_449,
+    },
+    {
+      account_id: '820288038',
+      username: 'RomeoStevens76',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/1378277804526067724/FDI5ymb6_normal.jpg',
+      num_tweets: 17_085,
     },
   ],
   [
@@ -143,15 +143,15 @@ export const FEATURED_ARCHIVE_GROUPS = [
         'https://pbs.twimg.com/profile_images/1327975905780670464/gbBmU0Gf_normal.jpg',
       num_tweets: 31_062,
     },
+    {
+      account_id: '2181422070',
+      username: 'Ben_Reinhardt',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/1894499823883063297/KEsTmz1z_400x400.jpg',
+      num_tweets: 16_098,
+    },
   ],
   [
-    {
-      account_id: '1223231444429856769',
-      username: 'the_wilderless',
-      avatar_media_url:
-        'https://pbs.twimg.com/profile_images/1991884556618862592/iB2nqI0__normal.jpg',
-      num_tweets: 61_929,
-    },
     {
       account_id: '1584642529',
       username: 'eigenrobot',
@@ -165,6 +165,27 @@ export const FEATURED_ARCHIVE_GROUPS = [
       avatar_media_url:
         'https://pbs.twimg.com/profile_images/92444681/n300283_31649789_8973_2_normal.jpg',
       num_tweets: 65_712,
+    },
+    {
+      account_id: '37547071',
+      username: 'TheZvi',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/2873511010/24e99a900de1fc5a22336b80aef68a59_normal.png',
+      num_tweets: 19_480,
+    },
+    {
+      account_id: '1139858422302748672',
+      username: 'gleech',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/1513339291883212803/9m6waiws_normal.jpg',
+      num_tweets: 14_107,
+    },
+    {
+      account_id: '281798056',
+      username: 'voooooogel',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/1876662518631829504/USrP45mT_normal.jpg',
+      num_tweets: 27_309,
     },
   ],
   [
@@ -188,6 +209,13 @@ export const FEATURED_ARCHIVE_GROUPS = [
       avatar_media_url:
         'https://pbs.twimg.com/profile_images/2076980377348956160/bVaPFuk3_normal.jpg',
       num_tweets: 8_276,
+    },
+    {
+      account_id: '1160994871',
+      username: 'NathanpmYoung',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/2084735528138915840/PYo9UnPg_normal.jpg',
+      num_tweets: 113_553,
     },
   ],
 ] as const satisfies ReadonlyArray<ReadonlyArray<AvatarType>>

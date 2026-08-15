@@ -23,6 +23,7 @@ import {
 import { PortalMedia, PortalQuotedTweet, PortalTweet } from '@/lib/portal/types'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { TweetLinkPreviews } from '@/components/TweetLinkPreviews'
+import { AddToProfileButton } from './AddToProfileButton'
 
 const HUES = [262, 32, 145, 4, 155, 200, 217, 88, 240, 190, 340, 45, 280, 20]
 const FEATURED_CARD_HOVER =
@@ -519,6 +520,12 @@ export function TweetRow({
             </CountMetric>
           ) : null}
           {showArchivedBadge && <span className="text-brand">archived</span>}
+          {origin !== 'profile' && (
+            <AddToProfileButton
+              tweetId={tweet.id}
+              accountId={tweet.accountId}
+            />
+          )}
           {showExternalLink && (
             <a
               href={`https://x.com/${encodeURIComponent(tweet.username)}/status/${encodeURIComponent(tweet.id)}`}

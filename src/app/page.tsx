@@ -1,4 +1,8 @@
+import { Suspense } from 'react'
 import ClassicHomepage from '@/components/home/ClassicHomepage'
+import HomepagePeople, {
+  HomepagePeopleFallback,
+} from '@/components/home/HomepagePeople'
 import { hasPendingOptInAction } from '@/lib/homepageAccess'
 import { getIsMember } from '@/lib/portal/auth'
 import { getPortalData } from '@/lib/portal/data'
@@ -26,6 +30,11 @@ export default async function Homepage({ searchParams }: HomepageProps = {}) {
       data={data}
       isMember={isMember}
       showCta={!isMember || hasPendingOptInAction(searchParams?.action)}
+      homepagePeople={
+        <Suspense fallback={<HomepagePeopleFallback />}>
+          <HomepagePeople isMember={isMember} />
+        </Suspense>
+      }
     />
   )
 }

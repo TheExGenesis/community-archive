@@ -140,6 +140,7 @@ export const getPrimaryNav = (isMember: boolean, isAdmin = false): NavItem[] =>
   isMember || isAdmin
     ? [
         { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
+        { href: '/digest', label: 'Digest' },
         { href: '/user-dir', label: 'Users' },
         { href: '/trends', label: 'Trends' },
         { href: '/stream', label: 'Live stream' },

@@ -33,6 +33,7 @@ import type {
 } from '@/lib/portal/types'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { BODY, CARD, MUTED, SERIF } from './styles'
+import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 
 type FeedFilter = 'include' | 'off'
 
@@ -863,6 +864,8 @@ export default function TrendsExplorer({
             Full corpus · {initialTrends.years[0]}–{initialTrends.years.at(-1)}
           </div>
         </div>
+
+        <ExtensionInstallPrompt surface="trends" className="mb-5" />
 
         <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
           <section className="min-w-0">

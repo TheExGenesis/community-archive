@@ -11,6 +11,7 @@ import { getTopFollowedAccounts } from '@/lib/clickhouseAnalytics'
 import type { PortalData } from '@/lib/portal/types'
 import { createServerClient } from '@/utils/supabase'
 import { getLatestDigestPreview } from '@/lib/digest/data'
+import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 
 const DynamicHeroCTAButtons = dynamic(
   () => import('@/components/HeroCTAButtons'),
@@ -194,6 +195,10 @@ export default async function ClassicHomepage({
       >
         <div className="relative z-10 mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8">
           <DynamicUploadArchiveSection />
+          <ExtensionInstallPrompt
+            surface="home"
+            className="mx-auto mt-8 max-w-3xl"
+          />
         </div>
       </section>
 

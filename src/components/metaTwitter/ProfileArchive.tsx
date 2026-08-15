@@ -41,6 +41,11 @@ interface FeedState {
   available: boolean
 }
 
+interface DismissedItem {
+  itemId: string
+  section: ProfileCurationSection
+}
+
 const scopeKey = (year: number | null) => year?.toString() ?? 'overall'
 const feedKey = (year: number | null, sort: ProfileBangerSort) =>
   `${scopeKey(year)}:${sort}`
@@ -124,6 +129,7 @@ export function ProfileArchive({
   )
   const { editing, editSaving, setEditing, setEditSaving } = useProfileEditing()
   const [editError, setEditError] = useState<string | null>(null)
+  const [dismissedItem, setDismissedItem] = useState<DismissedItem | null>(null)
   const feedsRef = useRef(feeds)
   const mediaRef = useRef(mediaByScope)
   const peopleRef = useRef(peopleByScope)
@@ -132,6 +138,12 @@ export function ProfileArchive({
   const peopleRequests = useRef(new Map<string, Promise<void>>())
   const automaticallyFilledFeeds = useRef(new Set<string>())
   const loadMoreRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!dismissedItem) return
+    const timeout = window.setTimeout(() => setDismissedItem(null), 10_000)
+    return () => window.clearTimeout(timeout)
+  }, [dismissedItem])
 
   const updateFeeds = useCallback(
     (
@@ -489,6 +501,8 @@ export function ProfileArchive({
       })
       if (!result) return
 
+      setDismissedItem({ section, itemId })
+
       if (section === 'bangers') {
         const prefix = `${activeScopeKey}:`
         updateFeeds((current) =>
@@ -521,6 +535,52 @@ export function ProfileArchive({
     },
     [accountId, activeScopeKey, runEditMutation, updateFeeds, updatePeople],
   )
+
+  const undoDismissItem = useCallback(async () => {
+    if (!dismissedItem) return
+    setDismissedItem(null)
+    const result = await runEditMutation({
+      action: 'restore-item',
+      accountId,
+      section: dismissedItem.section,
+      itemId: dismissedItem.itemId,
+    })
+    if (!result) {
+      setDismissedItem(dismissedItem)
+      return
+    }
+
+    if (dismissedItem.section === 'bangers') {
+      const prefix = `${activeScopeKey}:`
+      const nextFeeds = Object.fromEntries(
+        Object.entries(feedsRef.current).filter(
+          ([key]) => !key.startsWith(prefix),
+        ),
+      )
+      feedsRef.current = nextFeeds
+      setFeeds(nextFeeds)
+      automaticallyFilledFeeds.current.delete(activeKey)
+      await loadFeedPage(activeYear, sort, 0, PROFILE_BANGERS_PRELOAD_LIMIT)
+      return
+    }
+
+    const nextPeople = { ...peopleRef.current }
+    delete nextPeople[activeScopeKey]
+    peopleRef.current = nextPeople
+    setPeopleByScope(nextPeople)
+    peopleRequests.current.delete(activeScopeKey)
+    await loadPeople(activeYear)
+  }, [
+    accountId,
+    activeKey,
+    activeScopeKey,
+    activeYear,
+    dismissedItem,
+    loadFeedPage,
+    loadPeople,
+    runEditMutation,
+    sort,
+  ])
 
   const toggleFeature = useCallback(
     async (section: ProfileCurationSection, itemId: string) => {
@@ -759,6 +819,8 @@ export function ProfileArchive({
         editing={editing && activeYear === null}
         editSaving={editSaving}
         editError={editError}
+        undoDismissAvailable={dismissedItem !== null}
+        onUndoDismiss={() => void undoDismissItem()}
         onDismiss={(section, itemId) => void dismissItem(section, itemId)}
         onToggleFeature={(section, itemId) =>
           void toggleFeature(section, itemId)

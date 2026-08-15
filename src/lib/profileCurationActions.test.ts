@@ -68,6 +68,30 @@ describe('owner profile server actions', () => {
     expect(mockRevalidatePath).toHaveBeenCalledWith('/user/42')
   })
 
+  test('restores only the requested hidden profile item', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { app_metadata: { provider_id: '42' } } },
+      error: null,
+    })
+
+    await mutateProfileCuration({
+      action: 'restore-item',
+      accountId: '42',
+      section: 'bangers',
+      itemId: '100',
+    })
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      {
+        account_id: '42',
+        section: 'bangers',
+        item_id: '100',
+        is_hidden: false,
+      },
+      { onConflict: 'account_id,section,item_id' },
+    )
+  })
+
   test('keeps Download Archive visible unless the owner turns it off', async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { app_metadata: { provider_id: '42' } } },

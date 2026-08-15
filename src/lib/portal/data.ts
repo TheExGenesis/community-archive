@@ -681,6 +681,44 @@ export function selectDailyBangers(
   return [selected, ...candidates.filter((_, index) => index !== selectedIndex)]
 }
 
+/**
+ * Put one deterministic daily choice first, selected from the strongest
+ * bangers in the rolling 24-hour window.
+ */
+export function selectDailyRecentBangers(
+  tweets: PortalTweet[],
+  now = new Date(),
+  poolSize = 10,
+): PortalTweet[] {
+  const windowEnd = now.getTime()
+  const windowStart = windowEnd - 24 * 60 * 60 * 1_000
+  const candidates = tweets
+    .filter((tweet) => {
+      const createdAt = new Date(tweet.createdAt)
+      const createdAtTime = createdAt.getTime()
+      return (
+        !Number.isNaN(createdAtTime) &&
+        createdAtTime >= windowStart &&
+        createdAtTime <= windowEnd
+      )
+    })
+    .sort((left, right) => {
+      return (
+        (right.quoteCount ?? 0) - (left.quoteCount ?? 0) ||
+        right.likes - left.likes ||
+        Date.parse(right.createdAt) - Date.parse(left.createdAt) ||
+        right.id.localeCompare(left.id)
+      )
+    })
+    .slice(0, Math.max(1, poolSize))
+
+  if (candidates.length < 2) return candidates
+  const day = now.toISOString().slice(0, 10)
+  const selectedIndex = stableHash(day) % candidates.length
+  const selected = candidates[selectedIndex]
+  return [selected, ...candidates.filter((_, index) => index !== selectedIndex)]
+}
+
 async function fetchCorpusRange(): Promise<PortalCorpusRange> {
   const [firstResult, latestResult] = await Promise.all([
     portalRestRows<{ created_at: string }>(
@@ -771,9 +809,11 @@ const getCachedHistoricalBangers = unstable_cache(
   { revalidate: 86_400 },
 )
 const getCachedRecentBangers = unstable_cache(
-  async (_sourceKey: string) =>
-    enrichPortalTweets(await fetchPortalRecentBangers(50, 168)),
-  ['portal-recent-bangers-v3'],
+  async (_sourceKey: string, _day: string) =>
+    enrichPortalTweets(
+      selectDailyRecentBangers(await fetchPortalRecentBangers(50, 24)),
+    ),
+  ['portal-recent-bangers-v5'],
   { revalidate: 1_800 },
 )
 
@@ -1116,7 +1156,7 @@ export async function getPortalData(
     view === 'home'
       ? loadPortalComponentData(
           'recent-bangers',
-          () => getCachedRecentBangers(sourceKey),
+          () => getCachedRecentBangers(sourceKey, today),
           [],
         )
       : Promise.resolve({ data: [], failed: false }),

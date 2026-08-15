@@ -27,6 +27,7 @@ import {
   portalDataSourceKey,
   resolvePortalReadConfig,
   selectDailyBangers,
+  selectDailyRecentBangers,
 } from './data'
 import {
   fetchPortalBangersPage,
@@ -248,10 +249,10 @@ describe('portal page resilience', () => {
     })
   })
 
-  test('loads the homepage Banger of the moment from a rolling week', async () => {
+  test('loads the homepage Banger of the moment from the past 24 hours', async () => {
     await getPortalData()
 
-    expect(fetchPortalRecentBangersMock).toHaveBeenCalledWith(50, 168)
+    expect(fetchPortalRecentBangersMock).toHaveBeenCalledWith(50, 24)
   })
 
   test('does not load trend analysis for the live stream page', async () => {
@@ -808,5 +809,27 @@ describe('daily banger selection', () => {
       new Set(Array.from({ length: 10 }, (_, index) => String(index))),
     )
     expect(selected.some(({ id }) => id === 'current')).toBe(false)
+  })
+
+  test('chooses deterministically from the past 24 hours', () => {
+    const now = new Date('2026-08-14T12:00:00.000Z')
+    const candidates = [
+      tweet('today-1', '2026-08-14T10:00:00.000Z', 100),
+      tweet('today-2', '2026-08-14T11:00:00.000Z', 90),
+      tweet('overnight', '2026-08-13T12:30:00.000Z', 80),
+      tweet('too-old', '2026-08-13T11:59:00.000Z', 1_000_000),
+      tweet('future', '2026-08-14T12:01:00.000Z', 1_000_000),
+    ]
+
+    const selected = selectDailyRecentBangers(candidates, now)
+    const selectedAgain = selectDailyRecentBangers(candidates, now)
+
+    expect(selected).toHaveLength(3)
+    expect(selectedAgain[0].id).toBe(selected[0].id)
+    expect(selected.map(({ id }) => id)).toEqual(
+      expect.arrayContaining(['today-1', 'today-2', 'overnight']),
+    )
+    expect(selected.some(({ id }) => id === 'too-old')).toBe(false)
+    expect(selected.some(({ id }) => id === 'future')).toBe(false)
   })
 })

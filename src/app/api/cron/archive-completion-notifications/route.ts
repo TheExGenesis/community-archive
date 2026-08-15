@@ -83,9 +83,36 @@ export async function GET(request: NextRequest) {
   )
 
   const failed = results.filter((result) => result.status === 'rejected').length
+  const sent = notifications.length - failed
+  const { error: runStateError } = await supabase.rpc(
+    'finish_archive_completion_notification_run',
+    {
+      p_claimed: notifications.length,
+      p_sent: sent,
+      p_failed: failed,
+      p_error: failed > 0 ? `${failed} deliveries failed` : undefined,
+    },
+  )
+
+  if (runStateError) {
+    console.error(
+      'Failed to record notification worker heartbeat',
+      runStateError,
+    )
+    return NextResponse.json(
+      {
+        claimed: notifications.length,
+        sent,
+        failed,
+        error: 'Heartbeat failed',
+      },
+      { status: 500 },
+    )
+  }
+
   return NextResponse.json({
     claimed: notifications.length,
-    sent: notifications.length - failed,
+    sent,
     failed,
   })
 }

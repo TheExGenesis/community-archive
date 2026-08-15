@@ -285,6 +285,18 @@ CREATE TABLE IF NOT EXISTS "public"."archive_completion_notification_outbox" (
 );
 ALTER TABLE "public"."archive_completion_notification_outbox" OWNER TO "postgres";
 
+CREATE TABLE IF NOT EXISTS "public"."archive_completion_notification_worker_state" (
+    "singleton" boolean PRIMARY KEY DEFAULT true CHECK ("singleton" IS TRUE),
+    "last_started_at" timestamptz,
+    "last_finished_at" timestamptz,
+    "last_claimed" integer NOT NULL DEFAULT 0 CHECK ("last_claimed" >= 0),
+    "last_sent" integer NOT NULL DEFAULT 0 CHECK ("last_sent" >= 0),
+    "last_failed" integer NOT NULL DEFAULT 0 CHECK ("last_failed" >= 0),
+    "last_error" text,
+    "updated_at" timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE "public"."archive_completion_notification_worker_state" OWNER TO "postgres";
+
 -- Daily Digest editorial state. Analytical candidates come from ClickHouse,
 -- while PostgreSQL owns prompt/run history and publication status.
 CREATE TABLE IF NOT EXISTS "public"."digest_prompt_versions" (

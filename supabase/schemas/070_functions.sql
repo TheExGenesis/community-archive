@@ -3051,6 +3051,12 @@ BEGIN
     RAISE EXCEPTION 'p_limit must be between 1 and 100' USING ERRCODE = '22023';
   END IF;
 
+  INSERT INTO public.archive_completion_notification_worker_state (
+    singleton, last_started_at, updated_at
+  ) VALUES (true, now(), now())
+  ON CONFLICT (singleton) DO UPDATE
+  SET last_started_at = now(), updated_at = now();
+
   UPDATE public.archive_completion_notification_outbox AS stale
   SET status = 'retry', available_at = now(), locked_at = NULL,
       updated_at = now(),
@@ -3078,6 +3084,32 @@ BEGIN
 END;
 $$;
 ALTER FUNCTION public.claim_archive_completion_notifications(integer) OWNER TO postgres;
+
+CREATE OR REPLACE FUNCTION public.finish_archive_completion_notification_run(
+  p_claimed integer,
+  p_sent integer,
+  p_failed integer,
+  p_error text DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
+AS $$
+BEGIN
+  IF p_claimed < 0 OR p_sent < 0 OR p_failed < 0 OR p_sent + p_failed > p_claimed THEN
+    RAISE EXCEPTION 'Invalid notification run counts' USING ERRCODE = '22023';
+  END IF;
+
+  UPDATE public.archive_completion_notification_worker_state
+  SET last_finished_at = now(),
+      last_claimed = p_claimed,
+      last_sent = p_sent,
+      last_failed = p_failed,
+      last_error = LEFT(NULLIF(BTRIM(p_error), ''), 2000),
+      updated_at = now()
+  WHERE singleton IS TRUE;
+END;
+$$;
+ALTER FUNCTION public.finish_archive_completion_notification_run(integer, integer, integer, text) OWNER TO postgres;
 
 CREATE OR REPLACE FUNCTION public.finish_archive_completion_notification(
   p_id bigint,
@@ -3119,17 +3151,36 @@ RETURNS TABLE(
   processing_count bigint,
   dead_24h_count bigint,
   oldest_ready_seconds double precision,
-  seconds_since_last_sent double precision
+  seconds_since_last_sent double precision,
+  worker_last_started_timestamp_seconds double precision,
+  worker_last_finished_timestamp_seconds double precision,
+  worker_last_claimed integer,
+  worker_last_sent integer,
+  worker_last_failed integer
 )
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
 AS $$
   SELECT
-    COUNT(*) FILTER (WHERE status IN ('queued', 'retry') AND available_at <= now()),
-    COUNT(*) FILTER (WHERE status = 'processing'),
-    COUNT(*) FILTER (WHERE status = 'dead' AND updated_at >= now() - interval '24 hours'),
-    EXTRACT(EPOCH FROM now() - MIN(created_at) FILTER (WHERE status IN ('queued', 'retry'))),
-    EXTRACT(EPOCH FROM now() - MAX(sent_at) FILTER (WHERE status = 'sent'))
-  FROM public.archive_completion_notification_outbox;
+    (SELECT COUNT(*) FROM public.archive_completion_notification_outbox
+      WHERE status IN ('queued', 'retry') AND available_at <= now()),
+    (SELECT COUNT(*) FROM public.archive_completion_notification_outbox
+      WHERE status = 'processing'),
+    (SELECT COUNT(*) FROM public.archive_completion_notification_outbox
+      WHERE status = 'dead' AND updated_at >= now() - interval '24 hours'),
+    (SELECT EXTRACT(EPOCH FROM now() - MIN(created_at))
+      FROM public.archive_completion_notification_outbox
+      WHERE status IN ('queued', 'retry')),
+    (SELECT EXTRACT(EPOCH FROM now() - MAX(sent_at))
+      FROM public.archive_completion_notification_outbox
+      WHERE status = 'sent'),
+    EXTRACT(EPOCH FROM worker.last_started_at),
+    EXTRACT(EPOCH FROM worker.last_finished_at),
+    COALESCE(worker.last_claimed, 0),
+    COALESCE(worker.last_sent, 0),
+    COALESCE(worker.last_failed, 0)
+  FROM (SELECT true AS singleton) AS seed
+  LEFT JOIN public.archive_completion_notification_worker_state AS worker
+    ON worker.singleton = seed.singleton;
 $$;
 ALTER FUNCTION public.community_archive_monitoring_completion_notifications() OWNER TO postgres;
 
@@ -3137,17 +3188,19 @@ REVOKE EXECUTE ON FUNCTION public.set_archive_completion_notification(boolean) F
 REVOKE EXECUTE ON FUNCTION private.queue_archive_completion_notification() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE EXECUTE ON FUNCTION public.claim_archive_completion_notifications(integer) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.finish_archive_completion_notification(bigint, text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.finish_archive_completion_notification_run(integer, integer, integer, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.community_archive_monitoring_completion_notifications() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.set_archive_completion_notification(boolean) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_archive_completion_notifications(integer) TO service_role;
 GRANT EXECUTE ON FUNCTION public.finish_archive_completion_notification(bigint, text, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.finish_archive_completion_notification_run(integer, integer, integer, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.community_archive_monitoring_completion_notifications() TO service_role;
 
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'community_archive_metrics') THEN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'archive_metrics_exporter') THEN
     GRANT EXECUTE ON FUNCTION public.community_archive_monitoring_completion_notifications()
-      TO community_archive_metrics;
+      TO archive_metrics_exporter;
   END IF;
 END
 $$;

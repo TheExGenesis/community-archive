@@ -192,6 +192,7 @@ ALTER TABLE "public"."user_action_log" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE "public"."archive_completion_notification_preferences" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."archive_completion_notification_outbox" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."archive_completion_notification_worker_state" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Owners can read archive completion notification preference"
   ON "public"."archive_completion_notification_preferences"

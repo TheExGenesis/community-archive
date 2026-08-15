@@ -355,6 +355,39 @@ export type Database = {
         }
         Relationships: []
       }
+      archive_completion_notification_worker_state: {
+        Row: {
+          last_claimed: number
+          last_error: string | null
+          last_failed: number
+          last_finished_at: string | null
+          last_sent: number
+          last_started_at: string | null
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          last_claimed?: number
+          last_error?: string | null
+          last_failed?: number
+          last_finished_at?: string | null
+          last_sent?: number
+          last_started_at?: string | null
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          last_claimed?: number
+          last_error?: string | null
+          last_failed?: number
+          last_finished_at?: string | null
+          last_sent?: number
+          last_started_at?: string | null
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       archive_upload: {
         Row: {
           account_id: string
@@ -1728,6 +1761,11 @@ export type Database = {
           dead_24h_count: number
           oldest_ready_seconds: number
           seconds_since_last_sent: number
+          worker_last_started_timestamp_seconds: number
+          worker_last_finished_timestamp_seconds: number
+          worker_last_claimed: number
+          worker_last_sent: number
+          worker_last_failed: number
         }[]
       }
       compute_hourly_scraping_stats: {
@@ -1805,6 +1843,15 @@ export type Database = {
         Args: {
           p_id: number
           p_provider_message_id?: string
+          p_error?: string
+        }
+        Returns: undefined
+      }
+      finish_archive_completion_notification_run: {
+        Args: {
+          p_claimed: number
+          p_sent: number
+          p_failed: number
           p_error?: string
         }
         Returns: undefined
@@ -2578,4 +2625,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-

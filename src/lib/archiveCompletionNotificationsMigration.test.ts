@@ -40,4 +40,15 @@ describe('archive completion notification migration contract', () => {
     )
     expect(migration).toContain('LEFT(p_error, 2000)')
   })
+
+  it('records a scheduler heartbeat even when there is no mail to send', () => {
+    expect(migration).toContain(
+      'INSERT INTO public.archive_completion_notification_worker_state',
+    )
+    expect(migration).toContain(
+      'public.finish_archive_completion_notification_run',
+    )
+    expect(migration).toContain('worker_last_finished_timestamp_seconds')
+    expect(migration).toContain('TO archive_metrics_exporter')
+  })
 })

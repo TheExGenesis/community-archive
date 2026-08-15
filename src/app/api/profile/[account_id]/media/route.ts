@@ -31,10 +31,30 @@ export async function GET(
       )
     }
   }
+  const limitValue = request.nextUrl.searchParams.get('limit')
+  const offsetValue = request.nextUrl.searchParams.get('offset')
+  const limit = limitValue === null ? 6 : Number(limitValue)
+  const offset = offsetValue === null ? 0 : Number(offsetValue)
+  if (
+    !Number.isInteger(limit) ||
+    limit < 1 ||
+    limit > 50 ||
+    !Number.isInteger(offset) ||
+    offset < 0 ||
+    offset > 5_000
+  ) {
+    return NextResponse.json(
+      { error: 'Invalid profile media pagination' },
+      { status: 400, headers: { 'Cache-Control': 'private, no-store' } },
+    )
+  }
 
   try {
     return NextResponse.json(
-      await getClickHouseProfileMediaOrThrow(params.account_id, year),
+      await getClickHouseProfileMediaOrThrow(params.account_id, year, {
+        limit,
+        offset,
+      }),
       {
         headers: {
           'Cache-Control':

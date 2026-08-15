@@ -117,13 +117,14 @@ test('serves independently cached profile media and interactions', async () => {
   getClickHouseProfileMediaOrThrowMock.mockResolvedValue({
     media: [],
     mediaCount: 0,
+    nextOffset: null,
   })
   getClickHouseProfileInteractionsOrThrowMock.mockResolvedValue({ people: [] })
 
   const [media, interactions] = await Promise.all([
     getMedia(
       new NextRequest(
-        'https://community-archive.org/api/profile/42/media?year=2024',
+        'https://community-archive.org/api/profile/42/media?year=2024&offset=24&limit=24',
       ),
       { params: { account_id: '42' } },
     ),
@@ -139,11 +140,30 @@ test('serves independently cached profile media and interactions', async () => {
   expect(interactions.status).toBe(200)
   expect(media.headers.get('cache-control')).toContain('s-maxage=86400')
   expect(interactions.headers.get('cache-control')).toBe('private, no-store')
-  expect(getClickHouseProfileMediaOrThrowMock).toHaveBeenCalledWith('42', 2024)
+  expect(getClickHouseProfileMediaOrThrowMock).toHaveBeenCalledWith(
+    '42',
+    2024,
+    {
+      limit: 24,
+      offset: 24,
+    },
+  )
   expect(getClickHouseProfileInteractionsOrThrowMock).toHaveBeenCalledWith(
     '42',
     2024,
   )
+})
+
+test('rejects invalid profile media pagination before calling ClickHouse', async () => {
+  const response = await getMedia(
+    new NextRequest(
+      'https://community-archive.org/api/profile/42/media?offset=-1&limit=100',
+    ),
+    { params: { account_id: '42' } },
+  )
+
+  expect(response.status).toBe(400)
+  expect(getClickHouseProfileMediaOrThrowMock).not.toHaveBeenCalled()
 })
 
 test('does not cache a transient profile sidebar failure as empty data', async () => {

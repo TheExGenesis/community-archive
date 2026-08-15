@@ -7,6 +7,7 @@ import TweetComponent from '@/components/TweetComponent'
 import { CopyButton } from '@/components/copy-button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
+import { addCosmeticLineBreaks } from '@/lib/profileTweetDisplay'
 
 type TabData = {
   [key: string]: {
@@ -114,7 +115,7 @@ const AccountTopTweetsClient: React.FC<Props> = ({
                     tweet_id: popularTweet.tweet_id,
                     account_id: '',
                     created_at: popularTweet.created_at,
-                    full_text: popularTweet.full_text,
+                    full_text: addCosmeticLineBreaks(popularTweet.full_text),
                     retweet_count: popularTweet.retweet_count,
                     favorite_count: popularTweet.favorite_count,
                     reply_to_tweet_id: null,

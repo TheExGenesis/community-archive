@@ -3,7 +3,10 @@ import {
   type DigestEdition,
   type DigestEditionContent,
 } from '@/lib/digest/types'
-import { saveDigestEditionAction } from './actions'
+import {
+  saveDigestEditionAction,
+  stageEditedDigestEditionAction,
+} from './actions'
 import { MarkdownField } from './MarkdownField'
 import { SubmitButton } from './SubmitButton'
 
@@ -166,5 +169,51 @@ export function DigestEditionEditor({
         </div>
       </form>
     </section>
+  )
+}
+
+export function DigestValidatedOutputEditor({
+  content,
+  runId,
+}: {
+  content: DigestEditionContent
+  runId: string
+}) {
+  return (
+    <form
+      action={stageEditedDigestEditionAction}
+      className="mt-5 space-y-7 rounded-lg border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900 dark:bg-blue-950/20"
+    >
+      <input type="hidden" name="run_id" value={runId} />
+      <div>
+        <div className="font-semibold">Edit the validated copy inline</div>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          Correct typos or wording below. The validated model run stays
+          unchanged.
+        </p>
+      </div>
+      <DigestContentFields content={content} />
+      <div className="flex flex-wrap items-center gap-3 border-t border-blue-200 pt-4 dark:border-blue-900">
+        <SubmitButton
+          pendingLabel="Saving new draft…"
+          variant="secondary"
+          name="intent"
+          value="draft"
+        >
+          Save as draft
+        </SubmitButton>
+        <SubmitButton
+          pendingLabel="Saving and publishing…"
+          name="intent"
+          value="publish"
+        >
+          Publish now
+        </SubmitButton>
+        <span className="text-xs text-muted-foreground">
+          Publish now saves these corrections as a new version and makes it
+          public.
+        </span>
+      </div>
+    </form>
   )
 }

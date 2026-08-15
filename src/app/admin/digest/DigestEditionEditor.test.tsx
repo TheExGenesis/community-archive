@@ -4,11 +4,26 @@ import React from 'react'
 import '@testing-library/jest-dom'
 import { render, screen } from '@testing-library/react'
 import { AUGUST_11_MOCK_DIGEST } from '@/lib/digest/mock'
-import { DigestContentFields, DigestEditionEditor } from './DigestEditionEditor'
+import {
+  DigestContentFields,
+  DigestEditionEditor,
+  DigestValidatedOutputEditor,
+} from './DigestEditionEditor'
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
+
+jest.mock('react-dom', () => ({
+  ...jest.requireActual('react-dom'),
+  useFormStatus: () => ({
+    action: null,
+    data: null,
+    method: null,
+    pending: false,
+  }),
+}))
 
 jest.mock('./actions', () => ({
   saveDigestEditionAction: '/save-digest-edition',
+  stageEditedDigestEditionAction: '/stage-edited-digest-edition',
 }))
 
 jest.mock('./MarkdownField', () => ({
@@ -54,6 +69,23 @@ describe('DigestContentFields', () => {
       screen.getByRole('button', {
         name: `Save as draft v${AUGUST_11_MOCK_DIGEST.version + 1}`,
       }),
+    ).toHaveAttribute('value', 'draft')
+    expect(screen.getByRole('button', { name: 'Publish now' })).toHaveAttribute(
+      'value',
+      'publish',
+    )
+  })
+
+  test('offers draft and immediate publish actions beside validated copy', () => {
+    render(
+      <DigestValidatedOutputEditor
+        content={AUGUST_11_MOCK_DIGEST.content}
+        runId="00000000-0000-4000-8000-000000000001"
+      />,
+    )
+
+    expect(
+      screen.getByRole('button', { name: 'Save as draft' }),
     ).toHaveAttribute('value', 'draft')
     expect(screen.getByRole('button', { name: 'Publish now' })).toHaveAttribute(
       'value',

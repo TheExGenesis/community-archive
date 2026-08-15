@@ -121,16 +121,18 @@ function imageMedia(media: PortalMedia[] | undefined): PortalMedia[] {
 function TweetImages({
   media,
   compact,
+  compactGrid = false,
   label,
 }: {
   media: PortalMedia[] | undefined
   compact: boolean
+  compactGrid?: boolean
   label: string
 }) {
   const images = imageMedia(media)
   if (images.length === 0) return null
 
-  if (compact) {
+  if (compact && !compactGrid) {
     return (
       <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
         {images.slice(0, 4).map((item, index) => (
@@ -151,6 +153,8 @@ function TweetImages({
 
   return (
     <div
+      role={compactGrid ? 'group' : undefined}
+      aria-label={compactGrid ? 'Quoted tweet media' : undefined}
       className={`mt-2 grid gap-1.5 ${images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
     >
       {images.slice(0, 4).map((item, index) => (
@@ -165,8 +169,8 @@ function TweetImages({
               ? '(max-width: 640px) 50vw, 320px'
               : '(max-width: 640px) 100vw, 640px'
           }
-          className="max-h-72 rounded-[4px] border border-zinc-200 bg-zinc-100 dark:border-[#303036] dark:bg-[#202023]"
-          imageClassName="h-full max-h-72 w-full object-cover transition-transform hover:scale-[1.01]"
+          className={`${compactGrid ? (images.length > 1 ? 'aspect-square' : 'aspect-video') : 'max-h-72'} rounded-[4px] border border-zinc-200 bg-zinc-100 dark:border-[#303036] dark:bg-[#202023]`}
+          imageClassName={`${compactGrid ? 'h-full' : 'h-full max-h-72'} w-full object-cover transition-transform hover:scale-[1.01]`}
         />
       ))}
     </div>
@@ -195,7 +199,7 @@ function QuotedTweet({
   if (tweet.isDeleted) {
     return (
       <div className="mt-2 rounded-[4px] border border-dashed border-zinc-300 bg-white px-3 py-2 text-[12px] italic text-zinc-500 dark:border-[#3a3a40] dark:bg-[#18181b] dark:text-[#a7a7b4]">
-        Quoted tweet deleted
+        Quoted tweet unavailable
       </div>
     )
   }
@@ -250,6 +254,7 @@ function QuotedTweet({
           <TweetImages
             media={tweet.media}
             compact={compact}
+            compactGrid
             label="Quoted tweet image"
           />
           {/https?:\/\//.test(tweet.text) && (
@@ -402,8 +407,8 @@ export function TweetRow({
   const tweetContent = (
     <div
       className={`${
-        isEditorial ? 'mt-2.5 whitespace-pre-wrap' : 'mt-0.5'
-      } break-words text-zinc-700 dark:text-[#d9d9de] ${
+        isEditorial ? 'mt-2.5' : 'mt-0.5'
+      } whitespace-pre-wrap break-words text-zinc-700 dark:text-[#d9d9de] ${
         isEditorial
           ? isFeatured
             ? 'text-[20px] leading-[1.55] [font-family:var(--font-petrona)] sm:text-[22px]'

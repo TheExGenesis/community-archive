@@ -66,7 +66,10 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
                 from Twitter · not archived
               </span>
             )}
-            <TweetComponent tweet={convertToTweetData(tweet)} />
+            <TweetComponent
+              tweet={convertToTweetData(tweet)}
+              isPermalinkPage={isHighlighted}
+            />
           </div>
         )}
 

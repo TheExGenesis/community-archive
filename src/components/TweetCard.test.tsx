@@ -13,8 +13,22 @@ jest.mock('@/components/TweetAvatarImage', () => ({
 }))
 jest.mock('@/components/ImageLightbox', () => ({
   __esModule: true,
-  default: ({ src, alt }: { src: string; alt: string }) => (
-    <span data-testid="tweet-image" data-src={src} aria-label={alt} />
+  default: ({
+    src,
+    alt,
+    className,
+  }: {
+    src: string
+    alt: string
+    className?: string
+  }) => (
+    <button
+      type="button"
+      data-testid="tweet-image"
+      data-src={src}
+      aria-label={`Enlarge ${alt.toLowerCase()}`}
+      className={className}
+    />
   ),
 }))
 
@@ -82,6 +96,41 @@ describe('TweetCard', () => {
     )
   })
 
+  test.each([1, 2, 3, 4])(
+    'renders %i quoted images in a keyboard-accessible compact grid',
+    (imageCount) => {
+      const media = Array.from({ length: imageCount }, (_, index) => ({
+        url: `https://example.com/quoted-${index + 1}.jpg`,
+        type: 'photo' as const,
+      }))
+      render(
+        <TweetCard
+          compact
+          tweet={{
+            ...tweet,
+            media: [],
+            quotedTweet: { ...tweet.quotedTweet!, media },
+          }}
+        />,
+      )
+
+      const grid = screen.getByRole('group', { name: 'Quoted tweet media' })
+      expect(grid).toHaveClass(
+        'grid',
+        imageCount > 1 ? 'grid-cols-2' : 'grid-cols-1',
+      )
+      const images = screen.getAllByRole('button', {
+        name: /Enlarge quoted tweet image/i,
+      })
+      expect(images).toHaveLength(imageCount)
+      images.forEach((image) =>
+        expect(image).toHaveClass(
+          imageCount > 1 ? 'aspect-square' : 'aspect-video',
+        ),
+      )
+    },
+  )
+
   test('can summarize only the repeated quoted tweet marker', () => {
     render(<TweetCard tweet={tweet} quotedTweetDisplay="summary" />)
 
@@ -92,6 +141,20 @@ describe('TweetCard', () => {
       screen.getAllByTestId('tweet-image').map((image) => image.dataset.src),
     ).toEqual(['https://example.com/tweet.jpg'])
     expect(screen.queryByText('8 likes')).not.toBeInTheDocument()
+  })
+
+  test('uses an unavailable tombstone when a quoted tweet cannot be shown', () => {
+    render(
+      <TweetCard
+        tweet={{
+          ...tweet,
+          quotedTweet: { ...tweet.quotedTweet!, isDeleted: true },
+        }}
+      />,
+    )
+
+    expect(screen.getByText('Quoted tweet unavailable')).toBeVisible()
+    expect(screen.queryByText('Quoted tweet deleted')).not.toBeInTheDocument()
   })
 
   test('can disable text clamping independently of the card layout', () => {

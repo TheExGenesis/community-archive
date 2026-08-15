@@ -3,7 +3,10 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { PiInfo } from 'react-icons/pi'
 import { formatNumber } from '@/lib/formatNumber'
-import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
+import type {
+  ProfileHeaderData,
+  ResolvedProfileLink,
+} from '@/lib/metaTwitter/types'
 import { MembershipStatusIcon } from '@/components/MembershipStatusIcon'
 import { ProjectContributorBadge } from '@/components/ProjectContributorBadge'
 import { ProfileAvatar } from './ProfileAvatar'
@@ -23,6 +26,32 @@ const Stat = ({ value, label }: { value: number | null; label: string }) =>
       <span className="text-muted-foreground">{label}</span>
     </span>
   )
+
+const urlPattern = /(https?:\/\/[^\s]+)/g
+
+function ProfileText({
+  text,
+  links,
+}: {
+  text: string
+  links: Map<string, ResolvedProfileLink>
+}) {
+  return text.split(urlPattern).map((part, index) => {
+    if (!/^https?:\/\/[^\s]+$/.test(part)) return part
+    const link = links.get(part)
+    return (
+      <a
+        key={`${part}-${index}`}
+        href={link?.expanded_url ?? part}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="break-all text-brand underline-offset-2 hover:underline"
+      >
+        {link?.display_url ?? part.replace(/^https?:\/\//, '')}
+      </a>
+    )
+  })
+}
 
 export function ProfileHeader({
   profile,
@@ -45,6 +74,9 @@ export function ProfileHeader({
   const headerUrl = profile.header_media_url
     ? `${profile.header_media_url.replace(/\/$/, '')}/1500x500`
     : null
+  const profileLinks = new Map(
+    (profile.profile_links ?? []).map((link) => [link.original_url, link]),
+  )
 
   return (
     <header>
@@ -115,8 +147,16 @@ export function ProfileHeader({
                   : 'hidden lg:block'
               }
             >
-              {profile.bio}
+              {profile.bio ? (
+                <ProfileText text={profile.bio} links={profileLinks} />
+              ) : null}
             </div>
+
+            {profile.website ? (
+              <div className="mt-1 text-sm">
+                <ProfileText text={profile.website} links={profileLinks} />
+              </div>
+            ) : null}
 
             {!profile.has_archive && !profile.is_opted_in ? (
               <div

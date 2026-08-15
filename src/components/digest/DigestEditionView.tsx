@@ -49,6 +49,15 @@ export function DigestEditionView({
           <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-2.5 dark:border-zinc-200">
             <div className={sectionLabel}>What Happened Yesterday</div>
             <div className="flex flex-wrap items-center justify-end gap-3">
+              <a
+                href="https://communityarchive.substack.com/subscribe"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Subscribe to Community Archive on Substack"
+                className="rounded-full bg-brand px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 dark:text-brand-foreground dark:focus-visible:ring-offset-[#111114]"
+              >
+                Subscribe
+              </a>
               {isAdmin ? (
                 <Link
                   href="/admin/digest"

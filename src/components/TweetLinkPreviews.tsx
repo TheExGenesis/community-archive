@@ -50,6 +50,7 @@ export function TweetLinkPreviews({
                 src={`/api/link-preview/image?hash=${preview.urlHash}`}
                 alt=""
                 fill
+                unoptimized
                 sizes="144px"
                 className="object-cover"
               />

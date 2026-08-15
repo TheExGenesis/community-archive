@@ -1,6 +1,7 @@
 import type { PortalTweet } from './types'
 
 const HOMEPAGE_RECENCY_QUOTA = 4
+const HOMEPAGE_EXCLUDED_USERNAMES = new Set(['bot'])
 
 function compareTweetIdsDescending(left: string, right: string): number {
   return right.length - left.length || right.localeCompare(left)
@@ -52,6 +53,7 @@ export function selectHomepageStream(
   const safeLimit = Math.max(1, Math.min(100, Math.trunc(limit)))
   const byId = new Map<string, PortalTweet>()
   for (const tweet of tweets) {
+    if (HOMEPAGE_EXCLUDED_USERNAMES.has(tweet.username.toLowerCase())) continue
     const createdAt = new Date(tweet.createdAt)
     if (Number.isNaN(createdAt.getTime())) continue
     const previous = byId.get(tweet.id)

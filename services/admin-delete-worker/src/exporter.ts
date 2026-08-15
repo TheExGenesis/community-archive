@@ -57,12 +57,12 @@ export interface ExportResult {
 }
 
 /**
- * Run the full export → delete pipeline for one account.
+ * Run the full export → reversible policy-tombstone pipeline for one account.
  *
  *  1. Copy `archives/{username}/*` → `admin-deleted-user-data/{prefix}/archives/`
  *  2. Dump per-account tables as JSON into the same prefix
  *  3. Write manifest.json with metadata + counts
- *  4. Call public.delete_user_archive(account_id)
+ *  4. Call public.tombstone_policy_account(account_id)
  *  5. Remove the original archives/{username}/ files
  *
  * Throws on the first failure. Caller (runJob) is responsible for marking
@@ -79,7 +79,10 @@ export async function exportAndDelete(
   }
 
   const export_prefix = `${args.enqueuedAt.replace(/[:.]/g, '-')}-${args.accountId}`
-  const log = logger.child({ account_id: args.accountId, prefix: export_prefix })
+  const log = logger.child({
+    account_id: args.accountId,
+    prefix: export_prefix,
+  })
 
   // 1. archives/<username>/* → admin-deleted-user-data/<prefix>/archives/*
   log.info('phase: archives_copy starting')
@@ -151,8 +154,8 @@ export async function exportAndDelete(
     phase_ms,
     notes:
       'Exported by services/admin-delete-worker before calling ' +
-      'public.delete_user_archive. The archives/ subfolder mirrors the ' +
-      "original storage bucket contents; the per-table JSON files are " +
+      'public.tombstone_policy_account. The archives/ subfolder mirrors the ' +
+      'original storage bucket contents; the per-table JSON files are ' +
       'the canonical recovery source for anything that was only in the DB.',
   }
   const { error: manifestErr } = await storage.storage
@@ -167,13 +170,16 @@ export async function exportAndDelete(
   if (manifestErr) throw new Error(`upload manifest: ${manifestErr.message}`)
   tick('manifest_upload', tManifest)
 
-  // 4. delete_user_archive — runs the per-table cascade in Postgres.
-  // 20-minute statement timeout per its definition.
-  log.info('phase: delete_user_archive starting')
+  // 4. Preserve stable IDs as tombstones and remove authored content. Keep the
+  // historic phase key so existing worker dashboards remain continuous.
+  log.info('phase: tombstone_policy_account starting')
   const tDelete = Date.now()
-  await sql`SELECT public.delete_user_archive(${args.accountId})`
+  await sql`SELECT public.tombstone_policy_account(${args.accountId})`
   tick('delete_user_archive', tDelete)
-  log.info({ ms: phase_ms.delete_user_archive }, 'phase: delete_user_archive done')
+  log.info(
+    { ms: phase_ms.delete_user_archive },
+    'phase: tombstone_policy_account done',
+  )
 
   // 5. Remove the source archives/{username}/ files.
   const tArchiveCleanup = Date.now()

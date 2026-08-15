@@ -414,12 +414,12 @@ export async function adminOptOutAccount(
         }
       }
 
-      // archiveDeleted stays false — the delete happens asynchronously
-      // on the worker. The admin row will show populated counts until
-      // the worker completes and the next page refresh re-queries.
+      // archiveDeleted stays false — reversible tombstoning happens
+      // asynchronously on the worker. The admin row will show populated
+      // counts until the worker completes and the next page refresh re-queries.
       const jobKey = enqueueResponse.data as string
       message =
-        `@${username}: queued for export + delete (job ${jobKey.slice(0, 8)}). ` +
+        `@${username}: queued for export + reversible tombstones (job ${jobKey.slice(0, 8)}). ` +
         `The Hetzner worker (admin-delete-worker) typically picks the job up within ~10s ` +
         `and finishes within ~1 minute per 10k tweets. Refresh the page in a minute to ` +
         `see the row's archive counts drop to zero.`

@@ -170,6 +170,12 @@ Repeat with an account present only in `tes.blocked_scraping_users`. Keep the
 previous worker available for rollback, but do not roll back past this privacy
 gate after it has been verified unless ingestion is paused first.
 
+Then clear only the test account's explicit opt-out and opt it in. Confirm its
+`explicit_optout` block-source row disappears while an independent `admin`
+block-source row, when present, remains. Re-run the archive and verify the
+existing policy tombstones are hydrated in place (`is_tombstone = false`) with
+their text and child rows restored from the authorized upload.
+
 **Expected output in `logs/execution.log`:**
 ```
 [2024-01-15 14:30:01] Starting process-archive execution

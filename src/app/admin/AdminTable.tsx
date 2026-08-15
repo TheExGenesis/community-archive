@@ -133,7 +133,7 @@ function buildAdminActions(args: {
       label: 'Opt out and delete data',
       title: `Opt out and delete @${username}?`,
       description:
-        'Opt the account out and queue a job for the Hetzner admin-delete-worker. The worker copies archive files + dumps all per-account tables to the admin-deleted-user-data bucket, then deletes the Community Archive data.',
+        'Opt the account out and queue a job for the Hetzner admin-delete-worker. The worker exports the data, removes authored content, and preserves only reversible account/tweet ID tombstones.',
       action: adminOptOutAccount,
       hiddenInputs: [
         ...commonInputs,
@@ -147,13 +147,13 @@ function buildAdminActions(args: {
         'The opt-in row will be marked explicitly opted out (synchronously).',
         'The account id will be added to the scrape blocklist (synchronously).',
         'A job will be enqueued in private.admin_jobs for the Hetzner worker.',
-        `The worker will copy archives/${username}/ to admin-deleted-user-data/<timestamp>-${twitterUserId || '<account_id>'}/archives/, dump all per-account tables (tweets, likes, followers, following, all_account, all_profile, archive_upload, user_action_log, tweet_media, tweet_urls, user_mentions) as JSON, write a manifest.json, then call delete_user_archive(account_id).`,
+        `The worker will copy archives/${username}/ to admin-deleted-user-data/<timestamp>-${twitterUserId || '<account_id>'}/archives/, dump all per-account tables as JSON, write a manifest.json, then replace authored account/tweet data with policy tombstones.`,
         `Expected wall time on the worker: ~10s pickup latency, then ~1 minute per 10k tweets. This account has ${typeof numTweets === 'number' ? new Intl.NumberFormat('en').format(numTweets) : 'unknown'} tweets.`,
         'No Vercel timeout to worry about — the worker has no upper bound.',
       ],
       disabled: !twitterUserId,
       destructive: true,
-      irreversible: true,
+      irreversible: false,
     },
   ]
 }

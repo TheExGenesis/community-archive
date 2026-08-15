@@ -3,7 +3,8 @@
 Long-running worker that consumes `private.admin_jobs` rows with
 `job_name = 'admin_delete_with_export'`. Exports the affected
 account's data to the `admin-deleted-user-data` storage bucket and
-then calls `public.delete_user_archive` to wipe the account. Designed
+then calls `public.tombstone_policy_account` to remove authored content while
+preserving reversible account/tweet IDs. Designed
 to run on a Hetzner box (NOT on Vercel — accounts with >10k tweets
 exceed Vercel's serverless function ceiling and several phases need
 multi-minute headroom).
@@ -18,7 +19,7 @@ multi-minute headroom).
 | Concern | File |
 | --- | --- |
 | Polling loop, claim, status transitions | [`src/index.ts`](src/index.ts) |
-| Export + delete pipeline (storage copy, table dumps, manifest, `delete_user_archive`) | [`src/exporter.ts`](src/exporter.ts) |
+| Export + tombstone pipeline (storage copy, table dumps, manifest, `tombstone_policy_account`) | [`src/exporter.ts`](src/exporter.ts) |
 | `private.worker_runs` insert/update | [`src/runRecorder.ts`](src/runRecorder.ts) |
 | Structured pino logger setup | [`src/logger.ts`](src/logger.ts) |
 | Container image | [`Dockerfile`](Dockerfile) |

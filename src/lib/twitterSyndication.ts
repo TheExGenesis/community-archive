@@ -6,9 +6,9 @@
  * stale.
  *
  * Render-time hard rules:
- * - Never persist content fetched through this renderer-facing client. Dedicated
- *   ingestion writers may use their ingestion client only after checking each
- *   author's authoritative opt-out state at the final write boundary.
+ * - Never persist content fetched through this renderer-facing client. Persistent
+ *   enrichment belongs to the dedicated recovery queue worker, which applies the
+ *   authoritative per-author policy gate at its write boundary.
  * - The link-preview subsystem may separately cache the bounded title, teaser,
  *   and cover image that X publishes for an Article linked by an archived tweet.
  * - Never use hydrated tweet content in search results or global feeds.

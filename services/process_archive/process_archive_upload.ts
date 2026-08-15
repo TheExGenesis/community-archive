@@ -10,18 +10,8 @@ import postgres from 'postgres'
 type Sql = postgres.Sql
 
 import { createClient } from '@supabase/supabase-js'
-import {
-  fetchSyndicatedTweetForIngestion,
-  recoverSyndicatedConversation,
-  type SyndicatedTweetFetcher,
-  type SyndicatedTweetForIngestion,
-} from './twitter_syndication'
 
 // Configuration
-const configuredSyndicationMaxDepth = parseInt(
-  process.env.SYNDICATION_CONVERSATION_MAX_DEPTH || '64',
-  10,
-)
 const CONFIG = {
   LOG_LEVEL: process.env.LOG_LEVEL || 'debug',
   BATCH_SIZE: parseInt(process.env.PG_BATCH_SIZE || '1000', 10), // Conservative for large archives and pooler links
@@ -30,14 +20,7 @@ const CONFIG = {
   POSTGRES_CONNECTION_STRING: process.env.POSTGRES_CONNECTION_STRING,
   MAX_MEMORY_MB: parseInt(process.env.MAX_MEMORY_MB || '1000', 10), // Memory limit
   PROCESS_RETWEETS: process.env.PROCESS_RETWEETS !== 'false', // Enable retweet processing by default
-  DEBUG_PG_QUERIES: process.env.DEBUG_PG_QUERIES === 'true', // only log if it has been explicitly enabled
-  SYNDICATION_CONVERSATION_RECOVERY_ENABLED:
-    process.env.SYNDICATION_CONVERSATION_RECOVERY_ENABLED === 'true',
-  SYNDICATION_CONVERSATION_MAX_DEPTH: Number.isFinite(
-    configuredSyndicationMaxDepth,
-  )
-    ? Math.max(1, configuredSyndicationMaxDepth)
-    : 64,
+  DEBUG_PG_QUERIES: process.env.DEBUG_PG_QUERIES === 'true' // only log if it has been explicitly enabled
 } as const
 
 export async function createServerScriptClient() {
@@ -213,151 +196,6 @@ export function authoritativeConversationFromArchiveTweet(tweet: any) {
   }
 }
 
-export interface ArchiveConversationResolution {
-  conversation_id: string
-  producer_source:
-    | 'archive_upload_reply_chain'
-    | 'archive_upload_syndication'
-}
-
-export interface ArchiveConversationRecovery {
-  resolutions: Map<string, ArchiveConversationResolution>
-  syndicatedTweets: Map<string, SyndicatedTweetForIngestion>
-}
-
-function archiveTweetId(tweetRecord: any): string | null {
-  const id = String(tweetRecord?.tweet?.id_str || tweetRecord?.tweet?.id || '')
-  return /^\d{1,20}$/.test(id) ? id : null
-}
-
-function archiveReplyToTweetId(tweetRecord: any): string | null {
-  const id = String(tweetRecord?.tweet?.in_reply_to_status_id_str || '')
-  return /^\d{1,20}$/.test(id) ? id : null
-}
-
-/**
- * Resolve missing archive conversation IDs without holding a DB transaction
- * open across network requests. Local archive links are followed first; only a
- * parent outside the archive is fetched through syndication.
- */
-export async function recoverMissingArchiveConversations(
-  tweetRecords: any[],
-  fetchTweet: SyndicatedTweetFetcher = fetchSyndicatedTweetForIngestion,
-  maxDepth = CONFIG.SYNDICATION_CONVERSATION_MAX_DEPTH,
-): Promise<ArchiveConversationRecovery> {
-  const resolutions = new Map<string, ArchiveConversationResolution>()
-  const syndicatedTweets = new Map<string, SyndicatedTweetForIngestion>()
-  const archiveById = new Map<string, any>()
-
-  for (const record of tweetRecords) {
-    const id = archiveTweetId(record)
-    if (id) archiveById.set(id, record)
-  }
-
-  const fetchCache = new Map<
-    string,
-    Promise<SyndicatedTweetForIngestion | null>
-  >()
-  const cachedFetch: SyndicatedTweetFetcher = (id) => {
-    const existing = fetchCache.get(id)
-    if (existing) return existing
-    const request = fetchTweet(id)
-    fetchCache.set(id, request)
-    return request
-  }
-
-  for (const record of tweetRecords) {
-    const startId = archiveTweetId(record)
-    if (!startId || authoritativeConversationFromArchiveTweet(record.tweet)) {
-      continue
-    }
-    if (resolutions.has(startId)) continue
-
-    const localPath: string[] = []
-    const localVisited = new Set<string>()
-    let currentId: string | null = startId
-    let missingParentId: string | null = null
-    let localRootId: string | null = null
-    let inheritedResolution: ArchiveConversationResolution | null = null
-
-    while (currentId && localPath.length < maxDepth) {
-      if (localVisited.has(currentId)) break
-      localVisited.add(currentId)
-      const knownResolution = resolutions.get(currentId)
-      if (knownResolution) {
-        inheritedResolution = knownResolution
-        break
-      }
-      localPath.push(currentId)
-
-      const currentRecord = archiveById.get(currentId)
-      if (!currentRecord) {
-        missingParentId = currentId
-        localPath.pop()
-        break
-      }
-
-      const parentId = archiveReplyToTweetId(currentRecord)
-      if (!parentId) {
-        localRootId = currentId
-        break
-      }
-      currentId = parentId
-    }
-
-    if (inheritedResolution) {
-      for (const tweetId of localPath) {
-        resolutions.set(tweetId, inheritedResolution)
-      }
-      continue
-    }
-
-    if (localRootId) {
-      for (const tweetId of localPath) {
-        if (!resolutions.has(tweetId)) {
-          resolutions.set(tweetId, {
-            conversation_id: localRootId,
-            producer_source: 'archive_upload_reply_chain',
-          })
-        }
-      }
-      continue
-    }
-
-    if (!missingParentId || localPath.length >= maxDepth) continue
-    const remainingDepth = maxDepth - localPath.length
-    const recovery = await recoverSyndicatedConversation(
-      missingParentId,
-      cachedFetch,
-      remainingDepth,
-    )
-    if (!recovery) continue
-
-    for (const tweetId of localPath) {
-      resolutions.set(tweetId, {
-        conversation_id: recovery.rootTweetId,
-        producer_source: 'archive_upload_syndication',
-      })
-    }
-    for (const tweet of recovery.tweets) {
-      syndicatedTweets.set(tweet.tweet_id, tweet)
-      resolutions.set(tweet.tweet_id, {
-        conversation_id: recovery.rootTweetId,
-        producer_source: 'archive_upload_syndication',
-      })
-    }
-  }
-
-  return { resolutions, syndicatedTweets }
-}
-
-export function filterBlockedSyndicatedTweets(
-  tweets: SyndicatedTweetForIngestion[],
-  blockedAccountIds: ReadonlySet<string>,
-): SyndicatedTweetForIngestion[] {
-  return tweets.filter((tweet) => !blockedAccountIds.has(tweet.account_id))
-}
-
 function getMemoryUsageMB(): number {
   const usage = process.memoryUsage()
   return Math.round(usage.heapUsed / 1024 / 1024)
@@ -477,10 +315,6 @@ export class ArchiveUploadProcessor {
   private archiveUploadId: number
   private processedTweets = 0
   private totalTweets = 0
-  private conversationRecovery: ArchiveConversationRecovery = {
-    resolutions: new Map(),
-    syndicatedTweets: new Map(),
-  }
 
   constructor(sql: Sql, archiveUploadId: number) {
     this.sql = sql
@@ -492,15 +326,6 @@ export class ArchiveUploadProcessor {
     archive = patchArchive(archive);
 
 
-    if (CONFIG.SYNDICATION_CONVERSATION_RECOVERY_ENABLED) {
-      this.conversationRecovery = await recoverMissingArchiveConversations(
-        archive.tweets || [],
-      )
-      logger.info(
-        `Resolved ${this.conversationRecovery.resolutions.size} missing conversation IDs and recovered ${this.conversationRecovery.syndicatedTweets.size} syndicated tweet(s)`,
-      )
-    }
-
     logger.info(`Processing large archive with optimized batch inserts (${getMemoryUsageMB()}MB memory used)`)
     
     // Process everything in a single transaction
@@ -509,11 +334,6 @@ export class ArchiveUploadProcessor {
 
       // Process small data first (account, profile, etc.)
       await this.processUserData(trx, archive)
-
-      // The network walk completed before the transaction. Consent is checked
-      // here, at the authoritative write boundary, immediately before eligible
-      // recovered rows are persisted.
-      await this.processRecoveredSyndicatedTweets(trx, archive.tweets || [])
       
       // Process tweets in streaming chunks to avoid memory issues
       const tweets = archive.tweets || []
@@ -632,252 +452,6 @@ export class ArchiveUploadProcessor {
     }
   }
 
-  private async processRecoveredSyndicatedTweets(
-    trx: Sql,
-    archiveTweetRecords: any[],
-  ): Promise<void> {
-    if (this.conversationRecovery.syndicatedTweets.size === 0) return
-
-    const archiveTweetIds = new Set(
-      archiveTweetRecords
-        .map(archiveTweetId)
-        .filter((id): id is string => id !== null),
-    )
-    const candidates = Array.from(
-      this.conversationRecovery.syndicatedTweets.values(),
-    ).filter((tweet) => !archiveTweetIds.has(tweet.tweet_id))
-    if (candidates.length === 0) return
-
-    const accountIds = candidates.map((tweet) => tweet.account_id)
-    const usernames = candidates.map((tweet) => tweet.username.toLowerCase())
-    const blockedRows = await trx`
-      WITH candidates AS (
-        SELECT *
-        FROM unnest(
-          ${accountIds}::text[],
-          ${usernames}::text[]
-        ) AS candidate(account_id, username)
-      )
-      SELECT DISTINCT candidate.account_id
-      FROM candidates AS candidate
-      WHERE EXISTS (
-        SELECT 1
-        FROM tes.blocked_scraping_users AS blocked
-        WHERE blocked.account_id = candidate.account_id
-      )
-      OR EXISTS (
-        SELECT 1
-        FROM public.optin AS consent
-        WHERE consent.explicit_optout IS TRUE
-          AND (
-            NULLIF(BTRIM(consent.twitter_user_id), '') = candidate.account_id
-            OR LOWER(consent.username) = candidate.username
-          )
-      )
-    `
-    const blockedAccountIds = new Set<string>(
-      blockedRows.map((row) => String(row.account_id)),
-    )
-    const tweets = filterBlockedSyndicatedTweets(
-      candidates,
-      blockedAccountIds,
-    )
-
-    if (blockedAccountIds.size > 0) {
-      logger.warn(
-        `Skipped ${candidates.length - tweets.length} syndicated tweet(s) whose authors are explicitly opted out`,
-      )
-    }
-    if (tweets.length === 0) return
-
-    const accounts = tweets.map((tweet) => ({
-      account_id: tweet.account_id,
-      created_via: 'twitter_syndication',
-      username: tweet.username,
-      created_at: tweet.account_created_at || tweet.created_at,
-      account_display_name: tweet.account_display_name,
-      num_tweets: 0,
-      num_following: 0,
-      num_followers: 0,
-      num_likes: 0,
-      is_tombstone: false,
-    }))
-    const profiles = tweets
-      .filter(
-        (tweet) =>
-          tweet.avatar_media_url ||
-          tweet.header_media_url ||
-          tweet.bio ||
-          tweet.location ||
-          tweet.website,
-      )
-      .map((tweet) => ({
-        account_id: tweet.account_id,
-        avatar_media_url: tweet.avatar_media_url,
-        header_media_url: tweet.header_media_url,
-        bio: tweet.bio,
-        location: tweet.location,
-        website: tweet.website,
-        archive_upload_id: null,
-      }))
-    const tweetRows = tweets.map((tweet) => ({
-      tweet_id: tweet.tweet_id,
-      account_id: tweet.account_id,
-      created_at: tweet.created_at,
-      full_text: removeProblematicCharacters(tweet.full_text) || '',
-      favorite_count: tweet.favorite_count,
-      retweet_count: tweet.retweet_count,
-      reply_to_tweet_id: tweet.reply_to_tweet_id,
-      reply_to_user_id: tweet.reply_to_user_id,
-      reply_to_username: tweet.reply_to_username,
-      archive_upload_id: null,
-      is_tombstone: false,
-    }))
-    const now = new Date().toISOString()
-    const conversations = tweets.map((tweet) => {
-      const resolution = this.conversationRecovery.resolutions.get(
-        tweet.tweet_id,
-      )!
-      return {
-        tweet_id: tweet.tweet_id,
-        conversation_id: resolution.conversation_id,
-        producer_source: 'archive_upload_syndication',
-        resolution_status: 'authoritative',
-        resolved_at: now,
-        attempt_count: 0,
-        next_attempt_at: now,
-        last_error: null,
-      }
-    })
-    const media = tweets.flatMap((tweet) =>
-      tweet.media.map((item) => ({
-        tweet_id: tweet.tweet_id,
-        media_id: item.media_id,
-        media_url: item.media_url,
-        media_type: item.media_type,
-        width: item.width,
-        height: item.height,
-        archive_upload_id: null,
-      })),
-    )
-    const urls = tweets.flatMap((tweet) =>
-      tweet.urls.map((item) => ({ tweet_id: tweet.tweet_id, ...item })),
-    )
-    const mentionedUsers = new Map<string, any>()
-    const userMentions: any[] = []
-    for (const tweet of tweets) {
-      for (const mention of tweet.mentions) {
-        mentionedUsers.set(mention.user_id, mention)
-        userMentions.push({
-          tweet_id: tweet.tweet_id,
-          mentioned_user_id: mention.user_id,
-        })
-      }
-    }
-
-    // Sparse syndication rows establish missing FKs but never overwrite richer
-    // account/profile data from an archive or authenticated API source.
-    await bulkInsertWithCopy({
-      sql: trx,
-      tableName: 'all_account',
-      columns: TABLE_CONFIGS.all_account.columns,
-      conflictTarget: TABLE_CONFIGS.all_account.conflict,
-      data: this.dedupeByConflict(accounts, 'account_id'),
-      mapFn: (account: any) => [
-        account.account_id,
-        account.created_via,
-        account.username,
-        account.created_at,
-        account.account_display_name,
-        account.num_tweets,
-        account.num_following,
-        account.num_followers,
-        account.num_likes,
-        account.is_tombstone,
-      ],
-    })
-    await bulkInsertWithCopy({
-      sql: trx,
-      tableName: 'all_profile',
-      columns: TABLE_CONFIGS.all_profile.columns,
-      conflictTarget: TABLE_CONFIGS.all_profile.conflict,
-      data: this.dedupeByConflict(profiles, 'account_id'),
-      mapFn: (profile: any) => [
-        profile.account_id,
-        profile.avatar_media_url,
-        profile.header_media_url,
-        profile.bio,
-        profile.location,
-        profile.website,
-        profile.archive_upload_id,
-      ],
-    })
-    await bulkInsertWithCopy({
-      sql: trx,
-      tableName: 'tweets',
-      columns: TABLE_CONFIGS.tweets.columns,
-      conflictTarget: TABLE_CONFIGS.tweets.conflict,
-      updateColumns: ['favorite_count'],
-      data: this.dedupeByConflict(tweetRows, 'tweet_id'),
-      mapFn: (tweet: any) => [
-        tweet.tweet_id,
-        tweet.account_id,
-        tweet.created_at,
-        tweet.full_text,
-        tweet.favorite_count,
-        tweet.retweet_count,
-        tweet.reply_to_tweet_id,
-        tweet.reply_to_user_id,
-        tweet.reply_to_username,
-        tweet.archive_upload_id,
-        tweet.is_tombstone,
-      ],
-    })
-    await this.insertIfNotEmpty(trx, 'conversations', conversations, (row) => [
-      row.tweet_id,
-      row.conversation_id,
-      row.producer_source,
-      row.resolution_status,
-      row.resolved_at,
-      row.attempt_count,
-      row.next_attempt_at,
-      row.last_error,
-    ])
-    await bulkInsertWithCopy({
-      sql: trx,
-      tableName: 'tweet_media',
-      columns: TABLE_CONFIGS.tweet_media.columns,
-      conflictTarget: TABLE_CONFIGS.tweet_media.conflict,
-      updateColumns: ['media_url', 'width', 'height'],
-      data: this.dedupeByConflict(media, 'media_id'),
-      mapFn: (item: any) => [
-        item.tweet_id,
-        item.media_id,
-        item.media_url,
-        item.media_type,
-        item.width,
-        item.height,
-        item.archive_upload_id,
-      ],
-    })
-    await this.insertIfNotEmpty(
-      trx,
-      'mentioned_users',
-      Array.from(mentionedUsers.values()),
-      (mention) => [mention.user_id, mention.name, mention.screen_name],
-    )
-    await this.insertIfNotEmpty(trx, 'tweet_urls', urls, (url) => [
-      url.tweet_id,
-      url.url,
-      url.expanded_url,
-      url.display_url,
-    ])
-    await this.insertIfNotEmpty(trx, 'user_mentions', userMentions, (mention) => [
-      mention.tweet_id,
-      mention.mentioned_user_id,
-    ])
-  }
-
   private async processTweetChunk(trx: Sql, tweetChunk: any[], accountObj: any): Promise<void> {
     if (!accountObj) return
 
@@ -894,23 +468,7 @@ export class ArchiveUploadProcessor {
     for (const tweetData of tweetChunk) {
       const tweet = tweetData.tweet
       const tweetId = tweet.id_str || tweet.id
-      const recoveredResolution = this.conversationRecovery.resolutions.get(
-        String(tweetId),
-      )
-      const authoritativeConversation =
-        authoritativeConversationFromArchiveTweet(tweet) ??
-        (recoveredResolution
-          ? {
-              tweet_id: String(tweetId),
-              conversation_id: recoveredResolution.conversation_id,
-              producer_source: recoveredResolution.producer_source,
-              resolution_status: 'authoritative',
-              resolved_at: new Date().toISOString(),
-              attempt_count: 0,
-              next_attempt_at: new Date().toISOString(),
-              last_error: null,
-            }
-          : null)
+      const authoritativeConversation = authoritativeConversationFromArchiveTweet(tweet)
       if (authoritativeConversation) conversations.push(authoritativeConversation)
 
       // Process tweet

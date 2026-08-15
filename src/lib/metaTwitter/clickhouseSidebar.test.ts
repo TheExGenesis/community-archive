@@ -2,6 +2,7 @@ import type { AnalyticsGatewayFetcher } from '@/lib/clickhouseGateway'
 import {
   fetchClickHouseProfileInteractions,
   fetchClickHouseProfileMedia,
+  fetchClickHouseProfileOutreach,
   fetchClickHouseProfileSidebar,
 } from './clickhouseSidebar'
 
@@ -129,4 +130,45 @@ test('omits the year for the all-time sidebar and rejects scope drift', async ()
   await expect(
     fetchClickHouseProfileSidebar('42', 2025, wrongYearFetcher),
   ).rejects.toThrow('mismatched profile sidebar scope')
+})
+
+test('loads a scoped non-member outreach list', async () => {
+  const fetcher = jest.fn(async () => ({
+    data: {
+      people: [
+        {
+          accountId: '8',
+          username: 'carol',
+          displayName: 'Carol',
+          avatarUrl: null,
+          interactionCount: '12',
+          inCommunityArchive: false,
+        },
+      ],
+    },
+    query: {
+      accountId: '42',
+      year: null,
+      peopleLimit: 5,
+      missingOnly: true,
+    },
+  })) as unknown as AnalyticsGatewayFetcher
+
+  await expect(fetchClickHouseProfileOutreach('42', fetcher)).resolves.toEqual({
+    people: [
+      {
+        user_id: '8',
+        screen_name: 'carol',
+        name: 'Carol',
+        interactions: 12,
+        avatar_media_url: null,
+        in_archive: false,
+      },
+    ],
+  })
+  expect(fetcher).toHaveBeenCalledWith(
+    ['user', '42', 'interactions'],
+    new URLSearchParams({ limit: '5', missing_only: 'true' }),
+    { timeoutMs: 30_000 },
+  )
 })

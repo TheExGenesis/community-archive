@@ -11,6 +11,7 @@ import type { ArchiveMediaItem, ArchivePerson } from './types'
 const DAY = 86_400
 const MEDIA_LIMIT = 6
 const PEOPLE_LIMIT = 8
+const OUTREACH_LIMIT = 5
 const ID_PATTERN = /^\d{1,20}$/
 
 interface SidebarResponse {
@@ -47,6 +48,7 @@ interface InteractionsResponse {
     accountId?: unknown
     year?: unknown
     peopleLimit?: unknown
+    missingOnly?: unknown
   }
 }
 
@@ -66,6 +68,7 @@ interface SidebarPersonRow {
   displayName?: unknown
   avatarUrl?: unknown
   interactionCount?: unknown
+  inCommunityArchive?: unknown
 }
 
 export interface ClickHouseProfileSidebar {
@@ -164,7 +167,7 @@ const personItem = (value: unknown): ArchivePerson | null => {
       typeof row.avatarUrl === 'string' && row.avatarUrl.trim()
         ? row.avatarUrl
         : null,
-    in_archive: true,
+    in_archive: row.inCommunityArchive !== false,
   }
 }
 
@@ -236,6 +239,40 @@ export async function fetchClickHouseProfileInteractions(
     people: people.flatMap((value) => {
       const item = personItem(value)
       return item ? [item] : []
+    }),
+  }
+}
+
+export async function fetchClickHouseProfileOutreach(
+  accountId: string,
+  fetcher: AnalyticsGatewayFetcher = fetchAnalyticsGatewayJson,
+): Promise<ClickHouseProfileInteractions> {
+  if (!ID_PATTERN.test(accountId)) {
+    throw new Error('Profile outreach requires a numeric account ID')
+  }
+  const params = profileParams(undefined, OUTREACH_LIMIT)
+  params.set('missing_only', 'true')
+  const response = await fetcher<InteractionsResponse>(
+    ['user', accountId, 'interactions'],
+    params,
+    { timeoutMs: 30_000 },
+  )
+  if (
+    response.query?.accountId !== accountId ||
+    response.query?.year !== null ||
+    Number(response.query?.peopleLimit) !== OUTREACH_LIMIT ||
+    response.query?.missingOnly !== true
+  ) {
+    throw new Error('ClickHouse returned mismatched profile outreach scope')
+  }
+  const people = response.data?.people
+  if (!Array.isArray(people)) {
+    throw new Error('ClickHouse returned invalid profile outreach')
+  }
+  return {
+    people: people.flatMap((value) => {
+      const item = personItem(value)
+      return item && item.in_archive === false ? [item] : []
     }),
   }
 }

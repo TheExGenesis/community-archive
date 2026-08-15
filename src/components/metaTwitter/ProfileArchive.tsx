@@ -726,6 +726,7 @@ export function ProfileArchive({
         onSelect={selectChapter}
       />
       <Workspace
+        accountId={accountId}
         key={`${activeKey}:${activeFeed ? 'ready' : 'loading'}`}
         avatarUrl={avatarUrl}
         contextTitle={contextTitle}

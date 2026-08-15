@@ -73,6 +73,7 @@ test('shows the initial canonical banger cards with media and profile return lin
   const onLoadMore = jest.fn()
   render(
     <Workspace
+      accountId="42"
       avatarUrl={null}
       contextTitle="Best of Alice"
       tweets={tweets.slice(0, 2)}

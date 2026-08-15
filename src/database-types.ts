@@ -324,6 +324,45 @@ export type Database = {
           },
         ]
       }
+      conversation_resolution_reconciliation: {
+        Row: {
+          cursor_tweet_id: string | null
+          examined_count: number
+          high_watermark_tweet_id: string | null
+          id: boolean
+          last_error: string | null
+          queued_count: number
+          root_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cursor_tweet_id?: string | null
+          examined_count?: number
+          high_watermark_tweet_id?: string | null
+          id?: boolean
+          last_error?: string | null
+          queued_count?: number
+          root_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cursor_tweet_id?: string | null
+          examined_count?: number
+          high_watermark_tweet_id?: string | null
+          id?: boolean
+          last_error?: string | null
+          queued_count?: number
+          root_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       conversation_resolution_runs: {
         Row: {
           attempted: number
@@ -2510,4 +2549,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-

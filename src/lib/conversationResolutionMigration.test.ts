@@ -19,6 +19,21 @@ test('queues every new tweet without launching a historical backfill', () => {
   expect(migration).not.toContain(
     'INSERT INTO public.conversations (tweet_id, conversation_id)\nSELECT',
   )
+  expect(migration).not.toContain(
+    "cron.schedule(\n      'reconcile-conversations-historical'",
+  )
+})
+
+test('keeps historical reconciliation bounded, resumable, and operator-gated', () => {
+  expect(migration).toContain('conversation_resolution_reconciliation')
+  expect(migration).toContain('high_watermark_tweet_id')
+  expect(migration).toContain('cursor_tweet_id')
+  expect(migration).toContain('p_dry_run boolean DEFAULT false')
+  expect(migration).toContain('LIMIT p_limit')
+  expect(migration).toContain("v_state.status <> 'running'")
+  expect(migration).toContain(
+    "status = CASE WHEN p_run THEN 'running' ELSE 'paused' END",
+  )
 })
 
 test('processes a bounded resumable batch with retries and telemetry', () => {

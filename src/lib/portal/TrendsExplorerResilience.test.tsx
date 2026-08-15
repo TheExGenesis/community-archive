@@ -5,7 +5,7 @@ import React from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import TrendsExplorer from '@/components/portal/TrendsExplorer'
-import { emptyPortalTrends } from './trendConfig'
+import { CHART_TERMS, emptyPortalTrends } from './trendConfig'
 import type { PortalTrends } from './types'
 import { capturePostHogEvent } from '@/lib/posthog'
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
@@ -44,6 +44,16 @@ const twoTrends: PortalTrends = {
       perYear: [50, 80],
     },
   ],
+}
+
+const defaultTrends: PortalTrends = {
+  ...successfulTrends,
+  series: CHART_TERMS.map(({ term, color }, index) => ({
+    term,
+    color,
+    tweetsPerYear: [index + 1, index + 2],
+    perYear: [(index + 1) * 10, (index + 2) * 10],
+  })),
 }
 
 function feedTweet(id: string, year: number) {
@@ -203,6 +213,72 @@ describe('TrendsExplorer request isolation', () => {
       screen.queryByRole('button', { name: 'Remove tpot trend' }),
     ).not.toBeInTheDocument()
     expect(screen.getByText('0/12 trends')).toBeVisible()
+  })
+
+  test('replaces defaults with the first custom trend, then preserves later additions', async () => {
+    const user = userEvent.setup()
+    jest.spyOn(global, 'fetch').mockImplementation(async (url) => {
+      const requestUrl = new URL(String(url), 'https://example.com')
+      if (requestUrl.searchParams.get('view') === 'series') {
+        const terms = requestUrl.searchParams.getAll('q')
+        return {
+          ok: true,
+          json: async () => ({
+            granularity: 'year',
+            buckets: ['2025', '2026'],
+            series: terms.map((term) => ({
+              term,
+              color: '#3b82f6',
+              tweetsPerBucket: [1, 2],
+              perBucket: [10, 20],
+            })),
+          }),
+        } as Response
+      }
+      return {
+        ok: true,
+        json: async () => ({ tweets: [] }),
+      } as Response
+    })
+
+    render(<TrendsExplorer initialTrends={defaultTrends} />)
+    const input = screen.getByLabelText('Words or phrases to chart')
+
+    await user.type(input, 'custom idea')
+    await user.click(screen.getByRole('button', { name: 'Add trends' }))
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Remove custom idea trend' }),
+      ).toBeVisible(),
+    )
+    expect(
+      screen.queryByRole('button', { name: 'Remove tpot trend' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('1/12 trends')).toBeVisible()
+
+    await user.type(input, 'second idea')
+    await user.click(screen.getByRole('button', { name: 'Add trends' }))
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Remove second idea trend' }),
+      ).toBeVisible(),
+    )
+    expect(
+      screen.getByRole('button', { name: 'Remove custom idea trend' }),
+    ).toBeVisible()
+    expect(screen.getByText('2/12 trends')).toBeVisible()
+  })
+
+  test('lets the root layout own the viewport height without extra page length', () => {
+    jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(() => new Promise<Response>(() => undefined))
+
+    render(<TrendsExplorer initialTrends={successfulTrends} />)
+
+    const main = screen.getByRole('main')
+    expect(main).toHaveClass('flex-1')
+    expect(main).not.toHaveClass('min-h-screen')
   })
 
   test('loads only a newly included term when prior term evidence is cached', async () => {

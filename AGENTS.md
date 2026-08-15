@@ -24,6 +24,14 @@ The upload path is:
 4. `services/process_archive/` claims the upload, marks it `committing`, writes
    the normalized PostgreSQL records, and marks it `completed` or `failed`.
 
+Text fidelity has a separate source-of-truth boundary: the uploaded archive
+JSON in Supabase Storage preserves the original tweet text, while
+`public.tweets.full_text` is a normalized projection. The archive processor's
+text sanitization can remove control characters such as line feeds, so a
+flattened database value is not sufficient evidence that the original archive
+had no line breaks. For fidelity-sensitive diagnosis or recovery, compare the
+stored archive object before considering any external text source.
+
 Important locations:
 
 - `src/app/`: pages, server actions, and API routes.

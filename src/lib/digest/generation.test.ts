@@ -135,6 +135,28 @@ describe('daily digest generation contract', () => {
     expect(prompt).toContain('"tweet_id": "1"')
   })
 
+  test('adds bounded published history for continuity without changing the current corpus', () => {
+    const prompt = renderDigestPrompt('{{candidate_json}}', {
+      digestDate: '2026-08-12',
+      windowStart: '2026-08-11T12:00:00.000Z',
+      windowEnd: '2026-08-12T12:00:00.000Z',
+      candidates,
+      priorDigests: [
+        {
+          digestDate: '2026-08-11',
+          executiveSummary: ['The community compared model taste.'],
+          storyTitles: ['Taste benchmarks became public rituals'],
+          keywords: ['taste'],
+        },
+      ],
+    })
+
+    expect(prompt).toContain('PAST PUBLISHED DIGESTS')
+    expect(prompt).toContain('"digest_date": "2026-08-11"')
+    expect(prompt).toContain('TODAY\'S CURRENT CANDIDATE CORPUS')
+    expect(prompt.match(/"tweet_id": "1"/g)).toHaveLength(1)
+  })
+
   test('indexes all bangers before reply and quote context', () => {
     const corpus = buildDigestPromptCorpus([
       { ...candidates[0], replyTweetIds: ['11'] },

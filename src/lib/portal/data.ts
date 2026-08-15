@@ -524,17 +524,20 @@ export async function enrichPortalTweets(
 ): Promise<PortalTweet[]> {
   const tweetIdFilter = portalIdFilter(tweets.map(({ id }) => id))
   if (!tweetIdFilter) return tweets
+  const needsOwnMedia = tweets.some((tweet) => tweet.media === undefined)
 
   const [mediaRows, quoteRelations] = await Promise.all([
-    optionalPortalRestRows<PortalMediaRow>(
-      'tweet_media',
-      new URLSearchParams({
-        select: 'tweet_id,media_url,media_type,width,height',
-        tweet_id: tweetIdFilter,
-        order: 'media_id.asc',
-      }),
-      'media',
-    ),
+    needsOwnMedia
+      ? optionalPortalRestRows<PortalMediaRow>(
+          'tweet_media',
+          new URLSearchParams({
+            select: 'tweet_id,media_url,media_type,width,height',
+            tweet_id: tweetIdFilter,
+            order: 'media_id.asc',
+          }),
+          'media',
+        )
+      : Promise.resolve([]),
     optionalPortalRestRows<PortalQuoteRelationRow>(
       'quote_tweets',
       new URLSearchParams({

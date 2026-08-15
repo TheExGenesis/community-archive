@@ -234,6 +234,17 @@ describe('ClickHouse-backed portal analytics', () => {
       username: 'alice',
       accountDisplayName: 'Alice',
       avatarMediaUrl: null,
+      media:
+        tweetId === '102'
+          ? [
+              {
+                mediaUrl: 'https://pbs.twimg.com/media/evidence.jpg',
+                mediaType: 'photo',
+                width: 1200,
+                height: 800,
+              },
+            ]
+          : [],
     })
     const fetcherMock = jest.fn(
       async (_path: string[], params: URLSearchParams) => ({
@@ -279,6 +290,14 @@ describe('ClickHouse-backed portal analytics', () => {
       createdAt: '2026-08-07T12:00:00.000Z',
       likes: 3,
       rts: 1,
+      media: [
+        {
+          url: 'https://pbs.twimg.com/media/evidence.jpg',
+          type: 'photo',
+          width: 1200,
+          height: 800,
+        },
+      ],
     })
   })
 
@@ -336,12 +355,7 @@ describe('ClickHouse-backed portal analytics', () => {
       new URLSearchParams({ limit: '50', hours: '168' }),
       { timeoutMs: 30_000, revalidate: 1_800 },
     )
-    await fetchPortalRecentBangers(
-      50,
-      24,
-      fetcher,
-      '2026-08-12T07:00:00.000Z',
-    )
+    await fetchPortalRecentBangers(50, 24, fetcher, '2026-08-12T07:00:00.000Z')
     expect(fetcher).toHaveBeenLastCalledWith(
       ['recent-bangers'],
       new URLSearchParams({

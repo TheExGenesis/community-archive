@@ -306,6 +306,8 @@ export class ArchiveUploadProcessor {
     
     // Process everything in a single transaction
     await this.sql.begin(async (trx: Sql) => {
+      await this.assertArchiveOwnerMayBeStored(trx, archive)
+
       // Process small data first (account, profile, etc.)
       await this.processUserData(trx, archive)
       
@@ -333,6 +335,43 @@ export class ArchiveUploadProcessor {
       // Process remaining data that depends on all tweets being processed
       await this.processRemainingData(trx, archive)
     })
+  }
+
+  private async assertArchiveOwnerMayBeStored(
+    trx: Sql,
+    archive: any,
+  ): Promise<void> {
+    const account = archive.account?.[0]?.account
+    const accountId = account?.accountId
+    const username = account?.username
+
+    if (!accountId || !username) {
+      throw new Error('Archive owner identity is missing')
+    }
+
+    const [policy] = await trx`
+      SELECT
+        EXISTS (
+          SELECT 1
+          FROM tes.blocked_scraping_users AS blocked
+          WHERE blocked.account_id = ${accountId}
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM public.optin AS consent
+          WHERE consent.explicit_optout IS TRUE
+            AND (
+              consent.twitter_user_id = ${accountId}
+              OR LOWER(consent.username) = LOWER(${username})
+            )
+        ) AS blocked
+    `
+
+    if (policy?.blocked === true) {
+      throw new Error(
+        `Archive owner ${accountId} is explicitly opted out; refusing all archive writes`,
+      )
+    }
   }
 
   private async processUserData(trx: Sql, archive: any): Promise<void> {

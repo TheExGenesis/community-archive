@@ -1630,38 +1630,6 @@ export type Database = {
       }
     }
     Functions: {
-      claim_archive_completion_notifications: {
-        Args: { p_limit?: number }
-        Returns: {
-          account_id: string
-          archive_at: string
-          archive_username: string | null
-          id: number
-          recipient_email: string
-        }[]
-      }
-      community_archive_monitoring_completion_notifications: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          dead_24h_count: number
-          oldest_ready_seconds: number | null
-          processing_count: number
-          ready_count: number
-          seconds_since_last_sent: number | null
-        }[]
-      }
-      finish_archive_completion_notification: {
-        Args: {
-          p_error?: string
-          p_id: number
-          p_provider_message_id?: string
-        }
-        Returns: undefined
-      }
-      set_archive_completion_notification: {
-        Args: { p_enabled: boolean }
-        Returns: { email: string | null; enabled: boolean }[]
-      }
       admin_enqueue_delete_with_export: {
         Args: {
           p_account_id: string
@@ -1734,11 +1702,33 @@ export type Database = {
         }
         Returns: undefined
       }
+      claim_archive_completion_notifications: {
+        Args: {
+          p_limit?: number
+        }
+        Returns: {
+          id: number
+          recipient_email: string
+          account_id: string
+          archive_username: string
+          archive_at: string
+        }[]
+      }
       commit_temp_data: {
         Args: {
           p_suffix: string
         }
         Returns: undefined
+      }
+      community_archive_monitoring_completion_notifications: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          ready_count: number
+          processing_count: number
+          dead_24h_count: number
+          oldest_ready_seconds: number
+          seconds_since_last_sent: number
+        }[]
       }
       compute_hourly_scraping_stats: {
         Args: {
@@ -1808,6 +1798,14 @@ export type Database = {
       drop_temp_tables: {
         Args: {
           p_suffix: string
+        }
+        Returns: undefined
+      }
+      finish_archive_completion_notification: {
+        Args: {
+          p_id: number
+          p_provider_message_id?: string
+          p_error?: string
         }
         Returns: undefined
       }
@@ -2424,6 +2422,15 @@ export type Database = {
           media: Json
         }[]
       }
+      set_archive_completion_notification: {
+        Args: {
+          p_enabled: boolean
+        }
+        Returns: {
+          enabled: boolean
+          email: string
+        }[]
+      }
       set_limit: {
         Args: {
           "": number
@@ -2571,3 +2578,4 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+

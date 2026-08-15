@@ -119,6 +119,11 @@ const TABLE_CONFIGS: Record<string, TableConfig> = {
     conflict: 'tweet_id',
     updates: ['favorite_count', 'retweet_count', 'archive_upload_id']
   },
+  conversations: {
+    columns: ['tweet_id', 'conversation_id', 'producer_source', 'resolution_status', 'resolved_at', 'attempt_count', 'next_attempt_at', 'last_error'],
+    conflict: 'tweet_id',
+    updates: ['conversation_id', 'producer_source', 'resolution_status', 'resolved_at', 'attempt_count', 'next_attempt_at', 'last_error']
+  },
   mentioned_users: {
     columns: ['user_id', 'name', 'screen_name'],
     conflict: 'user_id'
@@ -170,6 +175,25 @@ const TABLE_CONFIGS: Record<string, TableConfig> = {
 function removeProblematicCharacters(value: string | null | undefined): string | null {
   if (!value || value === 'NULL') return null
   return value.replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+}
+
+export function authoritativeConversationFromArchiveTweet(tweet: any) {
+  const tweetId = String(tweet?.id_str || tweet?.id || '')
+  const conversationId = tweet?.conversation_id_str || tweet?.conversation_id
+  if (!/^\d{1,20}$/.test(tweetId) || !/^\d{1,20}$/.test(String(conversationId || ''))) {
+    return null
+  }
+  const now = new Date().toISOString()
+  return {
+    tweet_id: tweetId,
+    conversation_id: String(conversationId),
+    producer_source: 'archive_upload',
+    resolution_status: 'authoritative',
+    resolved_at: now,
+    attempt_count: 0,
+    next_attempt_at: now,
+    last_error: null
+  }
 }
 
 function getMemoryUsageMB(): number {
@@ -398,11 +422,14 @@ export class ArchiveUploadProcessor {
     const media: any[] = []
     const quotes: any[] = []
     const retweets: any[] = []
+    const conversations: any[] = []
 
     // Process each tweet in the chunk
     for (const tweetData of tweetChunk) {
       const tweet = tweetData.tweet
       const tweetId = tweet.id_str || tweet.id
+      const authoritativeConversation = authoritativeConversationFromArchiveTweet(tweet)
+      if (authoritativeConversation) conversations.push(authoritativeConversation)
 
       // Process tweet
       tweets.push({
@@ -478,6 +505,9 @@ export class ArchiveUploadProcessor {
     await this.insertIfNotEmpty(trx, 'tweets', tweets, (t: any) => 
       [t.tweet_id, t.account_id, t.created_at, t.full_text, t.favorite_count, t.retweet_count, t.reply_to_tweet_id, t.reply_to_user_id, t.reply_to_username, t.archive_upload_id])
 
+    await this.insertIfNotEmpty(trx, 'conversations', conversations, (c: any) =>
+      [c.tweet_id, c.conversation_id, c.producer_source, c.resolution_status, c.resolved_at, c.attempt_count, c.next_attempt_at, c.last_error])
+
     await this.insertIfNotEmpty(trx, 'mentioned_users', Array.from(mentionedUsersMap.values()), (m: any) => [m.user_id, m.name, m.screen_name]);
     
 
@@ -510,6 +540,7 @@ export class ArchiveUploadProcessor {
     media.length = 0
     quotes.length = 0
     retweets.length = 0
+    conversations.length = 0
   }
 
   private async processRemainingData(trx: Sql, archive: any): Promise<void> {

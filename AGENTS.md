@@ -113,16 +113,24 @@ Staging synchronization is automatic; production synchronization is not:
 
 - Treat `public.conversations` and archived `reply_to_tweet_id` links as the
   primary source for thread structure.
-- If the thread head is missing locally, fetch the known tweet with
-  `fetchSyndicatedTweet` in `src/lib/twitterSyndication.ts`, follow its
-  `reply_to_tweet_id` to the parent, and repeat until a tweet has no parent.
-  That terminal tweet is the original post and its ID is the thread head.
+- Every ingestion writer should persist a source-supplied conversation ID when
+  one is present. If it is missing, the writer may use Twitter/X syndication to
+  follow reply parents to the original post and use that terminal tweet ID as
+  the conversation ID.
 - Bound the traversal and track visited tweet IDs. If a parent is deleted,
   private, unavailable, cyclic, or the syndication request fails, keep the
   thread unresolved instead of guessing a head.
-- Syndication is a transient recovery source, not archived data. Preserve the
-  hydration and persistence restrictions documented in
-  `src/lib/twitterSyndication.ts`.
+- Apply authoritative consent policy separately to every recovered tweet at
+  the final PostgreSQL write boundary. A recovered tweet may be ingested only
+  when its own author is absent from both `public.optin.explicit_optout` and
+  `tes.blocked_scraping_users`. An opted-out node may be traversed by ID to find
+  the root, but its identifying account/profile fields, tweet content, media,
+  and authored relationships must never be persisted. The established
+  content-free policy tombstone may retain stable tweet/account IDs; eligible
+  tweets elsewhere in a fully resolved chain may still be stored.
+- Tag persisted rows with syndication provenance. Keep render-only hydration
+  external and non-persistent; ingestion writers are the only callers allowed
+  to archive eligible syndicated rows after the per-author policy check.
 
 ## Analytics Data Sources
 

@@ -324,6 +324,36 @@ export type Database = {
           },
         ]
       }
+      conversation_resolution_runs: {
+        Row: {
+          attempted: number
+          deferred: number
+          finished_at: string
+          id: number
+          ready_after: number
+          resolved: number
+          started_at: string
+        }
+        Insert: {
+          attempted: number
+          deferred: number
+          finished_at?: string
+          id?: number
+          ready_after: number
+          resolved: number
+          started_at?: string
+        }
+        Update: {
+          attempted?: number
+          deferred?: number
+          finished_at?: string
+          id?: number
+          ready_after?: number
+          resolved?: number
+          started_at?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           attempt_count: number
@@ -381,36 +411,6 @@ export type Database = {
             referencedColumns: ["tweet_id"]
           },
         ]
-      }
-      conversation_resolution_runs: {
-        Row: {
-          attempted: number
-          deferred: number
-          finished_at: string
-          id: number
-          ready_after: number
-          resolved: number
-          started_at: string
-        }
-        Insert: {
-          attempted: number
-          deferred: number
-          finished_at?: string
-          id?: number
-          ready_after: number
-          resolved: number
-          started_at?: string
-        }
-        Update: {
-          attempted?: number
-          deferred?: number
-          finished_at?: string
-          id?: number
-          ready_after?: number
-          resolved?: number
-          started_at?: string
-        }
-        Relationships: []
       }
       digest_editions: {
         Row: {
@@ -2510,3 +2510,4 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+

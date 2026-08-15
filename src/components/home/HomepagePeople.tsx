@@ -70,7 +70,7 @@ export default async function HomepagePeople({
     <div className="pt-2">
       <p className={labelClassName}>
         {personalized.length
-          ? 'People you interact with most'
+          ? 'People you interact with most this year'
           : 'Featured archives'}
       </p>
       <div className="mx-auto w-full max-w-3xl">

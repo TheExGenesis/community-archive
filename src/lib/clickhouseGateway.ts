@@ -100,7 +100,7 @@ export function analyticsGatewayRequestUrl(
   } else if (
     cleanPath.length === 3 &&
     cleanPath[0] === 'user' &&
-    /^\d{1,20}$/.test(cleanPath[1]) &&
+    /^(?:\d{1,20}|[A-Za-z0-9_@]{1,80})$/.test(cleanPath[1]) &&
     cleanPath[2] === 'interactions'
   ) {
     allowedParams = new Set(['year', 'limit'])

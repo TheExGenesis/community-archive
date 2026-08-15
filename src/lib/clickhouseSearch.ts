@@ -24,7 +24,13 @@ interface ClickHouseSearchResponse {
   data: {
     tweets: ClickHouseSearchTweet[]
     nextOffset: number | null
+    definitiveEmpty?: boolean
   }
+}
+
+interface MappedClickHouseSearchResponse {
+  tweets: TimelineTweet[]
+  definitiveEmpty: boolean
 }
 
 interface ClickHouseSearchRequestOptions {
@@ -59,20 +65,20 @@ function mapSearchTweets(result: ClickHouseSearchResponse): TimelineTweet[] {
   }))
 }
 
-async function requestClickHouseTweets(
+async function requestClickHouseSearch(
   criteria: FilterCriteria,
   page: number,
   pageSize: number,
   fetchImpl: typeof fetch,
   options: ClickHouseSearchRequestOptions = {},
-): Promise<TimelineTweet[]> {
+): Promise<MappedClickHouseSearchResponse> {
   const query = criteria.rawSearchQuery?.trim()
   if (!query) {
     throw new Error('ClickHouse text search requires the raw search query')
   }
 
   const offset = (page - 1) * pageSize
-  if (offset > 5_000) return []
+  if (offset > 5_000) return { tweets: [], definitiveEmpty: false }
 
   const params = new URLSearchParams({
     q: query,
@@ -111,7 +117,22 @@ async function requestClickHouseTweets(
     throw new Error('ClickHouse tweet search returned an invalid response')
   }
 
-  return mapSearchTweets(result)
+  return {
+    tweets: mapSearchTweets(result),
+    definitiveEmpty: result.data.definitiveEmpty === true,
+  }
+}
+
+async function requestClickHouseTweets(
+  criteria: FilterCriteria,
+  page: number,
+  pageSize: number,
+  fetchImpl: typeof fetch,
+  options: ClickHouseSearchRequestOptions = {},
+): Promise<TimelineTweet[]> {
+  return (
+    await requestClickHouseSearch(criteria, page, pageSize, fetchImpl, options)
+  ).tweets
 }
 
 export async function searchTweetsWithClickHouse(
@@ -134,13 +155,12 @@ export function canPreviewTweetSearch(
   )
 }
 
-export async function searchTweetPreviewWithClickHouse(
+export async function searchTweetPreviewsWithClickHouse(
   criteria: FilterCriteria,
   fetchImpl: typeof fetch = fetch,
-): Promise<TimelineTweet | null> {
-  const tweets = await requestClickHouseTweets(criteria, 1, 1, fetchImpl, {
+): Promise<MappedClickHouseSearchResponse> {
+  return requestClickHouseSearch(criteria, 1, 3, fetchImpl, {
     preview: true,
     excludeRetweets: criteria.excludeRetweets,
   })
-  return tweets[0] || null
 }

@@ -15,7 +15,7 @@ import {
 } from '@/lib/queries/tweetQueries'
 import {
   canPreviewTweetSearch,
-  searchTweetPreviewWithClickHouse,
+  searchTweetPreviewsWithClickHouse,
 } from '@/lib/clickhouseSearch'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import type { TweetOrigin } from '@/lib/navigation'
@@ -79,9 +79,17 @@ export default function TweetList({
       try {
         if (pageToLoad === 1 && canPreviewTweetSearch(criteria)) {
           try {
-            const preview = await searchTweetPreviewWithClickHouse(criteria)
-            if (preview) {
-              setTweets([preview])
+            const preview = await searchTweetPreviewsWithClickHouse(criteria)
+            if (preview.definitiveEmpty) {
+              setTweets([])
+              setIsLoading(false)
+              setLastFetchCount(0)
+              setTotalCount(0)
+              setCurrentPage(1)
+              return
+            }
+            if (preview.tweets.length > 0) {
+              setTweets(preview.tweets)
               setIsLoading(false)
               setIsCompletingPreview(true)
             }

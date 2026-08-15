@@ -47,7 +47,7 @@ export function DigestEditionView({
 
         <header>
           <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-2.5 dark:border-zinc-200">
-            <div className={sectionLabel}>The Daily Digest</div>
+            <div className={sectionLabel}>What Happened Yesterday</div>
             <div className="flex flex-wrap items-center justify-end gap-3">
               {isAdmin ? (
                 <Link
@@ -249,7 +249,7 @@ export function DigestEditionView({
         <footer className={`mt-4 border-t pt-5 text-xs leading-5 ${MUTED}`}>
           {edition.isPreview
             ? 'Prototype assembled from a frozen research snapshot. Tweet text and engagement were hydrated for this preview; editorial summaries come from the cluster memo.'
-            : 'Curated automatically from the previous 24 hours of archive bangers and reviewed through the Daily Digest lab before publication.'}
+            : 'Curated automatically from the previous 24 hours of archive bangers and reviewed in the editorial lab before publication.'}
         </footer>
       </article>
     </main>

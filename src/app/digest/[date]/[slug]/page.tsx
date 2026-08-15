@@ -14,7 +14,7 @@ export async function generateMetadata({
   params: { date: string; slug: string }
 }): Promise<Metadata> {
   if (!DATE_PATTERN.test(params.date))
-    return { title: 'Daily Digest · Community Archive' }
+    return { title: 'What Happened Yesterday · Community Archive' }
   const edition = await getPublishedDigest(params.date)
   const story = edition?.content.stories.find(
     (item) => item.slug === params.slug,
@@ -24,7 +24,7 @@ export async function generateMetadata({
         title: `${markdownToPlainText(story.title)} · Community Archive`,
         description: markdownToPlainText(story.subtitle),
       }
-    : { title: 'Daily Digest · Community Archive' }
+    : { title: 'What Happened Yesterday · Community Archive' }
 }
 
 export default async function DigestStoryPage({

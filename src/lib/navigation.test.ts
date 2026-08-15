@@ -132,7 +132,7 @@ describe('tweet detail navigation', () => {
         from: 'digest',
         returnTo: '/digest/2026-08-12/taste',
       }).label,
-    ).toBe('Back to Daily Digest')
+    ).toBe('Back to What Happened Yesterday')
     expect(
       getTweetBackLink({
         from: 'profile',

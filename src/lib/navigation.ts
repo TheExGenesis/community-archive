@@ -58,7 +58,7 @@ const TWEET_ORIGINS: Record<
   },
   digest: {
     href: '/digest',
-    label: 'Back to Daily Digest',
+    label: 'Back to What Happened Yesterday',
     matches: (href) => href === '/digest' || href.startsWith('/digest/'),
   },
   trends: {

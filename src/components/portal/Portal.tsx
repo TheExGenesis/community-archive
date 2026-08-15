@@ -634,8 +634,8 @@ export default function Portal({
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-[15px] font-bold">
                       {digestPreview.isPreview
-                        ? 'Mock Daily Digest'
-                        : 'Latest Daily Digest'}
+                        ? 'What Happened Yesterday · Preview'
+                        : 'What Happened Yesterday'}
                     </span>
                     <span className="text-[12px] font-semibold text-white/75 group-hover:text-white dark:text-zinc-700 dark:group-hover:text-zinc-950">
                       Read →

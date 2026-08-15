@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/archive-completion-notifications",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

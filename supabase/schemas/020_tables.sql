@@ -253,6 +253,50 @@ CREATE TABLE IF NOT EXISTS "public"."user_action_log" (
 );
 ALTER TABLE "public"."user_action_log" OWNER TO "postgres";
 
+-- Explicit owner preference and private delivery outbox for archive-completion
+-- email. The outbox snapshots the verified recipient when an upload completes.
+CREATE TABLE IF NOT EXISTS "public"."archive_completion_notification_preferences" (
+    "user_id" uuid PRIMARY KEY REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "account_id" text NOT NULL UNIQUE CHECK ("account_id" ~ '^[0-9]{1,20}$'),
+    "email" text NOT NULL CHECK (char_length("email") BETWEEN 3 AND 320),
+    "enabled" boolean NOT NULL DEFAULT false,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "updated_at" timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE "public"."archive_completion_notification_preferences" OWNER TO "postgres";
+
+CREATE TABLE IF NOT EXISTS "public"."archive_completion_notification_outbox" (
+    "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    "archive_upload_id" bigint NOT NULL UNIQUE REFERENCES "public"."archive_upload"("id") ON DELETE CASCADE,
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "account_id" text NOT NULL CHECK ("account_id" ~ '^[0-9]{1,20}$'),
+    "recipient_email" text NOT NULL CHECK (char_length("recipient_email") BETWEEN 3 AND 320),
+    "archive_username" text,
+    "archive_at" timestamptz NOT NULL,
+    "status" text NOT NULL DEFAULT 'queued' CHECK ("status" IN ('queued', 'processing', 'retry', 'sent', 'dead', 'cancelled')),
+    "attempt_count" integer NOT NULL DEFAULT 0 CHECK ("attempt_count" >= 0),
+    "available_at" timestamptz NOT NULL DEFAULT now(),
+    "locked_at" timestamptz,
+    "sent_at" timestamptz,
+    "provider_message_id" text,
+    "last_error" text,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "updated_at" timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE "public"."archive_completion_notification_outbox" OWNER TO "postgres";
+
+CREATE TABLE IF NOT EXISTS "public"."archive_completion_notification_worker_state" (
+    "singleton" boolean PRIMARY KEY DEFAULT true CHECK ("singleton" IS TRUE),
+    "last_started_at" timestamptz,
+    "last_finished_at" timestamptz,
+    "last_claimed" integer NOT NULL DEFAULT 0 CHECK ("last_claimed" >= 0),
+    "last_sent" integer NOT NULL DEFAULT 0 CHECK ("last_sent" >= 0),
+    "last_failed" integer NOT NULL DEFAULT 0 CHECK ("last_failed" >= 0),
+    "last_error" text,
+    "updated_at" timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE "public"."archive_completion_notification_worker_state" OWNER TO "postgres";
+
 -- Daily Digest editorial state. Analytical candidates come from ClickHouse,
 -- while PostgreSQL owns prompt/run history and publication status.
 CREATE TABLE IF NOT EXISTS "public"."digest_prompt_versions" (

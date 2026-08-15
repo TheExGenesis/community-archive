@@ -45,6 +45,18 @@ GRANT ALL ON TABLE "public"."profile_settings" TO "service_role";
 GRANT ALL ON TABLE "public"."profile_curation" TO "service_role";
 GRANT ALL ON TABLE "public"."tweet_link_previews" TO "service_role";
 
+-- Archive-completion preference is owner-readable and RPC-written. Its outbox
+-- and recipient snapshots are service-only.
+REVOKE ALL PRIVILEGES ON TABLE "public"."archive_completion_notification_preferences" FROM PUBLIC, "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."archive_completion_notification_outbox" FROM PUBLIC, "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."archive_completion_notification_worker_state" FROM PUBLIC, "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON SEQUENCE "public"."archive_completion_notification_outbox_id_seq" FROM PUBLIC, "anon", "authenticated";
+GRANT SELECT ON TABLE "public"."archive_completion_notification_preferences" TO "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."archive_completion_notification_preferences" TO "service_role";
+GRANT ALL PRIVILEGES ON TABLE "public"."archive_completion_notification_outbox" TO "service_role";
+GRANT ALL PRIVILEGES ON TABLE "public"."archive_completion_notification_worker_state" TO "service_role";
+GRANT USAGE, SELECT ON SEQUENCE "public"."archive_completion_notification_outbox_id_seq" TO "service_role";
+
 -- quote_tweets / retweets: read-only for anon/authenticated; writes via service_role
 -- only (firehose + worker). See #369. The blanket "GRANT ALL ON TABLE ... TO anon"
 -- previously applied to these tables (via ALTER DEFAULT PRIVILEGES in prod.sql) is

@@ -38,7 +38,12 @@ export default async function SettingsPage() {
         .maybeSingle()
     : admin.from('optin').select('*').eq('user_id', user.id).maybeSingle()
 
-  const [optInResponse, archivesResponse, settings] = await Promise.all([
+  const [
+    optInResponse,
+    archivesResponse,
+    settings,
+    notificationPreferenceResponse,
+  ] = await Promise.all([
     optInQuery,
     twitterAccountId
       ? supabase
@@ -65,6 +70,11 @@ export default async function SettingsPage() {
     twitterAccountId
       ? getPublicProfileSettings(twitterAccountId)
       : Promise.resolve({ downloadArchiveVisible: true }),
+    supabase
+      .from('archive_completion_notification_preferences')
+      .select('enabled,email')
+      .eq('user_id', user.id)
+      .maybeSingle(),
   ])
 
   return (
@@ -74,6 +84,7 @@ export default async function SettingsPage() {
           user={user}
           accountId={twitterAccountId}
           initialDownloadArchiveVisible={settings.downloadArchiveVisible}
+          initialNotificationPreference={notificationPreferenceResponse.data}
           initialOptInData={optInResponse.data}
           archives={archivesResponse.data || []}
         />

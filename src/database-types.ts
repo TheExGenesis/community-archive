@@ -263,6 +263,131 @@ export type Database = {
           },
         ]
       }
+      archive_completion_notification_outbox: {
+        Row: {
+          account_id: string
+          archive_at: string
+          archive_upload_id: number
+          archive_username: string | null
+          attempt_count: number
+          available_at: string
+          created_at: string
+          id: number
+          last_error: string | null
+          locked_at: string | null
+          provider_message_id: string | null
+          recipient_email: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          archive_at: string
+          archive_upload_id: number
+          archive_username?: string | null
+          attempt_count?: number
+          available_at?: string
+          created_at?: string
+          id?: never
+          last_error?: string | null
+          locked_at?: string | null
+          provider_message_id?: string | null
+          recipient_email: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          archive_at?: string
+          archive_upload_id?: number
+          archive_username?: string | null
+          attempt_count?: number
+          available_at?: string
+          created_at?: string
+          id?: never
+          last_error?: string | null
+          locked_at?: string | null
+          provider_message_id?: string | null
+          recipient_email?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "archive_completion_notification_outbox_archive_upload_id_fkey"
+            columns: ["archive_upload_id"]
+            isOneToOne: true
+            referencedRelation: "archive_upload"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      archive_completion_notification_preferences: {
+        Row: {
+          account_id: string
+          created_at: string
+          email: string
+          enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          email: string
+          enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          email?: string
+          enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      archive_completion_notification_worker_state: {
+        Row: {
+          last_claimed: number
+          last_error: string | null
+          last_failed: number
+          last_finished_at: string | null
+          last_sent: number
+          last_started_at: string | null
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          last_claimed?: number
+          last_error?: string | null
+          last_failed?: number
+          last_finished_at?: string | null
+          last_sent?: number
+          last_started_at?: string | null
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          last_claimed?: number
+          last_error?: string | null
+          last_failed?: number
+          last_finished_at?: string | null
+          last_sent?: number
+          last_started_at?: string | null
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       archive_upload: {
         Row: {
           account_id: string
@@ -1610,11 +1735,38 @@ export type Database = {
         }
         Returns: undefined
       }
+      claim_archive_completion_notifications: {
+        Args: {
+          p_limit?: number
+        }
+        Returns: {
+          id: number
+          recipient_email: string
+          account_id: string
+          archive_username: string
+          archive_at: string
+        }[]
+      }
       commit_temp_data: {
         Args: {
           p_suffix: string
         }
         Returns: undefined
+      }
+      community_archive_monitoring_completion_notifications: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          ready_count: number
+          processing_count: number
+          dead_24h_count: number
+          oldest_ready_seconds: number
+          seconds_since_last_sent: number
+          worker_last_started_timestamp_seconds: number
+          worker_last_finished_timestamp_seconds: number
+          worker_last_claimed: number
+          worker_last_sent: number
+          worker_last_failed: number
+        }[]
       }
       compute_hourly_scraping_stats: {
         Args: {
@@ -1684,6 +1836,23 @@ export type Database = {
       drop_temp_tables: {
         Args: {
           p_suffix: string
+        }
+        Returns: undefined
+      }
+      finish_archive_completion_notification: {
+        Args: {
+          p_id: number
+          p_provider_message_id?: string
+          p_error?: string
+        }
+        Returns: undefined
+      }
+      finish_archive_completion_notification_run: {
+        Args: {
+          p_claimed: number
+          p_sent: number
+          p_failed: number
+          p_error?: string
         }
         Returns: undefined
       }
@@ -2298,6 +2467,15 @@ export type Database = {
           username: string
           account_display_name: string
           media: Json
+        }[]
+      }
+      set_archive_completion_notification: {
+        Args: {
+          p_enabled: boolean
+        }
+        Returns: {
+          enabled: boolean
+          email: string
         }[]
       }
       set_limit: {

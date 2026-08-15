@@ -35,7 +35,7 @@ This is useful evidence for a candidate pool, but not a sufficient homepage rank
 
 ## Avatar and failure behavior
 
-All 24 stored avatar URLs returned HTTP 200 during validation. The shared avatar list also now retries missing or failed images through the existing bounded profile-avatar recovery route, then retains the initials fallback if recovery is unavailable. `tessera_antra` is explicitly excluded from homepage selections and was replaced in the editorial pool by `nosilverv`.
+All 24 stored avatar URLs returned HTTP 200 during validation. The shared avatar list also now retries missing or failed images through the existing bounded profile-avatar recovery route, then retains the initials fallback if recovery is unavailable. Compact cards reserve enough width and two username lines so long handles cannot overlap their neighbors. `tessera_antra` is explicitly excluded from homepage selections and was replaced in the editorial pool by `nosilverv`.
 
 If member identity or interaction analytics is unavailable, the signed-in homepage degrades to the guest featured sample instead of leaving an empty strip.
 

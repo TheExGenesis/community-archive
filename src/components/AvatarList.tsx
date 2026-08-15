@@ -96,13 +96,13 @@ const AvatarList = ({
               key={avatar.account_id}
               href={userProfileHref(avatar.username, avatar.account_id)}
               className={`flex flex-col items-center text-center ${
-                compact ? 'w-16' : 'w-20'
+                compact ? 'w-20' : 'w-24'
               }`}
             >
               <RecoverableArchiveAvatar avatar={avatar} compact={compact} />
               <span
-                className={`mt-1 break-words hover:underline ${
-                  compact ? 'text-[11px]' : 'text-xs'
+                className={`mt-1 w-full min-w-0 leading-tight [overflow-wrap:anywhere] hover:underline ${
+                  compact ? 'min-h-7 text-[11px]' : 'text-xs'
                 }`}
               >
                 {avatar.username}

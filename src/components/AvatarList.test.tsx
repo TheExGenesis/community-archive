@@ -96,3 +96,28 @@ it('shows archived tweet count instead of follower count', () => {
   expect(screen.getByText('12.3K tweets')).toBeInTheDocument()
   expect(screen.queryByText(/followers/)).not.toBeInTheDocument()
 })
+
+it('keeps long usernames inside a wider compact card', () => {
+  render(
+    <AvatarList
+      initialAvatars={[
+        {
+          ...archive,
+          username: 'tasshinfogleman',
+          avatar_media_url: 'https://pbs.twimg.com/tasshin_normal.jpg',
+          num_tweets: 77_031,
+        },
+      ]}
+      compact
+    />,
+  )
+
+  expect(screen.getByRole('link', { name: /tasshinfogleman/ })).toHaveClass(
+    'w-20',
+  )
+  expect(screen.getByText('tasshinfogleman')).toHaveClass(
+    'w-full',
+    'min-h-7',
+    '[overflow-wrap:anywhere]',
+  )
+})

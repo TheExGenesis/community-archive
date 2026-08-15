@@ -1,0 +1,76 @@
+name: Verify daily bulk export
+
+on:
+  workflow_dispatch:
+  schedule:
+    # The external exporter normally finishes by 11:00 UTC. Read the object's
+    # real timestamp after that window rather than presenting the run time.
+    - cron: '0 13 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  verify-export-and-update-release:
+    runs-on: ubuntu-latest
+    env:
+      EXPORT_URL: https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet
+      RELEASE_TAG: data_export
+      MAX_EXPORT_AGE_SECONDS: '129600'
+      MIN_EXPORT_BYTES: '100000000'
+    steps:
+      - name: Verify freshness and update release title
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          headers="$(curl --fail --silent --show-error --head --retry 3 "$EXPORT_URL" | tr -d '\r')"
+          last_modified="$(awk 'BEGIN { IGNORECASE = 1 } /^last-modified:/ { sub(/^[^:]+:[[:space:]]*/, ""); print; exit }' <<<"$headers")"
+          content_length="$(awk 'BEGIN { IGNORECASE = 1 } /^content-length:/ { sub(/^[^:]+:[[:space:]]*/, ""); print; exit }' <<<"$headers")"
+
+          if [[ -z "$last_modified" || ! "$content_length" =~ ^[0-9]+$ ]]; then
+            echo "The export response is missing a valid Last-Modified or Content-Length header." >&2
+            exit 1
+          fi
+
+          read -r export_date age_seconds <<<"$(python3 - "$last_modified" <<'PY'
+          from datetime import datetime, timezone
+          from email.utils import parsedate_to_datetime
+          import sys
+
+          timestamp = parsedate_to_datetime(sys.argv[1]).astimezone(timezone.utc)
+          age = int((datetime.now(timezone.utc) - timestamp).total_seconds())
+          print(timestamp.date().isoformat(), age)
+          PY
+          )"
+
+          if (( age_seconds < 0 || age_seconds > MAX_EXPORT_AGE_SECONDS )); then
+            echo "The bulk export is stale: ${age_seconds}s old (maximum ${MAX_EXPORT_AGE_SECONDS}s)." >&2
+            exit 1
+          fi
+
+          if (( content_length < MIN_EXPORT_BYTES )); then
+            echo "The bulk export is unexpectedly small: ${content_length} bytes." >&2
+            exit 1
+          fi
+
+          desired_title="Bulk tweet export — updated $export_date"
+          release="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          release_id="$(jq -r '.id' <<<"$release")"
+          current_title="$(jq -r '.name' <<<"$release")"
+
+          if [[ "$current_title" != "$desired_title" ]]; then
+            gh api \
+              --method PATCH \
+              "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+              -f "name=$desired_title" \
+              --silent
+          fi
+
+          {
+            echo "### $desired_title"
+            echo "Freshness: ${age_seconds}s"
+            echo "Size: ${content_length} bytes"
+            echo "Download: $EXPORT_URL"
+          } >> "$GITHUB_STEP_SUMMARY"

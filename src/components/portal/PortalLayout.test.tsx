@@ -93,7 +93,7 @@ test('renders the balanced homepage composition and editorial labels', async () 
     screen.getByRole('link', { name: /Export the archive/i }),
   ).toHaveAttribute(
     'href',
-    'https://github.com/TheExGenesis/community-archive/releases/tag/data_export',
+    'https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet',
   )
   expect(
     screen.getByRole('link', { name: /Community Builds/i }),

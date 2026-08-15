@@ -59,6 +59,10 @@ describe('member navigation', () => {
       href: '/digest',
       label: 'Digest',
     })
+    expect(getPrimaryNav(false)).toContainEqual({
+      href: '/user-dir',
+      label: 'Users',
+    })
     expect(getPrimaryNav(true)).toContainEqual({
       href: '/trends',
       label: 'Trends',

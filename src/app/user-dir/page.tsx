@@ -80,7 +80,7 @@ export default function UserDirectoryPage() {
         setUsers(fetchedUsers)
       } catch (err) {
         if (!isCurrentRequest) return
-        setError('We could not load the Library. Please try again.')
+        setError('We could not load users. Please try again.')
         console.error('Error fetching users:', err)
       } finally {
         if (isCurrentRequest) setLoading(false)
@@ -144,16 +144,16 @@ export default function UserDirectoryPage() {
       <div className="relative mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto mb-10 max-w-2xl text-center">
           <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-            Library
+            Users
           </h1>
           <p className="mt-3 text-base text-muted-foreground">
-            Browse the archive by contributor. More ways to explore the
-            collection are coming.
+            Meet the people preserving and participating in the Community
+            Archive.
           </p>
           <p className="mt-2 text-sm font-medium text-muted-foreground">
             {loading && users.length === 0
-              ? 'Loading members…'
-              : `${users.length} of ${totalCount.toLocaleString()} members`}
+              ? 'Loading users…'
+              : `${users.length} of ${totalCount.toLocaleString()} users`}
           </p>
         </div>
 
@@ -163,7 +163,7 @@ export default function UserDirectoryPage() {
             className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
           />
           <Input
-            aria-label="Search the Library"
+            aria-label="Search users"
             placeholder="Search by name or username…"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
@@ -191,14 +191,14 @@ export default function UserDirectoryPage() {
                   <Button
                     variant="ghost"
                     onClick={() => handleSort('account_display_name')}
-                    aria-label="Sort by member name"
+                    aria-label="Sort by user name"
                     className="-ml-3 h-8 px-3 text-xs font-semibold uppercase tracking-wider hover:bg-accent"
                   >
-                    Member {renderSortIcon('account_display_name')}
+                    User {renderSortIcon('account_display_name')}
                   </Button>
                 </TableHead>
                 <TableHead
-                  className="w-[20%] py-2 text-right"
+                  className="hidden w-[20%] py-2 text-right sm:table-cell"
                   aria-sort={
                     sortKey === 'num_followers'
                       ? sortOrder === 'asc'
@@ -217,7 +217,7 @@ export default function UserDirectoryPage() {
                   </Button>
                 </TableHead>
                 <TableHead
-                  className="w-[22%] py-2 text-right"
+                  className="hidden w-[22%] py-2 text-right md:table-cell"
                   aria-sort={
                     sortKey === 'joined_at'
                       ? sortOrder === 'asc'
@@ -246,7 +246,7 @@ export default function UserDirectoryPage() {
                   <TableCell colSpan={4} className="h-40 text-center">
                     <span className="inline-flex items-center text-sm text-muted-foreground">
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading members…
+                      Loading users…
                     </span>
                   </TableCell>
                 </TableRow>
@@ -265,7 +265,7 @@ export default function UserDirectoryPage() {
                     colSpan={4}
                     className="h-40 text-center text-sm text-muted-foreground"
                   >
-                    No members match “{debouncedSearch}”.
+                    No users match “{debouncedSearch}”.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -305,12 +305,12 @@ export default function UserDirectoryPage() {
                           {identity}
                         </Link>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-sm font-medium tabular-nums text-muted-foreground">
+                      <TableCell className="hidden whitespace-nowrap text-right text-sm font-medium tabular-nums text-muted-foreground sm:table-cell">
                         {user.num_followers == null
                           ? '—'
                           : formatNumber(user.num_followers)}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-right text-sm font-medium text-muted-foreground">
+                      <TableCell className="hidden whitespace-nowrap text-right text-sm font-medium text-muted-foreground md:table-cell">
                         <time dateTime={user.joined_at || undefined}>
                           {formatJoinedDate(user.joined_at)}
                         </time>

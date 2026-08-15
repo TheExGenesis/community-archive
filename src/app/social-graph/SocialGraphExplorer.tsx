@@ -34,6 +34,7 @@ import {
   followerSliderToCount,
 } from '@/lib/socialGraphFilter'
 import type { AdaptiveGraphResult } from '@/lib/socialGraphAdaptive'
+import { alignGraphLayout } from '@/lib/socialGraphProcrustes'
 import type {
   SocialGraphWorkerRequest,
   SocialGraphWorkerResponse,
@@ -377,6 +378,11 @@ export default function SocialGraphExplorer({
   const workerSignatureRef = useRef('')
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hoverCandidateRef = useRef<string | null>(null)
+  const layoutReferenceRef = useRef(
+    Object.fromEntries(
+      snapshot.nodes.map((node) => [node.id, { x: node.x, y: node.y }]),
+    ),
+  )
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme !== 'light'
   const defaultSettings = useMemo(
@@ -697,7 +703,15 @@ export default function SocialGraphExplorer({
           setAdaptiveError(event.data.error || 'Adaptive graph failed')
           return
         }
-        setAdaptiveResult(event.data.result)
+        const alignedPositions = alignGraphLayout(
+          layoutReferenceRef.current,
+          event.data.result.positions,
+        )
+        layoutReferenceRef.current = alignedPositions
+        setAdaptiveResult({
+          ...event.data.result,
+          positions: alignedPositions,
+        })
         setAdaptiveSignature(workerSignatureRef.current)
         setAdaptiveError(null)
       },

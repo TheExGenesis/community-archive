@@ -85,6 +85,12 @@ CREATE INDEX IF NOT EXISTS user_action_log_user_id_created_at_idx
 CREATE INDEX IF NOT EXISTS user_action_log_action_type_created_at_idx
   ON public.user_action_log (action_type, created_at DESC);
 
+CREATE INDEX IF NOT EXISTS archive_completion_notification_outbox_ready_idx
+  ON public.archive_completion_notification_outbox (available_at, id)
+  WHERE status IN ('queued', 'retry');
+CREATE INDEX IF NOT EXISTS archive_completion_notification_outbox_status_created_idx
+  ON public.archive_completion_notification_outbox (status, created_at);
+
 -- public.all_account: username is a hot lookup key (search_tweets from:/to:,
 -- get_tweet_page_data, client .eq/.in('username')). See #387.
 CREATE INDEX IF NOT EXISTS "idx_all_account_username"

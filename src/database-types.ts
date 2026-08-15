@@ -263,6 +263,98 @@ export type Database = {
           },
         ]
       }
+      archive_completion_notification_outbox: {
+        Row: {
+          account_id: string
+          archive_at: string
+          archive_upload_id: number
+          archive_username: string | null
+          attempt_count: number
+          available_at: string
+          created_at: string
+          id: number
+          last_error: string | null
+          locked_at: string | null
+          provider_message_id: string | null
+          recipient_email: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          archive_at: string
+          archive_upload_id: number
+          archive_username?: string | null
+          attempt_count?: number
+          available_at?: string
+          created_at?: string
+          id?: never
+          last_error?: string | null
+          locked_at?: string | null
+          provider_message_id?: string | null
+          recipient_email: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          archive_at?: string
+          archive_upload_id?: number
+          archive_username?: string | null
+          attempt_count?: number
+          available_at?: string
+          created_at?: string
+          id?: never
+          last_error?: string | null
+          locked_at?: string | null
+          provider_message_id?: string | null
+          recipient_email?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "archive_completion_notification_outbox_archive_upload_id_fkey"
+            columns: ["archive_upload_id"]
+            isOneToOne: true
+            referencedRelation: "archive_upload"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      archive_completion_notification_preferences: {
+        Row: {
+          account_id: string
+          created_at: string
+          email: string
+          enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          email: string
+          enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          email?: string
+          enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       archive_upload: {
         Row: {
           account_id: string
@@ -1538,6 +1630,38 @@ export type Database = {
       }
     }
     Functions: {
+      claim_archive_completion_notifications: {
+        Args: { p_limit?: number }
+        Returns: {
+          account_id: string
+          archive_at: string
+          archive_username: string | null
+          id: number
+          recipient_email: string
+        }[]
+      }
+      community_archive_monitoring_completion_notifications: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          dead_24h_count: number
+          oldest_ready_seconds: number | null
+          processing_count: number
+          ready_count: number
+          seconds_since_last_sent: number | null
+        }[]
+      }
+      finish_archive_completion_notification: {
+        Args: {
+          p_error?: string
+          p_id: number
+          p_provider_message_id?: string
+        }
+        Returns: undefined
+      }
+      set_archive_completion_notification: {
+        Args: { p_enabled: boolean }
+        Returns: { email: string | null; enabled: boolean }[]
+      }
       admin_enqueue_delete_with_export: {
         Args: {
           p_account_id: string
@@ -2447,4 +2571,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-

@@ -37,3 +37,7 @@ CREATE OR REPLACE TRIGGER "update_tes_blocked_scraping_timestamp" BEFORE UPDATE 
 CREATE OR REPLACE TRIGGER trg_log_archive_upload_event
   AFTER INSERT OR UPDATE OF upload_phase ON public.archive_upload
   FOR EACH ROW EXECUTE FUNCTION public.log_archive_upload_event();
+
+CREATE OR REPLACE TRIGGER queue_archive_completion_notification
+  AFTER INSERT OR UPDATE OF upload_phase ON public.archive_upload
+  FOR EACH ROW EXECUTE FUNCTION private.queue_archive_completion_notification();

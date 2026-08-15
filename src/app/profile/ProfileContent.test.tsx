@@ -5,6 +5,7 @@ import ProfileContent from './ProfileContent'
 const mockFetch = jest.fn()
 const originalFetch = global.fetch
 const mockLogInsert = jest.fn().mockResolvedValue({ error: null })
+const mockRpc = jest.fn().mockResolvedValue({ data: null, error: null })
 const mockUpdateDownloadArchiveVisibility = jest.fn()
 
 jest.mock('next/navigation', () => ({
@@ -20,6 +21,7 @@ jest.mock('@/hooks/useAuthAndArchive', () => ({
 jest.mock('@/utils/supabase', () => ({
   createBrowserClient: () => ({
     from: () => ({ insert: mockLogInsert }),
+    rpc: mockRpc,
     storage: { from: jest.fn() },
   }),
 }))
@@ -40,6 +42,8 @@ jest.mock('@/app/user/[account_id]/actions', () => ({
 
 const user = {
   id: 'auth-user-123',
+  email: 'member@example.com',
+  email_confirmed_at: '2026-08-15T00:00:00.000Z',
   user_metadata: {
     user_name: 'ExampleUser',
     provider_id: 'twitter-123',
@@ -137,5 +141,50 @@ describe('ProfileContent opt-in preference', () => {
     expect(
       screen.getByText('Download Archive is hidden from your public profile'),
     ).toBeVisible()
+  })
+
+  it('explicitly opts into future upload completion emails', async () => {
+    render(
+      <ProfileContent
+        user={user}
+        accountId="123"
+        initialNotificationPreference={null}
+        initialOptInData={null}
+        archives={[]}
+      />,
+    )
+
+    const notificationSwitch = screen.getByRole('switch', {
+      name: /email me when my upload is ready/i,
+    })
+    expect(notificationSwitch).not.toBeChecked()
+
+    fireEvent.click(notificationSwitch)
+
+    await waitFor(() =>
+      expect(mockRpc).toHaveBeenCalledWith(
+        'set_archive_completion_notification',
+        { p_enabled: true },
+      ),
+    )
+    expect(notificationSwitch).toBeChecked()
+    expect(screen.getByText(/we'll email member@example.com/i)).toBeVisible()
+  })
+
+  it('does not enable email notifications without a confirmed email', () => {
+    render(
+      <ProfileContent
+        user={{ ...user, email_confirmed_at: null } as any}
+        accountId="123"
+        initialOptInData={null}
+        archives={[]}
+      />,
+    )
+
+    expect(
+      screen.getByRole('switch', {
+        name: /email me when my upload is ready/i,
+      }),
+    ).toBeDisabled()
   })
 })

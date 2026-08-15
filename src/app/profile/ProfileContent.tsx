@@ -21,7 +21,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { AlertCircle, Archive, Trash2, UserX, CheckCircle } from 'lucide-react'
+import {
+  AlertCircle,
+  Archive,
+  Trash2,
+  UserX,
+  CheckCircle,
+  Mail,
+} from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@/utils/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -38,6 +45,10 @@ interface ProfileContentProps {
   user: User
   accountId?: string | null
   initialDownloadArchiveVisible?: boolean
+  initialNotificationPreference?: {
+    enabled: boolean
+    email: string
+  } | null
   initialOptInData: any
   archives: any[]
 }
@@ -46,6 +57,7 @@ export default function ProfileContent({
   user,
   accountId = null,
   initialDownloadArchiveVisible = true,
+  initialNotificationPreference = null,
   initialOptInData,
   archives,
 }: ProfileContentProps) {
@@ -62,6 +74,8 @@ export default function ProfileContent({
   const [downloadArchiveVisible, setDownloadArchiveVisible] = useState(
     initialDownloadArchiveVisible,
   )
+  const [completionNotificationsEnabled, setCompletionNotificationsEnabled] =
+    useState(initialNotificationPreference?.enabled || false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [deletingArchive, setDeletingArchive] = useState<string | null>(null)
@@ -146,6 +160,40 @@ export default function ProfileContent({
       )
     } catch (err: any) {
       setError(err.message || 'Failed to update profile visibility')
+    } finally {
+      endPreferenceMutation()
+    }
+  }
+
+  const handleCompletionNotifications = async (checked: boolean) => {
+    if (!beginPreferenceMutation()) return
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const { error: preferenceError } = await supabase.rpc(
+        'set_archive_completion_notification',
+        { p_enabled: checked },
+      )
+      if (preferenceError) throw preferenceError
+
+      setCompletionNotificationsEnabled(checked)
+      setSuccess(
+        checked
+          ? `We'll email ${user.email} when a future archive upload finishes processing`
+          : 'Archive completion emails are turned off',
+      )
+      capturePostHogEvent('archive_completion_notification_updated', {
+        enabled: checked,
+      })
+      await logUserAction('archive_completion_notification_updated', {
+        enabled: checked,
+      })
+    } catch (err: any) {
+      setError(
+        err.message || 'Failed to update archive completion notifications',
+      )
+      setCompletionNotificationsEnabled(!checked)
     } finally {
       endPreferenceMutation()
     }
@@ -391,6 +439,43 @@ export default function ProfileContent({
         </TabsList>
 
         <TabsContent value="privacy" className="space-y-4">
+          <Card>
+            <CardHeader className="space-y-1.5">
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Archive Completion Notifications
+              </CardTitle>
+              <CardDescription>
+                Get one email when each future upload finishes processing
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="archive-completion-notifications">
+                    Email me when my upload is ready
+                  </Label>
+                  <div className="text-sm text-muted-foreground">
+                    {user.email && user.email_confirmed_at
+                      ? `Notifications will go to ${user.email}. You can turn them off at any time.`
+                      : 'Add and confirm an email address on your account to enable notifications.'}
+                  </div>
+                </div>
+                <Switch
+                  id="archive-completion-notifications"
+                  checked={completionNotificationsEnabled}
+                  onCheckedChange={handleCompletionNotifications}
+                  disabled={
+                    isPreferenceSaving ||
+                    !accountId ||
+                    !user.email ||
+                    !user.email_confirmed_at
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="space-y-1.5">
               <CardTitle>Public Profile</CardTitle>

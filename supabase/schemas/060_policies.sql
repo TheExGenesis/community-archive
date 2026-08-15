@@ -190,6 +190,14 @@ CREATE POLICY "Tweet link previews are publicly visible"
 -- Service role bypasses RLS for the trigger and admin reads.
 ALTER TABLE "public"."user_action_log" ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE "public"."archive_completion_notification_preferences" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."archive_completion_notification_outbox" ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Owners can read archive completion notification preference"
+  ON "public"."archive_completion_notification_preferences"
+  FOR SELECT TO "authenticated"
+  USING ("user_id" = auth.uid());
+
 CREATE POLICY "Users can insert own action log" ON "public"."user_action_log"
   FOR INSERT TO authenticated WITH CHECK (
     user_id = auth.uid()

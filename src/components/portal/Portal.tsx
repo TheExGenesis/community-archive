@@ -25,7 +25,7 @@ export type PortalView = 'home' | 'stream'
 
 const HOME_LIVE_STREAM_LIMIT = 12
 const ARCHIVE_EXPORT_URL =
-  'https://github.com/TheExGenesis/community-archive/releases/tag/data_export'
+  'https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet'
 const COMMUNITY_BUILDS_URL = '/tweets/1835411943735140798'
 
 type DashboardDestination =

@@ -629,7 +629,7 @@ export default function Portal({
                   onClick={() =>
                     captureDashboardDestination('daily_digest', 'card', false)
                   }
-                  className="group rounded-[4px] border border-blue-200 bg-blue-50 px-5 py-5 transition-colors hover:border-brand/60 dark:border-blue-900 dark:bg-blue-950/30"
+                  className="group rounded-[4px] border border-zinc-950 bg-zinc-950 px-5 py-5 text-white transition-colors hover:border-zinc-700 hover:bg-zinc-800 dark:border-white dark:bg-white dark:text-zinc-950 dark:hover:border-zinc-200 dark:hover:bg-zinc-100"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-[15px] font-bold">
@@ -637,16 +637,14 @@ export default function Portal({
                         ? 'Mock Daily Digest'
                         : 'Latest Daily Digest'}
                     </span>
-                    <span className="text-[12px] font-semibold text-brand">
+                    <span className="text-[12px] font-semibold text-white/75 group-hover:text-white dark:text-zinc-700 dark:group-hover:text-zinc-950">
                       Read →
                     </span>
                   </div>
-                  <p
-                    className={`mt-2 line-clamp-3 text-[13px] leading-5 ${MUTED}`}
-                  >
+                  <p className="mt-2 line-clamp-3 text-[13px] leading-5 text-zinc-300 dark:text-zinc-600">
                     {digestPreview.executiveSummary}
                   </p>
-                  <div className={`mt-3 text-[11.5px] ${MUTED}`}>
+                  <div className="mt-3 text-[11.5px] text-zinc-300 dark:text-zinc-600">
                     {digestPreview.digestDate} · {digestPreview.storyCount}{' '}
                     stories ·{' '}
                     {digestPreview.storyTitles.slice(0, 3).join(' · ')}

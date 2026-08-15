@@ -18,6 +18,7 @@ interface CurationTarget {
 
 type ProfileCurationMutation =
   | (CurationTarget & { action: 'dismiss'; itemId: string })
+  | (CurationTarget & { action: 'restore-item'; itemId: string })
   | (CurationTarget & { action: 'toggle-feature'; itemId: string })
   | (CurationTarget & { action: 'reorder'; itemIds: string[] })
   | (CurationTarget & { action: 'restore' })
@@ -99,6 +100,18 @@ export async function mutateProfileCuration(input: ProfileCurationMutation) {
   }
 
   if (!idPattern.test(input.itemId)) throw new Error('Invalid profile item')
+
+  if (input.action === 'restore-item') {
+    const { error } = await supabase
+      .from('profile_curation')
+      .upsert(
+        { ...target, item_id: input.itemId, is_hidden: false },
+        { onConflict: 'account_id,section,item_id' },
+      )
+    if (error) throw error
+    revalidateProfile(input.accountId)
+    return { ok: true as const }
+  }
 
   if (input.action === 'dismiss') {
     const { error } = await supabase

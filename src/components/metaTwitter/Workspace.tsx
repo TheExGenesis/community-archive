@@ -59,6 +59,8 @@ export function Workspace({
   editing = false,
   editSaving = false,
   editError = null,
+  undoDismissAvailable = false,
+  onUndoDismiss,
   onDismiss,
   onToggleFeature,
   onMove,
@@ -89,6 +91,8 @@ export function Workspace({
   editing?: boolean
   editSaving?: boolean
   editError?: string | null
+  undoDismissAvailable?: boolean
+  onUndoDismiss?: () => void
   onDismiss?: (section: 'bangers' | 'people', itemId: string) => void
   onToggleFeature?: (section: 'bangers' | 'people', itemId: string) => void
   onMove?: (
@@ -161,6 +165,23 @@ export function Workspace({
           className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
         >
           {editError}
+        </div>
+      )}
+
+      {undoDismissAvailable && (
+        <div
+          role="status"
+          className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-sm"
+        >
+          <span>Hidden from your profile.</span>
+          <button
+            type="button"
+            onClick={onUndoDismiss}
+            disabled={editSaving}
+            className="font-semibold text-primary hover:underline disabled:opacity-60"
+          >
+            Undo
+          </button>
         </div>
       )}
 

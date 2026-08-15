@@ -188,6 +188,19 @@ test('shows owner-only curation controls and persists section edits', async () =
     }),
   )
   expect(screen.queryByText('Banger 1')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Undo' })).toBeVisible()
+
+  await user.click(screen.getByRole('button', { name: 'Undo' }))
+  await waitFor(() =>
+    expect(mockMutateProfileCuration).toHaveBeenCalledWith({
+      action: 'restore-item',
+      accountId: '42',
+      section: 'bangers',
+      itemId: '1',
+    }),
+  )
+  await waitFor(() => expect(screen.getByText('Banger 1')).toBeVisible())
+  expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
 
   mockMutateProfileCuration.mockResolvedValueOnce({
     ok: true,

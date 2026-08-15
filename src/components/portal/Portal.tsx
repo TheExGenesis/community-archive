@@ -20,6 +20,8 @@ import {
 import { BANGERS_ALL_TIME_HREF, BANGERS_WEEK_HREF } from '@/lib/portal/bangers'
 import { capturePostHogEvent } from '@/lib/posthog'
 import type { DigestPreview } from '@/lib/digest/types'
+import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
+import { CHROME_EXTENSION_URL } from '@/lib/browserExtension'
 
 export type PortalView = 'home' | 'stream'
 
@@ -866,9 +868,18 @@ export default function Portal({
             unavailable={data.failures.liveAnalytics}
           />
           <div className={`mb-3.5 text-[13px] ${MUTED}`}>
-            Tweets arriving from the browser-extension firehose, as contributors
-            read their timelines.
+            Tweets arriving from the{' '}
+            <a
+              href={CHROME_EXTENSION_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-brand hover:underline"
+            >
+              browser extension
+            </a>{' '}
+            firehose, as contributors read their timelines.
           </div>
+          <ExtensionInstallPrompt surface="stream" className="mb-3.5" />
           <div className={`${CARD} overflow-hidden`}>
             {visible.map((t, i) => (
               <TweetCard

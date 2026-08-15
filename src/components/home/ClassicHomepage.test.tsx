@@ -36,6 +36,10 @@ jest.mock('@/components/portal/Portal', () => ({
   __esModule: true,
   default: () => <div data-testid="shared-dashboard" />,
 }))
+jest.mock('@/components/ExtensionInstallPrompt', () => ({
+  __esModule: true,
+  default: () => null,
+}))
 jest.mock('@/lib/clickhouseAnalytics', () => ({
   getTopFollowedAccounts: jest.fn(),
 }))

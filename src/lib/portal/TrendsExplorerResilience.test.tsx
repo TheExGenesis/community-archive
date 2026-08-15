@@ -13,6 +13,10 @@ import { capturePostHogEvent } from '@/lib/posthog'
 jest.mock('@/lib/posthog', () => ({
   capturePostHogEvent: jest.fn(),
 }))
+jest.mock('@/components/ExtensionInstallPrompt', () => ({
+  __esModule: true,
+  default: () => null,
+}))
 const mockCapturePostHogEvent = capturePostHogEvent as jest.Mock
 
 jest.mock('next/navigation', () => ({

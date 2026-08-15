@@ -103,10 +103,11 @@ export async function fetchFavoritePeople(
 
 export async function loadFavoritePeople(
   identifier: string,
+  requestedLimit = DEFAULT_LIMIT,
 ): Promise<FavoritePeopleData> {
   try {
     return {
-      people: await fetchFavoritePeople(identifier),
+      people: await fetchFavoritePeople(identifier, requestedLimit),
       unavailable: false,
     }
   } catch (error) {

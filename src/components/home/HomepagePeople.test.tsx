@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import HomepagePeople from './HomepagePeople'
 import { loadFavoritePeople } from '@/lib/favoritePeople'
 import { sampleFeaturedArchives } from '@/lib/featuredArchives'
+import { loadHomepageArchiveProfiles } from '@/lib/homepageArchiveProfiles'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
 
@@ -10,10 +11,12 @@ jest.mock('@/components/AvatarList', () => ({
   default: ({
     initialAvatars,
   }: {
-    initialAvatars: Array<{ username: string }>
+    initialAvatars: Array<{ username: string; num_tweets?: number }>
   }) => (
     <div data-testid="homepage-avatars">
-      {initialAvatars.map((avatar) => avatar.username).join(',')}
+      {initialAvatars
+        .map((avatar) => `${avatar.username}:${avatar.num_tweets ?? 'none'}`)
+        .join(',')}
     </div>
   ),
 }))
@@ -21,6 +24,9 @@ jest.mock('@/lib/favoritePeople', () => ({ loadFavoritePeople: jest.fn() }))
 jest.mock('@/lib/featuredArchives', () => ({
   HOMEPAGE_FEATURED_ARCHIVE_COUNT: 8,
   sampleFeaturedArchives: jest.fn(),
+}))
+jest.mock('@/lib/homepageArchiveProfiles', () => ({
+  loadHomepageArchiveProfiles: jest.fn(),
 }))
 jest.mock('@/lib/portal/auth', () => ({ getCurrentUser: jest.fn() }))
 jest.mock('@/lib/sessionTwitterUsername', () => ({
@@ -32,6 +38,10 @@ const loadFavoritePeopleMock = loadFavoritePeople as jest.MockedFunction<
 >
 const sampleFeaturedArchivesMock =
   sampleFeaturedArchives as jest.MockedFunction<typeof sampleFeaturedArchives>
+const loadHomepageArchiveProfilesMock =
+  loadHomepageArchiveProfiles as jest.MockedFunction<
+    typeof loadHomepageArchiveProfiles
+  >
 const getCurrentUserMock = getCurrentUser as jest.MockedFunction<
   typeof getCurrentUser
 >
@@ -61,6 +71,12 @@ beforeEach(() => {
       avatar_media_url: 'https://example.com/featured.jpg',
     },
   ])
+  loadHomepageArchiveProfilesMock.mockImplementation(async (archives) =>
+    archives.map((archive, index) => ({
+      ...archive,
+      num_tweets: 1_000 + index,
+    })),
+  )
 })
 
 it('shows the eight cached interaction leaders to a signed-in member', async () => {
@@ -75,9 +91,18 @@ it('shows the eight cached interaction leaders to a signed-in member', async () 
 
   expect(screen.getByText('People you interact with most')).toBeInTheDocument()
   expect(screen.getByTestId('homepage-avatars')).toHaveTextContent(
-    Array.from({ length: 8 }, (_, index) => `friend${index}`).join(','),
+    Array.from(
+      { length: 8 },
+      (_, index) => `friend${index}:${1_000 + index}`,
+    ).join(','),
   )
-  expect(loadFavoritePeopleMock).toHaveBeenCalledWith('alice')
+  expect(loadFavoritePeopleMock).toHaveBeenCalledWith('alice', 12)
+  expect(loadHomepageArchiveProfilesMock).toHaveBeenCalledWith(
+    expect.arrayContaining([
+      expect.objectContaining({ account_id: '100' }),
+      expect.objectContaining({ account_id: '109' }),
+    ]),
+  )
   expect(sampleFeaturedArchivesMock).not.toHaveBeenCalled()
 })
 
@@ -85,7 +110,9 @@ it('shows the representative sample to guests', async () => {
   render(await HomepagePeople({ isMember: false }))
 
   expect(screen.getByText('Featured archives')).toBeInTheDocument()
-  expect(screen.getByTestId('homepage-avatars')).toHaveTextContent('featured')
+  expect(screen.getByTestId('homepage-avatars')).toHaveTextContent(
+    'featured:1000',
+  )
   expect(getCurrentUserMock).not.toHaveBeenCalled()
   expect(sampleFeaturedArchivesMock).toHaveBeenCalledTimes(1)
 })
@@ -98,5 +125,7 @@ it('falls back to the representative sample when interaction data is absent', as
   render(await HomepagePeople({ isMember: true }))
 
   expect(screen.getByText('Featured archives')).toBeInTheDocument()
-  expect(screen.getByTestId('homepage-avatars')).toHaveTextContent('featured')
+  expect(screen.getByTestId('homepage-avatars')).toHaveTextContent(
+    'featured:1000',
+  )
 })

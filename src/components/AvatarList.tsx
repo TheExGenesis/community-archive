@@ -112,8 +112,11 @@ const AvatarList = ({
                   compact ? 'text-[9px]' : 'text-[10px]'
                 }`}
               >
-                {avatar.num_followers &&
-                  `${formatNumber(avatar.num_followers)} followers`}
+                {avatar.num_tweets === undefined
+                  ? null
+                  : `${formatNumber(avatar.num_tweets)} ${
+                      avatar.num_tweets === 1 ? 'tweet' : 'tweets'
+                    }`}
               </span>
             </Link>
           ))}

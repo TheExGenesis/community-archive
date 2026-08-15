@@ -8,6 +8,7 @@ The homepage now uses two archive-selection paths:
 
 - Signed-in members see up to eight accounts from the existing cached `topInteractedAccounts` analytics result. The cache counts mentions, replies, quotes, and reposts and is refreshed every five minutes.
 - Guests see eight archives sampled on each render from a 24-person editorial pool. The sampler chooses one person from each of eight subject/community buckets and then shuffles the result, so follower count does not dominate the homepage.
+- The selected accounts are resolved in one batched `user_directory` read. This filters interaction targets to Community Archive users and supplies current usernames, avatars, and archived tweet counts for the captions. The verified editorial pool also stores a production tweet-count snapshot so guest captions remain present when a sparse preview directory triggers the intended local fallback.
 
 The current interaction projection is all-time. A one- or two-year preference should be added at the gateway/cache layer later; the homepage deliberately does not introduce an uncached ClickHouse query or pretend the present cache is time-weighted.
 
@@ -22,7 +23,7 @@ The current interaction projection is all-time. A one- or two-year preference sh
 | Qualia and contemplative work | Andrés Gómez Emilsson / Captain Pleasure (`algekalipso`), Tasshin Fogleman (`tasshinfogleman`), Vivid Void (`vividvoid`) |
 | Deep tech and tools           | Danielle Fong (`DanielleFong`), Teknium (`Teknium`), Conor White-Sullivan (`Conaw`)                                      |
 | Writers and internet culture  | Wilderless (`the_wilderless`), eigenrobot (`eigenrobot`), Katie Bakes (`katiebakes`)                                     |
-| Broader community voices      | Christine (`christineist`), Tess (`tessera_antra`), Priya Rose (`Prigoose`)                                              |
+| Broader community voices      | Christine (`christineist`), No Silver (`nosilverv`), Priya Rose (`Prigoose`)                                             |
 
 Goth and Nous Research are not in the pool.
 
@@ -34,7 +35,7 @@ This is useful evidence for a candidate pool, but not a sufficient homepage rank
 
 ## Avatar and failure behavior
 
-All 24 stored avatar URLs returned HTTP 200 during validation. The shared avatar list also now retries missing or failed images through the existing bounded profile-avatar recovery route, then retains the initials fallback if recovery is unavailable.
+All 24 stored avatar URLs returned HTTP 200 during validation. The shared avatar list also now retries missing or failed images through the existing bounded profile-avatar recovery route, then retains the initials fallback if recovery is unavailable. `tessera_antra` is explicitly excluded from homepage selections and was replaced in the editorial pool by `nosilverv`.
 
 If member identity or interaction analytics is unavailable, the signed-in homepage degrades to the guest featured sample instead of leaving an empty strip.
 
@@ -42,4 +43,4 @@ If member identity or interaction analytics is unavailable, the signed-in homepa
 
 - Focused server/client Jest suites cover member selection, guest sampling, avatar recovery, homepage composition, and interaction response parsing.
 - TypeScript and lint run as repository-level static checks.
-- A local production-backed browser pass verifies rendered guest avatars, no console errors, and no Next.js error overlay.
+- A protected Vercel preview browser pass verifies eight rendered guest profiles, loaded avatars, tweet-count captions, the `tessera_antra` exclusion, and no Next.js error overlay.

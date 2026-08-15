@@ -77,3 +77,22 @@ it('tries recovery once when a stored avatar fails to load', async () => {
   )
   expect(global.fetch).toHaveBeenCalledTimes(1)
 })
+
+it('shows archived tweet count instead of follower count', () => {
+  render(
+    <AvatarList
+      initialAvatars={[
+        {
+          ...archive,
+          avatar_media_url: 'https://pbs.twimg.com/alice_normal.jpg',
+          num_tweets: 12_345,
+          num_followers: 98_765,
+        },
+      ]}
+      compact
+    />,
+  )
+
+  expect(screen.getByText('12.3K tweets')).toBeInTheDocument()
+  expect(screen.queryByText(/followers/)).not.toBeInTheDocument()
+})

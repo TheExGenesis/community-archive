@@ -13,6 +13,12 @@ describe('sampleFeaturedArchives', () => {
       HOMEPAGE_FEATURED_ARCHIVE_COUNT,
     )
     expect(sample.every((archive) => archive.avatar_media_url)).toBe(true)
+    expect(
+      sample.every(
+        (archive) =>
+          typeof archive.num_tweets === 'number' && archive.num_tweets > 0,
+      ),
+    ).toBe(true)
 
     for (const group of FEATURED_ARCHIVE_GROUPS) {
       expect(
@@ -39,7 +45,9 @@ describe('sampleFeaturedArchives', () => {
         'eshear',
         'algekalipso',
         'davidad',
+        'nosilverv',
       ]),
     )
+    expect(usernames).not.toContain('tessera_antra')
   })
 })

@@ -113,3 +113,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS "digest_editions_one_published_per_date_idx"
 CREATE INDEX IF NOT EXISTS "digest_editions_public_archive_idx"
   ON "public"."digest_editions" ("digest_date" DESC, "published_at" DESC)
   WHERE "status" = 'published';
+
+CREATE INDEX IF NOT EXISTS "digest_feedback_edition_sentiment_idx"
+  ON "public"."digest_feedback" ("edition_id", "sentiment");

@@ -5,6 +5,7 @@ import { DigestMarkdown } from '@/components/digest/DigestMarkdown'
 import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
 import { buildSearchHref } from '@/lib/searchParams'
 import { MUTED, SERIF } from '@/components/portal/styles'
+import { DigestFeedback } from '@/components/digest/DigestFeedback'
 
 const longDate = (date: string) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -245,6 +246,13 @@ export function DigestEditionView({
             ) : null}
           </aside>
         </div>
+
+        {!edition.isPreview ? (
+          <DigestFeedback
+            digestDate={edition.digestDate}
+            editionId={edition.id}
+          />
+        ) : null}
 
         <footer className={`mt-4 border-t pt-5 text-xs leading-5 ${MUTED}`}>
           {edition.isPreview

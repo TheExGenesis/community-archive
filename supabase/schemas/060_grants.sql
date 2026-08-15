@@ -86,3 +86,9 @@ GRANT ALL PRIVILEGES ON TABLE "public"."digest_editions" TO "service_role";
 GRANT USAGE, SELECT ON SEQUENCE "public"."digest_prompt_versions_version_seq" TO "service_role";
 GRANT USAGE, SELECT ON SEQUENCE "public"."digest_editions_issue_number_seq" TO "service_role";
 GRANT SELECT ON TABLE "public"."digest_editions" TO "anon", "authenticated";
+
+-- Feedback comments are never public. Members manage only their own rows via
+-- RLS; editors and aggregation jobs use service_role.
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_feedback" FROM "anon", "authenticated";
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "public"."digest_feedback" TO "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_feedback" TO "service_role";

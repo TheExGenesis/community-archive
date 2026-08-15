@@ -411,6 +411,44 @@ export type Database = {
           },
         ]
       }
+      digest_feedback: {
+        Row: {
+          comment: string | null
+          created_at: string
+          edition_id: string
+          id: string
+          sentiment: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          edition_id: string
+          id?: string
+          sentiment: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          edition_id?: string
+          id?: string
+          sentiment?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_feedback_edition_id_fkey"
+            columns: ["edition_id"]
+            isOneToOne: false
+            referencedRelation: "digest_editions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       digest_prompt_versions: {
         Row: {
           created_at: string
@@ -2447,4 +2485,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-

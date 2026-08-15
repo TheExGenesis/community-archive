@@ -114,23 +114,24 @@ Staging synchronization is automatic; production synchronization is not:
 - Treat `public.conversations` and archived `reply_to_tweet_id` links as the
   primary source for thread structure.
 - Every ingestion writer should persist a source-supplied conversation ID when
-  one is present. If it is missing, the writer may use Twitter/X syndication to
-  follow reply parents to the original post and use that terminal tweet ID as
-  the conversation ID.
-- Bound the traversal and track visited tweet IDs. If a parent is deleted,
-  private, unavailable, cyclic, or the syndication request fails, keep the
-  thread unresolved instead of guessing a head.
+  one is present and preserve source reply metadata. When it is missing, record
+  pending recovery in the same PostgreSQL transaction; do not call Twitter/X
+  syndication from archive, Firehose, or Autorefresh writers.
+- A dedicated conversation-recovery service owns local-first resolution,
+  syndication requests, leases, retries, and persistent recovered writes.
+  `reply_to_user_id` can signal an incomplete reply but is not a traversable
+  parent pointer. Bound traversal, track visited tweet IDs, and keep partial or
+  failed walks unresolved instead of guessing a head.
 - Apply authoritative consent policy separately to every recovered tweet at
-  the final PostgreSQL write boundary. A recovered tweet may be ingested only
-  when its own author is absent from both `public.optin.explicit_optout` and
-  `tes.blocked_scraping_users`. An opted-out node may be traversed by ID to find
-  the root, but its identifying account/profile fields, tweet content, media,
-  and authored relationships must never be persisted. The established
-  content-free policy tombstone may retain stable tweet/account IDs; eligible
-  tweets elsewhere in a fully resolved chain may still be stored.
-- Tag persisted rows with syndication provenance. Keep render-only hydration
-  external and non-persistent; ingestion writers are the only callers allowed
-  to archive eligible syndicated rows after the per-author policy check.
+  recovery service's final PostgreSQL write boundary. A recovered tweet may be
+  ingested only when its own author is absent from both
+  `public.optin.explicit_optout` and `tes.blocked_scraping_users`. An opted-out
+  node may be traversed in memory by ID to find the root, but its identifying
+  account/profile fields, tweet content, media, and authored relationships must
+  never be persisted. Eligible tweets elsewhere in the chain may still be
+  stored with syndication provenance.
+- Keep renderer hydration external and non-persistent. Do not reuse the
+  renderer-facing syndication client for recovery-service persistence.
 
 ## Analytics Data Sources
 

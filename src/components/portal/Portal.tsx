@@ -571,9 +571,7 @@ export default function Portal({
                 data.failures.historicalBangers) && (
                 <div className="grid grid-cols-1 gap-4">
                   {(recentBanger || data.failures.recentBangers) && (
-                    <div
-                      className={`${CARD} flex min-w-0 flex-col overflow-hidden lg:min-h-[320px]`}
-                    >
+                    <div className={`${CARD} min-w-0 overflow-hidden`}>
                       <PanelHeader
                         title="Banger of the moment"
                         action={{
@@ -583,15 +581,13 @@ export default function Portal({
                         }}
                       />
                       {recentBanger ? (
-                        <div className="flex flex-1 flex-col [&>article]:flex-1">
-                          <TweetCard
-                            tweet={recentBanger}
-                            collapsible
-                            clickable
-                            origin="home"
-                            returnTo="/"
-                          />
-                        </div>
+                        <TweetCard
+                          tweet={recentBanger}
+                          collapsible
+                          clickable
+                          origin="home"
+                          returnTo="/"
+                        />
                       ) : (
                         <PanelUnavailable message="Recent bangers are temporarily unavailable." />
                       )}
@@ -599,9 +595,7 @@ export default function Portal({
                   )}
 
                   {(historicalBanger || data.failures.historicalBangers) && (
-                    <div
-                      className={`${CARD} flex min-w-0 flex-col overflow-hidden lg:min-h-[320px]`}
-                    >
+                    <div className={`${CARD} min-w-0 overflow-hidden`}>
                       <PanelHeader
                         title="Historical Banger"
                         action={{
@@ -611,16 +605,14 @@ export default function Portal({
                         }}
                       />
                       {historicalBanger ? (
-                        <div className="flex flex-1 flex-col [&>article]:flex-1">
-                          <TweetCard
-                            tweet={historicalBanger}
-                            collapsible
-                            showDate
-                            clickable
-                            origin="home"
-                            returnTo="/"
-                          />
-                        </div>
+                        <TweetCard
+                          tweet={historicalBanger}
+                          collapsible
+                          showDate
+                          clickable
+                          origin="home"
+                          returnTo="/"
+                        />
                       ) : (
                         <PanelUnavailable message="Historical bangers are temporarily unavailable." />
                       )}

@@ -38,7 +38,7 @@ export function DigestStoryView({
             href={`/digest/${edition.digestDate}`}
             className="rounded-sm text-sm font-semibold text-muted-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
-            ← The Daily Digest
+            ← What Happened Yesterday
           </Link>
           <span className={`text-xs ${MUTED}`}>{edition.digestDate}</span>
         </div>

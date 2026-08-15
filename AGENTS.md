@@ -109,6 +109,21 @@ Staging synchronization is automatic; production synchronization is not:
 - Upload phases use the PostgreSQL `upload_phase_enum`. Preserve the existing
   claim-before-process sequencing and failure handling when changing workers.
 
+## Conversation And Thread Recovery
+
+- Treat `public.conversations` and archived `reply_to_tweet_id` links as the
+  primary source for thread structure.
+- If the thread head is missing locally, fetch the known tweet with
+  `fetchSyndicatedTweet` in `src/lib/twitterSyndication.ts`, follow its
+  `reply_to_tweet_id` to the parent, and repeat until a tweet has no parent.
+  That terminal tweet is the original post and its ID is the thread head.
+- Bound the traversal and track visited tweet IDs. If a parent is deleted,
+  private, unavailable, cyclic, or the syndication request fails, keep the
+  thread unresolved instead of guessing a head.
+- Syndication is a transient recovery source, not archived data. Preserve the
+  hydration and persistence restrictions documented in
+  `src/lib/twitterSyndication.ts`.
+
 ## Analytics Data Sources
 
 - Use ClickHouse for corpus-scale read analytics and portal tweet records when

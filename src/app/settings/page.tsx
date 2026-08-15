@@ -38,13 +38,14 @@ export default async function SettingsPage() {
         .maybeSingle()
     : admin.from('optin').select('*').eq('user_id', user.id).maybeSingle()
 
-  const [optInResponse, archivesResponse, settings] = await Promise.all([
-    optInQuery,
-    twitterAccountId
-      ? supabase
-          .from('archive_upload')
-          .select(
-            `
+  const [optInResponse, archivesResponse, tweetsResponse, settings] =
+    await Promise.all([
+      optInQuery,
+      twitterAccountId
+        ? supabase
+            .from('archive_upload')
+            .select(
+              `
             id,
             account_id,
             upload_phase,
@@ -58,14 +59,24 @@ export default async function SettingsPage() {
               profile:all_profile(avatar_media_url)
             )
           `,
-          )
-          .eq('account_id', twitterAccountId)
-          .order('created_at', { ascending: false })
-      : Promise.resolve({ data: [], error: null }),
-    twitterAccountId
-      ? getPublicProfileSettings(twitterAccountId)
-      : Promise.resolve({ downloadArchiveVisible: true }),
-  ])
+            )
+            .eq('account_id', twitterAccountId)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      twitterAccountId
+        ? supabase
+            .from('tweets')
+            .select(
+              'tweet_id, created_at, full_text, favorite_count, retweet_count',
+            )
+            .eq('account_id', twitterAccountId)
+            .order('created_at', { ascending: false })
+            .limit(100)
+        : Promise.resolve({ data: [], error: null }),
+      twitterAccountId
+        ? getPublicProfileSettings(twitterAccountId)
+        : Promise.resolve({ downloadArchiveVisible: true }),
+    ])
 
   return (
     <main className="min-h-screen bg-card dark:bg-background">
@@ -76,6 +87,7 @@ export default async function SettingsPage() {
           initialDownloadArchiveVisible={settings.downloadArchiveVisible}
           initialOptInData={optInResponse.data}
           archives={archivesResponse.data || []}
+          initialTweets={tweetsResponse.data || []}
         />
       </div>
     </main>

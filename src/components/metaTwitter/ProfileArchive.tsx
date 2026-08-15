@@ -771,6 +771,30 @@ export function ProfileArchive({
     ],
   )
 
+  const addTweet = useCallback(
+    async (itemId: string) => {
+      const result = await runEditMutation({
+        action: 'add',
+        accountId,
+        section: 'bangers',
+        itemId,
+      })
+      if (!result) return false
+
+      const nextFeeds = Object.fromEntries(
+        Object.entries(feedsRef.current).filter(
+          ([key]) => !key.startsWith('overall:'),
+        ),
+      )
+      feedsRef.current = nextFeeds
+      setFeeds(nextFeeds)
+      automaticallyFilledFeeds.current.delete(activeKey)
+      await loadFeedPage(null, sort, 0, PROFILE_BANGERS_PRELOAD_LIMIT)
+      return true
+    },
+    [accountId, activeKey, loadFeedPage, runEditMutation, sort],
+  )
+
   const contextTitle = activeYear
     ? `Best of ${activeYear}`
     : `Best of ${displayName}`
@@ -829,6 +853,7 @@ export function ProfileArchive({
           void moveItem(section, itemId, direction)
         }
         onRestore={(section) => void restoreSection(section)}
+        onAddTweet={addTweet}
       />
     </div>
   )

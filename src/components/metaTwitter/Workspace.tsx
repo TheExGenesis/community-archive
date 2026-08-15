@@ -1,14 +1,23 @@
 'use client'
 
-import type { RefObject } from 'react'
+import { useState, type FormEvent, type RefObject } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowDown, ArrowUp, Info, RotateCcw, Star, X } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  Info,
+  Plus,
+  RotateCcw,
+  Star,
+  X,
+} from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
 import { getSmallAvatarUrl } from '@/lib/avatar'
 import { formatNumber } from '@/lib/formatNumber'
 import { bangerPortalTweet } from '@/lib/metaTwitter/bangerPortalTweet'
 import { tweetPermalinkHref } from '@/lib/navigation'
+import { parseProfileTweetId } from '@/lib/profileTweetLink'
 import type { ProfileBangerSort } from '@/lib/metaTwitter/profilePagination'
 import type {
   ArchiveMediaItem,
@@ -65,6 +74,7 @@ export function Workspace({
   onToggleFeature,
   onMove,
   onRestore,
+  onAddTweet,
 }: {
   avatarUrl: string | null
   contextTitle: string
@@ -101,9 +111,23 @@ export function Workspace({
     direction: -1 | 1,
   ) => void
   onRestore?: (section: 'bangers' | 'people') => void
+  onAddTweet?: (tweetId: string) => Promise<boolean>
 }) {
   const mediaTiles = media.slice(0, 6)
   const mediaOverflow = Math.max(mediaCount - 6, 0)
+  const [tweetReference, setTweetReference] = useState('')
+  const [addError, setAddError] = useState<string | null>(null)
+
+  const submitTweet = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const tweetId = parseProfileTweetId(tweetReference)
+    if (!tweetId) {
+      setAddError('Paste an X or Community Archive tweet link.')
+      return
+    }
+    setAddError(null)
+    if (await onAddTweet?.(tweetId)) setTweetReference('')
+  }
 
   return (
     <main className="flex min-w-0 flex-col gap-4 px-4 py-4 sm:px-6">
@@ -158,6 +182,45 @@ export function Workspace({
           </label>
         </div>
       </div>
+
+      {editing && (
+        <form
+          onSubmit={submitTweet}
+          className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-muted/20 p-3 sm:flex-row sm:flex-wrap sm:items-end"
+        >
+          <label className="min-w-0 flex-1 text-xs font-semibold text-muted-foreground">
+            Add one of your archived tweets
+            <input
+              type="text"
+              value={tweetReference}
+              onChange={(event) => setTweetReference(event.target.value)}
+              placeholder="Paste an X or Community Archive tweet link"
+              disabled={editSaving}
+              aria-describedby={
+                addError ? 'profile-add-tweet-error' : undefined
+              }
+              className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-normal text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={editSaving || tweetReference.trim().length === 0}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-foreground px-3 py-2 text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add to profile
+          </button>
+          {addError && (
+            <span
+              id="profile-add-tweet-error"
+              role="alert"
+              className="text-xs text-destructive sm:basis-full"
+            >
+              {addError}
+            </span>
+          )}
+        </form>
+      )}
 
       {editError && (
         <div

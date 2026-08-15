@@ -5,6 +5,13 @@ const { withWorkflow } = require('workflow/next')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    outputFileTracingIncludes: {
+      '/user/*/opengraph-image': [
+        './src/app/user/*/community-archive-logo-white.png',
+      ],
+    },
+  },
   images: {
     remotePatterns: [
       {

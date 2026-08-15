@@ -1,16 +1,16 @@
 /**
- * Remove all data for users who have explicitly opted out, and add them to
- * the scraping blocklist (tes.blocked_scraping_users) so their tweets aren't
- * picked up again.
+ * Remove authored content for users who have explicitly opted out, preserve
+ * stable account/tweet IDs as policy tombstones, and add a reversible consent
+ * block so a later opt-in plus authorized upload can hydrate those IDs again.
  *
  * For each username:
  *   1. Look up account in all_account (case-insensitive)
- *   2. Show what will be deleted (DB row counts + sample tweets + storage)
+ *   2. Show what will be tombstoned/removed (DB row counts + samples + storage)
  *   3. Prompt to type the username back to confirm
  *   4. UPSERT tes.blocked_scraping_users(account_id)  ← block first, race-safe
- *   5. Call public.delete_user_archive(account_id) as service_role
+ *   5. Call public.tombstone_policy_account(account_id) as service_role
  *   6. Delete any files under archives/<username>/ in Storage
- *   7. Verify block row exists and data rows are 0
+ *   7. Verify tombstones, content removal, and consent block
  *
  * Usage:
  *   pnpm tsx scripts/remove_user_data.mts <username> [<username> ...]
@@ -19,7 +19,7 @@
  *   --local      target the local Supabase instead of prod (default: prod)
  *   --yes-really skip interactive per-user confirmation (use with extreme care;
  *                still shows a 5-second abort window per user)
- *   --no-block   skip the blocklist upsert (DELETION ONLY — not recommended
+ *   --no-block   skip the blocklist upsert (CONTENT REMOVAL ONLY — not recommended
  *                for opt-out requests; use only if blocking is handled elsewhere)
  */
 import { fileURLToPath } from 'url'
@@ -143,7 +143,7 @@ async function confirmWithUsername(rl: readline.Interface, expected: string) {
 
 async function abortableCountdown(seconds: number) {
   for (let i = seconds; i > 0; i--) {
-    process.stdout.write(`\r  Deleting in ${i}s... (Ctrl-C to abort)   `)
+    process.stdout.write(`\r  Removing content in ${i}s... (Ctrl-C to abort)   `)
     await new Promise((r) => setTimeout(r, 1000))
   }
   process.stdout.write('\r' + ' '.repeat(50) + '\r')
@@ -170,6 +170,7 @@ async function processOne(rl: readline.Interface, rawUsername: string) {
   }
 
   const account = accounts[0]
+  let beforeCounts: Counts | null = null
   if (account) {
     console.log(`  account_id:    ${account.account_id}`)
     console.log(`  display name:  ${account.account_display_name}`)
@@ -177,6 +178,7 @@ async function processOne(rl: readline.Interface, rawUsername: string) {
     console.log(`  num_tweets (profile metadata): ${account.num_tweets}`)
 
     const before = await countsFor(supabase, account.account_id)
+    beforeCounts = before
     console.log(`  DB row counts:`)
     console.table(before)
 
@@ -213,7 +215,10 @@ async function processOne(rl: readline.Interface, rawUsername: string) {
     const { error: blockErr } = await supabase
       .schema('tes')
       .from('blocked_scraping_users')
-      .upsert({ account_id: account.account_id }, { onConflict: 'account_id' })
+      .upsert(
+        { account_id: account.account_id, block_source: 'explicit_optout' },
+        { onConflict: 'account_id,block_source' },
+      )
     if (blockErr) {
       console.error(`  ✗ Blocklist upsert failed: ${blockErr.message}`)
       return { username, outcome: 'block-failed' as const, error: blockErr.message }
@@ -225,12 +230,11 @@ async function processOne(rl: readline.Interface, rawUsername: string) {
     )
   }
 
-  // DB delete (if account exists)
+  // DB content removal + reversible tombstones (if account exists)
   if (account) {
-    console.log(`  → Calling delete_user_archive(${account.account_id})...`)
+    console.log(`  → Calling tombstone_policy_account(${account.account_id})...`)
     const start = Date.now()
-    // @ts-expect-error typed RPC in generated types
-    const { error } = await supabase.rpc('delete_user_archive', {
+    const { error } = await supabase.rpc('tombstone_policy_account', {
       p_account_id: account.account_id,
     })
     const elapsed = ((Date.now() - start) / 1000).toFixed(1)
@@ -255,7 +259,28 @@ async function processOne(rl: readline.Interface, rawUsername: string) {
   // Verify
   if (account) {
     const after = await countsFor(supabase, account.account_id)
-    const allZero = Object.values(after).every((v) => v === 0)
+    const expectedTweetCount = beforeCounts?.tweets ?? 0
+    const nonTombstoneTablesEmpty =
+      after.all_profile === 0 &&
+      after.archive_upload === 0 &&
+      after.likes === 0 &&
+      after.followers === 0 &&
+      after.following === 0
+    const { data: tombstoneAccount } = await supabase
+      .from('all_account')
+      .select('is_tombstone')
+      .eq('account_id', account.account_id)
+      .maybeSingle()
+    const { count: tombstoneTweetCount } = await supabase
+      .from('tweets')
+      .select('*', { count: 'exact', head: true })
+      .eq('account_id', account.account_id)
+      .eq('is_tombstone', true)
+    const tombstonesValid =
+      tombstoneAccount?.is_tombstone === true &&
+      after.all_account === 1 &&
+      after.tweets === expectedTweetCount &&
+      (tombstoneTweetCount ?? 0) === expectedTweetCount
     const remainingFiles = await storageFiles(username)
     const storageEmpty = remainingFiles.length === 0
     console.log(`  Verification — DB counts:`)
@@ -270,6 +295,7 @@ async function processOne(rl: readline.Interface, rawUsername: string) {
         .from('blocked_scraping_users')
         .select('account_id, updated_at')
         .eq('account_id', account.account_id)
+        .eq('block_source', 'explicit_optout')
         .maybeSingle()
       blocklisted = !!blockRow
       console.log(
@@ -277,14 +303,19 @@ async function processOne(rl: readline.Interface, rawUsername: string) {
       )
     }
 
-    if (!allZero || !storageEmpty || (!skipBlock && blocklisted === false)) {
-      console.log(`  ⚠️  Some data remains or blocklist entry missing.`)
+    if (
+      !tombstonesValid ||
+      !nonTombstoneTablesEmpty ||
+      !storageEmpty ||
+      (!skipBlock && blocklisted === false)
+    ) {
+      console.log(`  ⚠️  Tombstone verification failed or removable data remains.`)
       return { username, outcome: 'incomplete' as const }
     }
   }
 
-  console.log(`  ✅ Deletion verified.`)
-  return { username, outcome: 'deleted' as const }
+  console.log(`  ✅ Reversible tombstones verified.`)
+  return { username, outcome: 'tombstoned' as const }
 }
 
 async function main() {

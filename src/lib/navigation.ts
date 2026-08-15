@@ -58,7 +58,7 @@ const TWEET_ORIGINS: Record<
   },
   digest: {
     href: '/digest',
-    label: 'Back to Daily Digest',
+    label: 'Back to What Happened Yesterday',
     matches: (href) => href === '/digest' || href.startsWith('/digest/'),
   },
   trends: {
@@ -154,7 +154,7 @@ export const getPrimaryNav = (isMember: boolean, isAdmin = false): NavItem[] =>
     : [
         { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
-        { href: '/user-dir', label: 'Library' },
+        { href: '/user-dir', label: 'Users' },
         { href: '/docs', label: 'Docs' },
         { href: '/#upload-archive', label: 'Upload archive' },
       ]

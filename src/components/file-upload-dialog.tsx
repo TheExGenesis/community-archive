@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -106,8 +107,10 @@ export function FileUploadDialog({
     capturePostHogEvent('archive_upload_started', {
       includes_likes: options.uploadLikes,
       date_filter_applied:
-        dateInputs.start !== format(new Date(archiveStats.earliestTweetDate), 'yyyy-MM-dd') ||
-        dateInputs.end !== format(new Date(archiveStats.latestTweetDate), 'yyyy-MM-dd'),
+        dateInputs.start !==
+          format(new Date(archiveStats.earliestTweetDate), 'yyyy-MM-dd') ||
+        dateInputs.end !==
+          format(new Date(archiveStats.latestTweetDate), 'yyyy-MM-dd'),
     })
 
     try {
@@ -163,13 +166,22 @@ export function FileUploadDialog({
         <DialogHeader>
           <DialogTitle>
             {state.uploadStatus === 'uploading'
-              ? 'Uploading...'
+              ? 'Upload in progress'
               : state.uploadStatus === 'completed'
                 ? 'Upload Successful'
                 : state.error
                   ? 'Upload Error'
                   : 'Upload Confirmation'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {state.uploadStatus === 'uploading'
+              ? 'Your archive is being transferred. Keep this window open.'
+              : state.uploadStatus === 'completed'
+                ? 'Your archive upload finished successfully.'
+                : state.error
+                  ? 'The archive upload could not be completed.'
+                  : 'Review your archive details and choose what to upload.'}
+          </DialogDescription>
         </DialogHeader>
         {state.error ? (
           <div className="grid gap-4 py-4">
@@ -324,7 +336,6 @@ export function FileUploadDialog({
           </div>
         ) : state.uploadStatus === 'uploading' ? (
           <div className="grid gap-4 py-4">
-            <p className="mb-2 text-sm">Uploading your archive...</p>
             {state.progress && (
               <div>
                 <p className="mb-1">

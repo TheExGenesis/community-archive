@@ -1,7 +1,12 @@
 import type { TweetData } from '@/components/TweetComponent'
 import { fetchClickHouseQuotePosts } from '@/lib/clickhouseQuotePosts'
 import { fetchDigestReplies } from '@/lib/digest/context'
-import { mapDigestRun, mapPromptVersion, toJson } from '@/lib/digest/data'
+import {
+  mapDigestEdition,
+  mapDigestRun,
+  mapPromptVersion,
+  toJson,
+} from '@/lib/digest/data'
 import { createDigestAdminClient } from '@/lib/digest/database'
 import {
   assembleDigestEditionContent,
@@ -222,11 +227,44 @@ async function executeDigestGeneration(runId: string) {
     ),
   ]
 
+  const { data: priorEditionRows, error: priorEditionsError } = await admin
+    .from('digest_editions')
+    .select('*')
+    .eq('status', 'published')
+    .lt('digest_date', run.digestDate)
+    .order('digest_date', { ascending: false })
+    .order('version', { ascending: false })
+    .limit(7)
+  if (priorEditionsError) throw priorEditionsError
+
+  const priorDigests = (priorEditionRows ?? []).flatMap((row) => {
+    const edition = mapDigestEdition(row)
+    return edition
+      ? [
+          {
+            digestDate: edition.digestDate,
+            executiveSummary: edition.content.executiveSummary,
+            storyTitles: edition.content.stories.map(({ title }) => title),
+            keywords: edition.content.keywords,
+          },
+        ]
+      : []
+  })
+  events.push(
+    event(
+      'commentary',
+      'completed',
+      `Loaded ${priorDigests.length} published digest${priorDigests.length === 1 ? '' : 's'} for continuity.`,
+      { past_digest_count: priorDigests.length },
+    ),
+  )
+
   const baseUserPrompt = renderDigestPrompt(prompt.userPromptTemplate, {
     digestDate: run.digestDate,
     windowStart: run.windowStart,
     windowEnd: run.windowEnd,
     candidates: enrichedCandidates,
+    priorDigests,
   })
   const userPrompt =
     revisionBase && run.revisionInstruction
@@ -240,6 +278,7 @@ async function executeDigestGeneration(runId: string) {
     promptVersion: prompt,
     renderedUserPrompt: userPrompt,
     candidateSnapshot: enrichedCandidates,
+    continuityContext: priorDigests,
     ...(revisionBase && run.revisionInstruction
       ? {
           revision: {

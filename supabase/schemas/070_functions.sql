@@ -107,35 +107,57 @@ $$;
 ALTER FUNCTION "public"."update_optin_updated_at"() OWNER TO "postgres";
 
 
--- Explicit opt-outs are a hard scrape deny. Resolve username-only legacy rows
--- when possible, and never remove a block automatically because the same table
--- also contains administrator-managed blocks.
+-- Explicit opt-outs are a hard scrape deny. Consent-derived and administrator
+-- blocks have separate source rows so a later opt-in removes only the former.
 CREATE OR REPLACE FUNCTION "public"."propagate_explicit_optout_scrape_block"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 DECLARE
-    v_account_id text;
+    v_new_account_id text;
+    v_old_account_id text;
 BEGIN
-    IF NEW.explicit_optout IS NOT TRUE THEN
-        RETURN NEW;
-    END IF;
+    v_new_account_id := NULLIF(BTRIM(NEW.twitter_user_id), '');
 
-    v_account_id := NULLIF(BTRIM(NEW.twitter_user_id), '');
-
-    IF v_account_id IS NULL AND NULLIF(BTRIM(NEW.username), '') IS NOT NULL THEN
+    IF v_new_account_id IS NULL AND NULLIF(BTRIM(NEW.username), '') IS NOT NULL THEN
         SELECT a.account_id
-        INTO v_account_id
+        INTO v_new_account_id
         FROM public.all_account AS a
         WHERE LOWER(a.username) = LOWER(BTRIM(NEW.username))
         ORDER BY a.updated_at DESC NULLS LAST
         LIMIT 1;
     END IF;
 
-    IF v_account_id IS NOT NULL THEN
-        INSERT INTO tes.blocked_scraping_users (account_id)
-        VALUES (v_account_id)
-        ON CONFLICT (account_id) DO NOTHING;
+    IF TG_OP = 'UPDATE' THEN
+        v_old_account_id := NULLIF(BTRIM(OLD.twitter_user_id), '');
+        IF v_old_account_id IS NULL AND NULLIF(BTRIM(OLD.username), '') IS NOT NULL THEN
+            SELECT a.account_id
+            INTO v_old_account_id
+            FROM public.all_account AS a
+            WHERE LOWER(a.username) = LOWER(BTRIM(OLD.username))
+            ORDER BY a.updated_at DESC NULLS LAST
+            LIMIT 1;
+        END IF;
+
+        IF v_old_account_id IS NOT NULL
+           AND (
+               NEW.explicit_optout IS NOT TRUE
+               OR v_old_account_id IS DISTINCT FROM v_new_account_id
+           ) THEN
+            DELETE FROM tes.blocked_scraping_users
+            WHERE account_id = v_old_account_id
+              AND block_source = 'explicit_optout';
+        END IF;
+    END IF;
+
+    IF NEW.explicit_optout IS TRUE AND v_new_account_id IS NOT NULL THEN
+        INSERT INTO tes.blocked_scraping_users (account_id, block_source)
+        VALUES (v_new_account_id, 'explicit_optout')
+        ON CONFLICT (account_id, block_source) DO NOTHING;
+    ELSIF v_new_account_id IS NOT NULL THEN
+        DELETE FROM tes.blocked_scraping_users
+        WHERE account_id = v_new_account_id
+          AND block_source = 'explicit_optout';
     END IF;
 
     RETURN NEW;
@@ -1262,6 +1284,70 @@ $$;
 ALTER FUNCTION "public"."delete_tweets"("p_tweet_ids" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) RETURNS TABLE("deleted_tweets" integer, "deleted_conversations" integer, "deleted_tweet_media" integer, "deleted_user_mentions" integer, "deleted_tweet_urls" integer, "deleted_private_tweet_user" integer)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "statement_timeout" TO '30s'
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_provider_id text;
+  v_tweet_ids text[];
+BEGIN
+  v_provider_id := nullif(auth.jwt()->'app_metadata'->>'provider_id', '');
+
+  IF auth.uid() IS NULL OR v_provider_id IS NULL THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '42501',
+      MESSAGE = 'A linked Twitter account is required';
+  END IF;
+
+  SELECT array_agg(tweet_id ORDER BY tweet_id)
+  INTO v_tweet_ids
+  FROM (
+    SELECT DISTINCT btrim(candidate) AS tweet_id
+    FROM unnest(p_tweet_ids) AS requested(candidate)
+    WHERE candidate IS NOT NULL AND btrim(candidate) <> ''
+  ) normalized;
+
+  IF coalesce(cardinality(v_tweet_ids), 0) = 0 THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '22023',
+      MESSAGE = 'At least one tweet ID is required';
+  END IF;
+
+  IF cardinality(v_tweet_ids) > 100 THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '22023',
+      MESSAGE = 'At most 100 tweets can be deleted at once';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM unnest(v_tweet_ids) AS requested(tweet_id)
+    LEFT JOIN public.tweets AS owned
+      ON owned.tweet_id = requested.tweet_id
+     AND owned.account_id = v_provider_id
+    WHERE owned.tweet_id IS NULL
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '42501',
+      MESSAGE = 'One or more tweets cannot be deleted';
+  END IF;
+
+  RETURN QUERY
+  SELECT * FROM public.delete_tweets(v_tweet_ids);
+END;
+$$;
+
+ALTER FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) FROM "anon";
+GRANT EXECUTE ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) TO "service_role";
+
+COMMENT ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) IS 'Deletes up to 100 tweets only when every ID belongs to the authenticated Twitter account in app_metadata.provider_id.';
+
+
 CREATE OR REPLACE FUNCTION "public"."delete_user_archive"("p_account_id" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "statement_timeout" TO '20min'
@@ -1345,6 +1431,119 @@ $_$;
 
 ALTER FUNCTION "public"."delete_user_archive"("p_account_id" "text") OWNER TO "postgres";
 
+
+CREATE OR REPLACE FUNCTION public.tombstone_policy_account(p_account_id text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET statement_timeout TO '20min'
+SET search_path = ''
+AS $$
+DECLARE
+  v_provider_id text;
+  v_archive_upload_ids bigint[];
+  v_tweet_ids text[];
+BEGIN
+  IF p_account_id IS NULL OR BTRIM(p_account_id) = '' THEN
+    RAISE EXCEPTION 'p_account_id is required';
+  END IF;
+
+  SELECT auth.jwt()->'app_metadata'->>'provider_id'
+  INTO v_provider_id;
+
+  IF current_role NOT IN ('postgres', 'service_role')
+     AND (v_provider_id IS NULL OR v_provider_id <> p_account_id) THEN
+    RAISE EXCEPTION
+      'Unauthorized: provider_id % does not match account_id %',
+      v_provider_id,
+      p_account_id;
+  END IF;
+
+  SELECT COALESCE(array_agg(id), ARRAY[]::bigint[])
+  INTO v_archive_upload_ids
+  FROM public.archive_upload
+  WHERE account_id = p_account_id;
+
+  SELECT COALESCE(array_agg(tweet_id), ARRAY[]::text[])
+  INTO v_tweet_ids
+  FROM public.tweets
+  WHERE account_id = p_account_id;
+
+  DELETE FROM public.conversations
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.tweet_media
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.user_mentions
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.tweet_urls
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.quote_tweets
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.retweets
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM private.tweet_user
+  WHERE tweet_id = ANY(v_tweet_ids);
+
+  DELETE FROM public.likes
+  WHERE account_id = p_account_id
+     OR archive_upload_id = ANY(v_archive_upload_ids);
+  DELETE FROM public.followers
+  WHERE account_id = p_account_id
+     OR archive_upload_id = ANY(v_archive_upload_ids);
+  DELETE FROM public.following
+  WHERE account_id = p_account_id
+     OR archive_upload_id = ANY(v_archive_upload_ids);
+  DELETE FROM public.all_profile
+  WHERE account_id = p_account_id;
+
+  UPDATE public.tweet_media
+  SET archive_upload_id = NULL
+  WHERE archive_upload_id = ANY(v_archive_upload_ids);
+  UPDATE public.all_profile
+  SET archive_upload_id = NULL
+  WHERE archive_upload_id = ANY(v_archive_upload_ids);
+  UPDATE public.tweets
+  SET archive_upload_id = NULL
+  WHERE archive_upload_id = ANY(v_archive_upload_ids);
+
+  DELETE FROM public.archive_upload
+  WHERE id = ANY(v_archive_upload_ids);
+  DELETE FROM ca_autorefresh.account_refresh_log
+  WHERE account_id = p_account_id;
+
+  UPDATE public.tweets
+  SET
+    created_at = '1970-01-01 00:00:00+00',
+    full_text = '',
+    favorite_count = 0,
+    retweet_count = 0,
+    reply_to_tweet_id = NULL,
+    reply_to_user_id = NULL,
+    reply_to_username = NULL,
+    archive_upload_id = NULL,
+    is_tombstone = true
+  WHERE account_id = p_account_id;
+
+  UPDATE public.all_account
+  SET
+    created_via = 'policy_tombstone',
+    username = '',
+    created_at = '1970-01-01 00:00:00+00',
+    account_display_name = '',
+    num_tweets = 0,
+    num_following = 0,
+    num_followers = 0,
+    num_likes = 0,
+    is_tombstone = true
+  WHERE account_id = p_account_id;
+END;
+$$;
+
+ALTER FUNCTION public.tombstone_policy_account(text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.tombstone_policy_account(text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.tombstone_policy_account(text)
+  TO service_role;
 
 CREATE OR REPLACE FUNCTION "public"."delete_single_archive"("p_account_id" "text", "p_archive_upload_id" bigint) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -2958,7 +3157,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
   SELECT COALESCE(
-    array_agg(b.account_id),
+    array_agg(DISTINCT b.account_id),
     ARRAY[]::text[]
   )
   FROM tes.blocked_scraping_users b
@@ -2981,11 +3180,13 @@ BEGIN
   END IF;
 
   IF p_blocked THEN
-    INSERT INTO tes.blocked_scraping_users (account_id)
-    VALUES (p_account_id)
-    ON CONFLICT (account_id) DO NOTHING;
+    INSERT INTO tes.blocked_scraping_users (account_id, block_source)
+    VALUES (p_account_id, 'admin')
+    ON CONFLICT (account_id, block_source) DO NOTHING;
   ELSE
-    DELETE FROM tes.blocked_scraping_users WHERE account_id = p_account_id;
+    DELETE FROM tes.blocked_scraping_users
+    WHERE account_id = p_account_id
+      AND block_source = 'admin';
   END IF;
 END;
 $$;

@@ -122,9 +122,9 @@ const logger = createLogger()
 // Table configurations
 const TABLE_CONFIGS: Record<string, TableConfig> = {
   all_account: {
-    columns: ['account_id', 'created_via', 'username', 'created_at', 'account_display_name', 'num_tweets', 'num_following', 'num_followers', 'num_likes'],
+    columns: ['account_id', 'created_via', 'username', 'created_at', 'account_display_name', 'num_tweets', 'num_following', 'num_followers', 'num_likes', 'is_tombstone'],
     conflict: 'account_id',
-    updates: ['username', 'account_display_name', 'num_tweets', 'num_following', 'num_followers', 'num_likes']
+    updates: ['created_via', 'username', 'created_at', 'account_display_name', 'num_tweets', 'num_following', 'num_followers', 'num_likes', 'is_tombstone']
   },
   all_profile: {
     columns: ['account_id', 'avatar_media_url', 'header_media_url', 'bio', 'location', 'website', 'archive_upload_id'],
@@ -132,9 +132,9 @@ const TABLE_CONFIGS: Record<string, TableConfig> = {
     updates: ['avatar_media_url', 'header_media_url', 'bio', 'location', 'website', 'archive_upload_id']
   },
   tweets: {
-    columns: ['tweet_id', 'account_id', 'created_at', 'full_text', 'favorite_count', 'retweet_count', 'reply_to_tweet_id', 'reply_to_user_id', 'reply_to_username', 'archive_upload_id'],
+    columns: ['tweet_id', 'account_id', 'created_at', 'full_text', 'favorite_count', 'retweet_count', 'reply_to_tweet_id', 'reply_to_user_id', 'reply_to_username', 'archive_upload_id', 'is_tombstone'],
     conflict: 'tweet_id',
-    updates: ['favorite_count', 'retweet_count', 'archive_upload_id']
+    updates: ['account_id', 'created_at', 'full_text', 'favorite_count', 'retweet_count', 'reply_to_tweet_id', 'reply_to_user_id', 'reply_to_username', 'archive_upload_id', 'is_tombstone']
   },
   conversations: {
     columns: ['tweet_id', 'conversation_id', 'producer_source', 'resolution_status', 'resolved_at', 'attempt_count', 'next_attempt_at', 'last_error'],
@@ -505,6 +505,8 @@ export class ArchiveUploadProcessor {
     
     // Process everything in a single transaction
     await this.sql.begin(async (trx: Sql) => {
+      await this.assertArchiveOwnerMayBeStored(trx, archive)
+
       // Process small data first (account, profile, etc.)
       await this.processUserData(trx, archive)
 
@@ -539,6 +541,43 @@ export class ArchiveUploadProcessor {
     })
   }
 
+  private async assertArchiveOwnerMayBeStored(
+    trx: Sql,
+    archive: any,
+  ): Promise<void> {
+    const account = archive.account?.[0]?.account
+    const accountId = account?.accountId
+    const username = account?.username
+
+    if (!accountId || !username) {
+      throw new Error('Archive owner identity is missing')
+    }
+
+    const [policy] = await trx`
+      SELECT
+        EXISTS (
+          SELECT 1
+          FROM tes.blocked_scraping_users AS blocked
+          WHERE blocked.account_id = ${accountId}
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM public.optin AS consent
+          WHERE consent.explicit_optout IS TRUE
+            AND (
+              consent.twitter_user_id = ${accountId}
+              OR LOWER(consent.username) = LOWER(${username})
+            )
+        ) AS blocked
+    `
+
+    if (policy?.blocked === true) {
+      throw new Error(
+        `Archive owner ${accountId} is explicitly opted out; refusing all archive writes`,
+      )
+    }
+  }
+
   private async processUserData(trx: Sql, archive: any): Promise<void> {
     const accountObj = archive.account?.[0]?.account;
     const profileObj = archive.profile?.[0]?.profile
@@ -554,7 +593,8 @@ export class ArchiveUploadProcessor {
         num_tweets: archive.tweets?.length || 0,
         num_following: archive.following?.length || 0,
         num_followers: archive.follower?.length || 0,
-        num_likes: archive.like?.length || 0
+        num_likes: archive.like?.length || 0,
+        is_tombstone: false
       }]
 
       await bulkInsertWithCopy({
@@ -564,7 +604,7 @@ export class ArchiveUploadProcessor {
         conflictTarget: TABLE_CONFIGS.all_account.conflict,
         updateColumns: TABLE_CONFIGS.all_account.updates,
         data: account,
-        mapFn: (acc: any) => [acc.account_id, acc.created_via, acc.username, acc.created_at, acc.account_display_name, acc.num_tweets, acc.num_following, acc.num_followers, acc.num_likes]
+        mapFn: (acc: any) => [acc.account_id, acc.created_via, acc.username, acc.created_at, acc.account_display_name, acc.num_tweets, acc.num_following, acc.num_followers, acc.num_likes, acc.is_tombstone]
       })
     }
 
@@ -880,7 +920,8 @@ export class ArchiveUploadProcessor {
         reply_to_tweet_id: removeProblematicCharacters(tweet.in_reply_to_status_id_str),
         reply_to_user_id: removeProblematicCharacters(tweet.in_reply_to_user_id_str),
         reply_to_username: removeProblematicCharacters(tweet.in_reply_to_screen_name),
-        archive_upload_id: this.archiveUploadId
+        archive_upload_id: this.archiveUploadId,
+        is_tombstone: false
       })
 
       // Process mentions
@@ -941,7 +982,7 @@ export class ArchiveUploadProcessor {
 
     // Insert tweets first
     await this.insertIfNotEmpty(trx, 'tweets', tweets, (t: any) => 
-      [t.tweet_id, t.account_id, t.created_at, t.full_text, t.favorite_count, t.retweet_count, t.reply_to_tweet_id, t.reply_to_user_id, t.reply_to_username, t.archive_upload_id])
+      [t.tweet_id, t.account_id, t.created_at, t.full_text, t.favorite_count, t.retweet_count, t.reply_to_tweet_id, t.reply_to_user_id, t.reply_to_username, t.archive_upload_id, t.is_tombstone])
 
     await this.insertIfNotEmpty(trx, 'conversations', conversations, (c: any) =>
       [c.tweet_id, c.conversation_id, c.producer_source, c.resolution_status, c.resolved_at, c.attempt_count, c.next_attempt_at, c.last_error])

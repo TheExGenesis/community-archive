@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS "public"."all_account" (
     "num_following" integer DEFAULT 0,
     "num_followers" integer DEFAULT 0,
     "num_likes" integer DEFAULT 0,
+    "is_tombstone" boolean DEFAULT false NOT NULL,
     "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 )
 WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.05');
@@ -91,6 +92,7 @@ CREATE TABLE IF NOT EXISTS "public"."tweets" (
     "reply_to_user_id" "text",
     "reply_to_username" "text",
     "archive_upload_id" bigint,
+    "is_tombstone" boolean DEFAULT false NOT NULL,
     "fts" "tsvector" GENERATED ALWAYS AS ("to_tsvector"('"english"'::"regconfig", "full_text")) STORED,
     "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 )
@@ -258,6 +260,7 @@ ALTER TABLE "public"."optin" OWNER TO "postgres";
 -- tes.blocked_scraping_users
 CREATE TABLE IF NOT EXISTS "tes"."blocked_scraping_users" (
     "account_id" "text" NOT NULL,
+    "block_source" "text" DEFAULT 'admin'::"text" NOT NULL,
     "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 ALTER TABLE "tes"."blocked_scraping_users" OWNER TO "postgres";

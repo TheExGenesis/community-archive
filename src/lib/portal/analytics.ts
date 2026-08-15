@@ -62,6 +62,12 @@ interface ClickHouseSearchTweet {
   username: string | null
   accountDisplayName: string | null
   avatarMediaUrl: string | null
+  media?: Array<{
+    mediaUrl: string
+    mediaType: string
+    width: number | null
+    height: number | null
+  }>
 }
 
 interface ClickHouseSearchResponse {
@@ -371,6 +377,22 @@ export async function fetchPortalTrendEvidence(
       }
       const username = row.username || 'unknown'
       const createdAt = safeTimestamp(row.createdAt, 'trend tweet timestamp')
+      const media = row.media?.flatMap((item) =>
+        typeof item.mediaUrl === 'string' && typeof item.mediaType === 'string'
+          ? [
+              {
+                url: item.mediaUrl,
+                type: item.mediaType,
+                ...(typeof item.width === 'number'
+                  ? { width: item.width }
+                  : {}),
+                ...(typeof item.height === 'number'
+                  ? { height: item.height }
+                  : {}),
+              },
+            ]
+          : [],
+      )
       unique.set(row.tweetId, {
         id: row.tweetId,
         accountId: row.accountId,
@@ -382,6 +404,7 @@ export async function fetchPortalTrendEvidence(
         createdAt,
         likes: safeCount(row.favoriteCount, 'trend tweet favorite count'),
         rts: safeCount(row.retweetCount, 'trend tweet repost count'),
+        ...(media ? { media } : {}),
       })
     }
   }

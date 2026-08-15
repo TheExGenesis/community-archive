@@ -62,7 +62,11 @@ export default async function TweetPage({
               <ThreadView tree={threadTree} highlightTweetId={tweet_id} />
             ) : (
               <article className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
-                <TweetComponent key={tweet.tweet_id} tweet={tweet} />
+                <TweetComponent
+                  key={tweet.tweet_id}
+                  tweet={tweet}
+                  isPermalinkPage
+                />
               </article>
             )}
 

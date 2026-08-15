@@ -168,6 +168,7 @@ export type Database = {
           account_id: string
           created_at: string
           created_via: string
+          is_tombstone: boolean
           num_followers: number | null
           num_following: number | null
           num_likes: number | null
@@ -180,6 +181,7 @@ export type Database = {
           account_id: string
           created_at: string
           created_via: string
+          is_tombstone?: boolean
           num_followers?: number | null
           num_following?: number | null
           num_likes?: number | null
@@ -192,6 +194,7 @@ export type Database = {
           account_id?: string
           created_at?: string
           created_via?: string
+          is_tombstone?: boolean
           num_followers?: number | null
           num_following?: number | null
           num_likes?: number | null
@@ -1250,6 +1253,7 @@ export type Database = {
           favorite_count: number
           fts: unknown | null
           full_text: string
+          is_tombstone: boolean
           reply_to_tweet_id: string | null
           reply_to_user_id: string | null
           reply_to_username: string | null
@@ -1264,6 +1268,7 @@ export type Database = {
           favorite_count: number
           fts?: unknown | null
           full_text: string
+          is_tombstone?: boolean
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
@@ -1278,6 +1283,7 @@ export type Database = {
           favorite_count?: number
           fts?: unknown | null
           full_text?: string
+          is_tombstone?: boolean
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
@@ -1775,6 +1781,19 @@ export type Database = {
         }
         Returns: {
           requested_tweets: number
+          deleted_tweets: number
+          deleted_conversations: number
+          deleted_tweet_media: number
+          deleted_user_mentions: number
+          deleted_tweet_urls: number
+          deleted_private_tweet_user: number
+        }[]
+      }
+      delete_own_tweets: {
+        Args: {
+          p_tweet_ids: string[]
+        }
+        Returns: {
           deleted_tweets: number
           deleted_conversations: number
           deleted_tweet_media: number
@@ -2450,6 +2469,12 @@ export type Database = {
           "": string
         }
         Returns: string[]
+      }
+      tombstone_policy_account: {
+        Args: {
+          p_account_id: string
+        }
+        Returns: undefined
       }
       update_foreign_keys: {
         Args: {

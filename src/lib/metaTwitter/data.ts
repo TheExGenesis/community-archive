@@ -4,6 +4,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
 import { Database } from '@/database-types'
 import { devLog } from '@/lib/devLog'
+import { resolveProfileLinks } from '@/lib/profileLinks'
 import type {
   ArchiveMediaItem,
   ArchivePerson,
@@ -63,11 +64,15 @@ async function fetchProfileHeader(
   if (profileError) throw profileError
   if (membershipError) throw membershipError
   if (!account) return null
+  const bio = profile?.bio ?? null
+  const website = profile?.website ?? null
+  const profileLinks = await resolveProfileLinks([bio, website])
   return {
     ...account,
     account_display_name: account.account_display_name ?? account.username,
-    bio: profile?.bio ?? null,
-    website: profile?.website ?? null,
+    bio,
+    website,
+    profile_links: profileLinks,
     location: profile?.location ?? null,
     avatar_media_url: profile?.avatar_media_url ?? null,
     header_media_url: profile?.header_media_url ?? null,

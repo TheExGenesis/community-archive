@@ -69,4 +69,15 @@ describe('portal stream selection', () => {
       likes: 250,
     })
   })
+
+  test('excludes @bot from the homepage selection only', () => {
+    const now = new Date('2026-08-07T12:00:00.000Z')
+    const bot = tweet('102', '2026-08-07T11:59:00.000Z', {
+      username: 'BoT',
+      likes: 10_000,
+    })
+    const human = tweet('101', '2026-08-07T11:58:00.000Z')
+
+    expect(selectHomepageStream([bot, human], 2, now)).toEqual([human])
+  })
 })

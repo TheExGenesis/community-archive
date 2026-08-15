@@ -21,11 +21,8 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-// "Opt out and delete data" runs a synchronous export + delete that can
-// exceed Vercel's default 60s function ceiling for large accounts. Bumping
-// to 300s (Pro tier max for `nodejs` runtime — 800s is gated behind a paid
-// add-on, and 5 minutes is plenty for the parallelized export path).
-// Has no effect on smaller actions; they return in milliseconds.
+// Kept for compatibility with older inline admin cleanup paths. Current
+// export + tombstone work runs asynchronously on the Hetzner worker.
 export const maxDuration = 300
 
 async function RecentPrivacyActivitySection() {

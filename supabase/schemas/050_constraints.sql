@@ -82,6 +82,14 @@ ALTER TABLE ONLY "public"."archive_upload"
 
 ALTER TABLE ONLY "public"."conversations"
     ADD CONSTRAINT "conversations_pkey" PRIMARY KEY ("tweet_id");
+ALTER TABLE ONLY "public"."conversations"
+    ADD CONSTRAINT "conversations_resolution_status_check" CHECK (
+      "resolution_status" = ANY (
+        ARRAY['legacy'::text, 'authoritative'::text, 'root'::text, 'pending'::text, 'inherited'::text]
+      )
+    );
+ALTER TABLE ONLY "public"."conversations"
+    ADD CONSTRAINT "conversations_attempt_count_check" CHECK ("attempt_count" >= 0);
 
 ALTER TABLE ONLY "public"."followers"
     ADD CONSTRAINT "followers_account_id_follower_account_id_key" UNIQUE ("account_id", "follower_account_id");

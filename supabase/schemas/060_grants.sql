@@ -9,6 +9,7 @@ GRANT SELECT ON TABLE "public"."archive_upload" TO "readclient";
 GRANT SELECT ON TABLE "public"."account" TO "readclient";
 GRANT SELECT ON TABLE "public"."all_profile" TO "readclient";
 GRANT SELECT ON TABLE "public"."conversations" TO "readclient";
+GRANT SELECT ON TABLE "public"."conversation_resolution_health" TO "readclient";
 GRANT SELECT ON TABLE "public"."enriched_tweets" TO "readclient";
 GRANT SELECT ON TABLE "public"."followers" TO "readclient";
 GRANT SELECT ON TABLE "public"."following" TO "readclient";
@@ -86,3 +87,15 @@ GRANT ALL PRIVILEGES ON TABLE "public"."digest_editions" TO "service_role";
 GRANT USAGE, SELECT ON SEQUENCE "public"."digest_prompt_versions_version_seq" TO "service_role";
 GRANT USAGE, SELECT ON SEQUENCE "public"."digest_editions_issue_number_seq" TO "service_role";
 GRANT SELECT ON TABLE "public"."digest_editions" TO "anon", "authenticated";
+
+-- Conversation resolution internals are service-role only. Monitoring reads
+-- aggregate health through the security-invoker view or narrow private RPCs.
+REVOKE ALL PRIVILEGES ON TABLE "public"."conversation_resolution_runs" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."conversation_resolution_reconciliation" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."conversation_resolution_coverage_snapshots" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."conversation_resolution_health" FROM "anon", "authenticated";
+GRANT SELECT, INSERT, DELETE ON TABLE "public"."conversation_resolution_runs" TO "service_role";
+GRANT SELECT, INSERT, UPDATE ON TABLE "public"."conversation_resolution_reconciliation" TO "service_role";
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "public"."conversation_resolution_coverage_snapshots" TO "service_role";
+GRANT SELECT ON TABLE "public"."conversation_resolution_health" TO "service_role";
+GRANT USAGE, SELECT ON SEQUENCE "public"."conversation_resolution_runs_id_seq" TO "service_role";

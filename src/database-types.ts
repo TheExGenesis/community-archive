@@ -324,6 +324,39 @@ export type Database = {
           },
         ]
       }
+      conversation_resolution_coverage_snapshots: {
+        Row: {
+          latest_observed_at: string | null
+          latest_resolved_at: string | null
+          max_attempt_count: number | null
+          oldest_ready_at: string | null
+          producer_source: string
+          resolution_status: string
+          row_count: number
+          snapshot_at: string
+        }
+        Insert: {
+          latest_observed_at?: string | null
+          latest_resolved_at?: string | null
+          max_attempt_count?: number | null
+          oldest_ready_at?: string | null
+          producer_source: string
+          resolution_status: string
+          row_count: number
+          snapshot_at?: string
+        }
+        Update: {
+          latest_observed_at?: string | null
+          latest_resolved_at?: string | null
+          max_attempt_count?: number | null
+          oldest_ready_at?: string | null
+          producer_source?: string
+          resolution_status?: string
+          row_count?: number
+          snapshot_at?: string
+        }
+        Relationships: []
+      }
       conversation_resolution_reconciliation: {
         Row: {
           cursor_tweet_id: string | null

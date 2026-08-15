@@ -50,6 +50,8 @@ test('processes a bounded resumable batch with retries and telemetry', () => {
   expect(migration).toContain(
     'private.community_archive_monitoring_conversation_resolution_worker()',
   )
+  expect(migration).toContain('conversation_resolution_coverage_snapshots')
+  expect(migration).toContain("'17 4 * * *'")
   expect(migration).toContain("'* * * * *'")
 })
 

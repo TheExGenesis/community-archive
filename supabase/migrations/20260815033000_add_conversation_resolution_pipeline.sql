@@ -77,13 +77,29 @@ SELECT
 FROM public.conversations
 GROUP BY producer_source, resolution_status;
 
+CREATE TABLE public.conversation_resolution_coverage_snapshots (
+  producer_source text NOT NULL,
+  resolution_status text NOT NULL,
+  row_count bigint NOT NULL CHECK (row_count >= 0),
+  latest_observed_at timestamptz,
+  latest_resolved_at timestamptz,
+  oldest_ready_at timestamptz,
+  max_attempt_count integer,
+  snapshot_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (producer_source, resolution_status)
+);
+
 ALTER TABLE public.conversation_resolution_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.conversation_resolution_reconciliation ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversation_resolution_coverage_snapshots ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.conversation_resolution_runs FROM anon, authenticated;
 REVOKE ALL ON public.conversation_resolution_reconciliation FROM anon, authenticated;
+REVOKE ALL ON public.conversation_resolution_coverage_snapshots FROM anon, authenticated;
 GRANT SELECT, INSERT, DELETE ON public.conversation_resolution_runs TO service_role;
 GRANT SELECT, INSERT, UPDATE ON public.conversation_resolution_reconciliation
   TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON public.conversation_resolution_coverage_snapshots TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.conversation_resolution_runs_id_seq
   TO service_role;
 REVOKE ALL ON public.conversation_resolution_health FROM anon, authenticated;
@@ -503,6 +519,48 @@ GRANT EXECUTE ON FUNCTION private.configure_conversation_resolution_reconciliati
 GRANT EXECUTE ON FUNCTION private.process_conversation_resolution_reconciliation_batch(integer, boolean)
   TO service_role;
 
+CREATE OR REPLACE FUNCTION private.refresh_conversation_resolution_coverage()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_rows integer;
+BEGIN
+  DELETE FROM public.conversation_resolution_coverage_snapshots;
+
+  INSERT INTO public.conversation_resolution_coverage_snapshots (
+    producer_source,
+    resolution_status,
+    row_count,
+    latest_observed_at,
+    latest_resolved_at,
+    oldest_ready_at,
+    max_attempt_count,
+    snapshot_at
+  )
+  SELECT
+    health.producer_source,
+    health.resolution_status,
+    health.row_count,
+    health.latest_observed_at,
+    health.latest_resolved_at,
+    health.oldest_ready_at,
+    health.max_attempt_count,
+    now()
+  FROM public.conversation_resolution_health AS health;
+
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  RETURN v_rows;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION private.refresh_conversation_resolution_coverage()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.refresh_conversation_resolution_coverage()
+  TO service_role;
+
 CREATE OR REPLACE FUNCTION private.community_archive_monitoring_conversation_resolution_health()
 RETURNS TABLE (
   producer_source text,
@@ -511,7 +569,8 @@ RETURNS TABLE (
   latest_observed_at timestamptz,
   latest_resolved_at timestamptz,
   oldest_ready_at timestamptz,
-  max_attempt_count integer
+  max_attempt_count integer,
+  snapshot_at timestamptz
 )
 LANGUAGE sql
 STABLE
@@ -525,8 +584,9 @@ AS $$
     health.latest_observed_at,
     health.latest_resolved_at,
     health.oldest_ready_at,
-    health.max_attempt_count
-  FROM public.conversation_resolution_health AS health;
+    health.max_attempt_count,
+    health.snapshot_at
+  FROM public.conversation_resolution_coverage_snapshots AS health;
 $$;
 
 CREATE OR REPLACE FUNCTION private.community_archive_monitoring_conversation_resolution_worker()
@@ -618,6 +678,20 @@ BEGIN
       '* * * * *',
       'SELECT private.process_conversation_resolution_batch(500);'
     );
+
+    SELECT jobid INTO v_job_id
+    FROM cron.job
+    WHERE jobname = 'snapshot-conversation-resolution-coverage';
+
+    IF v_job_id IS NOT NULL THEN
+      PERFORM cron.unschedule(v_job_id);
+    END IF;
+
+    PERFORM cron.schedule(
+      'snapshot-conversation-resolution-coverage',
+      '17 4 * * *',
+      'SELECT private.refresh_conversation_resolution_coverage();'
+    );
   END IF;
 END;
 $$;
@@ -627,6 +701,8 @@ COMMENT ON TABLE public.conversation_resolution_runs IS
 COMMENT ON TABLE public.conversation_resolution_reconciliation IS
   'Durable cursor and progress for an explicitly enabled bounded historical reconciliation.';
 COMMENT ON VIEW public.conversation_resolution_health IS
-  'Conversation coverage, freshness, retry, and backlog metrics grouped by ingestion source and resolution status.';
+  'Live conversation coverage grouped by ingestion source and resolution status; refresh only through the daily monitoring snapshot.';
+COMMENT ON TABLE public.conversation_resolution_coverage_snapshots IS
+  'Daily per-source coverage snapshot used by monitoring without repeatedly scanning the serving table.';
 COMMENT ON FUNCTION private.process_conversation_resolution_batch(integer, timestamptz) IS
   'Resolves a bounded SKIP LOCKED batch of pending replies. Safe to rerun; does not perform historical discovery.';

@@ -106,11 +106,34 @@ PG_BATCH_SIZE=1000
 MEMORY_BATCH_SIZE=3000
 MAX_MEMORY_MB=2000
 
+# Leave disabled until the recovery/privacy staging checks below pass.
+SYNDICATION_CONVERSATION_RECOVERY_ENABLED=false
+SYNDICATION_CONVERSATION_MAX_DEPTH=64
+
 NODE_ENV=production
 
 # Docker-specific Configuration (OPTIONAL)
 ARCHIVE_DATA_PATH=./data
 ```
+
+### Verify syndication conversation recovery
+
+Keep `SYNDICATION_CONVERSATION_RECOVERY_ENABLED=false` for the initial image
+rollout. In staging, enable it for one archive containing a reply whose parent
+is outside the uploaded archive and whose source tweet has no conversation ID.
+Verify that the worker:
+
+- walks the public syndication parent chain to the original post;
+- writes `archive_upload_syndication` provenance for the recovered chain;
+- stores every eligible recovered tweet, account, profile, and media row;
+- stores no content or profile data for a recovered author present in either
+  `public.optin.explicit_optout` or `tes.blocked_scraping_users`;
+- leaves the conversation unresolved when the chain is cyclic, unavailable, or
+  exceeds `SYNDICATION_CONVERSATION_MAX_DEPTH`.
+
+Disable the flag to roll back the recovery path without stopping ordinary
+archive ingestion. Keep the previous worker image available during the staged
+test.
 
 ### Secure Your Environment File
 

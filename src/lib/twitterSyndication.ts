@@ -5,10 +5,12 @@
  * to recover an avatar transiently when an archived profile image is missing or
  * stale.
  *
- * Hard rules:
- * - Never persist hydrated tweet content to our DB. The link-preview subsystem may
- *   separately cache the bounded title, teaser, and cover image that X publishes for
- *   an Article linked by an archived tweet.
+ * Render-time hard rules:
+ * - Never persist content fetched through this renderer-facing client. Dedicated
+ *   ingestion writers may use their ingestion client only after checking each
+ *   author's authoritative opt-out state at the final write boundary.
+ * - The link-preview subsystem may separately cache the bounded title, teaser,
+ *   and cover image that X publishes for an Article linked by an archived tweet.
  * - Never use hydrated tweet content in search results or global feeds.
  * - Profile pages may use the text-only repair path for archived profile cards;
  *   that path only replaces flattened DB text when syndication supplies line breaks.
@@ -99,7 +101,11 @@ export async function fetchSyndicatedTweet(
     return null
   }
 
-  if (!data || data.__typename === 'TweetTombstone' || !data.id_str) {
+  if (
+    !data ||
+    data.__typename === 'TweetTombstone' ||
+    data.id_str !== tweetId
+  ) {
     return null
   }
 
@@ -141,18 +147,20 @@ export async function fetchSyndicatedTweet(
     account_display_name: data.user?.name ?? '',
     created_at: data.created_at ?? '',
     full_text: data.text ?? '',
-    retweet_count:
-      typeof data.conversation_count === 'number'
-        ? data.conversation_count
-        : null,
+    // Syndication does not expose retweet_count. conversation_count is a
+    // different metric and must not be substituted.
+    retweet_count: null,
     favorite_count:
       typeof data.favorite_count === 'number' ? data.favorite_count : 0,
     avatar_media_url: data.user?.profile_image_url_https,
     media: media.length > 0 ? media : undefined,
     article,
-    reply_to_tweet_id: data.in_reply_to_status_id_str ?? null,
-    reply_to_username: data.in_reply_to_screen_name ?? null,
-    reply_to_user_id: data.in_reply_to_user_id_str ?? null,
+    reply_to_tweet_id:
+      data.in_reply_to_status_id_str ?? data.parent?.id_str ?? null,
+    reply_to_username:
+      data.in_reply_to_screen_name ?? data.parent?.user?.screen_name ?? null,
+    reply_to_user_id:
+      data.in_reply_to_user_id_str ?? data.parent?.user?.id_str ?? null,
     from_external: true,
   }
 }

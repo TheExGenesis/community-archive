@@ -259,6 +259,74 @@ REVOKE ALL ON FUNCTION private.process_conversation_resolution_batch(integer, ti
 GRANT EXECUTE ON FUNCTION private.process_conversation_resolution_batch(integer, timestamptz)
   TO service_role;
 
+CREATE OR REPLACE FUNCTION private.community_archive_monitoring_conversation_resolution_health()
+RETURNS TABLE (
+  producer_source text,
+  resolution_status text,
+  row_count bigint,
+  latest_observed_at timestamptz,
+  latest_resolved_at timestamptz,
+  oldest_ready_at timestamptz,
+  max_attempt_count integer
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT
+    health.producer_source,
+    health.resolution_status,
+    health.row_count,
+    health.latest_observed_at,
+    health.latest_resolved_at,
+    health.oldest_ready_at,
+    health.max_attempt_count
+  FROM public.conversation_resolution_health AS health;
+$$;
+
+CREATE OR REPLACE FUNCTION private.community_archive_monitoring_conversation_resolution_worker()
+RETURNS TABLE (
+  finished_at timestamptz,
+  attempted integer,
+  resolved integer,
+  deferred integer,
+  ready_after integer
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT
+    latest.finished_at,
+    COALESCE(latest.attempted, 0),
+    COALESCE(latest.resolved, 0),
+    COALESCE(latest.deferred, 0),
+    COALESCE(latest.ready_after, 0)
+  FROM (VALUES (true)) AS sentinel(include_row)
+  LEFT JOIN LATERAL (
+    SELECT
+      runs.finished_at,
+      runs.attempted,
+      runs.resolved,
+      runs.deferred,
+      runs.ready_after
+    FROM public.conversation_resolution_runs AS runs
+    ORDER BY runs.finished_at DESC
+    LIMIT 1
+  ) AS latest ON sentinel.include_row;
+$$;
+
+REVOKE ALL ON FUNCTION private.community_archive_monitoring_conversation_resolution_health()
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION private.community_archive_monitoring_conversation_resolution_worker()
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.community_archive_monitoring_conversation_resolution_health()
+  TO service_role;
+GRANT EXECUTE ON FUNCTION private.community_archive_monitoring_conversation_resolution_worker()
+  TO service_role;
+
 DO $$
 DECLARE
   v_job_id bigint;

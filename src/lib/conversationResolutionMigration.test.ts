@@ -29,6 +29,12 @@ test('processes a bounded resumable batch with retries and telemetry', () => {
   expect(migration).toContain('conversation_resolution_runs')
   expect(migration).toContain('conversation_resolution_health')
   expect(migration).toContain('GROUP BY producer_source, resolution_status')
+  expect(migration).toContain(
+    'private.community_archive_monitoring_conversation_resolution_health()',
+  )
+  expect(migration).toContain(
+    'private.community_archive_monitoring_conversation_resolution_worker()',
+  )
   expect(migration).toContain("'* * * * *'")
 })
 

@@ -1693,12 +1693,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      tombstone_policy_account: {
-        Args: {
-          p_account_id: string
-        }
-        Returns: undefined
-      }
       drop_all_policies: {
         Args: {
           schema_name: string
@@ -2341,6 +2335,12 @@ export type Database = {
         }
         Returns: string[]
       }
+      tombstone_policy_account: {
+        Args: {
+          p_account_id: string
+        }
+        Returns: undefined
+      }
       update_foreign_keys: {
         Args: {
           old_table_name: string
@@ -2472,3 +2472,4 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+

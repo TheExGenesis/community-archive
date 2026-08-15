@@ -123,6 +123,35 @@ export function DigestStoryView({
               </div>
             </section>
 
+            {story.commentary.length ? (
+              <section>
+                <div className="flex items-center gap-3.5">
+                  <h2 className={sectionLabel}>Surrounding conversation</h2>
+                  <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
+                  <span className={`text-xs ${MUTED}`}>
+                    {story.commentary.length} selected
+                  </span>
+                </div>
+                <p className={`mt-2 text-sm leading-6 ${MUTED}`}>
+                  Quote posts that extended, challenged, or remixed the featured
+                  bangers.
+                </p>
+                <div className="mt-5">
+                  {story.commentary.map((tweet) => (
+                    <TweetCard
+                      key={tweet.id}
+                      tweet={tweet}
+                      variant="editorial"
+                      noClamp
+                      showDate
+                      origin="digest"
+                      returnTo={returnTo}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
             {unselectedQuotePosts.length ? (
               <section>
                 <div className="flex items-center gap-3.5">
@@ -161,35 +190,6 @@ export function DigestStoryView({
                       </section>
                     )
                   })}
-                </div>
-              </section>
-            ) : null}
-
-            {story.commentary.length ? (
-              <section>
-                <div className="flex items-center gap-3.5">
-                  <h2 className={sectionLabel}>Surrounding conversation</h2>
-                  <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
-                  <span className={`text-xs ${MUTED}`}>
-                    {story.commentary.length} selected
-                  </span>
-                </div>
-                <p className={`mt-2 text-sm leading-6 ${MUTED}`}>
-                  Quote posts that extended, challenged, or remixed the featured
-                  bangers.
-                </p>
-                <div className="mt-5">
-                  {story.commentary.map((tweet) => (
-                    <TweetCard
-                      key={tweet.id}
-                      tweet={tweet}
-                      variant="editorial"
-                      noClamp
-                      showDate
-                      origin="digest"
-                      returnTo={returnTo}
-                    />
-                  ))}
                 </div>
               </section>
             ) : null}

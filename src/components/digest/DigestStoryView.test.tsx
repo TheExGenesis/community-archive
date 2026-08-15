@@ -60,6 +60,12 @@ describe('DigestStoryView', () => {
     expect(
       screen.getByRole('heading', { name: 'Archived quote posts' }),
     ).toBeVisible()
+    const headings = screen
+      .getAllByRole('heading')
+      .map((heading) => heading.textContent)
+    expect(headings.indexOf('Surrounding conversation')).toBeLessThan(
+      headings.indexOf('Archived quote posts'),
+    )
     expect(
       screen.getByText('This quote belongs on the story page'),
     ).toBeVisible()

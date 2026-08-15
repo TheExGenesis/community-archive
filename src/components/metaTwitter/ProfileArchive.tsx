@@ -17,6 +17,7 @@ import type {
 import { mutateProfileCuration } from '@/app/user/[account_id]/actions'
 import type { ProfileCurationSection } from '@/lib/profileCurationState'
 import { useProfileEditing } from './ProfileEditingContext'
+import { ProfileMediaGallery } from './ProfileMediaGallery'
 
 interface SidebarData {
   media: ArchiveMediaItem[]
@@ -124,6 +125,7 @@ export function ProfileArchive({
   )
   const { editing, editSaving, setEditing, setEditSaving } = useProfileEditing()
   const [editError, setEditError] = useState<string | null>(null)
+  const [mediaGalleryOpen, setMediaGalleryOpen] = useState(false)
   const feedsRef = useRef(feeds)
   const mediaRef = useRef(mediaByScope)
   const peopleRef = useRef(peopleByScope)
@@ -434,6 +436,7 @@ export function ProfileArchive({
     (year: number | null) => {
       if (year === activeYear) return
       setEditing(false)
+      setMediaGalleryOpen(false)
       setSort('quotes')
       setActiveYear(year)
       window.history.pushState(null, '', archiveChapterHref(basePath, year))
@@ -741,6 +744,7 @@ export function ProfileArchive({
         }
         mediaFailed={activeMediaFailed}
         onRetryMedia={() => void loadMedia(activeYear)}
+        onOpenMediaGallery={() => setMediaGalleryOpen(true)}
         peopleLoading={
           activePeopleLoading || (!activePeople && !activePeopleFailed)
         }
@@ -768,6 +772,16 @@ export function ProfileArchive({
         }
         onRestore={(section) => void restoreSection(section)}
       />
+      {mediaGalleryOpen && activeMedia && (
+        <ProfileMediaGallery
+          accountId={accountId}
+          initialMedia={activeMedia.media}
+          mediaCount={activeMedia.mediaCount}
+          onOpenChange={setMediaGalleryOpen}
+          returnTo={returnTo}
+          year={activeYear}
+        />
+      )}
     </div>
   )
 }

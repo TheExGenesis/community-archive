@@ -20,6 +20,7 @@ const response = (year: number | null) => ({
       },
     ],
     mediaCount: '7',
+    nextOffset: 1,
     people: [
       {
         accountId: '7',
@@ -38,6 +39,7 @@ const response = (year: number | null) => ({
     accountId: '42',
     year,
     mediaLimit: 6,
+    mediaOffset: 0,
     peopleLimit: 8,
   },
 })
@@ -91,17 +93,21 @@ test('loads media and interactions through independent gateway resources', async
   ) as unknown as AnalyticsGatewayFetcher
 
   const [media, interactions] = await Promise.all([
-    fetchClickHouseProfileMedia('42', 2025, fetcher),
+    fetchClickHouseProfileMedia('42', 2025, {}, fetcher),
     fetchClickHouseProfileInteractions('42', 2025, fetcher),
   ])
 
-  expect(media).toMatchObject({ mediaCount: 7, media: [{ tweet_id: '501' }] })
+  expect(media).toMatchObject({
+    mediaCount: 7,
+    nextOffset: 1,
+    media: [{ tweet_id: '501' }],
+  })
   expect(interactions).toMatchObject({
     people: [{ user_id: '7', screen_name: 'bob', interactions: 9 }],
   })
   expect(fetcher).toHaveBeenCalledWith(
     ['user', '42', 'media'],
-    new URLSearchParams({ limit: '6', year: '2025' }),
+    new URLSearchParams({ limit: '6', offset: '0', year: '2025' }),
     { timeoutMs: 30_000 },
   )
   expect(fetcher).toHaveBeenCalledWith(

@@ -7,6 +7,7 @@ import {
 } from '@/lib/clickhouseGateway'
 import { devLog } from '@/lib/devLog'
 import type { ArchiveMediaItem, ArchivePerson } from './types'
+import type { ProfileMediaPageState } from './profileMediaPagination'
 
 const DAY = 86_400
 const MEDIA_LIMIT = 6
@@ -31,11 +32,13 @@ interface MediaResponse {
   data?: {
     media?: unknown
     mediaCount?: unknown
+    nextOffset?: unknown
   }
   query?: {
     accountId?: unknown
     year?: unknown
     mediaLimit?: unknown
+    mediaOffset?: unknown
   }
 }
 
@@ -79,10 +82,7 @@ export interface ClickHouseProfileSidebarState
   available: boolean
 }
 
-export interface ClickHouseProfileMedia {
-  media: ArchiveMediaItem[]
-  mediaCount: number
-}
+export interface ClickHouseProfileMedia extends ProfileMediaPageState {}
 
 export interface ClickHouseProfileMediaState extends ClickHouseProfileMedia {
   available: boolean
@@ -168,35 +168,58 @@ const personItem = (value: unknown): ArchivePerson | null => {
   }
 }
 
-const profileParams = (year: number | undefined, limit: number) => {
+const profileParams = (
+  year: number | undefined,
+  limit: number,
+  offset?: number,
+) => {
   const params = new URLSearchParams({ limit: String(limit) })
+  if (offset !== undefined) params.set('offset', String(offset))
   if (year !== undefined) params.set('year', String(year))
   return params
+}
+
+interface ProfileMediaPageOptions {
+  limit?: number
+  offset?: number
 }
 
 export async function fetchClickHouseProfileMedia(
   accountId: string,
   year: number | undefined,
+  options: ProfileMediaPageOptions = {},
   fetcher: AnalyticsGatewayFetcher = fetchAnalyticsGatewayJson,
 ): Promise<ClickHouseProfileMedia> {
   if (!ID_PATTERN.test(accountId)) {
     throw new Error('Profile media requires a numeric account ID')
   }
+  const limit = Math.max(
+    1,
+    Math.min(50, Math.trunc(options.limit ?? MEDIA_LIMIT)),
+  )
+  const offset = Math.max(0, Math.min(5_000, Math.trunc(options.offset ?? 0)))
   const response = await fetcher<MediaResponse>(
     ['user', accountId, 'media'],
-    profileParams(year, MEDIA_LIMIT),
+    profileParams(year, limit, offset),
     { timeoutMs: 30_000 },
   )
   if (
     response.query?.accountId !== accountId ||
     response.query?.year !== (year ?? null) ||
-    Number(response.query?.mediaLimit) !== MEDIA_LIMIT
+    Number(response.query?.mediaLimit) !== limit ||
+    Number(response.query?.mediaOffset) !== offset
   ) {
     throw new Error('ClickHouse returned mismatched profile media scope')
   }
   const media = response.data?.media
   const mediaCount = safeCount(response.data?.mediaCount)
-  if (mediaCount === null || !Array.isArray(media)) {
+  const rawNextOffset = response.data?.nextOffset
+  const nextOffset = rawNextOffset === null ? null : safeCount(rawNextOffset)
+  if (
+    mediaCount === null ||
+    !Array.isArray(media) ||
+    (rawNextOffset !== null && nextOffset === null)
+  ) {
     throw new Error('ClickHouse returned invalid profile media')
   }
   return {
@@ -205,6 +228,7 @@ export async function fetchClickHouseProfileMedia(
       return item ? [item] : []
     }),
     mediaCount,
+    nextOffset,
   }
 }
 
@@ -295,7 +319,7 @@ const getCachedClickHouseProfileSidebar = unstable_cache(
 
 const getCachedClickHouseProfileMedia = unstable_cache(
   fetchClickHouseProfileMedia,
-  ['meta-twitter-clickhouse-profile-media-v1'],
+  ['meta-twitter-clickhouse-profile-media-v2'],
   { revalidate: DAY },
 )
 
@@ -315,8 +339,9 @@ export async function getClickHouseProfileSidebarOrThrow(
 export async function getClickHouseProfileMediaOrThrow(
   accountId: string,
   year: number | undefined,
+  options: ProfileMediaPageOptions = {},
 ): Promise<ClickHouseProfileMedia> {
-  return getCachedClickHouseProfileMedia(accountId, year)
+  return getCachedClickHouseProfileMedia(accountId, year, options)
 }
 
 export async function getClickHouseProfileInteractionsOrThrow(
@@ -348,10 +373,11 @@ export async function getClickHouseProfileSidebar(
 export async function getClickHouseProfileMedia(
   accountId: string,
   year: number | undefined,
+  options: ProfileMediaPageOptions = {},
 ): Promise<ClickHouseProfileMediaState> {
   try {
     return {
-      ...(await getClickHouseProfileMediaOrThrow(accountId, year)),
+      ...(await getClickHouseProfileMediaOrThrow(accountId, year, options)),
       available: true,
     }
   } catch (error) {
@@ -360,7 +386,7 @@ export async function getClickHouseProfileMedia(
       year,
       error,
     })
-    return { media: [], mediaCount: 0, available: false }
+    return { media: [], mediaCount: 0, nextOffset: null, available: false }
   }
 }
 

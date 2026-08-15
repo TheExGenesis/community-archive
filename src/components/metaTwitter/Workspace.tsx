@@ -46,6 +46,7 @@ export function Workspace({
   mediaLoading,
   mediaFailed,
   onRetryMedia,
+  onOpenMediaGallery,
   peopleLoading,
   peopleFailed,
   onRetryPeople,
@@ -76,6 +77,7 @@ export function Workspace({
   mediaLoading: boolean
   mediaFailed: boolean
   onRetryMedia: () => void
+  onOpenMediaGallery?: () => void
   peopleLoading: boolean
   peopleFailed: boolean
   onRetryPeople: () => void
@@ -310,30 +312,47 @@ export function Workspace({
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-1">
-                {mediaTiles.map((item, index) => (
-                  <Link
-                    key={item.media_url}
-                    href={tweetPermalinkHref(
-                      item.tweet_id,
-                      'profile',
-                      returnTo,
-                    )}
-                    className="relative block aspect-square overflow-hidden rounded-md bg-muted"
-                  >
-                    <Image
-                      src={item.media_url}
-                      alt=""
-                      fill
-                      sizes="94px"
-                      className="object-cover"
-                    />
-                    {index === 5 && mediaOverflow > 0 && (
-                      <span className="absolute inset-0 grid place-items-center bg-black/50 text-xs font-semibold text-white">
-                        +{formatNumber(mediaOverflow)}
-                      </span>
-                    )}
-                  </Link>
-                ))}
+                {mediaTiles.map((item, index) => {
+                  const tile = (
+                    <>
+                      <Image
+                        src={item.media_url}
+                        alt=""
+                        fill
+                        sizes="94px"
+                        className="object-cover"
+                      />
+                      {index === 5 && mediaOverflow > 0 && (
+                        <span className="absolute inset-0 grid place-items-center bg-black/50 text-xs font-semibold text-white">
+                          +{formatNumber(mediaOverflow)}
+                        </span>
+                      )}
+                    </>
+                  )
+                  return index === 5 && mediaOverflow > 0 ? (
+                    <button
+                      key={item.media_url}
+                      type="button"
+                      aria-label={`View ${formatNumber(mediaOverflow)} more profile photos`}
+                      onClick={onOpenMediaGallery}
+                      className="relative block aspect-square overflow-hidden rounded-md bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {tile}
+                    </button>
+                  ) : (
+                    <Link
+                      key={item.media_url}
+                      href={tweetPermalinkHref(
+                        item.tweet_id,
+                        'profile',
+                        returnTo,
+                      )}
+                      className="relative block aspect-square overflow-hidden rounded-md bg-muted"
+                    >
+                      {tile}
+                    </Link>
+                  )
+                })}
               </div>
             )}
           </section>

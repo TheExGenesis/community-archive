@@ -71,6 +71,7 @@ const tweets: BangerTweet[] = Array.from({ length: 13 }, (_, index) => ({
 test('shows the initial canonical banger cards with media and profile return links', async () => {
   const user = userEvent.setup()
   const onLoadMore = jest.fn()
+  const onOpenMediaGallery = jest.fn()
   render(
     <Workspace
       avatarUrl={null}
@@ -78,13 +79,22 @@ test('shows the initial canonical banger cards with media and profile return lin
       tweets={tweets.slice(0, 2)}
       bangersAvailable
       bangersLoading={false}
-      media={[]}
-      mediaCount={0}
+      media={Array.from({ length: 6 }, (_, index) => ({
+        tweet_id: String(300 + index),
+        created_at: '2026-08-01T00:00:00.000Z',
+        favorite_count: 10,
+        media_url: `https://example.com/media-${index}.jpg`,
+        media_type: 'photo',
+        width: 1200,
+        height: 800,
+      }))}
+      mediaCount={325}
       people={[]}
       peopleTitle="Top people"
       mediaLoading={false}
       mediaFailed={false}
       onRetryMedia={jest.fn()}
+      onOpenMediaGallery={onOpenMediaGallery}
       peopleLoading={false}
       peopleFailed={false}
       onRetryPeople={jest.fn()}
@@ -166,4 +176,8 @@ test('shows the initial canonical banger cards with media and profile return lin
   await user.click(screen.getByRole('button', { name: 'Load more bangers' }))
 
   expect(onLoadMore).toHaveBeenCalledTimes(1)
+  await user.click(
+    screen.getByRole('button', { name: 'View 319 more profile photos' }),
+  )
+  expect(onOpenMediaGallery).toHaveBeenCalledTimes(1)
 })

@@ -202,5 +202,40 @@ CREATE POLICY "Users can read own action log" ON "public"."user_action_log"
     OR account_id = ((auth.jwt()->'app_metadata'->>'provider_id')::text)
   );
 
+-- Digest feedback is private to the author. Service-role editorial reads bypass
+-- RLS; client writes are accepted only for published editions.
+ALTER TABLE "public"."digest_feedback" ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Members can read own digest feedback"
+  ON "public"."digest_feedback" FOR SELECT TO "authenticated"
+  USING ("user_id" = (SELECT "auth"."uid"()));
+
+CREATE POLICY "Members can insert own published digest feedback"
+  ON "public"."digest_feedback" FOR INSERT TO "authenticated"
+  WITH CHECK (
+    "user_id" = (SELECT "auth"."uid"())
+    AND EXISTS (
+      SELECT 1 FROM "public"."digest_editions" AS "edition"
+      WHERE "edition"."id" = "digest_feedback"."edition_id"
+        AND "edition"."status" = 'published'
+    )
+  );
+
+CREATE POLICY "Members can update own published digest feedback"
+  ON "public"."digest_feedback" FOR UPDATE TO "authenticated"
+  USING ("user_id" = (SELECT "auth"."uid"()))
+  WITH CHECK (
+    "user_id" = (SELECT "auth"."uid"())
+    AND EXISTS (
+      SELECT 1 FROM "public"."digest_editions" AS "edition"
+      WHERE "edition"."id" = "digest_feedback"."edition_id"
+        AND "edition"."status" = 'published'
+    )
+  );
+
+CREATE POLICY "Members can delete own digest feedback"
+  ON "public"."digest_feedback" FOR DELETE TO "authenticated"
+  USING ("user_id" = (SELECT "auth"."uid"()));
+
 GRANT SELECT, INSERT ON public.user_action_log TO authenticated, service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.user_action_log_id_seq TO authenticated, service_role;

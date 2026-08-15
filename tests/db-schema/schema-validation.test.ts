@@ -34,6 +34,7 @@ describe('Database Schema Validation', () => {
       'profile_settings',
       'profile_curation',
       'tweet_link_previews',
+      'digest_feedback',
     ]
 
     test.each(requiredTables)(

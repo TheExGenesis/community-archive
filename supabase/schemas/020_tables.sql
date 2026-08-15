@@ -329,6 +329,22 @@ CREATE TABLE IF NOT EXISTS "public"."digest_editions" (
 );
 ALTER TABLE "public"."digest_editions" OWNER TO "postgres";
 
+-- Private member feedback on published digest editions. Editorial tooling
+-- reads it with the service role; public clients never see other responses.
+CREATE TABLE IF NOT EXISTS "public"."digest_feedback" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "edition_id" uuid NOT NULL REFERENCES "public"."digest_editions"("id") ON DELETE CASCADE,
+    "user_id" uuid NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
+    "sentiment" text NOT NULL,
+    "comment" text,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "updated_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "digest_feedback_edition_user_key" UNIQUE ("edition_id", "user_id"),
+    CONSTRAINT "digest_feedback_sentiment_check" CHECK ("sentiment" IN ('helpful', 'not_helpful')),
+    CONSTRAINT "digest_feedback_comment_length" CHECK ("comment" IS NULL OR char_length("comment") <= 2000)
+);
+ALTER TABLE "public"."digest_feedback" OWNER TO "postgres";
+
 -- Public profile preferences. PostgreSQL remains authoritative for this
 -- owner-controlled policy state; analytical stores only consume the result.
 CREATE TABLE IF NOT EXISTS "public"."profile_settings" (

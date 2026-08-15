@@ -700,6 +700,7 @@ export class ArchiveUploadProcessor {
       num_following: 0,
       num_followers: 0,
       num_likes: 0,
+      is_tombstone: false,
     }))
     const profiles = tweets
       .filter(
@@ -730,6 +731,7 @@ export class ArchiveUploadProcessor {
       reply_to_user_id: tweet.reply_to_user_id,
       reply_to_username: tweet.reply_to_username,
       archive_upload_id: null,
+      is_tombstone: false,
     }))
     const now = new Date().toISOString()
     const conversations = tweets.map((tweet) => {
@@ -791,6 +793,7 @@ export class ArchiveUploadProcessor {
         account.num_following,
         account.num_followers,
         account.num_likes,
+        account.is_tombstone,
       ],
     })
     await bulkInsertWithCopy({
@@ -827,6 +830,7 @@ export class ArchiveUploadProcessor {
         tweet.reply_to_user_id,
         tweet.reply_to_username,
         tweet.archive_upload_id,
+        tweet.is_tombstone,
       ],
     })
     await this.insertIfNotEmpty(trx, 'conversations', conversations, (row) => [

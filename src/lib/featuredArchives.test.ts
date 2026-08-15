@@ -31,12 +31,12 @@ describe('sampleFeaturedArchives', () => {
     }
   })
 
-  it('keeps the requested anchors in the 28-person candidate pool', () => {
+  it('keeps the requested anchors in the 29-person candidate pool', () => {
     const usernames = FEATURED_ARCHIVE_GROUPS.flat().map(
       (archive) => archive.username,
     )
 
-    expect(usernames).toHaveLength(28)
+    expect(usernames).toHaveLength(29)
     expect(usernames).toEqual(
       expect.arrayContaining([
         'tszzl',
@@ -53,6 +53,7 @@ describe('sampleFeaturedArchives', () => {
         'RomeoStevens76',
         'voooooogel',
         'NathanpmYoung',
+        'johnsonmxe',
       ]),
     )
     expect(usernames).not.toContain('tessera_antra')

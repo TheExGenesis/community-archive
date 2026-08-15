@@ -130,6 +130,13 @@ export const FEATURED_ARCHIVE_GROUPS = [
       num_tweets: 315_082,
     },
     {
+      account_id: '178479745',
+      username: 'johnsonmxe',
+      avatar_media_url:
+        'https://pbs.twimg.com/profile_images/1711003575764025344/t_2Gw0vB_normal.jpg',
+      num_tweets: 2_864,
+    },
+    {
       account_id: '1365020011123773442',
       username: 'Teknium',
       avatar_media_url:

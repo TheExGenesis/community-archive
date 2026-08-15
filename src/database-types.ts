@@ -1648,6 +1648,19 @@ export type Database = {
           deleted_private_tweet_user: number
         }[]
       }
+      delete_own_tweets: {
+        Args: {
+          p_tweet_ids: string[]
+        }
+        Returns: {
+          deleted_tweets: number
+          deleted_conversations: number
+          deleted_tweet_media: number
+          deleted_user_mentions: number
+          deleted_tweet_urls: number
+          deleted_private_tweet_user: number
+        }[]
+      }
       delete_single_archive: {
         Args: {
           p_account_id: string

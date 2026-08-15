@@ -21,6 +21,7 @@ import {
   createDbScriptClient,
 } from '../src/utils/supabase'
 import { Database } from '../src/database-types'
+import { getArchiveTweetMedia } from '../src/lib/archiveMedia'
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -188,16 +189,15 @@ const ARCHIVE_LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : undefine
     const allmedia:any[] = [];
 
     for(const tweet of tweets){
-      if(tweet.entities.media){
-        for(const media of tweet.entities.media){
+        for(const media of getArchiveTweetMedia(tweet)){
           const isDuplicate = allmedia.some(m => 
-            m.tweet_id === tweet.id && 
+            m.tweet_id === (tweet.id_str || tweet.id) &&
             m.media_url_https === media.media_url_https
           );
           
           if (!isDuplicate) {
             allmedia.push({
-              tweet_id: tweet.id,
+              tweet_id: tweet.id_str || tweet.id,
               url: media.url,
               expanded_url: media.expanded_url,
               display_url: media.display_url,
@@ -207,7 +207,6 @@ const ARCHIVE_LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : undefine
             });
           }
         }
-      }
     }
     
     let { count: media_ids, error } = await supabase.from("tweet_media").select("*", { count: "exact", head: true });

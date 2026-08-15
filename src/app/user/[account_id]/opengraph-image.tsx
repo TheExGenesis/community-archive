@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { ImageResponse } from 'next/og'
 import { notFound } from 'next/navigation'
 import { getHighResolutionAvatarUrl } from '@/lib/avatar'
@@ -50,36 +52,6 @@ const headerImageUrl = (value: string | null) => {
 const avatarImageUrl = (value: string | null) =>
   safeTwitterImageUrl(getHighResolutionAvatarUrl(value))
 
-function ArchiveMark() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="72"
-      height="72"
-      viewBox="0 0 72 72"
-      fill="none"
-    >
-      <path
-        d="M13 24h46l-4 39H17l-4-39Z"
-        fill="white"
-        stroke="white"
-        strokeWidth="3"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M18 23c1-8 7-13 18-13s17 5 18 13"
-        stroke="white"
-        strokeWidth="5"
-        strokeLinecap="round"
-      />
-      <circle cx="23" cy="12" r="4" fill="white" />
-      <circle cx="36" cy="8" r="4" fill="white" />
-      <circle cx="49" cy="12" r="4" fill="white" />
-      <path d="M24 38h24v5H24zM28 48h16v5H28z" fill={colors.brand} />
-    </svg>
-  )
-}
-
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ alignItems: 'baseline', display: 'flex' }}>
@@ -92,9 +64,11 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 function ProfilePreview({
+  logoUrl,
   profile,
   stats,
 }: {
+  logoUrl: string
   profile: ProfileHeaderData
   stats: ProfilePreviewStats | null
 }) {
@@ -138,7 +112,13 @@ function ProfilePreview({
             width: '100%',
           }}
         >
-          <ArchiveMark />
+          {/* ImageResponse renders the bundled raster asset directly. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            alt=""
+            src={logoUrl}
+            style={{ height: 72, objectFit: 'contain', width: 72 }}
+          />
           <span
             style={{
               fontFamily: 'serif',
@@ -313,10 +293,29 @@ export default async function Image({
 }) {
   const resolved = await resolveProfile(params.account_id)
   if (!resolved) notFound()
-  const stats = await getProfilePreviewStats(resolved.accountId)
+  const [logo, stats] = await Promise.all([
+    readFile(
+      join(
+        process.cwd(),
+        'src',
+        'app',
+        'user',
+        '[account_id]',
+        'community-archive-logo-white.png',
+      ),
+    ),
+    getProfilePreviewStats(resolved.accountId),
+  ])
+  const logoUrl = `data:image/png;base64,${logo.toString('base64')}`
 
   return new ImageResponse(
-    <ProfilePreview profile={resolved.profile} stats={stats} />,
+    (
+      <ProfilePreview
+        logoUrl={logoUrl}
+        profile={resolved.profile}
+        stats={stats}
+      />
+    ),
     size,
   )
 }

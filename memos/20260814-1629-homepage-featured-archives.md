@@ -6,11 +6,11 @@ _2026-08-14 16:29 PDT_
 
 The homepage now uses two archive-selection paths:
 
-- Signed-in members see up to eight accounts from the existing cached `topInteractedAccounts` analytics result. The cache counts mentions, replies, quotes, and reposts and is refreshed every five minutes.
+- Signed-in members see up to eight accounts from the existing persisted, current-calendar-year interaction result. The cache counts mentions, replies, quotes, and reposts; its year-scoped serving rows are refreshed in the background and the homepage revalidates every five minutes.
 - Guests see eight archives sampled on each render from a 29-person editorial pool. The sampler chooses one person from each of eight subject/community buckets and then shuffles the result, so follower count does not dominate the homepage.
 - The selected accounts are resolved in one batched `user_directory` read. This filters interaction targets to Community Archive users and supplies current usernames, avatars, and archived tweet counts for the captions. The verified editorial pool also stores a production tweet-count snapshot so guest captions remain present when a sparse preview directory triggers the intended local fallback.
 
-The current interaction projection is all-time. A one- or two-year preference should be added at the gateway/cache layer later; the homepage deliberately does not introduce an uncached ClickHouse query or pretend the present cache is time-weighted.
+The personalized path calls the existing `/analytics/user/:identifier/interactions?year=…` resource with the current UTC year. That route already resolves usernames, reads the persisted year-scoped interaction cache, and returns a scope marker that the homepage validates before rendering.
 
 ## Guest candidate pool
 

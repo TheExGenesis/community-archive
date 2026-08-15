@@ -89,7 +89,9 @@ it('shows the eight cached interaction leaders to a signed-in member', async () 
 
   render(await HomepagePeople({ isMember: true }))
 
-  expect(screen.getByText('People you interact with most')).toBeInTheDocument()
+  expect(
+    screen.getByText('People you interact with most this year'),
+  ).toBeInTheDocument()
   expect(screen.getByTestId('homepage-avatars')).toHaveTextContent(
     Array.from(
       { length: 8 },

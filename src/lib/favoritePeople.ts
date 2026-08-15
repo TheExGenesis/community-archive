@@ -17,9 +17,13 @@ interface ClickHouseInteractedAccount {
   repostCount: unknown
 }
 
-interface ClickHouseUserResponse {
+interface ClickHouseInteractionsResponse {
   data?: {
-    topInteractedAccounts?: unknown
+    people?: unknown
+  }
+  query?: {
+    year?: unknown
+    peopleLimit?: unknown
   }
 }
 
@@ -86,14 +90,22 @@ export async function fetchFavoritePeople(
     1,
     Math.min(MAX_LIMIT, Math.trunc(finiteLimit || DEFAULT_LIMIT)),
   )
-  const response = await fetcher<ClickHouseUserResponse>(
-    ['user', cleanIdentifier],
-    new URLSearchParams({ limit: String(limit) }),
+  const currentYear = new Date().getUTCFullYear()
+  const response = await fetcher<ClickHouseInteractionsResponse>(
+    ['user', cleanIdentifier, 'interactions'],
+    new URLSearchParams({ year: String(currentYear), limit: String(limit) }),
     { revalidate: 300, timeoutMs: 8_000 },
   )
-  const accounts = response.data?.topInteractedAccounts
+  if (
+    Number(response.query?.year) !== currentYear ||
+    Number(response.query?.peopleLimit) !== limit
+  ) {
+    throw new Error('ClickHouse interactions returned a mismatched scope')
+  }
+
+  const accounts = response.data?.people
   if (!Array.isArray(accounts)) {
-    throw new Error('ClickHouse user analytics returned an invalid response')
+    throw new Error('ClickHouse interactions returned an invalid response')
   }
 
   return accounts

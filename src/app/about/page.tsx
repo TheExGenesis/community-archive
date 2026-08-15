@@ -5,6 +5,7 @@ import {
   currentProjectContributors,
   pastProjectContributors,
 } from '@/lib/projectContributors'
+import { userProfileHref } from '@/lib/navigation'
 
 export default function AboutPage() {
   return (
@@ -36,10 +37,8 @@ export default function AboutPage() {
               className="rounded-lg bg-muted p-4 dark:bg-card"
             >
               <h3 className="mb-1 text-xl font-semibold">
-                <a
-                  href={`https://x.com/${contributor.username}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href={userProfileHref(contributor.username)}
                   className="transition-colors hover:text-brand"
                 >
                   {contributor.name}
@@ -49,7 +48,7 @@ export default function AboutPage() {
                       ({contributor.qualifier})
                     </span>
                   ) : null}
-                </a>
+                </Link>
               </h3>
               {contributor.role && (
                 <p className="text-muted-foreground">{contributor.role}</p>
@@ -72,14 +71,12 @@ export default function AboutPage() {
               className="rounded-lg bg-muted p-4 dark:bg-card"
             >
               <h3 className="text-lg font-semibold">
-                <a
-                  href={`https://x.com/${contributor.username}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href={userProfileHref(contributor.username)}
                   className="transition-colors hover:text-brand"
                 >
                   {contributor.name}
-                </a>
+                </Link>
               </h3>
             </div>
           ))}

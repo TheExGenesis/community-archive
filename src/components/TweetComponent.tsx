@@ -101,6 +101,7 @@ interface TweetComponentProps {
   compact?: boolean
   permalinkOrigin?: TweetOrigin
   permalinkReturnTo?: string
+  isPermalinkPage?: boolean
 }
 
 export const compactTweetGridClass =
@@ -116,6 +117,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
   compact = false,
   permalinkOrigin,
   permalinkReturnTo,
+  isPermalinkPage = false,
 }) => {
   const [isTextExpanded, setIsTextExpanded] = React.useState(false)
   // Support both interface formats for backwards compatibility
@@ -287,15 +289,13 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
     if (!isQuoteTweet || !tweet.quoted_tweet) return null
 
     const quotedTweet = tweet.quoted_tweet
-    // The fetchers set is_deleted=true when the quote relationship exists but the
-    // target tweet has been deleted. Render a muted tombstone instead of trying to
-    // show an empty card.
+    // A missing quote can be deleted, private, or otherwise inaccessible.
     if (quotedTweet.is_deleted) {
       return (
         <div
           className={`${compact ? 'mt-2 p-2 text-xs' : 'mt-3 p-3 text-sm'} rounded-lg border border-dashed border-border bg-muted italic text-muted-foreground dark:bg-card`}
         >
-          [Quoted tweet deleted]
+          [Quoted tweet unavailable]
         </div>
       )
     }
@@ -705,27 +705,34 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span>{new Date(tweet.created_at).toLocaleDateString()}</span>
-          <a
-            href={tweetPermalinkHref(
-              tweet.tweet_id,
-              permalinkOrigin,
-              permalinkReturnTo,
-            )}
-            className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
-            title="Permalink"
-          >
-            <FaExternalLinkAlt className="h-3 w-3" />
-            Archive
-          </a>
+          {!isPermalinkPage && (
+            <a
+              href={tweetPermalinkHref(
+                tweet.tweet_id,
+                permalinkOrigin,
+                permalinkReturnTo,
+              )}
+              className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+              title="Permalink"
+            >
+              <FaExternalLinkAlt className="h-3 w-3" />
+              Archive
+            </a>
+          )}
           <a
             href={`https://twitter.com/${displayUsername}/status/${tweet.tweet_id}`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+            aria-label={
+              isPermalinkPage
+                ? 'View on Twitter (opens in a new tab)'
+                : undefined
+            }
             title="View on Twitter"
           >
             <FaExternalLinkAlt className="h-3 w-3" />
-            Twitter
+            {!isPermalinkPage && 'Twitter'}
           </a>
         </div>
       </div>

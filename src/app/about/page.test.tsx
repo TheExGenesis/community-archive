@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import AboutPage from './page'
 
 describe('AboutPage contributors', () => {
-  it('shows the current and past contributors with their X accounts', () => {
+  it('links current and past contributors to their Archive profiles', () => {
     render(<AboutPage />)
 
     const currentHeading = screen.getByRole('heading', {
@@ -14,7 +14,7 @@ describe('AboutPage contributors', () => {
     const xiqLink = within(currentSection!).getByRole('link', {
       name: 'Francisco Carvalho (Xiq)',
     })
-    expect(xiqLink).toHaveAttribute('href', 'https://x.com/exgenesis')
+    expect(xiqLink).toHaveAttribute('href', '/user/exgenesis')
     expect(xiqLink).toHaveTextContent('Francisco Carvalho (Xiq)')
     expect(within(xiqLink).getByText('(Xiq)')).toHaveClass(
       'text-muted-foreground',
@@ -22,7 +22,7 @@ describe('AboutPage contributors', () => {
     expect(within(currentSection!).getByText('Founder')).toBeInTheDocument()
     expect(
       within(currentSection!).getByRole('link', { name: 'Christine Shiba' }),
-    ).toHaveAttribute('href', 'https://x.com/christineist')
+    ).toHaveAttribute('href', '/user/christineist')
 
     const xiqCard = xiqLink.closest('.rounded-lg')
     expect(xiqCard?.querySelector('svg')).toBeNull()
@@ -34,12 +34,12 @@ describe('AboutPage contributors', () => {
     expect(pastSection).not.toBeNull()
     expect(
       within(pastSection!).getByRole('link', { name: '@DefenderOfBasic' }),
-    ).toHaveAttribute('href', 'https://x.com/DefenderOfBasic')
+    ).toHaveAttribute('href', '/user/DefenderOfBasic')
     expect(
       within(pastSection!).getByRole('link', {
         name: 'Alexandre Variengien',
       }),
-    ).toHaveAttribute('href', 'https://x.com/A_Variengien')
+    ).toHaveAttribute('href', '/user/A_Variengien')
     expect(
       within(pastSection!).queryByText('Christine Shiba'),
     ).not.toBeInTheDocument()

@@ -67,6 +67,13 @@ const SERIES_COLORS = [
 ]
 const DEFAULT_TREND_TERMS = CHART_TERMS.map(({ term }) => term)
 
+function isDefaultTrendSet(terms: string[]): boolean {
+  return (
+    terms.length === DEFAULT_TREND_TERMS.length &&
+    terms.every((term, index) => term === DEFAULT_TREND_TERMS[index])
+  )
+}
+
 type TrendsExplorerAction =
   | 'chart_series_toggled'
   | 'evidence_filter_toggled'
@@ -590,7 +597,12 @@ export default function TrendsExplorer({
     const existing = new Set(configuredTerms)
     const alreadyPresent = requested.filter((term) => existing.has(term))
     const newTerms = requested.filter((term) => !existing.has(term))
-    if (configuredTerms.length + newTerms.length > MAX_SERIES) {
+    const replaceDefaults =
+      newTerms.length > 0 && isDefaultTrendSet(configuredTerms)
+    const nextConfiguredTerms = replaceDefaults
+      ? [...alreadyPresent, ...newTerms]
+      : [...configuredTerms, ...newTerms]
+    if (nextConfiguredTerms.length > MAX_SERIES) {
       setAddError(`Show up to ${MAX_SERIES} trends at once.`)
       return
     }
@@ -617,35 +629,50 @@ export default function TrendsExplorer({
     try {
       const body = await requestTrendSeries(newTerms, granularity)
 
-      const firstColorIndex = series.length
+      const retainedSeries = replaceDefaults
+        ? series.filter(({ term }) => alreadyPresent.includes(term))
+        : series
+      const firstColorIndex = retainedSeries.length
       const additions = body.series.map((item, index) => ({
         ...item,
         color: SERIES_COLORS[(firstColorIndex + index) % SERIES_COLORS.length],
       }))
+      const nextSeries = [...retainedSeries, ...additions]
       setBuckets(body.buckets)
-      setSeries((current) => [...current, ...additions])
-      setConfiguredTerms((current) => [...current, ...newTerms])
-      setChartEnabled((current) => ({
-        ...current,
-        ...Object.fromEntries(additions.map(({ term }) => [term, true])),
-      }))
-      setFeedFilters((current) => ({
-        ...current,
-        ...Object.fromEntries(
-          additions.map(({ term }) => [term, 'include' as const]),
-        ),
-      }))
-      const nextEnabled = new Set([
-        ...enabledSeries.map(({ term }) => term),
-        ...alreadyPresent,
-        ...additions.map(({ term }) => term),
-      ])
-      const nextIncluded = new Set([
-        ...includeTerms,
-        ...additions.map(({ term }) => term),
-      ])
+      setSeries(nextSeries)
+      setConfiguredTerms(nextConfiguredTerms)
+      setChartEnabled((current) =>
+        replaceDefaults
+          ? Object.fromEntries(nextConfiguredTerms.map((term) => [term, true]))
+          : {
+              ...current,
+              ...Object.fromEntries(additions.map(({ term }) => [term, true])),
+            },
+      )
+      setFeedFilters((current) =>
+        replaceDefaults
+          ? Object.fromEntries(
+              nextConfiguredTerms.map((term) => [term, 'include' as const]),
+            )
+          : {
+              ...current,
+              ...Object.fromEntries(
+                additions.map(({ term }) => [term, 'include' as const]),
+              ),
+            },
+      )
+      const nextEnabled = replaceDefaults
+        ? new Set(nextConfiguredTerms)
+        : new Set([
+            ...enabledSeries.map(({ term }) => term),
+            ...alreadyPresent,
+            ...additions.map(({ term }) => term),
+          ])
+      const nextIncluded = replaceDefaults
+        ? new Set(nextConfiguredTerms)
+        : new Set([...includeTerms, ...additions.map(({ term }) => term)])
       captureExplorerAction('terms_added', {
-        seriesCount: series.length + additions.length,
+        seriesCount: nextSeries.length,
         enabledSeriesCount: nextEnabled.size,
         includedSeriesCount: nextIncluded.size,
       })
@@ -814,7 +841,7 @@ export default function TrendsExplorer({
   }
 
   return (
-    <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
+    <main className="flex-1 bg-zinc-100/80 dark:bg-transparent">
       <div className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6">
         <Link
           href="/"

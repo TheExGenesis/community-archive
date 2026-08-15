@@ -128,7 +128,7 @@ export default function MemberSearchLanding({
           >
             <Users className="h-5 w-5 text-brand" />
             <h2 className="mt-4 text-base font-semibold text-foreground">
-              Library
+              Users
             </h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
               Browse the archive by contributor.

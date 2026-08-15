@@ -5,8 +5,16 @@ import type { ConversationTree, ThreadTweet } from '@/lib/threadUtils'
 
 jest.mock('./TweetComponent', () => ({
   __esModule: true,
-  default: ({ tweet }: { tweet: { full_text: string } }) => (
-    <div>{tweet.full_text}</div>
+  default: ({
+    tweet,
+    isPermalinkPage,
+  }: {
+    tweet: { full_text: string }
+    isPermalinkPage?: boolean
+  }) => (
+    <div>
+      {tweet.full_text} {isPermalinkPage ? '(permalink)' : ''}
+    </div>
   ),
 }))
 
@@ -52,5 +60,21 @@ describe('ThreadView', () => {
     expect(containers[1]).toHaveClass('border-l-2', 'pl-3')
     expect(containers[2]).not.toHaveClass('border-l-2', 'pl-3')
     expect(containers[3]).not.toHaveClass('border-l-2', 'pl-3')
+  })
+
+  test('marks only the highlighted tweet as the current permalink', () => {
+    const tree: ConversationTree = {
+      root: '1',
+      roots: ['1'],
+      tweets: { '1': tweet('1', null), '2': tweet('2', '1') },
+      children: { '1': ['2'], '2': [] },
+      parents: { '2': '1' },
+      paths: { '2': ['1', '2'] },
+    }
+
+    render(<ThreadView tree={tree} highlightTweetId="2" />)
+
+    expect(screen.getByText('tweet 1')).toBeVisible()
+    expect(screen.getByText('tweet 2 (permalink)')).toBeVisible()
   })
 })

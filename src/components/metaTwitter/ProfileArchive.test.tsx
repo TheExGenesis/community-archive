@@ -178,6 +178,20 @@ test('shows owner-only curation controls and persists section edits', async () =
   expect(screen.getByRole('button', { name: 'Restore Bangers' })).toBeVisible()
   expect(screen.getByRole('button', { name: 'Restore' })).toBeVisible()
 
+  await user.type(
+    screen.getByRole('textbox', { name: 'Add one of your archived tweets' }),
+    'https://x.com/alice/status/999',
+  )
+  await user.click(screen.getByRole('button', { name: 'Add to profile' }))
+  await waitFor(() =>
+    expect(mockMutateProfileCuration).toHaveBeenCalledWith({
+      action: 'add',
+      accountId: '42',
+      section: 'bangers',
+      itemId: '999',
+    }),
+  )
+
   await user.click(screen.getByRole('button', { name: 'Dismiss banger 1' }))
   await waitFor(() =>
     expect(mockMutateProfileCuration).toHaveBeenCalledWith({
@@ -188,6 +202,19 @@ test('shows owner-only curation controls and persists section edits', async () =
     }),
   )
   expect(screen.queryByText('Banger 1')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Undo' })).toBeVisible()
+
+  await user.click(screen.getByRole('button', { name: 'Undo' }))
+  await waitFor(() =>
+    expect(mockMutateProfileCuration).toHaveBeenCalledWith({
+      action: 'restore-item',
+      accountId: '42',
+      section: 'bangers',
+      itemId: '1',
+    }),
+  )
+  await waitFor(() => expect(screen.getByText('Banger 1')).toBeVisible())
+  expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
 
   mockMutateProfileCuration.mockResolvedValueOnce({
     ok: true,

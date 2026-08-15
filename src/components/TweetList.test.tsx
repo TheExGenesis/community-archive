@@ -5,7 +5,7 @@ import TweetList from './TweetList'
 import { fetchTweets } from '@/lib/queries/tweetQueries'
 import {
   canPreviewTweetSearch,
-  searchTweetPreviewWithClickHouse,
+  searchTweetPreviewsWithClickHouse,
 } from '@/lib/clickhouseSearch'
 
 jest.mock('@/utils/supabase', () => ({
@@ -18,14 +18,22 @@ jest.mock('@/lib/queries/tweetQueries', () => ({
 
 jest.mock('@/lib/clickhouseSearch', () => ({
   canPreviewTweetSearch: jest.fn(),
-  searchTweetPreviewWithClickHouse: jest.fn(),
+  searchTweetPreviewsWithClickHouse: jest.fn(),
 }))
 
 jest.mock('@/components/UnifiedTweetList', () => ({
   __esModule: true,
-  default: ({ tweets }: { tweets: Array<{ tweet_id: string }> }) => (
+  default: ({
+    tweets,
+    emptyMessage,
+  }: {
+    tweets: Array<{ tweet_id: string }>
+    emptyMessage: string
+  }) => (
     <div data-testid="tweet-ids">
-      {tweets.map((tweet) => tweet.tweet_id).join(',')}
+      {tweets.length > 0
+        ? tweets.map((tweet) => tweet.tweet_id).join(',')
+        : emptyMessage}
     </div>
   ),
 }))
@@ -44,6 +52,10 @@ const previewTweet = {
   },
   media: [],
 }
+
+const previewTweets = ['preview-1', 'preview-2', 'preview-3'].map(
+  (tweet_id) => ({ ...previewTweet, tweet_id }),
+)
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -76,9 +88,10 @@ describe('TweetList progressive search', () => {
       { ...previewTweet, tweet_id: 'canonical-2' },
     ]
     ;(canPreviewTweetSearch as jest.Mock).mockReturnValue(true)
-    ;(searchTweetPreviewWithClickHouse as jest.Mock).mockResolvedValue(
-      previewTweet,
-    )
+    ;(searchTweetPreviewsWithClickHouse as jest.Mock).mockResolvedValue({
+      tweets: previewTweets,
+      definitiveEmpty: false,
+    })
     ;(fetchTweets as jest.Mock).mockReturnValue(complete.promise)
 
     render(
@@ -91,7 +104,9 @@ describe('TweetList progressive search', () => {
       />,
     )
 
-    expect(await screen.findByTestId('tweet-ids')).toHaveTextContent('preview')
+    expect(await screen.findByTestId('tweet-ids')).toHaveTextContent(
+      'preview-1,preview-2,preview-3',
+    )
     expect(screen.getByRole('status')).toHaveTextContent(
       'Loading the remaining results…',
     )
@@ -111,7 +126,7 @@ describe('TweetList progressive search', () => {
 
   it('falls through to the canonical page when the preview fails', async () => {
     ;(canPreviewTweetSearch as jest.Mock).mockReturnValue(true)
-    ;(searchTweetPreviewWithClickHouse as jest.Mock).mockRejectedValue(
+    ;(searchTweetPreviewsWithClickHouse as jest.Mock).mockRejectedValue(
       new Error('preview unavailable'),
     )
     ;(fetchTweets as jest.Mock).mockResolvedValue({
@@ -134,5 +149,59 @@ describe('TweetList progressive search', () => {
       'canonical',
     )
     expect(fetchTweets).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls through when an empty preview is not marked definitive', async () => {
+    ;(canPreviewTweetSearch as jest.Mock).mockReturnValue(true)
+    ;(searchTweetPreviewsWithClickHouse as jest.Mock).mockResolvedValue({
+      tweets: [],
+      definitiveEmpty: false,
+    })
+    ;(fetchTweets as jest.Mock).mockResolvedValue({
+      tweets: [{ ...previewTweet, tweet_id: 'canonical' }],
+      totalCount: null,
+      error: null,
+    })
+
+    render(
+      <TweetList
+        filterCriteria={{
+          searchQuery: 'open & source',
+          rawSearchQuery: 'open source',
+          excludeRetweets: true,
+        }}
+      />,
+    )
+
+    expect(await screen.findByTestId('tweet-ids')).toHaveTextContent(
+      'canonical',
+    )
+    expect(fetchTweets).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows an immediate empty result without repeating a successful empty preview', async () => {
+    ;(canPreviewTweetSearch as jest.Mock).mockReturnValue(true)
+    ;(searchTweetPreviewsWithClickHouse as jest.Mock).mockResolvedValue({
+      tweets: [],
+      definitiveEmpty: true,
+    })
+
+    render(
+      <TweetList
+        filterCriteria={{
+          searchQuery: 'nothing',
+          rawSearchQuery: 'no results anywhere',
+          excludeRetweets: true,
+        }}
+      />,
+    )
+
+    expect(
+      await screen.findByText('No tweets to display for the current filters.'),
+    ).toBeVisible()
+    expect(fetchTweets).not.toHaveBeenCalled()
+    expect(
+      screen.queryByText('Loading the remaining results…'),
+    ).not.toBeInTheDocument()
   })
 })

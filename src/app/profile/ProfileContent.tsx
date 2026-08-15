@@ -40,6 +40,13 @@ interface ProfileContentProps {
   initialDownloadArchiveVisible?: boolean
   initialOptInData: any
   archives: any[]
+  initialTweets?: Array<{
+    tweet_id: string
+    created_at: string
+    full_text: string
+    favorite_count: number | null
+    retweet_count: number | null
+  }>
 }
 
 export default function ProfileContent({
@@ -48,6 +55,7 @@ export default function ProfileContent({
   initialDownloadArchiveVisible = true,
   initialOptInData,
   archives,
+  initialTweets = [],
 }: ProfileContentProps) {
   const router = useRouter()
   const { userMetadata } = useAuthAndArchive()
@@ -65,6 +73,8 @@ export default function ProfileContent({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [deletingArchive, setDeletingArchive] = useState<string | null>(null)
+  const [deletingTweetId, setDeletingTweetId] = useState<string | null>(null)
+  const [ownTweets, setOwnTweets] = useState(initialTweets)
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false)
   const [showOptOutDialog, setShowOptOutDialog] = useState(false)
   const supabase = createBrowserClient()
@@ -363,6 +373,42 @@ export default function ProfileContent({
     }
   }
 
+  const handleDeleteTweet = async (tweetId: string) => {
+    if (
+      !confirm(
+        'Permanently delete this tweet and its archived media? This cannot be undone.',
+      )
+    ) {
+      return
+    }
+
+    setDeletingTweetId(tweetId)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const { data, error: deleteError } = await supabase.rpc(
+        'delete_own_tweets',
+        { p_tweet_ids: [tweetId] },
+      )
+      if (deleteError) throw deleteError
+      if (data?.[0]?.deleted_tweets !== 1) {
+        throw new Error('The tweet was not deleted')
+      }
+
+      setOwnTweets((tweets) =>
+        tweets.filter((tweet) => tweet.tweet_id !== tweetId),
+      )
+      setSuccess('Tweet deleted permanently')
+      capturePostHogEvent('own_tweet_deleted')
+      await logUserAction('delete_tweet', { tweet_id: tweetId })
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete tweet')
+    } finally {
+      setDeletingTweetId(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -385,9 +431,10 @@ export default function ProfileContent({
       </Card>
 
       <Tabs defaultValue="privacy" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="privacy">Privacy Settings</TabsTrigger>
           <TabsTrigger value="archives">My Archives</TabsTrigger>
+          <TabsTrigger value="tweets">My Tweets</TabsTrigger>
         </TabsList>
 
         <TabsContent value="privacy" className="space-y-4">
@@ -584,6 +631,58 @@ export default function ProfileContent({
                   data — including data from the scraper/extension.
                 </p>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tweets" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Tweets</CardTitle>
+              <CardDescription>
+                Permanently remove individual tweets from your archive. The most
+                recent 100 tweets are shown.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {ownTweets.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  No archived tweets found.
+                </div>
+              ) : (
+                <div className="divide-y rounded-lg border">
+                  {ownTweets.map((tweet) => (
+                    <div
+                      key={tweet.tweet_id}
+                      className="flex items-start justify-between gap-4 p-4"
+                    >
+                      <div className="min-w-0 space-y-2">
+                        <p className="whitespace-pre-wrap break-words text-sm">
+                          {tweet.full_text}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(tweet.created_at).toLocaleDateString()} ·{' '}
+                          {tweet.favorite_count || 0} likes ·{' '}
+                          {tweet.retweet_count || 0} reposts
+                        </p>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="flex-shrink-0"
+                        onClick={() => handleDeleteTweet(tweet.tweet_id)}
+                        disabled={deletingTweetId !== null}
+                        aria-label={`Delete tweet ${tweet.tweet_id}`}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {deletingTweetId === tweet.tweet_id
+                          ? 'Deleting...'
+                          : 'Delete'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

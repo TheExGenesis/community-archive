@@ -14,8 +14,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   return {
     title: DATE_PATTERN.test(params.date)
-      ? `${params.date} Daily Digest · Community Archive`
-      : 'Daily Digest · Community Archive',
+      ? `What Happened Yesterday · ${params.date} · Community Archive`
+      : 'What Happened Yesterday · Community Archive',
   }
 }
 

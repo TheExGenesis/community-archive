@@ -22,6 +22,7 @@ import {
   getPortalData,
   getPortalStreamPage,
   getPortalStreamUpdates,
+  enrichPortalTweets,
   loadOptionalPortalData,
   loadPortalComponentData,
   portalDataSourceKey,
@@ -320,6 +321,95 @@ describe('portal reads', () => {
     process.env.CLICKHOUSE_ANALYTICS_API_URL =
       'https://analytics.community-archive.org/analytics'
     process.env.CLICKHOUSE_ANALYTICS_API_TOKEN = 'test-token'
+  })
+
+  test('preserves hydrated own media while still checking quote relations', async () => {
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async (input) => {
+        const url = new URL(String(input))
+        if (url.pathname.endsWith('/quote_tweets')) {
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        throw new Error(`Unexpected test request: ${url}`)
+      })
+    const tweet: PortalTweet = {
+      id: '42',
+      accountId: '7',
+      username: 'alice',
+      name: 'Alice',
+      avatar: null,
+      text: 'Hydrated evidence',
+      observedAt: '2026-08-07T20:00:00.000Z',
+      createdAt: '2026-08-07T19:00:00.000Z',
+      likes: 3,
+      rts: 2,
+      media: [
+        {
+          url: 'https://pbs.twimg.com/media/evidence.jpg',
+          type: 'photo',
+          width: 1200,
+          height: 800,
+        },
+      ],
+    }
+
+    await expect(enrichPortalTweets([tweet])).resolves.toEqual([tweet])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/quote_tweets?')
+  })
+
+  test('falls back to own-media enrichment for partially hydrated rows', async () => {
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async (input) => {
+        const url = new URL(String(input))
+        const rows = url.pathname.endsWith('/tweet_media')
+          ? [
+              {
+                tweet_id: '42',
+                media_url: 'https://pbs.twimg.com/media/fallback.jpg',
+                media_type: 'photo',
+                width: 1200,
+                height: 800,
+              },
+            ]
+          : []
+        return new Response(JSON.stringify(rows), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      })
+    const tweet: PortalTweet = {
+      id: '42',
+      accountId: '7',
+      username: 'alice',
+      name: 'Alice',
+      avatar: null,
+      text: 'Partial gateway evidence',
+      observedAt: '2026-08-07T20:00:00.000Z',
+      createdAt: '2026-08-07T19:00:00.000Z',
+      likes: 3,
+      rts: 2,
+    }
+
+    await expect(enrichPortalTweets([tweet])).resolves.toEqual([
+      {
+        ...tweet,
+        media: [
+          {
+            url: 'https://pbs.twimg.com/media/fallback.jpg',
+            type: 'photo',
+            width: 1200,
+            height: 800,
+          },
+        ],
+      },
+    ])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   test('reads the homepage corpus total from ClickHouse', async () => {

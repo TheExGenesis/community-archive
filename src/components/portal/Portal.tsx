@@ -25,7 +25,7 @@ export type PortalView = 'home' | 'stream'
 
 const HOME_LIVE_STREAM_LIMIT = 12
 const ARCHIVE_EXPORT_URL =
-  'https://github.com/TheExGenesis/community-archive/releases/tag/data_export'
+  'https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet'
 const COMMUNITY_BUILDS_URL = '/tweets/1835411943735140798'
 
 type DashboardDestination =
@@ -634,8 +634,8 @@ export default function Portal({
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-[15px] font-bold">
                       {digestPreview.isPreview
-                        ? 'Mock Daily Digest'
-                        : 'Latest Daily Digest'}
+                        ? 'What Happened Yesterday · Preview'
+                        : 'What Happened Yesterday'}
                     </span>
                     <span className="text-[12px] font-semibold text-white/75 group-hover:text-white dark:text-zinc-700 dark:group-hover:text-zinc-950">
                       Read →

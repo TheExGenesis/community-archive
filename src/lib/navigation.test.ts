@@ -59,6 +59,10 @@ describe('member navigation', () => {
       href: '/digest',
       label: 'Digest',
     })
+    expect(getPrimaryNav(false)).toContainEqual({
+      href: '/user-dir',
+      label: 'Users',
+    })
     expect(getPrimaryNav(true)).toContainEqual({
       href: '/trends',
       label: 'Trends',
@@ -128,7 +132,7 @@ describe('tweet detail navigation', () => {
         from: 'digest',
         returnTo: '/digest/2026-08-12/taste',
       }).label,
-    ).toBe('Back to Daily Digest')
+    ).toBe('Back to What Happened Yesterday')
     expect(
       getTweetBackLink({
         from: 'profile',

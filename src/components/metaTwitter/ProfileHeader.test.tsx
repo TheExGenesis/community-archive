@@ -175,3 +175,37 @@ test('requests a high-resolution avatar for the profile header', () => {
     'https://pbs.twimg.com/profile_images/42/avatar_400x400.jpg',
   )
 })
+
+test('shows resolved, clickable profile bio and website links', () => {
+  render(
+    <ProfileHeader
+      profile={{
+        ...profile({ has_archive: true, is_opted_in: false }),
+        bio: 'Building https://t.co/bio',
+        website: 'https://t.co/site',
+        profile_links: [
+          {
+            original_url: 'https://t.co/bio',
+            expanded_url: 'https://www.community-archive.org/',
+            display_url: 'community-archive.org',
+          },
+          {
+            original_url: 'https://t.co/site',
+            expanded_url: 'https://xiqo.substack.com/',
+            display_url: 'xiqo.substack.com',
+          },
+        ],
+      }}
+      archivedAt={null}
+    />,
+  )
+
+  expect(
+    screen.getByRole('link', { name: 'community-archive.org' }),
+  ).toHaveAttribute('href', 'https://www.community-archive.org/')
+  expect(
+    screen.getByRole('link', { name: 'xiqo.substack.com' }),
+  ).toHaveAttribute('href', 'https://xiqo.substack.com/')
+  expect(screen.queryByText('https://t.co/bio')).not.toBeInTheDocument()
+  expect(screen.queryByText('https://t.co/site')).not.toBeInTheDocument()
+})

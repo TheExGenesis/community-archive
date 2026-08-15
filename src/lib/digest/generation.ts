@@ -42,6 +42,13 @@ export interface DigestPromptCorpusRow {
   tweet: PortalTweet
 }
 
+export interface DigestContinuityContext {
+  digestDate: string
+  executiveSummary: string[]
+  storyTitles: string[]
+  keywords: string[]
+}
+
 export function selectDailyDigestBangers(tweets: PortalTweet[]): PortalTweet[] {
   return tweets.filter((tweet) => (tweet.quoteCount ?? 0) >= 2).slice(0, 50)
 }
@@ -280,6 +287,7 @@ export function renderDigestPrompt(
     windowStart: string
     windowEnd: string
     candidates: EnrichedDigestCandidate[]
+    priorDigests?: DigestContinuityContext[]
   },
 ): string {
   const corpus = buildDigestPromptCorpus(input.candidates)
@@ -306,11 +314,22 @@ export function renderDigestPrompt(
     null,
     2,
   )
-  return template
+  const rendered = template
     .replaceAll('{{digest_date}}', input.digestDate)
     .replaceAll('{{window_start}}', input.windowStart)
     .replaceAll('{{window_end}}', input.windowEnd)
     .replaceAll('{{candidate_json}}', candidateJson)
+
+  if (!input.priorDigests?.length) return rendered
+
+  const continuityContext = input.priorDigests.map((digest) => ({
+    digest_date: digest.digestDate,
+    executive_summary: digest.executiveSummary,
+    story_titles: digest.storyTitles,
+    keywords: digest.keywords,
+  }))
+
+  return `${rendered}\n\nPAST PUBLISHED DIGESTS (CONTINUITY CONTEXT)\n${JSON.stringify(continuityContext, null, 2)}\n\nUse this history only to preserve continuity, identify genuinely continuing threads, and avoid repetitive framing. Every factual claim and every selected tweet in today's digest must still be grounded in TODAY'S CURRENT CANDIDATE CORPUS above.`
 }
 
 export function renderDigestRevisionPrompt(input: {

@@ -27,13 +27,16 @@ describe('historical policy reconciler', () => {
     )
     expect(
       migration.indexOf(
-        'LOCK TABLE public.tweets, public.all_account IN ACCESS EXCLUSIVE MODE',
+        'LOCK TABLE\n  public.account,\n  public.profile,\n  public.enriched_tweets,',
       ),
     ).toBeLessThan(migration.indexOf('ALTER TABLE public.mentioned_users'))
     expect(migration.indexOf('BEGIN;')).toBeLessThan(
       migration.indexOf(
-        'LOCK TABLE public.tweets, public.all_account IN ACCESS EXCLUSIVE MODE',
+        'LOCK TABLE\n  public.account,\n  public.profile,\n  public.enriched_tweets,',
       ),
+    )
+    expect(migration.indexOf('public.enriched_tweets,')).toBeLessThan(
+      migration.indexOf('public.tweets,'),
     )
     const backfill = migration.indexOf(
       'UPDATE tes.blocked_scraping_users AS blocked',

@@ -8,11 +8,21 @@ SET lock_timeout TO '5s';
 SET statement_timeout TO '10min';
 BEGIN;
 
--- Queries commonly lock tweets/all_account before their nested detail tables.
--- Take those root locks first so swapping triggers on detail tables cannot form
--- the inverse all_account -> mentioned_users cycle with a live API reader.
--- This is a metadata lock only; the migration performs no corpus scan.
-LOCK TABLE public.tweets, public.all_account IN ACCESS EXCLUSIVE MODE;
+-- Queries lock a serving view before its base tables, then commonly lock
+-- tweets/all_account before their nested detail tables. Take the same order so
+-- changing a view or swapping a detail-table trigger cannot form an inverse
+-- lock cycle with a live API reader. These are metadata locks only; the
+-- migration performs no corpus scan.
+LOCK TABLE
+  public.account,
+  public.profile,
+  public.enriched_tweets,
+  public.tweet_replies_view,
+  public.tweets_w_conversation_id,
+  public.user_directory,
+  public.tweets,
+  public.all_account
+IN ACCESS EXCLUSIVE MODE;
 
 ALTER TABLE tes.blocked_scraping_users
   ADD COLUMN IF NOT EXISTS username text;

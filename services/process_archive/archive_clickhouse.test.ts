@@ -353,4 +353,6 @@ test('delivery manifest is content-free and historical uploads are not seeded', 
     completion,
   )
   assert.ok(completion >= 0 && directSink > completion)
+  assert.match(processor, /jsonb_array_elements\(\$\{trx\.json\(candidates as never\)\}::jsonb\)/)
+  assert.doesNotMatch(processor, /JSON\.stringify\(candidates\)/)
 })

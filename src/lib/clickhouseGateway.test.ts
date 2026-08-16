@@ -1,28 +1,10 @@
 import {
   analyticsGatewayRequestUrl,
-  isClickHouseLabEnvironmentEnabled,
-} from './clickhouseLab'
-import {
   clickHouseAnalyticsGatewayBaseUrl,
   clickHouseSearchGatewayBaseUrl,
 } from './clickhouseGateway'
 
-describe('ClickHouse staging lab guard', () => {
-  test('requires the flag and refuses the production Supabase project', () => {
-    expect(
-      isClickHouseLabEnvironmentEnabled('true', 'https://staging.supabase.co'),
-    ).toBe(true)
-    expect(
-      isClickHouseLabEnvironmentEnabled('false', 'https://staging.supabase.co'),
-    ).toBe(false)
-    expect(
-      isClickHouseLabEnvironmentEnabled(
-        'true',
-        'https://fabxmporizzqflnftavs.supabase.co',
-      ),
-    ).toBe(false)
-  })
-
+describe('ClickHouse analytics gateway requests', () => {
   test('builds only allowlisted gateway paths and parameters', () => {
     const target = analyticsGatewayRequestUrl(
       ['word-trend'],

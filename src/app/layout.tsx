@@ -17,8 +17,7 @@ import MobileNavigation from '@/components/MobileNavigation'
 import Footer from '@/components/Footer'
 import HashScrollHandler from '@/components/HashScrollHandler'
 import { checkIsAdmin } from '@/app/admin/data'
-import { DatabaseZap, Shield } from 'lucide-react'
-import { isClickHouseLabEnvironmentEnabled } from '@/lib/clickhouseLab'
+import { Shield } from 'lucide-react'
 import { getIsMember } from '@/lib/portal/auth'
 import { getPrimaryNav, getUtilityNav, getMobileNav } from '@/lib/navigation'
 
@@ -57,7 +56,6 @@ export default async function RootLayout({
   children: React.ReactNode
 }) {
   const [isAdmin, isMember] = await Promise.all([checkIsAdmin(), getIsMember()])
-  const showClickHouseLab = isAdmin && isClickHouseLabEnvironmentEnabled()
   const primaryNav = getPrimaryNav(isMember, isAdmin)
   const utilityNav = getUtilityNav(isMember)
   const mobileNav = getMobileNav(isMember, isAdmin)
@@ -123,16 +121,6 @@ export default async function RootLayout({
                         className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-input bg-background transition-colors hover:bg-accent hover:text-accent-foreground"
                       >
                         <Shield className="h-5 w-5" />
-                      </Link>
-                    ) : null}
-                    {showClickHouseLab ? (
-                      <Link
-                        href="/clickhouse"
-                        aria-label="ClickHouse staging lab"
-                        title="ClickHouse staging lab"
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-input bg-background text-brand transition-colors hover:bg-accent"
-                      >
-                        <DatabaseZap className="h-5 w-5" />
                       </Link>
                     ) : null}
                     <MobileMenu />

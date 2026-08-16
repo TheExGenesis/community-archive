@@ -9,14 +9,14 @@ export const metadata = {
 }
 
 export default async function ExplorePage() {
-  const { user, supabase } = await requireAuth('/explore')
+  const { user } = await requireAuth('/explore')
   const { data: optInData } = await getOptInStatus(user.id)
 
   if (!optInData?.opted_in) {
     redirect('/opt-in')
   }
 
-  const stats = await getStats(supabase).catch((error) => {
+  const stats = await getStats().catch((error) => {
     console.error('Unable to load archive stats for member search:', error)
     return { tweetCount: null, userCount: null }
   })

@@ -15,8 +15,7 @@ jest.mock('./research', () => ({
 }))
 
 import {
-  fetchPortalCorpusStats,
-  fetchPortalMemberCount,
+  fetchPortalGlobalStats,
   getInitialPortalBangersPage,
   getPortalBangersPage,
   getPortalData,
@@ -97,7 +96,7 @@ describe('portal read source', () => {
     })
 
     expect(key).toBe(
-      'portal-v5:preview:analytics.example:prod-project.supabase.co',
+      'portal-v6:preview:analytics.example:prod-project.supabase.co',
     )
   })
 })
@@ -174,15 +173,18 @@ describe('portal page resilience', () => {
 
     jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
       const url = new URL(String(input))
-      if (url.pathname.endsWith('/corpus-count')) {
+      if (url.pathname.endsWith('/summary')) {
         return new Response(
           JSON.stringify({
             data: {
               totalTweets: '15334092',
+              memberAccounts: '42',
               sourceUpdatedAt: '2026-08-13 18:34:09.903',
               collectedAt: '2026-08-13 18:34:20.907',
-              source: 'clickhouse.tweet_content_versions',
-              countMode: 'unique_tweets_observed',
+              membershipSnapshotAt: '2026-08-13 18:34:00.000',
+              source:
+                'clickhouse.community_membership_current+corpus_count_current',
+              countMode: 'live_membership+cached_unique_tweets_exact',
             },
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
@@ -196,20 +198,6 @@ describe('portal page resilience', () => {
           status: 200,
           headers: { 'content-range': '0-0/42' },
         })
-      }
-      if (url.pathname.endsWith('/global_activity_summary')) {
-        return new Response(
-          JSON.stringify([
-            {
-              total_tweets: 15_100_732,
-              last_updated: '2026-08-07T20:00:00.000Z',
-            },
-          ]),
-          {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          },
-        )
       }
       if (url.pathname.endsWith('/tweets')) {
         const createdAt = url.searchParams.get('order')?.endsWith('.asc')
@@ -287,7 +275,7 @@ describe('portal page resilience', () => {
     })
   })
 
-  test('preserves the Supabase corpus total when live analytics fails', async () => {
+  test('preserves the shared ClickHouse counts when live analytics fails', async () => {
     fetchPortalLiveAnalyticsMock.mockRejectedValueOnce(
       new Error('live analytics unavailable'),
     )
@@ -412,28 +400,32 @@ describe('portal reads', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  test('reads the homepage corpus total from ClickHouse', async () => {
+  test('reads the homepage counts from the shared ClickHouse summary', async () => {
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
       new Response(
         JSON.stringify({
           data: {
             totalTweets: '15334092',
+            memberAccounts: '658',
             sourceUpdatedAt: '2026-08-13 18:34:09.903',
             collectedAt: '2026-08-13 18:34:20.907',
-            source: 'clickhouse.tweet_content_versions',
-            countMode: 'unique_tweets_observed',
+            membershipSnapshotAt: '2026-08-13 18:34:00.000',
+            source:
+              'clickhouse.community_membership_current+corpus_count_current',
+            countMode: 'live_membership+cached_unique_tweets_exact',
           },
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
       ),
     )
 
-    await expect(fetchPortalCorpusStats()).resolves.toEqual({
+    await expect(fetchPortalGlobalStats()).resolves.toEqual({
       totalTweets: 15_334_092,
+      memberCount: 658,
       generatedAt: '2026-08-13T18:34:20.907Z',
     })
     expect(fetchMock).toHaveBeenCalledWith(
-      new URL('https://analytics.community-archive.org/analytics/corpus-count'),
+      new URL('https://analytics.community-archive.org/analytics/summary'),
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: 'Bearer test-token',
@@ -442,43 +434,17 @@ describe('portal reads', () => {
     )
   })
 
-  test('falls back to the Supabase summary when ClickHouse fails', async () => {
-    const consoleError = jest.spyOn(console, 'error').mockImplementation()
+  test('does not fall back to Supabase when the shared summary fails', async () => {
     const fetchMock = jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(
         new Response('gateway unavailable', { status: 503 }),
       )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify([
-            {
-              total_tweets: 15_100_732,
-              last_updated: '2026-08-12T05:15:00.098756+00:00',
-            },
-          ]),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
-      )
 
-    await expect(fetchPortalCorpusStats()).resolves.toEqual({
-      totalTweets: 15_100_732,
-      generatedAt: '2026-08-12T05:15:00.098Z',
-    })
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      'https://prod-project.supabase.co/rest/v1/global_activity_summary?select=total_tweets%2Clast_updated',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          apikey: 'prod-public-anon',
-          'Accept-Profile': 'public',
-        }),
-      }),
+    await expect(fetchPortalGlobalStats()).rejects.toThrow(
+      'ClickHouse analytics request failed (503)',
     )
-    expect(consoleError).toHaveBeenCalledWith(
-      'Portal ClickHouse corpus count failed; falling back to Supabase:',
-      expect.any(Error),
-    )
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   afterEach(() => {
@@ -825,24 +791,6 @@ describe('portal reads', () => {
     expect(query.get('limit')).toBe('31')
     expect(query.get('before')).toBe('2026-08-07T19:00:00.000Z')
     expect(query.get('before_id')).toBe('42')
-  })
-
-  test('uses the production uploader and opt-in membership count', async () => {
-    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      headers: new Headers({ 'content-range': '0-0/633' }),
-    } as Response)
-
-    await expect(fetchPortalMemberCount()).resolves.toBe(633)
-
-    const memberQuery = new URL(String(fetchMock.mock.calls[0][0])).searchParams
-    expect(memberQuery.get('select')).toBe('directory_id')
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({
-      method: 'HEAD',
-      headers: { Prefer: 'count=exact' },
-    })
-    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
 

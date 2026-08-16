@@ -47,18 +47,21 @@ interface PortalCorpusRange {
   currentYear: number
 }
 
-interface PortalCorpusStats {
+interface PortalGlobalStats {
   totalTweets: number
+  memberCount: number
   generatedAt: string
 }
 
-interface ClickHouseCorpusCountResponse {
+interface ClickHouseSummaryResponse {
   data: {
     totalTweets: unknown
+    memberAccounts: unknown
     sourceUpdatedAt: unknown
     collectedAt: unknown
-    source: 'clickhouse.tweet_content_versions'
-    countMode: 'unique_tweets_observed'
+    membershipSnapshotAt: unknown
+    source: string
+    countMode: string
   }
 }
 
@@ -129,7 +132,7 @@ export function portalDataSourceKey(
     throw new Error('ClickHouse analytics URL is invalid')
   }
   const environment = env.VERCEL_ENV || env.NODE_ENV || 'unknown'
-  return `portal-v5:${environment}:${analyticsSource}:${portalRead.sourceId}`
+  return `portal-v6:${environment}:${analyticsSource}:${portalRead.sourceId}`
 }
 
 interface PortalRestOptions {
@@ -245,68 +248,27 @@ function portalClickHouseCount(value: unknown, label: string): number {
   return portalSnapshotCount(Number(value), label)
 }
 
-async function fetchSupabasePortalCorpusStats(): Promise<PortalCorpusStats> {
-  const rows = await portalRestRows<{
-    total_tweets: number | null
-    last_updated: string
-  }>(
-    'global_activity_summary',
-    new URLSearchParams({ select: 'total_tweets,last_updated' }),
+/** Shared ClickHouse-backed counts used by every public count display. */
+export async function fetchPortalGlobalStats(): Promise<PortalGlobalStats> {
+  const response = await fetchAnalyticsGatewayJson<ClickHouseSummaryResponse>(
+    ['summary'],
+    new URLSearchParams(),
+    { timeoutMs: PORTAL_READ_TIMEOUT_MS },
   )
-  if (rows.length !== 1) {
-    throw new Error('Portal corpus summary returned an invalid response')
-  }
   return {
-    totalTweets: portalSnapshotCount(
-      rows[0].total_tweets,
-      'corpus tweet count',
+    totalTweets: portalClickHouseCount(
+      response.data.totalTweets,
+      'ClickHouse corpus tweet count',
     ),
-    generatedAt: portalSnapshotTimestamp(
-      rows[0].last_updated,
-      'corpus summary timestamp',
+    memberCount: portalClickHouseCount(
+      response.data.memberAccounts,
+      'ClickHouse member count',
+    ),
+    generatedAt: portalClickHouseTimestamp(
+      String(response.data.collectedAt),
+      'ClickHouse corpus count timestamp',
     ),
   }
-}
-
-/**
- * ClickHouse owns the live analytical corpus count. Supabase's daily summary
- * remains a last-known-good fallback during gateway or projection failures.
- */
-export async function fetchPortalCorpusStats(): Promise<PortalCorpusStats> {
-  try {
-    const response =
-      await fetchAnalyticsGatewayJson<ClickHouseCorpusCountResponse>(
-        ['corpus-count'],
-        new URLSearchParams(),
-        { timeoutMs: PORTAL_READ_TIMEOUT_MS },
-      )
-    return {
-      totalTweets: portalClickHouseCount(
-        response.data.totalTweets,
-        'ClickHouse corpus tweet count',
-      ),
-      generatedAt: portalClickHouseTimestamp(
-        String(response.data.collectedAt),
-        'ClickHouse corpus count timestamp',
-      ),
-    }
-  } catch (error) {
-    console.error(
-      'Portal ClickHouse corpus count failed; falling back to Supabase:',
-      error,
-    )
-    return fetchSupabasePortalCorpusStats()
-  }
-}
-
-/** Archive uploaders plus opted-in members, deduplicated by production. */
-export async function fetchPortalMemberCount(): Promise<number> {
-  const membersResponse = await portalRestRequest(
-    'user_directory',
-    new URLSearchParams({ select: 'directory_id' }),
-    { method: 'HEAD', prefer: 'count=exact' },
-  )
-  return exactCount(membersResponse, 'member')
 }
 
 function isoDaysAgo(days: number): string {
@@ -774,19 +736,14 @@ const getCachedCorpusRange = unstable_cache(
   ['portal-corpus-range-v1'],
   { revalidate: 86_400 },
 )
-const getCachedCorpusStats = unstable_cache(
-  async (_sourceKey: string) => fetchPortalCorpusStats(),
-  ['portal-corpus-stats-v1'],
-  { revalidate: 300 },
+const getCachedGlobalStats = unstable_cache(
+  async (_sourceKey: string) => fetchPortalGlobalStats(),
+  ['portal-global-stats-v1'],
+  { revalidate: 60 },
 )
 const getCachedLiveAnalytics = unstable_cache(
   async (_sourceKey: string) => fetchPortalLiveAnalytics(),
   ['portal-live-analytics-v1'],
-  { revalidate: 300 },
-)
-const getCachedMemberCount = unstable_cache(
-  async (_sourceKey: string) => fetchPortalMemberCount(),
-  ['portal-member-count-v1'],
   { revalidate: 300 },
 )
 const getCachedJoinedThisWeek = unstable_cache(
@@ -991,9 +948,8 @@ export async function getPortalData(
   const [
     trends,
     corpusRange,
-    corpusStats,
+    globalStats,
     liveAnalytics,
-    memberCount,
     joinedThisWeek,
     initialStream,
     research,
@@ -1021,9 +977,13 @@ export async function getPortalData(
           failed: false,
         }),
     loadPortalComponentData(
-      'corpus-stats',
-      () => getCachedCorpusStats(sourceKey),
-      { totalTweets: 0, generatedAt: new Date().toISOString() },
+      'global-stats',
+      () => getCachedGlobalStats(sourceKey),
+      {
+        totalTweets: 0,
+        memberCount: 0,
+        generatedAt: new Date().toISOString(),
+      },
     ),
     view === 'home'
       ? loadPortalComponentData(
@@ -1038,13 +998,6 @@ export async function getPortalData(
           data: { streamedLast24Hours: 0, latestObservedAt: null },
           failed: false,
         }),
-    view === 'home'
-      ? loadPortalComponentData(
-          'member-count',
-          () => getCachedMemberCount(sourceKey),
-          0,
-        )
-      : Promise.resolve({ data: 0, failed: false }),
     view === 'home'
       ? loadPortalComponentData(
           'joined-this-week',
@@ -1083,20 +1036,20 @@ export async function getPortalData(
       : Promise.resolve({ data: [], failed: false }),
   ])
   const stats: PortalStats = {
-    totalTweets: corpusStats.data.totalTweets,
-    accountCount: memberCount.data,
+    totalTweets: globalStats.data.totalTweets,
+    accountCount: globalStats.data.memberCount,
     streamedLast24Hours: liveAnalytics.data.streamedLast24Hours,
     joinedThisWeek: joinedThisWeek.data,
     firstYear: corpusRange.data.firstYear,
     currentYear: corpusRange.data.currentYear,
-    generatedAt: corpusStats.data.generatedAt,
+    generatedAt: globalStats.data.generatedAt,
   }
   const selectedStream =
     view === 'home'
       ? selectHomepageStream(
           [...initialStream.data, ...recentBangers.data],
           30,
-          new Date(corpusStats.data.generatedAt),
+          new Date(globalStats.data.generatedAt),
         )
       : initialStream.data
   return {
@@ -1107,8 +1060,8 @@ export async function getPortalData(
     recentBangers: recentBangers.data,
     historicalBangers: historicalBangers.data,
     failures: {
-      liveAnalytics: corpusStats.failed || liveAnalytics.failed,
-      memberCount: memberCount.failed,
+      liveAnalytics: globalStats.failed || liveAnalytics.failed,
+      memberCount: globalStats.failed,
       joinedThisWeek: joinedThisWeek.failed,
       corpusRange: corpusRange.failed,
       trends: trends.failed,

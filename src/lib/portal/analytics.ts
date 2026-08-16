@@ -668,7 +668,7 @@ export async function fetchPortalTrends(
     (_, index) => FIRST_TREND_YEAR + index,
   )
   // word-trend accepts date inputs (the same YYYY-MM-DD values used by the
-  // ClickHouse lab UI), rather than full ISO timestamps.
+  // ClickHouse analytics gateway), rather than full ISO timestamps.
   const yearlyFrom = `${FIRST_TREND_YEAR}-01-01`
   const yearlyTo = `${currentYear + 1}-01-01`
   const today = startOfUtcDay(now)

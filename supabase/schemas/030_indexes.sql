@@ -25,6 +25,7 @@ CREATE INDEX "idx_likes_liked_tweet_id" ON "public"."likes" USING "btree" ("like
 
 -- public.mentioned_users
 CREATE INDEX "idx_mentioned_users_user_id" ON "public"."mentioned_users" USING "btree" ("user_id");
+CREATE INDEX "mentioned_users_screen_name_lower_idx" ON "public"."mentioned_users" USING "btree" ("lower"("screen_name")) WHERE ("screen_name" <> ''::"text");
 
 -- public.tweet_media
 CREATE INDEX "idx_tweet_media_archive_upload_id" ON "public"."tweet_media" USING "btree" ("archive_upload_id");
@@ -33,6 +34,12 @@ CREATE INDEX "idx_tweet_media_tweet_id" ON "public"."tweet_media" USING "btree" 
 -- public.optin
 CREATE INDEX "idx_optin_opted_in" ON "public"."optin" USING "btree" ("opted_in") WHERE ("opted_in" = true);
 CREATE INDEX "idx_optin_explicit_optout" ON "public"."optin" USING "btree" ("explicit_optout") WHERE ("explicit_optout" = true);
+CREATE INDEX "optin_explicit_optout_twitter_user_id_idx" ON "public"."optin" USING "btree" ("twitter_user_id") WHERE (("explicit_optout" IS TRUE) AND ("twitter_user_id" IS NOT NULL));
+CREATE INDEX "optin_explicit_optout_username_lower_idx" ON "public"."optin" USING "btree" (lower("username")) WHERE ("explicit_optout" IS TRUE);
+
+CREATE INDEX "blocked_scraping_users_username_idx" ON "tes"."blocked_scraping_users" USING "btree" (lower("username")) WHERE ("username" IS NOT NULL);
+
+CREATE INDEX "liked_tweets_author_account_id_idx" ON "public"."liked_tweets" USING "btree" ("author_account_id") WHERE ("author_account_id" IS NOT NULL);
 CREATE INDEX "idx_optin_user_id" ON "public"."optin" USING "btree" ("user_id");
 CREATE INDEX "idx_optin_username" ON "public"."optin" USING "btree" ("username");
 
@@ -56,6 +63,8 @@ CREATE INDEX "idx_tweets_favorite_count" ON "public"."tweets" USING "btree" ("fa
 CREATE INDEX "idx_tweets_null_archive_upload_id" ON "public"."tweets" USING "btree" ("updated_at" DESC) WHERE ("archive_upload_id" IS NULL);
 CREATE INDEX "idx_tweets_reply_to_tweet_id" ON "public"."tweets" USING "btree" ("reply_to_tweet_id");
 CREATE INDEX "idx_tweets_reply_to_user_id" ON "public"."tweets" USING "btree" ("reply_to_user_id");
+CREATE INDEX "tweets_reply_to_username_lower_idx" ON "public"."tweets" USING "btree" ("lower"("reply_to_username")) WHERE ("reply_to_username" IS NOT NULL);
+CREATE INDEX "tweets_retweeted_username_lower_idx" ON "public"."tweets" USING "btree" (lower(substring("full_text" FROM '^RT @([A-Za-z0-9_]{1,15}):'::"text"))) WHERE ("full_text" ~ '^RT @[A-Za-z0-9_]{1,15}:'::"text");
 CREATE INDEX "idx_tweets_streaming" ON "public"."tweets" USING "btree" ("created_at") WHERE ("archive_upload_id" IS NULL);
 CREATE INDEX "idx_tweets_updated_at" ON "public"."tweets" USING "btree" ("updated_at" DESC);
 CREATE INDEX "idx_tweets_updated_at_tweet_id" ON "public"."tweets" USING "btree" ("updated_at", "tweet_id");
@@ -113,3 +122,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS "digest_editions_one_published_per_date_idx"
 CREATE INDEX IF NOT EXISTS "digest_editions_public_archive_idx"
   ON "public"."digest_editions" ("digest_date" DESC, "published_at" DESC)
   WHERE "status" = 'published';
+CREATE INDEX IF NOT EXISTS "policy_storage_objects_account_ids_idx"
+ON "private"."policy_storage_objects" USING "gin" ("account_ids");
+
+CREATE INDEX IF NOT EXISTS "policy_storage_objects_username_hashes_idx"
+ON "private"."policy_storage_objects" USING "gin" ("username_hashes");

@@ -155,6 +155,31 @@ tail -f logs/execution.log
 tail -f logs/process_archive.log
 ```
 
+### Verify the explicit opt-out gate
+
+Before promoting a new worker image, exercise the privacy gate with a staging
+account whose `public.optin.explicit_optout` value is true. Move one of that
+account's uploads to `ready_for_commit`, run the worker once, and verify:
+
+- the upload moves to `completed` after the transaction commits;
+- the account row and every authored tweet ID from the archive exist only as
+  content-free policy tombstones;
+- no profile, media, URL, mention, like, follower, following, quote, or retweet
+  payload authored by the blocked owner was written.
+
+Repeat with an account present only in `tes.blocked_scraping_users`. Also verify
+an allowed outer tweet keeps its quote/retweet relationship to a blocked target
+tombstone, while a blocked outer tweet does not remove an independently allowed
+embedded tweet already in the database. Keep the previous worker image only as
+an incident artifact; after this privacy gate is active, rollback means pausing
+ingestion rather than restarting a policy-unaware writer.
+
+Then clear only the test account's explicit opt-out and opt it in. Confirm its
+`explicit_optout` block-source row disappears while an independent `admin`
+block-source row, when present, remains. Re-run the archive and verify the
+existing policy tombstones are hydrated in place (`is_tombstone = false`) with
+their text and child rows restored from the authorized upload.
+
 **Expected output in `logs/execution.log`:**
 ```
 [2024-01-15 14:30:01] Starting process-archive execution
@@ -421,7 +446,7 @@ find "$BACKUP_DIR" -name "logs-*.tar.gz" -mtime +30 -delete
    # Make sure you're building from the correct context
    cd services/process_archive
    ./docker-build.sh
-   
+
    # Or manually:
    cd ../../
    docker build -f services/process_archive/Dockerfile -t process-archive .

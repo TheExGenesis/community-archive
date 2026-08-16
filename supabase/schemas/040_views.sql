@@ -3,7 +3,7 @@
 -- public.account moved to 032_views_prereq.sql
 
 -- public.enriched_tweets
-CREATE OR REPLACE VIEW "public"."enriched_tweets" AS
+CREATE OR REPLACE VIEW "public"."enriched_tweets" WITH (security_invoker = true) AS
  SELECT "t"."tweet_id",
     "t"."account_id",
     "a"."username",
@@ -44,7 +44,7 @@ ALTER TABLE "public"."global_monthly_tweet_counts" OWNER TO "postgres";
 -- public.profile moved to 032_views_prereq.sql
 
 -- public.tweet_replies_view
-CREATE OR REPLACE VIEW "public"."tweet_replies_view" AS
+CREATE OR REPLACE VIEW "public"."tweet_replies_view" WITH (security_invoker = true) AS
  SELECT "tweets"."reply_to_tweet_id",
     "tweets"."reply_to_user_id"
    FROM "public"."tweets"
@@ -52,7 +52,7 @@ CREATE OR REPLACE VIEW "public"."tweet_replies_view" AS
 ALTER TABLE "public"."tweet_replies_view" OWNER TO "postgres";
 
 -- public.tweets_w_conversation_id
-CREATE OR REPLACE VIEW "public"."tweets_w_conversation_id" AS
+CREATE OR REPLACE VIEW "public"."tweets_w_conversation_id" WITH (security_invoker = true) AS
  SELECT "tweets"."tweet_id",
     "tweets"."account_id",
     "tweets"."created_at",
@@ -70,7 +70,7 @@ CREATE OR REPLACE VIEW "public"."tweets_w_conversation_id" AS
 ALTER TABLE "public"."tweets_w_conversation_id" OWNER TO "postgres";
 
 -- public.user_directory
-CREATE OR REPLACE VIEW "public"."user_directory" AS
+CREATE OR REPLACE VIEW "public"."user_directory" WITH (security_invoker = true) AS
 WITH archived_members AS (
   SELECT
     a.account_id,

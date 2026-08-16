@@ -90,11 +90,8 @@ test('renders the balanced homepage composition and editorial labels', async () 
     screen.getByRole('link', { name: /All-time bangers/i }),
   ).toHaveAttribute('href', '/bangers?period=all')
   expect(
-    screen.getByRole('link', { name: /Export the archive/i }),
-  ).toHaveAttribute(
-    'href',
-    'https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet',
-  )
+    screen.getByRole('link', { name: /Bulk export paused/i }),
+  ).toHaveAttribute('href', '/docs#bulk-dump')
   expect(
     screen.getByRole('link', { name: /Community Builds/i }),
   ).toHaveAttribute('href', '/tweets/1835411943735140798')

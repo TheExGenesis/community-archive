@@ -1,10 +1,10 @@
 # API guide
 
-There are three ways to access Community Archive data:
+There are two currently supported ways to access Community Archive data:
 
-1. Download the bulk Parquet export for corpus-wide analysis.
-2. Query filtered records through the read-only Supabase REST API.
-3. Download one user's processed archive JSON from public object storage.
+1. Query filtered records through the read-only Supabase REST API.
+2. Authenticated owners may download their own processed archive through the
+   policy-aware web endpoint.
 
 The website version of this guide is at
 [`community-archive.org/docs`](https://www.community-archive.org/docs). Agents
@@ -13,22 +13,10 @@ should start at
 
 ## Bulk Parquet export
 
-Use the [GitHub data release](https://github.com/TheExGenesis/community-archive/releases/tag/data_export)
-as the canonical page for current export notes and its download link.
-
-Current file:
-[`enriched_tweets.parquet`](https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet)
-
-The dump is the right choice for full-corpus analysis. For example, DuckDB can
-query the remote Parquet file directly:
-
-```sql
-SELECT tweet_id, username, created_at, full_text
-FROM read_parquet('https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet')
-WHERE lower(username) = 'defenderofbasic'
-ORDER BY created_at DESC
-LIMIT 100;
-```
+The historical `enriched_tweets.parquet` artifact is unavailable. Its exporter
+did not re-check current PostgreSQL consent for every nested author immediately
+before publication, so the bucket is private until a policy-aware replacement
+is implemented. Use filtered REST requests in the meantime.
 
 ## REST API
 
@@ -132,19 +120,20 @@ for a complete example. Run it from the repository root with:
 pnpm script scripts/get_all_tweets_paginated.mts
 ```
 
-Use the Parquet dump instead when you need most or all of the corpus.
+Full-corpus access is paused until the replacement Parquet exporter enforces
+current consent.
 
 ## Raw user archives
 
-Given a lowercase username, use:
+While signed in as the matching archive owner, use:
 
 ```text
-https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/<username>/archive.json
+https://www.community-archive.org/api/archive/<username>
 ```
 
 Example:
 
-<https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/defenderofbasic/archive.json>
+<https://www.community-archive.org/api/archive/defenderofbasic>
 
 The object contains archive-shaped sections such as `account`, `profile`,
 `tweets`, `follower`, `following`, and optionally `like`. See

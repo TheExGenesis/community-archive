@@ -1,14 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowUpRight, Bot, Braces, Database, Download } from 'lucide-react'
+import { ArrowUpRight, Bot, Braces, Database } from 'lucide-react'
 
 const API_URL = 'https://fabxmporizzqflnftavs.supabase.co'
 const ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8'
-const RELEASE_URL =
-  'https://github.com/TheExGenesis/community-archive/releases/tag/data_export'
-const PARQUET_URL = `${API_URL}/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet`
-
 export const metadata: Metadata = {
   title: 'Docs | Community Archive',
   description:
@@ -42,16 +38,6 @@ const { data, error } = await supabase
 
 if (error) throw error
 console.log(data)`
-
-const duckDbExample = `SELECT
-  tweet_id,
-  username,
-  created_at,
-  full_text
-FROM read_parquet('${PARQUET_URL}')
-WHERE lower(username) = 'defenderofbasic'
-ORDER BY created_at DESC
-LIMIT 100;`
 
 function CodeBlock({ children }: { children: string }) {
   return (
@@ -97,8 +83,8 @@ export default function DocsPage() {
               Build with the archive
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-              Query public records through the API, analyze the complete dump,
-              or give an agent one canonical starting point.
+              Query policy-filtered public records through the API or give an
+              agent one canonical starting point.
             </p>
             <div className="rounded-xl border border-brand/30 bg-brand/5 p-5">
               <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -123,23 +109,20 @@ export default function DocsPage() {
               Choose an access path
             </h2>
             <p className="mt-2 text-muted-foreground">
-              The same public archive is available at three useful levels.
+              Choose the policy-safe surface that fits your query.
             </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
             <article className="rounded-xl border border-border bg-card p-6">
-              <Download className="h-6 w-6 text-brand" aria-hidden="true" />
+              <Database className="h-6 w-6 text-brand" aria-hidden="true" />
               <h3 className="mt-4 text-lg font-semibold text-foreground">
-                Bulk analysis
+                Bulk export paused
               </h3>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Use the Parquet dump for corpus-wide analysis, local SQL, or
-                machine-learning workflows.
+                The historical Parquet pipeline is private while it is rebuilt
+                to enforce current consent for every nested author.
               </p>
-              <div className="mt-4">
-                <ResourceLink href={RELEASE_URL}>GitHub release</ResourceLink>
-              </div>
             </article>
 
             <article className="rounded-xl border border-border bg-card p-6">
@@ -165,12 +148,12 @@ export default function DocsPage() {
                 One raw archive
               </h3>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Fetch an individual user&apos;s processed archive JSON when you
-                need its original archive-shaped records.
+                Signed-in owners can download their own processed archive JSON
+                while current PostgreSQL policy permits it.
               </p>
               <p className="mt-4 break-all font-mono text-xs leading-5 text-muted-foreground">
                 {API_URL}
-                /storage/v1/object/public/archives/&lt;username&gt;/archive.json
+                https://www.community-archive.org/api/archive/&lt;username&gt;
               </p>
             </article>
           </div>
@@ -178,25 +161,15 @@ export default function DocsPage() {
 
         <section className="space-y-6" id="bulk-dump">
           <div className="max-w-3xl">
-            <h2 className="text-3xl font-bold text-foreground">Bulk dump</h2>
+            <h2 className="text-3xl font-bold text-foreground">
+              Bulk export paused
+            </h2>
             <p className="mt-2 leading-7 text-muted-foreground">
-              The canonical release page records what is in the latest export
-              and links to the current <code>enriched_tweets.parquet</code>
-              file. The Parquet file includes account identity, tweet text,
-              engagement counts, reply, quote, and conversation fields.
+              The former <code>enriched_tweets.parquet</code> artifact was not
+              able to apply current consent to every nested author immediately
+              before publication. It is no longer public. Use filtered API
+              requests until a policy-aware replacement is available.
             </p>
-            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
-              <ResourceLink href={RELEASE_URL}>Release notes</ResourceLink>
-              <ResourceLink href={PARQUET_URL}>
-                Direct Parquet file
-              </ResourceLink>
-            </div>
-          </div>
-          <div>
-            <h3 className="mb-3 text-lg font-semibold text-foreground">
-              Query it directly with DuckDB
-            </h3>
-            <CodeBlock>{duckDbExample}</CodeBlock>
           </div>
         </section>
 

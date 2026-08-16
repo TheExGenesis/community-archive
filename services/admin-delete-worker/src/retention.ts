@@ -4,76 +4,82 @@ import { logger } from './logger.ts'
 type SupabaseClient = any
 
 const EXPORT_BUCKET = 'admin-deleted-user-data'
-const RETENTION_HOURS = 24
+// Contentful recovery exports predate policy tombstones and are not valid
+// durable recovery material. Delete them on the next sweep; ID-only manifests
+// under tombstones/ are retained.
 const PAGE_SIZE = 1000
-
-type ExpiredJob = {
-  key: string
-  args: {
-    account_id?: string
-    enqueued_at?: string
-    export_prefix?: string
-  } | null
-}
 
 export async function purgeExpiredExports(
   storage: SupabaseClient,
   sql: postgres.Sql,
 ): Promise<void> {
-  const jobs = await sql<ExpiredJob[]>`
-    SELECT key, args
-    FROM private.admin_jobs
-    WHERE job_name = 'admin_delete_with_export'
-      AND status IN ('DONE', 'FAILED')
-      AND updated_at < now() - (${RETENTION_HOURS} * interval '1 hour')
-      AND COALESCE(args->>'export_deleted_at', '') = ''
-    ORDER BY updated_at ASC
-    LIMIT 20
-  `
-
-  for (const job of jobs) {
-    const prefix = exportPrefix(job.args)
-    if (!prefix) {
-      logger.warn({ job_key: job.key }, 'cannot derive expired export prefix')
-      continue
+  try {
+    const paths = await listLegacyFiles(storage)
+    for (let offset = 0; offset < paths.length; offset += 100) {
+      const { error } = await storage.storage
+        .from(EXPORT_BUCKET)
+        .remove(paths.slice(offset, offset + 100))
+      if (error) throw new Error(error.message)
     }
 
-    try {
-      const paths = await listFilesRecursively(storage, prefix)
-      for (let offset = 0; offset < paths.length; offset += 100) {
-        const { error } = await storage.storage
-          .from(EXPORT_BUCKET)
-          .remove(paths.slice(offset, offset + 100))
-        if (error) throw new Error(error.message)
-      }
-
-      await sql`
-        UPDATE private.admin_jobs
-        SET args = COALESCE(args, '{}'::jsonb)
-          || jsonb_build_object(
-            'export_deleted_at', now(),
-            'export_retention_hours', ${RETENTION_HOURS}::integer
-          ),
+    await sql`
+      UPDATE private.admin_jobs
+      SET args = jsonb_strip_nulls(jsonb_build_object(
+            'account_id', args->>'account_id',
+            'completed_at', args->>'completed_at',
+            'failed_at', args->>'failed_at',
+            'export_prefix', CASE
+              WHEN args->>'export_prefix' LIKE 'tombstones/%'
+              THEN args->>'export_prefix'
+              ELSE NULL
+            END,
+            'legacy_export_deleted_at', now()
+          )),
           updated_at = now()
-        WHERE key = ${job.key}
-      `
+      WHERE job_name = 'admin_delete_with_export'
+        AND status IN ('DONE', 'FAILED')
+        AND (
+          args ? 'username'
+          OR args ? 'reason'
+          OR args ? 'requested_by_user_id'
+          OR args ? 'error'
+          OR COALESCE(args->>'export_prefix', '') NOT LIKE 'tombstones/%'
+        )
+    `
+    if (paths.length > 0) {
       logger.info(
-        { job_key: job.key, prefix, objects_deleted: paths.length },
-        'expired admin deletion export removed',
-      )
-    } catch (error) {
-      logger.error(
-        { job_key: job.key, prefix, error },
-        'failed to remove expired admin deletion export',
+        { objects_deleted: paths.length },
+        'legacy contentful admin deletion exports removed',
       )
     }
+  } catch (error) {
+    logger.error({ error }, 'failed to remove legacy admin deletion exports')
   }
 }
 
-function exportPrefix(args: ExpiredJob['args']): string | null {
-  if (args?.export_prefix) return args.export_prefix
-  if (!args?.enqueued_at || !args.account_id) return null
-  return `${args.enqueued_at.replace(/[:.]/g, '-')}-${args.account_id}`
+async function listLegacyFiles(storage: SupabaseClient): Promise<string[]> {
+  const paths: string[] = []
+  let offset = 0
+
+  while (true) {
+    const { data, error } = await storage.storage.from(EXPORT_BUCKET).list('', {
+      limit: PAGE_SIZE,
+      offset,
+      sortBy: { column: 'name', order: 'asc' },
+    })
+    if (error) throw new Error(error.message)
+
+    const entries = (data ?? []) as Array<{ id?: string | null; name: string }>
+    for (const entry of entries) {
+      if (entry.name === 'tombstones') continue
+      if (entry.id) paths.push(entry.name)
+      else paths.push(...(await listFilesRecursively(storage, entry.name)))
+    }
+    if (entries.length < PAGE_SIZE) break
+    offset += PAGE_SIZE
+  }
+
+  return paths
 }
 
 async function listFilesRecursively(

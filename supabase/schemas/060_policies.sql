@@ -10,12 +10,23 @@ CREATE POLICY "Published digest editions are publicly readable"
   TO "anon", "authenticated"
   USING ("status" = 'published');
 
--- Storage policies for the public archives bucket. Writes are restricted to
+-- Storage policies for the private archives bucket. Writes are restricted to
 -- the folder named by trusted, server-controlled app_metadata; the upload
 -- client derives the same name from its verified Twitter identity (#372).
-CREATE POLICY "Archives are publicly readable" ON "storage"."objects"
-  FOR SELECT TO public
-  USING (("bucket_id" = 'archives'::"text"));
+CREATE POLICY "Users can read their own archive" ON "storage"."objects"
+  FOR SELECT TO "authenticated"
+  USING (
+    ("bucket_id" = 'archives'::"text")
+    AND ("storage"."filename"("name") = 'archive.json'::"text")
+    AND (
+      "lower"(("storage"."foldername"("name"))[1]) =
+      "lower"((SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text")))
+    )
+    AND public.assert_archive_upload_allowed(
+      (SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'provider_id'::"text")),
+      (SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text"))
+    )
+  );
 
 CREATE POLICY "Users can upload their own archive" ON "storage"."objects"
   FOR INSERT TO "authenticated"
@@ -25,6 +36,10 @@ CREATE POLICY "Users can upload their own archive" ON "storage"."objects"
     AND (
       "lower"(("storage"."foldername"("name"))[1]) =
       "lower"((SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text")))
+    )
+    AND public.assert_archive_upload_allowed(
+      (SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'provider_id'::"text")),
+      (SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text"))
     )
   );
 
@@ -37,6 +52,10 @@ CREATE POLICY "Users can update their own archive" ON "storage"."objects"
       "lower"(("storage"."foldername"("name"))[1]) =
       "lower"((SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text")))
     )
+    AND public.assert_archive_upload_allowed(
+      (SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'provider_id'::"text")),
+      (SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text"))
+    )
   )
   WITH CHECK (
     ("bucket_id" = 'archives'::"text")
@@ -44,6 +63,10 @@ CREATE POLICY "Users can update their own archive" ON "storage"."objects"
     AND (
       "lower"(("storage"."foldername"("name"))[1]) =
       "lower"((SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text")))
+    )
+    AND public.assert_archive_upload_allowed(
+      (SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'provider_id'::"text")),
+      (SELECT (("auth"."jwt"() -> 'app_metadata'::"text") ->> 'user_name'::"text"))
     )
   );
 
@@ -68,7 +91,7 @@ CREATE POLICY "Data is modifiable by their users" ON "public"."likes" TO "authen
 CREATE POLICY "Data is modifiable by their users" ON "public"."tweets" TO "authenticated" USING (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))) WITH CHECK (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")));
 
 -- Public read policies
-CREATE POLICY "Data is publicly visible" ON "public"."all_account" FOR SELECT USING (true);
+CREATE POLICY "Data is publicly visible" ON "public"."all_account" FOR SELECT USING (("is_tombstone" IS NOT TRUE));
 CREATE POLICY "Data is publicly visible" ON "public"."all_profile" FOR SELECT USING (true);
 CREATE POLICY "Data is publicly visible" ON "public"."archive_upload" FOR SELECT USING (true);
 CREATE POLICY "Data is publicly visible" ON "public"."followers" FOR SELECT USING (true);
@@ -96,11 +119,15 @@ CREATE POLICY "Entities are modifiable by their users" ON "public"."user_mention
    FROM "public"."tweets" "dt"
   WHERE (("dt"."tweet_id" = "user_mentions"."tweet_id") AND ("dt"."account_id" = ( SELECT ("auth"."jwt"() ->> 'sub'::"text")))))));
 
-CREATE POLICY "Entities are publicly visible" ON "public"."liked_tweets" FOR SELECT USING (true);
+CREATE POLICY "Entities are publicly visible" ON "public"."liked_tweets" FOR SELECT USING (
+  "author_account_id" IS NOT NULL
+  OR ("is_tombstone" = true AND "full_text" = '')
+);
 CREATE POLICY "Entities are publicly visible" ON "public"."mentioned_users" FOR SELECT USING (true);
 CREATE POLICY "Entities are publicly visible" ON "public"."tweet_media" FOR SELECT USING (true);
 CREATE POLICY "Entities are publicly visible" ON "public"."tweet_urls" FOR SELECT USING (true);
 CREATE POLICY "Entities are publicly visible" ON "public"."user_mentions" FOR SELECT USING (true);
+CREATE POLICY "Conversations are publicly visible" ON "public"."conversations" FOR SELECT USING (true);
 
 -- quote_tweets / retweets are written only by the service_role (firehose + worker).
 -- Reads are public; anon/authenticated writes are revoked in 060_grants and enforced
@@ -115,7 +142,7 @@ CREATE POLICY "Users can update own opt-in status" ON "public"."optin" FOR UPDAT
 CREATE POLICY "Users can view own opt-in status" ON "public"."optin" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 -- Tweets public read policy
-CREATE POLICY "anyone can read tweets" ON "public"."tweets" FOR SELECT USING (true);
+CREATE POLICY "anyone can read tweets" ON "public"."tweets" FOR SELECT USING (("is_tombstone" IS NOT TRUE));
 
 -- TES schema policy
 CREATE POLICY "Allow select for all" ON "tes"."blocked_scraping_users" FOR SELECT USING (true);

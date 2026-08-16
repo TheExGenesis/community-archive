@@ -66,10 +66,9 @@ export function ProfileHeader({
   downloadArchiveVisible?: boolean
   isOwner?: boolean
 }) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const archiveUrl =
-    profile.has_archive && supabaseUrl
-      ? `${supabaseUrl}/storage/v1/object/public/archives/${profile.username.toLowerCase()}/archive.json`
+    profile.has_archive && isOwner
+      ? `/api/archive/${encodeURIComponent(profile.username.toLowerCase())}`
       : null
   const headerUrl = profile.header_media_url
     ? `${profile.header_media_url.replace(/\/$/, '')}/1500x500`

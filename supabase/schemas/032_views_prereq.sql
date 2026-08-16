@@ -1,7 +1,7 @@
 -- Views required by materialized views
 
 -- public.account
-CREATE OR REPLACE VIEW "public"."account" AS
+CREATE OR REPLACE VIEW "public"."account" WITH (security_invoker = true) AS
  SELECT "a"."account_id",
     "a"."created_via",
     "a"."username",
@@ -18,7 +18,7 @@ CREATE OR REPLACE VIEW "public"."account" AS
 ALTER TABLE "public"."account" OWNER TO "postgres";
 
 -- public.profile (needed by functions used in matviews)
-CREATE OR REPLACE VIEW "public"."profile" AS
+CREATE OR REPLACE VIEW "public"."profile" WITH (security_invoker = true) AS
  SELECT "p"."account_id",
     "p"."bio",
     "p"."website",

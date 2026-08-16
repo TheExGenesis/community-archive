@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url'
 import { Archive } from '../src/lib/types'
 const { insertArchiveForProcessing } = await import('../src/lib/db_insert')
 const { pipe } = await import('../src/lib/fp')
-const { uploadArchiveToStorage } = await import(
+const { uploadArchiveToStorageAsService } = await import(
   '../src/lib/upload-archive/uploadArchiveToStorage'
 )
 const { removeProblematicCharacters } = await import(
@@ -65,12 +65,17 @@ async function uploadArchive(filePath: string) {
 
     console.log('archive', archive.account)
 
-    await uploadArchiveToStorage(supabase, archive)
+    const objectPath = await uploadArchiveToStorageAsService(supabase, archive)
     console.log('Archive uploaded to storage successfully')
 
-    await insertArchiveForProcessing(supabase, archive, (progress) => {
-      console.log(`${progress.phase}: ${progress.percent?.toFixed(2)}%`)
-    })
+    try {
+      await insertArchiveForProcessing(supabase, archive, (progress) => {
+        console.log(`${progress.phase}: ${progress.percent?.toFixed(2)}%`)
+      })
+    } catch (error) {
+      await supabase.storage.from('archives').remove([objectPath])
+      throw error
+    }
 
     console.log('Archive upload and processing completed successfully')
   } catch (error) {

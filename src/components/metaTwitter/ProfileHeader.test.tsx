@@ -84,7 +84,7 @@ test('shows the opted-in icon without treating the user as a contributor', () =>
   ).not.toBeInTheDocument()
 })
 
-test('shows the archive icon without treating the user as a contributor', () => {
+test('shows the archive icon without exposing another owner raw download', () => {
   render(
     <ProfileHeader
       profile={profile({ has_archive: true, is_opted_in: false })}
@@ -95,11 +95,8 @@ test('shows the archive icon without treating the user as a contributor', () => 
   expect(screen.getByRole('img', { name: 'Archive uploaded' })).toBeVisible()
   expect(screen.queryByText('Archive contributor')).not.toBeInTheDocument()
   expect(
-    screen.getByRole('link', { name: 'Download archive' }),
-  ).toHaveAttribute(
-    'href',
-    'https://archive.supabase.co/storage/v1/object/public/archives/alice/archive.json',
-  )
+    screen.queryByRole('link', { name: 'Download archive' }),
+  ).not.toBeInTheDocument()
   expect(
     screen.queryByRole('note', { name: 'Limited profile' }),
   ).not.toBeInTheDocument()
@@ -141,6 +138,9 @@ test('puts the owner edit control immediately before the subtle X link', async (
 
   const editButton = screen.getByRole('button', { name: 'Edit profile' })
   const xLink = screen.getByRole('link', { name: 'View on X' })
+  expect(
+    screen.getByRole('link', { name: 'Download archive' }),
+  ).toHaveAttribute('href', '/api/archive/alice')
   expect(editButton.nextElementSibling).toBe(xLink)
   expect(xLink).toHaveClass('bg-transparent', 'text-muted-foreground')
 
@@ -150,11 +150,14 @@ test('puts the owner edit control immediately before the subtle X link', async (
 
 test('honors an owner setting that hides the archive download', () => {
   render(
-    <ProfileHeader
-      profile={profile({ has_archive: true, is_opted_in: false })}
-      archivedAt="2025-01-02T00:00:00.000Z"
-      downloadArchiveVisible={false}
-    />,
+    <ProfileEditingProvider>
+      <ProfileHeader
+        profile={profile({ has_archive: true, is_opted_in: false })}
+        archivedAt="2025-01-02T00:00:00.000Z"
+        downloadArchiveVisible={false}
+        isOwner
+      />
+    </ProfileEditingProvider>,
   )
 
   expect(

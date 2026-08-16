@@ -26,8 +26,7 @@ import { CHROME_EXTENSION_URL } from '@/lib/browserExtension'
 export type PortalView = 'home' | 'stream'
 
 const HOME_LIVE_STREAM_LIMIT = 12
-const ARCHIVE_EXPORT_URL =
-  'https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet'
+const ARCHIVE_EXPORT_URL = '/docs#bulk-dump'
 const COMMUNITY_BUILDS_URL = '/tweets/1835411943735140798'
 
 type DashboardDestination =
@@ -801,10 +800,8 @@ export default function Portal({
               </div>
               <a
                 href={ARCHIVE_EXPORT_URL}
-                target="_blank"
-                rel="noopener noreferrer"
                 onClick={() =>
-                  captureDashboardDestination('data_export', 'card', true)
+                  captureDashboardDestination('data_export', 'card', false)
                 }
                 className={`${CARD} group flex items-center gap-3 px-4 py-4 transition-colors hover:border-brand/60`}
               >
@@ -813,16 +810,16 @@ export default function Portal({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[13.5px] font-bold">
-                    Export the archive
+                    Bulk export paused
                   </span>
                   <span
                     className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
                   >
-                    Download the latest public Parquet release
+                    Learn why the historical Parquet file is private
                   </span>
                 </span>
                 <span className="flex-shrink-0 text-[12px] font-semibold text-brand">
-                  Download →
+                  Details →
                 </span>
               </a>
               <a

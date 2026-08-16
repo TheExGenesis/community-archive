@@ -7,18 +7,16 @@ Guide for AI agents working with the Community Archive database.
 
 ## Choose an access method
 
-- **Bulk or corpus-wide analysis:** use the Parquet dump linked from the
-  [GitHub data release](https://github.com/TheExGenesis/community-archive/releases/tag/data_export).
-  Do not page through millions of API rows.
+- **Bulk or corpus-wide analysis:** the historical Parquet artifact is private
+  while its exporter is rebuilt to enforce current consent. Scope work to
+  filtered API queries in the meantime.
 - **Filtered or application queries:** use the read-only Supabase REST API
   described below and in [api-doc.md](./api-doc.md).
-- **One user's processed archive:** fetch
-  `https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/<lowercase-username>/archive.json`.
+- **One user's processed archive:** only the authenticated owner may request
+  `https://www.community-archive.org/api/archive/<lowercase-username>`.
 
-The current bulk file is
-[`enriched_tweets.parquet`](https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet).
-Treat the GitHub release page as canonical for current export notes and the
-download link.
+Do not use or redistribute historical `enriched_tweets.parquet` copies; they
+were produced without a final nested-author consent check.
 
 ## Overview
 
@@ -90,7 +88,7 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9
 ```
 
 **Raw Archive Storage:** Individual user archives available at:
-`/storage/v1/object/public/archives/<username>/archive.json`
+`https://www.community-archive.org/api/archive/<username>`
 
 **Interactive reference:**
 [`https://www.community-archive.org/api/reference`](https://www.community-archive.org/api/reference)
@@ -217,20 +215,20 @@ WHERE um.mentioned_user_id = '1680757426889342977';
    case-insensitive comparison when the original casing is unknown. Public raw
    archive storage paths use lowercase usernames.
 2. **Pagination**: API responses are capped at 1,000 rows. Use `limit` and
-   `offset` with a stable `order`, or use the bulk Parquet dump for
-   full-corpus work (see [api-doc.md](./api-doc.md)).
+   `offset` with a stable `order`. Full-corpus bulk access is paused until the
+   Parquet exporter is policy-aware (see [api-doc.md](./api-doc.md)).
 3. **Archive Uploads**: Multiple uploads per user are possible - `all_profile` can have multiple rows per `account_id` with different `archive_upload_id`
 4. **Retweets**: Check `retweets` table to distinguish retweets from original tweets
 5. **Quote Tweets**: Use `quote_tweets` to find quoted tweet relationships
 6. **Conversations**: Use `conversations.conversation_id` to group related tweets
 7. **Replies**: Use `reply_to_tweet_id` and `reply_to_user_id` to trace reply chains
 8. **Media**: Media URLs may expire - stored at time of archive upload
-9. **Likes**: Liked tweets are stored separately in `liked_tweets` table with full text
+9. **Likes**: Liked tweet IDs are stored separately in `liked_tweets`; payloads
+   without authoritative author provenance are content-free tombstones.
 
 ## Related Documentation
 
 - [API Documentation](./api-doc.md) - How to query the database via Supabase API
-- [Bulk Data Release](https://github.com/TheExGenesis/community-archive/releases/tag/data_export) - Canonical dump notes and download link
 - [Website Docs](https://www.community-archive.org/docs) - Agent, API, and bulk-data quickstart
 - [Archive Data Structure](./archive_data.md) - Structure of raw archive JSON files
 - [Local Setup](./local-setup.md) - Setting up local development environment

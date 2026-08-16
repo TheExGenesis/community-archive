@@ -36,18 +36,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      commit_temp_data: {
-        Args: {
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      create_temp_tables: {
-        Args: {
-          p_suffix: string
-        }
-        Returns: undefined
-      }
       delete_all_archives: {
         Args: {
           p_account_id: string
@@ -58,12 +46,6 @@ export type Database = {
         Args: {
           function_name: string
           function_args: string[]
-        }
-        Returns: undefined
-      }
-      drop_temp_tables: {
-        Args: {
-          p_suffix: string
         }
         Returns: undefined
       }
@@ -85,73 +67,6 @@ export type Database = {
           follower_count: number
         }[]
       }
-      insert_temp_account: {
-        Args: {
-          p_account: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_archive_upload: {
-        Args: {
-          p_account_id: string
-          p_archive_at: string
-          p_suffix: string
-        }
-        Returns: number
-      }
-      insert_temp_followers: {
-        Args: {
-          p_followers: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_following: {
-        Args: {
-          p_following: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_likes: {
-        Args: {
-          p_likes: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_profiles: {
-        Args: {
-          p_profile: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_tweets: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      process_and_insert_tweet_entities: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      process_archive: {
-        Args: {
-          archive_data: Json
-        }
-        Returns: undefined
-      }
     }
     Enums: {
       [_ in never]: never
@@ -168,6 +83,7 @@ export type Database = {
           account_id: string
           created_at: string
           created_via: string
+          is_tombstone: boolean
           num_followers: number | null
           num_following: number | null
           num_likes: number | null
@@ -180,6 +96,7 @@ export type Database = {
           account_id: string
           created_at: string
           created_via: string
+          is_tombstone?: boolean
           num_followers?: number | null
           num_following?: number | null
           num_likes?: number | null
@@ -192,6 +109,7 @@ export type Database = {
           account_id?: string
           created_at?: string
           created_via?: string
+          is_tombstone?: boolean
           num_followers?: number | null
           num_following?: number | null
           num_likes?: number | null
@@ -657,18 +575,24 @@ export type Database = {
       }
       liked_tweets: {
         Row: {
+          author_account_id: string | null
           fts: unknown | null
           full_text: string
+          is_tombstone: boolean
           tweet_id: string
         }
         Insert: {
+          author_account_id?: string | null
           fts?: unknown | null
           full_text: string
+          is_tombstone?: boolean
           tweet_id: string
         }
         Update: {
+          author_account_id?: string | null
           fts?: unknown | null
           full_text?: string
+          is_tombstone?: boolean
           tweet_id?: string
         }
         Relationships: []
@@ -735,18 +659,21 @@ export type Database = {
       }
       mentioned_users: {
         Row: {
+          is_tombstone: boolean
           name: string
           screen_name: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          is_tombstone?: boolean
           name: string
           screen_name: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          is_tombstone?: boolean
           name?: string
           screen_name?: string
           updated_at?: string
@@ -1127,6 +1054,7 @@ export type Database = {
           favorite_count: number
           fts: unknown | null
           full_text: string
+          is_tombstone: boolean
           reply_to_tweet_id: string | null
           reply_to_user_id: string | null
           reply_to_username: string | null
@@ -1141,6 +1069,7 @@ export type Database = {
           favorite_count: number
           fts?: unknown | null
           full_text: string
+          is_tombstone?: boolean
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
@@ -1155,6 +1084,7 @@ export type Database = {
           favorite_count?: number
           fts?: unknown | null
           full_text?: string
+          is_tombstone?: boolean
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
@@ -1610,11 +1540,19 @@ export type Database = {
         }
         Returns: undefined
       }
-      commit_temp_data: {
+      archive_upload_is_allowed: {
         Args: {
-          p_suffix: string
+          p_account_id: string
+          p_username: string
         }
-        Returns: undefined
+        Returns: boolean
+      }
+      assert_archive_upload_allowed: {
+        Args: {
+          p_account_id: string
+          p_username: string
+        }
+        Returns: boolean
       }
       compute_hourly_scraping_stats: {
         Args: {
@@ -1627,12 +1565,6 @@ export type Database = {
           tweet_count: number
           unique_scrapers: number
         }[]
-      }
-      create_temp_tables: {
-        Args: {
-          p_suffix: string
-        }
-        Returns: undefined
       }
       delete_non_allowlist_streamed_tweet_batch: {
         Args: {
@@ -1694,11 +1626,13 @@ export type Database = {
         }
         Returns: undefined
       }
-      drop_temp_tables: {
+      enqueue_policy_archive_cleanup: {
         Args: {
-          p_suffix: string
+          p_account_id: string
+          p_username: string
+          p_reason?: string
         }
-        Returns: undefined
+        Returns: string
       }
       get_account_most_liked_tweets_archive_users: {
         Args: {
@@ -2151,76 +2085,30 @@ export type Database = {
         }
         Returns: unknown
       }
-      insert_temp_account: {
-        Args: {
-          p_account: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_archive_upload: {
+      lock_policy_account: {
         Args: {
           p_account_id: string
-          p_archive_at: string
-          p_keep_private: boolean
-          p_upload_likes: boolean
-          p_start_date: string
-          p_end_date: string
-          p_suffix: string
-        }
-        Returns: number
-      }
-      insert_temp_followers: {
-        Args: {
-          p_followers: Json
-          p_account_id: string
-          p_suffix: string
         }
         Returns: undefined
       }
-      insert_temp_following: {
+      policy_account_is_blocked: {
         Args: {
-          p_following: Json
-          p_account_id: string
-          p_suffix: string
+          p_account_id?: string
+          p_username?: string
         }
-        Returns: undefined
+        Returns: boolean
       }
-      insert_temp_likes: {
+      policy_blocked_account_id: {
         Args: {
-          p_likes: Json
-          p_account_id: string
-          p_suffix: string
+          p_username: string
         }
-        Returns: undefined
+        Returns: string
       }
-      insert_temp_profiles: {
+      policy_json_contains_blocked_author: {
         Args: {
-          p_profile: Json
-          p_account_id: string
-          p_suffix: string
+          p_payload: Json
         }
-        Returns: undefined
-      }
-      insert_temp_tweets: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      process_and_insert_tweet_entities: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      process_archive: {
-        Args: {
-          archive_data: Json
-        }
-        Returns: undefined
+        Returns: boolean
       }
       publish_digest_edition: {
         Args: {
@@ -2328,6 +2216,12 @@ export type Database = {
           "": string
         }
         Returns: string[]
+      }
+      tombstone_policy_account: {
+        Args: {
+          p_account_id: string
+        }
+        Returns: undefined
       }
       update_foreign_keys: {
         Args: {

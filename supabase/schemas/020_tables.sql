@@ -28,6 +28,58 @@ CREATE TABLE IF NOT EXISTS "private"."user_intercepted_stats" (
 );
 ALTER TABLE "private"."user_intercepted_stats" OWNER TO "postgres";
 
+-- Content-free manifest for policy-safe Firehose Parquet/DLQ objects. Objects
+-- are deleted wholesale when any indexed author becomes policy-blocked.
+CREATE TABLE IF NOT EXISTS "private"."policy_storage_objects" (
+    "storage_class" "text" NOT NULL,
+    "object_path" "text" NOT NULL,
+    "account_ids" "text"[] NOT NULL,
+    "username_hashes" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "policy_storage_objects_pkey" PRIMARY KEY ("storage_class", "object_path"),
+    CONSTRAINT "policy_storage_objects_storage_class_check" CHECK (("storage_class" = ANY (ARRAY['private'::"text", 'public'::"text"]))),
+    CONSTRAINT "policy_storage_objects_path_check" CHECK (("object_path" ~ '^policy_safe_v1/'::"text")),
+    CONSTRAINT "policy_storage_objects_account_ids_check" CHECK ((cardinality("account_ids") > 0)),
+    CONSTRAINT "policy_storage_objects_account_ids_nonnull_check" CHECK ((array_position("account_ids", NULL::"text") IS NULL)),
+    CONSTRAINT "policy_storage_objects_username_hashes_nonnull_check" CHECK ((array_position("username_hashes", NULL::"text") IS NULL)),
+    CONSTRAINT "policy_storage_objects_username_hashes_format_check" CHECK (((cardinality("username_hashes") = 0) OR (array_to_string("username_hashes", ','::"text") ~ '^([0-9a-f]{64})(,[0-9a-f]{64})*$'::"text")))
+);
+ALTER TABLE "private"."policy_storage_objects" OWNER TO "postgres";
+REVOKE ALL ON TABLE "private"."policy_storage_objects" FROM PUBLIC, "anon", "authenticated", "readclient";
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "private"."policy_storage_objects" TO "service_role";
+
+-- Durable keyset checkpoint for the bounded legacy liked-tweet policy sweep.
+-- The operator is PostgreSQL-only; no API role can read or change its cursor.
+CREATE TABLE IF NOT EXISTS "private"."policy_backfill_progress" (
+    "job_name" "text" PRIMARY KEY,
+    "last_tweet_id" "text",
+    "rows_processed" bigint DEFAULT 0 NOT NULL,
+    "authors_backfilled" bigint DEFAULT 0 NOT NULL,
+    "tombstones_written" bigint DEFAULT 0 NOT NULL,
+    "completed_at" timestamp with time zone,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "policy_backfill_progress_job_check" CHECK (("job_name" = 'legacy_liked_tweets_v1'::"text")),
+    CONSTRAINT "policy_backfill_progress_counts_check" CHECK ((("rows_processed" >= 0) AND ("authors_backfilled" >= 0) AND ("tombstones_written" >= 0)))
+);
+ALTER TABLE "private"."policy_backfill_progress" OWNER TO "postgres";
+REVOKE ALL ON TABLE "private"."policy_backfill_progress" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
+
+-- Durable phase checkpoints for the direct historical policy reconciliation.
+CREATE TABLE IF NOT EXISTS "private"."policy_historical_reconcile_progress" (
+    "job_name" "text" NOT NULL,
+    "phase" "text" NOT NULL,
+    "policy_version" "text" DEFAULT 'universal_policy_tombstones_v1'::"text" NOT NULL,
+    "policy_fingerprint" "text" NOT NULL,
+    "rows_affected" bigint DEFAULT 0 NOT NULL,
+    "completed_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "policy_historical_reconcile_progress_pkey" PRIMARY KEY ("job_name", "phase"),
+    CONSTRAINT "policy_historical_reconcile_version_check" CHECK (("policy_version" = 'universal_policy_tombstones_v1'::"text")),
+    CONSTRAINT "policy_historical_reconcile_fingerprint_check" CHECK (("policy_fingerprint" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "policy_historical_reconcile_rows_check" CHECK (("rows_affected" >= 0))
+);
+ALTER TABLE "private"."policy_historical_reconcile_progress" OWNER TO "postgres";
+REVOKE ALL ON TABLE "private"."policy_historical_reconcile_progress" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
+
 -- public.all_account
 CREATE TABLE IF NOT EXISTS "public"."all_account" (
     "account_id" "text" NOT NULL,
@@ -39,6 +91,7 @@ CREATE TABLE IF NOT EXISTS "public"."all_account" (
     "num_following" integer DEFAULT 0,
     "num_followers" integer DEFAULT 0,
     "num_likes" integer DEFAULT 0,
+    "is_tombstone" boolean DEFAULT false NOT NULL,
     "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 )
 WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.05');
@@ -74,6 +127,7 @@ CREATE TABLE IF NOT EXISTS "public"."mentioned_users" (
     "user_id" "text" NOT NULL,
     "name" "text" NOT NULL,
     "screen_name" "text" NOT NULL,
+    "is_tombstone" boolean DEFAULT false NOT NULL,
     "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 )
 WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.05');
@@ -91,6 +145,7 @@ CREATE TABLE IF NOT EXISTS "public"."tweets" (
     "reply_to_user_id" "text",
     "reply_to_username" "text",
     "archive_upload_id" bigint,
+    "is_tombstone" boolean DEFAULT false NOT NULL,
     "fts" "tsvector" GENERATED ALWAYS AS ("to_tsvector"('"english"'::"regconfig", "full_text")) STORED,
     "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 )
@@ -166,6 +221,8 @@ ALTER TABLE "public"."following" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."liked_tweets" (
     "tweet_id" "text" NOT NULL,
     "full_text" "text" NOT NULL,
+    "author_account_id" "text",
+    "is_tombstone" boolean DEFAULT false NOT NULL,
     "fts" "tsvector" GENERATED ALWAYS AS ("to_tsvector"('"english"'::"regconfig", "full_text")) STORED
 );
 ALTER TABLE "public"."liked_tweets" OWNER TO "postgres";
@@ -209,6 +266,8 @@ ALTER TABLE "public"."optin" OWNER TO "postgres";
 -- tes.blocked_scraping_users
 CREATE TABLE IF NOT EXISTS "tes"."blocked_scraping_users" (
     "account_id" "text" NOT NULL,
+    "block_source" "text" DEFAULT 'admin'::"text" NOT NULL,
+    "username" "text",
     "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 ALTER TABLE "tes"."blocked_scraping_users" OWNER TO "postgres";

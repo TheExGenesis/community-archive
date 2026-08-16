@@ -105,9 +105,9 @@ const logger = createLogger()
 // Table configurations
 const TABLE_CONFIGS: Record<string, TableConfig> = {
   all_account: {
-    columns: ['account_id', 'created_via', 'username', 'created_at', 'account_display_name', 'num_tweets', 'num_following', 'num_followers', 'num_likes'],
+    columns: ['account_id', 'created_via', 'username', 'created_at', 'account_display_name', 'num_tweets', 'num_following', 'num_followers', 'num_likes', 'is_tombstone'],
     conflict: 'account_id',
-    updates: ['username', 'account_display_name', 'num_tweets', 'num_following', 'num_followers', 'num_likes']
+    updates: ['created_via', 'username', 'created_at', 'account_display_name', 'num_tweets', 'num_following', 'num_followers', 'num_likes', 'is_tombstone']
   },
   all_profile: {
     columns: ['account_id', 'avatar_media_url', 'header_media_url', 'bio', 'location', 'website', 'archive_upload_id'],
@@ -115,13 +115,14 @@ const TABLE_CONFIGS: Record<string, TableConfig> = {
     updates: ['avatar_media_url', 'header_media_url', 'bio', 'location', 'website', 'archive_upload_id']
   },
   tweets: {
-    columns: ['tweet_id', 'account_id', 'created_at', 'full_text', 'favorite_count', 'retweet_count', 'reply_to_tweet_id', 'reply_to_user_id', 'reply_to_username', 'archive_upload_id'],
+    columns: ['tweet_id', 'account_id', 'created_at', 'full_text', 'favorite_count', 'retweet_count', 'reply_to_tweet_id', 'reply_to_user_id', 'reply_to_username', 'archive_upload_id', 'is_tombstone'],
     conflict: 'tweet_id',
-    updates: ['favorite_count', 'retweet_count', 'archive_upload_id']
+    updates: ['account_id', 'created_at', 'full_text', 'favorite_count', 'retweet_count', 'reply_to_tweet_id', 'reply_to_user_id', 'reply_to_username', 'archive_upload_id', 'is_tombstone']
   },
   mentioned_users: {
-    columns: ['user_id', 'name', 'screen_name'],
-    conflict: 'user_id'
+    columns: ['user_id', 'name', 'screen_name', 'is_tombstone'],
+    conflict: 'user_id',
+    updates: ['name', 'screen_name', 'is_tombstone']
   },
   user_mentions: {
     columns: ['tweet_id', 'mentioned_user_id'],
@@ -151,8 +152,9 @@ const TABLE_CONFIGS: Record<string, TableConfig> = {
     updates: ['archive_upload_id']
   },
   liked_tweets: {
-    columns: ['tweet_id', 'full_text'],
-    conflict: 'tweet_id'
+    columns: ['tweet_id', 'full_text', 'author_account_id', 'is_tombstone'],
+    conflict: 'tweet_id',
+    updates: ['full_text', 'author_account_id', 'is_tombstone']
   },
   following: {
     columns: ['account_id', 'following_account_id', 'archive_upload_id'],
@@ -306,6 +308,15 @@ export class ArchiveUploadProcessor {
     
     // Process everything in a single transaction
     await this.sql.begin(async (trx: Sql) => {
+      const accountId = archive.account?.[0]?.account?.accountId
+      if (!accountId) throw new Error('Archive owner identity is missing')
+      await trx`SELECT public.lock_policy_account(${accountId})`
+      const ownerBlocked = await this.archiveOwnerIsBlocked(trx, archive)
+      if (ownerBlocked) {
+        await this.processBlockedArchive(trx, archive)
+        return
+      }
+
       // Process small data first (account, profile, etc.)
       await this.processUserData(trx, archive)
       
@@ -335,6 +346,76 @@ export class ArchiveUploadProcessor {
     })
   }
 
+  private async archiveOwnerIsBlocked(
+    trx: Sql,
+    archive: any,
+  ): Promise<boolean> {
+    const account = archive.account?.[0]?.account
+    const accountId = account?.accountId
+    const username = account?.username
+
+    if (!accountId || !username) {
+      throw new Error('Archive owner identity is missing')
+    }
+
+    const [policy] = await trx`
+      SELECT public.policy_account_is_blocked(
+        ${accountId},
+        ${username}
+      ) AS blocked
+    `
+
+    return policy?.blocked === true
+  }
+
+  private async processBlockedArchive(trx: Sql, archive: any): Promise<void> {
+    const accountId = archive.account[0].account.accountId
+    await trx`
+      INSERT INTO public.all_account (
+        account_id, created_via, username, created_at, account_display_name,
+        num_tweets, num_following, num_followers, num_likes, is_tombstone
+      ) VALUES (
+        ${accountId}, 'policy_tombstone', '', '1970-01-01 00:00:00+00', '',
+        0, 0, 0, 0, true
+      )
+      ON CONFLICT (account_id) DO UPDATE SET
+        created_via = 'policy_tombstone',
+        username = '',
+        created_at = '1970-01-01 00:00:00+00',
+        account_display_name = '',
+        num_tweets = 0,
+        num_following = 0,
+        num_followers = 0,
+        num_likes = 0,
+        is_tombstone = true
+    `
+
+    for (const record of archive.tweets ?? []) {
+      const tweetId = record.tweet?.id_str ?? record.tweet?.id
+      if (!tweetId) continue
+      await trx`
+        INSERT INTO public.tweets (
+          tweet_id, account_id, created_at, full_text, favorite_count,
+          retweet_count, archive_upload_id, is_tombstone
+        ) VALUES (
+          ${tweetId}, ${accountId}, '1970-01-01 00:00:00+00', '', 0, 0,
+          NULL, true
+        )
+        ON CONFLICT (tweet_id) DO UPDATE SET
+          account_id = EXCLUDED.account_id,
+          created_at = EXCLUDED.created_at,
+          full_text = '',
+          favorite_count = 0,
+          retweet_count = 0,
+          reply_to_tweet_id = NULL,
+          reply_to_user_id = NULL,
+          reply_to_username = NULL,
+          archive_upload_id = NULL,
+          is_tombstone = true
+      `
+    }
+  }
+
   private async processUserData(trx: Sql, archive: any): Promise<void> {
     const accountObj = archive.account?.[0]?.account;
     const profileObj = archive.profile?.[0]?.profile
@@ -350,7 +431,8 @@ export class ArchiveUploadProcessor {
         num_tweets: archive.tweets?.length || 0,
         num_following: archive.following?.length || 0,
         num_followers: archive.follower?.length || 0,
-        num_likes: archive.like?.length || 0
+        num_likes: archive.like?.length || 0,
+        is_tombstone: false
       }]
 
       await bulkInsertWithCopy({
@@ -360,7 +442,7 @@ export class ArchiveUploadProcessor {
         conflictTarget: TABLE_CONFIGS.all_account.conflict,
         updateColumns: TABLE_CONFIGS.all_account.updates,
         data: account,
-        mapFn: (acc: any) => [acc.account_id, acc.created_via, acc.username, acc.created_at, acc.account_display_name, acc.num_tweets, acc.num_following, acc.num_followers, acc.num_likes]
+        mapFn: (acc: any) => [acc.account_id, acc.created_via, acc.username, acc.created_at, acc.account_display_name, acc.num_tweets, acc.num_following, acc.num_followers, acc.num_likes, acc.is_tombstone]
       })
     }
 
@@ -398,6 +480,7 @@ export class ArchiveUploadProcessor {
     const media: any[] = []
     const quotes: any[] = []
     const retweets: any[] = []
+    const nestedTargets = new Map<string, string | null>()
 
     // Process each tweet in the chunk
     for (const tweetData of tweetChunk) {
@@ -415,7 +498,8 @@ export class ArchiveUploadProcessor {
         reply_to_tweet_id: removeProblematicCharacters(tweet.in_reply_to_status_id_str),
         reply_to_user_id: removeProblematicCharacters(tweet.in_reply_to_user_id_str),
         reply_to_username: removeProblematicCharacters(tweet.in_reply_to_screen_name),
-        archive_upload_id: this.archiveUploadId
+        archive_upload_id: this.archiveUploadId,
+        is_tombstone: false
       })
 
       // Process mentions
@@ -426,7 +510,8 @@ export class ArchiveUploadProcessor {
           mentionedUsersMap.set(userId, {
             user_id: userId,
             name: removeProblematicCharacters(mention.name) || '',
-            screen_name: removeProblematicCharacters(mention.screen_name) || ''
+            screen_name: removeProblematicCharacters(mention.screen_name) || '',
+            is_tombstone: false,
           })
         }
         
@@ -442,15 +527,13 @@ export class ArchiveUploadProcessor {
           display_url: url.display_url || ''
         })
 
-        const isQuoteTweet = (url.expanded_url?.includes('twitter.com/') || 
-                            url.expanded_url?.includes('x.com/')) && 
-                           url.expanded_url?.includes('/status/')
-        
-        if (isQuoteTweet) {
-          const quotedTweetId = url.expanded_url?.split('/status/')[1]
-          if (quotedTweetId) {
-            quotes.push({ tweet_id: tweetId, quoted_tweet_id: quotedTweetId })
-          }
+        const quoteMatch = url.expanded_url?.match(
+          /(?:twitter\.com|x\.com)\/([A-Za-z0-9_]{1,15})\/status\/(\d+)/i,
+        )
+        if (quoteMatch) {
+          const [, quotedUsername, quotedTweetId] = quoteMatch
+          quotes.push({ tweet_id: tweetId, quoted_tweet_id: quotedTweetId })
+          nestedTargets.set(quotedTweetId, quotedUsername)
         }
       }
 
@@ -470,15 +553,27 @@ export class ArchiveUploadProcessor {
       // Process retweets
       const retweetMatch = tweet.full_text?.match(/^RT @\w+: /)
       if (retweetMatch) {
-        retweets.push({ tweet_id: tweetId, retweeted_tweet_id: null })
+        const retweetedTweetId =
+          tweet.retweeted_status_id_str ??
+          tweet.retweeted_status_id ??
+          tweet.retweeted_status?.id_str ??
+          null
+        const retweetedUsername =
+          tweet.full_text?.match(/^RT @([A-Za-z0-9_]{1,15}): /)?.[1] ?? null
+        retweets.push({ tweet_id: tweetId, retweeted_tweet_id: retweetedTweetId })
+        if (retweetedTweetId) {
+          nestedTargets.set(String(retweetedTweetId), retweetedUsername)
+        }
       }
     }
 
+    await this.ensureNestedTweetTombstones(trx, nestedTargets)
+
     // Insert tweets first
     await this.insertIfNotEmpty(trx, 'tweets', tweets, (t: any) => 
-      [t.tweet_id, t.account_id, t.created_at, t.full_text, t.favorite_count, t.retweet_count, t.reply_to_tweet_id, t.reply_to_user_id, t.reply_to_username, t.archive_upload_id])
+      [t.tweet_id, t.account_id, t.created_at, t.full_text, t.favorite_count, t.retweet_count, t.reply_to_tweet_id, t.reply_to_user_id, t.reply_to_username, t.archive_upload_id, t.is_tombstone])
 
-    await this.insertIfNotEmpty(trx, 'mentioned_users', Array.from(mentionedUsersMap.values()), (m: any) => [m.user_id, m.name, m.screen_name]);
+    await this.insertIfNotEmpty(trx, 'mentioned_users', Array.from(mentionedUsersMap.values()), (m: any) => [m.user_id, m.name, m.screen_name, m.is_tombstone]);
     
 
     // Insert chunk data in parallel using COPY
@@ -512,6 +607,49 @@ export class ArchiveUploadProcessor {
     retweets.length = 0
   }
 
+  private async ensureNestedTweetTombstones(
+    trx: Sql,
+    targets: Map<string, string | null>,
+  ): Promise<void> {
+    for (const [tweetId, username] of targets) {
+      const [existing] = await trx`
+        SELECT 1 AS present
+        FROM public.tweets
+        WHERE tweet_id = ${tweetId}
+        LIMIT 1
+      `
+      if (existing) continue
+
+      const [identity] = username
+        ? await trx`
+            SELECT public.policy_blocked_account_id(${username}) AS account_id
+          `
+        : [{ account_id: null }]
+      const accountId = identity?.account_id ?? `policy_unknown:${tweetId}`
+
+      await trx`
+        INSERT INTO public.all_account (
+          account_id, created_via, username, created_at, account_display_name,
+          num_tweets, num_following, num_followers, num_likes, is_tombstone
+        ) VALUES (
+          ${accountId}, 'policy_tombstone', '', '1970-01-01 00:00:00+00', '',
+          0, 0, 0, 0, true
+        )
+        ON CONFLICT (account_id) DO NOTHING
+      `
+      await trx`
+        INSERT INTO public.tweets (
+          tweet_id, account_id, created_at, full_text, favorite_count,
+          retweet_count, archive_upload_id, is_tombstone
+        ) VALUES (
+          ${tweetId}, ${accountId}, '1970-01-01 00:00:00+00', '', 0, 0,
+          NULL, true
+        )
+        ON CONFLICT (tweet_id) DO NOTHING
+      `
+    }
+  }
+
   private async processRemainingData(trx: Sql, archive: any): Promise<void> {
     const accountObj = archive.account?.[0]?.account
     if (!accountObj) return
@@ -523,9 +661,11 @@ export class ArchiveUploadProcessor {
         table: 'liked_tweets',
         data: (archive.like || []).map((like: any) => ({
           tweet_id: like.like.tweetId,
-          full_text: like.like.fullText || ''
+          full_text: '',
+          author_account_id: null,
+          is_tombstone: true,
         })),
-        mapFn: (lt: any) => [lt.tweet_id, lt.full_text]
+        mapFn: (lt: any) => [lt.tweet_id, lt.full_text, lt.author_account_id, lt.is_tombstone]
       },
       {
         table: 'likes',

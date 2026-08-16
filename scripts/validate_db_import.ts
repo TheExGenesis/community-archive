@@ -4,6 +4,7 @@ import { createDbScriptClient } from '../src/utils/supabase'
 import { Database } from '../src/database-types'
 import * as fs from 'fs'
 import * as path from 'path'
+import { getArchiveTweetMedia } from '../src/lib/archiveMedia'
 
 
 
@@ -134,7 +135,9 @@ async function validateProfile(data: any, supabase: any): Promise<ValidationResu
 async function validateTweetMedia(data: any, supabase: any): Promise<ValidationResult> {
   const BATCH_SIZE = 100
   const mediaItems = data.tweets.flatMap((t: any) => 
-    t.tweet.entities.media?.map((m: any) => m.media_url_https) || []
+    getArchiveTweetMedia(t.tweet).map(
+      (media) => media.media_url_https || media.media_url,
+    ),
   )
   const dbMediaUrls = new Set<string>()
 
@@ -417,4 +420,4 @@ async function main() {
   console.log(`📈 Total processed: ${totalValid + totalInvalid}`)
 }
 
-main().catch(console.error) 
+main().catch(console.error)

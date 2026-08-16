@@ -10,6 +10,7 @@ import postgres from 'postgres'
 type Sql = postgres.Sql
 
 import { createClient } from '@supabase/supabase-js'
+import { getArchiveTweetMedia } from '../../src/lib/archiveMedia'
 
 // Configuration
 const CONFIG = {
@@ -538,10 +539,10 @@ export class ArchiveUploadProcessor {
       }
 
       // Process media
-      for (const mediaItem of tweet.entities?.media || []) {
+      for (const mediaItem of getArchiveTweetMedia(tweet)) {
         media.push({
           tweet_id: tweetId,
-          media_id: mediaItem.id_str,
+          media_id: mediaItem.id_str || mediaItem.id,
           media_url: mediaItem.media_url_https || mediaItem.media_url,
           media_type: mediaItem.type,
           width: mediaItem.sizes?.large?.w || 0,

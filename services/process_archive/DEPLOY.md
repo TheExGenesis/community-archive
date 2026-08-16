@@ -2,6 +2,24 @@
 
 This guide walks you through deploying the process_archive service to a server for cronjob execution.
 
+## Multi-image repair
+
+The processor reads `extended_entities.media` first so multi-image archive
+tweets retain all attachments. Before deploying a processor release that
+includes this fix, audit affected archives without writing:
+
+```bash
+pnpm tsx scripts/repair_archive_media.mts --limit=10
+pnpm tsx scripts/repair_archive_media.mts --username=example
+```
+
+Review the candidate counts, deploy the processor, then run the same bounded
+command with `--apply`. The repair only inserts media IDs that are absent; it
+does not update or delete existing rows. Re-run the dry audit afterward and
+require zero remaining candidates. Omitting `--limit` and `--username` scans
+every completed archive and should only be done during a monitored maintenance
+window.
+
 ## Prerequisites
 
 - **Server with Docker installed** (Linux/Ubuntu recommended)

@@ -25,6 +25,11 @@ describe('historical policy reconciler', () => {
       ),
       'utf8',
     )
+    expect(
+      migration.indexOf(
+        'LOCK TABLE public.tweets, public.all_account IN ACCESS EXCLUSIVE MODE',
+      ),
+    ).toBeLessThan(migration.indexOf('ALTER TABLE public.mentioned_users'))
     const backfill = migration.indexOf(
       'UPDATE tes.blocked_scraping_users AS blocked',
     )

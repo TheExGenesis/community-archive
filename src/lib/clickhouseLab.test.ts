@@ -108,16 +108,16 @@ describe('ClickHouse staging lab guard', () => {
     ).toBe('https://stream.example/analytics')
   })
 
-  test('allows quote filters without forwarding unknown parameters', () => {
+  test('allows quote and authored-time filters without forwarding unknown parameters', () => {
     const target = analyticsGatewayRequestUrl(
       ['top-quotes'],
       new URLSearchParams(
-        'limit=25&offset=50&sort=recent&year=2024&q=archive&target_account_id=42&min_quote_count=2&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot&raw_sql=DROP',
+        'limit=25&offset=50&sort=recent&year=2024&created_after=2024-01-01T00%3A00%3A00.000Z&created_before=2024-04-01T00%3A00%3A00.000Z&q=archive&target_account_id=42&min_quote_count=2&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot&raw_sql=DROP',
       ),
       'https://stream.example/analytics',
     )
     expect(target.toString()).toBe(
-      'https://stream.example/analytics/top-quotes?limit=25&offset=50&sort=recent&year=2024&q=archive&target_account_id=42&min_quote_count=2&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot',
+      'https://stream.example/analytics/top-quotes?limit=25&offset=50&sort=recent&year=2024&created_after=2024-01-01T00%3A00%3A00.000Z&created_before=2024-04-01T00%3A00%3A00.000Z&q=archive&target_account_id=42&min_quote_count=2&exclude_self=true&target_ca_users_only=false&quote_ca_users_only=true&include_usernames=alice%2C+bob&exclude_usernames=bot',
     )
   })
 

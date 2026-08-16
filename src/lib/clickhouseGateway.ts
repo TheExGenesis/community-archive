@@ -32,6 +32,8 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'offset',
     'sort',
     'year',
+    'created_after',
+    'created_before',
     'q',
     'target_account_id',
     'min_quote_count',

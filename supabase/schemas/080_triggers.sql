@@ -29,6 +29,8 @@ CREATE OR REPLACE TRIGGER "update_tweets_updated_at" BEFORE UPDATE ON "public"."
 
 CREATE OR REPLACE TRIGGER "update_user_mentions_updated_at" BEFORE UPDATE ON "public"."user_mentions" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
+CREATE OR REPLACE TRIGGER "update_archive_clickhouse_delivery_updated_at" BEFORE UPDATE ON "private"."archive_clickhouse_delivery" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
+
 CREATE OR REPLACE TRIGGER "update_tes_blocked_scraping_timestamp" BEFORE UPDATE ON "tes"."blocked_scraping_users" FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 CREATE OR REPLACE TRIGGER "capture_policy_block_username" BEFORE INSERT OR UPDATE OF "account_id", "username" ON "tes"."blocked_scraping_users" FOR EACH ROW EXECUTE FUNCTION "public"."capture_policy_block_username"();

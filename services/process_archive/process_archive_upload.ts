@@ -10,6 +10,15 @@ import postgres from 'postgres'
 type Sql = postgres.Sql
 
 import { createClient } from '@supabase/supabase-js'
+import {
+  ArchiveClickHouseError,
+  ArchiveClickHouseSink,
+  type ArchiveClickHouseDelivery,
+  type ArchivePolicyCandidate,
+  type ArchivePolicyDecisions,
+  attemptArchiveClickHouseDelivery,
+  createArchiveClickHouseManifest,
+} from './archive_clickhouse'
 
 // Configuration
 const CONFIG = {
@@ -20,7 +29,21 @@ const CONFIG = {
   POSTGRES_CONNECTION_STRING: process.env.POSTGRES_CONNECTION_STRING,
   MAX_MEMORY_MB: parseInt(process.env.MAX_MEMORY_MB || '1000', 10), // Memory limit
   PROCESS_RETWEETS: process.env.PROCESS_RETWEETS !== 'false', // Enable retweet processing by default
-  DEBUG_PG_QUERIES: process.env.DEBUG_PG_QUERIES === 'true' // only log if it has been explicitly enabled
+  DEBUG_PG_QUERIES: process.env.DEBUG_PG_QUERIES === 'true', // only log if it has been explicitly enabled
+  ARCHIVE_CLICKHOUSE_SINK_ENABLED:
+    process.env.ARCHIVE_CLICKHOUSE_SINK_ENABLED === 'true',
+  ARCHIVE_CLICKHOUSE_RETRY_BATCH: Math.max(
+    1,
+    Math.min(
+      50,
+      parseInt(process.env.ARCHIVE_CLICKHOUSE_RETRY_BATCH || '5', 10),
+    ),
+  ),
+  CLICKHOUSE_URL: process.env.CLICKHOUSE_URL,
+  CLICKHOUSE_DATABASE:
+    process.env.CLICKHOUSE_DATABASE || 'community_archive',
+  CLICKHOUSE_USER: process.env.CLICKHOUSE_USER,
+  CLICKHOUSE_PASSWORD: process.env.CLICKHOUSE_PASSWORD,
 } as const
 
 export async function createServerScriptClient() {
@@ -302,6 +325,10 @@ export class ArchiveUploadProcessor {
   async processArchive(archive: any): Promise<void> {
 
     archive = patchArchive(archive);
+    const clickHouseManifest = createArchiveClickHouseManifest(
+      archive,
+      this.archiveUploadId,
+    )
 
 
     logger.info(`Processing large archive with optimized batch inserts (${getMemoryUsageMB()}MB memory used)`)
@@ -314,6 +341,7 @@ export class ArchiveUploadProcessor {
       const ownerBlocked = await this.archiveOwnerIsBlocked(trx, archive)
       if (ownerBlocked) {
         await this.processBlockedArchive(trx, archive)
+        await this.enqueueClickHouseDelivery(trx, clickHouseManifest)
         return
       }
 
@@ -343,7 +371,45 @@ export class ArchiveUploadProcessor {
 
       // Process remaining data that depends on all tweets being processed
       await this.processRemainingData(trx, archive)
+      await this.enqueueClickHouseDelivery(trx, clickHouseManifest)
     })
+  }
+
+  private async enqueueClickHouseDelivery(
+    trx: Sql,
+    manifest: ReturnType<typeof createArchiveClickHouseManifest>,
+  ): Promise<void> {
+    await trx`
+      INSERT INTO private.archive_clickhouse_delivery (
+        archive_upload_id,
+        account_id,
+        tweet_ids,
+        delivery_state,
+        next_attempt_at,
+        updated_at
+      ) VALUES (
+        ${manifest.archiveUploadId},
+        ${manifest.accountId},
+        ${manifest.tweetIds}::text[],
+        'pending',
+        now(),
+        now()
+      )
+      ON CONFLICT (archive_upload_id) DO UPDATE SET
+        account_id = EXCLUDED.account_id,
+        tweet_ids = EXCLUDED.tweet_ids,
+        delivery_state = CASE
+          WHEN private.archive_clickhouse_delivery.delivery_state = 'delivered'
+            THEN 'delivered'
+          ELSE 'pending'
+        END,
+        next_attempt_at = CASE
+          WHEN private.archive_clickhouse_delivery.delivery_state = 'delivered'
+            THEN private.archive_clickhouse_delivery.next_attempt_at
+          ELSE now()
+        END,
+        updated_at = now()
+    `
   }
 
   private async archiveOwnerIsBlocked(
@@ -841,7 +907,7 @@ function patchArchive(archive: any): any {
 }
 
 // Main processing function
-async function processSingleArchive(sql: Sql, username: string, archiveUploadId: number): Promise<void> {
+async function processSingleArchive(sql: Sql, username: string, archiveUploadId: number): Promise<any> {
   logger.debug(`Loading archive for optimized processing (current memory: ${getMemoryUsageMB()}MB)`)
   
   const archive = await loadArchiveData(username)
@@ -857,6 +923,170 @@ async function processSingleArchive(sql: Sql, username: string, archiveUploadId:
   await processor.processArchive(archive)
   
   logger.info(`Optimized processing completed (memory usage: ${getMemoryUsageMB()}MB)`)
+  return archive
+}
+
+function createArchiveClickHouseSink(): ArchiveClickHouseSink {
+  if (
+    !CONFIG.CLICKHOUSE_URL ||
+    !CONFIG.CLICKHOUSE_USER ||
+    !CONFIG.CLICKHOUSE_PASSWORD
+  ) {
+    throw new ArchiveClickHouseError('clickhouse_configuration_missing')
+  }
+  return new ArchiveClickHouseSink(
+    CONFIG.CLICKHOUSE_URL,
+    CONFIG.CLICKHOUSE_DATABASE,
+    CONFIG.CLICKHOUSE_USER,
+    CONFIG.CLICKHOUSE_PASSWORD,
+  )
+}
+
+async function resolveArchivePolicyDecisions(
+  trx: Sql,
+  candidates: ArchivePolicyCandidate[],
+): Promise<ArchivePolicyDecisions> {
+  if (candidates.length === 0) return new Map()
+  const rows = await trx`
+    WITH candidate AS (
+      SELECT
+        item->>'key' AS key,
+        NULLIF(item->>'accountId', '') AS account_id,
+        NULLIF(item->>'username', '') AS username,
+        NULLIF(item->>'tweetId', '') AS tweet_id
+      FROM jsonb_array_elements(${JSON.stringify(candidates)}::jsonb) AS item
+    ), resolved AS (
+      SELECT
+        candidate.key,
+        candidate.username,
+        COALESCE(
+          candidate.account_id,
+          CASE
+            WHEN target.account_id ~ '^(0|[1-9][0-9]*)$'
+              THEN target.account_id
+            ELSE NULL
+          END,
+          public.policy_blocked_account_id(candidate.username)
+        ) AS account_id
+      FROM candidate
+      LEFT JOIN public.tweets AS target
+        ON target.tweet_id = candidate.tweet_id
+    )
+    SELECT
+      key,
+      CASE
+        WHEN account_id ~ '^(0|[1-9][0-9]*)$' THEN account_id
+        ELSE NULL
+      END AS account_id,
+      public.policy_account_is_blocked(account_id, username) AS blocked
+    FROM resolved
+  `
+  return new Map(
+    rows.map((row) => [
+      row.key,
+      {
+        accountId: row.account_id ?? null,
+        blocked: row.blocked === true,
+      },
+    ]),
+  )
+}
+
+async function attemptClickHouseDelivery(
+  sql: Sql,
+  sink: ArchiveClickHouseSink,
+  delivery: ArchiveClickHouseDelivery,
+  archive?: any,
+): Promise<void> {
+  const result = await attemptArchiveClickHouseDelivery({
+    delivery,
+    archive,
+    loadArchive: async (username) => patchArchive(await loadArchiveData(username)),
+    sink,
+    withOwnerPolicyLock: async (accountId, operation) => {
+      await sql.begin(async (trx: Sql) => {
+        await trx`SELECT public.lock_policy_account(${accountId})`
+        const [policy] = await trx`
+          SELECT public.policy_account_is_blocked(
+            ${accountId},
+            ${delivery.username ?? null}
+          ) AS blocked
+        `
+        await operation({
+          ownerBlocked: policy?.blocked === true,
+          resolvePolicies: (candidates) =>
+            resolveArchivePolicyDecisions(trx, candidates),
+          markDelivered: async () => {
+            const updated = await trx`
+              UPDATE private.archive_clickhouse_delivery
+              SET
+                delivery_state = 'delivered',
+                attempt_count = attempt_count + 1,
+                last_error_code = NULL,
+                delivered_at = now(),
+                updated_at = now()
+              WHERE archive_upload_id = ${delivery.archive_upload_id}
+                AND account_id = ${delivery.account_id}
+              RETURNING archive_upload_id
+            `
+            if (updated.length !== 1) {
+              throw new ArchiveClickHouseError('delivery_state_missing')
+            }
+          },
+        })
+      })
+    },
+    markPending: async (errorCode) => {
+      await sql`
+        UPDATE private.archive_clickhouse_delivery
+        SET
+          delivery_state = 'pending',
+          attempt_count = attempt_count + 1,
+          last_error_code = ${errorCode},
+          next_attempt_at = now() + interval '5 minutes',
+          updated_at = now()
+        WHERE archive_upload_id = ${delivery.archive_upload_id}
+          AND account_id = ${delivery.account_id}
+      `
+    },
+  })
+
+  if (result.status === 'delivered') {
+    logger.info(
+      `ClickHouse delivery completed (archive_upload_id=${delivery.archive_upload_id})`,
+    )
+  } else {
+    logger.warn(
+      `ClickHouse delivery remains pending (archive_upload_id=${delivery.archive_upload_id}, code=${result.errorCode})`,
+    )
+  }
+}
+
+async function retryPendingClickHouseDeliveries(
+  sql: Sql,
+  sink: ArchiveClickHouseSink,
+): Promise<void> {
+  const pending = await sql`
+    SELECT
+      delivery.archive_upload_id,
+      delivery.account_id,
+      delivery.tweet_ids,
+      upload.username
+    FROM private.archive_clickhouse_delivery AS delivery
+    LEFT JOIN public.archive_upload AS upload
+      ON upload.id = delivery.archive_upload_id
+    WHERE delivery.delivery_state = 'pending'
+      AND delivery.next_attempt_at <= now()
+    ORDER BY delivery.next_attempt_at, delivery.archive_upload_id
+    LIMIT ${CONFIG.ARCHIVE_CLICKHOUSE_RETRY_BATCH}
+  `
+  for (const delivery of pending) {
+    await attemptClickHouseDelivery(
+      sql,
+      sink,
+      delivery as ArchiveClickHouseDelivery,
+    )
+  }
 }
 
 // Main function
@@ -890,6 +1120,24 @@ async function main() {
 
   try {
     logger.debug(`Starting optimized batch processing with ${getMemoryUsageMB()}MB memory usage`)
+
+    let clickHouseSink: ArchiveClickHouseSink | null = null
+    if (CONFIG.ARCHIVE_CLICKHOUSE_SINK_ENABLED) {
+      try {
+        clickHouseSink = createArchiveClickHouseSink()
+        await clickHouseSink.healthCheck()
+        await retryPendingClickHouseDeliveries(sql, clickHouseSink)
+      } catch (error) {
+        const code =
+          error instanceof ArchiveClickHouseError
+            ? error.code
+            : 'clickhouse_readiness_failed'
+        logger.warn(
+          `ClickHouse unavailable; PostgreSQL ingestion will continue and deliveries will remain pending (code=${code})`,
+        )
+        clickHouseSink = null
+      }
+    }
 
     logger.info('Fetching archive_upload records ready for processing...')
 
@@ -929,7 +1177,7 @@ async function main() {
         }
 
         // Process archive with optimized batch inserts
-        await processSingleArchive(sql, username, archiveUploadId)
+        const archive = await processSingleArchive(sql, username, archiveUploadId)
 
         // Mark as completed
         const completeResult = await sql`
@@ -945,6 +1193,23 @@ async function main() {
         }
 
         logger.info(`✅ Successfully completed account ${account_id} with optimized batches (archive_upload_id=${archiveUploadId})`)
+
+        if (clickHouseSink) {
+          await attemptClickHouseDelivery(
+            sql,
+            clickHouseSink,
+            {
+              archive_upload_id: archiveUploadId,
+              account_id,
+              tweet_ids: createArchiveClickHouseManifest(
+                archive,
+                archiveUploadId,
+              ).tweetIds,
+              username,
+            },
+            archive,
+          )
+        }
 
         // Force GC between accounts
         if (global.gc) {

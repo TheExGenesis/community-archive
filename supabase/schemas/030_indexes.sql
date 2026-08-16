@@ -127,3 +127,7 @@ ON "private"."policy_storage_objects" USING "gin" ("account_ids");
 
 CREATE INDEX IF NOT EXISTS "policy_storage_objects_username_hashes_idx"
 ON "private"."policy_storage_objects" USING "gin" ("username_hashes");
+
+CREATE INDEX IF NOT EXISTS "archive_clickhouse_delivery_pending_idx"
+ON "private"."archive_clickhouse_delivery" ("next_attempt_at", "archive_upload_id")
+WHERE ("delivery_state" = 'pending'::"text");

@@ -4,6 +4,8 @@ REVOKE ALL ON TABLE public.account_activity_summary
   FROM PUBLIC, anon, authenticated, readclient;
 REVOKE ALL ON TABLE public.global_activity_summary
   FROM PUBLIC, anon, authenticated, readclient;
+REVOKE ALL ON TABLE private.archive_clickhouse_delivery
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
 
 REVOKE ALL ON FUNCTION public.policy_account_is_blocked(text, text)
   FROM PUBLIC, anon, authenticated, readclient;

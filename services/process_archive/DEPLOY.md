@@ -100,6 +100,15 @@ NEXT_PUBLIC_SUPABASE_URL=https://[YOUR_PROJECT_REF].supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_SERVICE_ROLE=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
+# Independent new-archive ClickHouse sink. Keep false until the PostgreSQL
+# delivery-state migration and ClickHouse tombstone columns are verified.
+ARCHIVE_CLICKHOUSE_SINK_ENABLED=false
+ARCHIVE_CLICKHOUSE_RETRY_BATCH=5
+CLICKHOUSE_URL=http://clickhouse-host:8123
+CLICKHOUSE_DATABASE=community_archive
+CLICKHOUSE_USER=archive_ingestor
+CLICKHOUSE_PASSWORD=replace-with-runtime-secret
+
 # Performance Configuration (OPTIONAL)
 LOG_LEVEL=info
 PG_BATCH_SIZE=1000
@@ -111,6 +120,10 @@ NODE_ENV=production
 # Docker-specific Configuration (OPTIONAL)
 ARCHIVE_DATA_PATH=./data
 ```
+
+The production ClickHouse HTTP listener remains on host loopback. The checked-in
+Compose service and direct Docker fallback therefore use host networking; do
+not replace this with a public bind or published ClickHouse port.
 
 ### Secure Your Environment File
 
@@ -165,7 +178,23 @@ account's uploads to `ready_for_commit`, run the worker once, and verify:
 - the account row and every authored tweet ID from the archive exist only as
   content-free policy tombstones;
 - no profile, media, URL, mention, like, follower, following, quote, or retweet
-  payload authored by the blocked owner was written.
+payload authored by the blocked owner was written.
+
+The ClickHouse path is an independent sink from the same uploaded archive; it
+must never reconstruct content by reading PostgreSQL tweet/profile rows. Before
+setting `ARCHIVE_CLICKHOUSE_SINK_ENABLED=true`, verify the ClickHouse writer can
+insert into the nine canonical archive tables and that `is_tombstone UInt8`
+exists on `account_observations`, `tweet_content_versions`, and
+`tweet_analytics_versions`. A ClickHouse outage must not roll back a successful
+PostgreSQL archive insertion: the content-free
+`private.archive_clickhouse_delivery` row remains pending and a later cron run
+reloads the original private archive. If that archive has been removed after an
+opt-out, the stored account/tweet IDs are sufficient to deliver tombstones but
+never to reconstruct allowed content.
+
+This rollout applies only to uploads processed after the delivery-state
+migration. Do not seed the delivery table from completed uploads; historical
+tombstoning and replay require separate approval.
 
 Repeat with an account present only in `tes.blocked_scraping_users`. Also verify
 an allowed outer tweet keeps its quote/retweet relationship to a blocked target

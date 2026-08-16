@@ -35,6 +35,7 @@
     "migrations:check:staging": "tsx scripts/check-prod-migrations.ts --staging",
     "migrations:apply": "tsx scripts/apply-pending-migrations.ts",
     "migrations:apply:staging": "tsx scripts/apply-pending-migrations.ts --staging",
+    "policy:reconcile-liked-tweets": "tsx scripts/reconcile_legacy_liked_tweets.mts",
     "prepare": "husky install",
     "test": "jest --selectProjects server client",
     "test:ci": "jest --selectProjects server client --ci --runInBand",

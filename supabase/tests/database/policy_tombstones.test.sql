@@ -3,7 +3,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(41);
+SELECT plan(56);
 
 INSERT INTO public.all_account (
   account_id,
@@ -438,6 +438,130 @@ SELECT ok(
   'unattributed liked tweets retain only a stable ID'
 );
 
+-- Simulate three pre-migration liked-tweet payloads. The bounded operator uses
+-- canonical tweets for author provenance, tombstones a blocked canonical
+-- author, and fails closed when no canonical author exists.
+DELETE FROM private.policy_backfill_progress
+WHERE job_name = 'legacy_liked_tweets_v1';
+
+ALTER TABLE public.liked_tweets
+  DISABLE TRIGGER enforce_policy_liked_tweet_tombstone;
+INSERT INTO public.liked_tweets (
+  tweet_id, full_text, author_account_id, is_tombstone
+) VALUES
+  ('990000000000000013', 'legacy blocked liked payload', NULL, false),
+  ('990000000000000023', 'legacy allowed liked payload', NULL, false),
+  ('990000000000000049', 'legacy unknown liked payload', NULL, false);
+ALTER TABLE public.liked_tweets
+  ENABLE TRIGGER enforce_policy_liked_tweet_tombstone;
+
+CREATE TEMP TABLE policy_first_liked_batch AS
+SELECT * FROM private.reconcile_legacy_liked_tweets_batch(2);
+
+SELECT is(
+  (SELECT batch_rows FROM policy_first_liked_batch),
+  2,
+  'the legacy liked-tweet operator respects its batch bound'
+);
+
+SELECT is(
+  (SELECT batch_authors_backfilled FROM policy_first_liked_batch),
+  2,
+  'the first batch backfills canonical author IDs'
+);
+
+SELECT is(
+  (SELECT batch_tombstones_written FROM policy_first_liked_batch),
+  1,
+  'the first batch tombstones the blocked canonical author'
+);
+
+SELECT ok(
+  (
+    SELECT author_account_id = '990000000000000021'
+       AND is_tombstone IS FALSE
+       AND full_text = 'legacy allowed liked payload'
+    FROM public.liked_tweets
+    WHERE tweet_id = '990000000000000023'
+  ),
+  'known allowed liked-tweet content survives with canonical provenance'
+);
+
+SELECT ok(
+  (
+    SELECT author_account_id = '990000000000000011'
+       AND is_tombstone IS TRUE
+       AND full_text = ''
+    FROM public.liked_tweets
+    WHERE tweet_id = '990000000000000013'
+  ),
+  'known blocked liked-tweet content becomes a stable-ID tombstone'
+);
+
+SELECT is(
+  (SELECT checkpoint_tweet_id FROM policy_first_liked_batch),
+  '990000000000000023',
+  'the first batch persists a deterministic keyset checkpoint'
+);
+
+CREATE TEMP TABLE policy_second_liked_batch AS
+SELECT * FROM private.reconcile_legacy_liked_tweets_batch(2);
+
+SELECT is(
+  (SELECT batch_rows FROM policy_second_liked_batch),
+  1,
+  'a resumed batch starts after the durable checkpoint'
+);
+
+SELECT ok(
+  (
+    SELECT author_account_id IS NULL
+       AND is_tombstone IS TRUE
+       AND full_text = ''
+    FROM public.liked_tweets
+    WHERE tweet_id = '990000000000000049'
+  ),
+  'a liked tweet without canonical provenance becomes a stable-ID tombstone'
+);
+
+SELECT is(
+  (SELECT completed FROM policy_second_liked_batch),
+  true,
+  'a short final batch marks the resumable job complete'
+);
+
+SELECT ok(
+  (
+    SELECT rows_processed = 3
+       AND authors_backfilled = 2
+       AND tombstones_written = 2
+       AND completed_at IS NOT NULL
+    FROM private.policy_backfill_progress
+    WHERE job_name = 'legacy_liked_tweets_v1'
+  ),
+  'the durable checkpoint records cumulative reconciliation progress'
+);
+
+CREATE TEMP TABLE policy_idempotent_liked_batch AS
+SELECT * FROM private.reconcile_legacy_liked_tweets_batch(2);
+
+SELECT ok(
+  (
+    SELECT batch_rows = 0
+       AND completed IS TRUE
+       AND total_rows_processed = 3
+    FROM policy_idempotent_liked_batch
+  ),
+  'rerunning a completed liked-tweet reconciliation is idempotent'
+);
+
+SELECT throws_ok(
+  $$ SELECT * FROM private.reconcile_legacy_liked_tweets_batch(0) $$,
+  'P0001',
+  'p_batch_size must be between 1 and 10000',
+  'the operator rejects an unbounded or empty batch size'
+);
+
 INSERT INTO public.mentioned_users (user_id, name, screen_name)
 VALUES ('990000000000000011', 'Blocked name', '__pgtap_blocked_target')
 ON CONFLICT (user_id) DO UPDATE
@@ -470,6 +594,36 @@ SELECT hasnt_column(
   'policy_storage_objects',
   'username',
   'Storage reconciliation manifest retains stable IDs rather than profile data'
+);
+
+SELECT is(
+  has_function_privilege(
+    'anon',
+    'tes.search_liked_tweets(text,text,text,date,date,integer,integer,integer,integer,integer)',
+    'EXECUTE'
+  ),
+  false,
+  'anonymous callers cannot bypass liked-tweet RLS through the legacy definer search'
+);
+
+SELECT is(
+  has_function_privilege(
+    'authenticated',
+    'tes.search_liked_tweets(text,text,text,date,date,integer,integer,integer,integer,integer)',
+    'EXECUTE'
+  ),
+  false,
+  'authenticated callers cannot bypass liked-tweet RLS through the legacy definer search'
+);
+
+SELECT is(
+  has_function_privilege(
+    'service_role',
+    'tes.search_liked_tweets(text,text,text,date,date,integer,integer,integer,integer,integer)',
+    'EXECUTE'
+  ),
+  true,
+  'the trusted service role retains the legacy liked-tweet search grant'
 );
 
 SELECT * FROM finish();

@@ -2,6 +2,11 @@
 -- postgres/service_role imports and replays. Storage is private so a policy
 -- change hides a raw archive immediately; the cleanup worker removes the object.
 
+-- Fail rather than wait behind an unexpected long-running writer. Historical
+-- scans and concurrent index construction are intentionally outside this DDL.
+SET lock_timeout TO '5s';
+SET statement_timeout TO '10min';
+
 ALTER TABLE tes.blocked_scraping_users
   ADD COLUMN IF NOT EXISTS username text;
 
@@ -17,22 +22,44 @@ ALTER TABLE public.mentioned_users
 ALTER TABLE public.mentioned_users
   ADD CONSTRAINT mentioned_users_policy_tombstone_is_minimal CHECK (
     is_tombstone IS NOT TRUE OR (name = '' AND screen_name = '')
-  );
+  ) NOT VALID;
 
 ALTER TABLE public.liked_tweets
   DROP CONSTRAINT IF EXISTS liked_tweets_policy_tombstone_is_minimal;
 ALTER TABLE public.liked_tweets
   ADD CONSTRAINT liked_tweets_policy_tombstone_is_minimal CHECK (
     is_tombstone IS NOT TRUE OR full_text = ''
-  );
+  ) NOT VALID;
 
 CREATE INDEX IF NOT EXISTS blocked_scraping_users_username_idx
   ON tes.blocked_scraping_users (lower(username))
   WHERE username IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS liked_tweets_author_account_id_idx
-  ON public.liked_tweets (author_account_id)
-  WHERE author_account_id IS NOT NULL;
+-- Do not build the author index in this migration transaction. Production has
+-- millions of legacy rows; the bounded reconciliation operator creates it
+-- CONCURRENTLY immediately after DDL and before writers or backfill resume.
+
+CREATE TABLE IF NOT EXISTS private.policy_backfill_progress (
+  job_name text PRIMARY KEY,
+  last_tweet_id text,
+  rows_processed bigint NOT NULL DEFAULT 0,
+  authors_backfilled bigint NOT NULL DEFAULT 0,
+  tombstones_written bigint NOT NULL DEFAULT 0,
+  completed_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT policy_backfill_progress_job_check CHECK (
+    job_name = 'legacy_liked_tweets_v1'
+  ),
+  CONSTRAINT policy_backfill_progress_counts_check CHECK (
+    rows_processed >= 0
+    AND authors_backfilled >= 0
+    AND tombstones_written >= 0
+  )
+);
+
+ALTER TABLE private.policy_backfill_progress OWNER TO postgres;
+REVOKE ALL ON TABLE private.policy_backfill_progress
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
 
 CREATE OR REPLACE FUNCTION public.policy_account_is_blocked(
   p_account_id text DEFAULT NULL,
@@ -405,6 +432,164 @@ BEGIN
 END;
 $$;
 
+-- Reconcile legacy liked-tweet payloads without a table-wide transaction.
+-- Canonical tweets are the only accepted source of author provenance. Rows
+-- that still cannot be attributed, or whose canonical author is blocked, keep
+-- only their stable tweet ID. A durable keyset cursor makes every call bounded,
+-- idempotent, and resumable after an operator or connection failure.
+CREATE OR REPLACE FUNCTION private.reconcile_legacy_liked_tweets_batch(
+  p_batch_size integer DEFAULT 1000
+) RETURNS TABLE (
+  batch_rows integer,
+  batch_authors_backfilled integer,
+  batch_tombstones_written integer,
+  checkpoint_tweet_id text,
+  completed boolean,
+  total_rows_processed bigint
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+SET lock_timeout = '5s'
+SET statement_timeout = '2min'
+AS $$
+DECLARE
+  v_job_name constant text := 'legacy_liked_tweets_v1';
+  v_cursor text;
+  v_tweet_ids text[];
+  v_last_tweet_id text;
+  v_batch_rows integer := 0;
+  v_authors_backfilled integer := 0;
+  v_tombstones_written integer := 0;
+  v_completed boolean := false;
+  v_total_rows_processed bigint := 0;
+BEGIN
+  IF p_batch_size IS NULL OR p_batch_size < 1 OR p_batch_size > 10000 THEN
+    RAISE EXCEPTION 'p_batch_size must be between 1 and 10000';
+  END IF;
+
+  -- Serialize checkpoint advancement. Individual author locks below also
+  -- close the race with an opt-out arriving during a batch.
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      'community-archive-policy-backfill:' || v_job_name,
+      0
+    )
+  );
+
+  INSERT INTO private.policy_backfill_progress (job_name)
+  VALUES (v_job_name)
+  ON CONFLICT (job_name) DO NOTHING;
+
+  SELECT progress.last_tweet_id
+  INTO v_cursor
+  FROM private.policy_backfill_progress AS progress
+  WHERE progress.job_name = v_job_name
+  FOR UPDATE;
+
+  SELECT
+    pg_catalog.array_agg(candidate.tweet_id ORDER BY candidate.tweet_id),
+    pg_catalog.max(candidate.tweet_id)
+  INTO v_tweet_ids, v_last_tweet_id
+  FROM (
+    SELECT liked.tweet_id
+    FROM public.liked_tweets AS liked
+    WHERE (v_cursor IS NULL OR liked.tweet_id > v_cursor)
+      AND liked.author_account_id IS NULL
+      AND liked.is_tombstone IS FALSE
+    ORDER BY liked.tweet_id
+    LIMIT p_batch_size
+  ) AS candidate;
+
+  v_batch_rows := COALESCE(pg_catalog.cardinality(v_tweet_ids), 0);
+
+  IF v_batch_rows > 0 THEN
+    -- Acquire account locks in a stable order. If a policy change owns one of
+    -- these locks, this batch waits and re-checks the committed block state.
+    PERFORM public.lock_policy_account(author.account_id)
+    FROM (
+      SELECT DISTINCT tweet.account_id
+      FROM public.tweets AS tweet
+      WHERE tweet.tweet_id = ANY(v_tweet_ids)
+        AND NULLIF(pg_catalog.btrim(tweet.account_id), '') IS NOT NULL
+      ORDER BY tweet.account_id
+    ) AS author;
+
+    WITH sources AS MATERIALIZED (
+      SELECT
+        candidate.tweet_id,
+        tweet.account_id,
+        tweet.is_tombstone AS source_is_tombstone,
+        CASE
+          WHEN tweet.account_id IS NULL THEN true
+          ELSE public.policy_account_is_blocked(tweet.account_id, NULL)
+        END AS source_is_blocked
+      FROM pg_catalog.unnest(v_tweet_ids) AS candidate(tweet_id)
+      LEFT JOIN public.tweets AS tweet
+        ON tweet.tweet_id = candidate.tweet_id
+    ), updated AS (
+      UPDATE public.liked_tweets AS liked
+      SET author_account_id = source.account_id,
+          full_text = CASE
+            WHEN source.account_id IS NULL
+              OR source.source_is_tombstone IS TRUE
+              OR source.source_is_blocked
+            THEN ''
+            ELSE liked.full_text
+          END,
+          is_tombstone = (
+            source.account_id IS NULL
+            OR source.source_is_tombstone IS TRUE
+            OR source.source_is_blocked
+          )
+      FROM sources AS source
+      WHERE liked.tweet_id = source.tweet_id
+      RETURNING
+        source.account_id IS NOT NULL AS author_backfilled,
+        (
+          source.account_id IS NULL
+          OR source.source_is_tombstone IS TRUE
+          OR source.source_is_blocked
+        ) AS tombstone_written
+    )
+    SELECT
+      pg_catalog.count(*) FILTER (WHERE updated.author_backfilled)::integer,
+      pg_catalog.count(*) FILTER (WHERE updated.tombstone_written)::integer
+    INTO v_authors_backfilled, v_tombstones_written
+    FROM updated;
+  END IF;
+
+  v_completed := v_batch_rows < p_batch_size;
+
+  UPDATE private.policy_backfill_progress AS progress
+  SET last_tweet_id = COALESCE(v_last_tweet_id, progress.last_tweet_id),
+      rows_processed = progress.rows_processed + v_batch_rows,
+      authors_backfilled = progress.authors_backfilled + v_authors_backfilled,
+      tombstones_written = progress.tombstones_written + v_tombstones_written,
+      completed_at = CASE
+        WHEN v_completed THEN COALESCE(progress.completed_at, pg_catalog.now())
+        ELSE NULL
+      END,
+      updated_at = pg_catalog.now()
+  WHERE progress.job_name = v_job_name
+  RETURNING progress.rows_processed
+  INTO v_total_rows_processed;
+
+  RETURN QUERY SELECT
+    v_batch_rows,
+    v_authors_backfilled,
+    v_tombstones_written,
+    COALESCE(v_last_tweet_id, v_cursor),
+    v_completed,
+    v_total_rows_processed;
+END;
+$$;
+
+ALTER FUNCTION private.reconcile_legacy_liked_tweets_batch(integer)
+  OWNER TO postgres;
+REVOKE ALL ON FUNCTION private.reconcile_legacy_liked_tweets_batch(integer)
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
+
 CREATE OR REPLACE FUNCTION public.reject_policy_blocked_account_detail()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -770,18 +955,22 @@ BEGIN
        AND lower(screen_name) = lower(v_username)
      );
 
-  UPDATE public.liked_tweets
-  SET full_text = '', is_tombstone = true
-  WHERE author_account_id = p_account_id;
-
-  IF to_regclass('public.account_activity_summary') IS NOT NULL THEN
-    REFRESH MATERIALIZED VIEW public.account_activity_summary;
-  END IF;
-  IF to_regclass('public.global_activity_summary') IS NOT NULL THEN
-    REFRESH MATERIALIZED VIEW public.global_activity_summary;
-  END IF;
-  IF to_regclass('public.monthly_tweet_counts_mv') IS NOT NULL THEN
-    REFRESH MATERIALIZED VIEW public.monthly_tweet_counts_mv;
+  -- The universal migration intentionally defers this index to a concurrent
+  -- post-DDL step. Never sequential-scan the legacy liked-tweet table from an
+  -- opt-out transaction; the RLS boundary hides unattributed legacy rows until
+  -- the index exists and the operator reruns every blocked-account sweep.
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_index AS candidate
+    WHERE candidate.indexrelid = pg_catalog.to_regclass(
+      'public.liked_tweets_author_account_id_idx'
+    )
+      AND candidate.indisvalid
+      AND candidate.indisready
+  ) THEN
+    UPDATE public.liked_tweets
+    SET full_text = '', is_tombstone = true
+    WHERE author_account_id = p_account_id;
   END IF;
 
   PERFORM public.enqueue_policy_archive_cleanup(
@@ -957,11 +1146,16 @@ LEFT JOIN public.optin AS consent
 WHERE account.account_id = blocked.account_id
   AND blocked.username IS NULL;
 
--- Existing like payloads have no author provenance. Fail closed: retain their
--- stable tweet IDs but remove un-attributable content.
-UPDATE public.liked_tweets
-SET full_text = '', is_tombstone = true
-WHERE author_account_id IS NULL;
+-- Existing liked-tweet payloads have no author provenance. Hide those legacy
+-- rows immediately, then reconcile them in bounded post-migration batches;
+-- rewriting the full table inside this DDL transaction would hold relation
+-- locks over every production writer.
+DROP POLICY IF EXISTS "Entities are publicly visible" ON public.liked_tweets;
+CREATE POLICY "Entities are publicly visible" ON public.liked_tweets
+  FOR SELECT USING (
+    author_account_id IS NOT NULL
+    OR (is_tombstone = true AND full_text = '')
+  );
 
 -- Remove usernames, reasons, copied file paths, and error strings left in
 -- completed rows by the retired contentful admin export implementation.
@@ -987,13 +1181,30 @@ SET args = jsonb_strip_nulls(jsonb_build_object(
 WHERE worker_name = 'admin_delete_with_export'
   AND status <> 'started';
 
+-- There are only a small number of policy-blocked accounts. Reconcile them in
+-- this fail-closed transaction so no historical blocked-authored row becomes
+-- visible between DDL commit and an operator sweep. The function deliberately
+-- does not refresh large materialized views per account; those snapshots are
+-- revoked below and can be rebuilt once after reconciliation. It also skips
+-- liked_tweets until the author index is built concurrently; all legacy author
+-- IDs are NULL and hidden by RLS, and the operator reruns this same union after
+-- creating the index but before writers resume.
 DO $$
 DECLARE
   blocked record;
 BEGIN
   FOR blocked IN
-    SELECT DISTINCT account_id
-    FROM tes.blocked_scraping_users
+    SELECT policy_account.account_id
+    FROM (
+      SELECT account_id
+      FROM tes.blocked_scraping_users
+      UNION
+      SELECT twitter_user_id AS account_id
+      FROM public.optin
+      WHERE explicit_optout IS TRUE
+        AND NULLIF(BTRIM(twitter_user_id), '') IS NOT NULL
+    ) AS policy_account
+    ORDER BY account_id
   LOOP
     PERFORM public.tombstone_policy_account(blocked.account_id);
   END LOOP;
@@ -1098,3 +1309,13 @@ REVOKE ALL ON TABLE private.policy_storage_objects
   FROM PUBLIC, anon, authenticated, readclient;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE private.policy_storage_objects
   TO service_role;
+
+-- This legacy SECURITY DEFINER search reads liked_tweets as its owner and
+-- therefore bypasses the temporary fail-closed RLS boundary during backfill.
+-- Keep only its existing service-role grant.
+REVOKE EXECUTE ON FUNCTION tes.search_liked_tweets(
+  text, text, text, date, date, integer, integer, integer, integer, integer
+) FROM PUBLIC, anon, authenticated;
+
+RESET statement_timeout;
+RESET lock_timeout;

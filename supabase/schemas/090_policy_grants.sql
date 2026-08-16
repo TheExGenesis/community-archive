@@ -17,6 +17,11 @@ REVOKE ALL ON FUNCTION public.assert_archive_upload_allowed(text, text)
   FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.enqueue_policy_archive_cleanup(text, text, text)
   FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION private.reconcile_legacy_liked_tweets_batch(integer)
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
+REVOKE EXECUTE ON FUNCTION tes.search_liked_tweets(
+  text, text, text, date, date, integer, integer, integer, integer, integer
+) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.policy_account_is_blocked(text, text)
   TO service_role;

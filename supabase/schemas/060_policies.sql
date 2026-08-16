@@ -119,7 +119,10 @@ CREATE POLICY "Entities are modifiable by their users" ON "public"."user_mention
    FROM "public"."tweets" "dt"
   WHERE (("dt"."tweet_id" = "user_mentions"."tweet_id") AND ("dt"."account_id" = ( SELECT ("auth"."jwt"() ->> 'sub'::"text")))))));
 
-CREATE POLICY "Entities are publicly visible" ON "public"."liked_tweets" FOR SELECT USING (true);
+CREATE POLICY "Entities are publicly visible" ON "public"."liked_tweets" FOR SELECT USING (
+  "author_account_id" IS NOT NULL
+  OR ("is_tombstone" = true AND "full_text" = '')
+);
 CREATE POLICY "Entities are publicly visible" ON "public"."mentioned_users" FOR SELECT USING (true);
 CREATE POLICY "Entities are publicly visible" ON "public"."tweet_media" FOR SELECT USING (true);
 CREATE POLICY "Entities are publicly visible" ON "public"."tweet_urls" FOR SELECT USING (true);

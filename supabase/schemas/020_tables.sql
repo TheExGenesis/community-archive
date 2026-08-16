@@ -48,6 +48,22 @@ ALTER TABLE "private"."policy_storage_objects" OWNER TO "postgres";
 REVOKE ALL ON TABLE "private"."policy_storage_objects" FROM PUBLIC, "anon", "authenticated", "readclient";
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "private"."policy_storage_objects" TO "service_role";
 
+-- Durable keyset checkpoint for the bounded legacy liked-tweet policy sweep.
+-- The operator is PostgreSQL-only; no API role can read or change its cursor.
+CREATE TABLE IF NOT EXISTS "private"."policy_backfill_progress" (
+    "job_name" "text" PRIMARY KEY,
+    "last_tweet_id" "text",
+    "rows_processed" bigint DEFAULT 0 NOT NULL,
+    "authors_backfilled" bigint DEFAULT 0 NOT NULL,
+    "tombstones_written" bigint DEFAULT 0 NOT NULL,
+    "completed_at" timestamp with time zone,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "policy_backfill_progress_job_check" CHECK (("job_name" = 'legacy_liked_tweets_v1'::"text")),
+    CONSTRAINT "policy_backfill_progress_counts_check" CHECK ((("rows_processed" >= 0) AND ("authors_backfilled" >= 0) AND ("tombstones_written" >= 0)))
+);
+ALTER TABLE "private"."policy_backfill_progress" OWNER TO "postgres";
+REVOKE ALL ON TABLE "private"."policy_backfill_progress" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
+
 -- public.all_account
 CREATE TABLE IF NOT EXISTS "public"."all_account" (
     "account_id" "text" NOT NULL,

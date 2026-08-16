@@ -36,18 +36,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      commit_temp_data: {
-        Args: {
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      create_temp_tables: {
-        Args: {
-          p_suffix: string
-        }
-        Returns: undefined
-      }
       delete_all_archives: {
         Args: {
           p_account_id: string
@@ -58,12 +46,6 @@ export type Database = {
         Args: {
           function_name: string
           function_args: string[]
-        }
-        Returns: undefined
-      }
-      drop_temp_tables: {
-        Args: {
-          p_suffix: string
         }
         Returns: undefined
       }
@@ -84,73 +66,6 @@ export type Database = {
           header_media_url: string
           follower_count: number
         }[]
-      }
-      insert_temp_account: {
-        Args: {
-          p_account: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_archive_upload: {
-        Args: {
-          p_account_id: string
-          p_archive_at: string
-          p_suffix: string
-        }
-        Returns: number
-      }
-      insert_temp_followers: {
-        Args: {
-          p_followers: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_following: {
-        Args: {
-          p_following: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_likes: {
-        Args: {
-          p_likes: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_profiles: {
-        Args: {
-          p_profile: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_tweets: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      process_and_insert_tweet_entities: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      process_archive: {
-        Args: {
-          archive_data: Json
-        }
-        Returns: undefined
       }
     }
     Enums: {
@@ -1639,12 +1554,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      commit_temp_data: {
-        Args: {
-          p_suffix: string
-        }
-        Returns: undefined
-      }
       compute_hourly_scraping_stats: {
         Args: {
           p_start_date: string
@@ -1656,12 +1565,6 @@ export type Database = {
           tweet_count: number
           unique_scrapers: number
         }[]
-      }
-      create_temp_tables: {
-        Args: {
-          p_suffix: string
-        }
-        Returns: undefined
       }
       delete_non_allowlist_streamed_tweet_batch: {
         Args: {
@@ -1720,12 +1623,6 @@ export type Database = {
         Args: {
           schema_name: string
           table_name: string
-        }
-        Returns: undefined
-      }
-      drop_temp_tables: {
-        Args: {
-          p_suffix: string
         }
         Returns: undefined
       }
@@ -2188,64 +2085,6 @@ export type Database = {
         }
         Returns: unknown
       }
-      insert_temp_account: {
-        Args: {
-          p_account: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_archive_upload: {
-        Args: {
-          p_account_id: string
-          p_archive_at: string
-          p_keep_private: boolean
-          p_upload_likes: boolean
-          p_start_date: string
-          p_end_date: string
-          p_suffix: string
-        }
-        Returns: number
-      }
-      insert_temp_followers: {
-        Args: {
-          p_followers: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_following: {
-        Args: {
-          p_following: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_likes: {
-        Args: {
-          p_likes: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_profiles: {
-        Args: {
-          p_profile: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_tweets: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
       lock_policy_account: {
         Args: {
           p_account_id: string
@@ -2270,19 +2109,6 @@ export type Database = {
           p_payload: Json
         }
         Returns: boolean
-      }
-      process_and_insert_tweet_entities: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      process_archive: {
-        Args: {
-          archive_data: Json
-        }
-        Returns: undefined
       }
       publish_digest_edition: {
         Args: {
@@ -2528,4 +2354,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-

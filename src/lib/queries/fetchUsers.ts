@@ -76,25 +76,6 @@ export const fetchUsers = async (
   return (data as DirectoryUser[]) || []
 }
 
-export const fetchUsersCount = async (
-  supabase: SupabaseClient,
-  search?: string,
-): Promise<number> => {
-  let query = supabase
-    .schema('public')
-    .from('user_directory')
-    .select('account_id', { count: 'exact', head: true })
-
-  if (search) {
-    query = query.or(buildDirectorySearchFilter(search))
-  }
-
-  const { count, error } = await query
-
-  if (error) throw error
-  return count || 0
-}
-
 export const fetchUserSuggestions = async (
   supabase: SupabaseClient,
   fragment: string,

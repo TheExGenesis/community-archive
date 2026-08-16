@@ -219,6 +219,18 @@ export function chargeLikedWriteBatch(
   return chargedBatches + (rowsWritten > 0 ? 1 : 0)
 }
 
+export function parseUnknownLikedCtidCheckpoint(
+  checkpoint: string | null,
+): string {
+  const match = /^unknown-ctid:(\([0-9]+,[0-9]+\))$/.exec(checkpoint ?? '')
+  if (!match) {
+    throw new Error(
+      `Invalid unknown liked-tweet CTID checkpoint: ${checkpoint ?? 'null'}`,
+    )
+  }
+  return match[1]
+}
+
 export const BLOCKED_AUTHORED_TWEETS_SQL = `
   UPDATE public.tweets AS tweet
   SET created_at = '1970-01-01 00:00:00+00',
@@ -293,6 +305,9 @@ export const POLICY_AUTHORITY_SHARE_LOCK_SQL = `
 
 export const FAST_LIKED_TWEETS_TRIGGER_SUPPRESSION_SQL =
   'SET LOCAL session_replication_role TO replica'
+
+export const FAST_LIKED_TWEETS_UNKNOWN_PLAN_SQL =
+  'SET LOCAL enable_seqscan TO off'
 
 // This is the only corpus join. Disabling nested-loop and merge-join planning
 // makes PostgreSQL stage the small canonical intersection with one set-wise
@@ -386,23 +401,11 @@ export const FAST_LIKED_TWEETS_CANONICAL_DELETE_SQL = `
 // transaction. Writers and table-rewriting maintenance remain paused, so an
 // interrupted run safely resumes after its last committed source page.
 export const FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL = `
-  WITH progress AS MATERIALIZED (
-    SELECT
-      CASE
-        WHEN checkpoint.last_tweet_id ~
-          '^unknown-ctid:\\([0-9]+,[0-9]+\\)$'
-        THEN substring(checkpoint.last_tweet_id FROM 14)::tid
-        ELSE '(0,0)'::tid
-      END AS source_cursor
-    FROM private.policy_backfill_progress AS checkpoint
-    WHERE checkpoint.job_name = 'legacy_liked_tweets_v1'
-    FOR UPDATE
-  ), candidates AS MATERIALIZED (
+  WITH candidates AS MATERIALIZED (
     SELECT
       liked.ctid AS source_ctid
     FROM public.liked_tweets AS liked
-    CROSS JOIN progress
-    WHERE liked.ctid > progress.source_cursor
+    WHERE liked.ctid > $2::tid
       AND liked.author_account_id IS NULL
       AND liked.is_tombstone IS FALSE
     ORDER BY liked.ctid

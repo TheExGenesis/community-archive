@@ -78,8 +78,11 @@ WAL volume, replication lag, and disk headroom, use the production one-time
 completion path. It performs one set-wise hash join into a session-temporary
 stage, then attributes the small canonical intersection in bounded batches.
 Remaining unknown authors are tombstoned in bounded physical-order batches with
-a durable CTID checkpoint and no canonical-tweet lookup. Both paths retain every
-`tweet_id`; stored `fts` values recompute from the resulting `full_text`.
+a durable CTID checkpoint and no canonical-tweet lookup. The operator validates
+and binds that cursor directly and disables sequential scans locally so each
+batch begins with a TID range scan from the last committed heap position. Both
+paths retain every `tweet_id`; stored `fts` values recompute from the resulting
+`full_text`.
 
 Every blocked-author or canonical write transaction first takes `SHARE` locks
 on both PostgreSQL consent tables, then refreshes blocked identities, then

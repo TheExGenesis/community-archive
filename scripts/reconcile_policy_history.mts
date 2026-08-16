@@ -25,6 +25,7 @@ const {
   FAST_LIKED_TWEETS_STAGE_SQL,
   FAST_LIKED_TWEETS_TRIGGER_SUPPRESSION_SQL,
   FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL,
+  FAST_LIKED_TWEETS_UNKNOWN_PLAN_SQL,
   INDEX_SPECS,
   JOB_NAME,
   POLICY_AUTHORITY_SHARE_LOCK_SQL,
@@ -37,6 +38,7 @@ const {
   currentPolicyPhases,
   indexDefinitionMatches,
   parseOptions,
+  parseUnknownLikedCtidCheckpoint,
 } = policyHistory
 
 type IndexState = {
@@ -1125,9 +1127,20 @@ async function reconcileLikedTweets(): Promise<boolean> {
             )
           )
         `)
+          const [progress] = await db<{ last_tweet_id: string | null }[]>`
+            SELECT last_tweet_id
+            FROM private.policy_backfill_progress
+            WHERE job_name = 'legacy_liked_tweets_v1'
+            FOR UPDATE
+          `
+          const sourceCursor = parseUnknownLikedCtidCheckpoint(
+            progress?.last_tweet_id ?? null,
+          )
           await db.unsafe(FAST_LIKED_TWEETS_TRIGGER_SUPPRESSION_SQL)
+          await db.unsafe(FAST_LIKED_TWEETS_UNKNOWN_PLAN_SQL)
           return db.unsafe<LikedBatch[]>(FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL, [
             options.batchSize,
+            sourceCursor,
           ])
         },
       )

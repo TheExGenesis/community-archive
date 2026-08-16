@@ -12,6 +12,7 @@ import {
   FAST_LIKED_TWEETS_STAGE_SQL,
   FAST_LIKED_TWEETS_TRIGGER_SUPPRESSION_SQL,
   FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL,
+  FAST_LIKED_TWEETS_UNKNOWN_PLAN_SQL,
   INDEX_SPECS,
   JOB_NAME,
   POLICY_AUTHORITY_SHARE_LOCK_SQL,
@@ -25,6 +26,7 @@ import {
   currentPolicyPhases,
   indexDefinitionMatches,
   parseOptions,
+  parseUnknownLikedCtidCheckpoint,
 } from '../scripts/policy-history-reconciler'
 
 describe('historical policy reconciler', () => {
@@ -119,6 +121,21 @@ describe('historical policy reconciler', () => {
     )
     expect(operator).not.toContain('batches < batchLimit')
     expect(operator.match(/writeBatches < batchLimit/g)).toHaveLength(3)
+  })
+
+  test('validates the durable unknown CTID cursor before binding it', () => {
+    expect(parseUnknownLikedCtidCheckpoint('unknown-ctid:(123,45)')).toBe(
+      '(123,45)',
+    )
+    expect(() => parseUnknownLikedCtidCheckpoint('ctid:(123,45)')).toThrow(
+      'Invalid unknown liked-tweet CTID checkpoint',
+    )
+    expect(() =>
+      parseUnknownLikedCtidCheckpoint('unknown-ctid:(123,45) trailing'),
+    ).toThrow('Invalid unknown liked-tweet CTID checkpoint')
+    expect(() => parseUnknownLikedCtidCheckpoint(null)).toThrow(
+      'Invalid unknown liked-tweet CTID checkpoint',
+    )
   })
 
   test('owns three exact expression indexes plus the liked author index', () => {
@@ -228,6 +245,18 @@ describe('historical policy reconciler', () => {
     )
     expect(FAST_LIKED_TWEETS_CANONICAL_DELETE_SQL).toContain('LIMIT $1')
     expect(FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL).toContain('LIMIT $1')
+    expect(FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL).toContain(
+      'liked.ctid > $2::tid',
+    )
+    expect(FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL).not.toContain(
+      'CROSS JOIN progress',
+    )
+    expect(FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL).not.toContain(
+      'progress AS MATERIALIZED',
+    )
+    expect(FAST_LIKED_TWEETS_UNKNOWN_PLAN_SQL).toBe(
+      'SET LOCAL enable_seqscan TO off',
+    )
     expect(FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL).toContain(
       "'unknown-ctid:' || stats.checkpoint_ctid",
     )

@@ -554,6 +554,8 @@ export async function fetchPortalBangersPage(
     sort = 'quotes',
     scope = 'all',
     year,
+    createdAfter,
+    createdBefore,
     query = '',
   }: {
     limit?: number
@@ -561,6 +563,8 @@ export async function fetchPortalBangersPage(
     sort?: PortalBangersSort
     scope?: PortalBangersScope
     year?: number
+    createdAfter?: string
+    createdBefore?: string
     query?: string
   } = {},
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
@@ -574,6 +578,8 @@ export async function fetchPortalBangersPage(
     quote_ca_users_only: 'true',
   })
   if (year !== undefined) params.set('year', String(year))
+  if (createdAfter) params.set('created_after', createdAfter)
+  if (createdBefore) params.set('created_before', createdBefore)
   const safeQuery = query.trim().slice(0, 120)
   if (safeQuery) params.set('q', safeQuery)
 

@@ -612,9 +612,13 @@ BEGIN
   -- Legacy temporary rows and digest snapshots are durable JSON copies that
   -- bypass the normalized-table tombstone triggers. Remove or replace the
   -- complete snapshot when it contains any blocked nested author.
-  DELETE FROM private.archived_temporary_data AS archived
-  WHERE archived.originator_id = p_account_id
-     OR public.policy_json_contains_blocked_author(archived.data);
+  IF to_regclass('private.archived_temporary_data') IS NOT NULL THEN
+    EXECUTE
+      'DELETE FROM private.archived_temporary_data AS archived '
+      'WHERE archived.originator_id = $1 '
+      'OR public.policy_json_contains_blocked_author(archived.data)'
+    USING p_account_id;
+  END IF;
 
   UPDATE public.digest_editions AS edition
   SET status = 'archived',

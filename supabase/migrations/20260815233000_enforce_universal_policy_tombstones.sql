@@ -648,9 +648,13 @@ BEGIN
   -- Legacy temporary rows and digest snapshots are durable JSON copies that
   -- bypass the normalized-table tombstone triggers. Remove or replace the
   -- complete snapshot when it contains any blocked nested author.
-  DELETE FROM private.archived_temporary_data AS archived
-  WHERE archived.originator_id = p_account_id
-     OR public.policy_json_contains_blocked_author(archived.data);
+  IF to_regclass('private.archived_temporary_data') IS NOT NULL THEN
+    EXECUTE
+      'DELETE FROM private.archived_temporary_data AS archived '
+      'WHERE archived.originator_id = $1 '
+      'OR public.policy_json_contains_blocked_author(archived.data)'
+    USING p_account_id;
+  END IF;
 
   UPDATE public.digest_editions AS edition
   SET status = 'archived',
@@ -879,11 +883,20 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS reject_policy_blocked_json_payload
-  ON private.archived_temporary_data;
-CREATE TRIGGER reject_policy_blocked_json_payload
-BEFORE INSERT OR UPDATE ON private.archived_temporary_data
-FOR EACH ROW EXECUTE FUNCTION public.reject_policy_blocked_json_payload('data');
+DO $$
+BEGIN
+  IF to_regclass('private.archived_temporary_data') IS NOT NULL THEN
+    EXECUTE
+      'DROP TRIGGER IF EXISTS reject_policy_blocked_json_payload '
+      'ON private.archived_temporary_data';
+    EXECUTE
+      'CREATE TRIGGER reject_policy_blocked_json_payload '
+      'BEFORE INSERT OR UPDATE ON private.archived_temporary_data '
+      'FOR EACH ROW EXECUTE FUNCTION '
+      'public.reject_policy_blocked_json_payload(''data'')';
+  END IF;
+END;
+$$;
 
 DROP TRIGGER IF EXISTS reject_policy_blocked_json_payload
   ON public.digest_runs;

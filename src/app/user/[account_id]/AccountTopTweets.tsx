@@ -4,7 +4,6 @@ import { FormattedUser } from '@/lib/types'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import { PopularTweet } from '@/lib/types'
-import { repairProfileTweetText } from '@/lib/profileTweetText'
 
 const AccountTopTweets = async ({ userData }: { userData: FormattedUser }) => {
   const cookieStore = cookies()
@@ -35,22 +34,12 @@ const AccountTopTweets = async ({ userData }: { userData: FormattedUser }) => {
 
   const favorited = (favoritedResult.data ?? []) as unknown as PopularTweet[]
   const retweeted = (retweetedResult.data ?? []) as unknown as PopularTweet[]
-  const repaired = await repairProfileTweetText(
-    Array.from(
-      new Map(
-        [...favorited, ...retweeted].map((tweet) => [tweet.tweet_id, tweet]),
-      ).values(),
-    ),
-  )
-  const repairedById = new Map(repaired.map((tweet) => [tweet.tweet_id, tweet]))
-  const withRepairedText = (tweets: PopularTweet[]) =>
-    tweets.map((tweet) => repairedById.get(tweet.tweet_id) ?? tweet)
 
   const tweetData = {
     // liked: data.most_liked_tweets_by_archive_users,
     // replied: data.most_replied_tweets_by_archive_users,
-    favorited: withRepairedText(favorited),
-    retweeted: withRepairedText(retweeted),
+    favorited,
+    retweeted,
   }
 
   return (

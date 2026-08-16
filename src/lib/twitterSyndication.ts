@@ -9,9 +9,8 @@
  * - Never persist hydrated tweet content to our DB. The link-preview subsystem may
  *   separately cache the bounded title, teaser, and cover image that X publishes for
  *   an Article linked by an archived tweet.
- * - Never use hydrated tweet content in search results or global feeds.
- * - Profile pages may use the text-only repair path for archived profile cards;
- *   that path only replaces flattened DB text when syndication supplies line breaks.
+ * - Never include hydrated tweet content in search results, profile listings, or any
+ *   other query path. Avatar recovery is render-only and is never persisted.
  * - Caller decides whether to render with a "(from Twitter)" marker.
  *
  * The endpoint requires a `token` query param derived from the tweet id. This is

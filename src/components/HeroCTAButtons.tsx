@@ -15,9 +15,8 @@ import { createBrowserClient } from '@/utils/supabase'
 import { Users, Puzzle, Upload } from 'lucide-react'
 import { devLog } from '@/lib/devLog'
 import { updateOptIn } from '@/lib/optInApi'
-
-const CHROME_EXTENSION_URL =
-  'https://chromewebstore.google.com/detail/community-archive-stream/igclpobjpjlphgllncjcgaookmncegbk'
+import { useBrowserExtensionStatus } from '@/hooks/useBrowserExtensionStatus'
+import { CHROME_EXTENSION_URL } from '@/lib/browserExtension'
 
 interface HeroCTAButtonsProps {
   initialIsOptedIn?: boolean
@@ -32,6 +31,7 @@ export default function HeroCTAButtons({
   const supabase = useMemo(() => createBrowserClient(), [])
   const autoOptInStarted = useRef(false)
   const optInInFlight = useRef(false)
+  const extensionStatus = useBrowserExtensionStatus()
 
   const [user, setUser] = useState<any>(null)
   const [isOptedIn, setIsOptedIn] = useState(initialIsOptedIn)
@@ -261,28 +261,30 @@ export default function HeroCTAButtons({
           </Tooltip>
 
           {/* Install Extension Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                asChild
-                variant="outline"
-                className="h-14 w-full border-2 px-8 text-lg font-semibold"
-                size="lg"
-              >
-                <a
-                  href={CHROME_EXTENSION_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
+          {extensionStatus === 'not-installed' ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="h-14 w-full border-2 px-8 text-lg font-semibold"
+                  size="lg"
                 >
-                  <Puzzle className="mr-2 h-5 w-5" />
-                  Get extension
-                </a>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              Contribute tweets in real time while you browse
-            </TooltipContent>
-          </Tooltip>
+                  <a
+                    href={CHROME_EXTENSION_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Puzzle className="mr-2 h-5 w-5" />
+                    Get extension
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                Contribute tweets in real time while you browse
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
         </div>
         {optInError ? (
           <Alert variant="destructive" className="max-w-xl" aria-live="polite">

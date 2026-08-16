@@ -235,6 +235,15 @@ describe('ClickHouse staging lab guard', () => {
     expect(interactions.toString()).toBe(
       'https://stream.example/analytics/user/42/interactions?year=2025&limit=8',
     )
+
+    const usernameInteractions = analyticsGatewayRequestUrl(
+      ['user', 'alice', 'interactions'],
+      new URLSearchParams('year=2025&limit=8'),
+      'https://stream.example/analytics',
+    )
+    expect(usernameInteractions.toString()).toBe(
+      'https://stream.example/analytics/user/alice/interactions?year=2025&limit=8',
+    )
   })
 
   test('allows bounded reverse-quote parameters for numeric tweet IDs', () => {

@@ -1,8 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import Link from 'next/link'
 import { createBrowserClient } from '@/utils/supabase'
 import {
   ChartContainer,
@@ -21,9 +20,10 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import getLatestTweets from '@/lib/queries/getLatestTweets'
 import UnifiedTweetList from '@/components/UnifiedTweetList'
+import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 
 interface TweetMedia {
   media_url: string
@@ -52,13 +52,52 @@ interface Tweet {
   urls: TweetUrl[]
 }
 
+type ViewMode = '24h' | '7d' | '1y'
+
+function getStatsRange(viewMode: ViewMode, timeOffset: number) {
+  const now = new Date()
+  if (viewMode === '24h') {
+    const periods = 24
+    return {
+      startDate: new Date(
+        now.getTime() - (periods + timeOffset * periods) * 60 * 60 * 1000,
+      ),
+      endDate: new Date(now.getTime() - timeOffset * periods * 60 * 60 * 1000),
+      granularity: 'hour',
+    }
+  }
+  if (viewMode === '7d') {
+    const periods = 7
+    return {
+      startDate: new Date(
+        now.getTime() - (periods + timeOffset * periods) * 24 * 60 * 60 * 1000,
+      ),
+      endDate: new Date(
+        now.getTime() - timeOffset * periods * 24 * 60 * 60 * 1000,
+      ),
+      granularity: 'day',
+    }
+  }
+
+  const periods = 52
+  return {
+    startDate: new Date(
+      now.getTime() -
+        (periods + timeOffset * periods) * 7 * 24 * 60 * 60 * 1000,
+    ),
+    endDate: new Date(
+      now.getTime() - timeOffset * periods * 7 * 24 * 60 * 60 * 1000,
+    ),
+    granularity: 'week',
+  }
+}
+
 const StreamMonitor = () => {
-  const [viewMode, setViewMode] = useState<'24h' | '7d' | '1y'>('7d')
+  const [viewMode, setViewMode] = useState<ViewMode>('7d')
   const [timeOffset, setTimeOffset] = useState(0)
   const [showStreamedOnly, setShowStreamedOnly] = useState(true)
   const [loadedTweets, setLoadedTweets] = useState<Tweet[]>([])
   const [tweetOffset, setTweetOffset] = useState(0)
-  const [showBanner, setShowBanner] = useState(true)
   const tweetsPerPage = 20
 
   const supabase = createBrowserClient()
@@ -71,40 +110,10 @@ const StreamMonitor = () => {
   } = useQuery({
     queryKey: ['scrapingStats', viewMode, timeOffset, showStreamedOnly],
     queryFn: async () => {
-      const now = new Date()
-      let startDate, endDate, granularity, periods
-
-      if (viewMode === '24h') {
-        periods = 24
-        startDate = new Date(
-          now.getTime() - (periods + timeOffset * periods) * 60 * 60 * 1000,
-        )
-        endDate = new Date(
-          now.getTime() - timeOffset * periods * 60 * 60 * 1000,
-        )
-        granularity = 'hour'
-      } else if (viewMode === '7d') {
-        periods = 7
-        startDate = new Date(
-          now.getTime() -
-            (periods + timeOffset * periods) * 24 * 60 * 60 * 1000,
-        )
-        endDate = new Date(
-          now.getTime() - timeOffset * periods * 24 * 60 * 60 * 1000,
-        )
-        granularity = 'day'
-      } else {
-        // 1y
-        periods = 52 // 52 weeks
-        startDate = new Date(
-          now.getTime() -
-            (periods + timeOffset * periods) * 7 * 24 * 60 * 60 * 1000,
-        )
-        endDate = new Date(
-          now.getTime() - timeOffset * periods * 7 * 24 * 60 * 60 * 1000,
-        )
-        granularity = 'week'
-      }
+      const { startDate, endDate, granularity } = getStatsRange(
+        viewMode,
+        timeOffset,
+      )
 
       // Use the new API with custom date ranges
       const params = new URLSearchParams({
@@ -123,6 +132,32 @@ const StreamMonitor = () => {
     },
     refetchInterval: viewMode === '24h' && timeOffset === 0 ? 300000 : 0, // Only refresh current 24h view
     staleTime: 60000, // 1 minute stale time
+  })
+
+  const {
+    data: contributorCount,
+    isLoading: contributorCountLoading,
+    isError: contributorCountError,
+  } = useQuery({
+    queryKey: ['streamContributorCount', viewMode, timeOffset],
+    queryFn: async () => {
+      const { startDate, endDate } = getStatsRange(viewMode, timeOffset)
+      const params = new URLSearchParams({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      })
+      const response = await fetch(`/api/scraper-count?${params}`)
+      const body = (await response.json().catch(() => null)) as {
+        count?: unknown
+      } | null
+      const count = Number(body?.count)
+      if (!response.ok || !Number.isSafeInteger(count) || count < 0) {
+        throw new Error('Failed to fetch streaming contributor count')
+      }
+      return count
+    },
+    refetchInterval: viewMode === '24h' && timeOffset === 0 ? 300000 : 0,
+    staleTime: 60000,
   })
 
   // Extract chart data and summary from scraping stats
@@ -236,6 +271,9 @@ const StreamMonitor = () => {
     return scrapingStats?.summary?.avgTweetsPerPeriod || 0
   }
 
+  const averageUnit =
+    viewMode === '24h' ? 'hour' : viewMode === '7d' ? 'day' : 'week'
+
   const loadMoreTweets = () => {
     setTweetOffset((prev) => prev + tweetsPerPage)
   }
@@ -243,28 +281,6 @@ const StreamMonitor = () => {
   const refreshLatestTweets = async () => {
     setTweetOffset(0)
     await refetchTweets()
-  }
-
-  // LocalStorage key for banner dismissal
-  const BANNER_DISMISSED_KEY = 'stream-monitor-banner-dismissed'
-  const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
-
-  useEffect(() => {
-    const twoWeeksMs = TWO_WEEKS_MS
-    const dismissedAt = localStorage.getItem(BANNER_DISMISSED_KEY)
-    if (dismissedAt) {
-      const dismissedTime = parseInt(dismissedAt, 10)
-      if (Date.now() - dismissedTime < twoWeeksMs) {
-        setShowBanner(false)
-      } else {
-        localStorage.removeItem(BANNER_DISMISSED_KEY)
-      }
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleDismissBanner = () => {
-    localStorage.setItem(BANNER_DISMISSED_KEY, Date.now().toString())
-    setShowBanner(false)
   }
 
   return (
@@ -293,42 +309,9 @@ const StreamMonitor = () => {
         </div>
       </div>
 
-      {/* Compact call-to-action banner */}
-      {showBanner && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted p-4">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <span className="flex-shrink-0 text-xl">📡</span>
-              <p className="truncate text-sm text-brand">
-                Help grow the archive! Opt in and install the extension to
-                stream tweets.
-              </p>
-            </div>
-            <div className="flex flex-shrink-0 items-center gap-2">
-              <Link href="/">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-brand text-brand hover:bg-brand/10 dark:border-border dark:text-brand dark:hover:bg-brand/90"
-                >
-                  Get Started
-                </Button>
-              </Link>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-brand hover:text-brand"
-                onClick={handleDismissBanner}
-              >
-                <X className="h-4 w-4" />
-                <span className="sr-only">Dismiss</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ExtensionInstallPrompt surface="stream-monitor" className="mb-6" />
 
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
@@ -351,7 +334,9 @@ const StreamMonitor = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Average per period</CardTitle>
+            <CardTitle className="text-base">
+              Average per {averageUnit}
+            </CardTitle>
             <CardDescription>
               {showStreamedOnly ? 'Mean streaming rate' : 'Mean tweet rate'}
             </CardDescription>
@@ -359,6 +344,24 @@ const StreamMonitor = () => {
           <CardContent>
             <div className="text-2xl font-bold text-green-600 dark:text-green-400">
               {getAverageTweetsPerPeriod().toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Streaming contributors</CardTitle>
+            <CardDescription>
+              Distinct extension users in time range
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              {contributorCountLoading
+                ? '...'
+                : contributorCountError
+                  ? 'Unavailable'
+                  : contributorCount?.toLocaleString()}
             </div>
           </CardContent>
         </Card>

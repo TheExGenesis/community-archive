@@ -2,7 +2,6 @@ import React from 'react'
 import { render, screen } from '@testing-library/react'
 import ClassicHomepage from './ClassicHomepage'
 import type { PortalData } from '@/lib/portal/types'
-import { getTopFollowedAccounts } from '@/lib/clickhouseAnalytics'
 import { createServerClient } from '@/utils/supabase'
 import { getLatestDigestPreview } from '@/lib/digest/data'
 
@@ -24,10 +23,6 @@ jest.mock('@/components/HomepageSearch', () => ({
   __esModule: true,
   default: () => <div data-testid="homepage-search" />,
 }))
-jest.mock('@/components/AvatarList', () => ({
-  __esModule: true,
-  default: () => <div data-testid="social-proof" />,
-}))
 jest.mock('@/components/home/Testimonials', () => ({
   __esModule: true,
   default: () => <div data-testid="testimonials" />,
@@ -36,8 +31,9 @@ jest.mock('@/components/portal/Portal', () => ({
   __esModule: true,
   default: () => <div data-testid="shared-dashboard" />,
 }))
-jest.mock('@/lib/clickhouseAnalytics', () => ({
-  getTopFollowedAccounts: jest.fn(),
+jest.mock('@/components/ExtensionInstallPrompt', () => ({
+  __esModule: true,
+  default: () => null,
 }))
 jest.mock('@/lib/digest/data', () => ({
   getLatestDigestPreview: jest.fn(),
@@ -75,24 +71,39 @@ const data = {
 describe('ClassicHomepage audience actions', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    ;(getTopFollowedAccounts as jest.Mock).mockResolvedValue([])
     ;(getLatestDigestPreview as jest.Mock).mockResolvedValue(null)
     ;(createServerClient as jest.Mock).mockReturnValue({})
   })
 
   it('keeps search above the shared dashboard for signed-in members', async () => {
-    render(await ClassicHomepage({ data, isMember: true, showCta: false }))
+    render(
+      await ClassicHomepage({
+        data,
+        homepagePeople: <div data-testid="homepage-people" />,
+        isMember: true,
+        showCta: false,
+      }),
+    )
 
     expect(screen.getByTestId('homepage-search')).toBeInTheDocument()
     expect(screen.queryByTestId('hero-cta')).not.toBeInTheDocument()
+    expect(screen.getByTestId('homepage-people')).toBeInTheDocument()
     expect(screen.getByTestId('shared-dashboard')).toBeInTheDocument()
   })
 
   it('keeps the CTA above the same dashboard for guests', async () => {
-    render(await ClassicHomepage({ data, isMember: false, showCta: true }))
+    render(
+      await ClassicHomepage({
+        data,
+        homepagePeople: <div data-testid="homepage-people" />,
+        isMember: false,
+        showCta: true,
+      }),
+    )
 
     expect(screen.getByTestId('hero-cta')).toBeInTheDocument()
     expect(screen.queryByTestId('homepage-search')).not.toBeInTheDocument()
+    expect(screen.getByTestId('homepage-people')).toBeInTheDocument()
     expect(screen.getByTestId('shared-dashboard')).toBeInTheDocument()
   })
 })

@@ -1,16 +1,15 @@
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import type { ReactNode } from 'react'
 import { cookies } from 'next/headers'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import AvatarList from '@/components/AvatarList'
 import HomepageSearch from '@/components/HomepageSearch'
 import Portal from '@/components/portal/Portal'
 import Testimonials from '@/components/home/Testimonials'
 import { formatNumber } from '@/lib/formatNumber'
-import { getTopFollowedAccounts } from '@/lib/clickhouseAnalytics'
 import type { PortalData } from '@/lib/portal/types'
 import { createServerClient } from '@/utils/supabase'
 import { getLatestDigestPreview } from '@/lib/digest/data'
+import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 
 const DynamicHeroCTAButtons = dynamic(
   () => import('@/components/HeroCTAButtons'),
@@ -36,49 +35,22 @@ const DynamicUploadArchiveSection = dynamic(
   },
 )
 
-const getLegacyMostFollowedAccounts = async (supabase: SupabaseClient) => {
-  const { data, error } = await supabase
-    .from('global_activity_summary')
-    .select('top_accounts_with_followers')
-    .single()
-
-  if (error) {
-    console.error('Failed to fetch top accounts:', error)
-    return []
-  }
-  return data?.top_accounts_with_followers || []
-}
-
-const getMostFollowedAccounts = async (supabase: SupabaseClient) => {
-  try {
-    return await getTopFollowedAccounts(8)
-  } catch (error) {
-    console.error(
-      'Failed to fetch top accounts from ClickHouse; using the legacy summary:',
-      error,
-    )
-    return getLegacyMostFollowedAccounts(supabase)
-  }
-}
-
 interface ClassicHomepageProps {
   data: PortalData
+  homepagePeople: ReactNode
   isMember: boolean
   showCta: boolean
 }
 
 export default async function ClassicHomepage({
   data,
+  homepagePeople,
   isMember,
   showCta,
 }: ClassicHomepageProps) {
   const cookieStore = cookies()
   const supabase = createServerClient(cookieStore)
-  const [mostFollowedAccounts, digestPreview] = await Promise.all([
-    getMostFollowedAccounts(supabase),
-    getLatestDigestPreview(),
-  ])
-  const mostFollowed = mostFollowedAccounts.slice(0, 8)
+  const digestPreview = await getLatestDigestPreview()
 
   let isOptedIn = false
   if (showCta && isMember) {
@@ -161,20 +133,7 @@ export default async function ClassicHomepage({
             <HomepageSearch />
           ) : null}
 
-          <div className="pt-2">
-            <p className="mb-5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground/80">
-              With archives from
-            </p>
-            <div className="mx-auto w-full max-w-3xl">
-              {mostFollowed.length > 0 ? (
-                <AvatarList initialAvatars={mostFollowed} compact />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Featured archives are currently unavailable.
-                </p>
-              )}
-            </div>
-          </div>
+          {homepagePeople}
         </div>
       </section>
 
@@ -194,6 +153,10 @@ export default async function ClassicHomepage({
       >
         <div className="relative z-10 mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8">
           <DynamicUploadArchiveSection />
+          <ExtensionInstallPrompt
+            surface="home"
+            className="mx-auto mt-8 max-w-3xl"
+          />
         </div>
       </section>
 

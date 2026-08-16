@@ -103,7 +103,7 @@ export function analyticsGatewayRequestUrl(
     /^(?:\d{1,20}|[A-Za-z0-9_@]{1,80})$/.test(cleanPath[1]) &&
     cleanPath[2] === 'interactions'
   ) {
-    allowedParams = new Set(['year', 'limit'])
+    allowedParams = new Set(['year', 'limit', 'missing_only'])
   } else if (
     cleanPath.length === 2 &&
     cleanPath[0] === 'tweet' &&

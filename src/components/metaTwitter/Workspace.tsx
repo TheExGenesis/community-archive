@@ -24,6 +24,7 @@ import type {
   ArchivePerson,
   BangerTweet,
 } from '@/lib/metaTwitter/types'
+import { ProfileOutreach } from './ProfileOutreach'
 
 export const BANGER_SCORE_EXPLANATION =
   'Banger score is the number of archived quote posts from Community Archive members, excluding self-quotes.'
@@ -43,6 +44,7 @@ const sharesFeaturedGroup = (
   Boolean(left?.curation?.is_featured) === Boolean(right?.curation?.is_featured)
 
 export function Workspace({
+  accountId,
   avatarUrl,
   contextTitle,
   tweets,
@@ -76,6 +78,7 @@ export function Workspace({
   onRestore,
   onAddTweet,
 }: {
+  accountId: string
   avatarUrl: string | null
   contextTitle: string
   tweets: BangerTweet[]
@@ -369,6 +372,7 @@ export function Workspace({
         </section>
 
         <aside className="flex flex-col gap-5">
+          {editing && <ProfileOutreach accountId={accountId} />}
           <section aria-labelledby="profile-media-heading">
             <h3
               id="profile-media-heading"

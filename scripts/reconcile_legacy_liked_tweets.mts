@@ -187,35 +187,7 @@ async function ensureAuthorIndex(): Promise<void> {
 
 async function preparePolicySweep(): Promise<void> {
   await ensureAuthorIndex()
-
-  const blockedAccounts = await sql<{ account_id: string }[]>`
-    SELECT policy_account.account_id
-    FROM (
-      SELECT blocked.account_id
-      FROM tes.blocked_scraping_users AS blocked
-      UNION
-      SELECT consent.twitter_user_id AS account_id
-      FROM public.optin AS consent
-      WHERE consent.explicit_optout IS TRUE
-        AND NULLIF(BTRIM(consent.twitter_user_id), '') IS NOT NULL
-    ) AS policy_account
-    ORDER BY policy_account.account_id
-  `
-
-  let reconciled = 0
-  for (const blocked of blockedAccounts) {
-    await sql`
-      SELECT public.tombstone_policy_account(${blocked.account_id})
-    `
-    reconciled += 1
-    console.log(
-      `Reconciled blocked policy account ${reconciled}/${blockedAccounts.length}`,
-    )
-  }
-
-  console.log(
-    `Preparation verified: concurrent author index is ready and ${reconciled} blocked accounts were reconciled`,
-  )
+  console.log(`Preparation verified: concurrent author index is ready`)
 }
 
 async function finalizeSchema(): Promise<void> {

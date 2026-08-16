@@ -104,6 +104,14 @@ AS $$
           AND lower(consent.username) = lower(BTRIM(p_username))
         )
       )
+  ) OR EXISTS (
+    SELECT 1
+    FROM public.all_account AS account
+    JOIN public.optin AS consent
+      ON lower(consent.username) = lower(account.username)
+    WHERE NULLIF(BTRIM(p_account_id), '') IS NOT NULL
+      AND account.account_id = BTRIM(p_account_id)
+      AND consent.explicit_optout IS TRUE
   );
 $$;
 
@@ -225,4 +233,3 @@ REVOKE ALL ON FUNCTION public.assert_archive_upload_allowed(text, text)
   FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.assert_archive_upload_allowed(text, text)
   TO authenticated, service_role;
-

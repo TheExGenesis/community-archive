@@ -16,7 +16,113 @@ Do not repair, revert, or synthesize those ledger entries. Promote the universal
 policy migration only from a clean release checkout after its final version is
 reconciled with the production ledger.
 
+## Universal historical reconciliation
+
+Apply the fast universal-policy migration first, then keep every PostgreSQL
+writer paused while this direct operator reconciles history. Do not run the
+final universal-policy migration until the operator has recorded its durable
+`verification` checkpoint.
+
+The fast migration must report `archives`, `enriched_tweets`, `firehose`, and
+`firehose_private` as private Storage buckets before reconciliation starts. An
+absent optional bucket is acceptable; no configured Firehose bucket may remain
+public. Keep these buckets private through finalization and worker startup
+verification.
+
+The operator is dry-run by default. It requires a direct/session PostgreSQL
+connection as the `postgres` role; do not use the transaction-mode pooler. It
+never prints credentials:
+
+```bash
+POLICY_BACKFILL_DATABASE_URL="$DIRECT_POSTGRES_URL" \
+pnpm policy:reconcile-history
+```
+
+The preparation-only mode builds these indexes one at a time with
+`CREATE INDEX CONCURRENTLY`, outside a transaction:
+
+- `tweets_retweeted_username_lower_idx`
+- `tweets_reply_to_username_lower_idx`
+- `mentioned_users_screen_name_lower_idx`
+- `liked_tweets_author_account_id_idx` (a non-expression partial index)
+
+Only the first three are expression indexes. The operator checks their exact
+table, expression shape, predicate, access method, and readiness. It
+automatically drops and retries an invalid/not-ready index only when it has one
+of these operator-owned names. A valid index with a different definition stops
+the run for manual inspection. The invalid legacy
+`idx_tweets_full_text_trgm` is never used or modified.
+
+```bash
+CONFIRM_POLICY_HISTORY_RECONCILIATION=reconcile-policy-history \
+POLICY_BACKFILL_DATABASE_URL="$DIRECT_POSTGRES_URL" \
+pnpm policy:reconcile-history --execute --prepare-only
+```
+
+Start with bounded liked-tweet batches. Every other phase is an idempotent,
+set-based operation over indexed stable IDs or one corpus pass; there is no
+per-blocked-account tweets scan. The liked-tweet phase uses the migration's
+durable tweet-ID keyset checkpoint and commits each batch independently:
+
+```bash
+CONFIRM_POLICY_HISTORY_RECONCILIATION=reconcile-policy-history \
+POLICY_BACKFILL_DATABASE_URL="$DIRECT_POSTGRES_URL" \
+pnpm policy:reconcile-history \
+  --execute --batch-size=5000 --max-liked-batches=10
+```
+
+Rerun the same command to resume. After observing database latency, lock waits,
+WAL volume, replication lag, and disk headroom, explicitly continue the keyset
+phase to completion:
+
+```bash
+CONFIRM_POLICY_HISTORY_RECONCILIATION=reconcile-policy-history \
+POLICY_BACKFILL_DATABASE_URL="$DIRECT_POSTGRES_URL" \
+pnpm policy:reconcile-history \
+  --execute --batch-size=10000 --complete-liked
+```
+
+Every executable run re-applies all idempotent core phases before verification,
+even when older checkpoints exist. Each checkpoint stores both
+`policy_version = 'universal_policy_tombstones_v1'` and the authoritative
+PostgreSQL consent fingerprint computed immediately before it is written. If an
+opt-out lands between phases, the final migration rejects mixed fingerprints;
+rerun the operator to converge the new policy snapshot. New blocks are also
+handled synchronously by the fast migration's write triggers.
+
+The reconciliation keeps `public.tweets.tweet_id` and
+`public.all_account.account_id`. It deletes content-bearing children only when
+the blocked tweet is the outer/authored row, so an allowed outer tweet keeps its
+inbound quote/retweet relationship to the blocked tweet tombstone. Copied RT
+text and reply usernames are blanked without removing stable relationship IDs.
+Missing reply targets with a known blocked stable account ID are inserted as
+content-free tweet tombstones.
+
+Before writing `verification = 0`, the operator requires zero blocked content
+across accounts, authored tweets, copied RT/reply identity, profiles, tweet
+children, mentions, liked tweets, archives, durable JSON, and the rebuilt
+`global_activity_summary`. The retired `account_activity_summary` is cleared
+with `WITH NO DATA` instead of paying for another content-bearing corpus build.
+The operator also requires all ten current-fingerprint phase checkpoints and
+all four indexes valid/ready. A read-only audit can never write the final
+checkpoint:
+
+```bash
+POLICY_BACKFILL_DATABASE_URL="$DIRECT_POSTGRES_URL" \
+pnpm policy:reconcile-history --verify-only
+```
+
+Both activity summaries remain revoked after reconciliation. Rebuilding and
+verifying the global summary, and clearing the retired per-account summary,
+remove their historical payloads but do not authorize restoring public serving
+access.
+
 ## Legacy liked-tweet reconciliation
+
+The universal rollout uses `policy:reconcile-history` above. The narrower
+`policy:reconcile-liked-tweets` command remains available for a later isolated
+repair, but do not substitute its checkpoint for the universal operator's
+current-fingerprint `liked_tweets` and `verification` phases.
 
 The universal migration deliberately does not rewrite or index the multi-million
 row `public.liked_tweets` table. It immediately hides legacy content whose author

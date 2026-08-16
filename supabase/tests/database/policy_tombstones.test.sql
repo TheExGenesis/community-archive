@@ -3,7 +3,25 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 SET LOCAL search_path = public, extensions;
 
-SELECT plan(56);
+SELECT plan(75);
+
+-- Production builds these four indexes concurrently between the fast and
+-- final migrations. A clean reset creates them in the guarded final migration;
+-- keep the fixture explicit so the opt-out tests always exercise indexed paths.
+CREATE INDEX IF NOT EXISTS liked_tweets_author_account_id_idx
+  ON public.liked_tweets (author_account_id)
+  WHERE author_account_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS mentioned_users_screen_name_lower_idx
+  ON public.mentioned_users (lower(screen_name))
+  WHERE screen_name <> '';
+CREATE INDEX IF NOT EXISTS tweets_reply_to_username_lower_idx
+  ON public.tweets (lower(reply_to_username))
+  WHERE reply_to_username IS NOT NULL;
+CREATE INDEX IF NOT EXISTS tweets_retweeted_username_lower_idx
+  ON public.tweets (
+    lower(substring(full_text FROM '^RT @([A-Za-z0-9_]{1,15}):'))
+  )
+  WHERE full_text ~ '^RT @[A-Za-z0-9_]{1,15}:';
 
 INSERT INTO public.all_account (
   account_id,
@@ -213,6 +231,46 @@ SELECT is(
   'a username-only consent block is associated with the discovered stable ID'
 );
 
+-- Simulate consent arriving after account intake while the normal derived-ID
+-- propagation is briefly delayed. The write boundary must still resolve the
+-- authoritative username policy and fail closed at every sink.
+INSERT INTO public.all_account (
+  account_id, created_via, username, created_at, account_display_name
+) VALUES (
+  '990000000000000006', 'manual_import', '__pgtap_policy_lag', now(),
+  'Policy lag'
+);
+ALTER TABLE public.optin
+  DISABLE TRIGGER propagate_explicit_optout_scrape_block;
+INSERT INTO public.optin (username, opted_in, explicit_optout)
+VALUES ('__pgtap_policy_lag', false, true);
+
+INSERT INTO public.tweets (
+  tweet_id, account_id, created_at, full_text, favorite_count, retweet_count
+) VALUES (
+  '990000000000000007', '990000000000000006', now(),
+  'must be tombstoned despite delayed stable-id propagation', 1, 1
+);
+
+SELECT is(
+  (SELECT is_tombstone FROM public.tweets WHERE tweet_id = '990000000000000007'),
+  true,
+  'a direct tweet write resolves username-only consent while ID propagation lags'
+);
+
+INSERT INTO public.archive_upload (
+  account_id, archive_at, username, upload_phase
+) VALUES (
+  '990000000000000006', now(), '__pgtap_policy_lag', 'ready_for_commit'
+);
+SELECT is(
+  (SELECT count(*)::integer FROM public.archive_upload WHERE account_id = '990000000000000006'),
+  0,
+  'an archive metadata write is discarded while stable-ID propagation lags'
+);
+ALTER TABLE public.optin
+  ENABLE TRIGGER propagate_explicit_optout_scrape_block;
+
 INSERT INTO public.all_profile (account_id, bio)
 VALUES ('990000000000000001', 'blocked profile content');
 SELECT is(
@@ -409,6 +467,16 @@ SELECT is(
   'the historical non-policy-aware Parquet bucket is private'
 );
 
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1
+    FROM storage.buckets
+    WHERE id IN ('firehose', 'firehose_private')
+      AND public IS TRUE
+  ),
+  'every configured Firehose Parquet bucket is private'
+);
+
 SELECT is(
   (
     SELECT count(*)::integer
@@ -424,6 +492,12 @@ SELECT is(
   has_table_privilege('anon', 'public.account_activity_summary', 'SELECT'),
   false,
   'the legacy content-bearing activity snapshot is not publicly readable'
+);
+
+SELECT is(
+  has_table_privilege('anon', 'public.global_activity_summary', 'SELECT'),
+  false,
+  'the historical global account snapshot is not publicly readable'
 );
 
 INSERT INTO public.liked_tweets (tweet_id, full_text)
@@ -624,6 +698,176 @@ SELECT is(
   ),
   true,
   'the trusted service role retains the legacy liked-tweet search grant'
+);
+
+SELECT has_column(
+  'private',
+  'policy_historical_reconcile_progress',
+  'policy_version',
+  'historical checkpoints pin the rollout contract version'
+);
+
+SELECT has_column(
+  'private',
+  'policy_historical_reconcile_progress',
+  'policy_fingerprint',
+  'historical checkpoints pin the authoritative consent set'
+);
+
+CREATE TEMP TABLE policy_fingerprint_before AS
+SELECT private.policy_authority_fingerprint() AS value;
+
+SELECT matches(
+  (SELECT value FROM policy_fingerprint_before),
+  '^[0-9a-f]{64}$',
+  'the policy authority fingerprint is a deterministic SHA-256 value'
+);
+
+INSERT INTO tes.blocked_scraping_users (account_id, block_source)
+VALUES ('990000000000000090', 'admin');
+
+SELECT isnt(
+  private.policy_authority_fingerprint(),
+  (SELECT value FROM policy_fingerprint_before),
+  'a policy change invalidates stale reconciliation checkpoints'
+);
+
+INSERT INTO public.all_account (
+  account_id, created_via, username, created_at, account_display_name
+) VALUES (
+  '990000000000000091', 'manual_import', 'CaseSensitiveArchivePath', now(),
+  'Archive path case'
+);
+INSERT INTO public.archive_upload (
+  account_id, archive_at, username, upload_phase
+) VALUES
+  (
+    '990000000000000091', now() - interval '1 day',
+    'CaseSensitiveArchivePath', 'ready_for_commit'
+  ),
+  (
+    '990000000000000091', now(),
+    'casesensitivearchivepath', 'ready_for_commit'
+  );
+INSERT INTO tes.blocked_scraping_users (account_id, block_source)
+VALUES ('990000000000000091', 'admin');
+
+SELECT is(
+  (
+    SELECT array_agg(args->>'username' ORDER BY args->>'username')
+    FROM private.admin_jobs
+    WHERE job_name = 'admin_delete_with_export'
+      AND args->>'account_id' = '990000000000000091'
+  ),
+  ARRAY['CaseSensitiveArchivePath', 'casesensitivearchivepath']::text[],
+  'archive cleanup preserves every exact case-sensitive Storage path identity'
+);
+
+SELECT is(
+  (SELECT prosecdef FROM pg_proc
+   WHERE oid = 'public.search_tweets(text,text,text,date,date,integer,integer)'::regprocedure),
+  false,
+  'rich search runs with invoker policy instead of bypassing RLS'
+);
+
+SELECT is(
+  (SELECT prosecdef FROM pg_proc
+   WHERE oid = 'public.search_tweets(text,integer,text,timestamp without time zone,timestamp without time zone)'::regprocedure),
+  false,
+  'the compact search overload runs with invoker policy'
+);
+
+SELECT is(
+  (SELECT prosecdef FROM pg_proc
+   WHERE oid = 'public.search_tweets_exact_phrase(text,text,text,date,date,integer,integer)'::regprocedure),
+  false,
+  'exact-phrase search runs with invoker policy instead of bypassing RLS'
+);
+
+SELECT ok(
+  has_function_privilege(
+    'anon',
+    'public.search_tweets(text,text,text,date,date,integer,integer)',
+    'EXECUTE'
+  )
+  AND has_function_privilege(
+    'anon',
+    'public.search_tweets(text,integer,text,timestamp without time zone,timestamp without time zone)',
+    'EXECUTE'
+  )
+  AND has_function_privilege(
+    'anon',
+    'public.search_tweets_exact_phrase(text,text,text,date,date,integer,integer)',
+    'EXECUTE'
+  ),
+  'only policy-invoker search RPCs are restored for anonymous callers'
+);
+
+SELECT ok(
+  NOT has_function_privilege(
+    'readclient',
+    'public.search_tweets(text,text,text,date,date,integer,integer)',
+    'EXECUTE'
+  )
+  AND NOT has_function_privilege(
+    'readclient',
+    'public.search_tweets(text,integer,text,timestamp without time zone,timestamp without time zone)',
+    'EXECUTE'
+  )
+  AND NOT has_function_privilege(
+    'readclient',
+    'public.search_tweets_exact_phrase(text,text,text,date,date,integer,integer)',
+    'EXECUTE'
+  ),
+  'readclient cannot call RPCs outside its table/view contract'
+);
+
+SELECT ok(
+  NOT has_function_privilege('authenticated', 'tes.get_followers()', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'tes.get_followings()', 'EXECUTE')
+  AND NOT has_function_privilege('authenticated', 'tes.get_moots()', 'EXECUTE'),
+  'legacy social-graph definers remain closed after finalization'
+);
+
+SELECT ok(
+  (
+    SELECT count(*) = 6
+       AND bool_and('security_invoker=true' = ANY(COALESCE(reloptions, ARRAY[]::text[])))
+    FROM pg_class
+    WHERE oid = ANY (ARRAY[
+      'public.account'::regclass,
+      'public.profile'::regclass,
+      'public.enriched_tweets'::regclass,
+      'public.tweet_replies_view'::regclass,
+      'public.tweets_w_conversation_id'::regclass,
+      'public.user_directory'::regclass
+    ])
+  ),
+  'content-bearing views permanently inherit caller RLS'
+);
+
+SELECT hasnt_function(
+  'public',
+  'policy_historical_tweet_is_visible',
+  ARRAY['text', 'text', 'text', 'text', 'boolean'],
+  'the expensive historical tweet overlay helper is removed after proof'
+);
+
+SELECT hasnt_function(
+  'public',
+  'policy_historical_tweet_id_is_visible',
+  ARRAY['text'],
+  'the dependent-row historical overlay helper is removed after proof'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::integer
+    FROM pg_policies
+    WHERE policyname = 'policy reconciliation overlay'
+  ),
+  0,
+  'all temporary reconciliation policies are removed after proof'
 );
 
 SELECT * FROM finish();

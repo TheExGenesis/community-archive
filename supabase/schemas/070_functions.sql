@@ -2664,7 +2664,7 @@ ALTER FUNCTION "public"."search_tweets"("search_query" "text", "limit_count" int
 
 
 CREATE OR REPLACE FUNCTION "public"."search_tweets"("search_query" "text", "from_user" "text" DEFAULT NULL::"text", "to_user" "text" DEFAULT NULL::"text", "since_date" "date" DEFAULT NULL::"date", "until_date" "date" DEFAULT NULL::"date", "limit_" integer DEFAULT 50, "offset_" integer DEFAULT 0) RETURNS TABLE("tweet_id" "text", "account_id" "text", "created_at" timestamp with time zone, "full_text" "text", "retweet_count" integer, "favorite_count" integer, "reply_to_tweet_id" "text", "avatar_media_url" "text", "archive_upload_id" bigint, "username" "text", "account_display_name" "text", "media" "jsonb")
-    LANGUAGE "plpgsql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY INVOKER
     SET "statement_timeout" TO '5min'
     SET "search_path" TO ''
     AS $$
@@ -2763,7 +2763,7 @@ ALTER FUNCTION "public"."search_tweets"("search_query" "text", "from_user" "text
 -- find exact substrings in full_text for phrases like "you can just do things".
 -- The pg_trgm GIN index on full_text makes the ILIKE fast.
 CREATE OR REPLACE FUNCTION "public"."search_tweets_exact_phrase"("exact_phrase" "text", "from_user" "text" DEFAULT NULL::"text", "to_user" "text" DEFAULT NULL::"text", "since_date" "date" DEFAULT NULL::"date", "until_date" "date" DEFAULT NULL::"date", "limit_" integer DEFAULT 50, "offset_" integer DEFAULT 0) RETURNS TABLE("tweet_id" "text", "account_id" "text", "created_at" timestamp with time zone, "full_text" "text", "retweet_count" integer, "favorite_count" integer, "reply_to_tweet_id" "text", "avatar_media_url" "text", "archive_upload_id" bigint, "username" "text", "account_display_name" "text", "media" "jsonb")
-    LANGUAGE "plpgsql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY INVOKER
     SET "statement_timeout" TO '5min'
     SET "search_path" TO ''
     AS $$

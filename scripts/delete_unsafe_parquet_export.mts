@@ -18,8 +18,8 @@ if (process.env.CONFIRM_DELETE_UNSAFE_PARQUET !== CONFIRMATION) {
 }
 
 const supabase = createClient(
-  required('SUPABASE_URL'),
-  required('SUPABASE_SERVICE_ROLE'),
+  process.env.SUPABASE_URL ?? required('NEXT_PUBLIC_SUPABASE_URL'),
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? required('SUPABASE_SERVICE_ROLE'),
   { auth: { autoRefreshToken: false, persistSession: false } },
 )
 

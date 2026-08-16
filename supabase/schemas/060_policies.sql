@@ -127,6 +127,7 @@ CREATE POLICY "Entities are publicly visible" ON "public"."mentioned_users" FOR 
 CREATE POLICY "Entities are publicly visible" ON "public"."tweet_media" FOR SELECT USING (true);
 CREATE POLICY "Entities are publicly visible" ON "public"."tweet_urls" FOR SELECT USING (true);
 CREATE POLICY "Entities are publicly visible" ON "public"."user_mentions" FOR SELECT USING (true);
+CREATE POLICY "Conversations are publicly visible" ON "public"."conversations" FOR SELECT USING (true);
 
 -- quote_tweets / retweets are written only by the service_role (firehose + worker).
 -- Reads are public; anon/authenticated writes are revoked in 060_grants and enforced

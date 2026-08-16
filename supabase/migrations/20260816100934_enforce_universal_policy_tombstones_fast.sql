@@ -35,6 +35,17 @@ CREATE INDEX IF NOT EXISTS blocked_scraping_users_username_idx
   ON tes.blocked_scraping_users (lower(username))
   WHERE username IS NOT NULL;
 
+-- Consent and block tables are small policy metadata. These partial indexes
+-- keep the temporary read overlay and every future write trigger on indexed
+-- lookups without touching the historical tweet corpus.
+CREATE INDEX IF NOT EXISTS optin_explicit_optout_twitter_user_id_idx
+  ON public.optin (twitter_user_id)
+  WHERE explicit_optout IS TRUE
+    AND twitter_user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS optin_explicit_optout_username_lower_idx
+  ON public.optin (lower(username))
+  WHERE explicit_optout IS TRUE;
+
 -- Do not build the author index in this migration transaction. Production has
 -- millions of legacy rows; the bounded reconciliation operator creates it
 -- CONCURRENTLY immediately after DDL and before writers or backfill resume.
@@ -59,6 +70,83 @@ CREATE TABLE IF NOT EXISTS private.policy_backfill_progress (
 
 ALTER TABLE private.policy_backfill_progress OWNER TO postgres;
 REVOKE ALL ON TABLE private.policy_backfill_progress
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
+
+-- A direct PostgreSQL operator reconciles the historical corpus in short,
+-- idempotent phases while the temporary read overlay below remains active.
+-- Keeping the checkpoint private prevents an API caller from skipping a phase.
+CREATE TABLE IF NOT EXISTS private.policy_historical_reconcile_progress (
+  job_name text NOT NULL,
+  phase text NOT NULL,
+  policy_version text NOT NULL DEFAULT 'universal_policy_tombstones_v1',
+  policy_fingerprint text NOT NULL,
+  rows_affected bigint NOT NULL DEFAULT 0,
+  completed_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (job_name, phase),
+  CONSTRAINT policy_historical_reconcile_version_check CHECK (
+    policy_version = 'universal_policy_tombstones_v1'
+  ),
+  CONSTRAINT policy_historical_reconcile_fingerprint_check CHECK (
+    policy_fingerprint ~ '^[0-9a-f]{64}$'
+  ),
+  CONSTRAINT policy_historical_reconcile_rows_check CHECK (rows_affected >= 0)
+);
+
+ALTER TABLE private.policy_historical_reconcile_progress
+  ADD COLUMN IF NOT EXISTS policy_version text,
+  ADD COLUMN IF NOT EXISTS policy_fingerprint text;
+ALTER TABLE private.policy_historical_reconcile_progress
+  ALTER COLUMN policy_version
+    SET DEFAULT 'universal_policy_tombstones_v1';
+
+CREATE OR REPLACE FUNCTION private.policy_authority_fingerprint()
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  WITH policy_identity AS (
+    SELECT 'id:' || BTRIM(blocked.account_id) AS identity
+    FROM tes.blocked_scraping_users AS blocked
+    WHERE NULLIF(BTRIM(blocked.account_id), '') IS NOT NULL
+
+    UNION
+
+    SELECT 'username:' || lower(BTRIM(blocked.username))
+    FROM tes.blocked_scraping_users AS blocked
+    WHERE NULLIF(BTRIM(blocked.username), '') IS NOT NULL
+
+    UNION
+
+    SELECT 'id:' || BTRIM(consent.twitter_user_id)
+    FROM public.optin AS consent
+    WHERE consent.explicit_optout IS TRUE
+      AND NULLIF(BTRIM(consent.twitter_user_id), '') IS NOT NULL
+
+    UNION
+
+    SELECT 'username:' || lower(BTRIM(consent.username))
+    FROM public.optin AS consent
+    WHERE consent.explicit_optout IS TRUE
+      AND NULLIF(BTRIM(consent.username), '') IS NOT NULL
+  )
+  SELECT encode(
+    extensions.digest(
+      COALESCE(string_agg(identity, E'\n' ORDER BY identity), ''),
+      'sha256'
+    ),
+    'hex'
+  )
+  FROM policy_identity;
+$$;
+
+ALTER FUNCTION private.policy_authority_fingerprint() OWNER TO postgres;
+REVOKE ALL ON FUNCTION private.policy_authority_fingerprint()
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
+
+ALTER TABLE private.policy_historical_reconcile_progress OWNER TO postgres;
+REVOKE ALL ON TABLE private.policy_historical_reconcile_progress
   FROM PUBLIC, anon, authenticated, readclient, service_role;
 
 CREATE OR REPLACE FUNCTION public.policy_account_is_blocked(
@@ -93,6 +181,17 @@ AS $$
           AND lower(consent.username) = lower(BTRIM(p_username))
         )
       )
+  ) OR EXISTS (
+    -- Close the short interval where consent is known by username but the
+    -- derived stable-ID block has not yet been written. The account PK and the
+    -- partial consent-name index make this a bounded metadata lookup.
+    SELECT 1
+    FROM public.all_account AS account
+    JOIN public.optin AS consent
+      ON lower(consent.username) = lower(account.username)
+    WHERE NULLIF(BTRIM(p_account_id), '') IS NOT NULL
+      AND account.account_id = BTRIM(p_account_id)
+      AND consent.explicit_optout IS TRUE
   );
 $$;
 
@@ -137,6 +236,72 @@ REVOKE ALL ON FUNCTION public.policy_json_contains_blocked_author(jsonb)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.policy_json_contains_blocked_author(jsonb)
   TO service_role;
+
+-- Temporary fail-closed read predicate used only while the historical corpus
+-- is reconciled. It deliberately checks copied RT/reply identity as well as
+-- the outer author, because those payloads predate the new write triggers.
+CREATE OR REPLACE FUNCTION public.policy_historical_tweet_is_visible(
+  p_account_id text,
+  p_full_text text,
+  p_reply_to_user_id text,
+  p_reply_to_username text,
+  p_is_tombstone boolean
+) RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT p_is_tombstone IS NOT TRUE
+    AND NOT public.policy_account_is_blocked(p_account_id, NULL)
+    AND NOT public.policy_account_is_blocked(
+      p_reply_to_user_id,
+      p_reply_to_username
+    )
+    AND NOT public.policy_account_is_blocked(
+      NULL,
+      substring(COALESCE(p_full_text, '') FROM '^RT @([A-Za-z0-9_]{1,15}):')
+    );
+$$;
+
+ALTER FUNCTION public.policy_historical_tweet_is_visible(
+  text, text, text, text, boolean
+) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.policy_historical_tweet_is_visible(
+  text, text, text, text, boolean
+) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.policy_historical_tweet_is_visible(
+  text, text, text, text, boolean
+) TO anon, authenticated, readclient, service_role;
+
+CREATE OR REPLACE FUNCTION public.policy_historical_tweet_id_is_visible(
+  p_tweet_id text
+) RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.tweets AS tweet
+    WHERE tweet.tweet_id = p_tweet_id
+      AND public.policy_historical_tweet_is_visible(
+        tweet.account_id,
+        tweet.full_text,
+        tweet.reply_to_user_id,
+        tweet.reply_to_username,
+        tweet.is_tombstone
+      )
+  );
+$$;
+
+ALTER FUNCTION public.policy_historical_tweet_id_is_visible(text)
+  OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.policy_historical_tweet_id_is_visible(text)
+  FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.policy_historical_tweet_id_is_visible(text)
+  TO anon, authenticated, readclient, service_role;
 
 CREATE OR REPLACE FUNCTION public.policy_blocked_account_id(p_username text)
 RETURNS text
@@ -272,7 +437,7 @@ BEGIN
   FROM private.admin_jobs AS job
   WHERE job.job_name = 'admin_delete_with_export'
     AND job.status IN ('QUEUED', 'PROCESSING')
-    AND lower(job.args->>'username') = lower(BTRIM(p_username))
+    AND job.args->>'username' = BTRIM(p_username)
   ORDER BY job.created_at
   LIMIT 1;
 
@@ -286,7 +451,7 @@ BEGIN
     'QUEUED',
     jsonb_strip_nulls(jsonb_build_object(
       'account_id', NULLIF(BTRIM(p_account_id), ''),
-      'username', lower(BTRIM(p_username)),
+      'username', BTRIM(p_username),
       'reason', COALESCE(NULLIF(BTRIM(p_reason), ''), 'Policy block'),
       'enqueued_at', to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
     ))
@@ -598,8 +763,9 @@ SET search_path = ''
 AS $$
 DECLARE
   v_account_id text := to_jsonb(NEW)->>TG_ARGV[0];
+  v_username text := to_jsonb(NEW)->>'username';
 BEGIN
-  IF public.policy_account_is_blocked(v_account_id, NULL) THEN
+  IF public.policy_account_is_blocked(v_account_id, v_username) THEN
     RETURN NULL;
   END IF;
   RETURN NEW;
@@ -743,6 +909,8 @@ DECLARE
   v_provider_id text;
   v_username text;
   v_archive_upload_ids bigint[];
+  v_archive_usernames text[];
+  v_archive_username text;
   v_tweet_ids text[];
 BEGIN
   IF p_account_id IS NULL OR BTRIM(p_account_id) = '' THEN
@@ -801,6 +969,15 @@ BEGIN
   INTO v_archive_upload_ids
   FROM public.archive_upload
   WHERE account_id = p_account_id;
+
+  SELECT COALESCE(
+    array_agg(DISTINCT BTRIM(username) ORDER BY BTRIM(username)),
+    ARRAY[]::text[]
+  )
+  INTO v_archive_usernames
+  FROM public.archive_upload
+  WHERE account_id = p_account_id
+    AND NULLIF(BTRIM(username), '') IS NOT NULL;
 
   SELECT COALESCE(array_agg(tweet_id), ARRAY[]::text[])
   INTO v_tweet_ids
@@ -892,26 +1069,50 @@ BEGIN
       is_tombstone = true
   WHERE account_id = p_account_id;
 
-  -- A Twitter archive retweet row is authored by the allowed retweeter but
-  -- historically copied the original author's text. Preserve the allowed
-  -- interaction row while removing a newly blocked author's copied payload.
-  IF v_username ~ '^[A-Za-z0-9_]{1,15}$' THEN
+  -- These expression indexes are built CONCURRENTLY by the release operator.
+  -- Until then, the temporary RLS overlay hides copied identity immediately;
+  -- never fall back to a full tweets scan inside an opt-out transaction.
+  IF v_username ~ '^[A-Za-z0-9_]{1,15}$'
+     AND EXISTS (
+       SELECT 1
+       FROM pg_catalog.pg_index AS candidate
+       WHERE candidate.indexrelid = pg_catalog.to_regclass(
+         'public.tweets_retweeted_username_lower_idx'
+       )
+         AND candidate.indisvalid
+         AND candidate.indisready
+     ) THEN
     UPDATE public.tweets
     SET full_text = ''
     WHERE account_id <> p_account_id
-      AND full_text ~* ('^RT @' || v_username || ':');
+      AND full_text ~ '^RT @[A-Za-z0-9_]{1,15}:'
+      AND lower(substring(
+        full_text FROM '^RT @([A-Za-z0-9_]{1,15}):'
+      )) = lower(v_username);
   END IF;
 
+  -- The stable relationship ID is indexed and can be scrubbed synchronously.
   UPDATE public.tweets
   SET reply_to_username = NULL
   WHERE account_id <> p_account_id
-    AND (
-      reply_to_user_id = p_account_id
-      OR (
-        NULLIF(BTRIM(v_username), '') IS NOT NULL
-        AND lower(reply_to_username) = lower(v_username)
-      )
-    );
+    AND reply_to_user_id = p_account_id;
+
+  IF NULLIF(BTRIM(v_username), '') IS NOT NULL
+     AND EXISTS (
+       SELECT 1
+       FROM pg_catalog.pg_index AS candidate
+       WHERE candidate.indexrelid = pg_catalog.to_regclass(
+         'public.tweets_reply_to_username_lower_idx'
+       )
+         AND candidate.indisvalid
+         AND candidate.indisready
+     ) THEN
+    UPDATE public.tweets
+    SET reply_to_username = NULL
+    WHERE account_id <> p_account_id
+      AND reply_to_username IS NOT NULL
+      AND lower(reply_to_username) = lower(v_username);
+  END IF;
 
   INSERT INTO public.all_account (
     account_id,
@@ -949,11 +1150,23 @@ BEGIN
 
   UPDATE public.mentioned_users
   SET name = '', screen_name = '', is_tombstone = true
-  WHERE user_id = p_account_id
-     OR (
-       NULLIF(BTRIM(v_username), '') IS NOT NULL
-       AND lower(screen_name) = lower(v_username)
-     );
+  WHERE user_id = p_account_id;
+
+  IF NULLIF(BTRIM(v_username), '') IS NOT NULL
+     AND EXISTS (
+       SELECT 1
+       FROM pg_catalog.pg_index AS candidate
+       WHERE candidate.indexrelid = pg_catalog.to_regclass(
+         'public.mentioned_users_screen_name_lower_idx'
+       )
+         AND candidate.indisvalid
+         AND candidate.indisready
+     ) THEN
+    UPDATE public.mentioned_users
+    SET name = '', screen_name = '', is_tombstone = true
+    WHERE screen_name <> ''
+      AND lower(screen_name) = lower(v_username);
+  END IF;
 
   -- The universal migration intentionally defers this index to a concurrent
   -- post-DDL step. Never sequential-scan the legacy liked-tweet table from an
@@ -970,9 +1183,19 @@ BEGIN
   ) THEN
     UPDATE public.liked_tweets
     SET full_text = '', is_tombstone = true
-    WHERE author_account_id = p_account_id;
+    WHERE author_account_id IS NOT NULL
+      AND author_account_id = p_account_id;
   END IF;
 
+  -- Storage object names are case-sensitive. Enqueue every exact archive path
+  -- identity before metadata deletion, plus the best policy/account fallback.
+  FOREACH v_archive_username IN ARRAY v_archive_usernames LOOP
+    PERFORM public.enqueue_policy_archive_cleanup(
+      p_account_id,
+      v_archive_username,
+      'Policy tombstone cleanup'
+    );
+  END LOOP;
   PERFORM public.enqueue_policy_archive_cleanup(
     p_account_id,
     v_username,
@@ -1181,35 +1404,128 @@ SET args = jsonb_strip_nulls(jsonb_build_object(
 WHERE worker_name = 'admin_delete_with_export'
   AND status <> 'started';
 
--- There are only a small number of policy-blocked accounts. Reconcile them in
--- this fail-closed transaction so no historical blocked-authored row becomes
--- visible between DDL commit and an operator sweep. The function deliberately
--- does not refresh large materialized views per account; those snapshots are
--- revoked below and can be rebuilt once after reconciliation. It also skips
--- liked_tweets until the author index is built concurrently; all legacy author
--- IDs are NULL and hidden by RLS, and the operator reruns this same union after
--- creating the index but before writers resume.
-DO $$
-DECLARE
-  blocked record;
-BEGIN
-  FOR blocked IN
-    SELECT policy_account.account_id
-    FROM (
-      SELECT account_id
-      FROM tes.blocked_scraping_users
-      UNION
-      SELECT twitter_user_id AS account_id
-      FROM public.optin
-      WHERE explicit_optout IS TRUE
-        AND NULLIF(BTRIM(twitter_user_id), '') IS NOT NULL
-    ) AS policy_account
-    ORDER BY account_id
-  LOOP
-    PERFORM public.tombstone_policy_account(blocked.account_id);
-  END LOOP;
-END;
-$$;
+-- Historical reconciliation is intentionally not part of apply_migration:
+-- production's tweets corpus is too large for the API request ceiling. These
+-- restrictive policies AND the existing owner/public policies, so an
+-- authenticated owner cannot bypass the temporary fail-closed overlay through
+-- an otherwise-permissive write policy. The direct resumable operator removes
+-- historical payload before the final migration drops only these overlays.
+GRANT EXECUTE ON FUNCTION public.policy_account_is_blocked(text, text)
+  TO anon, authenticated, readclient;
+GRANT EXECUTE ON FUNCTION public.policy_json_contains_blocked_author(jsonb)
+  TO anon, authenticated, readclient;
+
+DROP POLICY IF EXISTS "policy reconciliation overlay" ON public.tweets;
+CREATE POLICY "policy reconciliation overlay" ON public.tweets
+  AS RESTRICTIVE FOR SELECT TO anon, authenticated, readclient
+  USING (public.policy_historical_tweet_is_visible(
+    account_id,
+    full_text,
+    reply_to_user_id,
+    reply_to_username,
+    is_tombstone
+  ));
+
+DROP POLICY IF EXISTS "policy reconciliation overlay" ON public.all_account;
+CREATE POLICY "policy reconciliation overlay" ON public.all_account
+  AS RESTRICTIVE FOR SELECT TO anon, authenticated, readclient
+  USING (NOT public.policy_account_is_blocked(account_id, username));
+
+DROP POLICY IF EXISTS "policy reconciliation overlay" ON public.all_profile;
+CREATE POLICY "policy reconciliation overlay" ON public.all_profile
+  AS RESTRICTIVE FOR SELECT TO anon, authenticated, readclient
+  USING (NOT public.policy_account_is_blocked(account_id, NULL));
+
+DROP POLICY IF EXISTS "policy reconciliation overlay" ON public.archive_upload;
+CREATE POLICY "policy reconciliation overlay" ON public.archive_upload
+  AS RESTRICTIVE FOR SELECT TO anon, authenticated, readclient
+  USING (NOT public.policy_account_is_blocked(account_id, username));
+
+DROP POLICY IF EXISTS "policy reconciliation overlay" ON public.mentioned_users;
+CREATE POLICY "policy reconciliation overlay" ON public.mentioned_users
+  AS RESTRICTIVE FOR SELECT TO anon, authenticated, readclient
+  USING (
+    (is_tombstone IS TRUE AND name = '' AND screen_name = '')
+    OR NOT public.policy_account_is_blocked(user_id, screen_name)
+  );
+
+DROP POLICY IF EXISTS "policy reconciliation overlay" ON public.liked_tweets;
+CREATE POLICY "policy reconciliation overlay" ON public.liked_tweets
+  AS RESTRICTIVE FOR SELECT TO anon, authenticated, readclient
+  USING (
+    (is_tombstone IS TRUE AND full_text = '')
+    OR (
+      author_account_id IS NOT NULL
+      AND is_tombstone IS NOT TRUE
+      AND NOT public.policy_account_is_blocked(author_account_id, NULL)
+    )
+  );
+
+DROP POLICY IF EXISTS "policy reconciliation overlay" ON public.tweet_media;
+CREATE POLICY "policy reconciliation overlay" ON public.tweet_media
+  AS RESTRICTIVE FOR SELECT TO anon, authenticated, readclient
+  USING (public.policy_historical_tweet_id_is_visible(tweet_id));
+
+DROP POLICY IF EXISTS "policy reconciliation overlay" ON public.tweet_urls;
+CREATE POLICY "policy reconciliation overlay" ON public.tweet_urls
+  AS RESTRICTIVE FOR SELECT TO anon, authenticated, readclient
+  USING (public.policy_historical_tweet_id_is_visible(tweet_id));
+
+DROP POLICY IF EXISTS "policy reconciliation overlay" ON public.user_mentions;
+CREATE POLICY "policy reconciliation overlay" ON public.user_mentions
+  AS RESTRICTIVE FOR SELECT TO anon, authenticated, readclient
+  USING (public.policy_historical_tweet_id_is_visible(tweet_id));
+
+DROP POLICY IF EXISTS "policy reconciliation overlay" ON public.profile_settings;
+CREATE POLICY "policy reconciliation overlay" ON public.profile_settings
+  AS RESTRICTIVE FOR SELECT TO anon, authenticated, readclient
+  USING (NOT public.policy_account_is_blocked(account_id, NULL));
+
+DROP POLICY IF EXISTS "policy reconciliation overlay" ON public.profile_curation;
+CREATE POLICY "policy reconciliation overlay" ON public.profile_curation
+  AS RESTRICTIVE FOR SELECT TO anon, authenticated, readclient
+  USING (NOT public.policy_account_is_blocked(account_id, NULL));
+
+DROP POLICY IF EXISTS "policy reconciliation overlay" ON public.digest_editions;
+CREATE POLICY "policy reconciliation overlay" ON public.digest_editions
+  AS RESTRICTIVE FOR SELECT TO anon, authenticated
+  USING (NOT public.policy_json_contains_blocked_author(content));
+
+-- Conversations contain stable IDs only. This explicit policy preserves the
+-- existing invoker-view behavior without exposing authored payload.
+DROP POLICY IF EXISTS "Conversations are publicly visible" ON public.conversations;
+CREATE POLICY "Conversations are publicly visible" ON public.conversations
+  FOR SELECT USING (true);
+
+-- Views owned by postgres otherwise bypass base-table policy. Keep these as
+-- invoker views permanently; after reconciliation they inherit the cheap
+-- tombstone policies instead of the temporary overlays.
+ALTER VIEW public.account SET (security_invoker = true);
+ALTER VIEW public.profile SET (security_invoker = true);
+ALTER VIEW public.enriched_tweets SET (security_invoker = true);
+ALTER VIEW public.tweet_replies_view SET (security_invoker = true);
+ALTER VIEW public.tweets_w_conversation_id SET (security_invoker = true);
+ALTER VIEW public.user_directory SET (security_invoker = true);
+
+-- These RPCs run as postgres and return content, so they must remain disabled
+-- until the operator proves zero historical violations. The final migration
+-- explicitly restores only the two policy-safe search entry points.
+REVOKE EXECUTE ON FUNCTION public.search_tweets(
+  text, text, text, date, date, integer, integer
+) FROM PUBLIC, anon, authenticated, readclient, service_role;
+REVOKE EXECUTE ON FUNCTION public.search_tweets(
+  text, integer, text, timestamp without time zone,
+  timestamp without time zone
+) FROM PUBLIC, anon, authenticated, readclient, service_role;
+REVOKE EXECUTE ON FUNCTION public.search_tweets_exact_phrase(
+  text, text, text, date, date, integer, integer
+) FROM PUBLIC, anon, authenticated, readclient, service_role;
+REVOKE EXECUTE ON FUNCTION tes.get_followers()
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
+REVOKE EXECUTE ON FUNCTION tes.get_followings()
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
+REVOKE EXECUTE ON FUNCTION tes.get_moots()
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
 
 -- Public raw-object URLs bypass row policy on a public bucket. Keep uploaded
 -- archives private and serve allowed owners through the policy-aware endpoint.
@@ -1217,7 +1533,12 @@ $$;
 -- bucket also fails closed until a consent-filtered exporter replaces it.
 UPDATE storage.buckets
 SET public = false
-WHERE id IN ('archives', 'enriched_tweets');
+WHERE id IN (
+  'archives',
+  'enriched_tweets',
+  'firehose',
+  'firehose_private'
+);
 
 DROP POLICY IF EXISTS "Archives are publicly readable" ON storage.objects;
 DROP POLICY IF EXISTS "Users can read their own archive" ON storage.objects;
@@ -1275,6 +1596,8 @@ CREATE POLICY "Users can update their own archive" ON storage.objects
 -- The old materialized snapshot embeds tweet text and does not have RLS.
 -- Revoke every public serving grant; the app now reads live policy-filtered rows.
 REVOKE ALL ON TABLE public.account_activity_summary
+  FROM PUBLIC, anon, authenticated, readclient;
+REVOKE ALL ON TABLE public.global_activity_summary
   FROM PUBLIC, anon, authenticated, readclient;
 
 -- Every policy-safe Firehose object is indexed by the stable author IDs it

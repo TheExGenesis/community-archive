@@ -64,6 +64,22 @@ CREATE TABLE IF NOT EXISTS "private"."policy_backfill_progress" (
 ALTER TABLE "private"."policy_backfill_progress" OWNER TO "postgres";
 REVOKE ALL ON TABLE "private"."policy_backfill_progress" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
 
+-- Durable phase checkpoints for the direct historical policy reconciliation.
+CREATE TABLE IF NOT EXISTS "private"."policy_historical_reconcile_progress" (
+    "job_name" "text" NOT NULL,
+    "phase" "text" NOT NULL,
+    "policy_version" "text" DEFAULT 'universal_policy_tombstones_v1'::"text" NOT NULL,
+    "policy_fingerprint" "text" NOT NULL,
+    "rows_affected" bigint DEFAULT 0 NOT NULL,
+    "completed_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "policy_historical_reconcile_progress_pkey" PRIMARY KEY ("job_name", "phase"),
+    CONSTRAINT "policy_historical_reconcile_version_check" CHECK (("policy_version" = 'universal_policy_tombstones_v1'::"text")),
+    CONSTRAINT "policy_historical_reconcile_fingerprint_check" CHECK (("policy_fingerprint" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "policy_historical_reconcile_rows_check" CHECK (("rows_affected" >= 0))
+);
+ALTER TABLE "private"."policy_historical_reconcile_progress" OWNER TO "postgres";
+REVOKE ALL ON TABLE "private"."policy_historical_reconcile_progress" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
+
 -- public.all_account
 CREATE TABLE IF NOT EXISTS "public"."all_account" (
     "account_id" "text" NOT NULL,

@@ -1,3 +1,49 @@
+CREATE OR REPLACE FUNCTION private.policy_authority_fingerprint()
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  WITH policy_identity AS (
+    SELECT 'id:' || BTRIM(blocked.account_id) AS identity
+    FROM tes.blocked_scraping_users AS blocked
+    WHERE NULLIF(BTRIM(blocked.account_id), '') IS NOT NULL
+
+    UNION
+
+    SELECT 'username:' || lower(BTRIM(blocked.username))
+    FROM tes.blocked_scraping_users AS blocked
+    WHERE NULLIF(BTRIM(blocked.username), '') IS NOT NULL
+
+    UNION
+
+    SELECT 'id:' || BTRIM(consent.twitter_user_id)
+    FROM public.optin AS consent
+    WHERE consent.explicit_optout IS TRUE
+      AND NULLIF(BTRIM(consent.twitter_user_id), '') IS NOT NULL
+
+    UNION
+
+    SELECT 'username:' || lower(BTRIM(consent.username))
+    FROM public.optin AS consent
+    WHERE consent.explicit_optout IS TRUE
+      AND NULLIF(BTRIM(consent.username), '') IS NOT NULL
+  )
+  SELECT encode(
+    extensions.digest(
+      COALESCE(string_agg(identity, E'\n' ORDER BY identity), ''),
+      'sha256'
+    ),
+    'hex'
+  )
+  FROM policy_identity;
+$$;
+
+ALTER FUNCTION private.policy_authority_fingerprint() OWNER TO postgres;
+REVOKE ALL ON FUNCTION private.policy_authority_fingerprint()
+  FROM PUBLIC, anon, authenticated, readclient, service_role;
+
 CREATE OR REPLACE FUNCTION public.policy_account_is_blocked(
   p_account_id text DEFAULT NULL,
   p_username text DEFAULT NULL
@@ -30,6 +76,14 @@ AS $$
           AND lower(consent.username) = lower(BTRIM(p_username))
         )
       )
+  ) OR EXISTS (
+    SELECT 1
+    FROM public.all_account AS account
+    JOIN public.optin AS consent
+      ON lower(consent.username) = lower(account.username)
+    WHERE NULLIF(BTRIM(p_account_id), '') IS NOT NULL
+      AND account.account_id = BTRIM(p_account_id)
+      AND consent.explicit_optout IS TRUE
   );
 $$;
 
@@ -209,7 +263,7 @@ BEGIN
   FROM private.admin_jobs AS job
   WHERE job.job_name = 'admin_delete_with_export'
     AND job.status IN ('QUEUED', 'PROCESSING')
-    AND lower(job.args->>'username') = lower(BTRIM(p_username))
+    AND job.args->>'username' = BTRIM(p_username)
   ORDER BY job.created_at
   LIMIT 1;
 
@@ -223,7 +277,7 @@ BEGIN
     'QUEUED',
     jsonb_strip_nulls(jsonb_build_object(
       'account_id', NULLIF(BTRIM(p_account_id), ''),
-      'username', lower(BTRIM(p_username)),
+      'username', BTRIM(p_username),
       'reason', COALESCE(NULLIF(BTRIM(p_reason), ''), 'Policy block'),
       'enqueued_at', to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
     ))
@@ -531,8 +585,9 @@ SET search_path = ''
 AS $$
 DECLARE
   v_account_id text := to_jsonb(NEW)->>TG_ARGV[0];
+  v_username text := to_jsonb(NEW)->>'username';
 BEGIN
-  IF public.policy_account_is_blocked(v_account_id, NULL) THEN
+  IF public.policy_account_is_blocked(v_account_id, v_username) THEN
     RETURN NULL;
   END IF;
   RETURN NEW;
@@ -676,6 +731,8 @@ DECLARE
   v_provider_id text;
   v_username text;
   v_archive_upload_ids bigint[];
+  v_archive_usernames text[];
+  v_archive_username text;
   v_tweet_ids text[];
 BEGIN
   IF p_account_id IS NULL OR BTRIM(p_account_id) = '' THEN
@@ -734,6 +791,15 @@ BEGIN
   INTO v_archive_upload_ids
   FROM public.archive_upload
   WHERE account_id = p_account_id;
+
+  SELECT COALESCE(
+    array_agg(DISTINCT BTRIM(username) ORDER BY BTRIM(username)),
+    ARRAY[]::text[]
+  )
+  INTO v_archive_usernames
+  FROM public.archive_upload
+  WHERE account_id = p_account_id
+    AND NULLIF(BTRIM(username), '') IS NOT NULL;
 
   SELECT COALESCE(array_agg(tweet_id), ARRAY[]::text[])
   INTO v_tweet_ids
@@ -825,26 +891,48 @@ BEGIN
       is_tombstone = true
   WHERE account_id = p_account_id;
 
-  -- A Twitter archive retweet row is authored by the allowed retweeter but
-  -- historically copied the original author's text. Preserve the allowed
-  -- interaction row while removing a newly blocked author's copied payload.
-  IF v_username ~ '^[A-Za-z0-9_]{1,15}$' THEN
+  -- Never fall back to a full corpus scan inside an opt-out transaction. The
+  -- release operator builds these exact-expression indexes concurrently.
+  IF v_username ~ '^[A-Za-z0-9_]{1,15}$'
+     AND EXISTS (
+       SELECT 1
+       FROM pg_catalog.pg_index AS candidate
+       WHERE candidate.indexrelid = pg_catalog.to_regclass(
+         'public.tweets_retweeted_username_lower_idx'
+       )
+         AND candidate.indisvalid
+         AND candidate.indisready
+     ) THEN
     UPDATE public.tweets
     SET full_text = ''
     WHERE account_id <> p_account_id
-      AND full_text ~* ('^RT @' || v_username || ':');
+      AND full_text ~ '^RT @[A-Za-z0-9_]{1,15}:'
+      AND lower(substring(
+        full_text FROM '^RT @([A-Za-z0-9_]{1,15}):'
+      )) = lower(v_username);
   END IF;
 
   UPDATE public.tweets
   SET reply_to_username = NULL
   WHERE account_id <> p_account_id
-    AND (
-      reply_to_user_id = p_account_id
-      OR (
-        NULLIF(BTRIM(v_username), '') IS NOT NULL
-        AND lower(reply_to_username) = lower(v_username)
-      )
-    );
+    AND reply_to_user_id = p_account_id;
+
+  IF NULLIF(BTRIM(v_username), '') IS NOT NULL
+     AND EXISTS (
+       SELECT 1
+       FROM pg_catalog.pg_index AS candidate
+       WHERE candidate.indexrelid = pg_catalog.to_regclass(
+         'public.tweets_reply_to_username_lower_idx'
+       )
+         AND candidate.indisvalid
+         AND candidate.indisready
+     ) THEN
+    UPDATE public.tweets
+    SET reply_to_username = NULL
+    WHERE account_id <> p_account_id
+      AND reply_to_username IS NOT NULL
+      AND lower(reply_to_username) = lower(v_username);
+  END IF;
 
   INSERT INTO public.all_account (
     account_id,
@@ -882,11 +970,23 @@ BEGIN
 
   UPDATE public.mentioned_users
   SET name = '', screen_name = '', is_tombstone = true
-  WHERE user_id = p_account_id
-     OR (
-       NULLIF(BTRIM(v_username), '') IS NOT NULL
-       AND lower(screen_name) = lower(v_username)
-     );
+  WHERE user_id = p_account_id;
+
+  IF NULLIF(BTRIM(v_username), '') IS NOT NULL
+     AND EXISTS (
+       SELECT 1
+       FROM pg_catalog.pg_index AS candidate
+       WHERE candidate.indexrelid = pg_catalog.to_regclass(
+         'public.mentioned_users_screen_name_lower_idx'
+       )
+         AND candidate.indisvalid
+         AND candidate.indisready
+     ) THEN
+    UPDATE public.mentioned_users
+    SET name = '', screen_name = '', is_tombstone = true
+    WHERE screen_name <> ''
+      AND lower(screen_name) = lower(v_username);
+  END IF;
 
   -- Never sequential-scan the legacy liked-tweet table from an opt-out
   -- transaction. The release operator creates this index concurrently and
@@ -902,9 +1002,17 @@ BEGIN
   ) THEN
     UPDATE public.liked_tweets
     SET full_text = '', is_tombstone = true
-    WHERE author_account_id = p_account_id;
+    WHERE author_account_id IS NOT NULL
+      AND author_account_id = p_account_id;
   END IF;
 
+  FOREACH v_archive_username IN ARRAY v_archive_usernames LOOP
+    PERFORM public.enqueue_policy_archive_cleanup(
+      p_account_id,
+      v_archive_username,
+      'Policy tombstone cleanup'
+    );
+  END LOOP;
   PERFORM public.enqueue_policy_archive_cleanup(
     p_account_id,
     v_username,

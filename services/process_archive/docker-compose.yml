@@ -9,6 +9,11 @@ services:
     # Explicitly load environment file
     env_file:
       - ../../.env
+
+    # Production ClickHouse is intentionally bound to host loopback only.
+    # The one-shot archive container therefore shares the host network rather
+    # than exposing ClickHouse or relying on an unstable bridge address.
+    network_mode: host
     
     # Environment variables - customize these
     

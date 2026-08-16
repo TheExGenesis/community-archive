@@ -121,6 +121,10 @@ NODE_ENV=production
 ARCHIVE_DATA_PATH=./data
 ```
 
+The production ClickHouse HTTP listener remains on host loopback. The checked-in
+Compose service and direct Docker fallback therefore use host networking; do
+not replace this with a public bind or published ClickHouse port.
+
 ### Secure Your Environment File
 
 ```bash

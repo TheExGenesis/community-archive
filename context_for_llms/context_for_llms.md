@@ -6,15 +6,16 @@ The Community Archive is an open database and API for tweet histories. This docu
 
 # API doc
 
-There are two ways to access the Community Archive's data: (1) Download a JSON file with an individual user's data from blob storage (2) query the DB through the Supabase API
+The public corpus is available through filtered Supabase API queries. The
+historical Parquet artifact is private while its exporter is rebuilt to enforce
+current consent. Individual raw archives are private owner data.
 
-### Raw user data from blob storage
+### Private raw user archive
 
-Given a username (lowercase), the URL format is: `/storage/v1/object/public/archives/<username>/archive.json`.
-
-For example, the URL for the user `DefenderOfBasic` is:
-
-https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/defenderofbasic/archive.json
+An authenticated archive owner may request `/api/archive/<username>`. The
+endpoint checks current PostgreSQL consent before issuing a short-lived signed
+download. There is no public raw-Storage URL, and blocked owners receive no
+download URL.
 
 The structure of this JSON is:
 

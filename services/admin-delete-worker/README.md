@@ -1,220 +1,40 @@
-# admin-delete-worker
+# Policy tombstone cleanup worker
 
-Long-running worker that consumes `private.admin_jobs` rows with
-`job_name = 'admin_delete_with_export'`. Exports the affected
-account's data to the `admin-deleted-user-data` storage bucket and
-then calls `public.tombstone_policy_account` to remove authored content while
-preserving reversible account/tweet IDs. Designed
-to run on a Hetzner box (NOT on Vercel — accounts with >10k tweets
-exceed Vercel's serverless function ceiling and several phases need
-multi-minute headroom).
+This worker consumes `private.admin_jobs` rows whose legacy-compatible
+`job_name` is `admin_delete_with_export`. Despite that retained queue name, it
+does not export authored content.
 
-> **Contract reference:** [`docs/admin-delete-worker.md`](../../docs/admin-delete-worker.md)
-> describes what the worker MUST do and explicitly enumerates the
-> queue row shape, status transitions, and the steps in order. This
-> directory is the implementation of that contract.
+For every job it:
 
-## Source-of-truth code paths
+1. calls `public.tombstone_policy_account(account_id)` (idempotently);
+2. deletes all objects under the private `archives/<username>/` prefix; and
+3. writes `admin-deleted-user-data/tombstones/<account_id>/<timestamp>/manifest.json`
+   containing only the account ID and stable tweet IDs.
 
-| Concern | File |
-| --- | --- |
-| Polling loop, claim, status transitions | [`src/index.ts`](src/index.ts) |
-| Export + tombstone pipeline (storage copy, table dumps, manifest, `tombstone_policy_account`) | [`src/exporter.ts`](src/exporter.ts) |
-| `private.worker_runs` insert/update | [`src/runRecorder.ts`](src/runRecorder.ts) |
-| Structured pino logger setup | [`src/logger.ts`](src/logger.ts) |
-| Container image | [`Dockerfile`](Dockerfile) |
-| Compose unit | [`docker-compose.yml`](docker-compose.yml) |
-| Environment template | [`env.example`](env.example) |
-| Worker-runs table | [`supabase/migrations/20260522183832_add_worker_runs.sql`](../../supabase/migrations/20260522183832_add_worker_runs.sql) |
+The worker never copies a raw archive, profile, tweet text, table dump, opt-out
+reason, username, or requester identity to recovery Storage. Its 15-minute
+legacy sweep immediately removes contentful export folders created by older
+worker versions while retaining `tombstones/` manifests.
 
-## Deploy
-
-Current placement: **`ca-autorefresh` (95.217.12.23)**, container name
-`admin-delete-worker`. See `AGENTS.md` → "Hetzner inventory & worker
-placement" for why this box and not `prod-vector-store`.
-
-On the Hetzner box, first time:
+## Local checks
 
 ```bash
-git clone https://github.com/TheExGenesis/community-archive.git
-cd community-archive/services/admin-delete-worker
-cp env.example .env
-# Fill in DATABASE_URL (prod), SUPABASE_URL, SUPABASE_SERVICE_ROLE.
-# IMPORTANT: on Hetzner you MUST use the IPv4 pooler URL, not the direct
-# `db.<ref>.supabase.co` host (which is IPv6-only and unreachable from
-# ca-autorefresh). See env.example for the format.
-
-docker compose up -d --build
+pnpm --dir services/admin-delete-worker build
 ```
 
-Subsequent deploys (pull new code, rebuild, restart):
+Required environment variables are `DATABASE_URL`, `SUPABASE_URL`, and
+`SUPABASE_SERVICE_ROLE`. `POLL_INTERVAL_MS` defaults to 10 seconds. See
+`docker-compose.yml` and `env.example` for runtime wiring.
 
-```bash
-cd community-archive
-git pull
-cd services/admin-delete-worker
-docker compose up -d --build
-# Old container is replaced gracefully (compose sends SIGTERM, worker
-# finishes any in-flight job, exits, new container starts).
-```
+## Operational verification
 
-Gotcha: `docker compose restart` does NOT reload `.env`. If you change
-environment variables, you need `docker compose down && docker compose up -d`
-(or `up -d --force-recreate`).
+- A policy block must make PostgreSQL rows content-free before the job is
+  claimed.
+- The raw `archives/<username>/` prefix must disappear after the job succeeds.
+- The manifest must have `content_free: true` and contain only `account_id`,
+  `tweet_ids`, format, and completion timestamp.
+- `private.worker_runs` and `private.admin_jobs` must not retain username,
+  reason, or other authored content after completion.
 
-### Running multiple replicas on the same box (e.g. staging + prod)
-
-Compose derives the **project name** from the containing directory by
-default. If two checkouts have the same deepest dir name
-(`services/admin-delete-worker` for both), compose treats them as the
-same project, and the second `up -d` will *delete* the first one's
-container — a real footgun when adding a prod replica next to staging.
-
-To run staging + prod on the same host:
-
-1. Use distinct clone paths (e.g. `~/community-archive` for staging,
-   `~/community-archive-prod-worker` for prod).
-2. Always pass `-p <project-name>` to scope the second replica:
-   ```bash
-   # On the prod-worker clone:
-   cd ~/community-archive-prod-worker/services/admin-delete-worker
-   docker compose -p admin-delete-worker-prod up -d --build
-   docker compose -p admin-delete-worker-prod logs -f
-   docker compose -p admin-delete-worker-prod down
-   ```
-3. Add a local-only (gitignored) `docker-compose.override.yml` to the
-   non-default replica's clone so `container_name` doesn't collide:
-   ```yaml
-   services:
-     admin-delete-worker:
-       container_name: admin-delete-worker-prod
-   ```
-4. Set `WORKER_HOST_LABEL` in the prod `.env` to something distinct
-   (`ca-autorefresh-prod`) so `private.worker_runs.host` lets you tell
-   the two replicas apart in SQL.
-
-## Observability
-
-Three places to look, in order from "I want a quick status" to "I want
-the full trace":
-
-### 1. Postgres — the canonical record of what ran
-
-```sql
--- 10 most recent jobs, with timing and status.
-SELECT
-  started_at,
-  status,
-  duration_ms,
-  args->>'username'   AS username,
-  args->>'account_id' AS account_id,
-  result->'phase_ms'  AS phase_ms,
-  error
-FROM private.worker_runs
-WHERE worker_name = 'admin_delete_with_export'
-ORDER BY started_at DESC
-LIMIT 10;
-
--- Jobs that failed.
-SELECT started_at, args->>'username' AS username, error
-FROM private.worker_runs
-WHERE worker_name = 'admin_delete_with_export'
-  AND status = 'failed'
-ORDER BY started_at DESC;
-
--- Did we miss a heartbeat? If the worker has been alive but no jobs
--- queued, you won't see new rows here — that's fine. To verify the
--- worker is reachable when idle, restart it and look for the
--- "worker started" log line in journalctl/docker logs (see §2).
-SELECT MAX(started_at) FROM private.worker_runs
-WHERE worker_name = 'admin_delete_with_export';
-
--- Pending + processing jobs (queue side).
-SELECT key, status, created_at, args
-FROM private.admin_jobs
-WHERE job_name = 'admin_delete_with_export'
-  AND status IN ('QUEUED', 'PROCESSING')
-ORDER BY created_at;
-
--- Manually re-queue a FAILED job (rare; investigate first).
--- UPDATE private.admin_jobs SET status = 'QUEUED', updated_at = now()
---  WHERE key = '<uuid>';
-```
-
-Run any of these from Supabase Studio's SQL editor (prod project →
-SQL). `private` is not exposed via PostgREST, so the API can't see
-it — only direct DB access can.
-
-### 2. Container logs — what the worker said while it was running
-
-The worker emits one-JSON-per-line via [pino](https://github.com/pinojs/pino).
-Every log line has stable fields: `worker`, `host`, `level`, `time`,
-plus per-event context (`job_key`, `account_id`, `phase`, `ms`,
-`err`, etc.).
-
-```bash
-# On the Hetzner box:
-docker compose logs -f admin-delete-worker
-
-# Filter to a specific job:
-docker compose logs admin-delete-worker | jq 'select(.job_key == "<uuid>")'
-
-# Per-phase timings of the most recent job:
-docker compose logs --tail=200 admin-delete-worker \
-  | jq 'select(.msg | test("phase: ")) | {ms, msg, table}'
-```
-
-If you ship logs to Loki / Axiom / Better Stack later, all the
-structured fields above are queryable — no parsing needed.
-
-### 3. Manifest in the export bucket — what got dumped
-
-Every successful job writes
-`admin-deleted-user-data/<timestamp>-<account_id>/manifest.json` last.
-
-The worker sweeps completed and failed exports every 15 minutes. Export
-objects are deleted after 24 hours, including partial exports from failed
-jobs; the job row retains only the deletion timestamp and row-count metadata.
-During the 24-hour recovery window, its presence means the entire export
-succeeded; its absence can mean either the export aborted partway or its
-retention window expired. Open the bucket in Supabase Studio → Storage to
-browse.
-
-## Local development
-
-```bash
-cd services/admin-delete-worker
-npm install
-cp env.example .env  # point at staging for local dev
-npm run dev          # tsx --watch
-```
-
-Trigger a test job by clicking "Opt out and delete data" in
-`/admin` on staging (signed in as `xiq_dev`). The worker should
-claim it within `POLL_INTERVAL_MS` (default 10s) and you should see
-the run materialize in `private.worker_runs` and the export folder
-appear in the `admin-deleted-user-data` bucket.
-
-## Known limitations / TODO
-
-- **Single replica.** The claim query uses `FOR UPDATE SKIP LOCKED`
-  so additional replicas would be safe in principle, but
-  `docker-compose.yml` runs exactly one container. Scale only if
-  throughput becomes a problem.
-- **No retry on failure.** A job marked `FAILED` stays `FAILED`.
-  Re-running is manual: `UPDATE private.admin_jobs SET status='QUEUED',
-  updated_at = now() WHERE key = '<uuid>'`. Worth adding bounded
-  retries if failures become routine.
-- **No alerting.** A failed job leaves a row in `private.worker_runs`
-  with `status='failed'` and an error message, but nothing pages
-  you. Wire whichever alerting you'd add to staging/prod monitoring
-  here.
-- **No metrics export.** If you want Prometheus/Grafana, add a
-  `prom-client` registry that scrapes `private.worker_runs` and a
-  small `/metrics` HTTP endpoint. Out of scope for the first cut.
-- **Per-account-only tables.** The exporter currently dumps tables
-  keyed on `account_id` plus three tweet-keyed tables
-  (`tweet_media`, `tweet_urls`, `user_mentions`). If other per-account
-  data appears in the schema (e.g. a new `conversations` filter,
-  `mentioned_users` for accounts the deleted user mentioned), add it
-  to `PER_ACCOUNT_TABLES` in `src/exporter.ts`.
+Do not deploy or cut over this worker independently of the PostgreSQL migration
+that makes the `archives` bucket private and installs policy write triggers.

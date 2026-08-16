@@ -33,6 +33,10 @@ CREATE INDEX "idx_tweet_media_tweet_id" ON "public"."tweet_media" USING "btree" 
 -- public.optin
 CREATE INDEX "idx_optin_opted_in" ON "public"."optin" USING "btree" ("opted_in") WHERE ("opted_in" = true);
 CREATE INDEX "idx_optin_explicit_optout" ON "public"."optin" USING "btree" ("explicit_optout") WHERE ("explicit_optout" = true);
+
+CREATE INDEX "blocked_scraping_users_username_idx" ON "tes"."blocked_scraping_users" USING "btree" (lower("username")) WHERE ("username" IS NOT NULL);
+
+CREATE INDEX "liked_tweets_author_account_id_idx" ON "public"."liked_tweets" USING "btree" ("author_account_id") WHERE ("author_account_id" IS NOT NULL);
 CREATE INDEX "idx_optin_user_id" ON "public"."optin" USING "btree" ("user_id");
 CREATE INDEX "idx_optin_username" ON "public"."optin" USING "btree" ("username");
 
@@ -113,3 +117,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS "digest_editions_one_published_per_date_idx"
 CREATE INDEX IF NOT EXISTS "digest_editions_public_archive_idx"
   ON "public"."digest_editions" ("digest_date" DESC, "published_at" DESC)
   WHERE "status" = 'published';
+CREATE INDEX IF NOT EXISTS "policy_storage_objects_account_ids_idx"
+ON "private"."policy_storage_objects" USING "gin" ("account_ids");
+
+CREATE INDEX IF NOT EXISTS "policy_storage_objects_username_hashes_idx"
+ON "private"."policy_storage_objects" USING "gin" ("username_hashes");

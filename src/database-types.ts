@@ -660,18 +660,24 @@ export type Database = {
       }
       liked_tweets: {
         Row: {
+          author_account_id: string | null
           fts: unknown | null
           full_text: string
+          is_tombstone: boolean
           tweet_id: string
         }
         Insert: {
+          author_account_id?: string | null
           fts?: unknown | null
           full_text: string
+          is_tombstone?: boolean
           tweet_id: string
         }
         Update: {
+          author_account_id?: string | null
           fts?: unknown | null
           full_text?: string
+          is_tombstone?: boolean
           tweet_id?: string
         }
         Relationships: []
@@ -738,18 +744,21 @@ export type Database = {
       }
       mentioned_users: {
         Row: {
+          is_tombstone: boolean
           name: string
           screen_name: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          is_tombstone?: boolean
           name: string
           screen_name: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          is_tombstone?: boolean
           name?: string
           screen_name?: string
           updated_at?: string
@@ -1544,6 +1553,13 @@ export type Database = {
       }
     }
     Functions: {
+      assert_archive_upload_allowed: {
+        Args: {
+          p_account_id: string
+          p_username: string
+        }
+        Returns: boolean
+      }
       admin_enqueue_delete_with_export: {
         Args: {
           p_account_id: string
@@ -2472,4 +2488,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-

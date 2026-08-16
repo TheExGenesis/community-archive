@@ -8,6 +8,7 @@ from toolz import partition_all
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import os.path
+import json
 
 # Determine the script's directory and project root
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -56,9 +57,22 @@ if files_to_upload:
 for username, file_path in tqdm.tqdm(files_to_upload):
     # Assuming filenames are like '<user_id>.json' or '<username>.json'.
     # Extract the identifier (user_id or username) from the filename without the extension.
-    destination_path = f"{username}/archive.json"
-
     try:
+        with open(file_path, "r", encoding="utf-8") as source:
+            archive = json.load(source)
+        account = archive["account"][0]["account"]
+        archive_username = account["username"].lower()
+        if archive_username != username.lower():
+            raise ValueError("archive username does not match its source folder")
+        destination_path = f"{archive_username}/archive.json"
+        supabase.rpc(
+            "assert_archive_upload_allowed",
+            {
+                "p_account_id": account["accountId"],
+                "p_username": archive_username,
+            },
+        ).execute()
+
         with open(file_path, "rb") as f:  # Open in binary mode for upload
             res = supabase.storage.from_(BUCKET_NAME).upload(
                 path=destination_path,

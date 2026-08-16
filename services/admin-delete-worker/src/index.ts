@@ -110,7 +110,7 @@ async function drainOnce(
       key: string
       job_name: string
       args: {
-        account_id: string
+        account_id?: string
         username: string
         reason?: string
         requested_by_user_id?: string
@@ -142,13 +142,16 @@ async function drainOnce(
     job_key: job.key,
     account_id: job.args.account_id,
   })
-  jobLogger.info({ args: job.args }, 'claimed job')
+  jobLogger.info('claimed policy tombstone cleanup job')
 
   const runId = await recorder.start({
     workerName: WORKER_NAME,
     jobKey: job.key,
     jobName: job.job_name,
-    jobArgs: job.args,
+    jobArgs: {
+      account_id: job.args.account_id ?? null,
+      enqueued_at: job.args.enqueued_at,
+    },
   })
 
   try {
@@ -164,27 +167,29 @@ async function drainOnce(
       UPDATE private.admin_jobs
          SET status     = 'DONE',
              updated_at = now(),
-             args       = COALESCE(args, '{}'::jsonb)
-                          || jsonb_build_object(
-                               'completed_at', now(),
-                               'export_prefix', ${result.export_prefix}::text
-                             )
+             args       = jsonb_strip_nulls(jsonb_build_object(
+                            'account_id', ${job.args.account_id ?? null}::text,
+                            'completed_at', now(),
+                            'export_prefix', ${result.export_prefix}::text
+                          ))
        WHERE key = ${job.key}
     `
     jobLogger.info({ result }, 'job done')
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
     jobLogger.error({ err: serializeError(e) }, 'job failed')
     await recorder.finish(runId, {
       status: 'failed',
-      error: message,
+      error: 'policy_tombstone_cleanup_failed',
     })
     await sql`
       UPDATE private.admin_jobs
          SET status     = 'FAILED',
              updated_at = now(),
-             args       = COALESCE(args, '{}'::jsonb)
-                          || jsonb_build_object('error', ${message}::text, 'failed_at', now())
+             args       = jsonb_strip_nulls(jsonb_build_object(
+                            'account_id', ${job.args.account_id ?? null}::text,
+                            'failure_code', 'policy_tombstone_cleanup_failed',
+                            'failed_at', now()
+                          ))
        WHERE key = ${job.key}
     `
   }

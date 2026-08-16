@@ -30,6 +30,10 @@ GRANT SELECT ON TABLE "public"."profile_settings" TO "readclient";
 GRANT SELECT ON TABLE "public"."profile_curation" TO "readclient";
 GRANT SELECT ON TABLE "public"."tweet_link_previews" TO "readclient";
 
+-- This legacy materialized view embeds historical tweet text and has no RLS.
+-- The app uses live public.tweets rows instead.
+REVOKE ALL ON TABLE "public"."account_activity_summary" FROM PUBLIC, "anon", "authenticated", "readclient";
+
 -- Public profile projections are readable by everyone and owner-writable.
 REVOKE ALL PRIVILEGES ON TABLE "public"."profile_settings" FROM "anon", "authenticated";
 REVOKE ALL PRIVILEGES ON TABLE "public"."profile_curation" FROM "anon", "authenticated";

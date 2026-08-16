@@ -3,7 +3,6 @@ import AccountTopTweetsClient from './AccountTopTweetsClient'
 import { FormattedUser } from '@/lib/types'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
-import { devLog } from '@/lib/devLog'
 import { PopularTweet } from '@/lib/types'
 import { repairProfileTweetText } from '@/lib/profileTweetText'
 
@@ -11,26 +10,31 @@ const AccountTopTweets = async ({ userData }: { userData: FormattedUser }) => {
   const cookieStore = cookies()
   const supabase = createServerClient(cookieStore)
 
-  const { data, error } = await supabase
-    .from('account_activity_summary')
-    .select('most_retweeted_tweets, most_favorited_tweets')
-    .eq('username', userData.username)
-    .single()
-  // devLog('account_activity_summary', data)
+  if (!userData.account_id) return null
 
-  if (error || !data) {
+  const selection =
+    'tweet_id,account_id,created_at,full_text,retweet_count,favorite_count,reply_to_tweet_id,reply_to_user_id,reply_to_username,archive_upload_id'
+  const [favoritedResult, retweetedResult] = await Promise.all([
+    supabase
+      .from('tweets')
+      .select(selection)
+      .eq('account_id', userData.account_id)
+      .order('favorite_count', { ascending: false })
+      .limit(100),
+    supabase
+      .from('tweets')
+      .select(selection)
+      .eq('account_id', userData.account_id)
+      .order('retweet_count', { ascending: false })
+      .limit(100),
+  ])
+
+  if (favoritedResult.error || retweetedResult.error) {
     return <div>Error fetching data</div>
   }
 
-  if (
-    !Array.isArray(data.most_favorited_tweets) ||
-    !Array.isArray(data.most_retweeted_tweets)
-  ) {
-    return <div>Invalid data format</div>
-  }
-
-  const favorited = data.most_favorited_tweets as PopularTweet[]
-  const retweeted = data.most_retweeted_tweets as PopularTweet[]
+  const favorited = (favoritedResult.data ?? []) as unknown as PopularTweet[]
+  const retweeted = (retweetedResult.data ?? []) as unknown as PopularTweet[]
   const repaired = await repairProfileTweetText(
     Array.from(
       new Map(

@@ -275,8 +275,10 @@ export default function ProfileContent({
       setExplicitOptOut(true)
       setOptInStatus(false)
 
-      await deleteArchive(supabase, userMetadata.provider_id)
-      await deleteStorageFiles(userMetadata.provider_id)
+      // persistOptOut() is serviced by the privileged API; the database policy
+      // trigger has already synchronously replaced authored rows with tombstones.
+      if (twitterUsername)
+        await deleteStorageFiles(twitterUsername.toLowerCase())
 
       setShowOptOutDialog(false)
       setSuccess('Data deleted and added to explicit opt-out list')

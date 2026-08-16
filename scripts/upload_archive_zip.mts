@@ -11,7 +11,7 @@ const { validateFileContents } = await import(
   '../src/lib/upload-archive/validateContent'
 )
 const { insertArchiveForProcessing } = await import('../src/lib/db_insert')
-const { uploadArchiveToStorage } = await import(
+const { uploadArchiveToStorageAsService } = await import(
   '../src/lib/upload-archive/uploadArchiveToStorage'
 )
 
@@ -105,12 +105,17 @@ const uploadArchive = async (filePath: string) => {
   try {
     const archive = await extractZip(filePath)
 
-    await uploadArchiveToStorage(supabase, archive)
+    const objectPath = await uploadArchiveToStorageAsService(supabase, archive)
     console.log('Archive uploaded to storage successfully')
 
-    await insertArchiveForProcessing(supabase, archive, (progress) => {
-      console.log(`${progress.phase}: ${progress.percent?.toFixed(2)}%`)
-    })
+    try {
+      await insertArchiveForProcessing(supabase, archive, (progress) => {
+        console.log(`${progress.phase}: ${progress.percent?.toFixed(2)}%`)
+      })
+    } catch (error) {
+      await supabase.storage.from('archives').remove([objectPath])
+      throw error
+    }
     console.log('Archive processing completed successfully')
   } catch (error) {
     console.error('Error uploading and processing archive:', error)

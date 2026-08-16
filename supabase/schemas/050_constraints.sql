@@ -95,6 +95,8 @@ ALTER TABLE ONLY "public"."following"
 
 ALTER TABLE ONLY "public"."liked_tweets"
     ADD CONSTRAINT "liked_tweets_pkey" PRIMARY KEY ("tweet_id");
+ALTER TABLE ONLY "public"."liked_tweets"
+    ADD CONSTRAINT "liked_tweets_policy_tombstone_is_minimal" CHECK ((("is_tombstone" IS NOT TRUE) OR ("full_text" = ''::"text")));
 
 ALTER TABLE ONLY "public"."likes"
     ADD CONSTRAINT "likes_account_id_liked_tweet_id_key" UNIQUE ("account_id", "liked_tweet_id");
@@ -103,6 +105,8 @@ ALTER TABLE ONLY "public"."likes"
 
 ALTER TABLE ONLY "public"."mentioned_users"
     ADD CONSTRAINT "mentioned_users_pkey" PRIMARY KEY ("user_id");
+ALTER TABLE ONLY "public"."mentioned_users"
+    ADD CONSTRAINT "mentioned_users_policy_tombstone_is_minimal" CHECK ((("is_tombstone" IS NOT TRUE) OR (("name" = ''::"text") AND ("screen_name" = ''::"text"))));
 
 ALTER TABLE ONLY "public"."tweet_media"
     ADD CONSTRAINT "tweet_media_pkey" PRIMARY KEY ("media_id");

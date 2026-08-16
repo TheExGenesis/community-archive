@@ -1,9 +1,8 @@
 # Docs
 
-- [Agent entry point](https://www.community-archive.org/llms.txt) machine-readable index of the docs, bulk dump, and API usage.
+- [Agent entry point](https://www.community-archive.org/llms.txt) machine-readable index of the docs and API usage.
 - [Website docs](https://www.community-archive.org/docs) quickstart for agents, developers, and researchers.
-- [Bulk data release](https://github.com/TheExGenesis/community-archive/releases/tag/data_export) canonical notes and download link for the Parquet export.
-- [API docs](./api-doc.md) how to download raw JSON data from storage, or query the database through the Supabase API.
+- [API docs](./api-doc.md) how owners download their private raw JSON or query the public database API.
 - [Declarative schemas](./supabase-declarative-schemas.md) how to evolve the database using ordered schema files and migrations.
 - [Daily Digest](./daily-digest.md) explains the editorial lab, reproducible generation runs, publication boundary, and rollout gates.
 - [Archive insertion performance plan](./archive-insertion-performance-plan.md) testable staged/COPY and membership design that preserves the Supabase contract.

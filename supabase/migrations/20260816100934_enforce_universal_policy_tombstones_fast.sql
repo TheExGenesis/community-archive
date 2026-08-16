@@ -6,6 +6,7 @@
 -- scans and concurrent index construction are intentionally outside this DDL.
 SET lock_timeout TO '5s';
 SET statement_timeout TO '10min';
+BEGIN;
 
 -- Queries commonly lock tweets/all_account before their nested detail tables.
 -- Take those root locks first so swapping triggers on detail tables cannot form
@@ -1662,5 +1663,6 @@ REVOKE EXECUTE ON FUNCTION tes.search_liked_tweets(
   text, text, text, date, date, integer, integer, integer, integer, integer
 ) FROM PUBLIC, anon, authenticated;
 
+COMMIT;
 RESET statement_timeout;
 RESET lock_timeout;

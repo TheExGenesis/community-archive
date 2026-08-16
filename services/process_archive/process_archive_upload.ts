@@ -954,7 +954,7 @@ async function resolveArchivePolicyDecisions(
         NULLIF(item->>'accountId', '') AS account_id,
         NULLIF(item->>'username', '') AS username,
         NULLIF(item->>'tweetId', '') AS tweet_id
-      FROM jsonb_array_elements(${JSON.stringify(candidates)}::jsonb) AS item
+      FROM jsonb_array_elements(${trx.json(candidates as never)}::jsonb) AS item
     ), resolved AS (
       SELECT
         candidate.key,

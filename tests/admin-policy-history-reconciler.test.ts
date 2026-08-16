@@ -4,14 +4,24 @@ import { join } from 'node:path'
 import {
   BLOCKED_AUTHORED_TWEETS_SQL,
   CONFIRMATION,
+  FAST_LIKED_TWEETS_BLOCKED_BATCH_SQL,
+  FAST_LIKED_TWEETS_CANONICAL_BATCH_SQL,
+  FAST_LIKED_TWEETS_CANONICAL_DELETE_SQL,
+  FAST_LIKED_TWEETS_SESSION_SETTINGS,
+  FAST_LIKED_TWEETS_STAGE_PLAN_SETTINGS,
+  FAST_LIKED_TWEETS_STAGE_SQL,
+  FAST_LIKED_TWEETS_TRIGGER_SUPPRESSION_SQL,
+  FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL,
   INDEX_SPECS,
   JOB_NAME,
+  POLICY_AUTHORITY_SHARE_LOCK_SQL,
   PRESERVED_INBOUND_RELATIONSHIP_PREDICATES,
   REPLY_USER_ID_SQL,
   REPLY_USERNAME_SQL,
   REQUIRED_PHASES,
   RETWEET_PAYLOAD_SQL,
   VERIFICATION_PHASE,
+  chargeLikedWriteBatch,
   currentPolicyPhases,
   indexDefinitionMatches,
   parseOptions,
@@ -63,7 +73,7 @@ describe('historical policy reconciler', () => {
       prepareOnly: false,
       verifyOnly: false,
       completeLiked: false,
-      batchSize: 5000,
+      batchSize: 250000,
       maxLikedBatches: 10,
     })
 
@@ -84,15 +94,31 @@ describe('historical policy reconciler', () => {
 
   test('bounds liked-tweet keyset batches', () => {
     expect(
-      parseOptions(['--batch-size=10000', '--max-liked-batches=100000'], {})
+      parseOptions(['--batch-size=1000000', '--max-liked-batches=100000'], {})
         .batchSize,
-    ).toBe(10000)
-    expect(() => parseOptions(['--batch-size=10001'], {})).toThrow(
-      'batch-size must be an integer between 1 and 10000',
+    ).toBe(1000000)
+    expect(() => parseOptions(['--batch-size=1000001'], {})).toThrow(
+      'batch-size must be an integer between 1 and 1000000',
     )
     expect(() => parseOptions(['--max-liked-batches=0'], {})).toThrow(
       'max-liked-batches must be an integer between 1 and 100000',
     )
+  })
+
+  test('does not charge empty liked completion probes to the write budget', () => {
+    let chargedBatches = chargeLikedWriteBatch(0, 0)
+    expect(chargedBatches).toBe(0)
+
+    chargedBatches = chargeLikedWriteBatch(chargedBatches, 250000)
+    expect(chargedBatches).toBe(1)
+    expect(chargeLikedWriteBatch(chargedBatches, 0)).toBe(1)
+
+    const operator = readFileSync(
+      join(process.cwd(), 'scripts/reconcile_policy_history.mts'),
+      'utf8',
+    )
+    expect(operator).not.toContain('batches < batchLimit')
+    expect(operator.match(/writeBatches < batchLimit/g)).toHaveLength(3)
   })
 
   test('owns three exact expression indexes plus the liked author index', () => {
@@ -177,5 +203,68 @@ describe('historical policy reconciler', () => {
       quote: 'quote_tweets.tweet_id = blocked_tweet.tweet_id',
       retweet: 'retweets.tweet_id = blocked_tweet.tweet_id',
     })
+  })
+
+  test('bounds every liked write after one set-wise canonical stage', () => {
+    expect(FAST_LIKED_TWEETS_STAGE_SQL).toContain(
+      'CREATE TEMP TABLE policy_reconcile_liked_canonical_stage',
+    )
+    expect(FAST_LIKED_TWEETS_STAGE_SQL).toContain('JOIN public.tweets AS tweet')
+    expect(FAST_LIKED_TWEETS_STAGE_PLAN_SETTINGS).toEqual([
+      "SET LOCAL work_mem TO '128MB'",
+      'SET LOCAL enable_nestloop TO off',
+      'SET LOCAL enable_mergejoin TO off',
+    ])
+    expect(FAST_LIKED_TWEETS_SESSION_SETTINGS).toContain(
+      "SET statement_timeout TO '20min'",
+    )
+    expect(FAST_LIKED_TWEETS_SESSION_SETTINGS.join(' ')).not.toContain(
+      "statement_timeout TO '0'",
+    )
+    expect(FAST_LIKED_TWEETS_BLOCKED_BATCH_SQL).toContain('LIMIT $1')
+    expect(FAST_LIKED_TWEETS_CANONICAL_BATCH_SQL).toContain('LIMIT $1')
+    expect(FAST_LIKED_TWEETS_CANONICAL_BATCH_SQL).toContain(
+      'ELSE liked.full_text',
+    )
+    expect(FAST_LIKED_TWEETS_CANONICAL_DELETE_SQL).toContain('LIMIT $1')
+    expect(FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL).toContain('LIMIT $1')
+    expect(FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL).toContain(
+      "'unknown-ctid:' || stats.checkpoint_ctid",
+    )
+    expect(FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL).toContain("SET full_text = ''")
+    expect(FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL).not.toContain('public.tweets')
+    expect(
+      [
+        FAST_LIKED_TWEETS_BLOCKED_BATCH_SQL,
+        FAST_LIKED_TWEETS_CANONICAL_BATCH_SQL,
+        FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL,
+      ].join('\n'),
+    ).not.toContain('DELETE FROM public.liked_tweets')
+  })
+
+  test('serializes policy snapshots before each policy-dependent write', () => {
+    expect(POLICY_AUTHORITY_SHARE_LOCK_SQL).toContain(
+      'LOCK TABLE public.optin, tes.blocked_scraping_users IN SHARE MODE',
+    )
+    expect(FAST_LIKED_TWEETS_TRIGGER_SUPPRESSION_SQL).toBe(
+      'SET LOCAL session_replication_role TO replica',
+    )
+
+    const operator = readFileSync(
+      join(process.cwd(), 'scripts/reconcile_policy_history.mts'),
+      'utf8',
+    )
+    const helperStart = operator.indexOf('const runPolicyLockedBatch = async')
+    const helperEnd = operator.indexOf('let blockedComplete', helperStart)
+    const helper = operator.slice(helperStart, helperEnd)
+    expect(helper.indexOf('POLICY_AUTHORITY_SHARE_LOCK_SQL')).toBeLessThan(
+      helper.indexOf('refreshBlockedIdentities(db)'),
+    )
+    expect(helper.indexOf('refreshBlockedIdentities(db)')).toBeLessThan(
+      helper.indexOf('FAST_LIKED_TWEETS_TRIGGER_SUPPRESSION_SQL'),
+    )
+    expect(operator).not.toContain(
+      'FROM private.reconcile_legacy_liked_tweets_batch(1)',
+    )
   })
 })

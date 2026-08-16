@@ -61,26 +61,45 @@ pnpm policy:reconcile-history --execute --prepare-only
 
 Start with bounded liked-tweet batches. Every other phase is an idempotent,
 set-based operation over indexed stable IDs or one corpus pass; there is no
-per-blocked-account tweets scan. The liked-tweet phase uses the migration's
-durable tweet-ID keyset checkpoint and commits each batch independently:
+per-blocked-account tweets scan. The liked-tweet fallback scans nearby heap
+pages in physical order and commits each checkpointed batch independently.
+This requires every PostgreSQL writer to remain paused; a restart safely skips
+rows already attributed or tombstoned:
 
 ```bash
 CONFIRM_POLICY_HISTORY_RECONCILIATION=reconcile-policy-history \
 POLICY_BACKFILL_DATABASE_URL="$DIRECT_POSTGRES_URL" \
 pnpm policy:reconcile-history \
-  --execute --batch-size=5000 --max-liked-batches=10
+  --execute --batch-size=250000 --max-liked-batches=1
 ```
 
 Rerun the same command to resume. After observing database latency, lock waits,
-WAL volume, replication lag, and disk headroom, explicitly continue the keyset
-phase to completion:
+WAL volume, replication lag, and disk headroom, use the production one-time
+completion path. It performs one set-wise hash join into a session-temporary
+stage, then attributes the small canonical intersection in bounded batches.
+Remaining unknown authors are tombstoned in bounded physical-order batches with
+a durable CTID checkpoint and no canonical-tweet lookup. Both paths retain every
+`tweet_id`; stored `fts` values recompute from the resulting `full_text`.
+
+Every blocked-author or canonical write transaction first takes `SHARE` locks
+on both PostgreSQL consent tables, then refreshes blocked identities, then
+suppresses row triggers transaction-locally. An opt-out therefore cannot commit
+between the policy snapshot and its write. The hash-join stage bounds `work_mem`
+at 128 MB, all statements retain a finite 20-minute timeout, and no durable
+write transaction updates more than `--batch-size` rows. Keep writers and any
+`VACUUM FULL`, `CLUSTER`, or table rewrite paused until completion:
 
 ```bash
 CONFIRM_POLICY_HISTORY_RECONCILIATION=reconcile-policy-history \
 POLICY_BACKFILL_DATABASE_URL="$DIRECT_POSTGRES_URL" \
 pnpm policy:reconcile-history \
-  --execute --batch-size=10000 --complete-liked
+  --execute --complete-liked
 ```
+
+The completion path is restart-safe: it restages only remaining canonical rows,
+while unknown rows resume from `unknown-ctid:(block,offset)`. The final empty
+unknown batch writes `private.policy_backfill_progress.completed_at` directly;
+it does not call the legacy keyset function or use a lexicographic sentinel.
 
 Every executable run re-applies all idempotent core phases before verification,
 even when older checkpoints exist. Each checkpoint stores both

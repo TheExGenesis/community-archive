@@ -17,13 +17,23 @@ const policyHistory =
 const {
   BLOCKED_AUTHORED_TWEETS_SQL,
   CONFIRMATION,
+  FAST_LIKED_TWEETS_BLOCKED_BATCH_SQL,
+  FAST_LIKED_TWEETS_CANONICAL_BATCH_SQL,
+  FAST_LIKED_TWEETS_CANONICAL_DELETE_SQL,
+  FAST_LIKED_TWEETS_SESSION_SETTINGS,
+  FAST_LIKED_TWEETS_STAGE_PLAN_SETTINGS,
+  FAST_LIKED_TWEETS_STAGE_SQL,
+  FAST_LIKED_TWEETS_TRIGGER_SUPPRESSION_SQL,
+  FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL,
   INDEX_SPECS,
   JOB_NAME,
+  POLICY_AUTHORITY_SHARE_LOCK_SQL,
   REPLY_USER_ID_SQL,
   REPLY_USERNAME_SQL,
   REQUIRED_PHASES,
   RETWEET_PAYLOAD_SQL,
   VERIFICATION_PHASE,
+  chargeLikedWriteBatch,
   currentPolicyPhases,
   indexDefinitionMatches,
   parseOptions,
@@ -83,9 +93,9 @@ Options:
   --execute                    Allow durable writes (requires confirmation)
   --prepare-only               Build/repair only the operator-owned indexes
   --verify-only                Run a read-only zero-violation audit
-  --batch-size=N               Liked-tweet keyset batch (1-10000, default 5000)
+  --batch-size=N               Physical liked-tweet batch (1-1000000, default 250000)
   --max-liked-batches=N        Bounded batches per invocation (default 10)
-  --complete-liked             Continue liked-tweet batches to completion
+  --complete-liked             Use the fast set-wise liked-tweet completion path
   --help                       Show this help
 `
 
@@ -177,6 +187,24 @@ const sql = databaseUrl
 
 function affected(result: { count: number | null }): number {
   return Number(result.count ?? 0)
+}
+
+// postgres.js reserve() pins a physical connection but its runtime object does
+// not expose begin(), despite the upstream type declaration. Keep the stage
+// and every bounded transaction on that one connection explicitly.
+async function withReservedTransaction<T>(
+  db: postgres.ReservedSql,
+  operation: (transaction: postgres.ReservedSql) => Promise<T>,
+): Promise<T> {
+  await db.unsafe('BEGIN')
+  try {
+    const result = await operation(db)
+    await db.unsafe('COMMIT')
+    return result
+  } catch (error) {
+    await db.unsafe('ROLLBACK')
+    throw error
+  }
 }
 
 async function assertFastMigrationContract(): Promise<void> {
@@ -299,9 +327,7 @@ async function clearVerificationCheckpoint(): Promise<void> {
   `
 }
 
-async function refreshBlockedIdentities(
-  db: postgres.TransactionSql,
-): Promise<void> {
+async function refreshBlockedIdentities(db: postgres.Sql): Promise<void> {
   await db.unsafe(`
     CREATE TEMP TABLE IF NOT EXISTS policy_reconcile_blocked_accounts (
       account_id text PRIMARY KEY
@@ -951,34 +977,179 @@ async function reconcileArchiveMetadata(
 }
 
 async function reconcileLikedTweets(): Promise<boolean> {
-  await sql.begin(async (db) => {
-    await db.unsafe("SET LOCAL lock_timeout TO '5s'")
-    await db.unsafe("SET LOCAL statement_timeout TO '20min'")
-    await refreshBlockedIdentities(db)
-    await db.unsafe(`
-      UPDATE public.liked_tweets AS liked
-      SET full_text = '', is_tombstone = true
-      FROM policy_reconcile_blocked_accounts AS blocked
-      WHERE liked.author_account_id = blocked.account_id
-        AND (liked.full_text <> '' OR liked.is_tombstone IS NOT TRUE)
-    `)
-  })
-
+  let acceleratedRows = 0
+  let batches = 0
+  let writeBatches = 0
   const batchLimit = options.completeLiked
     ? Number.POSITIVE_INFINITY
     : options.maxLikedBatches
-  let complete = false
-  let batches = 0
-  while (!complete && batches < batchLimit) {
-    const [batch] = await sql<LikedBatch[]>`
-      SELECT *
-      FROM private.reconcile_legacy_liked_tweets_batch(${options.batchSize})
+  const likedSession = await sql.reserve()
+
+  try {
+    for (const setting of FAST_LIKED_TWEETS_SESSION_SETTINGS) {
+      await likedSession.unsafe(setting)
+    }
+
+    const runPolicyLockedBatch = async <T,>(
+      operation: (db: postgres.ReservedSql) => Promise<T>,
+    ): Promise<T> => {
+      const result = await withReservedTransaction(likedSession, async (db) => {
+        // This must be the first statement in every policy-dependent write
+        // transaction. SHARE conflicts with opt-out table writes, so the
+        // refreshed identities cannot go stale before this batch commits.
+        await db.unsafe(POLICY_AUTHORITY_SHARE_LOCK_SQL)
+        await refreshBlockedIdentities(db)
+        await db.unsafe(FAST_LIKED_TWEETS_TRIGGER_SUPPRESSION_SQL)
+        return operation(db)
+      })
+      return result
+    }
+
+    let blockedComplete = false
+    while (!blockedComplete && writeBatches < batchLimit) {
+      const [batch] = await runPolicyLockedBatch((db) =>
+        db.unsafe<{ batch_rows: number }[]>(
+          FAST_LIKED_TWEETS_BLOCKED_BATCH_SQL,
+          [options.batchSize],
+        ),
+      )
+      batches += 1
+      writeBatches = chargeLikedWriteBatch(writeBatches, batch.batch_rows)
+      acceleratedRows += batch.batch_rows
+      blockedComplete = batch.batch_rows < options.batchSize
+      console.log(
+        `liked_tweets blocked-author batch ${batches}: ${batch.batch_rows} rows; complete=${blockedComplete}`,
+      )
+    }
+    if (!blockedComplete) {
+      console.log('liked_tweets: bounded run stopped during blocked authors')
+      return false
+    }
+
+    await withReservedTransaction(likedSession, async (db) => {
+      await db.unsafe(
+        'DROP TABLE IF EXISTS pg_temp.policy_reconcile_liked_canonical_stage',
+      )
+      for (const setting of FAST_LIKED_TWEETS_STAGE_PLAN_SETTINGS) {
+        await db.unsafe(setting)
+      }
+      await db.unsafe(FAST_LIKED_TWEETS_STAGE_SQL)
+      await db.unsafe(`
+        ALTER TABLE policy_reconcile_liked_canonical_stage
+        ADD PRIMARY KEY (tweet_id)
+      `)
+      await db.unsafe('ANALYZE policy_reconcile_liked_canonical_stage')
+    })
+
+    const [staged] = await likedSession<{ count: string | number }[]>`
+      SELECT pg_catalog.count(*) AS count
+      FROM policy_reconcile_liked_canonical_stage
     `
-    batches += 1
-    complete = batch.completed
-    console.log(
-      `liked_tweets batch ${batches}: ${batch.batch_rows} rows; checkpoint=${batch.checkpoint_tweet_id ?? 'none'}; complete=${batch.completed}`,
+    let stagedRemaining = Number(staged.count)
+    console.log(`liked_tweets canonical stage: ${stagedRemaining} rows`)
+
+    while (stagedRemaining > 0 && writeBatches < batchLimit) {
+      const result = await runPolicyLockedBatch(async (db) => {
+        const [batch] = await db.unsafe<
+          {
+            batch_rows: number
+            batch_tombstones_written: number
+          }[]
+        >(FAST_LIKED_TWEETS_CANONICAL_BATCH_SQL, [options.batchSize])
+        const removed = affected(
+          await db.unsafe(FAST_LIKED_TWEETS_CANONICAL_DELETE_SQL, [
+            options.batchSize,
+          ]),
+        )
+        return { ...batch, removed }
+      })
+      if (result.removed === 0) {
+        throw new Error('Canonical liked-tweet stage made no progress')
+      }
+      batches += 1
+      writeBatches = chargeLikedWriteBatch(writeBatches, result.batch_rows)
+      stagedRemaining -= result.removed
+      acceleratedRows += result.batch_rows
+      console.log(
+        `liked_tweets canonical batch ${batches}: ${result.batch_rows} rows; staged remaining=${stagedRemaining}`,
+      )
+    }
+    if (stagedRemaining > 0) {
+      console.log('liked_tweets: bounded run stopped during canonical stage')
+      return false
+    }
+
+    await withReservedTransaction(likedSession, async (db) => {
+      await db.unsafe(`
+        SELECT pg_catalog.pg_advisory_xact_lock(
+          pg_catalog.hashtextextended(
+            'community-archive-policy-backfill:legacy_liked_tweets_v1',
+            0
+          )
+        )
+      `)
+      await db.unsafe(`
+        INSERT INTO private.policy_backfill_progress (job_name)
+        VALUES ('legacy_liked_tweets_v1')
+        ON CONFLICT (job_name) DO NOTHING
+      `)
+      await db.unsafe(`
+        UPDATE private.policy_backfill_progress AS progress
+        SET last_tweet_id = CASE
+              WHEN progress.last_tweet_id ~
+                '^unknown-ctid:\\([0-9]+,[0-9]+\\)$'
+              THEN progress.last_tweet_id
+              ELSE 'unknown-ctid:(0,0)'
+            END,
+            completed_at = CASE
+              WHEN progress.last_tweet_id ~
+                '^unknown-ctid:\\([0-9]+,[0-9]+\\)$'
+              THEN progress.completed_at
+              ELSE NULL
+            END,
+            updated_at = pg_catalog.now()
+        WHERE progress.job_name = 'legacy_liked_tweets_v1'
+      `)
+    })
+
+    let unknownComplete = false
+    while (!unknownComplete && writeBatches < batchLimit) {
+      const [batch] = await withReservedTransaction(
+        likedSession,
+        async (db) => {
+          await db.unsafe(`
+          SELECT pg_catalog.pg_advisory_xact_lock(
+            pg_catalog.hashtextextended(
+              'community-archive-policy-backfill:legacy_liked_tweets_v1',
+              0
+            )
+          )
+        `)
+          await db.unsafe(FAST_LIKED_TWEETS_TRIGGER_SUPPRESSION_SQL)
+          return db.unsafe<LikedBatch[]>(FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL, [
+            options.batchSize,
+          ])
+        },
+      )
+      batches += 1
+      writeBatches = chargeLikedWriteBatch(writeBatches, batch.batch_rows)
+      acceleratedRows += batch.batch_rows
+      unknownComplete = batch.completed
+      console.log(
+        `liked_tweets unknown-author batch ${batches}: ${batch.batch_rows} rows; checkpoint=${batch.checkpoint_tweet_id ?? 'none'}; complete=${batch.completed}`,
+      )
+    }
+    if (!unknownComplete) {
+      console.log('liked_tweets: bounded run stopped during unknown authors')
+      return false
+    }
+  } finally {
+    await likedSession.unsafe(
+      'DROP TABLE IF EXISTS pg_temp.policy_reconcile_liked_canonical_stage',
     )
+    await likedSession.unsafe('RESET lock_timeout')
+    await likedSession.unsafe('RESET statement_timeout')
+    likedSession.release()
   }
 
   const [progress] = await sql<LikedProgress[]>`
@@ -998,10 +1169,14 @@ async function reconcileLikedTweets(): Promise<boolean> {
   }
 
   await sql.begin(async (db) => {
-    await recordPhase(db, 'liked_tweets', Number(progress.rows_processed))
+    await recordPhase(
+      db,
+      'liked_tweets',
+      Number(progress.rows_processed) + acceleratedRows,
+    )
   })
   console.log(
-    `liked_tweets: complete (${progress.rows_processed} processed; ${progress.tombstones_written} tombstones)`,
+    `liked_tweets: complete (${progress.rows_processed} checkpointed; ${acceleratedRows} accelerated this run; ${progress.tombstones_written} checkpointed tombstones)`,
   )
   return true
 }

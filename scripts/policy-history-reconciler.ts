@@ -173,7 +173,7 @@ export function parseOptions(
     prepareOnly,
     verifyOnly,
     completeLiked,
-    batchSize: integerFlag(argv, 'batch-size', 5000, 10000),
+    batchSize: integerFlag(argv, 'batch-size', 250000, 1000000),
     maxLikedBatches: integerFlag(argv, 'max-liked-batches', 10, 100000),
   }
 }
@@ -210,6 +210,13 @@ export function currentPolicyPhases(
       )
       .map((checkpoint) => checkpoint.phase),
   )
+}
+
+export function chargeLikedWriteBatch(
+  chargedBatches: number,
+  rowsWritten: number,
+): number {
+  return chargedBatches + (rowsWritten > 0 ? 1 : 0)
 }
 
 export const BLOCKED_AUTHORED_TWEETS_SQL = `
@@ -268,3 +275,180 @@ export const PRESERVED_INBOUND_RELATIONSHIP_PREDICATES = {
   quote: 'quote_tweets.tweet_id = blocked_tweet.tweet_id',
   retweet: 'retweets.tweet_id = blocked_tweet.tweet_id',
 } as const
+
+export const FAST_LIKED_TWEETS_SESSION_SETTINGS = [
+  "SET lock_timeout TO '5s'",
+  "SET statement_timeout TO '20min'",
+] as const
+
+export const FAST_LIKED_TWEETS_STAGE_PLAN_SETTINGS = [
+  "SET LOCAL work_mem TO '128MB'",
+  'SET LOCAL enable_nestloop TO off',
+  'SET LOCAL enable_mergejoin TO off',
+] as const
+
+export const POLICY_AUTHORITY_SHARE_LOCK_SQL = `
+  LOCK TABLE public.optin, tes.blocked_scraping_users IN SHARE MODE
+`
+
+export const FAST_LIKED_TWEETS_TRIGGER_SUPPRESSION_SQL =
+  'SET LOCAL session_replication_role TO replica'
+
+// This is the only corpus join. Disabling nested-loop and merge-join planning
+// makes PostgreSQL stage the small canonical intersection with one set-wise
+// hash join instead of millions of random primary-key lookups.
+export const FAST_LIKED_TWEETS_STAGE_SQL = `
+  CREATE TEMP TABLE policy_reconcile_liked_canonical_stage
+  ON COMMIT PRESERVE ROWS
+  AS
+  SELECT
+    liked.tweet_id,
+    tweet.account_id AS source_account_id,
+    tweet.is_tombstone AS source_is_tombstone
+  FROM public.liked_tweets AS liked
+  JOIN public.tweets AS tweet
+    ON tweet.tweet_id = liked.tweet_id
+  WHERE liked.author_account_id IS NULL
+    AND liked.is_tombstone IS FALSE
+`
+
+export const FAST_LIKED_TWEETS_BLOCKED_BATCH_SQL = `
+  WITH candidates AS MATERIALIZED (
+    SELECT liked.ctid AS source_ctid
+    FROM public.liked_tweets AS liked
+    JOIN policy_reconcile_blocked_accounts AS blocked
+      ON blocked.account_id = liked.author_account_id
+    WHERE liked.full_text <> '' OR liked.is_tombstone IS NOT TRUE
+    ORDER BY liked.ctid
+    LIMIT $1
+  ), updated AS (
+    UPDATE public.liked_tweets AS liked
+    SET full_text = '',
+        is_tombstone = true
+    FROM candidates AS candidate
+    WHERE liked.ctid = candidate.source_ctid
+    RETURNING 1
+  )
+  SELECT pg_catalog.count(*)::integer AS batch_rows
+  FROM updated
+`
+
+export const FAST_LIKED_TWEETS_CANONICAL_BATCH_SQL = `
+  WITH candidates AS MATERIALIZED (
+    SELECT
+      stage.tweet_id,
+      stage.source_account_id,
+      stage.source_is_tombstone,
+      (
+        stage.source_account_id IS NULL
+        OR stage.source_is_tombstone IS TRUE
+        OR blocked.account_id IS NOT NULL
+      ) AS write_tombstone
+    FROM policy_reconcile_liked_canonical_stage AS stage
+    LEFT JOIN policy_reconcile_blocked_accounts AS blocked
+      ON blocked.account_id = stage.source_account_id
+    ORDER BY stage.tweet_id
+    LIMIT $1
+  ), updated AS (
+    UPDATE public.liked_tweets AS liked
+    SET author_account_id = candidate.source_account_id,
+        full_text = CASE
+          WHEN candidate.write_tombstone THEN ''
+          ELSE liked.full_text
+        END,
+        is_tombstone = candidate.write_tombstone
+    FROM candidates AS candidate
+    WHERE liked.tweet_id = candidate.tweet_id
+      AND liked.author_account_id IS NULL
+      AND liked.is_tombstone IS FALSE
+    RETURNING candidate.write_tombstone AS tombstone_written
+  )
+  SELECT
+    pg_catalog.count(*)::integer AS batch_rows,
+    pg_catalog.count(*) FILTER (
+      WHERE updated.tombstone_written
+    )::integer AS batch_tombstones_written
+  FROM updated
+`
+
+export const FAST_LIKED_TWEETS_CANONICAL_DELETE_SQL = `
+  DELETE FROM policy_reconcile_liked_canonical_stage AS stage
+  WHERE stage.tweet_id IN (
+    SELECT candidate.tweet_id
+    FROM policy_reconcile_liked_canonical_stage AS candidate
+    ORDER BY candidate.tweet_id
+    LIMIT $1
+  )
+`
+
+// Unknown authors need no canonical lookup: scan the heap in physical order,
+// blank the payload, and advance the durable CTID cursor in the same bounded
+// transaction. Writers and table-rewriting maintenance remain paused, so an
+// interrupted run safely resumes after its last committed source page.
+export const FAST_LIKED_TWEETS_UNKNOWN_BATCH_SQL = `
+  WITH progress AS MATERIALIZED (
+    SELECT
+      CASE
+        WHEN checkpoint.last_tweet_id ~
+          '^unknown-ctid:\\([0-9]+,[0-9]+\\)$'
+        THEN substring(checkpoint.last_tweet_id FROM 14)::tid
+        ELSE '(0,0)'::tid
+      END AS source_cursor
+    FROM private.policy_backfill_progress AS checkpoint
+    WHERE checkpoint.job_name = 'legacy_liked_tweets_v1'
+    FOR UPDATE
+  ), candidates AS MATERIALIZED (
+    SELECT
+      liked.ctid AS source_ctid
+    FROM public.liked_tweets AS liked
+    CROSS JOIN progress
+    WHERE liked.ctid > progress.source_cursor
+      AND liked.author_account_id IS NULL
+      AND liked.is_tombstone IS FALSE
+    ORDER BY liked.ctid
+    LIMIT $1
+  ), updated AS (
+    UPDATE public.liked_tweets AS liked
+    SET full_text = '',
+        is_tombstone = true
+    FROM candidates AS candidate
+    WHERE liked.ctid = candidate.source_ctid
+    RETURNING candidate.source_ctid
+  ), batch_stats AS (
+    SELECT
+      pg_catalog.count(*)::integer AS batch_rows,
+      (
+        SELECT candidate.source_ctid::text
+        FROM candidates AS candidate
+        ORDER BY candidate.source_ctid DESC
+        LIMIT 1
+      ) AS checkpoint_ctid
+    FROM updated
+  )
+  UPDATE private.policy_backfill_progress AS checkpoint
+  SET last_tweet_id = CASE
+        WHEN stats.checkpoint_ctid IS NULL THEN checkpoint.last_tweet_id
+        ELSE 'unknown-ctid:' || stats.checkpoint_ctid
+      END,
+      rows_processed = checkpoint.rows_processed + stats.batch_rows,
+      tombstones_written =
+        checkpoint.tombstones_written + stats.batch_rows,
+      completed_at = CASE
+        WHEN stats.batch_rows < $1
+        THEN COALESCE(checkpoint.completed_at, pg_catalog.now())
+        ELSE NULL
+      END,
+      updated_at = pg_catalog.now()
+  FROM batch_stats AS stats
+  WHERE checkpoint.job_name = 'legacy_liked_tweets_v1'
+  RETURNING
+    stats.batch_rows,
+    0::integer AS batch_authors_backfilled,
+    stats.batch_rows AS batch_tombstones_written,
+    CASE
+      WHEN stats.checkpoint_ctid IS NULL THEN checkpoint.last_tweet_id
+      ELSE 'unknown-ctid:' || stats.checkpoint_ctid
+    END AS checkpoint_tweet_id,
+    (stats.batch_rows < $1) AS completed,
+    checkpoint.rows_processed AS total_rows_processed
+`

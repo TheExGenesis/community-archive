@@ -19,6 +19,7 @@ const {
   CONFIRMATION,
   INDEX_SPECS,
   JOB_NAME,
+  REPLY_USER_ID_SQL,
   REPLY_USERNAME_SQL,
   REQUIRED_PHASES,
   RETWEET_PAYLOAD_SQL,
@@ -687,8 +688,11 @@ async function reconcileReplyUsernames(
       `Reply tombstone anchor verification failed for ${invalidAnchor.count} relationships`,
     )
   }
-  const scrubbed = await db.unsafe(REPLY_USERNAME_SQL)
-  return affected(anchors) + affected(scrubbed)
+  const scrubbedById = await db.unsafe(REPLY_USER_ID_SQL)
+  const scrubbedByUsername = await db.unsafe(REPLY_USERNAME_SQL)
+  return (
+    affected(anchors) + affected(scrubbedById) + affected(scrubbedByUsername)
+  )
 }
 
 async function reconcileMentionedUsers(
@@ -1072,19 +1076,15 @@ async function readViolations(): Promise<Record<string, number>> {
         (
           SELECT pg_catalog.count(*)
           FROM public.tweets AS tweet
+          JOIN policy_reconcile_blocked_accounts AS blocked
+            ON blocked.account_id = tweet.reply_to_user_id
           WHERE tweet.reply_to_username IS NOT NULL
-            AND (
-              EXISTS (
-                SELECT 1
-                FROM policy_reconcile_blocked_accounts AS blocked
-                WHERE blocked.account_id = tweet.reply_to_user_id
-              )
-              OR EXISTS (
-                SELECT 1
-                FROM policy_reconcile_blocked_usernames AS blocked
-                WHERE blocked.username_lower = lower(tweet.reply_to_username)
-              )
-            )
+        ) + (
+          SELECT pg_catalog.count(*)
+          FROM public.tweets AS tweet
+          JOIN policy_reconcile_blocked_usernames AS blocked
+            ON blocked.username_lower = lower(tweet.reply_to_username)
+          WHERE tweet.reply_to_username IS NOT NULL
         ) AS tweets_reply_usernames,
         (
           SELECT pg_catalog.count(*)

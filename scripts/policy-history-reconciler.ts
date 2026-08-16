@@ -248,22 +248,20 @@ export const RETWEET_PAYLOAD_SQL = `
     AND tweet.full_text <> ''
 `
 
+export const REPLY_USER_ID_SQL = `
+  UPDATE public.tweets AS tweet
+  SET reply_to_username = NULL
+  FROM policy_reconcile_blocked_accounts AS blocked
+  WHERE tweet.reply_to_username IS NOT NULL
+    AND tweet.reply_to_user_id = blocked.account_id
+`
+
 export const REPLY_USERNAME_SQL = `
   UPDATE public.tweets AS tweet
   SET reply_to_username = NULL
+  FROM policy_reconcile_blocked_usernames AS blocked
   WHERE tweet.reply_to_username IS NOT NULL
-    AND (
-      EXISTS (
-        SELECT 1
-        FROM policy_reconcile_blocked_accounts AS blocked
-        WHERE blocked.account_id = tweet.reply_to_user_id
-      )
-      OR EXISTS (
-        SELECT 1
-        FROM policy_reconcile_blocked_usernames AS blocked
-        WHERE blocked.username_lower = lower(tweet.reply_to_username)
-      )
-    )
+    AND blocked.username_lower = lower(tweet.reply_to_username)
 `
 
 export const PRESERVED_INBOUND_RELATIONSHIP_PREDICATES = {

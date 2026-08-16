@@ -7,6 +7,7 @@ import {
   INDEX_SPECS,
   JOB_NAME,
   PRESERVED_INBOUND_RELATIONSHIP_PREDICATES,
+  REPLY_USER_ID_SQL,
   REPLY_USERNAME_SQL,
   REQUIRED_PHASES,
   RETWEET_PAYLOAD_SQL,
@@ -163,7 +164,14 @@ describe('historical policy reconciler', () => {
 
   test('scrubs copied identity while retaining allowed outer relationships', () => {
     expect(RETWEET_PAYLOAD_SQL).toContain("SET full_text = ''")
+    expect(REPLY_USER_ID_SQL).toContain(
+      'tweet.reply_to_user_id = blocked.account_id',
+    )
     expect(REPLY_USERNAME_SQL).toContain('SET reply_to_username = NULL')
+    expect(REPLY_USERNAME_SQL).toContain(
+      'blocked.username_lower = lower(tweet.reply_to_username)',
+    )
+    expect(REPLY_USERNAME_SQL).not.toContain('OR EXISTS')
     expect(REPLY_USERNAME_SQL).not.toContain('reply_to_tweet_id = NULL')
     expect(PRESERVED_INBOUND_RELATIONSHIP_PREDICATES).toEqual({
       quote: 'quote_tweets.tweet_id = blocked_tweet.tweet_id',

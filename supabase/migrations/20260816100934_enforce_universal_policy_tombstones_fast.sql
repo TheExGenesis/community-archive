@@ -1210,6 +1210,35 @@ REVOKE ALL ON FUNCTION public.tombstone_policy_account(text)
 GRANT EXECUTE ON FUNCTION public.tombstone_policy_account(text)
   TO service_role;
 
+-- Backfill the small policy table before installing the policy-block trigger.
+-- Otherwise this metadata-only UPDATE would invoke tombstone_policy_account
+-- once per historical block and turn the fast DDL into an unbounded corpus
+-- cleanup. Drop an older copy first so rerunning this idempotent migration has
+-- the same bounded behavior.
+DROP TRIGGER IF EXISTS apply_policy_block_tombstone
+  ON tes.blocked_scraping_users;
+DROP TRIGGER IF EXISTS capture_policy_block_username
+  ON tes.blocked_scraping_users;
+
+UPDATE tes.blocked_scraping_users AS blocked
+SET username = COALESCE(
+  NULLIF(BTRIM(blocked.username), ''),
+  (
+    SELECT NULLIF(BTRIM(account.username), '')
+    FROM public.all_account AS account
+    WHERE account.account_id = blocked.account_id
+    LIMIT 1
+  ),
+  (
+    SELECT NULLIF(BTRIM(consent.username), '')
+    FROM public.optin AS consent
+    WHERE consent.twitter_user_id = blocked.account_id
+    ORDER BY consent.updated_at DESC NULLS LAST
+    LIMIT 1
+  )
+)
+WHERE NULLIF(BTRIM(blocked.username), '') IS NULL;
+
 -- Store the username before a tombstone blanks public.all_account, then make a
 -- direct INSERT/UPDATE of any policy block synchronously remove authored data.
 DROP TRIGGER IF EXISTS capture_policy_block_username
@@ -1355,19 +1384,6 @@ BEGIN
   END LOOP;
 END;
 $$;
-
--- Backfill identifiers before any future tombstone blanks public usernames.
-UPDATE tes.blocked_scraping_users AS blocked
-SET username = COALESCE(
-  blocked.username,
-  NULLIF(BTRIM(account.username), ''),
-  NULLIF(BTRIM(consent.username), '')
-)
-FROM public.all_account AS account
-LEFT JOIN public.optin AS consent
-  ON consent.twitter_user_id = account.account_id
-WHERE account.account_id = blocked.account_id
-  AND blocked.username IS NULL;
 
 -- Existing liked-tweet payloads have no author provenance. Hide those legacy
 -- rows immediately, then reconcile them in bounded post-migration batches;

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import {
   BLOCKED_AUTHORED_TWEETS_SQL,
   CONFIRMATION,
@@ -14,6 +17,32 @@ import {
 } from '../scripts/policy-history-reconciler'
 
 describe('historical policy reconciler', () => {
+  test('keeps the fast policy metadata backfill ahead of cleanup triggers', () => {
+    const migration = readFileSync(
+      join(
+        process.cwd(),
+        'supabase/migrations/20260816100934_enforce_universal_policy_tombstones_fast.sql',
+      ),
+      'utf8',
+    )
+    const backfill = migration.indexOf(
+      'UPDATE tes.blocked_scraping_users AS blocked',
+    )
+    const cleanupTrigger = migration.indexOf(
+      'CREATE TRIGGER apply_policy_block_tombstone',
+    )
+
+    expect(backfill).toBeGreaterThan(0)
+    expect(cleanupTrigger).toBeGreaterThan(backfill)
+    const boundedBackfill = migration.slice(backfill, cleanupTrigger)
+    expect(boundedBackfill).toContain(
+      'WHERE account.account_id = blocked.account_id',
+    )
+    expect(boundedBackfill).not.toContain(
+      'FROM public.all_account AS account\nLEFT JOIN',
+    )
+  })
+
   test('is a dry run by default and requires an exact execute confirmation', () => {
     expect(parseOptions([], {})).toEqual({
       execute: false,

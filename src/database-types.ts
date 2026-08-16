@@ -1553,13 +1553,6 @@ export type Database = {
       }
     }
     Functions: {
-      assert_archive_upload_allowed: {
-        Args: {
-          p_account_id: string
-          p_username: string
-        }
-        Returns: boolean
-      }
       admin_enqueue_delete_with_export: {
         Args: {
           p_account_id: string
@@ -1631,6 +1624,20 @@ export type Database = {
           table_name: string
         }
         Returns: undefined
+      }
+      archive_upload_is_allowed: {
+        Args: {
+          p_account_id: string
+          p_username: string
+        }
+        Returns: boolean
+      }
+      assert_archive_upload_allowed: {
+        Args: {
+          p_account_id: string
+          p_username: string
+        }
+        Returns: boolean
       }
       commit_temp_data: {
         Args: {
@@ -1721,6 +1728,14 @@ export type Database = {
           p_suffix: string
         }
         Returns: undefined
+      }
+      enqueue_policy_archive_cleanup: {
+        Args: {
+          p_account_id: string
+          p_username: string
+          p_reason?: string
+        }
+        Returns: string
       }
       get_account_most_liked_tweets_archive_users: {
         Args: {
@@ -2231,6 +2246,31 @@ export type Database = {
         }
         Returns: undefined
       }
+      lock_policy_account: {
+        Args: {
+          p_account_id: string
+        }
+        Returns: undefined
+      }
+      policy_account_is_blocked: {
+        Args: {
+          p_account_id?: string
+          p_username?: string
+        }
+        Returns: boolean
+      }
+      policy_blocked_account_id: {
+        Args: {
+          p_username: string
+        }
+        Returns: string
+      }
+      policy_json_contains_blocked_author: {
+        Args: {
+          p_payload: Json
+        }
+        Returns: boolean
+      }
       process_and_insert_tweet_entities: {
         Args: {
           p_tweets: Json
@@ -2488,3 +2528,4 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+

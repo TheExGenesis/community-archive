@@ -616,16 +616,16 @@ describe('portal reads', () => {
     fetchPortalBangersPageMock.mockResolvedValueOnce({
       tweets: [
         {
-          id: 'today-low',
-          username: 'alice',
-          name: 'Alice',
+          id: 'boundary',
+          username: 'carol',
+          name: 'Carol',
           avatar: null,
-          text: 'Today with fewer quotes',
-          observedAt: '2026-08-10T13:00:00.000Z',
-          createdAt: '2026-08-10T13:00:00.000Z',
-          likes: 4,
+          text: 'Exactly 24 hours ago',
+          observedAt: '2026-08-09T14:00:00.000Z',
+          createdAt: '2026-08-09T14:00:00.000Z',
+          likes: 20,
           rts: 0,
-          quoteCount: 2,
+          quoteCount: 20,
         },
         {
           id: 'today-high',
@@ -640,37 +640,25 @@ describe('portal reads', () => {
           quoteCount: 9,
         },
         {
-          id: 'boundary',
-          username: 'carol',
-          name: 'Carol',
+          id: 'today-low',
+          username: 'alice',
+          name: 'Alice',
           avatar: null,
-          text: 'Exactly 24 hours ago',
-          observedAt: '2026-08-09T14:00:00.000Z',
-          createdAt: '2026-08-09T14:00:00.000Z',
-          likes: 20,
+          text: 'Today with fewer quotes',
+          observedAt: '2026-08-10T13:00:00.000Z',
+          createdAt: '2026-08-10T13:00:00.000Z',
+          likes: 4,
           rts: 0,
-          quoteCount: 20,
-        },
-        {
-          id: 'outside-window',
-          username: 'dave',
-          name: 'Dave',
-          avatar: null,
-          text: 'One second outside the window',
-          observedAt: '2026-08-09T13:59:59.000Z',
-          createdAt: '2026-08-09T13:59:59.000Z',
-          likes: 40,
-          rts: 0,
-          quoteCount: 40,
+          quoteCount: 2,
         },
       ],
       pagination: {
-        limit: 100,
+        limit: 30,
         offset: 0,
-        nextOffset: 100,
-        totalAvailable: 1_000,
-        snapshotSize: 1_000,
-        yearCounts: [{ year: 2026, count: 1_000 }],
+        nextOffset: null,
+        totalAvailable: 3,
+        snapshotSize: 3,
+        yearCounts: [{ year: 2026, count: 3 }],
         candidateRankingTruncated: false,
       },
     })
@@ -688,11 +676,13 @@ describe('portal reads', () => {
         },
       })
       expect(fetchPortalBangersPageMock).toHaveBeenCalledWith({
-        limit: 100,
+        limit: 30,
         offset: 0,
-        sort: 'recent',
+        sort: 'quotes',
         scope: 'all',
         query: '',
+        createdAfter: '2026-08-09T14:00:00.000Z',
+        createdBefore: '2026-08-10T14:00:00.000Z',
       })
     } finally {
       jest.useRealTimers()
@@ -716,26 +706,14 @@ describe('portal reads', () => {
           rts: 0,
           quoteCount: 2,
         },
-        {
-          id: 'outside-window',
-          username: 'bob',
-          name: 'Bob',
-          avatar: null,
-          text: 'One second outside the week',
-          observedAt: '2026-08-05T13:59:59.000Z',
-          createdAt: '2026-08-05T13:59:59.000Z',
-          likes: 8,
-          rts: 0,
-          quoteCount: 9,
-        },
       ],
       pagination: {
-        limit: 100,
+        limit: 30,
         offset: 0,
         nextOffset: null,
-        totalAvailable: 1_000,
-        snapshotSize: 1_000,
-        yearCounts: [{ year: 2026, count: 1_000 }],
+        totalAvailable: 1,
+        snapshotSize: 1,
+        yearCounts: [{ year: 2026, count: 1 }],
         candidateRankingTruncated: false,
       },
     })
@@ -746,6 +724,15 @@ describe('portal reads', () => {
       ).resolves.toMatchObject({
         tweets: [{ id: 'boundary' }],
         pagination: { totalAvailable: 1 },
+      })
+      expect(fetchPortalBangersPageMock).toHaveBeenCalledWith({
+        limit: 30,
+        offset: 0,
+        sort: 'quotes',
+        scope: 'all',
+        query: '',
+        createdAfter: '2026-08-05T14:00:00.000Z',
+        createdBefore: '2026-08-12T14:00:00.000Z',
       })
     } finally {
       jest.useRealTimers()
@@ -769,26 +756,14 @@ describe('portal reads', () => {
           rts: 0,
           quoteCount: 2,
         },
-        {
-          id: 'outside-quarter',
-          username: 'bob',
-          name: 'Bob',
-          avatar: null,
-          text: 'Outside the quarter',
-          observedAt: '2026-05-10T13:59:59.000Z',
-          createdAt: '2026-05-10T13:59:59.000Z',
-          likes: 8,
-          rts: 0,
-          quoteCount: 9,
-        },
       ],
       pagination: {
-        limit: 100,
+        limit: 30,
         offset: 0,
         nextOffset: null,
-        totalAvailable: 2,
-        snapshotSize: 2,
-        yearCounts: [{ year: 2026, count: 2 }],
+        totalAvailable: 1,
+        snapshotSize: 1,
+        yearCounts: [{ year: 2026, count: 1 }],
         candidateRankingTruncated: false,
       },
     })
@@ -799,6 +774,15 @@ describe('portal reads', () => {
       ).resolves.toMatchObject({
         tweets: [{ id: 'inside-quarter' }],
         pagination: { totalAvailable: 1 },
+      })
+      expect(fetchPortalBangersPageMock).toHaveBeenCalledWith({
+        limit: 30,
+        offset: 0,
+        sort: 'quotes',
+        scope: 'all',
+        query: '',
+        createdAfter: '2026-05-10T14:00:00.000Z',
+        createdBefore: '2026-08-10T14:00:00.000Z',
       })
     } finally {
       jest.useRealTimers()

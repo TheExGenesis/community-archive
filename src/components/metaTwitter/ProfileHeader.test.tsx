@@ -102,7 +102,7 @@ test('shows the archive icon without exposing another owner raw download', () =>
   ).not.toBeInTheDocument()
 })
 
-test('gives rostered contributors a distinct blue award badge', () => {
+test('gives rostered contributors a distinct gold award badge', () => {
   render(
     <ProfileHeader
       profile={{
@@ -114,9 +114,9 @@ test('gives rostered contributors a distinct blue award badge', () => {
   )
 
   expect(screen.getByText('Archive contributor')).toHaveClass(
-    'border-brand/40',
-    'bg-brand/10',
-    'text-brand',
+    'border-yellow-500/40',
+    'bg-yellow-500/10',
+    'text-yellow-600',
   )
   expect(screen.getByRole('img', { name: 'Archive uploaded' })).toBeVisible()
   expect(screen.getByText('Archive contributor').parentElement).toHaveClass(

@@ -5,6 +5,8 @@ import { cookies } from 'next/headers'
 import HomepageSearch from '@/components/HomepageSearch'
 import Portal from '@/components/portal/Portal'
 import Testimonials from '@/components/home/Testimonials'
+import CorpusRibbon from '@/components/home/CorpusRibbon'
+import TweetCountTicker from '@/components/home/TweetCountTicker'
 import { formatNumber } from '@/lib/formatNumber'
 import type { PortalData } from '@/lib/portal/types'
 import { createServerClient } from '@/utils/supabase'
@@ -95,7 +97,8 @@ export default async function ClassicHomepage({
                 <>
                   We preserve{' '}
                   <strong className="font-semibold text-foreground">
-                    {formatNumber(data.stats.totalTweets)} public tweets
+                    <TweetCountTicker value={data.stats.totalTweets} /> public
+                    tweets
                   </strong>{' '}
                   from{' '}
                   <strong className="font-semibold text-foreground">
@@ -135,6 +138,10 @@ export default async function ClassicHomepage({
 
           {homepagePeople}
         </div>
+
+        {!data.failures.historicalBangers && (
+          <CorpusRibbon tweets={data.historicalBangers} />
+        )}
       </section>
 
       <section className="bg-zinc-100/80 py-4 dark:bg-transparent sm:py-7">

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { FaDatabase, FaExternalLinkAlt, FaUsers } from 'react-icons/fa'
+import { FaExternalLinkAlt } from 'react-icons/fa'
 import {
   PortalData,
   PortalTweet,
@@ -184,6 +184,77 @@ function LiveCounter({ count }: { count: number }) {
   )
 }
 
+/** Evergreen sidebar destinations, condensed into one hairline-split list. */
+function UtilityLink({
+  href,
+  destination,
+  title,
+  note,
+  action,
+}: {
+  href: string
+  destination: DashboardDestination
+  title: string
+  note: string
+  action: string
+}) {
+  return (
+    <a
+      href={href}
+      onClick={() => captureDashboardDestination(destination, 'list', false)}
+      className="flex items-baseline justify-between gap-2.5 border-b border-zinc-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#26262a] dark:hover:bg-[#1f1f23]"
+    >
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[12.5px] font-bold">{title}</span>
+        <span className={`text-[11.5px] leading-snug ${MUTED}`}>{note}</span>
+      </span>
+      <span className="flex-shrink-0 text-[11.5px] font-semibold text-brand">
+        {action} &rarr;
+      </span>
+    </a>
+  )
+}
+
+function ArchiveMetric({
+  value,
+  label,
+  note,
+  noteClass,
+  live = false,
+  divider = false,
+}: {
+  value: string
+  label: string
+  note: string
+  noteClass?: string
+  live?: boolean
+  divider?: boolean
+}) {
+  return (
+    <span
+      className={`flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-zinc-200 py-1 dark:border-[#26262a] sm:py-0 ${
+        divider ? 'sm:mr-7 sm:border-r sm:pr-7' : ''
+      }`}
+    >
+      {live && (
+        <span
+          aria-hidden
+          className="h-[7px] w-[7px] animate-pulse self-center rounded-full bg-[#2acf80]"
+        />
+      )}
+      <span className="text-[20px] font-semibold tabular-nums" style={SERIF}>
+        {value}
+      </span>
+      <span
+        className={`text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
+      >
+        {label}
+      </span>
+      <span className={`text-[12px] ${noteClass ?? MUTED}`}>{note}</span>
+    </span>
+  )
+}
+
 function ArchiveOverview({
   stats,
   generatedDate,
@@ -198,30 +269,29 @@ function ArchiveOverview({
 }) {
   return (
     <>
-      <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-2">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[30px] font-semibold" style={SERIF}>
           Today on the archive
         </h2>
-        {!failures.liveAnalytics && (
-          <span className="flex items-baseline gap-3">
-            <LiveCounter count={stats.totalTweets} />
-            <span className={`text-[12.5px] ${MUTED}`}>{generatedDate}</span>
-          </span>
-        )}
+        <span className={`text-[12.5px] ${MUTED}`}>{generatedDate}</span>
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard
-          label="Tweets archived"
+      <div
+        className={`${CARD} mb-4 flex flex-col px-4 py-2.5 sm:flex-row sm:flex-wrap sm:items-center`}
+      >
+        <ArchiveMetric
+          divider
+          live={!failures.liveAnalytics}
           value={
             failures.liveAnalytics
               ? 'Unavailable'
               : stats.totalTweets.toLocaleString('en-US')
           }
+          label="Tweets archived"
           note={
             failures.liveAnalytics
               ? 'Tweet totals are temporarily unavailable.'
-              : `+${stats.streamedLast24Hours.toLocaleString('en-US')} streamed in the last 24h`
+              : `+${stats.streamedLast24Hours.toLocaleString('en-US')} in the last 24h`
           }
           noteClass={
             failures.liveAnalytics
@@ -229,13 +299,14 @@ function ArchiveOverview({
               : 'text-[#16a34a] dark:text-[#2acf80]'
           }
         />
-        <StatCard
-          label="Community members"
+        <ArchiveMetric
+          divider
           value={
             failures.memberCount
               ? 'Unavailable'
               : stats.accountCount.toLocaleString('en-US')
           }
+          label="Community members"
           note={
             failures.memberCount
               ? 'Member count is temporarily unavailable.'
@@ -246,13 +317,13 @@ function ArchiveOverview({
                   : 'volunteered archives'
           }
         />
-        <StatCard
-          label="Corpus span"
+        <ArchiveMetric
           value={
             failures.corpusRange
               ? 'Unavailable'
-              : `${stats.firstYear}–${stats.currentYear}`
+              : `${stats.firstYear}\u2013${stats.currentYear}`
           }
+          label="Corpus span"
           note={
             failures.corpusRange
               ? 'Corpus range is temporarily unavailable.'
@@ -261,6 +332,107 @@ function ArchiveOverview({
         />
       </div>
     </>
+  )
+}
+
+/**
+ * Lead story of the day. The digest is the one panel that changes wholesale
+ * every morning, so it runs full width above the dashboard grid.
+ */
+function DigestHero({ preview }: { preview: DigestPreview | null }) {
+  if (!preview) {
+    return (
+      <div className="mb-4 rounded-[4px] border border-dashed border-[#10516B]/50 bg-[#10516B]/5 px-6 py-6 text-center dark:border-[#7fb4cc]/40 dark:bg-[#7fb4cc]/10">
+        <div
+          className={`text-[11px] font-bold uppercase tracking-[0.14em] ${MUTED}`}
+        >
+          What happened yesterday
+        </div>
+        <p className="mt-2 text-[24px] font-semibold" style={SERIF}>
+          Today&rsquo;s edition is being assembled
+        </p>
+        <p
+          className={`mx-auto mt-2 max-w-[520px] text-[13px] leading-normal ${MUTED}`}
+        >
+          Editions are written from a frozen 24-hour banger set and reviewed
+          before publication. Yesterday&rsquo;s is still in the editorial lab.
+        </p>
+        <Link
+          href={BANGERS_WEEK_HREF}
+          onClick={() =>
+            captureDashboardDestination('recent_bangers', 'card', false)
+          }
+          className="mt-3.5 inline-block text-[12.5px] font-bold text-brand hover:underline"
+        >
+          Explore today&rsquo;s bangers &rarr;
+        </Link>
+      </div>
+    )
+  }
+
+  const openDigest = () =>
+    captureDashboardDestination('daily_digest', 'card', false)
+
+  return (
+    <div className="mb-4 rounded-[4px] bg-[#10516B] px-6 py-6 text-white sm:px-7">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/75">
+            {preview.isPreview
+              ? 'What happened yesterday \u00b7 Preview'
+              : 'What happened yesterday'}
+          </span>
+          <span className="text-[11px] text-white/75">
+            {preview.digestDate} &middot; {preview.storyCount}{' '}
+            {preview.storyCount === 1 ? 'story' : 'stories'}
+          </span>
+        </span>
+        <Link
+          href={preview.href}
+          onClick={openDigest}
+          className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-[12.5px] font-bold text-[#10516B] transition-colors hover:bg-white/90"
+        >
+          Read the edition &rarr;
+        </Link>
+      </div>
+
+      {preview.headline && (
+        <Link
+          href={preview.href}
+          onClick={openDigest}
+          className="mt-3.5 block max-w-[900px] text-[22px] font-semibold leading-[1.28] text-white decoration-1 underline-offset-[3px] hover:underline sm:text-[27px]"
+          style={SERIF}
+        >
+          {preview.headline}
+        </Link>
+      )}
+
+      {preview.stories.length > 0 && (
+        <div className="mt-5 grid grid-cols-1 gap-2 border-t border-white/25 pt-3 sm:grid-cols-2 lg:grid-cols-3">
+          {preview.stories.map((story) => (
+            <Link
+              key={story.slug}
+              href={`${preview.href}/${story.slug}`}
+              onClick={openDigest}
+              className="flex flex-col gap-1.5 rounded-[4px] px-3 py-2.5 transition-colors hover:bg-white/[0.14]"
+            >
+              <span className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-white/70">
+                {story.tag}
+              </span>
+              <span className="text-[14px] font-bold leading-snug">
+                {story.title}
+              </span>
+              <span className="text-[12.5px] leading-normal text-white/80">
+                {story.blurb}
+              </span>
+              <span className="mt-0.5 text-[11.5px] font-bold text-white/80">
+                Read story &rarr;
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -521,6 +693,8 @@ export default function Portal({
             failures={data.failures}
           />
 
+          <DigestHero preview={digestPreview} />
+
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
             <div className="flex h-full min-h-0 flex-col gap-4 lg:overflow-hidden">
               <div
@@ -570,7 +744,7 @@ export default function Portal({
                 historicalBanger ||
                 data.failures.recentBangers ||
                 data.failures.historicalBangers) && (
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {(recentBanger || data.failures.recentBangers) && (
                     <div className={`${CARD} min-w-0 overflow-hidden`}>
                       <PanelHeader
@@ -624,34 +798,6 @@ export default function Portal({
             </div>
 
             <div className="flex flex-col gap-4">
-              {digestPreview ? (
-                <Link
-                  href={digestPreview.href}
-                  onClick={() =>
-                    captureDashboardDestination('daily_digest', 'card', false)
-                  }
-                  className="group rounded-[4px] border border-zinc-950 bg-zinc-950 px-5 py-5 text-white transition-colors hover:border-zinc-700 hover:bg-zinc-800 dark:border-white dark:bg-white dark:text-zinc-950 dark:hover:border-zinc-200 dark:hover:bg-zinc-100"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[15px] font-bold">
-                      {digestPreview.isPreview
-                        ? 'What Happened Yesterday · Preview'
-                        : 'What Happened Yesterday'}
-                    </span>
-                    <span className="text-[12px] font-semibold text-white/75 group-hover:text-white dark:text-zinc-700 dark:group-hover:text-zinc-950">
-                      Read →
-                    </span>
-                  </div>
-                  <p className="mt-2 line-clamp-3 text-[13px] leading-5 text-zinc-300 dark:text-zinc-600">
-                    {digestPreview.executiveSummary}
-                  </p>
-                  <div className="mt-3 text-[11.5px] text-zinc-300 dark:text-zinc-600">
-                    {digestPreview.digestDate} · {digestPreview.storyCount}{' '}
-                    stories ·{' '}
-                    {digestPreview.storyTitles.slice(0, 3).join(' · ')}
-                  </div>
-                </Link>
-              ) : null}
               <div className={`${CARD} flex flex-col`}>
                 <PanelHeader
                   title="Trending terms · 7 days"
@@ -693,7 +839,7 @@ export default function Portal({
                           title={`${b.last7.toLocaleString('en-US')} tweets in the last 7 days; bar is relative to ${weeklyBars[0].term}`}
                         >
                           <div
-                            className="h-full rounded bg-brand"
+                            className="h-full rounded bg-chart-accent"
                             style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
                           />
                         </div>
@@ -798,54 +944,22 @@ export default function Portal({
                   )}
                 </div>
               </div>
-              <a
-                href={ARCHIVE_EXPORT_URL}
-                onClick={() =>
-                  captureDashboardDestination('data_export', 'card', false)
-                }
-                className={`${CARD} group flex items-center gap-3 px-4 py-4 transition-colors hover:border-brand/60`}
-              >
-                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[4px] border border-zinc-200 bg-zinc-50 text-brand dark:border-[#2a2a2e] dark:bg-[#121214]">
-                  <FaDatabase className="h-4 w-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13.5px] font-bold">
-                    Bulk export paused
-                  </span>
-                  <span
-                    className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
-                  >
-                    Learn why the historical Parquet file is private
-                  </span>
-                </span>
-                <span className="flex-shrink-0 text-[12px] font-semibold text-brand">
-                  Details →
-                </span>
-              </a>
-              <a
-                href={COMMUNITY_BUILDS_URL}
-                onClick={() =>
-                  captureDashboardDestination('community_builds', 'card', false)
-                }
-                className={`${CARD} group flex items-center gap-3 px-4 py-4 transition-colors hover:border-brand/60`}
-              >
-                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[4px] border border-zinc-200 bg-zinc-50 text-brand dark:border-[#2a2a2e] dark:bg-[#121214]">
-                  <FaUsers className="h-4 w-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13.5px] font-bold">
-                    Community Builds
-                  </span>
-                  <span
-                    className={`mt-0.5 block text-[12px] leading-snug ${MUTED}`}
-                  >
-                    Projects made with Community Archive data
-                  </span>
-                </span>
-                <span className="flex-shrink-0 text-[12px] font-semibold text-brand">
-                  Explore →
-                </span>
-              </a>
+              <div className={`${CARD} overflow-hidden`}>
+                <UtilityLink
+                  href={ARCHIVE_EXPORT_URL}
+                  destination="data_export"
+                  title="Bulk export paused"
+                  note="Why the historical Parquet file is private"
+                  action="Details"
+                />
+                <UtilityLink
+                  href={COMMUNITY_BUILDS_URL}
+                  destination="community_builds"
+                  title="Community Builds"
+                  note="Projects made with Community Archive data"
+                  action="Explore"
+                />
+              </div>
             </div>
           </div>
         </div>

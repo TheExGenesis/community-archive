@@ -198,9 +198,15 @@ export async function getLatestDigestPreview(): Promise<DigestPreview | null> {
   return {
     href: `/digest/${edition.digestDate}`,
     digestDate: edition.digestDate,
-    executiveSummary: edition.content.executiveSummary.join(' '),
+    headline: edition.content.executiveSummary[0] ?? '',
     storyCount: edition.content.stories.length,
-    storyTitles: edition.content.stories.map((story) => story.title),
+    stories: edition.content.stories.slice(0, 3).map((story) => ({
+      slug: story.slug,
+      // Older saved editions predate categories; the keyword is the fallback label.
+      tag: story.category ?? story.keyword,
+      title: story.title,
+      blurb: story.subtitle,
+    })),
     isPreview: edition.isPreview,
   }
 }

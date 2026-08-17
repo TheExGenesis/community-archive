@@ -90,6 +90,13 @@ describe.each<PortalView>(['home', 'stream'])(
       jest.restoreAllMocks()
     })
 
+    // The corpus total is a live counter on /stream and the first metric in
+    // the home dashboard strip.
+    const expectCorpusCount = () =>
+      expect(
+        screen.getByText(view === 'home' ? '14,000,000' : '14,000,000 tweets'),
+      ).toBeInTheDocument()
+
     test('polls from the latest cursor without changing the corpus snapshot count', async () => {
       const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
         ok: true,
@@ -113,19 +120,16 @@ describe.each<PortalView>(['home', 'stream'])(
         'after=2026-08-07T12%3A00%3A00.000Z&afterId=100',
       )
       expect(screen.getByText('fresh tweet')).toBeInTheDocument()
-      expect(screen.getByText('14,000,000 tweets')).toBeInTheDocument()
+      expectCorpusCount()
       if (view === 'home') {
-        expect(screen.getByText('14,000,000')).toBeInTheDocument()
-        expect(
-          screen.getByText('+2,400 streamed in the last 24h'),
-        ).toBeInTheDocument()
+        expect(screen.getByText('+2,400 in the last 24h')).toBeInTheDocument()
       }
 
       await act(async () => {
         jest.advanceTimersByTime(30_000)
         await Promise.resolve()
       })
-      expect(screen.getByText('14,000,000 tweets')).toBeInTheDocument()
+      expectCorpusCount()
 
       await act(async () => {
         jest.advanceTimersByTime(29_999)
@@ -139,7 +143,7 @@ describe.each<PortalView>(['home', 'stream'])(
         await Promise.resolve()
       })
       expect(fetchMock).toHaveBeenCalledTimes(2)
-      expect(screen.getByText('14,000,000 tweets')).toBeInTheDocument()
+      expectCorpusCount()
       expect(String(fetchMock.mock.calls[1][0])).toContain(
         'after=2026-08-07T12%3A01%3A00.000Z&afterId=101',
       )
@@ -148,10 +152,7 @@ describe.each<PortalView>(['home', 'stream'])(
         jest.advanceTimersByTime(240_000)
         await Promise.resolve()
       })
-      expect(screen.getByText('14,000,000 tweets')).toBeInTheDocument()
-      if (view === 'home') {
-        expect(screen.getByText('14,000,000')).toBeInTheDocument()
-      }
+      expectCorpusCount()
 
       unmount()
     })

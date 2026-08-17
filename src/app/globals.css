@@ -24,8 +24,13 @@
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
-    --brand: 217 91% 60%;
+    --brand: 197 74% 46%;
     --brand-foreground: 0 0% 100%;
+    /* Deep brand: emphasis surfaces only (banners, callouts) - never body text. */
+    --brand-deep: 199 74% 24%;
+    --brand-deep-foreground: 0 0% 100%;
+    /* Tracked off the brand so data viz never drifts from the accent. */
+    --chart-accent: 197 74% 46%;
     --radius: 0.3rem;
   }
 
@@ -50,8 +55,11 @@
     --border: 240 4% 16%;
     --input: 240 4% 16%;
     --ring: 0 0% 80%;
-    --brand: 217 91% 60%;
+    --brand: 197 74% 46%;
     --brand-foreground: 0 0% 100%;
+    --brand-deep: 199 74% 24%;
+    --brand-deep-foreground: 0 0% 100%;
+    --chart-accent: 197 74% 46%;
   }
 }
 
@@ -64,6 +72,15 @@
   }
   html {
     scroll-behavior: smooth;
+  }
+  /* Links inherit their surrounding color and lean on weight, not hue, to read
+     as links. Utility classes still win over this base rule. */
+  a {
+    color: inherit;
+    font-weight: 600;
+  }
+  a:hover {
+    text-decoration: underline;
   }
   /* Petrona is reserved for the hero (h1) and section headers (h2).
      Smaller headings (card titles, etc.) stay on the Manrope body font. */
@@ -86,4 +103,14 @@
 }
 .portal-slide-in {
   animation: portal-slide-in 0.35s ease-out;
+}
+
+/* Homepage hero: corpus ribbon marquee (the track is rendered twice) */
+@keyframes corpus-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
 }

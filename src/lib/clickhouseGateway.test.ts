@@ -34,6 +34,19 @@ describe('ClickHouse analytics gateway requests', () => {
     )
   })
 
+  test('allows only bounded member-directory parameters', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['member-directory'],
+      new URLSearchParams(
+        'limit=15&offset=30&sort_by=num_followers&sort_order=desc&search=alice&raw_sql=DROP',
+      ),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/member-directory?limit=15&offset=30&sort_by=num_followers&sort_order=desc&search=alice',
+    )
+  })
+
   test('allows only bounded tweet-search parameters', () => {
     const target = analyticsGatewayRequestUrl(
       ['search'],

@@ -1,6 +1,13 @@
 const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
   'corpus-count': new Set(),
   summary: new Set(),
+  'member-directory': new Set([
+    'limit',
+    'offset',
+    'sort_by',
+    'sort_order',
+    'search',
+  ]),
   'social-graph': new Set(),
   search: new Set([
     'q',

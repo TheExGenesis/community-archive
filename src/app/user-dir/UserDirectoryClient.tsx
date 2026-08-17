@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Search } from 'lucide-react'
 
@@ -19,7 +19,6 @@ import { MembershipStatusIcon } from '@/components/MembershipStatusIcon'
 import { formatNumber } from '@/lib/formatNumber'
 import { fetchUsers, getDirectoryProfileHref } from '@/lib/queries/fetchUsers'
 import { DirectoryUser, SortKey } from '@/lib/types'
-import { createBrowserClient } from '@/utils/supabase'
 
 export const USERS_PER_PAGE = 15
 
@@ -36,24 +35,28 @@ function formatJoinedDate(date: string | null) {
 
 interface UserDirectoryClientProps {
   totalCount: number | null
+  initialUsers: DirectoryUser[] | null
+  initialHasMore: boolean
 }
 
 export default function UserDirectoryClient({
   totalCount,
+  initialUsers,
+  initialHasMore,
 }: UserDirectoryClientProps) {
-  const supabase = useMemo(() => createBrowserClient(), [])
-  const [users, setUsers] = useState<DirectoryUser[]>([])
-  const [loading, setLoading] = useState(true)
+  const [users, setUsers] = useState<DirectoryUser[]>(initialUsers ?? [])
+  const [loading, setLoading] = useState(initialUsers === null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('num_followers')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [hasMore, setHasMore] = useState(true)
+  const [hasMore, setHasMore] = useState(initialHasMore)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const loadMoreTargetRef = useRef<HTMLDivElement>(null)
   const loadMoreInFlightRef = useRef(false)
   const requestVersionRef = useRef(0)
+  const skipInitialRequestRef = useRef(initialUsers !== null)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300)
@@ -61,6 +64,10 @@ export default function UserDirectoryClient({
   }, [searchQuery])
 
   useEffect(() => {
+    if (skipInitialRequestRef.current) {
+      skipInitialRequestRef.current = false
+      return
+    }
     let isCurrentRequest = true
     const requestVersion = ++requestVersionRef.current
 
@@ -70,7 +77,7 @@ export default function UserDirectoryClient({
 
       try {
         const search = debouncedSearch || undefined
-        const fetchedUsers = await fetchUsers(supabase, {
+        const page = await fetchUsers({
           limit: USERS_PER_PAGE,
           offset: 0,
           sortBy: sortKey,
@@ -80,13 +87,8 @@ export default function UserDirectoryClient({
 
         if (!isCurrentRequest || requestVersion !== requestVersionRef.current)
           return
-        setUsers(fetchedUsers)
-        setHasMore(
-          fetchedUsers.length === USERS_PER_PAGE &&
-            (Boolean(search) ||
-              totalCount === null ||
-              fetchedUsers.length < totalCount),
-        )
+        setUsers(page.users)
+        setHasMore(page.hasMore)
       } catch (err) {
         if (!isCurrentRequest) return
         setError('We could not load users. Please try again.')
@@ -100,7 +102,7 @@ export default function UserDirectoryClient({
     return () => {
       isCurrentRequest = false
     }
-  }, [debouncedSearch, sortKey, sortOrder, supabase, totalCount])
+  }, [debouncedSearch, sortKey, sortOrder])
 
   const loadMore = useCallback(async () => {
     if (loading || loadingMore || !hasMore || loadMoreInFlightRef.current) {
@@ -108,13 +110,12 @@ export default function UserDirectoryClient({
     }
 
     const requestVersion = requestVersionRef.current
-    const offset = users.length
     loadMoreInFlightRef.current = true
     setLoadingMore(true)
     setError(null)
 
     try {
-      const fetchedUsers = await fetchUsers(supabase, {
+      const page = await fetchUsers({
         limit: USERS_PER_PAGE,
         offset: users.length,
         sortBy: sortKey,
@@ -123,13 +124,8 @@ export default function UserDirectoryClient({
       })
       if (requestVersion !== requestVersionRef.current) return
 
-      setUsers((currentUsers) => [...currentUsers, ...fetchedUsers])
-      setHasMore(
-        fetchedUsers.length === USERS_PER_PAGE &&
-          (Boolean(debouncedSearch) ||
-            totalCount === null ||
-            offset + fetchedUsers.length < totalCount),
-      )
+      setUsers((currentUsers) => [...currentUsers, ...page.users])
+      setHasMore(page.hasMore)
     } catch (err) {
       if (requestVersion !== requestVersionRef.current) return
       setError('We could not load more members. Please try again.')
@@ -145,8 +141,6 @@ export default function UserDirectoryClient({
     loadingMore,
     sortKey,
     sortOrder,
-    supabase,
-    totalCount,
     users.length,
   ])
 

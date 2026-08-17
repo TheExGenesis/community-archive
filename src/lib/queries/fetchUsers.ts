@@ -1,5 +1,10 @@
-import { DirectoryUser, FormattedUser, SortKey } from '@/lib/types'
-import { SupabaseClient } from '@supabase/supabase-js'
+import {
+  DirectoryUser,
+  FormattedUser,
+  SortKey,
+  UserDirectoryPage,
+} from '@/lib/types'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { devLog } from '@/lib/devLog'
 import { rankUserSuggestions } from '@/lib/searchSuggestions'
 import type { UserSuggestion } from '@/lib/searchSuggestions'
@@ -25,9 +30,9 @@ export const getDirectoryProfileHref = (user: DirectoryUser) =>
   userProfileHref(user.username, user.account_id || user.directory_id)
 
 export const fetchUsers = async (
-  supabase: SupabaseClient,
   options?: FetchUsersOptions,
-): Promise<DirectoryUser[]> => {
+  fetchImpl: typeof fetch = fetch,
+): Promise<UserDirectoryPage> => {
   const {
     limit,
     offset = 0,
@@ -36,44 +41,25 @@ export const fetchUsers = async (
     search,
   } = options || {}
 
-  let query = supabase
-    .schema('public')
-    .from('user_directory')
-    .select(
-      `
-      account_id,
-      username,
-      account_display_name,
-      avatar_media_url,
-      num_followers,
-      archive_uploaded_at,
-      directory_id,
-      has_archive,
-      is_opted_in,
-      opted_in_at,
-      joined_at
-    `,
-    )
-
-  if (search) {
-    query = query.or(buildDirectorySearchFilter(search))
-  }
-
-  query = query.order(sortBy, {
-    ascending: sortOrder === 'asc',
-    nullsFirst: false,
+  const searchParams = new URLSearchParams({
+    limit: String(limit || 15),
+    offset: String(offset),
+    sort_by: sortBy,
+    sort_order: sortOrder,
   })
-  query = query.order('directory_id', { ascending: true })
+  if (search) searchParams.set('search', search)
 
-  if (limit) {
-    query = query.range(offset, offset + limit - 1)
+  const response = await fetchImpl(`/api/user-directory?${searchParams}`, {
+    cache: 'no-store',
+  })
+  if (!response.ok) {
+    throw new Error(`User directory request failed (${response.status})`)
   }
-
-  const { data, error } = await query
-
-  if (error) throw error
-
-  return (data as DirectoryUser[]) || []
+  const page = (await response.json()) as UserDirectoryPage
+  if (!Array.isArray(page?.users) || typeof page.hasMore !== 'boolean') {
+    throw new Error('User directory returned an invalid response')
+  }
+  return page
 }
 
 export const fetchUserSuggestions = async (

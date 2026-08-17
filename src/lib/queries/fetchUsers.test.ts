@@ -1,6 +1,7 @@
 import { DirectoryUser } from '@/lib/types'
 import {
   buildDirectorySearchFilter,
+  fetchUsers,
   getDirectoryProfileHref,
   getUserData,
 } from './fetchUsers'
@@ -30,6 +31,32 @@ describe('buildDirectorySearchFilter', () => {
   it('escapes quotes and backslashes inside quoted filter values', () => {
     expect(buildDirectorySearchFilter('a"b\\c')).toBe(
       'username.ilike."%a\\"b\\\\c%",account_display_name.ilike."%a\\"b\\\\c%"',
+    )
+  })
+})
+
+describe('fetchUsers', () => {
+  it('requests a bounded ClickHouse-backed website page', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ users: [directoryUser({})], hasMore: true }),
+    })
+
+    await expect(
+      fetchUsers(
+        {
+          limit: 15,
+          offset: 30,
+          sortBy: 'joined_at',
+          sortOrder: 'asc',
+          search: 'alice',
+        },
+        fetchImpl as unknown as typeof fetch,
+      ),
+    ).resolves.toMatchObject({ hasMore: true })
+    expect(fetchImpl).toHaveBeenCalledWith(
+      '/api/user-directory?limit=15&offset=30&sort_by=joined_at&sort_order=asc&search=alice',
+      { cache: 'no-store' },
     )
   })
 })

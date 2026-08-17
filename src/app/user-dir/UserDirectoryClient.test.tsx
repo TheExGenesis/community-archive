@@ -5,10 +5,6 @@ import UserDirectoryClient, { USERS_PER_PAGE } from './UserDirectoryClient'
 import { fetchUsers } from '@/lib/queries/fetchUsers'
 import type { DirectoryUser } from '@/lib/types'
 
-jest.mock('@/utils/supabase', () => ({
-  createBrowserClient: () => ({ kind: 'test-client' }),
-}))
-
 jest.mock('@/lib/queries/fetchUsers', () => ({
   fetchUsers: jest.fn(),
   getDirectoryProfileHref: (user: DirectoryUser) => `/user/${user.username}`,
@@ -53,33 +49,39 @@ describe('UserDirectoryClient', () => {
     })
   })
 
-  test('requests and renders only the first 15 users without an exact count query', async () => {
-    mockFetchUsers.mockResolvedValueOnce(
-      Array.from({ length: USERS_PER_PAGE }, (_, index) =>
-        directoryUser(index),
-      ),
+  test('renders the server-supplied first 15 users without a client refetch', async () => {
+    const initialUsers = Array.from({ length: USERS_PER_PAGE }, (_, index) =>
+      directoryUser(index),
     )
 
-    render(<UserDirectoryClient totalCount={740} />)
+    render(
+      <UserDirectoryClient
+        totalCount={740}
+        initialUsers={initialUsers}
+        initialHasMore
+      />,
+    )
 
     expect(await screen.findByText('15 of 740 users')).toBeInTheDocument()
-    expect(mockFetchUsers).toHaveBeenCalledTimes(1)
-    expect(mockFetchUsers).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ limit: 15, offset: 0 }),
-    )
+    expect(mockFetchUsers).not.toHaveBeenCalled()
   })
 
   test('loads the next page when the scroll target enters view', async () => {
-    mockFetchUsers
-      .mockResolvedValueOnce(
-        Array.from({ length: USERS_PER_PAGE }, (_, index) =>
-          directoryUser(index),
-        ),
-      )
-      .mockResolvedValueOnce([directoryUser(15), directoryUser(16)])
+    const initialUsers = Array.from({ length: USERS_PER_PAGE }, (_, index) =>
+      directoryUser(index),
+    )
+    mockFetchUsers.mockResolvedValueOnce({
+      users: [directoryUser(15), directoryUser(16)],
+      hasMore: false,
+    })
 
-    render(<UserDirectoryClient totalCount={740} />)
+    render(
+      <UserDirectoryClient
+        totalCount={740}
+        initialUsers={initialUsers}
+        initialHasMore
+      />,
+    )
 
     await screen.findByText('15 of 740 users')
     await waitFor(() =>
@@ -95,13 +97,31 @@ describe('UserDirectoryClient', () => {
     })
 
     expect(await screen.findByText('17 of 740 users')).toBeInTheDocument()
-    expect(mockFetchUsers).toHaveBeenNthCalledWith(
-      2,
-      expect.anything(),
+    expect(mockFetchUsers).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 15, offset: 15 }),
     )
     expect(
       screen.queryByRole('button', { name: 'Load more users' }),
     ).not.toBeInTheDocument()
+  })
+
+  test('loads in the browser when the server could not supply the first page', async () => {
+    mockFetchUsers.mockResolvedValueOnce({
+      users: [directoryUser(0)],
+      hasMore: false,
+    })
+
+    render(
+      <UserDirectoryClient
+        totalCount={740}
+        initialUsers={null}
+        initialHasMore
+      />,
+    )
+
+    expect(await screen.findByText('1 of 740 users')).toBeInTheDocument()
+    expect(mockFetchUsers).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 15, offset: 0 }),
+    )
   })
 })

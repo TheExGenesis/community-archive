@@ -37,7 +37,7 @@ export default function CorpusRibbon({ tweets }: { tweets: PortalTweet[] }) {
   if (items.length < 4) return null
 
   return (
-    <div className="mt-14 overflow-hidden [mask-image:linear-gradient(90deg,transparent,#000_10%,#000_90%,transparent)]">
+    <div className="mt-16 overflow-hidden [mask-image:linear-gradient(90deg,transparent,#000_10%,#000_90%,transparent)]">
       <div className="flex w-max gap-3 [animation:corpus-marquee_64s_linear_infinite] hover:[animation-play-state:paused] motion-reduce:animate-none">
         {[0, 1].map((pass) =>
           items.map((item) => (
@@ -48,7 +48,7 @@ export default function CorpusRibbon({ tweets }: { tweets: PortalTweet[] }) {
               tabIndex={pass === 1 ? -1 : undefined}
               className="flex items-center gap-2.5 whitespace-nowrap rounded-full border border-zinc-200 bg-white px-4 py-[9px] text-[13.5px] transition-colors hover:border-brand dark:border-[#26262a] dark:bg-[#1b1b1e]"
             >
-              <span className="text-[12.5px] font-semibold text-brand">
+              <span className="text-[12.5px] font-semibold text-brand-deep dark:text-brand">
                 @{item.who}
               </span>
               <span className={BODY}>{item.text}</span>

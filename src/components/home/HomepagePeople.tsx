@@ -67,7 +67,7 @@ export default async function HomepagePeople({
       : featuredCandidates
 
   return (
-    <div className="pt-2">
+    <div className="home-fade-in pt-2">
       <p className={labelClassName}>
         {personalized.length
           ? 'People you interact with most this year'

@@ -119,7 +119,7 @@ export default function Testimonials() {
             <Link
               key={testimonial.tweetId}
               href={`/tweets/${testimonial.tweetId}`}
-              className="group rounded-xl border border-border bg-background p-5 transition-colors hover:border-brand/60"
+              className="group rounded-xl border border-border bg-background p-5 transition-colors hover:border-brand-deep/60"
             >
               <blockquote className="text-[15px] leading-7 text-foreground">
                 “{testimonial.quote}”
@@ -129,9 +129,6 @@ export default function Testimonials() {
                 <span className="font-normal text-muted-foreground">
                   @{testimonial.handle}
                 </span>
-              </p>
-              <p className="mt-1 text-xs font-semibold text-brand group-hover:underline">
-                View in the archive →
               </p>
             </Link>
           ))}

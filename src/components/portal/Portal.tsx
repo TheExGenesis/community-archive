@@ -1,8 +1,9 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { FaExternalLinkAlt } from 'react-icons/fa'
+import { FaDatabase, FaExternalLinkAlt, FaUsers } from 'react-icons/fa'
 import {
   PortalData,
   PortalTweet,
@@ -184,27 +185,32 @@ function LiveCounter({ count }: { count: number }) {
   )
 }
 
-/** Evergreen sidebar destinations, condensed into one hairline-split list. */
+/** Evergreen sidebar destinations. */
 function UtilityLink({
   href,
   destination,
   title,
   note,
   action,
+  icon,
 }: {
   href: string
   destination: DashboardDestination
   title: string
   note: string
   action: string
+  icon: ReactNode
 }) {
   return (
     <a
       href={href}
-      onClick={() => captureDashboardDestination(destination, 'list', false)}
-      className="flex items-baseline justify-between gap-2.5 border-b border-zinc-200 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#26262a] dark:hover:bg-[#1f1f23]"
+      onClick={() => captureDashboardDestination(destination, 'card', false)}
+      className={`${CARD} flex items-center gap-3 px-4 py-3 font-normal transition-colors hover:border-brand`}
     >
-      <span className="flex min-w-0 flex-col gap-0.5">
+      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[4px] border border-zinc-200 bg-zinc-100 text-brand-icon dark:border-[#2a2a2e] dark:bg-[#121214]">
+        {icon}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-px">
         <span className="text-[12.5px] font-bold">{title}</span>
         <span className={`text-[11.5px] leading-snug ${MUTED}`}>{note}</span>
       </span>
@@ -342,7 +348,7 @@ function ArchiveOverview({
 function DigestHero({ preview }: { preview: DigestPreview | null }) {
   if (!preview) {
     return (
-      <div className="mb-4 rounded-[4px] border border-dashed border-[#10516B]/50 bg-[#10516B]/5 px-6 py-6 text-center dark:border-[#7fb4cc]/40 dark:bg-[#7fb4cc]/10">
+      <div className="mb-4 rounded-[4px] border border-dashed border-brand-deep/50 bg-brand-deep/5 px-6 py-6 text-center">
         <div
           className={`text-[11px] font-bold uppercase tracking-[0.14em] ${MUTED}`}
         >
@@ -374,7 +380,7 @@ function DigestHero({ preview }: { preview: DigestPreview | null }) {
     captureDashboardDestination('daily_digest', 'card', false)
 
   return (
-    <div className="mb-4 rounded-[4px] bg-[#10516B] px-6 py-6 text-white sm:px-7">
+    <div className="mb-4 rounded-[4px] bg-brand-deep px-6 py-6 text-brand-deep-foreground sm:px-7">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/75">
@@ -390,7 +396,7 @@ function DigestHero({ preview }: { preview: DigestPreview | null }) {
         <Link
           href={preview.href}
           onClick={openDigest}
-          className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-[12.5px] font-bold text-[#10516B] transition-colors hover:bg-white/90"
+          className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-[12.5px] font-bold text-brand-deep transition-colors hover:bg-white/90"
         >
           Read the edition &rarr;
         </Link>
@@ -944,13 +950,14 @@ export default function Portal({
                   )}
                 </div>
               </div>
-              <div className={`${CARD} overflow-hidden`}>
+              <div className="flex flex-col gap-3">
                 <UtilityLink
                   href={ARCHIVE_EXPORT_URL}
                   destination="data_export"
                   title="Bulk export paused"
                   note="Why the historical Parquet file is private"
                   action="Details"
+                  icon={<FaDatabase className="h-[17px] w-[17px]" />}
                 />
                 <UtilityLink
                   href={COMMUNITY_BUILDS_URL}
@@ -958,6 +965,7 @@ export default function Portal({
                   title="Community Builds"
                   note="Projects made with Community Archive data"
                   action="Explore"
+                  icon={<FaUsers className="h-[17px] w-[17px]" />}
                 />
               </div>
             </div>

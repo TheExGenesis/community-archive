@@ -81,7 +81,7 @@ export default async function ClassicHomepage({
 
   return (
     <main>
-      <section className="overflow-hidden bg-card pb-12 pt-14 dark:bg-background md:pb-16 md:pt-20">
+      <section className="overflow-hidden bg-card pb-7 pt-14 dark:bg-background md:pt-20">
         <div className="relative z-10 mx-auto w-full max-w-5xl space-y-9 px-4 text-center sm:px-6 lg:px-8">
           <div className="space-y-3">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
@@ -108,26 +108,6 @@ export default async function ClassicHomepage({
                 </>
               )}
             </p>
-            <p className="text-xs text-muted-foreground/80">
-              Backed by{' '}
-              <Link
-                href="https://survivalandflourishing.fund/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium transition-colors hover:text-brand hover:underline"
-              >
-                Survival and Flourishing Fund
-              </Link>{' '}
-              and{' '}
-              <Link
-                href="https://x.com/VitalikButerin"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium transition-colors hover:text-brand hover:underline"
-              >
-                Vitalik Buterin
-              </Link>
-            </p>
           </div>
 
           {showCta ? (
@@ -137,6 +117,27 @@ export default async function ClassicHomepage({
           ) : null}
 
           {homepagePeople}
+
+          <p className="text-xs text-muted-foreground/80">
+            Backed by{' '}
+            <Link
+              href="https://survivalandflourishing.fund/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium transition-colors hover:text-brand hover:underline"
+            >
+              Survival and Flourishing Fund
+            </Link>{' '}
+            and{' '}
+            <Link
+              href="https://x.com/VitalikButerin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium transition-colors hover:text-brand hover:underline"
+            >
+              Vitalik Buterin
+            </Link>
+          </p>
         </div>
 
         {!data.failures.historicalBangers && (

@@ -18,6 +18,12 @@ module.exports = {
           DEFAULT: 'hsl(var(--brand))',
           foreground: 'hsl(var(--brand-foreground))',
         },
+        'brand-deep': {
+          DEFAULT: 'hsl(var(--brand-deep))',
+          foreground: 'hsl(var(--brand-deep-foreground))',
+        },
+        'chart-accent': 'hsl(var(--chart-accent))',
+        'brand-icon': 'hsl(var(--brand-icon))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         primary: {

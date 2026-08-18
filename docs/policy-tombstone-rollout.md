@@ -1,8 +1,19 @@
 # Policy tombstone rollout
 
-Do not deploy the web or worker changes independently of the matching database
-migration. PostgreSQL consent must become the policy boundary before any writer
-or private download endpoint depends on it.
+PostgreSQL remains the consent authority. Active ingestion services must load
+that authority once per batch immediately before persistence and send the same
+policy-safe input independently to PostgreSQL and ClickHouse.
+
+The database no longer re-evaluates consent through row triggers on every
+account, tweet, child, archive metadata, Storage, or digest write. The archive
+worker, Firehose persistence worker, and autorefresh writer each fail closed at
+their ingestion boundary. Rare triggers on `optin` and
+`tes.blocked_scraping_users` remain so a newly recorded opt-out synchronously
+tombstones existing data.
+
+Do not deploy the trigger-removal migration until every active writer version
+with those boundary checks is confirmed live. Deployment and writer cutover are
+separate from this repository change.
 
 ## Migration ledger preflight
 
@@ -109,8 +120,10 @@ even when older checkpoints exist. Each checkpoint stores both
 `policy_version = 'universal_policy_tombstones_v1'` and the authoritative
 PostgreSQL consent fingerprint computed immediately before it is written. If an
 opt-out lands between phases, the final migration rejects mixed fingerprints;
-rerun the operator to converge the new policy snapshot. New blocks are also
-handled synchronously by the fast migration's write triggers.
+rerun the operator to converge the new policy snapshot. New blocks are handled
+synchronously by the policy-state event triggers. Every subsequent writer must
+independently reload the authoritative policy snapshot before persisting its
+batch.
 
 The reconciliation keeps `public.tweets.tweet_id` and
 `public.all_account.account_id`. It deletes content-bearing children only when
@@ -148,11 +161,11 @@ current-fingerprint `liked_tweets` and `verification` phases.
 
 The universal migration deliberately does not rewrite or index the multi-million
 row `public.liked_tweets` table. It immediately hides legacy content whose author
-is unknown, enforces content-free tombstones for every new write, installs a
-bounded reconciliation function, and adds the liked-tweet and mentioned-user
-minimal tombstone constraints as `NOT VALID`. PostgreSQL still enforces a
-`NOT VALID` check on new and changed rows; only the historical validation scans
-are deferred.
+is unknown, installs a bounded reconciliation function, and adds the liked-tweet
+and mentioned-user minimal tombstone constraints as `NOT VALID`. Active writers
+must provide content-free tombstones for blocked or unattributed authors before
+inserting. PostgreSQL still enforces a `NOT VALID` check on new and changed rows;
+only the historical validation scans are deferred.
 
 The operator accepts author provenance only from a matching canonical
 `public.tweets` row. It retains an allowed payload after recording that author's

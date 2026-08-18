@@ -58,6 +58,9 @@ function RecoverableArchiveAvatar({
         <AvatarImage
           src={avatarUrl}
           alt={`${avatar.username}'s avatar`}
+          // Radix only mounts the image once it has decoded, so the fade runs
+          // exactly when the photo replaces the letter fallback.
+          className="home-fade-in"
           onError={() => {
             setAvatarUrl(undefined)
             recoverAvatar()

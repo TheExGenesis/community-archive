@@ -34,14 +34,26 @@ GRANT SELECT ON TABLE "public"."tweet_link_previews" TO "readclient";
 -- The app uses live public.tweets rows instead.
 REVOKE ALL ON TABLE "public"."account_activity_summary" FROM PUBLIC, "anon", "authenticated", "readclient";
 
--- Public profile projections are readable by everyone and owner-writable.
+-- These tables are populated only by trusted service-role routes and workers.
+-- Public/authenticated clients retain read access but no direct write grants.
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE
+  "public"."all_profile",
+  "public"."followers",
+  "public"."following",
+  "public"."likes",
+  "public"."tweets",
+  "public"."tweet_media",
+  "public"."tweet_urls",
+  "public"."user_mentions",
+  "public"."optin"
+FROM "anon", "authenticated";
+
+-- Public profile projections are readable by everyone and service-role writable.
 REVOKE ALL PRIVILEGES ON TABLE "public"."profile_settings" FROM "anon", "authenticated";
 REVOKE ALL PRIVILEGES ON TABLE "public"."profile_curation" FROM "anon", "authenticated";
 REVOKE ALL PRIVILEGES ON TABLE "public"."tweet_link_previews" FROM "anon", "authenticated";
 GRANT SELECT ON TABLE "public"."profile_settings" TO "anon", "authenticated";
-GRANT INSERT, UPDATE ON TABLE "public"."profile_settings" TO "authenticated";
 GRANT SELECT ON TABLE "public"."profile_curation" TO "anon", "authenticated";
-GRANT INSERT, UPDATE, DELETE ON TABLE "public"."profile_curation" TO "authenticated";
 
 -- Link metadata is populated only by trusted server enrichment code.
 GRANT SELECT ON TABLE "public"."tweet_link_previews" TO "anon", "authenticated";

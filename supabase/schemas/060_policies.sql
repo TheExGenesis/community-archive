@@ -81,14 +81,10 @@ CREATE POLICY "Users can delete their own archive" ON "storage"."objects"
     )
   );
 
--- Modification policies for authenticated users
+-- Browser writes are limited to archive ownership and upload bookkeeping.
+-- All other archive corpus writes are performed by trusted service-role workers.
 CREATE POLICY "Data is modifiable by their users" ON "public"."all_account" TO "authenticated" USING (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))) WITH CHECK (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")));
-CREATE POLICY "Data is modifiable by their users" ON "public"."all_profile" TO "authenticated" USING (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))) WITH CHECK (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")));
 CREATE POLICY "Data is modifiable by their users" ON "public"."archive_upload" TO "authenticated" USING (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))) WITH CHECK (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")));
-CREATE POLICY "Data is modifiable by their users" ON "public"."followers" TO "authenticated" USING (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))) WITH CHECK (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")));
-CREATE POLICY "Data is modifiable by their users" ON "public"."following" TO "authenticated" USING (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))) WITH CHECK (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")));
-CREATE POLICY "Data is modifiable by their users" ON "public"."likes" TO "authenticated" USING (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))) WITH CHECK (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")));
-CREATE POLICY "Data is modifiable by their users" ON "public"."tweets" TO "authenticated" USING (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text"))) WITH CHECK (("account_id" = ((( SELECT "auth"."jwt"() AS "jwt") -> 'app_metadata'::"text") ->> 'provider_id'::"text")));
 
 -- Public read policies
 CREATE POLICY "Data is publicly visible" ON "public"."all_account" FOR SELECT USING (("is_tombstone" IS NOT TRUE));
@@ -98,27 +94,11 @@ CREATE POLICY "Data is publicly visible" ON "public"."followers" FOR SELECT USIN
 CREATE POLICY "Data is publicly visible" ON "public"."following" FOR SELECT USING (true);
 CREATE POLICY "Data is publicly visible" ON "public"."likes" FOR SELECT USING (true);
 
--- Entity-specific modify/read policies
+-- Entity read policies
 -- NOTE: liked_tweets and mentioned_users are global dedup tables written only by
 -- the service_role worker (which bypasses RLS). They intentionally have NO
 -- authenticated write policy: the previous "modifiable by their users" policy was
 -- uncorrelated to the row being changed and allowed cross-user modification (#370).
-CREATE POLICY "Entities are modifiable by their users" ON "public"."tweet_media" TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM "public"."tweets" "dt"
-  WHERE (("dt"."tweet_id" = "tweet_media"."tweet_id") AND ("dt"."account_id" = ( SELECT ("auth"."jwt"() ->> 'sub'::"text"))))))) WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."tweets" "dt"
-  WHERE (("dt"."tweet_id" = "tweet_media"."tweet_id") AND ("dt"."account_id" = ( SELECT ("auth"."jwt"() ->> 'sub'::"text")))))));
-CREATE POLICY "Entities are modifiable by their users" ON "public"."tweet_urls" TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM "public"."tweets" "dt"
-  WHERE (("dt"."tweet_id" = "tweet_urls"."tweet_id") AND ("dt"."account_id" = ( SELECT ("auth"."jwt"() ->> 'sub'::"text"))))))) WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."tweets" "dt"
-  WHERE (("dt"."tweet_id" = "tweet_urls"."tweet_id") AND ("dt"."account_id" = ( SELECT ("auth"."jwt"() ->> 'sub'::"text")))))));
-CREATE POLICY "Entities are modifiable by their users" ON "public"."user_mentions" TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM "public"."tweets" "dt"
-  WHERE (("dt"."tweet_id" = "user_mentions"."tweet_id") AND ("dt"."account_id" = ( SELECT ("auth"."jwt"() ->> 'sub'::"text"))))))) WITH CHECK ((EXISTS ( SELECT 1
-   FROM "public"."tweets" "dt"
-  WHERE (("dt"."tweet_id" = "user_mentions"."tweet_id") AND ("dt"."account_id" = ( SELECT ("auth"."jwt"() ->> 'sub'::"text")))))));
-
 CREATE POLICY "Entities are publicly visible" ON "public"."liked_tweets" FOR SELECT USING (
   "author_account_id" IS NOT NULL
   OR ("is_tombstone" = true AND "full_text" = '')
@@ -137,8 +117,6 @@ CREATE POLICY "Retweets are publicly visible" ON "public"."retweets" FOR SELECT 
 
 -- Opt-in table policies
 CREATE POLICY "Public can view opted-in users" ON "public"."optin" FOR SELECT USING (("opted_in" = true));
-CREATE POLICY "Users can create own opt-in record" ON "public"."optin" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
-CREATE POLICY "Users can update own opt-in status" ON "public"."optin" FOR UPDATE USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
 CREATE POLICY "Users can view own opt-in status" ON "public"."optin" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 -- Tweets public read policy
@@ -173,39 +151,10 @@ ALTER TABLE "public"."tweet_link_previews" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Profile settings are publicly visible"
   ON "public"."profile_settings" FOR SELECT
   TO "anon", "authenticated" USING (true);
-CREATE POLICY "Owners can insert profile settings"
-  ON "public"."profile_settings" FOR INSERT
-  TO "authenticated" WITH CHECK (
-    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
-  );
-CREATE POLICY "Owners can update profile settings"
-  ON "public"."profile_settings" FOR UPDATE
-  TO "authenticated" USING (
-    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
-  ) WITH CHECK (
-    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
-  );
 
 CREATE POLICY "Profile curation is publicly visible"
   ON "public"."profile_curation" FOR SELECT
   TO "anon", "authenticated" USING (true);
-CREATE POLICY "Owners can insert profile curation"
-  ON "public"."profile_curation" FOR INSERT
-  TO "authenticated" WITH CHECK (
-    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
-  );
-CREATE POLICY "Owners can update profile curation"
-  ON "public"."profile_curation" FOR UPDATE
-  TO "authenticated" USING (
-    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
-  ) WITH CHECK (
-    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
-  );
-CREATE POLICY "Owners can delete profile curation"
-  ON "public"."profile_curation" FOR DELETE
-  TO "authenticated" USING (
-    "account_id" = (SELECT "auth"."jwt"()->'app_metadata'->>'provider_id')
-  );
 
 CREATE POLICY "Tweet link previews are publicly visible"
   ON "public"."tweet_link_previews" FOR SELECT

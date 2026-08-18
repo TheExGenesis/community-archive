@@ -28,7 +28,6 @@ async function personalizedArchives(): Promise<AvatarType[]> {
 export function HomepagePeopleFallback() {
   return (
     <div className="pt-2">
-      <p className={labelClassName}>Featured archives</p>
       <div
         aria-hidden="true"
         className="mx-auto flex max-w-3xl flex-wrap justify-center gap-x-3 gap-y-4 pb-2"
@@ -67,12 +66,12 @@ export default async function HomepagePeople({
       : featuredCandidates
 
   return (
-    <div className="pt-2">
-      <p className={labelClassName}>
-        {personalized.length
-          ? 'People you interact with most this year'
-          : 'Featured archives'}
-      </p>
+    <div className="home-fade-in pt-2">
+      {personalized.length > 0 && (
+        <p className={labelClassName}>
+          People you interact with most this year
+        </p>
+      )}
       <div className="mx-auto w-full max-w-3xl">
         <AvatarList initialAvatars={archives} compact />
       </div>

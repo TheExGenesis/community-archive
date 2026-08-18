@@ -211,7 +211,7 @@ export default function HeroCTAButtons({
   }
 
   const getOptInButtonStyle = () => {
-    return 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-400 dark:hover:bg-green-300 dark:text-green-950'
+    return 'bg-brand text-brand-foreground hover:bg-brand/90'
   }
 
   return (
@@ -244,7 +244,7 @@ export default function HeroCTAButtons({
                 variant={isOptedIn ? 'default' : 'outline'}
                 className={`h-14 w-full px-8 text-lg font-semibold ${
                   isOptedIn
-                    ? 'bg-green-600 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300'
+                    ? 'bg-brand text-brand-foreground hover:bg-brand/90'
                     : 'border-2'
                 }`}
                 size="lg"

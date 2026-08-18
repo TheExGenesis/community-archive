@@ -2,7 +2,6 @@ import 'server-only'
 
 import { cache } from 'react'
 import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
-import { getProfileBangers } from '@/lib/metaTwitter/bangers'
 import {
   getCachedProfileHeader,
   resolveAccountId,
@@ -12,12 +11,6 @@ import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 export interface ResolvedProfile {
   accountId: string
   profile: ProfileHeaderData
-}
-
-export interface ProfilePreviewStats {
-  archivedQuotes: number
-  bangers: number
-  yearsArchived: number
 }
 
 /**
@@ -55,22 +48,6 @@ export const resolveProfile = cache(
         avatar_media_url: user.avatar_media_url,
         header_media_url: user.header_media_url ?? null,
       },
-    }
-  },
-)
-
-export const getProfilePreviewStats = cache(
-  async (accountId: string): Promise<ProfilePreviewStats | null> => {
-    const collection = await getProfileBangers(accountId)
-    if (!collection.available) return null
-
-    return {
-      archivedQuotes: collection.tweets.reduce(
-        (total, tweet) => total + tweet.quote_count,
-        0,
-      ),
-      bangers: collection.total,
-      yearsArchived: collection.yearCounts.length,
     }
   },
 )

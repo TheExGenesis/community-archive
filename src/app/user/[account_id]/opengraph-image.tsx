@@ -5,16 +5,19 @@ import { notFound } from 'next/navigation'
 import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 import { formatNumber } from '@/lib/formatNumber'
 import {
-  getProfilePreviewStats,
-  resolveProfile,
-  type ProfilePreviewStats,
-} from '@/lib/metaTwitter/profile'
+  MEMBERSHIP_BADGE_LABELS,
+  membershipBadge,
+} from '@/lib/metaTwitter/membershipBadge'
+import { resolveProfile } from '@/lib/metaTwitter/profile'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 
 export const alt = 'Community Archive user profile'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 export const revalidate = 3600
+// Header and avatar images are fetched from pbs.twimg.com while the image
+// renders; a slow upstream can outlast the 15s default and 504 the card.
+export const maxDuration = 60
 
 const colors = {
   brand: '#25aadf',
@@ -52,13 +55,79 @@ const headerImageUrl = (value: string | null) => {
 const avatarImageUrl = (value: string | null) =>
   safeTwitterImageUrl(getHighResolutionAvatarUrl(value))
 
+const joinedYear = (value: string | null) => {
+  if (!value) return null
+  const joined = new Date(value)
+  return Number.isNaN(joined.getTime()) ? null : String(joined.getUTCFullYear())
+}
+
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ alignItems: 'baseline', display: 'flex' }}>
-      <span style={{ fontSize: 26, fontWeight: 800 }}>{value}</span>
-      <span style={{ color: colors.muted, fontSize: 26, marginLeft: 7 }}>
+      <span style={{ fontSize: 25, fontWeight: 800 }}>{value}</span>
+      <span style={{ color: colors.muted, fontSize: 25, marginLeft: 7 }}>
         {label}
       </span>
+    </div>
+  )
+}
+
+function MembershipBadge({ profile }: { profile: ProfileHeaderData }) {
+  const badge = membershipBadge(profile)
+  if (!badge) return null
+  const label = MEMBERSHIP_BADGE_LABELS[badge]
+
+  return (
+    <div
+      style={{
+        alignItems: 'center',
+        background: '#e9f6fc',
+        border: `1px solid ${colors.brand}`,
+        borderRadius: 999,
+        color: colors.brand,
+        display: 'flex',
+        flexShrink: 0,
+        fontSize: 21,
+        fontWeight: 700,
+        marginLeft: 20,
+        padding: '5px 16px',
+      }}
+    >
+      {badge === 'archive' ? (
+        // Satori cannot render fragments inside <svg>, so each badge state
+        // supplies its own complete element rather than sharing one.
+        <svg
+          fill="none"
+          height="21"
+          stroke={colors.brand}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          viewBox="0 0 24 24"
+          width="21"
+        >
+          <rect x="2" y="3" width="20" height="5" rx="1" />
+          <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+          <path d="M10 12h4" />
+        </svg>
+      ) : (
+        <svg
+          fill="none"
+          height="21"
+          stroke={colors.brand}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          viewBox="0 0 24 24"
+          width="21"
+        >
+          <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9" />
+          <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5" />
+          <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5" />
+          <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1" />
+        </svg>
+      )}
+      <span style={{ marginLeft: 9 }}>{label}</span>
     </div>
   )
 }
@@ -66,15 +135,23 @@ function Metric({ label, value }: { label: string; value: string }) {
 function ProfilePreview({
   logoUrl,
   profile,
-  stats,
 }: {
   logoUrl: string
   profile: ProfileHeaderData
-  stats: ProfilePreviewStats | null
 }) {
   const headerUrl = headerImageUrl(profile.header_media_url)
   const avatarUrl = avatarImageUrl(profile.avatar_media_url)
   const bio = profile.bio?.replace(/\s+/g, ' ').trim() ?? ''
+  const joined = joinedYear(profile.created_at)
+  const metrics = [
+    { label: 'Posts', value: profile.num_tweets },
+    { label: 'Followers', value: profile.num_followers },
+  ]
+    .filter((metric) => metric.value !== null)
+    .map((metric) => ({
+      label: metric.label,
+      value: formatNumber(metric.value),
+    }))
 
   return (
     <div
@@ -216,30 +293,36 @@ function ProfilePreview({
             padding: '28px 64px 44px',
           }}
         >
-          <div style={{ alignItems: 'baseline', display: 'flex' }}>
+          <div style={{ alignItems: 'center', display: 'flex' }}>
             <span
               style={{
                 fontFamily: 'serif',
                 fontSize: 52,
                 fontWeight: 700,
                 lineHeight: 1,
-                maxWidth: 680,
+                maxWidth: 480,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}
             >
-              {truncate(profile.account_display_name, 42)}
+              {truncate(profile.account_display_name, 30)}
             </span>
             <span
               style={{
                 color: colors.muted,
                 fontSize: 28,
+                lineHeight: 1,
                 marginLeft: 16,
+                maxWidth: 260,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
-              @{truncate(profile.username, 30)}
+              @{truncate(profile.username, 20)}
             </span>
+            <MembershipBadge profile={profile} />
           </div>
 
           <div
@@ -256,29 +339,27 @@ function ProfilePreview({
             {bio ? truncate(bio, 145) : 'A profile in the Community Archive'}
           </div>
 
-          <div
-            style={{
-              alignItems: 'center',
-              display: 'flex',
-              marginTop: 18,
-            }}
-          >
-            <Metric
-              value={stats ? formatNumber(stats.bangers) : '—'}
-              label="Bangers"
-            />
-            <div style={{ display: 'flex', marginLeft: 40 }}>
-              <Metric
-                value={stats ? formatNumber(stats.archivedQuotes) : '—'}
-                label="Archived quotes"
-              />
-            </div>
-            <div style={{ display: 'flex', marginLeft: 40 }}>
-              <Metric
-                value={stats ? formatNumber(stats.yearsArchived) : '—'}
-                label="Years archived"
-              />
-            </div>
+          <div style={{ alignItems: 'center', display: 'flex', marginTop: 18 }}>
+            {metrics.map((metric, index) => (
+              <div
+                key={metric.label}
+                style={{ display: 'flex', marginLeft: index === 0 ? 0 : 34 }}
+              >
+                <Metric label={metric.label} value={metric.value} />
+              </div>
+            ))}
+            {joined ? (
+              <div
+                style={{
+                  color: colors.muted,
+                  display: 'flex',
+                  fontSize: 25,
+                  marginLeft: metrics.length === 0 ? 0 : 34,
+                }}
+              >
+                Joined {joined}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -293,29 +374,20 @@ export default async function Image({
 }) {
   const resolved = await resolveProfile(params.account_id)
   if (!resolved) notFound()
-  const [logo, stats] = await Promise.all([
-    readFile(
-      join(
-        process.cwd(),
-        'src',
-        'app',
-        'user',
-        '[account_id]',
-        'community-archive-logo-white.png',
-      ),
+  const logo = await readFile(
+    join(
+      process.cwd(),
+      'src',
+      'app',
+      'user',
+      '[account_id]',
+      'community-archive-logo-white.png',
     ),
-    getProfilePreviewStats(resolved.accountId),
-  ])
+  )
   const logoUrl = `data:image/png;base64,${logo.toString('base64')}`
 
   return new ImageResponse(
-    (
-      <ProfilePreview
-        logoUrl={logoUrl}
-        profile={resolved.profile}
-        stats={stats}
-      />
-    ),
+    <ProfilePreview logoUrl={logoUrl} profile={resolved.profile} />,
     size,
   )
 }

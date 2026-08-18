@@ -1,7 +1,6 @@
 const resolveAccountIdMock = jest.fn()
 const getCachedProfileHeaderMock = jest.fn()
 const getClickHouseUserProfileMock = jest.fn()
-const getProfileBangersMock = jest.fn()
 
 jest.mock('react', () => ({
   ...jest.requireActual('react'),
@@ -19,11 +18,7 @@ jest.mock('@/lib/clickhouseUserProfile', () => ({
     getClickHouseUserProfileMock(...args),
 }))
 
-jest.mock('@/lib/metaTwitter/bangers', () => ({
-  getProfileBangers: (...args: unknown[]) => getProfileBangersMock(...args),
-}))
-
-import { getProfilePreviewStats, resolveProfile } from './profile'
+import { resolveProfile } from './profile'
 
 const archivedProfile = {
   account_id: '42',
@@ -91,33 +86,4 @@ test('returns null when neither profile source can resolve the user', async () =
   getClickHouseUserProfileMock.mockResolvedValue(null)
 
   await expect(resolveProfile('missing')).resolves.toBeNull()
-})
-
-test('summarizes the profile collection for the preview card', async () => {
-  getProfileBangersMock.mockResolvedValue({
-    available: true,
-    total: 3,
-    yearCounts: [
-      { year: 2024, count: 2 },
-      { year: 2023, count: 1 },
-    ],
-    tweets: [{ quote_count: 5 }, { quote_count: 8 }, { quote_count: 2 }],
-  })
-
-  await expect(getProfilePreviewStats('42')).resolves.toEqual({
-    archivedQuotes: 15,
-    bangers: 3,
-    yearsArchived: 2,
-  })
-})
-
-test('omits preview stats when the analytical collection is unavailable', async () => {
-  getProfileBangersMock.mockResolvedValue({
-    available: false,
-    total: 0,
-    yearCounts: [],
-    tweets: [],
-  })
-
-  await expect(getProfilePreviewStats('42')).resolves.toBeNull()
 })

@@ -244,7 +244,7 @@ export default function HomeOptInWidget() {
         <Button
           onClick={handleOptIn}
           disabled={isLoading}
-          className="bg-green-600 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
+          className="bg-brand text-brand-foreground hover:bg-brand/90"
         >
           <Users className="mr-2 h-4 w-4" />
           {isLoading ? 'Processing...' : 'Opt In to Tweet Streaming'}

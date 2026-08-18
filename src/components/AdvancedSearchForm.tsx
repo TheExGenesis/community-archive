@@ -114,7 +114,7 @@ export default function AdvancedSearchForm() {
         </div>
         <Button
           type="submit"
-          className="h-10 bg-green-600 px-6 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
+          className="h-10 bg-brand px-6 text-brand-foreground hover:bg-brand/90"
         >
           <Search className="mr-2 h-4 w-4" />
           Search

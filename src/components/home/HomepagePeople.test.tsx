@@ -89,9 +89,8 @@ it('shows the eight cached interaction leaders to a signed-in member', async () 
 
   render(await HomepagePeople({ isMember: true }))
 
-  expect(
-    screen.getByText('People you interact with most this year'),
-  ).toBeInTheDocument()
+  // The personalized row is uncaptioned too; the avatars are the whole message.
+  expect(screen.queryByText(/interact with most/i)).not.toBeInTheDocument()
   expect(screen.getByTestId('homepage-avatars')).toHaveTextContent(
     Array.from(
       { length: 8 },
@@ -111,10 +110,6 @@ it('shows the eight cached interaction leaders to a signed-in member', async () 
 it('shows the representative sample to guests', async () => {
   render(await HomepagePeople({ isMember: false }))
 
-  // The unpersonalized row carries no caption; the avatars are the proof.
-  expect(
-    screen.queryByText('People you interact with most this year'),
-  ).not.toBeInTheDocument()
   expect(screen.getByTestId('homepage-avatars')).toHaveTextContent(
     'featured:1000',
   )
@@ -129,9 +124,6 @@ it('falls back to the representative sample when interaction data is absent', as
 
   render(await HomepagePeople({ isMember: true }))
 
-  expect(
-    screen.queryByText('People you interact with most this year'),
-  ).not.toBeInTheDocument()
   expect(screen.getByTestId('homepage-avatars')).toHaveTextContent(
     'featured:1000',
   )

@@ -91,7 +91,11 @@ export function analyticsGatewayRequestUrl(
     cleanPath[0] === 'user' &&
     /^[A-Za-z0-9_@]{1,80}$/.test(cleanPath[1])
   ) {
-    allowedParams = new Set(['limit', 'include_interactions'])
+    allowedParams = new Set([
+      'limit',
+      'include_interactions',
+      'include_top_tweets',
+    ])
   } else if (
     cleanPath.length === 3 &&
     cleanPath[0] === 'user' &&

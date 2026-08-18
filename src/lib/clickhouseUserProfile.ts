@@ -8,12 +8,23 @@ interface ClickHouseUserResponse {
       accountId?: unknown
       username?: unknown
       displayName?: unknown
+      createdAt?: unknown
       bio?: unknown
+      website?: unknown
+      location?: unknown
       avatarUrl?: unknown
       headerUrl?: unknown
       followers?: unknown
       following?: unknown
       statusCount?: unknown
+      likeCount?: unknown
+    }
+    membership?: {
+      isMember?: unknown
+      hasArchive?: unknown
+      isOptedIn?: unknown
+      joinedAt?: unknown
+      snapshotAt?: unknown
     }
     topTweets?: unknown
   }
@@ -40,6 +51,7 @@ export interface ClickHouseProfileTweet {
 export interface ClickHouseUserProfile {
   user: FormattedUser
   topTweets: ClickHouseProfileTweet[]
+  membershipResolved: boolean
 }
 
 const optionalText = (value: unknown): string | null =>
@@ -87,6 +99,7 @@ export async function getClickHouseUserProfile(
       new URLSearchParams({
         limit: '20',
         include_interactions: 'false',
+        include_top_tweets: 'false',
       }),
       { revalidate: 300, timeoutMs: 8_000 },
     )
@@ -95,27 +108,34 @@ export async function getClickHouseUserProfile(
     const username = optionalText(account?.username)
     if (!accountId || !/^\d{1,20}$/.test(accountId) || !username) return null
     const topTweets = response.data?.topTweets
+    const membership = response.data?.membership
+    const membershipResolved =
+      typeof membership?.isMember === 'boolean' &&
+      typeof membership?.hasArchive === 'boolean' &&
+      typeof membership?.isOptedIn === 'boolean'
 
     return {
       user: {
         account_id: accountId,
         username,
         account_display_name: optionalText(account?.displayName) || username,
-        created_at: null,
+        created_at: optionalText(account?.createdAt),
         bio: optionalText(account?.bio),
-        website: null,
-        location: null,
+        website: optionalText(account?.website),
+        location: optionalText(account?.location),
         avatar_media_url: optionalText(account?.avatarUrl),
         header_media_url: optionalText(account?.headerUrl),
         archive_at: null,
         num_tweets: optionalCount(account?.statusCount),
         num_followers: optionalCount(account?.followers),
         num_following: optionalCount(account?.following),
-        num_likes: null,
+        num_likes: optionalCount(account?.likeCount),
         archive_uploaded_at: null,
-        joined_at: null,
-        has_archive: false,
-        is_opted_in: false,
+        joined_at: membershipResolved
+          ? optionalText(membership?.joinedAt)
+          : null,
+        has_archive: membershipResolved && membership?.hasArchive === true,
+        is_opted_in: membershipResolved && membership?.isOptedIn === true,
       },
       topTweets: Array.isArray(topTweets)
         ? topTweets.flatMap((tweet) => {
@@ -123,6 +143,7 @@ export async function getClickHouseUserProfile(
             return parsed ? [parsed] : []
           })
         : [],
+      membershipResolved,
     }
   } catch {
     return null

@@ -20,42 +20,54 @@ export interface ProfilePreviewStats {
   yearsArchived: number
 }
 
+const resolvedClickHouseProfile = (
+  clickHouseProfile: Awaited<ReturnType<typeof getClickHouseUserProfile>>,
+): ResolvedProfile | null => {
+  const accountId = clickHouseProfile?.user.account_id
+  if (!clickHouseProfile || !accountId) return null
+  const user = clickHouseProfile.user
+  return {
+    accountId,
+    profile: {
+      account_id: accountId,
+      username: user.username,
+      account_display_name: user.account_display_name,
+      created_at: user.created_at,
+      num_tweets: user.num_tweets,
+      num_followers: user.num_followers,
+      num_following: user.num_following,
+      num_likes: user.num_likes,
+      has_archive: user.has_archive,
+      is_opted_in: user.is_opted_in,
+      bio: user.bio,
+      website: user.website,
+      location: user.location,
+      avatar_media_url: user.avatar_media_url,
+      header_media_url: user.header_media_url ?? null,
+    },
+  }
+}
+
 /**
  * Resolves either a stable account ID or a username to the shared profile
  * payload used by the page, its metadata, and its social preview image.
  */
 export const resolveProfile = cache(
   async (param: string): Promise<ResolvedProfile | null> => {
+    const clickHouseProfile = await getClickHouseUserProfile(param)
+    if (clickHouseProfile?.membershipResolved) {
+      return resolvedClickHouseProfile(clickHouseProfile)
+    }
+
+    // Compatibility fallback for a gateway release that predates projected
+    // membership fields, or for a temporarily unavailable analytical path.
     const archiveAccountId = await resolveAccountId(param)
     if (archiveAccountId) {
       const profile = await getCachedProfileHeader(archiveAccountId)
       if (profile) return { accountId: archiveAccountId, profile }
     }
 
-    const clickHouseProfile = await getClickHouseUserProfile(param)
-    const accountId = clickHouseProfile?.user.account_id
-    if (!clickHouseProfile || !accountId) return null
-    const user = clickHouseProfile.user
-    return {
-      accountId,
-      profile: {
-        account_id: accountId,
-        username: user.username,
-        account_display_name: user.account_display_name,
-        created_at: user.created_at,
-        num_tweets: user.num_tweets,
-        num_followers: user.num_followers,
-        num_following: user.num_following,
-        num_likes: user.num_likes,
-        has_archive: user.has_archive,
-        is_opted_in: user.is_opted_in,
-        bio: user.bio,
-        website: user.website,
-        location: user.location,
-        avatar_media_url: user.avatar_media_url,
-        header_media_url: user.header_media_url ?? null,
-      },
-    }
+    return resolvedClickHouseProfile(clickHouseProfile)
   },
 )
 

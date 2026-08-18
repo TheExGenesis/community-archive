@@ -47,7 +47,27 @@ beforeEach(() => {
   jest.clearAllMocks()
 })
 
-test('prefers the authoritative archived profile', async () => {
+test('prefers the projected member profile without PostgreSQL lookups', async () => {
+  getClickHouseUserProfileMock.mockResolvedValue({
+    user: archivedProfile,
+    topTweets: [],
+    membershipResolved: true,
+  })
+
+  await expect(resolveProfile('alice')).resolves.toEqual({
+    accountId: '42',
+    profile: archivedProfile,
+  })
+  expect(resolveAccountIdMock).not.toHaveBeenCalled()
+  expect(getCachedProfileHeaderMock).not.toHaveBeenCalled()
+})
+
+test('uses PostgreSQL as a compatibility fallback for an older gateway', async () => {
+  getClickHouseUserProfileMock.mockResolvedValue({
+    user: archivedProfile,
+    topTweets: [],
+    membershipResolved: false,
+  })
   resolveAccountIdMock.mockResolvedValue('42')
   getCachedProfileHeaderMock.mockResolvedValue(archivedProfile)
 
@@ -55,11 +75,9 @@ test('prefers the authoritative archived profile', async () => {
     accountId: '42',
     profile: archivedProfile,
   })
-  expect(getClickHouseUserProfileMock).not.toHaveBeenCalled()
 })
 
-test('maps the analytical fallback to the shared profile shape', async () => {
-  resolveAccountIdMock.mockResolvedValue(null)
+test('maps a nonmember analytical fallback to the shared profile shape', async () => {
   getClickHouseUserProfileMock.mockResolvedValue({
     user: {
       ...archivedProfile,
@@ -72,7 +90,9 @@ test('maps the analytical fallback to the shared profile shape', async () => {
       header_media_url: undefined,
     },
     topTweets: [],
+    membershipResolved: false,
   })
+  resolveAccountIdMock.mockResolvedValue(null)
 
   await expect(resolveProfile('bob')).resolves.toMatchObject({
     accountId: '77',

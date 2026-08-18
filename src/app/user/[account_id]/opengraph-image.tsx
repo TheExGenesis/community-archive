@@ -28,7 +28,6 @@ const colors = {
   card: '#ffffff',
   foreground: '#111113',
   muted: '#777780',
-  border: '#e1e1e5',
 }
 
 const truncate = (value: string, maximum: number) =>
@@ -167,9 +166,12 @@ function ProfilePreview({
     }))
 
   return (
+    // Full bleed on purpose. Every surface that renders a social card rounds it
+    // with its own radius at its own display size, so any corner the image
+    // rounds itself only shows up as a pale sliver outside theirs.
     <div
       style={{
-        background: '#f4f4f5',
+        background: colors.card,
         display: 'flex',
         height: '100%',
         width: '100%',
@@ -178,8 +180,6 @@ function ProfilePreview({
       <div
         style={{
           background: colors.card,
-          border: `1px solid ${colors.border}`,
-          borderRadius: 32,
           color: colors.foreground,
           display: 'flex',
           flexDirection: 'column',

@@ -430,11 +430,8 @@ function DigestHero({ preview }: { preview: DigestPreview | null }) {
                 index > 0 ? 'lg:border-l lg:pl-7' : ''
               } ${index < preview.stories.length - 1 ? 'lg:pr-7' : ''}`}
             >
-              <div className="mb-2 flex items-baseline gap-2">
-                <span className={`text-[11px] tabular-nums ${FAINT}`}>
-                  {String(index + 1).padStart(2, '0')}
-                </span>
-                <span className="text-[10px] uppercase tracking-[0.12em] text-brand">
+              <div className="mb-2.5">
+                <span className="inline-flex items-center rounded-full border border-brand/25 bg-brand/10 px-2 py-[3px] text-[10px] font-semibold uppercase tracking-[0.1em] text-brand-deep">
                   {story.tag}
                 </span>
               </div>

@@ -12,9 +12,10 @@ describe('Testimonials', () => {
       screen.queryByText(/Search that finds the posts people remember/i),
     ).not.toBeInTheDocument()
 
-    const links = screen.getAllByRole('link', {
-      name: /View in the archive/i,
-    })
+    // The cards link through on their own; the explicit call-to-action is gone.
+    const links = screen
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('href')?.startsWith('/tweets/'))
     expect(links).toHaveLength(15)
     const hrefs = links.map((link) => link.getAttribute('href'))
     expect(hrefs).toEqual(

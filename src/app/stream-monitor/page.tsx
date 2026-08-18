@@ -209,7 +209,7 @@ const StreamMonitor = () => {
       label: showStreamedOnly
         ? 'Unique Tweets Streamed'
         : 'Unique Tweets Observed',
-      color: 'hsl(var(--chart-1))',
+      color: 'hsl(var(--chart-accent))',
     },
   }
 

@@ -30,7 +30,7 @@ export type DataPoint = {
 const chartConfig = {
   tweet_count: {
     label: 'Tweets',
-    color: 'hsl(var(--chart-1))',
+    color: 'hsl(var(--chart-accent))',
   },
 } satisfies ChartConfig
 

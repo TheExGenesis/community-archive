@@ -343,18 +343,21 @@ function ArchiveOverview({
 
 /**
  * Lead story of the day. The digest is the one panel that changes wholesale
- * every morning, so it runs full width above the dashboard grid.
+ * every morning, so it runs full width above the dashboard grid, marked by an
+ * accent rule along its top edge rather than a filled surface.
  */
 function DigestHero({ preview }: { preview: DigestPreview | null }) {
   if (!preview) {
     return (
-      <div className="mb-4 rounded-[4px] border border-dashed border-brand-deep/50 bg-brand-deep/5 px-6 py-6 text-center">
+      <div
+        className={`${CARD} mb-4 border-t-2 border-dashed border-t-brand px-8 py-7 text-center`}
+      >
         <div
-          className={`text-[11px] font-bold uppercase tracking-[0.14em] ${MUTED}`}
+          className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${MUTED}`}
         >
           What happened yesterday
         </div>
-        <p className="mt-2 text-[24px] font-semibold" style={SERIF}>
+        <p className="mt-2 text-[24px] font-medium" style={SERIF}>
           Today&rsquo;s edition is being assembled
         </p>
         <p
@@ -368,7 +371,7 @@ function DigestHero({ preview }: { preview: DigestPreview | null }) {
           onClick={() =>
             captureDashboardDestination('recent_bangers', 'card', false)
           }
-          className="mt-3.5 inline-block text-[12.5px] font-bold text-brand hover:underline"
+          className="mt-3.5 inline-block text-[13px] font-semibold text-brand hover:underline"
         >
           Explore today&rsquo;s bangers &rarr;
         </Link>
@@ -380,61 +383,72 @@ function DigestHero({ preview }: { preview: DigestPreview | null }) {
     captureDashboardDestination('daily_digest', 'card', false)
 
   return (
-    <div className="mb-4 rounded-[4px] bg-brand-deep px-6 py-6 text-brand-deep-foreground sm:px-7">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-deep-foreground/75">
-            {preview.isPreview
-              ? 'What happened yesterday \u00b7 Preview'
-              : 'What happened yesterday'}
+    <div
+      className={`${CARD} mb-4 border-t-2 border-t-brand px-6 pb-[30px] pt-7 sm:px-8`}
+    >
+      <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+        <span className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand">
+            What happened yesterday
           </span>
-          <span className="text-[11px] text-brand-deep-foreground/75">
+          <span className={`text-[12px] tabular-nums ${MUTED}`}>
             {preview.digestDate} &middot; {preview.storyCount}{' '}
             {preview.storyCount === 1 ? 'story' : 'stories'}
+            {preview.isPreview ? ' \u00b7 preview' : ''}
           </span>
         </span>
         <Link
           href={preview.href}
           onClick={openDigest}
-          className="inline-flex items-center gap-1.5 rounded-full bg-brand-deep-foreground px-3.5 py-1.5 text-[12.5px] font-bold text-brand-deep transition-colors hover:bg-brand-deep-foreground/90"
+          className="whitespace-nowrap text-[13px] font-semibold text-brand hover:underline"
         >
           Read the edition &rarr;
         </Link>
       </div>
 
       {preview.headline && (
-        <Link
-          href={preview.href}
-          onClick={openDigest}
-          className="mt-3.5 block max-w-[900px] text-[22px] font-semibold leading-[1.28] text-brand-deep-foreground decoration-1 underline-offset-[3px] hover:underline sm:text-[27px]"
+        <h2
+          className="mb-6 max-w-[22ch] text-[26px] font-medium leading-[1.2] tracking-[-0.01em] sm:text-[34px]"
           style={SERIF}
         >
-          {preview.headline}
-        </Link>
+          <Link
+            href={preview.href}
+            onClick={openDigest}
+            className="font-medium text-foreground transition-colors hover:text-brand"
+          >
+            {preview.headline}
+          </Link>
+        </h2>
       )}
 
       {preview.stories.length > 0 && (
-        <div className="mt-5 grid grid-cols-1 gap-2 border-t border-brand-deep-foreground/25 pt-3 sm:grid-cols-2 lg:grid-cols-3">
-          {preview.stories.map((story) => (
-            <Link
+        <div className="grid grid-cols-1 lg:grid-cols-3">
+          {preview.stories.map((story, index) => (
+            <div
               key={story.slug}
-              href={`${preview.href}/${story.slug}`}
-              onClick={openDigest}
-              className="flex flex-col gap-1.5 rounded-[4px] px-3 py-2.5 transition-colors hover:bg-brand-deep-foreground/[0.14]"
+              className={`border-t border-zinc-200 pt-5 dark:border-[#26262a] ${
+                index > 0 ? 'lg:border-l lg:pl-7' : ''
+              } ${index < preview.stories.length - 1 ? 'lg:pr-7' : ''}`}
             >
-              <span className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-brand-deep-foreground/70">
-                {story.tag}
-              </span>
-              <span className="text-[14px] font-bold leading-snug">
+              <div className="mb-2 flex items-baseline gap-2">
+                <span className={`text-[11px] tabular-nums ${FAINT}`}>
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <span className="text-[10px] uppercase tracking-[0.12em] text-brand">
+                  {story.tag}
+                </span>
+              </div>
+              <Link
+                href={`${preview.href}/${story.slug}`}
+                onClick={openDigest}
+                className="mb-1.5 block text-[15px] font-semibold leading-[1.35] transition-colors hover:text-brand"
+              >
                 {story.title}
-              </span>
-              <span className="text-[12.5px] leading-normal text-brand-deep-foreground/80">
+              </Link>
+              <p className={`m-0 text-[13.5px] leading-normal ${MUTED}`}>
                 {story.blurb}
-              </span>
-              <span className="mt-0.5 text-[11.5px] font-bold text-brand-deep-foreground/80">
-                Read story &rarr;
-              </span>
-            </Link>
+              </p>
+            </div>
           ))}
         </div>
       )}

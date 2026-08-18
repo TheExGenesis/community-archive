@@ -205,11 +205,13 @@ describe('ClickHouse analytics gateway requests', () => {
   test('allows a core user read to omit interactions', () => {
     const target = analyticsGatewayRequestUrl(
       ['user', 'alice'],
-      new URLSearchParams('limit=20&include_interactions=false&raw_sql=DROP'),
+      new URLSearchParams(
+        'limit=20&include_interactions=false&include_top_tweets=false&raw_sql=DROP',
+      ),
       'https://stream.example/analytics',
     )
     expect(target.toString()).toBe(
-      'https://stream.example/analytics/user/alice?limit=20&include_interactions=false',
+      'https://stream.example/analytics/user/alice?limit=20&include_interactions=false&include_top_tweets=false',
     )
   })
 

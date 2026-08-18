@@ -9,9 +9,6 @@ import { getCurrentUser } from '@/lib/portal/auth'
 import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
 import type { AvatarType } from '@/lib/types'
 
-const labelClassName =
-  'mb-5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground/80'
-
 async function personalizedArchives(): Promise<AvatarType[]> {
   const user = await getCurrentUser()
   const username = user ? getSessionTwitterUsername(user) : null
@@ -67,11 +64,6 @@ export default async function HomepagePeople({
 
   return (
     <div className="home-fade-in pt-2">
-      {personalized.length > 0 && (
-        <p className={labelClassName}>
-          People you interact with most this year
-        </p>
-      )}
       <div className="mx-auto w-full max-w-3xl">
         <AvatarList initialAvatars={archives} compact />
       </div>

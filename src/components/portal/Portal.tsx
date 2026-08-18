@@ -205,7 +205,7 @@ function UtilityLink({
     <a
       href={href}
       onClick={() => captureDashboardDestination(destination, 'card', false)}
-      className={`${CARD} flex items-center gap-3 px-4 py-3 font-normal transition-colors hover:border-brand`}
+      className={`${CARD} flex items-center gap-3 px-4 py-3 font-normal transition-colors hover:border-brand dark:hover:border-brand`}
     >
       <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[4px] border border-zinc-200 bg-zinc-100 text-brand-icon dark:border-[#2a2a2e] dark:bg-[#121214]">
         {icon}
@@ -350,7 +350,7 @@ function DigestHero({ preview }: { preview: DigestPreview | null }) {
   if (!preview) {
     return (
       <div
-        className={`${CARD} mb-4 border-t-2 border-dashed border-t-brand px-8 py-7 text-center`}
+        className={`${CARD} mb-4 border-t-2 border-dashed border-t-brand px-8 py-7 text-center dark:border-t-brand`}
       >
         <div
           className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${MUTED}`}
@@ -384,7 +384,7 @@ function DigestHero({ preview }: { preview: DigestPreview | null }) {
 
   return (
     <div
-      className={`${CARD} mb-4 border-t-2 border-t-brand px-6 pb-[30px] pt-7 sm:px-8`}
+      className={`${CARD} mb-4 border-t-2 border-t-brand px-6 pb-[30px] pt-7 dark:border-t-brand sm:px-8`}
     >
       <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <span className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1">

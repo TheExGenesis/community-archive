@@ -169,7 +169,7 @@ export default function QuotingTweetsSidebar({
       aria-labelledby="quoting-tweets-heading"
       className="lg:sticky lg:top-24 lg:h-[calc(100vh-7rem)] lg:min-h-0"
     >
-      <div className="flex overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:h-full lg:min-h-0 lg:flex-col">
+      <div className="flex overflow-hidden rounded-lg border border-border bg-card shadow-sm lg:h-full lg:min-h-0 lg:flex-col">
         <div className="flex min-w-0 flex-1 flex-col lg:min-h-0">
           <div className="flex flex-none items-center justify-between gap-3 border-b border-border px-5 py-4">
             <div className="flex items-center gap-2">

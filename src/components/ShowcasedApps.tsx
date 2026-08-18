@@ -80,7 +80,7 @@ const AppCard: React.FC<AppItem> = ({ icon, name, description, link }) => (
     <a
       target="_blank"
       rel="noopener noreferrer"
-      className="flex h-full cursor-pointer flex-col items-center rounded-xl bg-muted p-6 transition-shadow duration-300 dark:bg-card"
+      className="flex h-full cursor-pointer flex-col items-center rounded-lg bg-muted p-6 transition-shadow duration-300 dark:bg-card"
     >
       <div className="mb-4 text-4xl text-brand">{icon}</div>
       <h3 className="mb-2 text-center text-xl font-semibold text-foreground">

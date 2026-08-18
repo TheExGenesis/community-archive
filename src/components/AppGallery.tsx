@@ -63,7 +63,7 @@ function GalleryAppCard({ app }: { app: GalleryApp }) {
       href={app.link}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:bg-accent"
+      className="group flex items-center gap-4 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-accent"
     >
       <div className="flex-shrink-0 text-2xl text-brand">{app.icon}</div>
       <div className="min-w-0 flex-1">

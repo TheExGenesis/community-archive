@@ -119,7 +119,7 @@ export default function Testimonials() {
             <Link
               key={testimonial.tweetId}
               href={`/tweets/${testimonial.tweetId}`}
-              className="group rounded-xl border border-border bg-background p-5 transition-colors hover:border-brand/60"
+              className="group rounded-lg border border-border bg-background p-5 transition-colors hover:border-brand/60"
             >
               <blockquote className="text-[15px] leading-7 text-foreground">
                 “{testimonial.quote}”

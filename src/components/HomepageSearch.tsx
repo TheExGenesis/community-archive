@@ -36,7 +36,7 @@ export default function HomepageSearch() {
     <div className="mx-auto w-full max-w-3xl">
       <form
         onSubmit={handleSubmit}
-        className="relative rounded-2xl border border-border bg-card p-1.5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.10)] sm:p-2"
+        className="relative rounded-lg border border-border bg-card p-1.5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.10)] sm:p-2"
       >
         <UserSearchInput
           value={query}

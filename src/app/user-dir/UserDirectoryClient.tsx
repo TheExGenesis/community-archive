@@ -216,12 +216,12 @@ export default function UserDirectoryClient({
             placeholder="Search by name or username…"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="h-12 rounded-xl border-border bg-card pl-11 shadow-sm dark:border-border dark:bg-background"
+            className="h-12 rounded-lg border-border bg-card pl-11 shadow-sm dark:border-border dark:bg-background"
           />
         </div>
 
         <div
-          className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm dark:border-border dark:bg-card"
+          className="overflow-hidden rounded-lg border border-border bg-card shadow-sm dark:border-border dark:bg-card"
           aria-busy={loading}
         >
           <Table>

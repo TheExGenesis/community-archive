@@ -86,7 +86,7 @@ export default function DocsPage() {
               Query policy-filtered public records through the API or give an
               agent one canonical starting point.
             </p>
-            <div className="rounded-xl border border-brand/30 bg-brand/5 p-5">
+            <div className="rounded-lg border border-brand/30 bg-brand/5 p-5">
               <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Point an agent here
               </p>
@@ -114,7 +114,7 @@ export default function DocsPage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
-            <article className="rounded-xl border border-border bg-card p-6">
+            <article className="rounded-lg border border-border bg-card p-6">
               <Database className="h-6 w-6 text-brand" aria-hidden="true" />
               <h3 className="mt-4 text-lg font-semibold text-foreground">
                 Bulk export paused
@@ -125,7 +125,7 @@ export default function DocsPage() {
               </p>
             </article>
 
-            <article className="rounded-xl border border-border bg-card p-6">
+            <article className="rounded-lg border border-border bg-card p-6">
               <Braces className="h-6 w-6 text-brand" aria-hidden="true" />
               <h3 className="mt-4 text-lg font-semibold text-foreground">
                 Live API
@@ -142,7 +142,7 @@ export default function DocsPage() {
               </div>
             </article>
 
-            <article className="rounded-xl border border-border bg-card p-6">
+            <article className="rounded-lg border border-border bg-card p-6">
               <Database className="h-6 w-6 text-brand" aria-hidden="true" />
               <h3 className="mt-4 text-lg font-semibold text-foreground">
                 One raw archive
@@ -199,7 +199,7 @@ export default function DocsPage() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-border bg-card p-5">
+            <div className="rounded-lg border border-border bg-card p-5">
               <h3 className="font-semibold text-foreground">
                 Useful resources
               </h3>
@@ -221,7 +221,7 @@ export default function DocsPage() {
                 </li>
               </ul>
             </div>
-            <div className="rounded-xl border border-border bg-card p-5">
+            <div className="rounded-lg border border-border bg-card p-5">
               <h3 className="font-semibold text-foreground">Query rules</h3>
               <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
                 <li>

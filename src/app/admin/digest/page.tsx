@@ -259,7 +259,7 @@ export default async function DigestLabPage({
         ) : null}
 
         {activeDraft && state.activeRun ? (
-          <section className="mb-6 flex flex-col gap-4 rounded-xl border-2 border-emerald-500 bg-emerald-50 p-5 shadow-sm dark:bg-emerald-950/25 sm:flex-row sm:items-center sm:justify-between">
+          <section className="mb-6 flex flex-col gap-4 rounded-lg border-2 border-emerald-500 bg-emerald-50 p-5 shadow-sm dark:bg-emerald-950/25 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-800 dark:text-emerald-200">
                 Draft v{activeDraft.version} ready

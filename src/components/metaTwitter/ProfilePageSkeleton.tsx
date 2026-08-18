@@ -16,8 +16,8 @@ export function ProfileArchiveSkeleton() {
         <section className="space-y-3">
           <Pulse className="h-7 w-52" />
           <Pulse className="h-4 w-72 max-w-full" />
-          <Pulse className="h-48 w-full rounded-xl" />
-          <Pulse className="h-48 w-full rounded-xl" />
+          <Pulse className="h-48 w-full rounded-lg" />
+          <Pulse className="h-48 w-full rounded-lg" />
         </section>
         <aside className="space-y-5">
           <Pulse className="h-32 w-full" />
@@ -31,7 +31,7 @@ export function ProfileArchiveSkeleton() {
 export function ProfilePageSkeleton() {
   return (
     <div className="flex justify-center px-4 py-8 sm:px-6">
-      <div className="h-fit w-full max-w-[1220px] overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="h-fit w-full max-w-[1220px] overflow-hidden rounded-lg border border-border bg-card">
         <Pulse className="h-[210px] w-full rounded-none" />
         <div className="space-y-3 px-6 pb-5">
           <Pulse className="-mt-[58px] h-[116px] w-[116px] rounded-full" />

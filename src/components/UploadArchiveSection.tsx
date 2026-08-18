@@ -162,7 +162,7 @@ export default function UploadArchiveSection() {
         {steps.map((step) => (
           <div
             key={step.number}
-            className="rounded-xl border border-border bg-card p-6 text-center"
+            className="rounded-lg border border-border bg-card p-6 text-center"
           >
             <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-muted text-lg font-bold text-brand">
               {step.number}

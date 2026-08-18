@@ -118,7 +118,7 @@ function SearchPageContent() {
               }
             />
           ) : (
-            <div className="rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center sm:px-10">
+            <div className="rounded-lg border border-dashed border-border bg-card px-6 py-10 text-center sm:px-10">
               <SlidersHorizontal className="mx-auto h-8 w-8 text-muted-foreground" />
               <h2 className="mt-4 text-2xl font-semibold text-foreground">
                 Start with a topic or phrase

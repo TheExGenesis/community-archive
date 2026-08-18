@@ -17,9 +17,9 @@ const DynamicHeroCTAButtons = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex flex-col justify-center gap-4 sm:flex-row sm:gap-6">
-        <div className="h-14 w-48 animate-pulse rounded-xl bg-muted" />
-        <div className="h-14 w-48 animate-pulse rounded-xl bg-muted" />
-        <div className="h-14 w-48 animate-pulse rounded-xl bg-muted" />
+        <div className="h-14 w-48 animate-pulse rounded-lg bg-muted" />
+        <div className="h-14 w-48 animate-pulse rounded-lg bg-muted" />
+        <div className="h-14 w-48 animate-pulse rounded-lg bg-muted" />
       </div>
     ),
   },
@@ -30,7 +30,7 @@ const DynamicUploadArchiveSection = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-48 w-full animate-pulse rounded-xl bg-muted dark:bg-card" />
+      <div className="h-48 w-full animate-pulse rounded-lg bg-muted dark:bg-card" />
     ),
   },
 )

@@ -198,7 +198,7 @@ export default function UserSearchInput({
           id={listboxId}
           role="listbox"
           aria-label="User suggestions"
-          className="absolute left-0 top-full z-50 mt-2 max-h-80 w-full min-w-[18rem] overflow-y-auto rounded-xl border border-border bg-popover p-1.5 text-popover-foreground shadow-xl"
+          className="absolute left-0 top-full z-50 mt-2 max-h-80 w-full min-w-[18rem] overflow-y-auto rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-xl"
         >
           {suggestions.map((suggestion, index) => {
             const displayName =

@@ -44,7 +44,7 @@ function FeaturedAppCard({ app }: { app: FeaturedApp }) {
       href={app.link}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:shadow-lg"
+      className="group flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-all duration-300 hover:shadow-lg"
     >
       {/* Thumbnail header — gradient + icon stay behind as a fallback if the image is missing */}
       <div

@@ -82,7 +82,7 @@ export default async function SupportersPage() {
             href="https://opencollective.com/community-archive/donate"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center rounded-lg bg-green-600 px-6 py-3 font-medium text-white transition-colors hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
+            className="inline-flex items-center justify-center rounded-lg bg-brand px-6 py-3 font-medium text-brand-foreground transition-colors hover:bg-brand/90"
           >
             <FaHeart className="mr-2" /> Support the Project
           </Link>

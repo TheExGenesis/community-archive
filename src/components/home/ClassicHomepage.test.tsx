@@ -106,4 +106,18 @@ describe('ClassicHomepage audience actions', () => {
     expect(screen.getByTestId('homepage-people')).toBeInTheDocument()
     expect(screen.getByTestId('shared-dashboard')).toBeInTheDocument()
   })
+
+  it('states the totals plainly, with no counter to animate them', async () => {
+    render(
+      await ClassicHomepage({
+        data,
+        homepagePeople: <div data-testid="homepage-people" />,
+        isMember: false,
+        showCta: true,
+      }),
+    )
+
+    expect(screen.getByText(/14\.0M public tweets/)).toBeInTheDocument()
+    expect(screen.getByText(/700 community members/)).toBeInTheDocument()
+  })
 })

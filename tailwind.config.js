@@ -15,12 +15,12 @@ module.exports = {
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
         brand: {
-          DEFAULT: 'hsl(var(--brand))',
-          foreground: 'hsl(var(--brand-foreground))',
+          DEFAULT: 'hsl(var(--brand) / <alpha-value>)',
+          foreground: 'hsl(var(--brand-foreground) / <alpha-value>)',
         },
         'brand-deep': {
-          DEFAULT: 'hsl(var(--brand-deep))',
-          foreground: 'hsl(var(--brand-deep-foreground))',
+          DEFAULT: 'hsl(var(--brand-deep) / <alpha-value>)',
+          foreground: 'hsl(var(--brand-deep-foreground) / <alpha-value>)',
         },
         'chart-accent': 'hsl(var(--chart-accent))',
         'brand-icon': 'hsl(var(--brand-icon))',

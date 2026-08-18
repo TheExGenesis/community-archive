@@ -24,15 +24,16 @@
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
-    --brand: 197 74% 46%;
+    /* One hue for the whole family; each value lands exactly on its hex. */
+    --brand: 197 74.4% 46%; /* #1E9BCD */
     --brand-foreground: 0 0% 100%;
     /* Deep brand: emphasis surfaces only (banners, callouts) - never body text. */
-    --brand-deep: 199 74% 24%;
+    --brand-deep: 197 74% 24.1%; /* #10516B */
     --brand-deep-foreground: 0 0% 100%;
     /* Tracked off the brand so data viz never drifts from the accent. */
-    --chart-accent: 197 74% 46%;
+    --chart-accent: 197 74.4% 46%;
     /* Icon glyphs only: a lift off the accent so small marks stay legible. */
-    --brand-icon: 196 76% 51%;
+    --brand-icon: 197 74.1% 51%; /* #25AADF */
     --radius: 0.3rem;
   }
 
@@ -57,12 +58,16 @@
     --border: 240 4% 16%;
     --input: 240 4% 16%;
     --ring: 0 0% 80%;
-    --brand: 197 74% 46%;
-    --brand-foreground: 0 0% 100%;
-    --brand-deep: 199 74% 24%;
-    --brand-deep-foreground: 0 0% 100%;
-    --chart-accent: 197 74% 46%;
-    --brand-icon: 196 76% 51%;
+    /* Dark keeps the hue and flips the lightness: the accent lifts to #75C9EB
+       and the deep tone inverts into a light surface (#8BD2EE), so both
+       foregrounds flip to the page ink to stay readable. */
+    --brand: 197 74.1% 69%; /* #75C9EB */
+    --brand-foreground: 240 5% 7%;
+    --brand-deep: 197 75% 74%; /* #8BD2EE */
+    --brand-deep-foreground: 240 5% 7%;
+    --chart-accent: 197 74.1% 69%;
+    /* Same +5% lift off the accent that the light theme uses. */
+    --brand-icon: 197 74.1% 74%;
   }
 }
 

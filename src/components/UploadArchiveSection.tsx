@@ -164,7 +164,7 @@ export default function UploadArchiveSection() {
             key={step.number}
             className="rounded-xl border border-border bg-card p-6 text-center"
           >
-            <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-muted text-lg font-bold text-brand">
+            <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-muted text-lg font-bold text-foreground">
               {step.number}
             </div>
             <h3 className="mb-2 font-semibold text-foreground">{step.title}</h3>
@@ -189,7 +189,7 @@ export default function UploadArchiveSection() {
                 <Button
                   onClick={handleUploadClick}
                   disabled={isUploadProcessing}
-                  className="bg-green-600 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
+                  className="bg-brand text-brand-foreground hover:bg-brand/90"
                 >
                   <Upload className="mr-2 h-4 w-4" />
                   {isUploadProcessing ? 'Processing...' : 'Upload .zip'}

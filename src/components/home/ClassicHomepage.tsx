@@ -116,28 +116,31 @@ export default async function ClassicHomepage({
             <HomepageSearch />
           ) : null}
 
-          {homepagePeople}
+          {/* The backers line is a footnote to the social proof above it. */}
+          <div>
+            {homepagePeople}
 
-          <p className="text-xs text-muted-foreground/80">
-            Backed by{' '}
-            <Link
-              href="https://survivalandflourishing.fund/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium transition-colors hover:text-brand hover:underline"
-            >
-              Survival and Flourishing Fund
-            </Link>{' '}
-            and{' '}
-            <Link
-              href="https://x.com/VitalikButerin"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium transition-colors hover:text-brand hover:underline"
-            >
-              Vitalik Buterin
-            </Link>
-          </p>
+            <p className="mt-1 text-xs text-muted-foreground/80">
+              Backed by{' '}
+              <Link
+                href="https://survivalandflourishing.fund/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium transition-colors hover:text-brand hover:underline"
+              >
+                Survival and Flourishing Fund
+              </Link>{' '}
+              and{' '}
+              <Link
+                href="https://x.com/VitalikButerin"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium transition-colors hover:text-brand hover:underline"
+              >
+                Vitalik Buterin
+              </Link>
+            </p>
+          </div>
         </div>
 
         {!data.failures.historicalBangers && (

@@ -383,12 +383,12 @@ function DigestHero({ preview }: { preview: DigestPreview | null }) {
     <div className="mb-4 rounded-[4px] bg-brand-deep px-6 py-6 text-brand-deep-foreground sm:px-7">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/75">
+          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-deep-foreground/75">
             {preview.isPreview
               ? 'What happened yesterday \u00b7 Preview'
               : 'What happened yesterday'}
           </span>
-          <span className="text-[11px] text-white/75">
+          <span className="text-[11px] text-brand-deep-foreground/75">
             {preview.digestDate} &middot; {preview.storyCount}{' '}
             {preview.storyCount === 1 ? 'story' : 'stories'}
           </span>
@@ -396,7 +396,7 @@ function DigestHero({ preview }: { preview: DigestPreview | null }) {
         <Link
           href={preview.href}
           onClick={openDigest}
-          className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-[12.5px] font-bold text-brand-deep transition-colors hover:bg-white/90"
+          className="inline-flex items-center gap-1.5 rounded-full bg-brand-deep-foreground px-3.5 py-1.5 text-[12.5px] font-bold text-brand-deep transition-colors hover:bg-brand-deep-foreground/90"
         >
           Read the edition &rarr;
         </Link>
@@ -406,7 +406,7 @@ function DigestHero({ preview }: { preview: DigestPreview | null }) {
         <Link
           href={preview.href}
           onClick={openDigest}
-          className="mt-3.5 block max-w-[900px] text-[22px] font-semibold leading-[1.28] text-white decoration-1 underline-offset-[3px] hover:underline sm:text-[27px]"
+          className="mt-3.5 block max-w-[900px] text-[22px] font-semibold leading-[1.28] text-brand-deep-foreground decoration-1 underline-offset-[3px] hover:underline sm:text-[27px]"
           style={SERIF}
         >
           {preview.headline}
@@ -414,24 +414,24 @@ function DigestHero({ preview }: { preview: DigestPreview | null }) {
       )}
 
       {preview.stories.length > 0 && (
-        <div className="mt-5 grid grid-cols-1 gap-2 border-t border-white/25 pt-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-5 grid grid-cols-1 gap-2 border-t border-brand-deep-foreground/25 pt-3 sm:grid-cols-2 lg:grid-cols-3">
           {preview.stories.map((story) => (
             <Link
               key={story.slug}
               href={`${preview.href}/${story.slug}`}
               onClick={openDigest}
-              className="flex flex-col gap-1.5 rounded-[4px] px-3 py-2.5 transition-colors hover:bg-white/[0.14]"
+              className="flex flex-col gap-1.5 rounded-[4px] px-3 py-2.5 transition-colors hover:bg-brand-deep-foreground/[0.14]"
             >
-              <span className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-white/70">
+              <span className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-brand-deep-foreground/70">
                 {story.tag}
               </span>
               <span className="text-[14px] font-bold leading-snug">
                 {story.title}
               </span>
-              <span className="text-[12.5px] leading-normal text-white/80">
+              <span className="text-[12.5px] leading-normal text-brand-deep-foreground/80">
                 {story.blurb}
               </span>
-              <span className="mt-0.5 text-[11.5px] font-bold text-white/80">
+              <span className="mt-0.5 text-[11.5px] font-bold text-brand-deep-foreground/80">
                 Read story &rarr;
               </span>
             </Link>

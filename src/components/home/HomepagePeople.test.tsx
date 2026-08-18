@@ -111,7 +111,10 @@ it('shows the eight cached interaction leaders to a signed-in member', async () 
 it('shows the representative sample to guests', async () => {
   render(await HomepagePeople({ isMember: false }))
 
-  expect(screen.getByText('Featured archives')).toBeInTheDocument()
+  // The unpersonalized row carries no caption; the avatars are the proof.
+  expect(
+    screen.queryByText('People you interact with most this year'),
+  ).not.toBeInTheDocument()
   expect(screen.getByTestId('homepage-avatars')).toHaveTextContent(
     'featured:1000',
   )
@@ -126,7 +129,9 @@ it('falls back to the representative sample when interaction data is absent', as
 
   render(await HomepagePeople({ isMember: true }))
 
-  expect(screen.getByText('Featured archives')).toBeInTheDocument()
+  expect(
+    screen.queryByText('People you interact with most this year'),
+  ).not.toBeInTheDocument()
   expect(screen.getByTestId('homepage-avatars')).toHaveTextContent(
     'featured:1000',
   )

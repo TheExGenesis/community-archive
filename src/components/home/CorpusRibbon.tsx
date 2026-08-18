@@ -48,7 +48,7 @@ export default function CorpusRibbon({ tweets }: { tweets: PortalTweet[] }) {
               tabIndex={pass === 1 ? -1 : undefined}
               className="flex items-center gap-2.5 whitespace-nowrap rounded-full border border-zinc-200 bg-white px-4 py-[9px] text-[13.5px] transition-colors hover:border-brand dark:border-[#26262a] dark:bg-[#1b1b1e]"
             >
-              <span className="text-[12.5px] font-semibold text-brand-deep dark:text-brand">
+              <span className="text-[12.5px] font-semibold text-brand-deep">
                 @{item.who}
               </span>
               <span className={BODY}>{item.text}</span>

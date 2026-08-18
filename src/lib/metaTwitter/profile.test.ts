@@ -34,8 +34,9 @@ const archivedProfile = {
   bio: 'Archived profile',
   website: null,
   location: null,
-  avatar_media_url: null,
-  header_media_url: null,
+  avatar_media_url:
+    'https://pbs.twimg.com/profile_images/7/archived_normal.jpg',
+  header_media_url: 'https://pbs.twimg.com/profile_banners/7/7',
 }
 
 beforeEach(() => {
@@ -86,4 +87,70 @@ test('returns null when neither profile source can resolve the user', async () =
   getClickHouseUserProfileMock.mockResolvedValue(null)
 
   await expect(resolveProfile('missing')).resolves.toBeNull()
+})
+
+test('backfills a missing archive avatar from the analytical profile', async () => {
+  resolveAccountIdMock.mockResolvedValue('42')
+  getCachedProfileHeaderMock.mockResolvedValue({
+    ...archivedProfile,
+    avatar_media_url: null,
+    header_media_url: '',
+  })
+  getClickHouseUserProfileMock.mockResolvedValue({
+    user: {
+      ...archivedProfile,
+      avatar_media_url: 'https://pbs.twimg.com/profile_images/1/a_normal.jpg',
+      header_media_url: 'https://pbs.twimg.com/profile_banners/1/2',
+    },
+    topTweets: [],
+  })
+
+  await expect(resolveProfile('alice')).resolves.toMatchObject({
+    profile: {
+      avatar_media_url: 'https://pbs.twimg.com/profile_images/1/a_normal.jpg',
+      header_media_url: 'https://pbs.twimg.com/profile_banners/1/2',
+    },
+  })
+})
+
+test('keeps the archived media and skips the analytical lookup when both are present', async () => {
+  resolveAccountIdMock.mockResolvedValue('42')
+  getCachedProfileHeaderMock.mockResolvedValue({
+    ...archivedProfile,
+    avatar_media_url: 'https://pbs.twimg.com/profile_images/9/archived.jpg',
+    header_media_url: 'https://pbs.twimg.com/profile_banners/9/9',
+  })
+
+  await expect(resolveProfile('alice')).resolves.toMatchObject({
+    profile: {
+      avatar_media_url: 'https://pbs.twimg.com/profile_images/9/archived.jpg',
+    },
+  })
+  expect(getClickHouseUserProfileMock).not.toHaveBeenCalled()
+})
+
+test('leaves media null when neither source has it', async () => {
+  resolveAccountIdMock.mockResolvedValue('42')
+  getCachedProfileHeaderMock.mockResolvedValue({
+    ...archivedProfile,
+    avatar_media_url: '   ',
+    header_media_url: null,
+  })
+  getClickHouseUserProfileMock.mockResolvedValue(null)
+
+  await expect(resolveProfile('alice')).resolves.toMatchObject({
+    profile: { avatar_media_url: null, header_media_url: null },
+  })
+})
+
+test('strips the archive prefix before the analytical lookup', async () => {
+  resolveAccountIdMock.mockResolvedValue('42')
+  getCachedProfileHeaderMock.mockResolvedValue({
+    ...archivedProfile,
+    avatar_media_url: null,
+  })
+  getClickHouseUserProfileMock.mockResolvedValue(null)
+
+  await resolveProfile('archive%3Aalice')
+  expect(getClickHouseUserProfileMock).toHaveBeenCalledWith('alice')
 })

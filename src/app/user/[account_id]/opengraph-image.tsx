@@ -5,9 +5,10 @@ import { notFound } from 'next/navigation'
 import { getHighResolutionAvatarUrl } from '@/lib/avatar'
 import { formatNumber } from '@/lib/formatNumber'
 import {
-  MEMBERSHIP_BADGE_LABELS,
-  membershipBadge,
-} from '@/lib/metaTwitter/membershipBadge'
+  PROFILE_BADGE_LABELS,
+  profileBadge,
+  type ProfileBadge,
+} from '@/lib/metaTwitter/profileBadge'
 import { resolveProfile } from '@/lib/metaTwitter/profile'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 
@@ -21,6 +22,9 @@ export const maxDuration = 60
 
 const colors = {
   brand: '#25aadf',
+  gold: '#ca8a04',
+  goldBorder: 'rgba(234, 179, 8, 0.4)',
+  goldFill: 'rgba(234, 179, 8, 0.1)',
   card: '#ffffff',
   foreground: '#111113',
   muted: '#777780',
@@ -72,19 +76,61 @@ function Metric({ label, value }: { label: string; value: string }) {
   )
 }
 
-function MembershipBadge({ profile }: { profile: ProfileHeaderData }) {
-  const badge = membershipBadge(profile)
+function BadgeIcon({ badge }: { badge: Exclude<ProfileBadge, null> }) {
+  // Satori cannot render fragments inside <svg>, so each state supplies its own
+  // complete element rather than sharing one wrapper.
+  const stroke = badge === 'contributor' ? colors.gold : colors.brand
+  const shared = {
+    fill: 'none',
+    height: 21,
+    stroke,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    strokeWidth: 2,
+    viewBox: '0 0 24 24',
+    width: 21,
+  }
+
+  if (badge === 'contributor') {
+    return (
+      <svg {...shared}>
+        <circle cx="12" cy="8" r="6" />
+        <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" />
+      </svg>
+    )
+  }
+  if (badge === 'archive') {
+    return (
+      <svg {...shared}>
+        <rect x="2" y="3" width="20" height="5" rx="1" />
+        <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+        <path d="M10 12h4" />
+      </svg>
+    )
+  }
+  return (
+    <svg {...shared}>
+      <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9" />
+      <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5" />
+      <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5" />
+      <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1" />
+    </svg>
+  )
+}
+
+function ProfileBadgePill({ profile }: { profile: ProfileHeaderData }) {
+  const badge = profileBadge(profile)
   if (!badge) return null
-  const label = MEMBERSHIP_BADGE_LABELS[badge]
+  const isContributor = badge === 'contributor'
 
   return (
     <div
       style={{
         alignItems: 'center',
-        background: '#e9f6fc',
-        border: `1px solid ${colors.brand}`,
+        background: isContributor ? colors.goldFill : '#e9f6fc',
+        border: `1px solid ${isContributor ? colors.goldBorder : colors.brand}`,
         borderRadius: 999,
-        color: colors.brand,
+        color: isContributor ? colors.gold : colors.brand,
         display: 'flex',
         flexShrink: 0,
         fontSize: 21,
@@ -93,41 +139,8 @@ function MembershipBadge({ profile }: { profile: ProfileHeaderData }) {
         padding: '5px 16px',
       }}
     >
-      {badge === 'archive' ? (
-        // Satori cannot render fragments inside <svg>, so each badge state
-        // supplies its own complete element rather than sharing one.
-        <svg
-          fill="none"
-          height="21"
-          stroke={colors.brand}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-          width="21"
-        >
-          <rect x="2" y="3" width="20" height="5" rx="1" />
-          <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
-          <path d="M10 12h4" />
-        </svg>
-      ) : (
-        <svg
-          fill="none"
-          height="21"
-          stroke={colors.brand}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-          width="21"
-        >
-          <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9" />
-          <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5" />
-          <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5" />
-          <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1" />
-        </svg>
-      )}
-      <span style={{ marginLeft: 9 }}>{label}</span>
+      <BadgeIcon badge={badge} />
+      <span style={{ marginLeft: 9 }}>{PROFILE_BADGE_LABELS[badge]}</span>
     </div>
   )
 }
@@ -322,7 +335,7 @@ function ProfilePreview({
             >
               @{truncate(profile.username, 20)}
             </span>
-            <MembershipBadge profile={profile} />
+            <ProfileBadgePill profile={profile} />
           </div>
 
           <div

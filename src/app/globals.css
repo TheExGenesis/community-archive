@@ -34,7 +34,7 @@
     --chart-accent: 197 74.4% 46%;
     /* Icon glyphs only: a lift off the accent so small marks stay legible. */
     --brand-icon: 197 74.1% 51%; /* #25AADF */
-    --radius: 0.3rem;
+    --radius: 0.5rem;
   }
 
   .dark {

@@ -61,7 +61,7 @@ export default async function TweetPage({
             {isThread && threadTree ? (
               <ThreadView tree={threadTree} highlightTweetId={tweet_id} />
             ) : (
-              <article className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
+              <article className="rounded-lg border border-border bg-card p-5 shadow-sm sm:p-6">
                 <TweetComponent
                   key={tweet.tweet_id}
                   tweet={tweet}
@@ -70,7 +70,7 @@ export default async function TweetPage({
               </article>
             )}
 
-            <div className="mt-8 rounded-xl border border-dashed border-border bg-card px-5 py-4 text-sm leading-6 text-muted-foreground">
+            <div className="mt-8 rounded-lg border border-dashed border-border bg-card px-5 py-4 text-sm leading-6 text-muted-foreground">
               This permalink preserves the archived version. Use the Twitter
               link on the tweet to compare it with the live post when it is
               still available.

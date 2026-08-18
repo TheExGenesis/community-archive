@@ -95,7 +95,7 @@ export default function AdvancedSearchForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4"
+      className="rounded-lg border border-border bg-card p-3 shadow-sm sm:p-4"
     >
       <Label htmlFor="main-search" className="sr-only">
         Search the archive

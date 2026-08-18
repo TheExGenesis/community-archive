@@ -167,7 +167,7 @@ export default function TweetList({
         {[0, 1, 2].map((item) => (
           <div
             key={item}
-            className="rounded-xl border border-border bg-card p-5"
+            className="rounded-lg border border-border bg-card p-5"
           >
             <div className="flex gap-3">
               <Skeleton className="h-11 w-11 rounded-full" />

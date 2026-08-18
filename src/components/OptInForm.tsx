@@ -169,7 +169,7 @@ export default function OptInForm({
       </div>
     </section>
   ) : (
-    <section className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-green-200 bg-green-50/60 p-6 text-left shadow-sm dark:border-green-900 dark:bg-green-950/20 sm:p-8">
+    <section className="mx-auto max-w-4xl overflow-hidden rounded-lg border border-green-200 bg-green-50/60 p-6 text-left shadow-sm dark:border-green-900 dark:bg-green-950/20 sm:p-8">
       {mockOptIn && (
         <Alert className="mb-6 border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/30">
           <AlertDescription className="text-sky-900 dark:text-sky-100">
@@ -225,7 +225,7 @@ export default function OptInForm({
         </div>
 
         <ol className="mx-auto mt-6 grid max-w-3xl gap-4 sm:grid-cols-2">
-          <li className="flex h-full flex-col items-center rounded-xl border border-green-200 bg-background p-5 text-center dark:border-green-900">
+          <li className="flex h-full flex-col items-center rounded-lg border border-green-200 bg-background p-5 text-center dark:border-green-900">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg font-bold text-green-700 dark:bg-green-900/70 dark:text-green-300">
               1
             </div>
@@ -246,7 +246,7 @@ export default function OptInForm({
             </Button>
           </li>
 
-          <li className="flex h-full flex-col items-center rounded-xl border border-green-200 bg-background p-5 text-center dark:border-green-900">
+          <li className="flex h-full flex-col items-center rounded-lg border border-green-200 bg-background p-5 text-center dark:border-green-900">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg font-bold text-green-700 dark:bg-green-900/70 dark:text-green-300">
               2
             </div>
@@ -272,7 +272,7 @@ export default function OptInForm({
             <Link
               key={step.href}
               href={step.href}
-              className="group overflow-hidden rounded-xl border bg-background shadow-sm transition hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="group overflow-hidden rounded-lg border bg-background shadow-sm transition hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <div className="relative aspect-video overflow-hidden border-b bg-muted">
                 <Image

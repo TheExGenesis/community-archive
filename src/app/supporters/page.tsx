@@ -22,7 +22,7 @@ export default async function SupportersPage() {
           </p>
         </div>
 
-        <div className="mx-auto max-w-4xl rounded-2xl border border-border bg-card p-6 md:p-8">
+        <div className="mx-auto max-w-4xl rounded-lg border border-border bg-card p-6 md:p-8">
           <div className="mb-6 text-center">
             <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Major Backers
@@ -82,7 +82,7 @@ export default async function SupportersPage() {
             href="https://opencollective.com/community-archive/donate"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center rounded-xl bg-green-600 px-6 py-3 font-medium text-white transition-colors hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
+            className="inline-flex items-center justify-center rounded-lg bg-green-600 px-6 py-3 font-medium text-white transition-colors hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
           >
             <FaHeart className="mr-2" /> Support the Project
           </Link>

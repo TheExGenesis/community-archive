@@ -186,7 +186,7 @@ export function Workspace({
       {editing && (
         <form
           onSubmit={submitTweet}
-          className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-muted/20 p-3 sm:flex-row sm:flex-wrap sm:items-end"
+          className="flex flex-col gap-2 rounded-lg border border-dashed border-border bg-muted/20 p-3 sm:flex-row sm:flex-wrap sm:items-end"
         >
           <label className="min-w-0 flex-1 text-xs font-semibold text-muted-foreground">
             Add one of your archived tweets
@@ -254,18 +254,18 @@ export function Workspace({
           className="flex flex-col gap-3"
         >
           {!bangersAvailable && (
-            <div className="rounded-xl border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
               Bangers are temporarily unavailable. The rest of this profile is
               still here.
             </div>
           )}
           {bangersAvailable && bangersLoading && tweets.length === 0 && (
-            <div className="rounded-xl border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
               Loading bangers…
             </div>
           )}
           {bangersAvailable && !bangersLoading && tweets.length === 0 && (
-            <div className="rounded-xl border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
               No posts in this chapter have at least two Community Archive
               quotes yet.
             </div>

@@ -56,7 +56,7 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
           <div
             className={`
             ${isHighlighted ? 'border-brand/50 bg-card ring-1 ring-brand/20' : tweet.from_external ? 'border-dashed border-amber-300 bg-amber-50/60 dark:border-amber-700 dark:bg-amber-900/10' : 'border-border bg-card'}
-            relative mb-4 rounded-xl border p-4 sm:p-5
+            relative mb-4 rounded-lg border p-4 sm:p-5
           `}
           >
             {tweet.from_external && (

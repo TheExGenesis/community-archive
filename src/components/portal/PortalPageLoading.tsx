@@ -17,7 +17,7 @@ export function PortalPageLoading({ label }: PortalPageLoadingProps) {
           {Array.from({ length: 5 }, (_, index) => (
             <div
               key={index}
-              className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950"
+              className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950"
             >
               <div className="mb-4 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-zinc-200 dark:bg-zinc-800" />

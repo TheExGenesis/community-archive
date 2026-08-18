@@ -142,7 +142,7 @@ export default function SignIn() {
           className={`rounded-[8px] border border-transparent px-4 py-2 text-sm font-medium text-white transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-background ${
             isDevLoginEnabled
               ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500 dark:bg-yellow-500 dark:hover:bg-yellow-600'
-              : 'bg-green-600 hover:bg-green-700 focus:ring-green-500 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300'
+              : 'bg-brand text-brand-foreground hover:bg-brand/90 focus:ring-brand'
           }`}
         >
           {isStagingLogin ? (

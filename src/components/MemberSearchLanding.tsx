@@ -88,7 +88,7 @@ export default function MemberSearchLanding({
             type="submit"
             size="lg"
             disabled={!query.trim()}
-            className="h-14 bg-green-600 px-7 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
+            className="h-14 bg-brand px-7 text-brand-foreground hover:bg-brand/90"
           >
             Search
             <ArrowRight className="ml-2 h-4 w-4" />

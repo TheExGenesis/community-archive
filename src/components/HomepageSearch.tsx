@@ -49,7 +49,7 @@ export default function HomepageSearch() {
         <Button
           type="submit"
           size="icon"
-          className="absolute right-2.5 top-1/2 h-11 w-11 -translate-y-1/2 rounded-full bg-green-600 text-white shadow-sm hover:bg-green-700 focus-visible:ring-green-600 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300 dark:focus-visible:ring-green-400 sm:right-3"
+          className="absolute right-2.5 top-1/2 h-11 w-11 -translate-y-1/2 rounded-full bg-brand text-brand-foreground shadow-sm hover:bg-brand/90 focus-visible:ring-brand sm:right-3"
           aria-label="Search archive"
         >
           <Search className="h-5 w-5" />

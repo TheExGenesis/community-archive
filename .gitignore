@@ -66,3 +66,6 @@ __pycache__/
 
 # local scratch / dev notes (kept out of the repo; move keepers into docs/)
 scratchpad/
+
+# Left behind when `gen-types` fails before it can mv the file into place.
+src/database-types.ts.tmp

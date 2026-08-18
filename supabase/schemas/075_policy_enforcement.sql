@@ -707,9 +707,8 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
-  -- A nested block write from enforce_policy_account_tombstone only records
-  -- the stable-id association. The outer account trigger already scrubs that
-  -- row, so avoid recursively upserting the same account.
+  -- Avoid recursively applying the same block while tombstone_policy_account
+  -- updates policy-owned rows.
   IF pg_trigger_depth() > 1 THEN
     RETURN NEW;
   END IF;

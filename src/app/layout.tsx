@@ -10,16 +10,16 @@ import Link from 'next/link'
 import Image from 'next/image'
 import ThemeToggle from '@/components/ThemeToggle'
 import dynamic from 'next/dynamic'
-import HeaderNavigation from '@/components/HeaderNavigation'
 import HeaderSearch from '@/components/HeaderSearch'
 import MobileMenu from '@/components/MobileMenu'
-import MobileNavigation from '@/components/MobileNavigation'
 import Footer from '@/components/Footer'
 import HashScrollHandler from '@/components/HashScrollHandler'
-import { checkIsAdmin } from '@/app/admin/data'
-import { Shield } from 'lucide-react'
-import { getIsMember } from '@/lib/portal/auth'
-import { getPrimaryNav, getUtilityNav, getMobileNav } from '@/lib/navigation'
+import {
+  AdminNavigationLink,
+  AudienceHeaderNavigation,
+  AudienceMobileNavigation,
+  NavigationAudienceProvider,
+} from '@/components/NavigationAudience'
 
 const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
   ssr: false,
@@ -50,15 +50,11 @@ export const metadata = {
   description: "A public archive of everyone's tweets ",
 }
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const [isAdmin, isMember] = await Promise.all([checkIsAdmin(), getIsMember()])
-  const primaryNav = getPrimaryNav(isMember, isAdmin)
-  const utilityNav = getUtilityNav(isMember)
-  const mobileNav = getMobileNav(isMember, isAdmin)
   return (
     <html
       lang="en"
@@ -76,57 +72,48 @@ export default async function RootLayout({
           >
             <ReactQueryProvider>
               <HashScrollHandler />
-              <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
-                <div className="flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <MobileNavigation items={mobileNav} />
-                    <Link
-                      href="/"
-                      className="flex flex-shrink-0 items-center space-x-2"
-                    >
-                      <Image
-                        src="/images/logo.png"
-                        alt="Community Archive logo"
-                        width={28}
-                        height={28}
-                        className="h-7 w-7 flex-shrink-0"
-                        priority
-                      />
-                      <span
-                        className="hidden whitespace-nowrap text-lg font-bold text-foreground sm:inline"
-                        style={{
-                          fontFamily:
-                            'var(--font-petrona), Georgia, "Times New Roman", serif',
-                        }}
-                      >
-                        Community Archive
-                      </span>
-                    </Link>
-                    <HeaderNavigation items={primaryNav} />
-                  </div>
-                  <div className="flex flex-shrink-0 items-center space-x-3">
-                    {utilityNav.length > 0 && (
-                      <HeaderNavigation items={utilityNav} />
-                    )}
-                    <HeaderSearch />
-                    <div className="text-sm">
-                      <DynamicSignIn />
-                    </div>
-                    <ThemeToggle side="bottom" />
-                    {isAdmin ? (
+              <NavigationAudienceProvider>
+                <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
+                  <div className="flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <AudienceMobileNavigation />
                       <Link
-                        href="/admin"
-                        aria-label="Admin dashboard"
-                        title="Admin dashboard"
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-input bg-background transition-colors hover:bg-accent hover:text-accent-foreground"
+                        href="/"
+                        className="flex flex-shrink-0 items-center space-x-2"
                       >
-                        <Shield className="h-5 w-5" />
+                        <Image
+                          src="/images/logo.png"
+                          alt="Community Archive logo"
+                          width={28}
+                          height={28}
+                          className="h-7 w-7 flex-shrink-0"
+                          priority
+                        />
+                        <span
+                          className="hidden whitespace-nowrap text-lg font-bold text-foreground sm:inline"
+                          style={{
+                            fontFamily:
+                              'var(--font-petrona), Georgia, "Times New Roman", serif',
+                          }}
+                        >
+                          Community Archive
+                        </span>
                       </Link>
-                    ) : null}
-                    <MobileMenu />
+                      <AudienceHeaderNavigation kind="primary" />
+                    </div>
+                    <div className="flex flex-shrink-0 items-center space-x-3">
+                      <AudienceHeaderNavigation kind="utility" />
+                      <HeaderSearch />
+                      <div className="text-sm">
+                        <DynamicSignIn />
+                      </div>
+                      <ThemeToggle side="bottom" />
+                      <AdminNavigationLink />
+                      <MobileMenu />
+                    </div>
                   </div>
-                </div>
-              </header>
+                </header>
+              </NavigationAudienceProvider>
               <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
                 {children}
                 <Analytics />

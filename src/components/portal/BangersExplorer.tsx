@@ -24,6 +24,7 @@ import { CARD, MUTED } from './styles'
 
 interface BangersExplorerProps {
   initialPage: PortalBangersPage
+  isMember: boolean
   scope: PortalBangersScope
   sort: PortalBangersSort
   currentYear: number
@@ -191,6 +192,7 @@ function apiHref({
 
 export function BangersExplorer({
   initialPage,
+  isMember,
   scope,
   sort,
   currentYear,
@@ -322,13 +324,13 @@ export function BangersExplorer({
 
   const loadMore = useCallback(() => {
     const nextOffset = page.pagination.nextOffset
-    if (nextOffset === null || query.trim() !== loadedQuery) return
+    if (!isMember || nextOffset === null || query.trim() !== loadedQuery) return
     void requestPage({
       offset: nextOffset,
       requestQuery: loadedQuery,
       replace: false,
     })
-  }, [loadedQuery, page.pagination.nextOffset, query, requestPage])
+  }, [isMember, loadedQuery, page.pagination.nextOffset, query, requestPage])
   const retryLoad = () => {
     const nextQuery = query.trim()
     if (nextQuery !== loadedQuery) {
@@ -348,6 +350,7 @@ export function BangersExplorer({
   }, [loadedQuery, query, requestPage])
 
   useEffect(() => {
+    if (!isMember) return
     const target = loadMoreRef.current
     if (!target || page.pagination.nextOffset === null) return
     const observer = new IntersectionObserver(
@@ -358,7 +361,7 @@ export function BangersExplorer({
     )
     observer.observe(target)
     return () => observer.disconnect()
-  }, [loadMore, page.pagination.nextOffset])
+  }, [isMember, loadMore, page.pagination.nextOffset])
 
   useEffect(
     () => () => {
@@ -750,7 +753,16 @@ export function BangersExplorer({
         </div>
       ) : null}
 
-      {page.pagination.nextOffset !== null ? (
+      {page.pagination.nextOffset !== null && !isMember ? (
+        <div className="min-h-20 flex items-center justify-center py-5">
+          <Link
+            href={`/login?redirect=${encodeURIComponent(currentReturnTo)}`}
+            className="rounded-[3px] border border-zinc-300 px-4 py-2 text-[12.5px] font-semibold text-brand hover:border-brand dark:border-[#3a3a40]"
+          >
+            Log in to see more bangers
+          </Link>
+        </div>
+      ) : page.pagination.nextOffset !== null ? (
         <div
           ref={loadMoreRef}
           data-testid="bangers-load-more-sentinel"

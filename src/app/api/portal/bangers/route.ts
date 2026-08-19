@@ -3,6 +3,8 @@ import {
   getPortalBangersPage,
   PORTAL_BANGERS_PAGE_SIZE,
 } from '@/lib/portal/data'
+import { getIsMember } from '@/lib/portal/auth'
+import { PUBLIC_PORTAL_PREVIEW_LIMIT } from '@/lib/portal/access'
 import type {
   PortalBangersPeriod,
   PortalBangersScope,
@@ -12,12 +14,12 @@ import type {
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-function publicJson(body: unknown, status = 200) {
+function bangersJson(body: unknown, status = 200, shared = false) {
   return NextResponse.json(body, {
     status,
     headers: {
       'Cache-Control':
-        status === 200
+        status === 200 && shared
           ? 'public, s-maxage=60, stale-while-revalidate=300'
           : 'private, no-store',
     },
@@ -43,6 +45,9 @@ export async function GET(request: NextRequest) {
   try {
     const params = new URL(request.url).searchParams
     const offset = boundedInteger(params.get('offset'), 0, 0, 1_000_000)
+    if (offset > 0 && !(await getIsMember())) {
+      return bangersJson({ error: 'Log in to see more bangers' }, 401)
+    }
     const periodValue = params.get('period')
     if (
       periodValue &&
@@ -75,9 +80,10 @@ export async function GET(request: NextRequest) {
     const query = (params.get('q') || '').trim()
     if (query.length > 120) throw new Error('Banger search is too long')
 
-    return publicJson(
+    return bangersJson(
       await getPortalBangersPage({
-        limit: PORTAL_BANGERS_PAGE_SIZE,
+        limit:
+          offset === 0 ? PUBLIC_PORTAL_PREVIEW_LIMIT : PORTAL_BANGERS_PAGE_SIZE,
         offset,
         scope,
         sort,
@@ -85,13 +91,15 @@ export async function GET(request: NextRequest) {
         period,
         query,
       }),
+      200,
+      offset === 0,
     )
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
     const isInputError =
       message.startsWith('Invalid') || message === 'Banger search is too long'
     if (!isInputError) console.error('Portal bangers request failed:', error)
-    return publicJson(
+    return bangersJson(
       {
         error: isInputError
           ? message

@@ -25,6 +25,7 @@ import type {
   PortalTrends,
   PortalTweet,
 } from './types'
+import { PUBLIC_PORTAL_PREVIEW_LIMIT } from './access'
 
 interface PortalReadConfig {
   url: string
@@ -908,6 +909,7 @@ export async function getPortalBangersPage(
 
 export async function getInitialPortalBangersPage(
   options: {
+    limit?: number
     sort?: PortalBangersSort
     scope?: PortalBangersScope
     year?: number
@@ -918,9 +920,13 @@ export async function getInitialPortalBangersPage(
   const scope = options.scope ?? 'all'
   const sort = options.sort ?? 'quotes'
   const query = options.query?.trim() ?? ''
-  if (query || options.period) {
+  const limit = Math.max(
+    1,
+    Math.min(100, Math.trunc(options.limit ?? PORTAL_BANGERS_PAGE_SIZE)),
+  )
+  if (query || options.period || limit !== PORTAL_BANGERS_PAGE_SIZE) {
     return getPortalBangersPage({
-      limit: PORTAL_BANGERS_PAGE_SIZE,
+      limit,
       scope,
       sort,
       ...(options.period ? { period: options.period } : { year: options.year }),
@@ -1010,7 +1016,7 @@ export async function getPortalData(
       () =>
         view === 'home'
           ? getCachedHomepageStreamCandidates(sourceKey)
-          : getPortalStreamPage(30),
+          : getPortalStreamPage(PUBLIC_PORTAL_PREVIEW_LIMIT),
       [],
     ),
     view === 'home'

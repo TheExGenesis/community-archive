@@ -127,10 +127,15 @@ function page(
   }
 }
 
-function renderExplorer(initialPage = page(), period?: PortalBangersPeriod) {
+function renderExplorer(
+  initialPage = page(),
+  period?: PortalBangersPeriod,
+  isMember = true,
+) {
   return render(
     <BangersExplorer
       initialPage={initialPage}
+      isMember={isMember}
       scope="all"
       sort="quotes"
       currentYear={2026}
@@ -404,6 +409,20 @@ describe('BangersExplorer', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
     expect(screen.getByText('All 4 matching bangers loaded.')).toBeVisible()
+  })
+
+  test('prompts logged-out visitors to sign in for continuation pages', () => {
+    const fetchMock = jest.spyOn(global, 'fetch')
+    renderExplorer(page(tweets, 3, 4), undefined, false)
+
+    expect(
+      screen.getByRole('link', { name: 'Log in to see more bangers' }),
+    ).toHaveAttribute('href', '/login?redirect=%2Fbangers%3Fperiod%3Dall')
+    expect(
+      screen.queryByRole('button', { name: 'Load more bangers' }),
+    ).not.toBeInTheDocument()
+    expect(IntersectionObserverMock.instances).toHaveLength(0)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   test('loads more when the masonry approaches its end', async () => {

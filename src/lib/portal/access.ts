@@ -1,0 +1,1 @@
+export const PUBLIC_PORTAL_PREVIEW_LIMIT = 10

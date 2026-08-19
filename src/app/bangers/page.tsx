@@ -6,6 +6,8 @@ import type {
   PortalBangersPeriod,
   PortalBangersScope,
 } from '@/lib/portal/types'
+import { getIsMember } from '@/lib/portal/auth'
+import { PUBLIC_PORTAL_PREVIEW_LIMIT } from '@/lib/portal/access'
 
 export const metadata = { title: 'Bangers · Community Archive' }
 export const maxDuration = 60
@@ -42,12 +44,16 @@ export default async function BangersPage({
   const allTime =
     periodValue === 'all' || (period === undefined && year === undefined)
   const query = paramValue(searchParams.q).trim().slice(0, 120)
-  const initialPage = await getInitialPortalBangersPage({
-    scope,
-    sort,
-    ...(period ? { period } : { year }),
-    query,
-  })
+  const [isMember, initialPage] = await Promise.all([
+    getIsMember(),
+    getInitialPortalBangersPage({
+      limit: PUBLIC_PORTAL_PREVIEW_LIMIT,
+      scope,
+      sort,
+      ...(period ? { period } : { year }),
+      query,
+    }),
+  ])
 
   return (
     <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
@@ -86,6 +92,7 @@ export default async function BangersPage({
           period={period}
           allTime={allTime}
           initialQuery={query}
+          isMember={isMember}
         />
       </div>
     </main>

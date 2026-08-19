@@ -102,6 +102,10 @@ interface TweetPageResult {
   quotingTweetCount: number
 }
 
+interface TweetPageOptions {
+  includeQuotingTweets?: boolean
+}
+
 /**
  * Load portal permalink records and incoming quote posts from the same
  * ClickHouse snapshot when enabled. The Supabase RPC remains the complete
@@ -109,8 +113,12 @@ interface TweetPageResult {
  */
 export async function getTweetPageData(
   tweetId: string,
+  { includeQuotingTweets = true }: TweetPageOptions = {},
 ): Promise<TweetPageResult> {
-  const clickHousePage = await fetchClickHousePage(tweetId)
+  const clickHousePage = await fetchClickHousePage(
+    tweetId,
+    includeQuotingTweets,
+  )
   if (clickHousePage) return clickHousePage
 
   const cookieStore = await cookies()
@@ -133,10 +141,12 @@ export async function getTweetPageData(
   }
 
   const result = data as unknown as RpcResult
-  const quotingTweets = (result.quoting_tweets ?? []).map(buildQuotingTweetData)
-  const quotingTweetCount = Number(
-    result.quoting_tweet_count ?? quotingTweets.length,
-  )
+  const quotingTweets = includeQuotingTweets
+    ? (result.quoting_tweets ?? []).map(buildQuotingTweetData)
+    : []
+  const quotingTweetCount = includeQuotingTweets
+    ? Number(result.quoting_tweet_count ?? quotingTweets.length)
+    : 0
 
   if (!result.tweet) {
     return {
@@ -209,19 +219,30 @@ export async function getTweetPageData(
 
 async function fetchClickHousePage(
   tweetId: string,
+  includeQuotingTweets: boolean,
 ): Promise<TweetPageResult | null> {
   if (!isClickHouseReadsEnabled()) return null
 
   try {
-    const [tweet, quotePosts] = await Promise.all([
-      fetchClickHouseTweetPageData(tweetId),
-      fetchClickHouseQuotePosts(tweetId).catch((error) => {
-        console.error('ClickHouse quote posts failed:', {
-          tweetId,
-          error: error instanceof Error ? error.message : String(error),
+    const tweetPromise = fetchClickHouseTweetPageData(tweetId)
+    const quotePostsPromise = includeQuotingTweets
+      ? fetchClickHouseQuotePosts(tweetId).catch((error) => {
+          console.error('ClickHouse quote posts failed:', {
+            tweetId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+          return {
+            tweets: [],
+            totalCount: 0,
+          } satisfies ClickHouseQuotePostsData
         })
-        return { tweets: [], totalCount: 0 } satisfies ClickHouseQuotePostsData
-      }),
+      : Promise.resolve({
+          tweets: [],
+          totalCount: 0,
+        } satisfies ClickHouseQuotePostsData)
+    const [tweet, quotePosts] = await Promise.all([
+      tweetPromise,
+      quotePostsPromise,
     ])
     if (!tweet) return null
     return {

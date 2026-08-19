@@ -11,6 +11,7 @@ import type { PortalData } from '@/lib/portal/types'
 import { createServerClient } from '@/utils/supabase'
 import { getLatestDigestPreview } from '@/lib/digest/data'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
+import { PUBLIC_PORTAL_PREVIEW_LIMIT } from '@/lib/portal/access'
 
 const DynamicHeroCTAButtons = dynamic(
   () => import('@/components/HeroCTAButtons'),
@@ -75,6 +76,7 @@ export default async function ClassicHomepage({
     ? data
     : {
         ...data,
+        initialStream: data.initialStream.slice(0, PUBLIC_PORTAL_PREVIEW_LIMIT),
         trends: { ...data.trends, years: [], series: [] },
       }
 

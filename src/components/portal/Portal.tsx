@@ -23,10 +23,11 @@ import { capturePostHogEvent } from '@/lib/posthog'
 import type { DigestPreview } from '@/lib/digest/types'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 import { CHROME_EXTENSION_URL } from '@/lib/browserExtension'
+import { PUBLIC_PORTAL_PREVIEW_LIMIT } from '@/lib/portal/access'
 
 export type PortalView = 'home' | 'stream'
 
-const HOME_LIVE_STREAM_LIMIT = 12
+const HOME_LIVE_STREAM_LIMIT = PUBLIC_PORTAL_PREVIEW_LIMIT
 const ARCHIVE_EXPORT_URL = '/docs#bulk-dump'
 const COMMUNITY_BUILDS_URL = '/tweets/1835411943735140798'
 
@@ -498,13 +499,16 @@ export default function Portal({
   const loadingMoreRef = useRef(false)
   const loadMoreTarget = useRef<HTMLDivElement>(null)
   const [hasMore, setHasMore] = useState(
-    !data.failures.initialStream && data.initialStream.length >= 30,
+    isMember &&
+      !data.failures.initialStream &&
+      data.initialStream.length >= PUBLIC_PORTAL_PREVIEW_LIMIT,
   )
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const loadMore = useCallback(async () => {
     if (
       view !== 'stream' ||
+      !isMember ||
       !hasMore ||
       loadingMoreRef.current ||
       !pageCursor.current
@@ -549,9 +553,10 @@ export default function Portal({
       loadingMoreRef.current = false
       setIsLoadingMore(false)
     }
-  }, [hasMore, view])
+  }, [hasMore, isMember, view])
 
   useEffect(() => {
+    if (!isMember) return
     const controller = new AbortController()
     let polling = false
     const applyHead = (tweets: PortalTweet[], nextHasMore: boolean) => {
@@ -654,10 +659,17 @@ export default function Portal({
       controller.abort()
       window.clearInterval(interval)
     }
-  }, [view])
+  }, [isMember, view])
 
   useEffect(() => {
-    if (view !== 'stream' || !hasMore) return
+    if (
+      !isMember ||
+      view !== 'stream' ||
+      !hasMore ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return
+    }
     const target = loadMoreTarget.current
     if (!target) return
     const observer = new IntersectionObserver(
@@ -668,7 +680,7 @@ export default function Portal({
     )
     observer.observe(target)
     return () => observer.disconnect()
-  }, [hasMore, loadMore, view])
+  }, [hasMore, isMember, loadMore, view])
 
   // ---- derived trend views ----------------------------------------------
   const weeklyRanked = useMemo(
@@ -1030,19 +1042,30 @@ export default function Portal({
               </div>
             )}
           </div>
-          <div
-            ref={loadMoreTarget}
-            aria-live="polite"
-            className={`py-5 text-center text-[12.5px] ${MUTED}`}
-          >
-            {isLoadingMore
-              ? 'Loading older tweets…'
-              : hasMore
-                ? 'Scroll for older tweets'
-                : visible.length > 0
-                  ? 'You’ve reached the end.'
-                  : ''}
-          </div>
+          {!isMember && visible.length > 0 ? (
+            <div className="py-5 text-center">
+              <Link
+                href={signInHref('/stream')}
+                className="text-[12.5px] font-semibold text-brand hover:underline"
+              >
+                Log in to see more live-stream tweets
+              </Link>
+            </div>
+          ) : (
+            <div
+              ref={loadMoreTarget}
+              aria-live="polite"
+              className={`py-5 text-center text-[12.5px] ${MUTED}`}
+            >
+              {isLoadingMore
+                ? 'Loading older tweets…'
+                : hasMore
+                  ? 'Scroll for older tweets'
+                  : visible.length > 0
+                    ? 'You’ve reached the end.'
+                    : ''}
+            </div>
+          )}
         </div>
       )}
     </Root>

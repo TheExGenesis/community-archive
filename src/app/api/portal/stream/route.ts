@@ -5,6 +5,8 @@ import {
   type PortalStreamPageCursor,
   type PortalStreamUpdateCursor,
 } from '@/lib/portal/data'
+import { getIsMember } from '@/lib/portal/auth'
+import { PUBLIC_PORTAL_PREVIEW_LIMIT } from '@/lib/portal/access'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -57,6 +59,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    if ((updateCursor || pageCursor) && !(await getIsMember())) {
+      return NextResponse.json(
+        { error: 'Log in to see more live-stream tweets' },
+        { status: 401, headers: { 'Cache-Control': 'private, no-store' } },
+      )
+    }
+
     if (updateCursor) {
       const tweets = await getPortalStreamUpdates(100, updateCursor)
       const edge = tweets[tweets.length - 1]
@@ -76,7 +85,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const pageSize = 30
+    const pageSize = pageCursor ? 30 : PUBLIC_PORTAL_PREVIEW_LIMIT
     const rows = await getPortalStreamPage(
       pageSize + 1,
       pageCursor ?? undefined,
@@ -92,9 +101,7 @@ export async function GET(request: NextRequest) {
       },
       {
         headers: {
-          'Cache-Control': pageCursor
-            ? 'public, s-maxage=15, stale-while-revalidate=30'
-            : 'private, no-store',
+          'Cache-Control': 'private, no-store',
         },
       },
     )

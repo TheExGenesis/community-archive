@@ -175,7 +175,6 @@ describe.each<PortalView>(['home', 'stream'])(
       expect(screen.getByText('preview tweet 3')).toBeInTheDocument()
       expect(screen.getByText('preview tweet 4')).toBeInTheDocument()
       expect(screen.getByText('preview tweet 5')).toBeInTheDocument()
-      expect(screen.getByText('preview tweet 12')).toBeInTheDocument()
       if (view === 'home') {
         expect(screen.getByText('preview tweet 1')).toHaveAttribute(
           'data-no-clamp',
@@ -189,6 +188,8 @@ describe.each<PortalView>(['home', 'stream'])(
           'lg:h-[420px]',
           'lg:min-h-[420px]',
         )
+        expect(screen.queryByText('preview tweet 11')).not.toBeInTheDocument()
+        expect(screen.queryByText('preview tweet 12')).not.toBeInTheDocument()
         expect(screen.queryByText('preview tweet 13')).not.toBeInTheDocument()
       } else {
         expect(screen.getByText('preview tweet 1')).toHaveAttribute(
@@ -198,6 +199,7 @@ describe.each<PortalView>(['home', 'stream'])(
         expect(
           screen.queryByRole('region', { name: 'Live tweet stream' }),
         ).not.toBeInTheDocument()
+        expect(screen.getByText('preview tweet 12')).toBeInTheDocument()
         expect(screen.getByText('preview tweet 13')).toBeInTheDocument()
       }
 
@@ -304,6 +306,32 @@ describe('portal stream page', () => {
     expect(screen.queryByText('Cooling this week')).not.toBeInTheDocument()
 
     unmount()
+  })
+
+  test('keeps the public preview static and prompts for login', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch')
+
+    render(
+      <Portal
+        data={{ ...data, initialStream: previewTweets.slice(0, 10) }}
+        view="stream"
+        isMember={false}
+      />,
+    )
+    await act(async () => {
+      await Promise.resolve()
+      jest.advanceTimersByTime(60_000)
+      await Promise.resolve()
+    })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(screen.getByText('preview tweet 10')).toBeInTheDocument()
+    expect(screen.queryByText('preview tweet 11')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('link', {
+        name: 'Log in to see more live-stream tweets',
+      }),
+    ).toHaveAttribute('href', '/login?redirect=%2Fstream')
   })
 
   test('jumps a truncated update backlog to the current stream head', async () => {

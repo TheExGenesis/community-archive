@@ -1,4 +1,5 @@
 import Portal from '@/components/portal/Portal'
+import { getIsMember } from '@/lib/portal/auth'
 import { getPortalData } from '@/lib/portal/data'
 
 export const metadata = { title: 'Stream · Community Archive' }
@@ -8,6 +9,9 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 export default async function StreamPage() {
-  const data = await getPortalData('stream')
-  return <Portal data={data} view="stream" />
+  const [data, isMember] = await Promise.all([
+    getPortalData('stream'),
+    getIsMember(),
+  ])
+  return <Portal data={data} view="stream" isMember={isMember} />
 }

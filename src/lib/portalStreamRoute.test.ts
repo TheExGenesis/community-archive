@@ -1,22 +1,27 @@
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/portal/stream/route'
 import { getPortalStreamPage, getPortalStreamUpdates } from '@/lib/portal/data'
+import { getIsMember } from '@/lib/portal/auth'
 
 jest.mock('@/lib/portal/data', () => ({
   getPortalStreamPage: jest.fn(),
   getPortalStreamUpdates: jest.fn(),
 }))
+jest.mock('@/lib/portal/auth', () => ({ getIsMember: jest.fn() }))
 
 const getPortalStreamPageMock = getPortalStreamPage as jest.MockedFunction<
   typeof getPortalStreamPage
 >
 const getPortalStreamUpdatesMock =
   getPortalStreamUpdates as jest.MockedFunction<typeof getPortalStreamUpdates>
+const getIsMemberMock = getIsMember as jest.MockedFunction<typeof getIsMember>
 
 describe('portal stream route', () => {
   beforeEach(() => {
     getPortalStreamPageMock.mockReset()
     getPortalStreamUpdatesMock.mockReset()
+    getIsMemberMock.mockReset()
+    getIsMemberMock.mockResolvedValue(true)
   })
 
   test('forwards a validated composite observation cursor', async () => {
@@ -108,9 +113,7 @@ describe('portal stream route', () => {
       createdAt: '2026-08-07T12:00:00.000Z',
       id: '201',
     })
-    expect(response.headers.get('cache-control')).toBe(
-      'public, s-maxage=15, stale-while-revalidate=30',
-    )
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
     await expect(response.json()).resolves.toMatchObject({
       tweets: expect.arrayContaining([expect.objectContaining({ id: '200' })]),
       nextCursor: {
@@ -129,6 +132,23 @@ describe('portal stream route', () => {
     )
 
     expect(response.headers.get('cache-control')).toBe('private, no-store')
+    expect(getPortalStreamPageMock).toHaveBeenCalledWith(11, undefined)
+    expect(getIsMemberMock).not.toHaveBeenCalled()
+  })
+
+  test('requires login for polling and older pages', async () => {
+    getIsMemberMock.mockResolvedValue(false)
+
+    const response = await GET(
+      new NextRequest(
+        'https://community-archive.org/api/portal/stream?before=2026-08-07T12%3A00%3A00.000Z&beforeId=201',
+      ),
+    )
+
+    expect(response.status).toBe(401)
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
+    expect(getPortalStreamPageMock).not.toHaveBeenCalled()
+    expect(getPortalStreamUpdatesMock).not.toHaveBeenCalled()
   })
 
   test('rejects malformed cursors before reading data', async () => {

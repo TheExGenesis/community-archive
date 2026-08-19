@@ -1,19 +1,24 @@
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/portal/bangers/route'
 import { getPortalBangersPage } from '@/lib/portal/data'
+import { getIsMember } from '@/lib/portal/auth'
 
 jest.mock('@/lib/portal/data', () => ({
   getPortalBangersPage: jest.fn(),
   PORTAL_BANGERS_PAGE_SIZE: 30,
 }))
+jest.mock('@/lib/portal/auth', () => ({ getIsMember: jest.fn() }))
 
 const getPortalBangersPageMock = getPortalBangersPage as jest.MockedFunction<
   typeof getPortalBangersPage
 >
+const getIsMemberMock = getIsMember as jest.MockedFunction<typeof getIsMember>
 
 describe('portal bangers route', () => {
   beforeEach(() => {
     getPortalBangersPageMock.mockReset()
+    getIsMemberMock.mockReset()
+    getIsMemberMock.mockResolvedValue(true)
     getPortalBangersPageMock.mockResolvedValue({
       tweets: [],
       pagination: {
@@ -35,7 +40,9 @@ describe('portal bangers route', () => {
 
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toContain('public')
-    expect(getPortalBangersPageMock).toHaveBeenCalled()
+    expect(getPortalBangersPageMock).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 10, offset: 0 }),
+    )
   })
 
   test('forwards bounded paging, ranking, scope, year, and search', async () => {
@@ -46,6 +53,7 @@ describe('portal bangers route', () => {
     )
 
     expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
     expect(getPortalBangersPageMock).toHaveBeenCalledWith({
       limit: 30,
       offset: 5001,
@@ -57,6 +65,20 @@ describe('portal bangers route', () => {
     })
   })
 
+  test('requires login for continuation pages', async () => {
+    getIsMemberMock.mockResolvedValue(false)
+
+    const response = await GET(
+      new NextRequest(
+        'https://community-archive.org/api/portal/bangers?offset=10',
+      ),
+    )
+
+    expect(response.status).toBe(401)
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
+    expect(getPortalBangersPageMock).not.toHaveBeenCalled()
+  })
+
   test('forwards this-week filtering instead of a year', async () => {
     const response = await GET(
       new NextRequest(
@@ -66,7 +88,7 @@ describe('portal bangers route', () => {
 
     expect(response.status).toBe(200)
     expect(getPortalBangersPageMock).toHaveBeenCalledWith({
-      limit: 30,
+      limit: 10,
       offset: 0,
       scope: 'all',
       sort: 'quotes',

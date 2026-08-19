@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import TweetComponent from '@/components/TweetComponent'
 import TweetBackLink from '@/components/TweetBackLink'
 import ThreadView from '@/components/ThreadView'
-import QuotingTweetsSidebar from '@/components/QuotingTweetsSidebar'
+import AuthenticatedQuotingTweetsSidebar from '@/components/AuthenticatedQuotingTweetsSidebar'
 import { getTweetBackLink } from '@/lib/navigation'
 import { Link2, MessagesSquare } from 'lucide-react'
 
@@ -18,8 +18,9 @@ export default async function TweetPage({
   searchParams?: Record<string, string | string[] | undefined>
 }) {
   const { tweet_id } = params
-  const { tweet, threadTree, quotingTweets, quotingTweetCount } =
-    await getTweetPageData(tweet_id)
+  const { tweet, threadTree } = await getTweetPageData(tweet_id, {
+    includeQuotingTweets: false,
+  })
 
   if (!tweet) {
     notFound()
@@ -77,11 +78,7 @@ export default async function TweetPage({
             </div>
           </div>
 
-          <QuotingTweetsSidebar
-            tweets={quotingTweets}
-            totalCount={quotingTweetCount}
-            targetTweet={tweet}
-          />
+          <AuthenticatedQuotingTweetsSidebar targetTweet={tweet} />
         </div>
       </section>
     </main>

@@ -131,6 +131,38 @@ describe('getTweetPageData', () => {
     expect(rpc).not.toHaveBeenCalled()
   })
 
+  test('can load a public ClickHouse permalink without requesting quote posts', async () => {
+    const tweet = {
+      tweet_id: '2085473085399150817',
+      account_id: '10',
+      created_at: '2026-08-07T12:00:00.000Z',
+      full_text: 'The linked portal tweet',
+      retweet_count: 4,
+      favorite_count: 25,
+      reply_to_tweet_id: null,
+      quote_tweet_id: null,
+      retweeted_tweet_id: null,
+      avatar_media_url: null,
+      username: 'alice',
+      account_display_name: 'Alice',
+      media: [],
+      urls: [],
+    } satisfies TweetData
+    clickHouseEnabledMock.mockReturnValue(true)
+    fetchClickHouseTweetPageDataMock.mockResolvedValue(tweet)
+
+    await expect(
+      getTweetPageData(tweet.tweet_id, { includeQuotingTweets: false }),
+    ).resolves.toEqual({
+      tweet,
+      threadTree: null,
+      quotingTweets: [],
+      quotingTweetCount: 0,
+    })
+    expect(fetchClickHouseQuotePostsMock).not.toHaveBeenCalled()
+    expect(createServerClientMock).not.toHaveBeenCalled()
+  })
+
   test('keeps the ClickHouse permalink available when quote posts fail', async () => {
     const tweet = {
       tweet_id: '2085473085399150817',

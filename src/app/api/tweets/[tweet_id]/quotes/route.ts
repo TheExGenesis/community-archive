@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getQuotingTweetsPage } from '@/lib/quotingTweets'
+import { createServerClient } from '@/utils/supabase'
+import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -24,6 +26,21 @@ export async function GET(
   { params }: { params: { tweet_id: string } },
 ) {
   try {
+    const cookieStore = await cookies()
+    const supabase = createServerClient(cookieStore)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Log in to see archived quotes' },
+        {
+          status: 401,
+          headers: { 'Cache-Control': 'private, no-store' },
+        },
+      )
+    }
+
     if (!/^\d{1,20}$/.test(params.tweet_id)) {
       return NextResponse.json({ error: 'Tweet not found' }, { status: 404 })
     }

@@ -304,7 +304,13 @@ export async function createDigestRunAction(formData: FormData) {
   try {
     const windowEnd = new Date()
     const windowStart = new Date(windowEnd.getTime() - 24 * 60 * 60 * 1_000)
-    const tweets = await fetchPortalRecentBangers(50, 24)
+    const tweets = await fetchPortalRecentBangers(
+      50,
+      24,
+      undefined,
+      undefined,
+      true,
+    )
     const candidates: DigestCandidate[] = selectDailyDigestBangers(tweets).map(
       (tweet, index) => ({
         tweet,
@@ -315,11 +321,12 @@ export async function createDigestRunAction(formData: FormData) {
     const initialEvent = event(
       'candidates',
       'completed',
-      'Saved up to 50 rolling 24-hour posts with a Community Archive banger score of at least two.',
+      'Saved up to 50 rolling 24-hour posts authored by current Community Archive members with a banger score of at least two.',
       {
         candidate_count: candidates.length,
         default_selected_count: candidates.length,
         minimum_ca_quote_count: 2,
+        target_author_population: 'community_members',
       },
     )
     const { data: run, error } = await admin
@@ -404,6 +411,7 @@ export async function createAndGenerateDigestDateAction(formData: FormData) {
       24,
       undefined,
       window.windowEnd,
+      true,
     )
     const candidates: DigestCandidate[] = selectDailyDigestBangers(tweets).map(
       (tweet, index) => ({
@@ -415,11 +423,12 @@ export async function createAndGenerateDigestDateAction(formData: FormData) {
     const initialEvent = event(
       'candidates',
       'completed',
-      `Saved up to 50 bangers authored during the ${digestDate} Community Archive day (06:00 UTC to 05:59 UTC).`,
+      `Saved up to 50 bangers by current Community Archive members authored during the ${digestDate} Community Archive day (06:00 UTC to 05:59 UTC).`,
       {
         candidate_count: candidates.length,
         default_selected_count: candidates.length,
         minimum_ca_quote_count: 2,
+        target_author_population: 'community_members',
         historical_window: true,
       },
     )

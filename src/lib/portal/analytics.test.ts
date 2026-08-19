@@ -355,13 +355,20 @@ describe('ClickHouse-backed portal analytics', () => {
       new URLSearchParams({ limit: '50', hours: '168' }),
       { timeoutMs: 30_000, revalidate: 1_800 },
     )
-    await fetchPortalRecentBangers(50, 24, fetcher, '2026-08-12T07:00:00.000Z')
+    await fetchPortalRecentBangers(
+      50,
+      24,
+      fetcher,
+      '2026-08-12T07:00:00.000Z',
+      true,
+    )
     expect(fetcher).toHaveBeenLastCalledWith(
       ['recent-bangers'],
       new URLSearchParams({
         limit: '50',
         hours: '24',
         end: '2026-08-12T07:00:00.000Z',
+        target_ca_users_only: 'true',
       }),
       { timeoutMs: 30_000, revalidate: 1_800 },
     )

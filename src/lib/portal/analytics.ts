@@ -454,12 +454,13 @@ export async function fetchPortalLiveAnalytics(
   }
 }
 
-/** Recent original posts from current archive uploaders and opted-in members. */
+/** Recent posts ranked by quotes from current archive uploaders and opted-in members. */
 export async function fetchPortalRecentBangers(
   limit = 50,
   hours = 48,
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
   end?: string,
+  targetCommunityUsersOnly = false,
 ): Promise<PortalTweet[]> {
   const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
   const safeHours = Math.max(1, Math.min(168, Math.trunc(hours)))
@@ -469,6 +470,7 @@ export async function fetchPortalRecentBangers(
       limit: String(safeLimit),
       hours: String(safeHours),
       ...(end ? { end: safeTimestamp(end, 'window end') } : {}),
+      ...(targetCommunityUsersOnly ? { target_ca_users_only: 'true' } : {}),
     }),
     { timeoutMs: 30_000, revalidate: 1_800 },
   )

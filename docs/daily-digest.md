@@ -73,8 +73,9 @@ non-production environment. Do not set it in production.
 
 - ClickHouse is the analytical source for candidates and archived quote-post
   commentary. The current `recent-bangers` ranking counts distinct non-self
-  quote tweets from Community Archive members against targets authored in the
-  selected time window. A run keeps only the top `min(50,
+  quote tweets from Community Archive members. Digest pulls restrict target
+  authors to current Community Archive members in the selected time window. A
+  run keeps only the top `min(50,
 num_bangers_with_score_at_least_2)` rows: every included post has a Community
   Archive banger score of at least two, and there are never more than 50.
 - The existing Supabase tweet-page RPC supplies in-window conversation replies

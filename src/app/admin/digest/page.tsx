@@ -452,8 +452,9 @@ export default async function DigestLabPage({
                         Candidate selection
                       </h2>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Up to 50 posts with a Community Archive banger score of
-                        at least two, ranked strongest first.
+                        Up to 50 posts authored by current Community Archive
+                        members with a banger score of at least two, ranked
+                        strongest first.
                       </p>
                     </div>
                     <span className="text-xs text-muted-foreground">

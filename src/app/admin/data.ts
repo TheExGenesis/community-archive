@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/portal/auth'
 
 export const ADMIN_USERNAME = 'exgenesis'
+export const ADMIN_USERNAMES = [ADMIN_USERNAME, 'christineist'] as const
 const PRODUCTION_SUPABASE_HOST = 'fabxmporizzqflnftavs.supabase.co'
 
 export const ACCOUNTS_PAGE_SIZE = 25
@@ -125,6 +126,13 @@ export const getTwitterProviderId = (user: User): string | null => {
 const ADMIN_TWITTER_PROVIDER_ID =
   process.env.ADMIN_TWITTER_PROVIDER_ID?.trim() || null
 
+const ADMIN_TWITTER_IDENTITIES = new Map<string, string | null>([
+  [ADMIN_USERNAME, ADMIN_TWITTER_PROVIDER_ID],
+  // Public X account id for @christineist. Binding the handle to the immutable
+  // provider id prevents a future handle transfer from granting admin access.
+  ['christineist', '826134955549790208'],
+])
+
 const isKnownProductionSupabase = () =>
   process.env.NEXT_PUBLIC_SUPABASE_URL?.includes(PRODUCTION_SUPABASE_HOST) ??
   false
@@ -155,10 +163,10 @@ function getStagingAdminUsername(user: User): string | null {
 // Pure predicate: is this user the configured real admin? No redirects.
 // Two paths:
 //
-//   1. Real Twitter OAuth identity matches ADMIN_USERNAME. On prod, this
-//      is the only path that returns true — guarded by username plus,
-//      when ADMIN_TWITTER_PROVIDER_ID is set, the immutable Twitter
-//      numeric id (belt-and-suspenders against a future handle takeover).
+//   1. Real Twitter OAuth identity matches an entry in
+//      ADMIN_TWITTER_IDENTITIES. On prod, this is the only path that returns
+//      true. Each configured immutable Twitter numeric id must match too.
+//      ADMIN_USERNAME keeps its legacy environment-configured id behavior.
 //
 //   2. (staging only) app_metadata.user_name is in the
 //      STAGING_ADMIN_USERNAMES allowlist. The dev-login route sets
@@ -167,9 +175,10 @@ function getStagingAdminUsername(user: User): string | null {
 //      regular auth API — so this is a safe identity claim on staging.
 export function isAdminUser(user: User): boolean {
   const twitterUsername = getTwitterUsername(user)
-  if (twitterUsername === ADMIN_USERNAME) {
-    if (ADMIN_TWITTER_PROVIDER_ID === null) return true
-    return getTwitterProviderId(user) === ADMIN_TWITTER_PROVIDER_ID
+  if (twitterUsername && ADMIN_TWITTER_IDENTITIES.has(twitterUsername)) {
+    const requiredProviderId = ADMIN_TWITTER_IDENTITIES.get(twitterUsername)
+    if (requiredProviderId === null) return true
+    return getTwitterProviderId(user) === requiredProviderId
   }
   const stagingName = getStagingAdminUsername(user)
   if (stagingName && STAGING_ADMIN_USERNAMES.has(stagingName)) return true

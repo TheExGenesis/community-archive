@@ -5,6 +5,7 @@ import { DigestMarkdown } from '@/components/digest/DigestMarkdown'
 import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
 import { buildSearchHref } from '@/lib/searchParams'
 import { MUTED, SERIF } from '@/components/portal/styles'
+import PostHogLink from '@/components/PostHogLink'
 
 const longDate = (date: string) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -49,15 +50,17 @@ export function DigestEditionView({
           <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-2.5 dark:border-zinc-200">
             <div className={sectionLabel}>What Happened Yesterday</div>
             <div className="flex flex-wrap items-center justify-end gap-3">
-              <a
+              <PostHogLink
                 href="https://communityarchive.substack.com/subscribe"
                 target="_blank"
                 rel="noreferrer"
+                eventName="digest_action"
+                eventProperties={{ action: 'subscribed', surface: 'subscribe' }}
                 aria-label="Subscribe to Community Archive on Substack"
                 className="rounded-full bg-brand px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 dark:text-brand-foreground dark:focus-visible:ring-offset-[#111114]"
               >
                 Subscribe
-              </a>
+              </PostHogLink>
               {isAdmin ? (
                 <Link
                   href="/admin/digest"
@@ -138,8 +141,13 @@ export function DigestEditionView({
                       className="mt-4 text-[34px] font-semibold leading-[1.14] tracking-[-0.005em] [text-wrap:pretty] sm:text-[42px]"
                       style={SERIF}
                     >
-                      <Link
+                      <PostHogLink
                         href={storyHref}
+                        eventName="digest_action"
+                        eventProperties={{
+                          action: 'story_opened',
+                          surface: 'edition_title',
+                        }}
                         className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       >
                         {story.titleIsQuote === false ? null : '“'}
@@ -147,7 +155,7 @@ export function DigestEditionView({
                           {story.title}
                         </DigestMarkdown>
                         {story.titleIsQuote === false ? null : '”'}
-                      </Link>
+                      </PostHogLink>
                     </h2>
                     <p
                       className={`mt-3 max-w-[60ch] text-base leading-[1.65] [text-wrap:pretty] sm:text-[17.5px] ${MUTED}`}
@@ -169,12 +177,17 @@ export function DigestEditionView({
                       ))}
                     </div>
 
-                    <Link
+                    <PostHogLink
                       href={storyHref}
+                      eventName="digest_action"
+                      eventProperties={{
+                        action: 'story_opened',
+                        surface: 'edition_cta',
+                      }}
                       className="mt-5 inline-flex rounded-sm text-sm font-semibold text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     >
                       Read the full story and surrounding conversation →
-                    </Link>
+                    </PostHogLink>
 
                     <div className="my-12 flex items-center gap-4 text-zinc-400 dark:text-zinc-600">
                       <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
@@ -202,14 +215,19 @@ export function DigestEditionView({
               </h2>
               <div className="mt-4 flex flex-wrap gap-2">
                 {content.keywords.map((keyword) => (
-                  <Link
+                  <PostHogLink
                     key={keyword}
                     href={buildSearchHref(keyword)}
+                    eventName="digest_action"
+                    eventProperties={{
+                      action: 'keyword_search_opened',
+                      surface: 'keyword',
+                    }}
                     aria-label={`Search Community Archive for ${keyword}`}
                     className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs transition-colors hover:bg-blue-100 hover:text-blue-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:bg-zinc-800 dark:hover:bg-blue-950 dark:hover:text-blue-100"
                   >
                     {keyword}
-                  </Link>
+                  </PostHogLink>
                 ))}
               </div>
             </section>
@@ -223,12 +241,17 @@ export function DigestEditionView({
                   : `Clustered from ${content.source.selectedCount} selected bangers in a frozen 24-hour snapshot.`}{' '}
                 Keywords are required to occur in the included posts.
               </p>
-              <Link
+              <PostHogLink
                 href="/bangers?period=today"
+                eventName="digest_action"
+                eventProperties={{
+                  action: 'bangers_opened',
+                  surface: 'sidebar',
+                }}
                 className="mt-4 inline-flex font-semibold text-brand hover:underline"
               >
                 Explore today&apos;s bangers →
-              </Link>
+              </PostHogLink>
             </section>
 
             {archive.length > 1 ? (
@@ -241,13 +264,18 @@ export function DigestEditionView({
                     .filter((item) => item.digestDate !== edition.digestDate)
                     .slice(0, 6)
                     .map((item) => (
-                      <Link
+                      <PostHogLink
                         key={item.digestDate}
                         href={`/digest/${item.digestDate}`}
+                        eventName="digest_action"
+                        eventProperties={{
+                          action: 'recent_edition_opened',
+                          surface: 'recent_editions',
+                        }}
                         className="block text-sm text-muted-foreground hover:text-brand hover:underline"
                       >
                         {longDate(item.digestDate)}
-                      </Link>
+                      </PostHogLink>
                     ))}
                 </div>
               </section>

@@ -79,6 +79,7 @@ type TrendsExplorerAction =
   | 'chart_series_toggled'
   | 'evidence_filter_toggled'
   | 'evidence_refreshed'
+  | 'granularity_changed'
   | 'retry_defaults'
   | 'scale_changed'
   | 'term_removed'
@@ -734,6 +735,7 @@ export default function TrendsExplorer({
 
   const selectGranularity = (nextGranularity: TrendGranularity) => {
     if (nextGranularity === granularity) return
+    captureExplorerAction('granularity_changed')
     const nextBuckets = snapshotBuckets(initialTrends, nextGranularity)
     setGranularity(nextGranularity)
     setSelectedRange((current) =>

@@ -10,7 +10,12 @@ import {
   navigationMenuTriggerStyle,
 } from '@/components/ui/navigation-menu'
 import { cn } from '@/utils/tailwind'
-import { isNavItemActive, NavItem } from '@/lib/navigation'
+import {
+  isNavItemActive,
+  navAnalyticsDestination,
+  NavItem,
+} from '@/lib/navigation'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 export default function HeaderNavigation({ items }: { items: NavItem[] }) {
   const pathname = usePathname()
@@ -24,6 +29,13 @@ export default function HeaderNavigation({ items }: { items: NavItem[] }) {
             <NavigationMenuItem key={item.href}>
               <Link href={item.href} legacyBehavior passHref>
                 <NavigationMenuLink
+                  onClick={() =>
+                    capturePostHogEvent('navigation_item_clicked', {
+                      destination: navAnalyticsDestination(item.href),
+                      surface: 'desktop',
+                      already_active: isActive,
+                    })
+                  }
                   className={cn(
                     navigationMenuTriggerStyle(),
                     'px-2.5 text-xs transition-colors duration-150 hover:bg-accent 2xl:px-4 2xl:text-sm',

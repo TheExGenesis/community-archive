@@ -130,6 +130,35 @@ describe('sanitizePostHogEvent', () => {
         has_year_filter: false,
       },
     ],
+    ['product_page_viewed', { page: 'user_directory' }],
+    [
+      'navigation_item_clicked',
+      {
+        destination: 'bangers',
+        surface: 'desktop',
+        already_active: false,
+      },
+    ],
+    ['digest_action', { action: 'story_opened', surface: 'edition_cta' }],
+    [
+      'user_directory_action',
+      {
+        action: 'profile_opened',
+        has_query: false,
+        sort_by: 'num_followers',
+        sort_order: 'desc',
+        visible_result_count: 15,
+      },
+    ],
+    [
+      'search_interface_action',
+      {
+        action: 'advanced_options_opened',
+        has_query: false,
+        active_filter_count: 0,
+      },
+    ],
+    ['settings_tab_selected', { tab: 'archives' }],
     ['portal_stream_loaded_more', { loaded_tweet_count: 30, has_more: true }],
   ])('keeps aggregate properties for %s', (eventName, properties) => {
     const event = captureResult(eventName, {

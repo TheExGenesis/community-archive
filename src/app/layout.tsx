@@ -6,7 +6,6 @@ import './globals.css'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import ReactQueryProvider from '@/providers/ReactQueryProvider'
 import PostHogProvider from '@/providers/PostHogProvider'
-import Link from 'next/link'
 import Image from 'next/image'
 import ThemeToggle from '@/components/ThemeToggle'
 import dynamic from 'next/dynamic'
@@ -14,6 +13,8 @@ import HeaderSearch from '@/components/HeaderSearch'
 import MobileMenu from '@/components/MobileMenu'
 import Footer from '@/components/Footer'
 import HashScrollHandler from '@/components/HashScrollHandler'
+import PostHogPageView from '@/components/PostHogPageView'
+import PostHogLink from '@/components/PostHogLink'
 import {
   AdminNavigationLink,
   AudienceHeaderNavigation,
@@ -64,6 +65,7 @@ export default function RootLayout({
       <body className="bg-background text-foreground transition-colors duration-300">
         <NextTopLoader showSpinner={false} height={3} color="#2acf80" />
         <PostHogProvider>
+          <PostHogPageView />
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"
@@ -77,8 +79,14 @@ export default function RootLayout({
                   <div className="flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
                     <div className="flex min-w-0 items-center gap-3">
                       <AudienceMobileNavigation />
-                      <Link
+                      <PostHogLink
                         href="/"
+                        eventName="navigation_item_clicked"
+                        eventProperties={{
+                          destination: 'home',
+                          surface: 'brand',
+                          already_active: false,
+                        }}
                         className="flex flex-shrink-0 items-center space-x-2"
                       >
                         <Image
@@ -98,7 +106,7 @@ export default function RootLayout({
                         >
                           Community Archive
                         </span>
-                      </Link>
+                      </PostHogLink>
                       <AudienceHeaderNavigation kind="primary" />
                     </div>
                     <div className="flex flex-shrink-0 items-center space-x-3">

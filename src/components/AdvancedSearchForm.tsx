@@ -92,6 +92,16 @@ export default function AdvancedSearchForm() {
     { key: 'until' as const, label: 'Until', value: until },
   ].filter((filter) => filter.value)
 
+  const toggleAdvancedOptions = () => {
+    const nextOpen = !showAdvancedOptions
+    capturePostHogEvent('search_interface_action', {
+      action: nextOpen ? 'advanced_options_opened' : 'advanced_options_closed',
+      has_query: Boolean(query.trim()),
+      active_filter_count: activeFilters.length,
+    })
+    setShowAdvancedOptions(nextOpen)
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -126,7 +136,7 @@ export default function AdvancedSearchForm() {
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+          onClick={toggleAdvancedOptions}
           className="-ml-2 h-8 text-muted-foreground hover:text-foreground"
           aria-expanded={showAdvancedOptions}
         >

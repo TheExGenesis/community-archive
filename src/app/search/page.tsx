@@ -11,6 +11,7 @@ import { Search, SlidersHorizontal } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 const starterSearches = [
   { label: 'Open source', query: 'open source' },
@@ -57,6 +58,16 @@ function SearchPageContent() {
   }
 
   const handleSortChange = (sort: TweetSearchSort) => {
+    capturePostHogEvent('search_interface_action', {
+      action: 'result_sort_changed',
+      has_query: Boolean(cleanRawText),
+      active_filter_count: [
+        filterCriteria.fromUsername,
+        filterCriteria.replyToUsername,
+        filterCriteria.startDate,
+        filterCriteria.endDate,
+      ].filter(Boolean).length,
+    })
     const next = new URLSearchParams(normalizedSearchParams)
     if (sort === 'newest') next.delete('sort')
     else next.set('sort', sort)
@@ -132,6 +143,13 @@ function SearchPageContent() {
                   <Link
                     key={item.query}
                     href={`/search?q=${encodeURIComponent(item.query)}`}
+                    onClick={() =>
+                      capturePostHogEvent('search_interface_action', {
+                        action: 'starter_search_selected',
+                        has_query: false,
+                        active_filter_count: 0,
+                      })
+                    }
                     className="rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
                   >
                     {item.label}

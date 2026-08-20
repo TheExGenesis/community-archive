@@ -2,6 +2,7 @@ import type { PortalTweet } from '@/lib/portal/types'
 import {
   assembleDigestEditionContent,
   buildDigestPromptCorpus,
+  fillDailyDigestCandidates,
   renderDigestPrompt,
   selectDailyDigestBangers,
   type EnrichedDigestCandidate,
@@ -116,6 +117,26 @@ describe('daily digest generation contract', () => {
     expect(selected.at(-1)?.quoteCount).toBe(2)
   })
 
+  test('fills a sparse banger set with unique CA interaction-ranked posts', () => {
+    const selected = fillDailyDigestCandidates(
+      [tweet('1', 'strong', 4), tweet('2', 'weak', 1)],
+      [
+        tweet('1', 'duplicate', 4),
+        tweet('3', 'discussed', 1),
+        tweet('4', 'also discussed', 0),
+      ],
+      3,
+    )
+
+    expect(
+      selected.map(({ tweet: item, source }) => [item.id, source]),
+    ).toEqual([
+      ['1', 'banger'],
+      ['3', 'ca_interactions'],
+      ['4', 'ca_interactions'],
+    ])
+  })
+
   test('renders a reproducible prompt from the frozen candidate snapshot', () => {
     const prompt = renderDigestPrompt(
       '{{digest_date}}|{{window_start}}|{{window_end}}|{{candidate_json}}',
@@ -131,6 +152,7 @@ describe('daily digest generation contract', () => {
     expect(prompt).toContain('taste benchmarks are becoming public rituals')
     expect(prompt).toContain('"index": 0')
     expect(prompt).toContain('"archived_ca_quote_count": 9')
+    expect(prompt).toContain('"selection_source": "banger"')
     expect(prompt).toContain('"kind": "quote"')
     expect(prompt).toContain('"tweet_id": "1"')
   })

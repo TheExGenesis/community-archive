@@ -310,6 +310,16 @@ export default async function DigestLabPage({
                       </option>
                     ))}
                   </select>
+                  <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      name="target_ca_users_only"
+                      value="true"
+                      defaultChecked
+                      className="mt-0.5 h-4 w-4 rounded border-zinc-300"
+                    />
+                    Only include posts authored by Community Archive members
+                  </label>
                   <SubmitButton pendingLabel="Pulling candidates…">
                     Pull last 24 hours
                   </SubmitButton>
@@ -338,6 +348,7 @@ export default async function DigestLabPage({
                       action: createAndGenerateDigestDateAction,
                       dates: pastDates,
                       promptVersionId: prompt.id,
+                      targetCommunityUsersOnly: true,
                       runningRuns: runningRuns.map((run) => ({
                         date: run.digestDate,
                         id: run.id,
@@ -452,9 +463,9 @@ export default async function DigestLabPage({
                         Candidate selection
                       </h2>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Up to 50 posts authored by current Community Archive
-                        members with a banger score of at least two, ranked
-                        strongest first.
+                        Qualifying bangers first, supplemented to a pool of 10
+                        by same-day posts with the most non-self replies and
+                        quotes from Community Archive members.
                       </p>
                     </div>
                     <span className="text-xs text-muted-foreground">
@@ -499,8 +510,10 @@ export default async function DigestLabPage({
                                 @{candidate.tweet.username}
                               </span>
                               <span className="ml-auto tabular-nums text-muted-foreground">
-                                ✦ {candidate.tweet.quoteCount ?? 0} · ♥{' '}
-                                {candidate.tweet.likes.toLocaleString()}
+                                {candidate.source === 'ca_interactions'
+                                  ? `↪ ${candidate.tweet.interactionCount ?? 0} CA interactions (${candidate.tweet.replyCount ?? 0} replies · ${candidate.tweet.quoteCount ?? 0} quotes) · `
+                                  : `banger ${candidate.tweet.quoteCount ?? 0} quotes · `}
+                                ♥ {candidate.tweet.likes.toLocaleString()}
                               </span>
                             </span>
                             <span className="mt-2 block whitespace-pre-wrap text-sm leading-6">
@@ -511,8 +524,8 @@ export default async function DigestLabPage({
                       ))}
                       {state.activeRun.candidates.length === 0 ? (
                         <p className="p-5 text-sm text-muted-foreground">
-                          No recent bangers met the current quote-based
-                          threshold.
+                          No qualifying bangers or same-day CA-interaction
+                          candidates were found.
                         </p>
                       ) : null}
                     </div>

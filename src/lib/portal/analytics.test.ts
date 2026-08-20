@@ -1,5 +1,6 @@
 import {
   fetchPortalBangersPage,
+  fetchPortalDailyInteractions,
   fetchPortalTrendEvidence,
   fetchPortalTrendSeries,
   fetchPortalLiveAnalytics,
@@ -371,6 +372,55 @@ describe('ClickHouse-backed portal analytics', () => {
         target_ca_users_only: 'true',
       }),
       { timeoutMs: 30_000, revalidate: 1_800 },
+    )
+  })
+
+  test('maps same-day CA interaction rankings with the exact window and author scope', async () => {
+    const fetcher = jest.fn(async () => ({
+      data: [
+        {
+          tweetId: '2085365448686866863',
+          accountId: '14816854',
+          createdAt: '2026-08-17 14:00:41.000',
+          fullText: 'A same-day discussed post',
+          favoriteCount: '12',
+          retweetCount: '3',
+          latestObservedAt: '2026-08-17 14:00:41.000',
+          interactionCount: '8',
+          replyCount: '7',
+          quoteCount: '1',
+          username: 'katiebakes',
+          accountDisplayName: 'Katie',
+          avatarMediaUrl: null,
+        },
+      ],
+    })) as unknown as AnalyticsFetcher
+
+    await expect(
+      fetchPortalDailyInteractions(
+        50,
+        24,
+        fetcher,
+        '2026-08-18T06:00:00.000Z',
+        true,
+      ),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: '2085365448686866863',
+        interactionCount: 8,
+        replyCount: 7,
+        quoteCount: 1,
+      }),
+    ])
+    expect(fetcher).toHaveBeenCalledWith(
+      ['daily-interactions'],
+      new URLSearchParams({
+        limit: '50',
+        hours: '24',
+        end: '2026-08-18T06:00:00.000Z',
+        target_ca_users_only: 'true',
+      }),
+      { timeoutMs: 30_000, revalidate: 300 },
     )
   })
 

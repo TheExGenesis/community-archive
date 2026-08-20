@@ -24,6 +24,7 @@ export interface DigestCandidate {
   tweet: PortalTweet
   sourceRank: number
   selected: boolean
+  source?: 'banger' | 'ca_interactions'
 }
 
 export interface DigestRunEvent {

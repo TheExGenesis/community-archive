@@ -53,6 +53,28 @@ export function selectDailyDigestBangers(tweets: PortalTweet[]): PortalTweet[] {
   return tweets.filter((tweet) => (tweet.quoteCount ?? 0) >= 2).slice(0, 50)
 }
 
+export function fillDailyDigestCandidates(
+  bangers: PortalTweet[],
+  interactionRanked: PortalTweet[],
+  minimum = 10,
+): Array<{ tweet: PortalTweet; source: 'banger' | 'ca_interactions' }> {
+  const selected: Array<{
+    tweet: PortalTweet
+    source: 'banger' | 'ca_interactions'
+  }> = selectDailyDigestBangers(bangers).map((tweet) => ({
+    tweet,
+    source: 'banger',
+  }))
+  const seen = new Set(selected.map(({ tweet }) => tweet.id))
+  for (const tweet of interactionRanked) {
+    if (selected.length >= minimum) break
+    if (seen.has(tweet.id)) continue
+    seen.add(tweet.id)
+    selected.push({ tweet, source: 'ca_interactions' })
+  }
+  return selected
+}
+
 const cleanText = (value: unknown, max: number): string | null => {
   if (typeof value !== 'string') return null
   const cleaned = value.trim().replace(/\s+/g, ' ')
@@ -305,7 +327,13 @@ export function renderDigestPrompt(
         ...(candidate
           ? {
               source_rank: candidate.sourceRank,
+              selection_source: candidate.source ?? 'banger',
               archived_ca_quote_count: candidate.tweet.quoteCount ?? 0,
+              archived_ca_reply_count: candidate.tweet.replyCount ?? 0,
+              archived_ca_interaction_count:
+                candidate.tweet.interactionCount ??
+                candidate.tweet.quoteCount ??
+                0,
             }
           : {}),
         tweet: promptTweet(row.tweet),

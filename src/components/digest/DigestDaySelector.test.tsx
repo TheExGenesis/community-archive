@@ -87,6 +87,14 @@ describe('DigestDaySelector', () => {
     expect(august11.closest('form')).toHaveFormValues({
       prompt_version_id: 'prompt-1',
       digest_date: '2026-08-11',
+      target_ca_users_only: 'true',
+    })
+    const authorshipToggle = screen.getByRole('checkbox', {
+      name: 'Only include posts authored by Community Archive members',
+    })
+    await user.click(authorshipToggle)
+    expect(august11.closest('form')).toHaveFormValues({
+      target_ca_users_only: 'false',
     })
     expect(screen.getByText('10').closest('button')).toBeNull()
     expect(

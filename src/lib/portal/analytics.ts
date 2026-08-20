@@ -101,6 +101,15 @@ interface ClickHouseRecentBangersResponse {
   data: ClickHouseRecentBanger[]
 }
 
+interface ClickHouseDailyInteraction extends ClickHouseRecentBanger {
+  interactionCount: string | number
+  replyCount: string | number
+}
+
+interface ClickHouseDailyInteractionsResponse {
+  data: ClickHouseDailyInteraction[]
+}
+
 interface ClickHouseTopQuote {
   tweetId: string
   quoteCount: string | number
@@ -516,6 +525,78 @@ export async function fetchPortalRecentBangers(
       likes: safeCount(row.favoriteCount, 'banger favorite count'),
       rts: safeCount(row.retweetCount, 'banger repost count'),
       quoteCount: safeCount(row.quoteCount, 'banger quote count'),
+      ...(media.length ? { media } : {}),
+    }
+  })
+}
+
+/** Same-window posts ranked by non-self replies and quotes from CA members. */
+export async function fetchPortalDailyInteractions(
+  limit = 50,
+  hours = 24,
+  fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+  end?: string,
+  targetCommunityUsersOnly = false,
+): Promise<PortalTweet[]> {
+  const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
+  const safeHours = Math.max(1, Math.min(168, Math.trunc(hours)))
+  const response = await fetcher<ClickHouseDailyInteractionsResponse>(
+    ['daily-interactions'],
+    new URLSearchParams({
+      limit: String(safeLimit),
+      hours: String(safeHours),
+      ...(end ? { end: safeTimestamp(end, 'window end') } : {}),
+      ...(targetCommunityUsersOnly ? { target_ca_users_only: 'true' } : {}),
+    }),
+    { timeoutMs: 30_000, revalidate: 300 },
+  )
+  if (!Array.isArray(response.data)) {
+    throw new Error('ClickHouse daily-interactions returned an invalid response')
+  }
+
+  return response.data.map((row) => {
+    if (
+      !/^\d{1,32}$/.test(row.tweetId) ||
+      !/^\d{1,32}$/.test(row.accountId) ||
+      typeof row.fullText !== 'string'
+    ) {
+      throw new Error('ClickHouse daily-interactions returned an invalid tweet')
+    }
+    const username = row.username || 'unknown'
+    const media = (row.media ?? []).flatMap((item) =>
+      typeof item.mediaUrl === 'string' && typeof item.mediaType === 'string'
+        ? [
+            {
+              url: item.mediaUrl,
+              type: item.mediaType,
+              ...(typeof item.width === 'number' ? { width: item.width } : {}),
+              ...(typeof item.height === 'number'
+                ? { height: item.height }
+                : {}),
+            },
+          ]
+        : [],
+    )
+    return {
+      id: row.tweetId,
+      accountId: row.accountId,
+      username,
+      name: row.accountDisplayName || username,
+      avatar: row.avatarMediaUrl || null,
+      text: row.fullText,
+      observedAt: safeTimestamp(
+        row.latestObservedAt,
+        'interaction observation timestamp',
+      ),
+      createdAt: safeTimestamp(row.createdAt, 'interaction authored timestamp'),
+      likes: safeCount(row.favoriteCount, 'interaction favorite count'),
+      rts: safeCount(row.retweetCount, 'interaction repost count'),
+      quoteCount: safeCount(row.quoteCount, 'interaction quote count'),
+      replyCount: safeCount(row.replyCount, 'interaction reply count'),
+      interactionCount: safeCount(
+        row.interactionCount,
+        'interaction total count',
+      ),
       ...(media.length ? { media } : {}),
     }
   })

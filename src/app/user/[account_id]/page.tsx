@@ -18,15 +18,10 @@ import {
 } from '@/lib/metaTwitter/profilePagination'
 import { getCachedArchivedAt } from '@/lib/metaTwitter/data'
 import { resolveProfile } from '@/lib/metaTwitter/profile'
-import {
-  curatedSectionsByYear,
-  type SectionsByYear,
-} from '@/lib/metaTwitter/chapterSections'
-import { getGeneratedSections } from '@/lib/metaTwitter/generatedSections'
 
 interface PageProps {
   params: { account_id: string }
-  searchParams: { chapter?: string; section?: string; username?: string }
+  searchParams: { chapter?: string; username?: string }
 }
 
 export async function generateMetadata({
@@ -66,14 +61,12 @@ async function ProfileArchiveContent({
   avatarUrl,
   basePath,
   candidateYear,
-  candidateSection,
   displayName,
 }: {
   accountId: string
   avatarUrl: string | null
   basePath: string
   candidateYear: number | null
-  candidateSection: string | null
   displayName: string
 }) {
   const candidatePage = await getCuratedProfileBangersPage(accountId, {
@@ -91,30 +84,6 @@ async function ProfileArchiveContent({
 
   const navChapters: NavChapter[] = initialPage.yearCounts
 
-  // Hand-curated sections win; anyone else gets a one-time generated split,
-  // cached server-side. When banger data is unavailable we make no claim
-  // about sections at all.
-  let sectionsByYear: SectionsByYear = {}
-  let sectionsNote: string | null = null
-  if (initialPage.available) {
-    const curated = curatedSectionsByYear(accountId)
-    if (curated) {
-      sectionsByYear = curated
-    } else {
-      const bangerCount = navChapters.reduce(
-        (total, chapter) => total + chapter.count,
-        0,
-      )
-      const generated = await getGeneratedSections(accountId, bangerCount)
-      if (generated.status === 'generated') {
-        sectionsByYear = generated.sectionsByYear
-      } else if (generated.status === 'insufficient') {
-        sectionsNote =
-          'Not enough widely-quoted posts yet to split this archive into sections.'
-      }
-    }
-  }
-
   return (
     <ProfileArchive
       accountId={accountId}
@@ -123,10 +92,7 @@ async function ProfileArchiveContent({
       chapters={navChapters}
       displayName={displayName}
       initialYear={year}
-      initialSectionSlug={year === candidateYear ? candidateSection : null}
       initialPage={initialPage}
-      sectionsByYear={sectionsByYear}
-      sectionsNote={sectionsNote}
     />
   )
 }
@@ -165,21 +131,12 @@ export default async function UserPage({ params, searchParams }: PageProps) {
     requestedYear <= new Date().getUTCFullYear() + 1
       ? requestedYear
       : null
-  // Sections may be generated during render, so the slug is validated inside
-  // the archive content; here it only has to be shaped like a slug.
-  const candidateSection =
-    candidateYear &&
-    searchParams.section &&
-    /^[a-z0-9-]{1,64}$/.test(searchParams.section)
-      ? searchParams.section
-      : null
 
   const requestedProfilePath = `/user/${encodeURIComponent(params.account_id)}`
   const canonicalProfilePath = userProfileHref(profile.username, accountId)
   if (canonicalProfilePath !== requestedProfilePath) {
     const canonicalParams = new URLSearchParams()
     if (candidateYear) canonicalParams.set('chapter', String(candidateYear))
-    if (candidateSection) canonicalParams.set('section', candidateSection)
     const canonicalQuery = canonicalParams.toString()
     redirect(
       `${canonicalProfilePath}${canonicalQuery ? `?${canonicalQuery}` : ''}`,
@@ -209,7 +166,6 @@ export default async function UserPage({ params, searchParams }: PageProps) {
               avatarUrl={profile.avatar_media_url}
               basePath={canonicalProfilePath}
               candidateYear={candidateYear}
-              candidateSection={candidateSection}
               displayName={profile.account_display_name}
             />
           </Suspense>

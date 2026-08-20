@@ -432,7 +432,13 @@ export default function ProfileContent({
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="privacy" className="w-full">
+      <Tabs
+        defaultValue="privacy"
+        className="w-full"
+        onValueChange={(tab) =>
+          capturePostHogEvent('settings_tab_selected', { tab })
+        }
+      >
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="privacy">Privacy Settings</TabsTrigger>
           <TabsTrigger value="archives">My Archives</TabsTrigger>

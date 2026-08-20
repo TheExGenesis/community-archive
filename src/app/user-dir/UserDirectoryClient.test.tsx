@@ -1,14 +1,16 @@
 import '@testing-library/jest-dom'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import UserDirectoryClient, { USERS_PER_PAGE } from './UserDirectoryClient'
 import { fetchUsers } from '@/lib/queries/fetchUsers'
 import type { DirectoryUser } from '@/lib/types'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 jest.mock('@/lib/queries/fetchUsers', () => ({
   fetchUsers: jest.fn(),
   getDirectoryProfileHref: (user: DirectoryUser) => `/user/${user.username}`,
 }))
+jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 
 const mockFetchUsers = fetchUsers as jest.MockedFunction<typeof fetchUsers>
 
@@ -41,12 +43,67 @@ const directoryUser = (index: number): DirectoryUser => ({
 describe('UserDirectoryClient', () => {
   beforeEach(() => {
     mockFetchUsers.mockReset()
+    ;(capturePostHogEvent as jest.Mock).mockReset()
     IntersectionObserverMock.instances = []
     Object.defineProperty(window, 'IntersectionObserver', {
       configurable: true,
       writable: true,
       value: IntersectionObserverMock,
     })
+  })
+
+  test('records profile opens using aggregate directory context', async () => {
+    const initialUsers = [directoryUser(1)]
+    render(
+      <UserDirectoryClient
+        totalCount={1}
+        initialUsers={initialUsers}
+        initialHasMore={false}
+      />,
+    )
+
+    const profileLink = screen.getByRole('link', { name: /Member 1/ })
+    profileLink.addEventListener('click', (event) => event.preventDefault())
+    profileLink.click()
+
+    expect(capturePostHogEvent).toHaveBeenCalledWith('user_directory_action', {
+      action: 'profile_opened',
+      has_query: false,
+      sort_by: 'num_followers',
+      sort_order: 'desc',
+      visible_result_count: 1,
+    })
+  })
+
+  test('records a settled directory search without sending its text', async () => {
+    mockFetchUsers.mockResolvedValueOnce({
+      users: [directoryUser(2)],
+      hasMore: false,
+    })
+    render(
+      <UserDirectoryClient
+        totalCount={2}
+        initialUsers={[directoryUser(1)]}
+        initialHasMore={false}
+      />,
+    )
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search users' }), {
+      target: { value: 'sensitive name' },
+    })
+
+    await waitFor(() =>
+      expect(capturePostHogEvent).toHaveBeenCalledWith(
+        'user_directory_action',
+        {
+          action: 'searched',
+          has_query: true,
+          sort_by: 'num_followers',
+          sort_order: 'desc',
+          visible_result_count: 1,
+        },
+      ),
+    )
   })
 
   test('renders the server-supplied first 15 users without a client refetch', async () => {

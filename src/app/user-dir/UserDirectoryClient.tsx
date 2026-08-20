@@ -19,6 +19,7 @@ import { MembershipStatusIcon } from '@/components/MembershipStatusIcon'
 import { formatNumber } from '@/lib/formatNumber'
 import { fetchUsers, getDirectoryProfileHref } from '@/lib/queries/fetchUsers'
 import { DirectoryUser, SortKey } from '@/lib/types'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 export const USERS_PER_PAGE = 15
 
@@ -57,6 +58,7 @@ export default function UserDirectoryClient({
   const loadMoreInFlightRef = useRef(false)
   const requestVersionRef = useRef(0)
   const skipInitialRequestRef = useRef(initialUsers !== null)
+  const lastCapturedSearchRef = useRef('')
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300)
@@ -89,6 +91,19 @@ export default function UserDirectoryClient({
           return
         setUsers(page.users)
         setHasMore(page.hasMore)
+        if (
+          debouncedSearch &&
+          debouncedSearch !== lastCapturedSearchRef.current
+        ) {
+          lastCapturedSearchRef.current = debouncedSearch
+          capturePostHogEvent('user_directory_action', {
+            action: 'searched',
+            has_query: true,
+            sort_by: sortKey,
+            sort_order: sortOrder,
+            visible_result_count: page.users.length,
+          })
+        }
       } catch (err) {
         if (!isCurrentRequest) return
         setError('We could not load users. Please try again.')
@@ -160,6 +175,21 @@ export default function UserDirectoryClient({
   }, [error, hasMore, loadMore, loading, loadingMore])
 
   const handleSort = (key: SortKey) => {
+    const nextOrder =
+      key === sortKey
+        ? sortOrder === 'asc'
+          ? 'desc'
+          : 'asc'
+        : key === 'num_followers' || key === 'joined_at'
+          ? 'desc'
+          : 'asc'
+    capturePostHogEvent('user_directory_action', {
+      action: 'sort_changed',
+      has_query: Boolean(debouncedSearch),
+      sort_by: key,
+      sort_order: nextOrder,
+      visible_result_count: users.length,
+    })
     if (key === sortKey) {
       setSortOrder((current) => (current === 'asc' ? 'desc' : 'asc'))
     } else {
@@ -349,6 +379,15 @@ export default function UserDirectoryClient({
                       <TableCell className="py-4">
                         <Link
                           href={getDirectoryProfileHref(user)}
+                          onClick={() =>
+                            capturePostHogEvent('user_directory_action', {
+                              action: 'profile_opened',
+                              has_query: Boolean(debouncedSearch),
+                              sort_by: sortKey,
+                              sort_order: sortOrder,
+                              visible_result_count: users.length,
+                            })
+                          }
                           className="block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group-hover:[&_div.font-semibold]:underline"
                         >
                           {identity}

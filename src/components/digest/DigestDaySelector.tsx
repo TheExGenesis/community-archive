@@ -5,6 +5,7 @@ import { useState } from 'react'
 import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
 import { CARD, MUTED } from '@/components/portal/styles'
 import { DigestGenerationDayButton } from './DigestGenerationDayButton'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
@@ -195,6 +196,12 @@ export function DigestDaySelector({
             <Link
               key={date}
               href={`/digest/${date}`}
+              onClick={() =>
+                capturePostHogEvent('digest_action', {
+                  action: 'edition_selected',
+                  surface: 'calendar',
+                })
+              }
               aria-label={`${date}${availableDay.isPreview ? ', preview edition' : ''}`}
               aria-current={isCurrent ? 'date' : undefined}
               className={`relative flex aspect-square items-center justify-center rounded-[6px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${

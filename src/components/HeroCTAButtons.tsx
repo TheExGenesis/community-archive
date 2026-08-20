@@ -17,6 +17,7 @@ import { devLog } from '@/lib/devLog'
 import { updateOptIn } from '@/lib/optInApi'
 import { useBrowserExtensionStatus } from '@/hooks/useBrowserExtensionStatus'
 import { CHROME_EXTENSION_URL } from '@/lib/browserExtension'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 interface HeroCTAButtonsProps {
   initialIsOptedIn?: boolean
@@ -190,6 +191,10 @@ export default function HeroCTAButtons({
   ])
 
   const handleOptIn = async () => {
+    capturePostHogEvent('homepage_action_clicked', {
+      action: 'opt_in',
+      authenticated: Boolean(user),
+    })
     if (!user) {
       await signIn('optin')
       return
@@ -249,7 +254,15 @@ export default function HeroCTAButtons({
                 }`}
                 size="lg"
               >
-                <a href="#upload-archive">
+                <a
+                  href="#upload-archive"
+                  onClick={() =>
+                    capturePostHogEvent('homepage_action_clicked', {
+                      action: 'upload_archive',
+                      authenticated: Boolean(user),
+                    })
+                  }
+                >
                   <Upload className="mr-2 h-5 w-5" />
                   Upload archive
                 </a>
@@ -274,6 +287,12 @@ export default function HeroCTAButtons({
                     href={CHROME_EXTENSION_URL}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() =>
+                      capturePostHogEvent('homepage_action_clicked', {
+                        action: 'get_extension',
+                        authenticated: Boolean(user),
+                      })
+                    }
                   >
                     <Puzzle className="mr-2 h-5 w-5" />
                     Get extension

@@ -87,6 +87,12 @@ Staging synchronization is automatic; production synchronization is not:
   verify that the seed loads twice without a database reset.
 - Editing only `supabase/schemas/` is insufficient. Generate and commit the
   migration that the workflow can apply.
+- A Storage access change must keep three sources aligned: the bucket
+  declaration in `supabase/config.toml`, the desired RLS policy in
+  `supabase/schemas/060_policies.sql`, and a replay-safe migration in
+  `supabase/migrations/`. Verify the bucket's public flag and anonymous versus
+  authenticated object access on staging; a green staging sync does not change
+  production.
 - Before merging a PR with migrations, run the read-only
   `pnpm migrations:check`. If production is behind, report the pending
   migration in the PR or handoff.

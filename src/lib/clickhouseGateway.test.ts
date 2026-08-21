@@ -182,6 +182,24 @@ describe('ClickHouse analytics gateway requests', () => {
     ).toThrow('Unsupported ClickHouse analytics endpoint')
   })
 
+  test('allows only numeric tweet-thread paths and no query parameters', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['tweet', '2085473085399150817', 'thread'],
+      new URLSearchParams('raw_sql=DROP'),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/tweet/2085473085399150817/thread',
+    )
+    expect(() =>
+      analyticsGatewayRequestUrl(
+        ['tweet', 'not-a-tweet', 'thread'],
+        new URLSearchParams(),
+        'https://stream.example/analytics',
+      ),
+    ).toThrow('Unsupported ClickHouse analytics endpoint')
+  })
+
   test('allows only scoped profile-sidebar parameters for numeric accounts', () => {
     const target = analyticsGatewayRequestUrl(
       ['user', '42', 'sidebar'],

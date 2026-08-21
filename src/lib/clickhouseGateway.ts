@@ -126,6 +126,13 @@ export function analyticsGatewayRequestUrl(
   ) {
     allowedParams = new Set()
   } else if (
+    cleanPath.length === 3 &&
+    cleanPath[0] === 'tweet' &&
+    /^\d{1,20}$/.test(cleanPath[1]) &&
+    cleanPath[2] === 'thread'
+  ) {
+    allowedParams = new Set()
+  } else if (
     cleanPath.length === 2 &&
     cleanPath[0] === 'quote-posts' &&
     /^\d{1,20}$/.test(cleanPath[1])

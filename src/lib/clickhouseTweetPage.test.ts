@@ -1,4 +1,7 @@
-import { fetchClickHouseTweetPageData } from './clickhouseTweetPage'
+import {
+  fetchClickHouseTweetPageData,
+  fetchClickHouseTweetThreadPageData,
+} from './clickhouseTweetPage'
 
 describe('fetchClickHouseTweetPageData', () => {
   test('maps a portal tweet detail from ClickHouse into the permalink renderer', async () => {
@@ -86,5 +89,67 @@ describe('fetchClickHouseTweetPageData', () => {
       fetchClickHouseTweetPageData('not-a-tweet', fetcher),
     ).resolves.toBeNull()
     expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  test('maps a ClickHouse conversation into the existing thread tree', async () => {
+    const root = {
+      tweetId: '1636679643120951297',
+      accountId: '10',
+      createdAt: '2023-03-17 10:43:29.000',
+      fullText: 'Thread root',
+      replyToTweetId: null,
+      replyToUsername: null,
+      favoriteCount: '144',
+      retweetCount: '32',
+      username: 'exgenesis',
+      accountDisplayName: 'xiq',
+      avatarMediaUrl: null,
+      quoteTweetId: null,
+      quotedTweet: null,
+      retweetedTweetId: null,
+      media: [],
+    }
+    const reply = {
+      ...root,
+      tweetId: '1636682659488301059',
+      createdAt: '2023-03-17 10:55:28.000',
+      fullText: 'this is my best tweet',
+      replyToTweetId: root.tweetId,
+      replyToUsername: 'exgenesis',
+      favoriteCount: '25',
+      retweetCount: '2',
+    }
+    const fetcher = jest.fn().mockResolvedValue({
+      data: {
+        tweet: root,
+        conversationTweets: [root, reply],
+      },
+    })
+
+    const page = await fetchClickHouseTweetThreadPageData(root.tweetId, fetcher)
+
+    expect(fetcher).toHaveBeenCalledWith(
+      ['tweet', root.tweetId, 'thread'],
+      expect.any(URLSearchParams),
+      { revalidate: 3600 },
+    )
+    expect(page?.tweet).toMatchObject({
+      tweet_id: root.tweetId,
+      full_text: 'Thread root',
+    })
+    expect(page?.threadTree).toMatchObject({
+      root: root.tweetId,
+      roots: [root.tweetId],
+      children: {
+        [root.tweetId]: [reply.tweetId],
+        [reply.tweetId]: [],
+      },
+      parents: { [reply.tweetId]: root.tweetId },
+    })
+    expect(page?.threadTree?.tweets[reply.tweetId]).toMatchObject({
+      tweet_id: reply.tweetId,
+      reply_to_tweet_id: root.tweetId,
+      username: 'exgenesis',
+    })
   })
 })

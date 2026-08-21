@@ -2,7 +2,7 @@ import type { TweetData } from '@/components/TweetComponent'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@/utils/supabase'
 import { isClickHouseReadsEnabled } from './clickhouseGateway'
-import { fetchClickHouseTweetPageData } from './clickhouseTweetPage'
+import { fetchClickHouseTweetThreadPageData } from './clickhouseTweetPage'
 import { fetchClickHouseQuotePosts } from './clickhouseQuotePosts'
 import { getTweetPageData } from './getTweetPageData'
 
@@ -12,7 +12,7 @@ jest.mock('./clickhouseGateway', () => ({
   isClickHouseReadsEnabled: jest.fn(),
 }))
 jest.mock('./clickhouseTweetPage', () => ({
-  fetchClickHouseTweetPageData: jest.fn(),
+  fetchClickHouseTweetThreadPageData: jest.fn(),
 }))
 jest.mock('./clickhouseQuotePosts', () => ({
   fetchClickHouseQuotePosts: jest.fn(),
@@ -24,9 +24,9 @@ jest.mock('./twitterSyndication', () => ({
 const clickHouseEnabledMock = isClickHouseReadsEnabled as jest.MockedFunction<
   typeof isClickHouseReadsEnabled
 >
-const fetchClickHouseTweetPageDataMock =
-  fetchClickHouseTweetPageData as jest.MockedFunction<
-    typeof fetchClickHouseTweetPageData
+const fetchClickHouseTweetThreadPageDataMock =
+  fetchClickHouseTweetThreadPageData as jest.MockedFunction<
+    typeof fetchClickHouseTweetThreadPageData
   >
 const fetchClickHouseQuotePostsMock =
   fetchClickHouseQuotePosts as jest.MockedFunction<
@@ -71,7 +71,7 @@ describe('getTweetPageData', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     clickHouseEnabledMock.mockReturnValue(false)
-    fetchClickHouseTweetPageDataMock.mockResolvedValue(null)
+    fetchClickHouseTweetThreadPageDataMock.mockResolvedValue(null)
     fetchClickHouseQuotePostsMock.mockResolvedValue({
       tweets: [],
       totalCount: 0,
@@ -98,8 +98,31 @@ describe('getTweetPageData', () => {
       media: [],
       urls: [],
     } satisfies TweetData
+    const threadTree = {
+      root: tweet.tweet_id,
+      roots: [tweet.tweet_id],
+      tweets: {
+        [tweet.tweet_id]: tweet,
+        '2085473085399150818': {
+          ...tweet,
+          tweet_id: '2085473085399150818',
+          reply_to_tweet_id: tweet.tweet_id,
+        },
+      },
+      children: {
+        [tweet.tweet_id]: ['2085473085399150818'],
+        '2085473085399150818': [],
+      },
+      parents: { '2085473085399150818': tweet.tweet_id },
+      paths: {
+        '2085473085399150818': [tweet.tweet_id, '2085473085399150818'],
+      },
+    }
     clickHouseEnabledMock.mockReturnValue(true)
-    fetchClickHouseTweetPageDataMock.mockResolvedValue(tweet)
+    fetchClickHouseTweetThreadPageDataMock.mockResolvedValue({
+      tweet,
+      threadTree: threadTree as never,
+    })
     fetchClickHouseQuotePostsMock.mockResolvedValue({
       totalCount: 7,
       tweets: [
@@ -114,7 +137,7 @@ describe('getTweetPageData', () => {
 
     await expect(getTweetPageData(tweet.tweet_id)).resolves.toMatchObject({
       tweet,
-      threadTree: null,
+      threadTree,
       quotingTweetCount: 7,
       quotingTweets: [
         expect.objectContaining({
@@ -123,7 +146,7 @@ describe('getTweetPageData', () => {
         }),
       ],
     })
-    expect(fetchClickHouseTweetPageDataMock).toHaveBeenCalledWith(
+    expect(fetchClickHouseTweetThreadPageDataMock).toHaveBeenCalledWith(
       tweet.tweet_id,
     )
     expect(fetchClickHouseQuotePostsMock).toHaveBeenCalledWith(tweet.tweet_id)
@@ -149,7 +172,10 @@ describe('getTweetPageData', () => {
       urls: [],
     } satisfies TweetData
     clickHouseEnabledMock.mockReturnValue(true)
-    fetchClickHouseTweetPageDataMock.mockResolvedValue(tweet)
+    fetchClickHouseTweetThreadPageDataMock.mockResolvedValue({
+      tweet,
+      threadTree: null,
+    })
     fetchClickHouseQuotePostsMock.mockRejectedValue(new Error('gateway down'))
     const consoleError = jest
       .spyOn(console, 'error')

@@ -3321,3 +3321,69 @@ REVOKE EXECUTE ON FUNCTION "public"."publish_digest_edition"(uuid)
   FROM PUBLIC, "anon", "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."publish_digest_edition"(uuid)
   TO "service_role";
+
+CREATE OR REPLACE FUNCTION "public"."community_archive_monitoring_digest"()
+RETURNS TABLE (
+  "publication_age_seconds" double precision,
+  "expected_date_published" double precision,
+  "automated_run_failed" double precision,
+  "healthy" double precision
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  WITH expected AS (
+    SELECT
+      ((CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '30 hours')::date
+        AS digest_date,
+      (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') AS checked_at
+  ), latest_published AS (
+    SELECT edition.digest_date, edition.published_at
+    FROM public.digest_editions AS edition
+    WHERE edition.status = 'published'
+    ORDER BY edition.digest_date DESC, edition.version DESC
+    LIMIT 1
+  ), state AS (
+    SELECT
+      expected.digest_date AS expected_date,
+      expected.checked_at,
+      latest_published.digest_date AS published_date,
+      latest_published.published_at,
+      EXISTS (
+        SELECT 1
+        FROM public.digest_runs AS run
+        WHERE run.digest_date = expected.digest_date
+          AND run.status = 'failed'
+          AND run.created_by IS NULL
+          AND run.parent_run_id IS NULL
+          AND run.workflow_run_id IS NOT NULL
+      ) AS run_failed
+    FROM expected
+    LEFT JOIN latest_published ON TRUE
+  )
+  SELECT
+    COALESCE(
+      EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - state.published_at)),
+      1000000000000
+    )::double precision AS publication_age_seconds,
+    COALESCE(state.published_date = state.expected_date, FALSE)::integer::double precision
+      AS expected_date_published,
+    state.run_failed::integer::double precision AS automated_run_failed,
+    (
+      CASE
+        WHEN state.published_date = state.expected_date THEN 1
+        WHEN state.run_failed THEN 0
+        WHEN state.checked_at < state.expected_date::timestamp + INTERVAL '32 hours'
+          THEN 1
+        ELSE 0
+      END
+    )::double precision AS healthy
+  FROM state;
+$$;
+ALTER FUNCTION "public"."community_archive_monitoring_digest"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."community_archive_monitoring_digest"()
+  FROM PUBLIC, "anon", "authenticated", "service_role";
+GRANT EXECUTE ON FUNCTION "public"."community_archive_monitoring_digest"()
+  TO "readclient";

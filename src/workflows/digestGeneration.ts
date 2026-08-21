@@ -1,5 +1,9 @@
 import type { TweetData } from '@/components/TweetComponent'
 import { fetchClickHouseQuotePosts } from '@/lib/clickhouseQuotePosts'
+import {
+  loadDigestCandidates,
+  MINIMUM_DIGEST_CANDIDATE_POOL,
+} from '@/lib/digest/candidates'
 import { fetchDigestReplies } from '@/lib/digest/context'
 import {
   mapDigestEdition,
@@ -8,6 +12,7 @@ import {
   toJson,
 } from '@/lib/digest/data'
 import { createDigestAdminClient } from '@/lib/digest/database'
+import { getDigestDateWindow } from '@/lib/digest/dateWindow'
 import {
   assembleDigestEditionContent,
   renderDigestPrompt,
@@ -484,6 +489,272 @@ async function markDigestGenerationFailed(runId: string, message: string) {
     .eq('status', 'running')
 }
 
+type NightlyDigestClaim =
+  | { action: 'generate'; runId: string }
+  | { action: 'publish'; runId: string }
+  | {
+      action: 'skip'
+      reason: 'already-published' | 'already-running' | 'failed'
+      runId: string | null
+    }
+
+async function claimNightlyDigestRun(
+  digestDate: string,
+  workflowRunId: string,
+): Promise<NightlyDigestClaim> {
+  'use step'
+
+  const admin = createDigestAdminClient()
+  const { data: published, error: publishedError } = await admin
+    .from('digest_editions')
+    .select('source_run_id')
+    .eq('digest_date', digestDate)
+    .eq('status', 'published')
+    .limit(1)
+    .maybeSingle()
+  if (publishedError) throw publishedError
+  if (published) {
+    return {
+      action: 'skip',
+      reason: 'already-published',
+      runId: published.source_run_id,
+    }
+  }
+
+  const findExistingAutomatedRun = () =>
+    admin
+      .from('digest_runs')
+      .select('*')
+      .eq('digest_date', digestDate)
+      .is('created_by', null)
+      .is('parent_run_id', null)
+      .not('workflow_run_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+  const existingResult = await findExistingAutomatedRun()
+  if (existingResult.error) throw existingResult.error
+  if (existingResult.data) {
+    const existing = mapDigestRun(existingResult.data)
+    if (existing.status === 'completed') {
+      return { action: 'publish', runId: existing.id }
+    }
+    if (
+      existing.status === 'running' &&
+      existing.workflowRunId === workflowRunId
+    ) {
+      return { action: 'generate', runId: existing.id }
+    }
+    return {
+      action: 'skip',
+      reason: existing.status === 'failed' ? 'failed' : 'already-running',
+      runId: existing.id,
+    }
+  }
+
+  const { data: promptRow, error: promptError } = await admin
+    .from('digest_prompt_versions')
+    .select('id')
+    .order('version', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (promptError || !promptRow) {
+    throw promptError ?? new Error('No digest prompt version is configured')
+  }
+
+  const window = getDigestDateWindow(digestDate)
+  const snapshot = await loadDigestCandidates(window.windowEnd, false)
+  const startedAt = new Date()
+  const hasEnoughCandidates = snapshot.candidates.length >= 3
+  const initialEvents: DigestRunEvent[] = [
+    event(
+      'candidates',
+      'completed',
+      `Saved ${digestDate} nightly candidates from all authors, with Community Archive authors marked for editorial preference.`,
+      {
+        automation: true,
+        candidate_count: snapshot.candidates.length,
+        community_authored_count: snapshot.communityAuthoredCount,
+        default_selected_count: snapshot.candidates.length,
+        interaction_fallback_count: snapshot.fallbackCount,
+        minimum_candidate_pool: MINIMUM_DIGEST_CANDIDATE_POOL,
+        minimum_ca_quote_count: 2,
+        qualifying_banger_count: snapshot.bangerCount,
+        target_author_population: 'all_authors',
+        workflow_run_id: workflowRunId,
+      },
+    ),
+  ]
+  if (!hasEnoughCandidates) {
+    initialEvents.push(
+      event(
+        'generation',
+        'failed',
+        `Only ${snapshot.candidates.length} candidates were found; at least three are required.`,
+      ),
+    )
+  }
+  const { data: created, error: createError } = await admin
+    .from('digest_runs')
+    .insert({
+      digest_date: digestDate,
+      status: hasEnoughCandidates ? 'running' : 'failed',
+      prompt_version_id: promptRow.id,
+      window_start: window.windowStart,
+      window_end: window.windowEnd,
+      candidates: toJson(snapshot.candidates),
+      workflow_run_id: workflowRunId,
+      events: toJson(initialEvents),
+      started_at: hasEnoughCandidates ? startedAt.toISOString() : null,
+      completed_at: hasEnoughCandidates ? null : startedAt.toISOString(),
+      error: hasEnoughCandidates
+        ? null
+        : `Only ${snapshot.candidates.length} digest candidates were found`,
+      created_by: null,
+    })
+    .select('id')
+    .single()
+
+  if (createError) {
+    if (createError.code !== '23505') throw createError
+    const duplicateResult = await findExistingAutomatedRun()
+    if (duplicateResult.error || !duplicateResult.data) {
+      throw duplicateResult.error ?? createError
+    }
+    const duplicate = mapDigestRun(duplicateResult.data)
+    if (duplicate.status === 'completed') {
+      return { action: 'publish', runId: duplicate.id }
+    }
+    return {
+      action: 'skip',
+      reason: duplicate.status === 'failed' ? 'failed' : 'already-running',
+      runId: duplicate.id,
+    }
+  }
+
+  return hasEnoughCandidates
+    ? { action: 'generate', runId: created.id }
+    : { action: 'skip', reason: 'failed', runId: created.id }
+}
+
+async function publishNightlyDigestRun(runId: string) {
+  'use step'
+
+  const admin = createDigestAdminClient()
+  const { data: runRow, error: runError } = await admin
+    .from('digest_runs')
+    .select('*')
+    .eq('id', runId)
+    .maybeSingle()
+  if (runError || !runRow) throw runError ?? new Error('Digest run not found')
+  const run = mapDigestRun(runRow)
+  if (run.status !== 'completed' || !run.parsedOutput) {
+    throw new Error('Nightly digest run did not complete with valid output')
+  }
+
+  const { data: alreadyPublished, error: publishedError } = await admin
+    .from('digest_editions')
+    .select('id, source_run_id, version')
+    .eq('digest_date', run.digestDate)
+    .eq('status', 'published')
+    .limit(1)
+    .maybeSingle()
+  if (publishedError) throw publishedError
+  if (alreadyPublished) {
+    return {
+      digestDate: run.digestDate,
+      editionId: alreadyPublished.id,
+      status:
+        alreadyPublished.source_run_id === runId
+          ? ('published' as const)
+          : ('editorial-edition-preserved' as const),
+      version: alreadyPublished.version,
+    }
+  }
+
+  const { data: existingDraft, error: draftError } = await admin
+    .from('digest_editions')
+    .select('id, version')
+    .eq('source_run_id', runId)
+    .eq('status', 'draft')
+    .order('version', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (draftError) throw draftError
+
+  let draft = existingDraft
+  if (!draft) {
+    const { data: latest, error: latestError } = await admin
+      .from('digest_editions')
+      .select('version')
+      .eq('digest_date', run.digestDate)
+      .order('version', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (latestError) throw latestError
+
+    const version = (latest?.version ?? 0) + 1
+    const { data: createdDraft, error: createError } = await admin
+      .from('digest_editions')
+      .insert({
+        digest_date: run.digestDate,
+        version,
+        status: 'draft',
+        source_run_id: run.id,
+        content: toJson({
+          ...run.parsedOutput,
+          executiveSummary: run.parsedOutput.executiveSummary.slice(0, 3),
+        }),
+        created_by: null,
+      })
+      .select('id, version')
+      .single()
+    if (createError) throw createError
+    draft = createdDraft
+  }
+
+  const { data: published, error: publishError } = await admin.rpc(
+    'publish_digest_edition',
+    { p_edition_id: draft.id },
+  )
+  if (publishError || !published) {
+    throw publishError ?? new Error('Digest publication returned no edition')
+  }
+
+  const events = [
+    ...run.events,
+    event(
+      'edition',
+      'completed',
+      `Nightly automation published digest edition version ${published.version}.`,
+      { automation: true, edition_id: published.id },
+    ),
+  ]
+  const { error: eventError } = await admin
+    .from('digest_runs')
+    .update({ events: toJson(events), updated_at: new Date().toISOString() })
+    .eq('id', runId)
+  if (eventError) {
+    console.warn(
+      '[daily digest workflow] published edition but could not append event',
+      { runId, editionId: published.id, error: eventError },
+    )
+  }
+
+  console.info('[daily digest workflow] nightly edition published', {
+    digestDate: published.digest_date,
+    editionId: published.id,
+    runId,
+    version: published.version,
+  })
+  return {
+    digestDate: published.digest_date,
+    editionId: published.id,
+    status: 'published' as const,
+    version: published.version,
+  }
+}
+
 export async function generateDigestWorkflow(runId: string) {
   'use workflow'
 
@@ -495,4 +766,30 @@ export async function generateDigestWorkflow(runId: string) {
     await markDigestGenerationFailed(runId, describeError(error))
     throw error
   }
+}
+
+export async function publishNightlyDigestWorkflow(digestDate: string) {
+  'use workflow'
+
+  const { workflowRunId } = getWorkflowMetadata()
+  const claim = await claimNightlyDigestRun(digestDate, workflowRunId)
+  if (claim.action === 'skip') {
+    return {
+      digestDate,
+      reason: claim.reason,
+      runId: claim.runId,
+      status: 'skipped' as const,
+    }
+  }
+
+  if (claim.action === 'generate') {
+    try {
+      await executeDigestGeneration(claim.runId)
+    } catch (error) {
+      await markDigestGenerationFailed(claim.runId, describeError(error))
+      throw error
+    }
+  }
+
+  return publishNightlyDigestRun(claim.runId)
 }

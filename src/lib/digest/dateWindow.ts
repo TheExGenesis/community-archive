@@ -42,6 +42,10 @@ export function listPastDigestDates(count = 7, now = new Date()) {
   )
 }
 
+export function getLatestCompletedDigestDate(now = new Date()) {
+  return listPastDigestDates(1, now)[0]
+}
+
 export function isRecentPastDigestDate(
   digestDate: string,
   now = new Date(),

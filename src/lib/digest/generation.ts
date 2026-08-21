@@ -328,6 +328,8 @@ export function renderDigestPrompt(
           ? {
               source_rank: candidate.sourceRank,
               selection_source: candidate.source ?? 'banger',
+              authored_by_community_member:
+                candidate.communityAuthored === true,
               archived_ca_quote_count: candidate.tweet.quoteCount ?? 0,
               archived_ca_reply_count: candidate.tweet.replyCount ?? 0,
               archived_ca_interaction_count:

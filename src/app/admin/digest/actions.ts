@@ -5,25 +5,20 @@ import { redirect } from 'next/navigation'
 import { start } from 'workflow/api'
 import { requireAdmin } from '@/app/admin/data'
 import {
-  fetchPortalDailyInteractions,
-  fetchPortalRecentBangers,
-} from '@/lib/portal/analytics'
-import {
   getDigestDateWindow,
   isRecentPastDigestDate,
   listPastDigestDates,
 } from '@/lib/digest/dateWindow'
-import { createDigestAdminClient } from '@/lib/digest/database'
 import {
-  fillDailyDigestCandidates,
-  selectDailyDigestBangers,
-} from '@/lib/digest/generation'
+  loadDigestCandidates,
+  MINIMUM_DIGEST_CANDIDATE_POOL,
+} from '@/lib/digest/candidates'
+import { createDigestAdminClient } from '@/lib/digest/database'
 import { captureDigestPostHogEvent } from '@/lib/digest/posthogServer'
 import { mapDigestEdition, mapDigestRun, toJson } from '@/lib/digest/data'
 import {
   DIGEST_STORY_CATEGORIES,
   parseDigestEditionContent,
-  type DigestCandidate,
   type DigestEditionContent,
   type DigestRunEvent,
 } from '@/lib/digest/types'
@@ -39,49 +34,6 @@ const formString = (formData: FormData, key: string) =>
   String(formData.get(key) ?? '').trim()
 const formBoolean = (formData: FormData, key: string) =>
   ['true', 'on', '1'].includes(formString(formData, key).toLowerCase())
-
-const MINIMUM_DIGEST_CANDIDATE_POOL = 10
-
-async function loadDigestCandidates(
-  windowEnd: string,
-  targetCommunityUsersOnly: boolean,
-) {
-  const bangers = await fetchPortalRecentBangers(
-    50,
-    24,
-    undefined,
-    windowEnd,
-    targetCommunityUsersOnly,
-  )
-  const qualifyingBangers = selectDailyDigestBangers(bangers)
-  const interactionRanked =
-    qualifyingBangers.length < MINIMUM_DIGEST_CANDIDATE_POOL
-      ? await fetchPortalDailyInteractions(
-          50,
-          24,
-          undefined,
-          windowEnd,
-          targetCommunityUsersOnly,
-        )
-      : []
-  const selected = fillDailyDigestCandidates(
-    bangers,
-    interactionRanked,
-    MINIMUM_DIGEST_CANDIDATE_POOL,
-  )
-  return {
-    candidates: selected.map<DigestCandidate>(({ tweet, source }, index) => ({
-      tweet,
-      source,
-      sourceRank: index + 1,
-      selected: true,
-    })),
-    bangerCount: qualifyingBangers.length,
-    fallbackCount: selected.filter(
-      ({ source }) => source === 'ca_interactions',
-    ).length,
-  }
-}
 
 const event = (
   stage: DigestRunEvent['stage'],
@@ -336,10 +288,7 @@ export async function createDigestPromptVersionAction(formData: FormData) {
 export async function createDigestRunAction(formData: FormData) {
   const { user } = await requireAdmin()
   const promptVersionId = formString(formData, 'prompt_version_id')
-  const targetCommunityUsersOnly = formBoolean(
-    formData,
-    'target_ca_users_only',
-  )
+  const targetCommunityUsersOnly = formBoolean(formData, 'target_ca_users_only')
   if (!UUID_PATTERN.test(promptVersionId)) {
     redirectToLab({ error: 'Choose a prompt version.' })
   }
@@ -375,6 +324,7 @@ export async function createDigestRunAction(formData: FormData) {
         candidate_count: candidates.length,
         default_selected_count: candidates.length,
         qualifying_banger_count: snapshot.bangerCount,
+        community_authored_count: snapshot.communityAuthoredCount,
         interaction_fallback_count: snapshot.fallbackCount,
         minimum_ca_quote_count: 2,
         target_author_population: targetCommunityUsersOnly
@@ -422,10 +372,7 @@ export async function createAndGenerateDigestDateAction(formData: FormData) {
   const { user } = await requireAdmin()
   const promptVersionId = formString(formData, 'prompt_version_id')
   const digestDate = formString(formData, 'digest_date')
-  const targetCommunityUsersOnly = formBoolean(
-    formData,
-    'target_ca_users_only',
-  )
+  const targetCommunityUsersOnly = formBoolean(formData, 'target_ca_users_only')
   if (!UUID_PATTERN.test(promptVersionId)) {
     redirectToLab({ error: 'Choose a prompt version.' })
   }
@@ -479,6 +426,7 @@ export async function createAndGenerateDigestDateAction(formData: FormData) {
         candidate_count: candidates.length,
         default_selected_count: candidates.length,
         qualifying_banger_count: snapshot.bangerCount,
+        community_authored_count: snapshot.communityAuthoredCount,
         interaction_fallback_count: snapshot.fallbackCount,
         minimum_ca_quote_count: 2,
         target_author_population: targetCommunityUsersOnly

@@ -207,8 +207,9 @@ export default async function DigestLabPage({
             <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
               Pull a frozen 24-hour banger set, choose what belongs, compare
               immutable prompt versions, inspect the exact request and run
-              trace, then stage a public edition. Nothing publishes
-              automatically.
+              trace, then stage a public edition. The nightly workflow uses the
+              newest prompt and publishes automatically; manual runs remain
+              editable here.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -269,7 +270,7 @@ export default async function DigestLabPage({
               </h2>
               <p className="mt-1 text-sm text-emerald-900/75 dark:text-emerald-100/75">
                 Publishing makes this exact draft the public edition. It never
-                happens automatically.
+                changes the immutable source run.
               </p>
             </div>
             <form action={publishDigestEditionAction}>
@@ -315,10 +316,9 @@ export default async function DigestLabPage({
                       type="checkbox"
                       name="target_ca_users_only"
                       value="true"
-                      defaultChecked
                       className="mt-0.5 h-4 w-4 rounded border-zinc-300"
                     />
-                    Only include posts authored by Community Archive members
+                    Restrict this manual run to Community Archive authors
                   </label>
                   <SubmitButton pendingLabel="Pulling candidates…">
                     Pull last 24 hours
@@ -348,7 +348,7 @@ export default async function DigestLabPage({
                       action: createAndGenerateDigestDateAction,
                       dates: pastDates,
                       promptVersionId: prompt.id,
-                      targetCommunityUsersOnly: true,
+                      targetCommunityUsersOnly: false,
                       runningRuns: runningRuns.map((run) => ({
                         date: run.digestDate,
                         id: run.id,
@@ -509,6 +509,11 @@ export default async function DigestLabPage({
                               <span className="text-muted-foreground">
                                 @{candidate.tweet.username}
                               </span>
+                              {candidate.communityAuthored ? (
+                                <Badge variant="secondary">
+                                  Community author
+                                </Badge>
+                              ) : null}
                               <span className="ml-auto tabular-nums text-muted-foreground">
                                 {candidate.source === 'ca_interactions'
                                   ? `↪ ${candidate.tweet.interactionCount ?? 0} CA interactions (${candidate.tweet.replyCount ?? 0} replies · ${candidate.tweet.quoteCount ?? 0} quotes) · `

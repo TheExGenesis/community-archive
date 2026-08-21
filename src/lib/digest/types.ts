@@ -25,6 +25,8 @@ export interface DigestCandidate {
   sourceRank: number
   selected: boolean
   source?: 'banger' | 'ca_interactions'
+  /** Frozen membership marker supplied to editors and the generation prompt. */
+  communityAuthored?: boolean
 }
 
 export interface DigestRunEvent {

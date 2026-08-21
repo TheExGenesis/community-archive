@@ -73,9 +73,9 @@ non-production environment. Do not set it in production.
 
 - ClickHouse is the analytical source for candidates and archived quote-post
   commentary. The current `recent-bangers` ranking counts distinct non-self
-  quote tweets from Community Archive members. Digest pulls restrict target
-  authors to current Community Archive members in the selected time window. A
-  run keeps only the top `min(50,
+  quote tweets from Community Archive members. Digest pulls include targets by
+  all authors and make a second member-scoped query to freeze a
+  `communityAuthored` marker on each candidate. A run keeps only the top `min(50,
 num_bangers_with_score_at_least_2)` rows: every included post has a Community
   Archive banger score of at least two, and there are never more than 50.
 - The existing Supabase tweet-page RPC supplies in-window conversation replies
@@ -117,8 +117,10 @@ projection, not a write authority.
    Neither path mutates the model run or replaces an existing published
    version, and every later save creates another draft version.
 7. Publish explicitly with the prominent **Publish Daily Digest** action.
-   `publish_digest_edition(uuid)` archives the old version
-   and publishes the selected draft in one database transaction.
+   `publish_digest_edition(uuid)` archives the old version and publishes the
+   selected draft in one database transaction. The nightly workflow uses the
+   same function after a valid generation; if an editor has already published
+   that date, automation preserves the editorial edition.
 
 A generation attempt is immutable once it starts. The lab polls the saved run
 while it is open and shows queued, context, model, and validation phases; the
@@ -127,8 +129,11 @@ to reuse the exact frozen source snapshot with the same or a newer prompt
 version. Finished-run checkboxes can also be changed directly; saving that
 selection forks an editable run. Both paths preserve failed and successful
 model responses for comparison.
-Generation never auto-stages or auto-publishes: those remain explicit editorial
-steps after a valid result is reviewed.
+Manual generations never auto-stage or auto-publish. The production nightly
+workflow is the deliberate exception: it creates one system-owned run for the
+completed date, generates with the newest immutable prompt, stages the
+validated output, and publishes it. The unique automated-run index and the
+one-published-edition index make duplicate cron delivery safe.
 
 Every edition keyword must occur verbatim in supplied posts. Exact story-title
 excerpts are preferred and checked, while a paraphrase becomes a non-fatal
@@ -157,6 +162,11 @@ every three seconds. Server failures also log with the digest run ID, so Vercel
 logs, Workflow run/step observability, and the durable ledger can be joined
 during diagnosis.
 
+`community_archive_monitoring_digest()` exposes only aggregate publication
+freshness and automated-failure state to the least-privilege `readclient` role.
+The production PostgreSQL exporter turns that into the service-catalog health
+signal; prompt text, source snapshots, drafts, and error details remain private.
+
 ## Configuration
 
 Required server-only values:
@@ -169,12 +179,14 @@ DEEPSEEK_API_BASE_URL=https://api.deepseek.com
 CLICKHOUSE_ANALYTICS_API_URL=https://analytics.community-archive.org/analytics
 CLICKHOUSE_ANALYTICS_API_TOKEN=<shared-gateway-token>
 SUPABASE_SERVICE_ROLE=<server-only-service-role>
+CRON_SECRET=<random-secret-at-least-16-characters>
+DIGEST_AUTOMATION_ENABLED=true
 ```
 
 Do not expose any of these with a `NEXT_PUBLIC_` prefix. Public digest reads use
 the normal anonymous Supabase client and the `status = 'published'` RLS policy.
 
-The current experiment prompt uses `deepseek/deepseek-v4-flash-0731` through
+The current prompt uses `deepseek/deepseek-v4-flash-0731` through
 OpenRouter, high reasoning effort, and a 6,000-token output ceiling. Its
 one-call structured output requires exactly three summary bullets, a
 representative tweet index, three to five stories with loose labels and
@@ -191,10 +203,35 @@ over a fixed character target, with 500 characters of transport and editing
 headroom. These looser transport limits prevent a provider from satisfying the
 schema by clipping prose.
 
+The candidate corpus spans all authors and marks every banger with
+`authored_by_community_member`. The prompt treats that marker as a strong
+editorial preference: it favors coherent and relevant community-authored
+stories, but keeps non-community stories when they are unusually big,
+especially relevant, or needed to make a strong edition.
+
+## Nightly schedule and recovery
+
+Vercel invokes `GET /api/cron/daily-digest` at `06:15 UTC` every day. That is
+10:15 PM PST or 11:15 PM PDT, fifteen minutes after the existing Community
+Archive day closes. Vercel cron schedules are UTC-only; the digest boundary is
+therefore stable while the local Pacific clock shifts with daylight saving
+time. The route requires Vercel's `CRON_SECRET` bearer header and returns as
+soon as the durable workflow is queued.
+
+The workflow is date-idempotent. It skips a date that is already published,
+does not replace an edition an editor published during generation, and reuses a
+completed automated run if publication is retried. Generation or validation
+failure leaves the run failed and does not change the public edition.
+
+To pause new nightly writes without affecting public reads, set
+`DIGEST_AUTOMATION_ENABLED=false` or disable the cron in Vercel. To recover a
+failed date, inspect its saved run and Workflow trace in `/admin/digest`, then
+clone/revise and publish through the existing editorial path. Do not delete the
+run ledger.
+
 ## Rollout gates
 
-Automation is deliberately disabled during the editorial experiment. Before a
-daily timer or weekly Substack send is enabled:
+Before setting `DIGEST_AUTOMATION_ENABLED=true` in production:
 
 1. Apply `20260813000650_add_daily_digest_editorial_workspace.sql` and
    the subsequent Daily Digest prompt-version migrations through
@@ -211,10 +248,9 @@ daily timer or weekly Substack send is enabled:
 4. Verify the public daily and story pages in a protected remote preview.
 5. Apply the migration and server secrets in production before merging a
    frontend release that expects the tables.
-6. Treat the scheduler as a new monitored timer: document it in the service
-   catalog, add success/failure/freshness signals and alerts, verify one manual
-   production run, and keep publishing manual until quality evidence supports
-   auto-publish.
+6. Deploy the service-catalog and Grafana digest-health check, verify one manual
+   production-equivalent cron request, and confirm the new run reaches
+   `published` before enabling the recurring write path.
 7. Add the weekly email/Substack adapter as a separate delivery boundary. A
    delivery failure must not mutate or unpublish the daily edition.
 

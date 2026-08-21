@@ -18,14 +18,16 @@ export default async function TweetPage({
   searchParams?: Record<string, string | string[] | undefined>
 }) {
   const { tweet_id } = params
-  const { tweet, threadTree, quotingTweets, quotingTweetCount } =
+  const { tweet, threadTree, threadPage, quotingTweets, quotingTweetCount } =
     await getTweetPageData(tweet_id)
 
   if (!tweet) {
     notFound()
   }
 
-  const isThread = threadTree && Object.keys(threadTree.tweets).length > 1
+  const isThread =
+    threadTree &&
+    (threadPage?.totalCount ?? Object.keys(threadTree.tweets).length) > 1
   const backLink = getTweetBackLink(searchParams)
 
   return (
@@ -59,7 +61,12 @@ export default async function TweetPage({
         <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] xl:gap-10">
           <div className="min-w-0">
             {isThread && threadTree ? (
-              <ThreadView tree={threadTree} highlightTweetId={tweet_id} />
+              <ThreadView
+                tree={threadTree}
+                highlightTweetId={tweet_id}
+                totalCount={threadPage?.totalCount}
+                nextCursor={threadPage?.nextCursor}
+              />
             ) : (
               <article className="rounded-lg border border-border bg-card p-5 shadow-sm sm:p-6">
                 <TweetComponent

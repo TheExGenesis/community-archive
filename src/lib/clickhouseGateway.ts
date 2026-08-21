@@ -131,7 +131,7 @@ export function analyticsGatewayRequestUrl(
     /^\d{1,20}$/.test(cleanPath[1]) &&
     cleanPath[2] === 'thread'
   ) {
-    allowedParams = new Set()
+    allowedParams = new Set(['limit', 'after', 'after_id'])
   } else if (
     cleanPath.length === 2 &&
     cleanPath[0] === 'quote-posts' &&

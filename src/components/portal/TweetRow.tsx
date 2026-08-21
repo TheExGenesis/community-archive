@@ -221,7 +221,7 @@ function QuotedTweet({
         <div className="min-w-0 text-[12px] leading-tight">
           <Link
             href={profileHref}
-            className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             <span className="font-bold">{tweet.name}</span>{' '}
             <span className="text-zinc-500 dark:text-[#a7a7b4]">
@@ -438,7 +438,7 @@ export function TweetRow({
       <div className="flex items-baseline gap-2 overflow-hidden">
         <Link
           href={profileHref}
-          className="min-w-0 rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="min-w-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
           <span
             className={`truncate font-bold ${
@@ -480,7 +480,7 @@ export function TweetRow({
             captureAction(isExpanded ? 'collapse' : 'expand')
             setIsExpanded((expanded) => !expanded)
           }}
-          className="mt-1 text-[12px] font-semibold text-brand hover:underline"
+          className="mt-1 text-[12px] font-semibold text-brand"
         >
           {isExpanded ? 'Show less' : 'Read more'}
         </button>
@@ -538,7 +538,7 @@ export function TweetRow({
               rel="noopener noreferrer"
               onClick={() => captureAction('open_external')}
               aria-label="View tweet on X (opens in a new tab)"
-              className="ml-auto inline-flex items-center gap-1 rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="ml-auto inline-flex items-center gap-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               <span>View on X</span>
               <PiArrowSquareOut aria-hidden="true" />

@@ -137,7 +137,7 @@ function PanelHeader({
                 true,
               )
             }
-            className="text-[12.5px] font-semibold text-brand hover:underline"
+            className="text-[12.5px] font-semibold text-brand"
           >
             {action.label} →
           </a>
@@ -151,7 +151,7 @@ function PanelHeader({
                 false,
               )
             }
-            className="text-[12.5px] font-semibold text-brand hover:underline"
+            className="text-[12.5px] font-semibold text-brand"
           >
             {action.label} →
           </Link>
@@ -371,7 +371,7 @@ function DigestHero({ preview }: { preview: DigestPreview | null }) {
           onClick={() =>
             captureDashboardDestination('recent_bangers', 'card', false)
           }
-          className="mt-3.5 inline-block text-[13px] font-semibold text-brand hover:underline"
+          className="mt-3.5 inline-block text-[13px] font-semibold text-brand"
         >
           Explore today&rsquo;s bangers &rarr;
         </Link>
@@ -400,7 +400,7 @@ function DigestHero({ preview }: { preview: DigestPreview | null }) {
         <Link
           href={preview.href}
           onClick={openDigest}
-          className="whitespace-nowrap text-[13px] font-semibold text-brand hover:underline"
+          className="whitespace-nowrap text-[13px] font-semibold text-brand"
         >
           Read the edition &rarr;
         </Link>
@@ -1003,7 +1003,7 @@ export default function Portal({
               href={CHROME_EXTENSION_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-brand hover:underline"
+              className="font-semibold text-brand"
             >
               browser extension
             </a>{' '}
@@ -1094,7 +1094,7 @@ export function PortalNotes({
       <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
         <button
           onClick={() => setArticleId(null)}
-          className="mb-4 text-[13px] font-semibold text-brand hover:underline"
+          className="mb-4 text-[13px] font-semibold text-brand"
         >
           ← All field notes
         </button>

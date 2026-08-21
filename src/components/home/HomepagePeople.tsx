@@ -1,26 +1,9 @@
 import AvatarList from '@/components/AvatarList'
-import { loadFavoritePeople } from '@/lib/favoritePeople'
 import {
   HOMEPAGE_FEATURED_ARCHIVE_COUNT,
   sampleFeaturedArchives,
 } from '@/lib/featuredArchives'
 import { loadHomepageArchiveProfiles } from '@/lib/homepageArchiveProfiles'
-import { getCurrentUser } from '@/lib/portal/auth'
-import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
-import type { AvatarType } from '@/lib/types'
-
-async function personalizedArchives(): Promise<AvatarType[]> {
-  const user = await getCurrentUser()
-  const username = user ? getSessionTwitterUsername(user) : null
-  if (!username) return []
-
-  const favoritePeople = await loadFavoritePeople(username, 12)
-  return favoritePeople.people.map((person) => ({
-    account_id: person.accountId,
-    username: person.username || person.accountId,
-    avatar_media_url: person.avatarUrl || '',
-  }))
-}
 
 export function HomepagePeopleFallback() {
   return (
@@ -40,27 +23,10 @@ export function HomepagePeopleFallback() {
   )
 }
 
-export default async function HomepagePeople({
-  isMember,
-}: {
-  isMember: boolean
-}) {
-  const personalizedCandidates = isMember ? await personalizedArchives() : []
-  const personalized = personalizedCandidates.length
-    ? (await loadHomepageArchiveProfiles(personalizedCandidates)).slice(
-        0,
-        HOMEPAGE_FEATURED_ARCHIVE_COUNT,
-      )
-    : []
-  const featuredCandidates = personalized.length ? [] : sampleFeaturedArchives()
-  const featured = featuredCandidates.length
-    ? await loadHomepageArchiveProfiles(featuredCandidates)
-    : []
-  const archives = personalized.length
-    ? personalized
-    : featured.length
-      ? featured
-      : featuredCandidates
+export default async function HomepagePeople() {
+  const featuredCandidates = sampleFeaturedArchives()
+  const featured = await loadHomepageArchiveProfiles(featuredCandidates)
+  const archives = featured.length ? featured : featuredCandidates
 
   return (
     <div className="home-fade-in pt-2">

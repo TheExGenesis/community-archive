@@ -32,7 +32,7 @@ export default async function Homepage({ searchParams }: HomepageProps = {}) {
       showCta={!isMember || hasPendingOptInAction(searchParams?.action)}
       homepagePeople={
         <Suspense fallback={<HomepagePeopleFallback />}>
-          <HomepagePeople isMember={isMember} />
+          <HomepagePeople />
         </Suspense>
       }
     />

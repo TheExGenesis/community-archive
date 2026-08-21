@@ -87,9 +87,6 @@
     color: inherit;
     font-weight: 600;
   }
-  a:hover {
-    text-decoration: underline;
-  }
   /* Petrona is reserved for the hero (h1) and section headers (h2).
      Smaller headings (card titles, etc.) stay on the Manrope body font. */
   h1,
@@ -131,15 +128,5 @@
 @media (prefers-reduced-motion: reduce) {
   .home-fade-in {
     animation: none;
-  }
-}
-
-/* Homepage hero: corpus ribbon marquee (the track is rendered twice) */
-@keyframes corpus-marquee {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(-50%, 0, 0);
   }
 }

@@ -131,7 +131,7 @@ function EditionList({
           <div className="mt-3 flex flex-wrap gap-2">
             {edition.status === 'published' ? (
               <Link
-                className="text-sm font-semibold text-brand hover:underline"
+                className="text-sm font-semibold text-brand"
                 href={`/digest/${edition.digestDate}`}
               >
                 Open public page →

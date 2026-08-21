@@ -142,7 +142,7 @@ export default function AboutPage() {
         <h2 className="mb-4 mt-8 text-2xl font-semibold">Learn More</h2>
         <ul className="space-y-2">
           <li>
-            <Link href="/data-policy" className="text-brand hover:underline">
+            <Link href="/data-policy" className="text-brand">
               Data Policy
             </Link>{' '}
             - How we handle your data
@@ -152,7 +152,7 @@ export default function AboutPage() {
               href="https://github.com/TheExGenesis/community-archive/tree/main/docs"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-brand hover:underline"
+              className="text-brand"
             >
               Documentation
             </a>{' '}

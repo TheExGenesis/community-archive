@@ -64,7 +64,7 @@ export default function HomepageSearch() {
             key={example}
             type="button"
             onClick={() => search(example)}
-            className="font-medium text-foreground underline-offset-4 transition-colors hover:text-brand hover:underline"
+            className="font-medium text-foreground underline-offset-4 transition-colors hover:text-brand"
           >
             {example}
           </button>

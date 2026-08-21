@@ -45,7 +45,7 @@ function ProfileText({
         href={link?.expanded_url ?? part}
         target="_blank"
         rel="noopener noreferrer"
-        className="break-all text-brand underline-offset-2 hover:underline"
+        className="break-all text-brand underline-offset-2"
       >
         {link?.display_url ?? part.replace(/^https?:\/\//, '')}
       </a>

@@ -177,7 +177,7 @@ export default function UploadArchiveSection() {
                 href={step.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center text-sm text-brand hover:underline"
+                className="inline-flex items-center text-sm text-brand"
               >
                 {step.linkText}
                 <ExternalLink className="ml-1 h-3 w-3" />
@@ -215,7 +215,7 @@ export default function UploadArchiveSection() {
           href="https://github.com/TheExGenesis/community-archive/blob/main/docs/archive_data.md"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-brand hover:underline"
+          className="text-brand"
         >
           what data we use
         </a>{' '}

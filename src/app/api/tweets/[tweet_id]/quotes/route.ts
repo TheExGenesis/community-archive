@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getQuotingTweetsPage } from '@/lib/quotingTweets'
+import { enforceBotId } from '@/lib/botIdServer'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -23,6 +24,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { tweet_id: string } },
 ) {
+  const botResponse = await enforceBotId()
+  if (botResponse) return botResponse
+
   try {
     if (!/^\d{1,20}$/.test(params.tweet_id)) {
       return NextResponse.json({ error: 'Tweet not found' }, { status: 404 })

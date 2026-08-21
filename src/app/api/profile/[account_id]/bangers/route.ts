@@ -4,6 +4,7 @@ import {
   type ProfileBangerSort,
 } from '@/lib/metaTwitter/bangers'
 import { getCuratedProfileBangersPage } from '@/lib/profileCuration'
+import { enforceBotId } from '@/lib/botIdServer'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -37,6 +38,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { account_id: string } },
 ) {
+  const botResponse = await enforceBotId()
+  if (botResponse) return botResponse
+
   try {
     if (!ACCOUNT_ID_PATTERN.test(params.account_id)) {
       throw new Error('Invalid profile account')

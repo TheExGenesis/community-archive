@@ -78,7 +78,10 @@ export interface PortalStats {
 export interface TermWeek {
   term: string
   last7: number
-  prev7: number
+  /** Raw tweet count across the preceding 28-day comparison window. */
+  baseline28: number
+  currentAuthors: number
+  /** Change in tweet share for the last 7 days versus the preceding 28 days. */
   deltaPct: number | null
   status: 'comparable' | 'new' | 'inactive'
 }

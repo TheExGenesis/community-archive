@@ -65,7 +65,11 @@ const signInHref = (returnTo: string) =>
 const fmtDelta = (term: TermWeek) => {
   if (term.status === 'new') return 'new'
   if (term.status === 'inactive' || term.deltaPct === null) return '—'
-  return `${term.deltaPct >= 0 ? '+' : '−'}${Math.abs(term.deltaPct)}%`
+  const change = new Intl.NumberFormat('en', {
+    notation: Math.abs(term.deltaPct) >= 1000 ? 'compact' : 'standard',
+    maximumFractionDigits: Math.abs(term.deltaPct) >= 1000 ? 1 : 0,
+  }).format(Math.abs(term.deltaPct))
+  return `${term.deltaPct >= 0 ? '+' : '−'}${change}%`
 }
 
 function compareTweetIds(left: string, right: string): number {
@@ -671,14 +675,10 @@ export default function Portal({
   }, [hasMore, loadMore, view])
 
   // ---- derived trend views ----------------------------------------------
-  const weeklyRanked = useMemo(
-    () =>
-      trends.weekly
-        .filter((term) => term.last7 > 0)
-        .sort((a, b) => b.last7 - a.last7),
+  const weeklyBars = useMemo(
+    () => trends.weekly.filter((term) => term.last7 > 0).slice(0, 6),
     [trends.weekly],
   )
-  const weeklyBars = weeklyRanked.slice(0, 6)
   const maxWeekly = Math.max(...weeklyBars.map((w) => w.last7), 1)
 
   const recentBanger = data.recentBangers[0] ?? null
@@ -834,7 +834,12 @@ export default function Portal({
                       <span className="w-[82px]" />
                       <span className="w-[46px] text-right">Tweets</span>
                       <span className="flex-1">Volume</span>
-                      <span className="w-[46px] text-right">Change</span>
+                      <span
+                        className="w-[46px] text-right"
+                        title="Change in share of community tweets versus the preceding 28 days"
+                      >
+                        vs 28d
+                      </span>
                     </div>
                   ) : null}
                   {!data.failures.trends &&
@@ -861,7 +866,7 @@ export default function Portal({
                           />
                         </div>
                         <span
-                          title={`${b.last7.toLocaleString('en-US')} tweets vs ${b.prev7.toLocaleString('en-US')} in the previous 7 days`}
+                          title={`${b.last7.toLocaleString('en-US')} tweets from ${b.currentAuthors.toLocaleString('en-US')} authors in the last 7 days; ${b.baseline28.toLocaleString('en-US')} tweets in the preceding 28 days. Change compares each window's share of community tweets.`}
                           className={`w-[46px] text-right text-[11px] font-bold tabular-nums ${
                             b.status === 'inactive'
                               ? MUTED
@@ -876,7 +881,7 @@ export default function Portal({
                     ))}
                   {!data.failures.trends && weeklyBars.length === 0 && (
                     <div className={`py-8 text-center text-[13px] ${MUTED}`}>
-                      No watchlist activity in the last seven days.
+                      No trending terms in the last seven days.
                     </div>
                   )}
                 </div>

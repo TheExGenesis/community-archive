@@ -728,8 +728,8 @@ async function fetchPortalJoinedThisWeek(): Promise<number> {
 // deployment environments isolated even when the Data Cache survives deploys.
 const getCachedTrendsSnapshot = unstable_cache(
   async (_sourceKey: string) => fetchPortalTrends(),
-  ['portal-trends-snapshot-v1'],
-  { revalidate: 86_400 },
+  ['portal-trends-snapshot-v2'],
+  { revalidate: 1_800 },
 )
 const getCachedCorpusRange = unstable_cache(
   async (_sourceKey: string) => fetchCorpusRange(),

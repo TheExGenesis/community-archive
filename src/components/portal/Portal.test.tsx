@@ -206,6 +206,72 @@ describe.each<PortalView>(['home', 'stream'])(
   },
 )
 
+describe('portal trending terms', () => {
+  beforeEach(() => {
+    jest.useFakeTimers()
+    jest.setSystemTime(Date.parse('2026-08-07T13:00:00.000Z'))
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ tweets: [], updateCursor: null }),
+    } as Response)
+  })
+
+  afterEach(() => {
+    jest.clearAllTimers()
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+  })
+
+  test('labels the normalized 28-day comparison without re-ranking results', async () => {
+    const trendingData: PortalData = {
+      ...data,
+      trends: {
+        ...data.trends,
+        weekly: [
+          {
+            term: 'egregore',
+            last7: 11,
+            baseline28: 3,
+            currentAuthors: 6,
+            deltaPct: 83,
+            status: 'comparable',
+          },
+          {
+            term: 'claude',
+            last7: 746,
+            baseline28: 1_200,
+            currentAuthors: 85,
+            deltaPct: -43,
+            status: 'comparable',
+          },
+        ],
+      },
+    }
+
+    const { unmount } = render(<Portal data={trendingData} view="home" />)
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('vs 28d')).toHaveAttribute(
+      'title',
+      'Change in share of community tweets versus the preceding 28 days',
+    )
+    expect(screen.getByText('+83%')).toHaveAttribute(
+      'title',
+      expect.stringContaining(
+        '11 tweets from 6 authors in the last 7 days; 3 tweets in the preceding 28 days',
+      ),
+    )
+    const termLabels = screen
+      .getAllByText(/^(egregore|claude)$/)
+      .map((element) => element.textContent)
+    expect(termLabels).toEqual(['egregore', 'claude'])
+
+    unmount()
+  })
+})
+
 describe('portal component failures', () => {
   beforeEach(() => {
     jest.useFakeTimers()

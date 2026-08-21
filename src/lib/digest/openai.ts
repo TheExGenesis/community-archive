@@ -108,6 +108,37 @@ const safeTokenCount = (value: unknown): number | null => {
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null
 }
 
+const describeOpenRouterCompletion = (
+  payload: Record<string, unknown>,
+  choice: unknown,
+) => {
+  const choiceRecord =
+    choice && typeof choice === 'object'
+      ? (choice as Record<string, unknown>)
+      : {}
+  const usage =
+    payload.usage && typeof payload.usage === 'object'
+      ? (payload.usage as Record<string, unknown>)
+      : {}
+  const completionDetails =
+    usage.completion_tokens_details &&
+    typeof usage.completion_tokens_details === 'object'
+      ? (usage.completion_tokens_details as Record<string, unknown>)
+      : {}
+  const details = [
+    typeof choiceRecord.finish_reason === 'string'
+      ? `finish_reason=${choiceRecord.finish_reason}`
+      : null,
+    safeTokenCount(usage.completion_tokens) !== null
+      ? `completion_tokens=${safeTokenCount(usage.completion_tokens)}`
+      : null,
+    safeTokenCount(completionDetails.reasoning_tokens) !== null
+      ? `reasoning_tokens=${safeTokenCount(completionDetails.reasoning_tokens)}`
+      : null,
+  ].filter((value): value is string => Boolean(value))
+  return details.length > 0 ? ` (${details.join(', ')})` : ''
+}
+
 const fetchModelResponse = async (
   fetchImpl: typeof fetch,
   input: Parameters<typeof fetch>[0],
@@ -242,16 +273,17 @@ export async function generateDigestWithModel(
       message && typeof message === 'object'
         ? (message as { content?: unknown }).content
         : null
+    const completionDescription = describeOpenRouterCompletion(payload, choice)
     let output: unknown = null
     let outputError: string | null = null
     if (typeof outputText !== 'string') {
-      outputError = 'OpenRouter response did not include output text'
+      outputError = `OpenRouter response did not include output text${completionDescription}`
     } else {
       try {
         output = JSON.parse(outputText)
       } catch {
         output = outputText
-        outputError = 'OpenRouter structured output was not valid JSON'
+        outputError = `OpenRouter structured output was not valid JSON${completionDescription}`
       }
     }
     const usage =

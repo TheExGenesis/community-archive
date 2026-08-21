@@ -1554,6 +1554,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      community_archive_monitoring_digest: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          publication_age_seconds: number
+          expected_date_published: number
+          automated_run_failed: number
+          healthy: number
+        }[]
+      }
       compute_hourly_scraping_stats: {
         Args: {
           p_start_date: string

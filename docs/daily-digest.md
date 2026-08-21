@@ -223,6 +223,12 @@ does not replace an edition an editor published during generation, and reuses a
 completed automated run if publication is retried. Generation or validation
 failure leaves the run failed and does not change the public edition.
 
+For a supervised backfill within the last 30 completed days, send the same
+bearer credential to `POST /api/cron/daily-digest` with a JSON body such as
+`{"digestDate":"2026-08-19"}`. This queues the same idempotent generation and
+publication workflow as the nightly schedule; it is not an editor-side publish
+shortcut. Dates outside that recovery window are rejected.
+
 To pause new nightly writes without affecting public reads, set
 `DIGEST_AUTOMATION_ENABLED=false` or disable the cron in Vercel. To recover a
 failed date, inspect its saved run and Workflow trace in `/admin/digest`, then

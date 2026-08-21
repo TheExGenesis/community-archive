@@ -187,7 +187,8 @@ Do not expose any of these with a `NEXT_PUBLIC_` prefix. Public digest reads use
 the normal anonymous Supabase client and the `status = 'published'` RLS policy.
 
 The current prompt uses `deepseek/deepseek-v4-flash-0731` through
-OpenRouter, high reasoning effort, and a 12,000-token completion ceiling. Its
+OpenRouter, high reasoning effort, and the model's 384,000-token maximum
+completion ceiling. Its
 one-call structured output requires exactly three summary bullets, a
 representative tweet index, three to five stories with loose labels and
 tweet-index lists, tweet-grounded titles, short explanatory subtitles,
@@ -203,8 +204,9 @@ over a fixed character target, with 500 characters of transport and editing
 headroom. These looser transport limits prevent a provider from satisfying the
 schema by clipping prose. OpenRouter counts hidden reasoning and visible JSON
 against the same completion ceiling; representative local replays exhausted a
-6,000-token ceiling before producing valid JSON, so the larger budget preserves
-high reasoning while leaving enough room for the structured edition.
+6,000-token ceiling before producing valid JSON. The maximum provider-supported
+budget preserves high reasoning while leaving ample room for the structured
+edition; generation still stops naturally when the concise response is done.
 
 The candidate corpus spans all authors and marks every banger with
 `authored_by_community_member`. The prompt treats that marker as a strong

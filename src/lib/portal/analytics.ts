@@ -9,6 +9,7 @@ import type {
   PortalTweet,
   TermSeries,
   TrendGranularity,
+  TrendLane,
   TermWeek,
 } from './types'
 
@@ -37,15 +38,19 @@ interface ClickHouseTrendResponse {
 }
 
 interface ClickHouseTrendingTermRow {
+  lane?: TrendLane
   term: string
   currentTweets: string | number
   currentAuthors: string | number
   baselineTweets: string | number
+  expectedTweets?: number
+  tweetDelta?: number
   changePct: number
 }
 
 interface ClickHouseTrendingTermsResponse {
   data: ClickHouseTrendingTermRow[]
+  lanes?: Record<TrendLane, ClickHouseTrendingTermRow[]>
   query: {
     windowDays: number
     baselineDays: number
@@ -241,31 +246,68 @@ export async function fetchPortalTrendingTerms(
     throw new Error('ClickHouse trending-terms returned an invalid response')
   }
 
-  return response.data.map((row) => {
-    if (typeof row.term !== 'string' || row.term.trim().length === 0) {
-      throw new Error('ClickHouse trending-terms returned an invalid term')
-    }
-    const last7 = safeCount(row.currentTweets, 'trending term tweet count')
-    const baseline28 = safeCount(
-      row.baselineTweets,
-      'trending term baseline tweet count',
-    )
-    const currentAuthors = safeCount(
-      row.currentAuthors,
-      'trending term author count',
-    )
-    if (!Number.isFinite(row.changePct)) {
-      throw new Error('ClickHouse trending-terms returned an invalid change')
-    }
-    return {
-      term: row.term,
-      last7,
-      baseline28,
-      currentAuthors,
-      deltaPct: baseline28 > 0 ? Math.round(row.changePct) : null,
-      status: baseline28 > 0 ? 'comparable' : 'new',
-    }
-  })
+  const laneRows: Array<[TrendLane, ClickHouseTrendingTermRow[]]> =
+    response.lanes
+      ? [
+          ['emerging', response.lanes.emerging],
+          ['rising', response.lanes.rising],
+          ['falling', response.lanes.falling],
+        ]
+      : [['emerging', response.data]]
+  if (laneRows.some(([, rows]) => !Array.isArray(rows))) {
+    throw new Error('ClickHouse trending-terms returned invalid lanes')
+  }
+
+  return laneRows.flatMap(([lane, rows]) =>
+    rows.map((row) => {
+      if (typeof row.term !== 'string' || row.term.trim().length === 0) {
+        throw new Error('ClickHouse trending-terms returned an invalid term')
+      }
+      if (row.lane !== undefined && row.lane !== lane) {
+        throw new Error('ClickHouse trending-terms returned an invalid lane')
+      }
+      const last7 = safeCount(row.currentTweets, 'trending term tweet count')
+      const baseline28 = safeCount(
+        row.baselineTweets,
+        'trending term baseline tweet count',
+      )
+      const currentAuthors = safeCount(
+        row.currentAuthors,
+        'trending term author count',
+      )
+      if (!Number.isFinite(row.changePct)) {
+        throw new Error('ClickHouse trending-terms returned an invalid change')
+      }
+      const expected7 =
+        row.expectedTweets === undefined ? null : Number(row.expectedTweets)
+      const tweetDelta =
+        row.tweetDelta === undefined ? null : Number(row.tweetDelta)
+      if (
+        expected7 !== null &&
+        (!Number.isFinite(expected7) || expected7 < 0)
+      ) {
+        throw new Error(
+          'ClickHouse trending-terms returned an invalid expectation',
+        )
+      }
+      if (tweetDelta !== null && !Number.isFinite(tweetDelta)) {
+        throw new Error(
+          'ClickHouse trending-terms returned an invalid tweet delta',
+        )
+      }
+      return {
+        lane,
+        term: row.term,
+        last7,
+        baseline28,
+        currentAuthors,
+        expected7,
+        tweetDelta,
+        deltaPct: baseline28 > 0 ? Math.round(row.changePct) : null,
+        status: baseline28 > 0 ? 'comparable' : 'new',
+      }
+    }),
+  )
 }
 
 function ratePerHundredThousand(row: ClickHouseTrendRow): number {
@@ -805,7 +847,7 @@ export async function fetchPortalTrends(
   ]
   const [yearlyResponses, weekly] = await Promise.all([
     runBatched(jobs),
-    fetchPortalTrendingTerms(6, fetcher),
+    fetchPortalTrendingTerms(2, fetcher),
   ])
 
   const series: TermSeries[] = CHART_TERMS.map(({ term, color }, index) => {

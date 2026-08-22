@@ -1,6 +1,20 @@
 import { act, render, screen } from '@testing-library/react'
+import type { AnchorHTMLAttributes } from 'react'
 import Portal, { type PortalView } from './Portal'
 import type { PortalData, PortalTweet } from '@/lib/portal/types'
+
+jest.mock('next/link', () => ({
+  __esModule: true,
+  default: ({
+    href,
+    children,
+    ...props
+  }: AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={String(href)} {...props}>
+      {children}
+    </a>
+  ),
+}))
 
 jest.mock('./TweetRow', () => ({
   TweetRow: ({ tweet, noClamp }: { tweet: PortalTweet; noClamp?: boolean }) => (
@@ -229,19 +243,36 @@ describe('portal trending terms', () => {
         ...data.trends,
         weekly: [
           {
+            lane: 'emerging',
             term: 'egregore',
             last7: 11,
             baseline28: 3,
             currentAuthors: 6,
+            expected7: 6,
+            tweetDelta: 5,
             deltaPct: 83,
             status: 'comparable',
           },
           {
+            lane: 'rising',
             term: 'claude',
             last7: 746,
             baseline28: 1_200,
             currentAuthors: 85,
-            deltaPct: -43,
+            expected7: 500,
+            tweetDelta: 246,
+            deltaPct: 49,
+            status: 'comparable',
+          },
+          {
+            lane: 'falling',
+            term: 'alignment',
+            last7: 211,
+            baseline28: 1_600,
+            currentAuthors: 50,
+            expected7: 400,
+            tweetDelta: -189,
+            deltaPct: -47,
             status: 'comparable',
           },
         ],
@@ -263,10 +294,21 @@ describe('portal trending terms', () => {
         '11 tweets from 6 authors in the last 7 days; 3 tweets in the preceding 28 days',
       ),
     )
+    expect(screen.getByText('Emerging')).toBeInTheDocument()
+    expect(screen.getByText('Rising')).toBeInTheDocument()
+    expect(screen.getByText('Falling')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'egregore' })).toHaveAttribute(
+      'href',
+      '/search?q=egregore',
+    )
+    expect(screen.getByText('−47%')).toHaveAttribute(
+      'title',
+      expect.stringContaining('Normalized expectation: 400 tweets (−189)'),
+    )
     const termLabels = screen
-      .getAllByText(/^(egregore|claude)$/)
+      .getAllByText(/^(egregore|claude|alignment)$/)
       .map((element) => element.textContent)
-    expect(termLabels).toEqual(['egregore', 'claude'])
+    expect(termLabels).toEqual(['egregore', 'claude', 'alignment'])
 
     unmount()
   })

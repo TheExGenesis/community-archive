@@ -42,29 +42,63 @@ describe('ClickHouse-backed portal analytics', () => {
   test('combines bounded chart history with community-ranked weekly terms', async () => {
     const fetcher = jest.fn(async (path: string[], params: URLSearchParams) => {
       if (path[0] === 'trending-terms') {
+        const emerging = [
+          {
+            lane: 'emerging',
+            term: 'egregore',
+            currentTweets: '11',
+            currentAuthors: '6',
+            baselineTweets: '3',
+            expectedTweets: 6,
+            tweetDelta: 5,
+            changePct: 82.6,
+          },
+          {
+            lane: 'emerging',
+            term: 'newterm',
+            currentTweets: '10',
+            currentAuthors: '4',
+            baselineTweets: '0',
+            expectedTweets: 0,
+            tweetDelta: 10,
+            changePct: 100,
+          },
+        ]
         return {
-          data: [
-            {
-              term: 'egregore',
-              currentTweets: '11',
-              currentAuthors: '6',
-              baselineTweets: '3',
-              changePct: 82.6,
-            },
-            {
-              term: 'newterm',
-              currentTweets: '10',
-              currentAuthors: '4',
-              baselineTweets: '0',
-              changePct: 100,
-            },
-          ],
+          data: emerging,
+          lanes: {
+            emerging,
+            rising: [
+              {
+                lane: 'rising',
+                term: 'claude',
+                currentTweets: '150',
+                currentAuthors: '42',
+                baselineTweets: '320',
+                expectedTweets: 100,
+                tweetDelta: 50,
+                changePct: 50,
+              },
+            ],
+            falling: [
+              {
+                lane: 'falling',
+                term: 'alignment',
+                currentTweets: '50',
+                currentAuthors: '18',
+                baselineTweets: '320',
+                expectedTweets: 100,
+                tweetDelta: -50,
+                changePct: -50,
+              },
+            ],
+          },
           query: {
             windowDays: 7,
             baselineDays: 28,
             population: 'community_members',
             countMode: 'unique_tweets_containing_term',
-            limit: 6,
+            limit: 2,
           },
         }
       }
@@ -106,7 +140,7 @@ describe('ClickHouse-backed portal analytics', () => {
     }
     expect((fetcher as jest.Mock).mock.calls).toContainEqual([
       ['trending-terms'],
-      new URLSearchParams({ limit: '6' }),
+      new URLSearchParams({ limit: '2' }),
       { timeoutMs: 30_000 },
     ])
     expect(trends.years).toEqual([
@@ -119,14 +153,23 @@ describe('ClickHouse-backed portal analytics', () => {
       trends.series.find(({ term }) => term === 'tpot')?.tweetsPerYear,
     ).toEqual([10, 0, 0, 0, 0, 0, 0, 40])
     expect(trends.weekly[0]).toEqual({
+      lane: 'emerging',
       term: 'egregore',
       last7: 11,
       baseline28: 3,
       currentAuthors: 6,
+      expected7: 6,
+      tweetDelta: 5,
       deltaPct: 83,
       status: 'comparable',
     })
     expect(trends.weekly[1]?.status).toBe('new')
+    expect(trends.weekly.map(({ lane, term }) => [lane, term])).toEqual([
+      ['emerging', 'egregore'],
+      ['emerging', 'newterm'],
+      ['rising', 'claude'],
+      ['falling', 'alignment'],
+    ])
   })
 
   test('fetches several user-selected trend series concurrently', async () => {

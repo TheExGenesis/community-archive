@@ -7,6 +7,7 @@ import { FaDatabase, FaExternalLinkAlt, FaUsers } from 'react-icons/fa'
 import {
   PortalData,
   PortalTweet,
+  TrendLane,
   TermWeek,
   RESEARCH_SOURCE,
 } from '@/lib/portal/types'
@@ -23,12 +24,43 @@ import { capturePostHogEvent } from '@/lib/posthog'
 import type { DigestPreview } from '@/lib/digest/types'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 import { CHROME_EXTENSION_URL } from '@/lib/browserExtension'
+import { buildSearchHref } from '@/lib/searchParams'
 
 export type PortalView = 'home' | 'stream'
 
 const HOME_LIVE_STREAM_LIMIT = 12
 const ARCHIVE_EXPORT_URL = '/docs#bulk-dump'
 const COMMUNITY_BUILDS_URL = '/tweets/1835411943735140798'
+
+const TREND_LANES: Array<{
+  id: TrendLane
+  label: string
+  description: string
+  dotClass: string
+  barClass: string
+}> = [
+  {
+    id: 'emerging',
+    label: 'Emerging',
+    description: 'Newer terms rising from a small baseline',
+    dotClass: 'bg-chart-accent',
+    barClass: 'bg-chart-accent',
+  },
+  {
+    id: 'rising',
+    label: 'Rising',
+    description: 'Established topics with a meaningful increase',
+    dotClass: 'bg-[#16a34a] dark:bg-[#2acf80]',
+    barClass: 'bg-[#16a34a] dark:bg-[#2acf80]',
+  },
+  {
+    id: 'falling',
+    label: 'Falling',
+    description: 'Established topics with a meaningful decrease',
+    dotClass: 'bg-[#dc2626] dark:bg-[#f87171]',
+    barClass: 'bg-[#dc2626] dark:bg-[#f87171]',
+  },
+]
 
 type DashboardDestination =
   | 'all_time_bangers'
@@ -65,7 +97,11 @@ const signInHref = (returnTo: string) =>
 const fmtDelta = (term: TermWeek) => {
   if (term.status === 'new') return 'new'
   if (term.status === 'inactive' || term.deltaPct === null) return '—'
-  return `${term.deltaPct >= 0 ? '+' : '−'}${Math.abs(term.deltaPct)}%`
+  const change = new Intl.NumberFormat('en', {
+    notation: Math.abs(term.deltaPct) >= 1000 ? 'compact' : 'standard',
+    maximumFractionDigits: Math.abs(term.deltaPct) >= 1000 ? 1 : 0,
+  }).format(Math.abs(term.deltaPct))
+  return `${term.deltaPct >= 0 ? '+' : '−'}${change}%`
 }
 
 function compareTweetIds(left: string, right: string): number {
@@ -671,15 +707,16 @@ export default function Portal({
   }, [hasMore, loadMore, view])
 
   // ---- derived trend views ----------------------------------------------
-  const weeklyRanked = useMemo(
+  const weeklyLanes = useMemo(
     () =>
-      trends.weekly
-        .filter((term) => term.last7 > 0)
-        .sort((a, b) => b.last7 - a.last7),
+      TREND_LANES.map((lane) => ({
+        ...lane,
+        terms: trends.weekly
+          .filter((term) => term.lane === lane.id && term.last7 > 0)
+          .slice(0, 2),
+      })),
     [trends.weekly],
   )
-  const weeklyBars = weeklyRanked.slice(0, 6)
-  const maxWeekly = Math.max(...weeklyBars.map((w) => w.last7), 1)
 
   const recentBanger = data.recentBangers[0] ?? null
   const historicalBanger = data.historicalBangers[0] ?? null
@@ -827,56 +864,94 @@ export default function Portal({
                 <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
                   {data.failures.trends ? (
                     <PanelUnavailable message="Trending terms are temporarily unavailable." />
-                  ) : weeklyBars.length > 0 ? (
+                  ) : (
                     <div
                       className={`flex items-center gap-2 pb-1 text-[9px] font-medium uppercase tracking-wide ${MUTED}`}
                     >
                       <span className="w-[82px]" />
                       <span className="w-[46px] text-right">Tweets</span>
                       <span className="flex-1">Volume</span>
-                      <span className="w-[46px] text-right">Change</span>
-                    </div>
-                  ) : null}
-                  {!data.failures.trends &&
-                    weeklyBars.map((b) => (
-                      <div
-                        key={b.term}
-                        className="flex items-center gap-2 py-[6px]"
+                      <span
+                        className="w-[46px] text-right"
+                        title="Change in share of community tweets versus the preceding 28 days"
                       >
-                        <span className="w-[82px] truncate text-[12px] font-semibold">
-                          {b.term}
-                        </span>
-                        <span className="w-[46px] text-right text-[11px] tabular-nums text-muted-foreground">
-                          {b.last7.toLocaleString('en-US')}
-                        </span>
-                        <div
-                          className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]"
-                          role="img"
-                          aria-label={`${b.term}: ${b.last7.toLocaleString('en-US')} tweets in the last seven days`}
-                          title={`${b.last7.toLocaleString('en-US')} tweets in the last 7 days; bar is relative to ${weeklyBars[0].term}`}
-                        >
-                          <div
-                            className="h-full rounded bg-chart-accent"
-                            style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
-                          />
-                        </div>
-                        <span
-                          title={`${b.last7.toLocaleString('en-US')} tweets vs ${b.prev7.toLocaleString('en-US')} in the previous 7 days`}
-                          className={`w-[46px] text-right text-[11px] font-bold tabular-nums ${
-                            b.status === 'inactive'
-                              ? MUTED
-                              : (b.deltaPct ?? 0) >= 0
-                                ? 'text-[#16a34a] dark:text-[#2acf80]'
-                                : 'text-[#dc2626] dark:text-[#f87171]'
-                          }`}
-                        >
-                          {fmtDelta(b)}
-                        </span>
-                      </div>
-                    ))}
-                  {!data.failures.trends && weeklyBars.length === 0 && (
-                    <div className={`py-8 text-center text-[13px] ${MUTED}`}>
-                      No watchlist activity in the last seven days.
+                        vs 28d
+                      </span>
+                    </div>
+                  )}
+                  {!data.failures.trends && (
+                    <div className="space-y-1">
+                      {weeklyLanes.map((lane) => {
+                        const laneMax = Math.max(
+                          ...lane.terms.map((term) => term.last7),
+                          1,
+                        )
+                        return (
+                          <section
+                            key={lane.id}
+                            aria-label={lane.label}
+                            className="border-t border-zinc-100 first:border-t-0 dark:border-[#26262a]"
+                          >
+                            <div
+                              className={`flex items-center gap-1.5 pb-0.5 pt-2 text-[9px] font-bold uppercase tracking-[0.12em] ${MUTED}`}
+                              title={lane.description}
+                            >
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${lane.dotClass}`}
+                              />
+                              {lane.label}
+                            </div>
+                            {lane.terms.length > 0 ? (
+                              lane.terms.map((b) => (
+                                <div
+                                  key={`${lane.id}-${b.term}`}
+                                  className="flex items-center gap-2 py-[5px]"
+                                >
+                                  <Link
+                                    href={buildSearchHref(b.term)}
+                                    className="w-[82px] truncate text-[12px] font-semibold hover:text-brand hover:underline"
+                                    title={`Search archive posts containing ${b.term}`}
+                                  >
+                                    {b.term}
+                                  </Link>
+                                  <span className="w-[46px] text-right text-[11px] tabular-nums text-muted-foreground">
+                                    {b.last7.toLocaleString('en-US')}
+                                  </span>
+                                  <div
+                                    className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]"
+                                    role="img"
+                                    aria-label={`${b.term}: ${b.last7.toLocaleString('en-US')} tweets in the last seven days`}
+                                    title={`${b.last7.toLocaleString('en-US')} tweets in the last 7 days; bar is relative to the largest ${lane.label.toLowerCase()} term`}
+                                  >
+                                    <div
+                                      className={`h-full rounded ${lane.barClass}`}
+                                      style={{
+                                        width: `${(b.last7 / laneMax) * 100}%`,
+                                      }}
+                                    />
+                                  </div>
+                                  <span
+                                    title={`${b.last7.toLocaleString('en-US')} tweets from ${b.currentAuthors.toLocaleString('en-US')} authors in the last 7 days; ${b.baseline28.toLocaleString('en-US')} tweets in the preceding 28 days.${b.expected7 === null ? '' : ` Normalized expectation: ${b.expected7.toLocaleString('en-US')} tweets (${(b.tweetDelta ?? 0) >= 0 ? '+' : '−'}${Math.abs(b.tweetDelta ?? 0).toLocaleString('en-US')}).`} Change compares each window's share of community tweets.`}
+                                    className={`w-[46px] text-right text-[11px] font-bold tabular-nums ${
+                                      b.status === 'inactive'
+                                        ? MUTED
+                                        : (b.deltaPct ?? 0) >= 0
+                                          ? 'text-[#16a34a] dark:text-[#2acf80]'
+                                          : 'text-[#dc2626] dark:text-[#f87171]'
+                                    }`}
+                                  >
+                                    {fmtDelta(b)}
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <div className={`py-1 text-[11px] ${MUTED}`}>
+                                No strong signal
+                              </div>
+                            )}
+                          </section>
+                        )
+                      })}
                     </div>
                   )}
                 </div>

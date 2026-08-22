@@ -23,6 +23,7 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'exclude_retweets',
   ]),
   'trend-evidence': new Set(['q', 'mode', 'since', 'until', 'limit']),
+  'trending-terms': new Set(['limit']),
   'word-trend': new Set(['q', 'bucket', 'match', 'from', 'to']),
   'stream-stats': new Set(['start', 'end', 'granularity', 'scope']),
   'recent-bangers': new Set(['limit', 'hours', 'end', 'target_ca_users_only']),

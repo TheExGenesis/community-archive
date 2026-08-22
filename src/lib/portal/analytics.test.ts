@@ -39,73 +39,110 @@ describe('ClickHouse-backed portal analytics', () => {
     )
   })
 
-  test('builds one bounded trend snapshot and distinguishes new from inactive', async () => {
-    const fetcher = jest.fn(
-      async (_path: string[], params: URLSearchParams) => {
-        const term = params.get('q')
-        const bucket = params.get('bucket')
-        if (bucket === 'year' && term === 'tpot') {
-          return {
-            data: [
+  test('combines bounded chart history with community-ranked weekly terms', async () => {
+    const fetcher = jest.fn(async (path: string[], params: URLSearchParams) => {
+      if (path[0] === 'trending-terms') {
+        const emerging = [
+          {
+            lane: 'emerging',
+            term: 'egregore',
+            currentTweets: '11',
+            currentAuthors: '6',
+            baselineTweets: '3',
+            expectedTweets: 6,
+            tweetDelta: 5,
+            changePct: 82.6,
+          },
+          {
+            lane: 'emerging',
+            term: 'newterm',
+            currentTweets: '10',
+            currentAuthors: '4',
+            baselineTweets: '0',
+            expectedTweets: 0,
+            tweetDelta: 10,
+            changePct: 100,
+          },
+        ]
+        return {
+          data: emerging,
+          lanes: {
+            emerging,
+            rising: [
               {
-                bucket: '2019-01-01 00:00:00.000',
-                tweets: '10',
-                totalTweets: '1000',
-                ratePerThousand: 10,
-              },
-              {
-                bucket: '2026-01-01 00:00:00.000',
-                tweets: '40',
-                totalTweets: '2000',
-                ratePerThousand: 20,
-              },
-            ],
-          }
-        }
-        if (bucket === 'day' && term === 'tpot') {
-          return {
-            data: [
-              {
-                bucket: '2026-07-27 00:00:00.000',
-                tweets: '4',
-                totalTweets: '100',
-                ratePerThousand: 40,
-              },
-              {
-                bucket: '2026-08-02 00:00:00.000',
-                tweets: '8',
-                totalTweets: '100',
-                ratePerThousand: 80,
-              },
-            ],
-          }
-        }
-        if (bucket === 'day' && term === 'claude') {
-          return {
-            data: [
-              {
-                bucket: '2026-08-03 00:00:00.000',
-                tweets: '3',
-                totalTweets: '100',
-                ratePerThousand: 30,
+                lane: 'rising',
+                term: 'claude',
+                currentTweets: '150',
+                currentAuthors: '42',
+                baselineTweets: '320',
+                expectedTweets: 100,
+                tweetDelta: 50,
+                changePct: 50,
               },
             ],
-          }
+            falling: [
+              {
+                lane: 'falling',
+                term: 'alignment',
+                currentTweets: '50',
+                currentAuthors: '18',
+                baselineTweets: '320',
+                expectedTweets: 100,
+                tweetDelta: -50,
+                changePct: -50,
+              },
+            ],
+          },
+          query: {
+            windowDays: 7,
+            baselineDays: 28,
+            population: 'community_members',
+            countMode: 'unique_tweets_containing_term',
+            limit: 2,
+          },
         }
-        return { data: [] }
-      },
-    ) as unknown as AnalyticsFetcher
+      }
+      const term = params.get('q')
+      const bucket = params.get('bucket')
+      if (bucket === 'year' && term === 'tpot') {
+        return {
+          data: [
+            {
+              bucket: '2019-01-01 00:00:00.000',
+              tweets: '10',
+              totalTweets: '1000',
+              ratePerThousand: 10,
+            },
+            {
+              bucket: '2026-01-01 00:00:00.000',
+              tweets: '40',
+              totalTweets: '2000',
+              ratePerThousand: 20,
+            },
+          ],
+        }
+      }
+      return { data: [] }
+    }) as unknown as AnalyticsFetcher
 
     const trends = await fetchPortalTrends(
       new Date('2026-08-07T12:00:00.000Z'),
       fetcher,
     )
 
-    expect(fetcher).toHaveBeenCalledTimes(19)
-    for (const [, params] of (fetcher as jest.Mock).mock.calls) {
+    expect(fetcher).toHaveBeenCalledTimes(8)
+    const trendCalls = (fetcher as jest.Mock).mock.calls.filter(
+      ([path]) => path[0] === 'word-trend',
+    )
+    for (const [, params] of trendCalls) {
       expect(params.get('from')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
       expect(params.get('to')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     }
+    expect((fetcher as jest.Mock).mock.calls).toContainEqual([
+      ['trending-terms'],
+      new URLSearchParams({ limit: '2' }),
+      { timeoutMs: 30_000 },
+    ])
     expect(trends.years).toEqual([
       2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026,
     ])
@@ -115,19 +152,24 @@ describe('ClickHouse-backed portal analytics', () => {
     expect(
       trends.series.find(({ term }) => term === 'tpot')?.tweetsPerYear,
     ).toEqual([10, 0, 0, 0, 0, 0, 0, 40])
-    expect(trends.weekly.find(({ term }) => term === 'tpot')).toEqual({
-      term: 'tpot',
-      last7: 8,
-      prev7: 4,
-      deltaPct: 100,
+    expect(trends.weekly[0]).toEqual({
+      lane: 'emerging',
+      term: 'egregore',
+      last7: 11,
+      baseline28: 3,
+      currentAuthors: 6,
+      expected7: 6,
+      tweetDelta: 5,
+      deltaPct: 83,
       status: 'comparable',
     })
-    expect(trends.weekly.find(({ term }) => term === 'claude')?.status).toBe(
-      'new',
-    )
-    expect(trends.weekly.find(({ term }) => term === 'jhana')?.status).toBe(
-      'inactive',
-    )
+    expect(trends.weekly[1]?.status).toBe('new')
+    expect(trends.weekly.map(({ lane, term }) => [lane, term])).toEqual([
+      ['emerging', 'egregore'],
+      ['emerging', 'newterm'],
+      ['rising', 'claude'],
+      ['falling', 'alignment'],
+    ])
   })
 
   test('fetches several user-selected trend series concurrently', async () => {

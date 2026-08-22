@@ -77,10 +77,20 @@ export interface PortalStats {
   generatedAt: string
 }
 
+export type TrendLane = 'emerging' | 'rising' | 'falling'
+
 export interface TermWeek {
+  lane: TrendLane
   term: string
   last7: number
-  prev7: number
+  /** Raw tweet count across the preceding 28-day comparison window. */
+  baseline28: number
+  currentAuthors: number
+  /** Corpus-normalized tweet count expected in a comparable seven-day window. */
+  expected7: number | null
+  /** Current tweets minus the normalized seven-day expectation. */
+  tweetDelta: number | null
+  /** Change in tweet share for the last 7 days versus the preceding 28 days. */
   deltaPct: number | null
   status: 'comparable' | 'new' | 'inactive'
 }

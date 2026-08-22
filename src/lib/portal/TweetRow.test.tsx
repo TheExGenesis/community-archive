@@ -119,6 +119,12 @@ describe('portal TweetRow media', () => {
     })
   })
 
+  test('marks community-authored digest bangers', () => {
+    render(<TweetRow tweet={{ ...tweet, communityAuthored: true }} />)
+
+    expect(screen.getByText('Community author')).toBeVisible()
+  })
+
   test('renders quotes and closes an enlarged image when the backdrop is clicked', async () => {
     render(<TweetRow tweet={tweet} />)
 

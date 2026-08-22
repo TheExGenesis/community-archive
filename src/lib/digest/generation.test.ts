@@ -29,6 +29,7 @@ const candidates: EnrichedDigestCandidate[] = [
       tweet: tweet('1', 'taste benchmarks are becoming public rituals', 9),
       sourceRank: 1,
       selected: true,
+      communityAuthored: true,
     },
     commentary: [tweet('11', 'taste is not the same thing as prediction')],
     totalReplyCount: 12,
@@ -153,6 +154,7 @@ describe('daily digest generation contract', () => {
     expect(prompt).toContain('"index": 0')
     expect(prompt).toContain('"archived_ca_quote_count": 9')
     expect(prompt).toContain('"selection_source": "banger"')
+    expect(prompt).toContain('"authored_by_community_member": true')
     expect(prompt).toContain('"kind": "quote"')
     expect(prompt).toContain('"tweet_id": "1"')
   })
@@ -175,7 +177,7 @@ describe('daily digest generation contract', () => {
 
     expect(prompt).toContain('PAST PUBLISHED DIGESTS')
     expect(prompt).toContain('"digest_date": "2026-08-11"')
-    expect(prompt).toContain('TODAY\'S CURRENT CANDIDATE CORPUS')
+    expect(prompt).toContain("TODAY'S CURRENT CANDIDATE CORPUS")
     expect(prompt.match(/"tweet_id": "1"/g)).toHaveLength(1)
   })
 
@@ -213,6 +215,7 @@ describe('daily digest generation contract', () => {
     })
 
     expect(edition.topBanger.id).toBe('1')
+    expect(edition.topBanger.communityAuthored).toBe(true)
     expect(edition.executiveSummary).toHaveLength(3)
     expect(edition.stories).toHaveLength(3)
     expect(edition.stories[0]).toMatchObject({
@@ -222,6 +225,8 @@ describe('daily digest generation contract', () => {
       replyCount: 12,
     })
     expect(edition.stories[0].commentary[0].id).toBe('11')
+    expect(edition.stories[0].bangers[0].communityAuthored).toBe(true)
+    expect(edition.stories[1].bangers[0].communityAuthored).toBeUndefined()
     expect(edition.stories[0].editorialNote).toContain('settled verdict')
     expect(edition.source).toEqual({
       candidateCount: 12,

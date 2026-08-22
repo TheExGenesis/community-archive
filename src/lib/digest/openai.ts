@@ -65,7 +65,8 @@ export const DIGEST_JSON_SCHEMA = {
             type: 'array',
             minItems: 1,
             maxItems: 18,
-            uniqueItems: true,
+            // OpenAI strict structured outputs do not support uniqueItems.
+            // The deterministic receiver rejects repeated indices instead.
             items: { type: 'integer', minimum: 0 },
           },
         },
@@ -106,6 +107,37 @@ const MODEL_REQUEST_TIMEOUT_MS = 240_000
 const safeTokenCount = (value: unknown): number | null => {
   const parsed = Number(value)
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null
+}
+
+const describeOpenRouterCompletion = (
+  payload: Record<string, unknown>,
+  choice: unknown,
+) => {
+  const choiceRecord =
+    choice && typeof choice === 'object'
+      ? (choice as Record<string, unknown>)
+      : {}
+  const usage =
+    payload.usage && typeof payload.usage === 'object'
+      ? (payload.usage as Record<string, unknown>)
+      : {}
+  const completionDetails =
+    usage.completion_tokens_details &&
+    typeof usage.completion_tokens_details === 'object'
+      ? (usage.completion_tokens_details as Record<string, unknown>)
+      : {}
+  const details = [
+    typeof choiceRecord.finish_reason === 'string'
+      ? `finish_reason=${choiceRecord.finish_reason}`
+      : null,
+    safeTokenCount(usage.completion_tokens) !== null
+      ? `completion_tokens=${safeTokenCount(usage.completion_tokens)}`
+      : null,
+    safeTokenCount(completionDetails.reasoning_tokens) !== null
+      ? `reasoning_tokens=${safeTokenCount(completionDetails.reasoning_tokens)}`
+      : null,
+  ].filter((value): value is string => Boolean(value))
+  return details.length > 0 ? ` (${details.join(', ')})` : ''
 }
 
 const fetchModelResponse = async (
@@ -188,14 +220,17 @@ export async function generateDigestWithModel(
         { role: 'user', content: request.userPrompt },
       ],
       provider: { data_collection: 'deny', zdr: true },
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'community_archive_daily_digest',
-          strict: true,
-          schema: DIGEST_JSON_SCHEMA,
-        },
-      },
+      response_format:
+        request.model === 'z-ai/glm-5.3'
+          ? { type: 'json_object' }
+          : {
+              type: 'json_schema',
+              json_schema: {
+                name: 'community_archive_daily_digest',
+                strict: true,
+                schema: DIGEST_JSON_SCHEMA,
+              },
+            },
     }
     if (request.reasoningEffort) {
       body.reasoning = { effort: request.reasoningEffort, exclude: true }
@@ -242,16 +277,17 @@ export async function generateDigestWithModel(
       message && typeof message === 'object'
         ? (message as { content?: unknown }).content
         : null
+    const completionDescription = describeOpenRouterCompletion(payload, choice)
     let output: unknown = null
     let outputError: string | null = null
     if (typeof outputText !== 'string') {
-      outputError = 'OpenRouter response did not include output text'
+      outputError = `OpenRouter response did not include output text${completionDescription}`
     } else {
       try {
         output = JSON.parse(outputText)
       } catch {
         output = outputText
-        outputError = 'OpenRouter structured output was not valid JSON'
+        outputError = `OpenRouter structured output was not valid JSON${completionDescription}`
       }
     }
     const usage =

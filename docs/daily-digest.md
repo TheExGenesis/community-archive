@@ -73,9 +73,9 @@ non-production environment. Do not set it in production.
 
 - ClickHouse is the analytical source for candidates and archived quote-post
   commentary. The current `recent-bangers` ranking counts distinct non-self
-  quote tweets from Community Archive members. Digest pulls restrict target
-  authors to current Community Archive members in the selected time window. A
-  run keeps only the top `min(50,
+  quote tweets from Community Archive members. Digest pulls include targets by
+  all authors and make a second member-scoped query to freeze a
+  `communityAuthored` marker on each candidate. A run keeps only the top `min(50,
 num_bangers_with_score_at_least_2)` rows: every included post has a Community
   Archive banger score of at least two, and there are never more than 50.
 - The existing Supabase tweet-page RPC supplies in-window conversation replies
@@ -117,8 +117,10 @@ projection, not a write authority.
    Neither path mutates the model run or replaces an existing published
    version, and every later save creates another draft version.
 7. Publish explicitly with the prominent **Publish Daily Digest** action.
-   `publish_digest_edition(uuid)` archives the old version
-   and publishes the selected draft in one database transaction.
+   `publish_digest_edition(uuid)` archives the old version and publishes the
+   selected draft in one database transaction. The nightly workflow uses the
+   same function after a valid generation; if an editor has already published
+   that date, automation preserves the editorial edition.
 
 A generation attempt is immutable once it starts. The lab polls the saved run
 while it is open and shows queued, context, model, and validation phases; the
@@ -127,8 +129,11 @@ to reuse the exact frozen source snapshot with the same or a newer prompt
 version. Finished-run checkboxes can also be changed directly; saving that
 selection forks an editable run. Both paths preserve failed and successful
 model responses for comparison.
-Generation never auto-stages or auto-publishes: those remain explicit editorial
-steps after a valid result is reviewed.
+Manual generations never auto-stage or auto-publish. The production nightly
+workflow is the deliberate exception: it creates one system-owned run for the
+completed date, generates with the newest immutable prompt, stages the
+validated output, and publishes it. The unique automated-run index and the
+one-published-edition index make duplicate cron delivery safe.
 
 Every edition keyword must occur verbatim in supplied posts. Exact story-title
 excerpts are preferred and checked, while a paraphrase becomes a non-fatal
@@ -146,36 +151,42 @@ separately.
 - immutable prompt version and exact rendered request;
 - raw provider response and validated publication artifact;
 - provider response ID and resolved model;
-- the durable Vercel Workflow run ID;
+- the automation run ID (`systemd:YYYY-MM-DD` for nightly publication);
 - input, output, and total token counts;
 - end-to-end duration and terminal error;
 - an ordered event trace for candidate, selection, commentary, generation,
   and edition stages.
 
 The lab renders those fields directly and refreshes a visible running-job panel
-every three seconds. Server failures also log with the digest run ID, so Vercel
-logs, Workflow run/step observability, and the durable ledger can be joined
-during diagnosis.
+every three seconds. Nightly publisher failures log structured JSON with the
+digest run ID to the production host journal, so systemd logs and the durable
+ledger can be joined during diagnosis.
+
+`community_archive_monitoring_digest()` exposes only aggregate publication
+freshness and automated-failure state to the least-privilege `readclient` role.
+The production PostgreSQL exporter turns that into the service-catalog health
+signal; prompt text, source snapshots, drafts, and error details remain private.
 
 ## Configuration
 
 Required server-only values:
 
 ```env
-OPENAI_API_KEY=<secret>
-OPENAI_API_BASE_URL=https://api.openai.com/v1
-DEEPSEEK_API_KEY=<secret>
-DEEPSEEK_API_BASE_URL=https://api.deepseek.com
+OPENROUTER_API_KEY=<secret>
 CLICKHOUSE_ANALYTICS_API_URL=https://analytics.community-archive.org/analytics
 CLICKHOUSE_ANALYTICS_API_TOKEN=<shared-gateway-token>
 SUPABASE_SERVICE_ROLE=<server-only-service-role>
+NEXT_PUBLIC_SUPABASE_URL=https://PROJECT.supabase.co
 ```
 
-Do not expose any of these with a `NEXT_PUBLIC_` prefix. Public digest reads use
-the normal anonymous Supabase client and the `status = 'published'` RLS policy.
+The project URL is public configuration. Do not expose the service role,
+OpenRouter key, or ClickHouse token with a `NEXT_PUBLIC_` prefix. Public digest
+reads use the normal anonymous Supabase client and the `status = 'published'`
+RLS policy.
 
-The current experiment prompt uses `deepseek/deepseek-v4-flash-0731` through
-OpenRouter, high reasoning effort, and a 6,000-token output ceiling. Its
+The current prompt uses `z-ai/glm-5.3` through OpenRouter, high reasoning
+effort, temperature `0.2`, and the model's 131,072-token maximum completion
+ceiling. Its
 one-call structured output requires exactly three summary bullets, a
 representative tweet index, three to five stories with loose labels and
 tweet-index lists, tweet-grounded titles, short explanatory subtitles,
@@ -189,12 +200,52 @@ configuration. Summary bullets target 140 characters while the transport
 schema allows up to 200. Subtitles prioritize one complete explanatory sentence
 over a fixed character target, with 500 characters of transport and editing
 headroom. These looser transport limits prevent a provider from satisfying the
-schema by clipping prose.
+schema by clipping prose. OpenRouter counts hidden reasoning and visible JSON
+against the same completion ceiling; representative local replays exhausted a
+6,000-token ceiling before producing valid JSON. DeepSeek V4 Flash also
+intermittently ignored the strict schema at higher ceilings. GLM-5.3 likewise
+returned Markdown when relying on the API schema alone, so its immutable prompt
+also requires one JSON object with no Markdown or surrounding prose. Exact
+August 19 and 20 replays then produced schema-shaped JSON. The maximum
+provider-supported budget preserves high reasoning while leaving ample room for
+the structured edition; generation still stops naturally when the concise
+response is done.
+
+The candidate corpus spans all authors and marks every banger with
+`authored_by_community_member`. The prompt treats that marker as a strong
+editorial preference: it favors coherent and relevant community-authored
+stories, but keeps non-community stories when they are unusually big,
+especially relevant, or needed to make a strong edition.
+The frozen marker is also copied onto selected banger snapshots so public
+digest tweet cards label community-authored posts as `Community author`.
+
+## Nightly schedule and recovery
+
+`community-archive-nightly-digest.timer` runs on `prod-firehose` at `06:15 UTC`
+every day. That is 10:15 PM PST or 11:15 PM PDT, fifteen minutes after the
+Community Archive editorial day closes. The oneshot Bun process ingests the
+candidate snapshot, sends one GLM-5.3 request, performs one repair request only
+when deterministic validation rejects the first response, and stages and
+publishes the validated edition through Supabase.
+
+The publisher is date-idempotent. It exits before generation when a date is
+already published, records the stable run identifier `systemd:YYYY-MM-DD`, does
+not replace an edition an editor published during generation, and publishes a
+completed automated run if an earlier database publication attempt failed.
+Generation or validation failure leaves the run failed and does not change the
+public edition.
+
+For a supervised no-write replay, run the publisher with
+`--date YYYY-MM-DD --dry-run`. To pause new nightly writes without affecting
+public reads, disable `community-archive-nightly-digest.timer`. Keep the legacy
+Vercel cron schedule absent and `DIGEST_AUTOMATION_ENABLED=false` so there is
+only one scheduler. To recover a failed date, inspect its saved run and
+`journalctl -u community-archive-nightly-digest.service`, then clone/revise and
+publish through the existing editorial path. Do not delete the run ledger.
 
 ## Rollout gates
 
-Automation is deliberately disabled during the editorial experiment. Before a
-daily timer or weekly Substack send is enabled:
+Before setting `DIGEST_AUTOMATION_ENABLED=true` in production:
 
 1. Apply `20260813000650_add_daily_digest_editorial_workspace.sql` and
    the subsequent Daily Digest prompt-version migrations through
@@ -211,17 +262,16 @@ daily timer or weekly Substack send is enabled:
 4. Verify the public daily and story pages in a protected remote preview.
 5. Apply the migration and server secrets in production before merging a
    frontend release that expects the tables.
-6. Treat the scheduler as a new monitored timer: document it in the service
-   catalog, add success/failure/freshness signals and alerts, verify one manual
-   production run, and keep publishing manual until quality evidence supports
-   auto-publish.
+6. Install the systemd service with its timer disabled, deploy the
+   service-catalog and Grafana digest-health check, verify one production-data
+   `--dry-run`, and only then enable the timer.
 7. Add the weekly email/Substack adapter as a separate delivery boundary. A
    delivery failure must not mutate or unpublish the daily edition.
 
 ## Rollback
 
-- Stop DeepSeek generation by removing `DEEPSEEK_API_KEY` (and OpenAI
-  experiments by removing `OPENAI_API_KEY`); public editions remain readable.
+- Stop nightly generation by disabling the systemd timer; public editions
+  remain readable.
 - Archive a bad edition and republish a previously staged version through the
   service-role publication function.
 - Roll back the frontend independently of the tables. The migration is additive

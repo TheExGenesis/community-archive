@@ -465,6 +465,13 @@ export function TweetRow({
             : relativeTime(tweet.createdAt)}
         </span>
       </div>
+      {tweet.communityAuthored ? (
+        <div className="mt-1">
+          <span className="inline-flex rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">
+            Community author
+          </span>
+        </div>
+      ) : null}
       <Link
         href={href}
         onClick={() => captureAction('open')}

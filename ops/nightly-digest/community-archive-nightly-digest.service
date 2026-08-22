@@ -1,0 +1,24 @@
+[Unit]
+Description=Publish the Community Archive nightly digest
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/community-archive-nightly-digest
+EnvironmentFile=/etc/community-archive-nightly-digest.env
+ExecStart=/root/.bun/bin/bun /opt/community-archive-nightly-digest/services/nightly-digest/publish.ts
+TimeoutStartSec=20min
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

@@ -1,6 +1,7 @@
 import {
   digestDateForCommunityDay,
   getDigestDateWindow,
+  getLatestCompletedDigestDate,
   isRecentPastDigestDate,
   listPastDigestDates,
 } from './dateWindow'
@@ -46,6 +47,15 @@ describe('digest date windows', () => {
     ])
     expect(isRecentPastDigestDate('2026-08-11', now)).toBe(true)
     expect(isRecentPastDigestDate('2026-08-14', now)).toBe(false)
+  })
+
+  test('selects the latest completed edition on either side of the cutoff', () => {
+    expect(
+      getLatestCompletedDigestDate(new Date('2026-08-21T05:59:59.000Z')),
+    ).toBe('2026-08-19')
+    expect(
+      getLatestCompletedDigestDate(new Date('2026-08-21T06:15:00.000Z')),
+    ).toBe('2026-08-20')
   })
 
   test('allows completed days across the twelve-month generation calendar', () => {

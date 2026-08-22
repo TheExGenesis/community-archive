@@ -115,6 +115,12 @@ CREATE INDEX IF NOT EXISTS "digest_runs_date_created_idx"
 CREATE INDEX IF NOT EXISTS "digest_runs_prompt_version_idx"
   ON "public"."digest_runs" ("prompt_version_id");
 
+CREATE UNIQUE INDEX IF NOT EXISTS "digest_runs_one_nightly_run_per_date_idx"
+  ON "public"."digest_runs" ("digest_date")
+  WHERE "created_by" IS NULL
+    AND "parent_run_id" IS NULL
+    AND "workflow_run_id" IS NOT NULL;
+
 CREATE UNIQUE INDEX IF NOT EXISTS "digest_editions_one_published_per_date_idx"
   ON "public"."digest_editions" ("digest_date")
   WHERE "status" = 'published';

@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the Community Archive digest after the Pacific editorial day closes
+
+[Timer]
+OnCalendar=*-*-* 06:15:00 UTC
+Persistent=true
+AccuracySec=1min
+RandomizedDelaySec=0
+Unit=community-archive-nightly-digest.service
+
+[Install]
+WantedBy=timers.target

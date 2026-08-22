@@ -1,5 +1,6 @@
--- Vercel cron delivery is best effort and may be duplicated. Automated runs
--- are system-owned, top-level workflow runs; keep one immutable run per date.
+-- Scheduled delivery may be duplicated across retries or scheduler changes.
+-- Automated runs are system-owned and top-level; keep one immutable run per
+-- date regardless of the execution host.
 create unique index if not exists "digest_runs_one_nightly_run_per_date_idx"
   on "public"."digest_runs" ("digest_date")
   where "created_by" is null

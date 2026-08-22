@@ -220,14 +220,17 @@ export async function generateDigestWithModel(
         { role: 'user', content: request.userPrompt },
       ],
       provider: { data_collection: 'deny', zdr: true },
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'community_archive_daily_digest',
-          strict: true,
-          schema: DIGEST_JSON_SCHEMA,
-        },
-      },
+      response_format:
+        request.model === 'z-ai/glm-5.3'
+          ? { type: 'json_object' }
+          : {
+              type: 'json_schema',
+              json_schema: {
+                name: 'community_archive_daily_digest',
+                strict: true,
+                schema: DIGEST_JSON_SCHEMA,
+              },
+            },
     }
     if (request.reasoningEffort) {
       body.reasoning = { effort: request.reasoningEffort, exclude: true }

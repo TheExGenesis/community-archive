@@ -151,16 +151,16 @@ separately.
 - immutable prompt version and exact rendered request;
 - raw provider response and validated publication artifact;
 - provider response ID and resolved model;
-- the durable Vercel Workflow run ID;
+- the automation run ID (`systemd:YYYY-MM-DD` for nightly publication);
 - input, output, and total token counts;
 - end-to-end duration and terminal error;
 - an ordered event trace for candidate, selection, commentary, generation,
   and edition stages.
 
 The lab renders those fields directly and refreshes a visible running-job panel
-every three seconds. Server failures also log with the digest run ID, so Vercel
-logs, Workflow run/step observability, and the durable ledger can be joined
-during diagnosis.
+every three seconds. Nightly publisher failures log structured JSON with the
+digest run ID to the production host journal, so systemd logs and the durable
+ledger can be joined during diagnosis.
 
 `community_archive_monitoring_digest()` exposes only aggregate publication
 freshness and automated-failure state to the least-privilege `readclient` role.
@@ -172,19 +172,17 @@ signal; prompt text, source snapshots, drafts, and error details remain private.
 Required server-only values:
 
 ```env
-OPENAI_API_KEY=<secret>
-OPENAI_API_BASE_URL=https://api.openai.com/v1
-DEEPSEEK_API_KEY=<secret>
-DEEPSEEK_API_BASE_URL=https://api.deepseek.com
+OPENROUTER_API_KEY=<secret>
 CLICKHOUSE_ANALYTICS_API_URL=https://analytics.community-archive.org/analytics
 CLICKHOUSE_ANALYTICS_API_TOKEN=<shared-gateway-token>
 SUPABASE_SERVICE_ROLE=<server-only-service-role>
-CRON_SECRET=<random-secret-at-least-16-characters>
-DIGEST_AUTOMATION_ENABLED=true
+NEXT_PUBLIC_SUPABASE_URL=https://PROJECT.supabase.co
 ```
 
-Do not expose any of these with a `NEXT_PUBLIC_` prefix. Public digest reads use
-the normal anonymous Supabase client and the `status = 'published'` RLS policy.
+The project URL is public configuration. Do not expose the service role,
+OpenRouter key, or ClickHouse token with a `NEXT_PUBLIC_` prefix. Public digest
+reads use the normal anonymous Supabase client and the `status = 'published'`
+RLS policy.
 
 The current prompt uses `z-ai/glm-5.3` through OpenRouter, high reasoning
 effort, temperature `0.2`, and the model's 131,072-token maximum completion
@@ -223,29 +221,27 @@ digest tweet cards label community-authored posts as `Community author`.
 
 ## Nightly schedule and recovery
 
-Vercel invokes `GET /api/cron/daily-digest` at `06:15 UTC` every day. That is
-10:15 PM PST or 11:15 PM PDT, fifteen minutes after the existing Community
-Archive day closes. Vercel cron schedules are UTC-only; the digest boundary is
-therefore stable while the local Pacific clock shifts with daylight saving
-time. The route requires Vercel's `CRON_SECRET` bearer header and returns as
-soon as the durable workflow is queued.
+`community-archive-nightly-digest.timer` runs on `prod-firehose` at `06:15 UTC`
+every day. That is 10:15 PM PST or 11:15 PM PDT, fifteen minutes after the
+Community Archive editorial day closes. The oneshot Bun process ingests the
+candidate snapshot, sends one GLM-5.3 request, performs one repair request only
+when deterministic validation rejects the first response, and stages and
+publishes the validated edition through Supabase.
 
-The workflow is date-idempotent. It skips a date that is already published,
-does not replace an edition an editor published during generation, and reuses a
-completed automated run if publication is retried. Generation or validation
-failure leaves the run failed and does not change the public edition.
+The publisher is date-idempotent. It exits before generation when a date is
+already published, records the stable run identifier `systemd:YYYY-MM-DD`, does
+not replace an edition an editor published during generation, and publishes a
+completed automated run if an earlier database publication attempt failed.
+Generation or validation failure leaves the run failed and does not change the
+public edition.
 
-For a supervised backfill within the last 30 completed days, send the same
-bearer credential to `POST /api/cron/daily-digest` with a JSON body such as
-`{"digestDate":"2026-08-19"}`. This queues the same idempotent generation and
-publication workflow as the nightly schedule; it is not an editor-side publish
-shortcut. Dates outside that recovery window are rejected.
-
-To pause new nightly writes without affecting public reads, set
-`DIGEST_AUTOMATION_ENABLED=false` or disable the cron in Vercel. To recover a
-failed date, inspect its saved run and Workflow trace in `/admin/digest`, then
-clone/revise and publish through the existing editorial path. Do not delete the
-run ledger.
+For a supervised no-write replay, run the publisher with
+`--date YYYY-MM-DD --dry-run`. To pause new nightly writes without affecting
+public reads, disable `community-archive-nightly-digest.timer`. Keep the legacy
+Vercel cron schedule absent and `DIGEST_AUTOMATION_ENABLED=false` so there is
+only one scheduler. To recover a failed date, inspect its saved run and
+`journalctl -u community-archive-nightly-digest.service`, then clone/revise and
+publish through the existing editorial path. Do not delete the run ledger.
 
 ## Rollout gates
 
@@ -266,16 +262,16 @@ Before setting `DIGEST_AUTOMATION_ENABLED=true` in production:
 4. Verify the public daily and story pages in a protected remote preview.
 5. Apply the migration and server secrets in production before merging a
    frontend release that expects the tables.
-6. Deploy the service-catalog and Grafana digest-health check, verify one manual
-   production-equivalent cron request, and confirm the new run reaches
-   `published` before enabling the recurring write path.
+6. Install the systemd service with its timer disabled, deploy the
+   service-catalog and Grafana digest-health check, verify one production-data
+   `--dry-run`, and only then enable the timer.
 7. Add the weekly email/Substack adapter as a separate delivery boundary. A
    delivery failure must not mutate or unpublish the daily edition.
 
 ## Rollback
 
-- Stop DeepSeek generation by removing `DEEPSEEK_API_KEY` (and OpenAI
-  experiments by removing `OPENAI_API_KEY`); public editions remain readable.
+- Stop nightly generation by disabling the systemd timer; public editions
+  remain readable.
 - Archive a bad edition and republish a previously staged version through the
   service-role publication function.
 - Roll back the frontend independently of the tables. The migration is additive

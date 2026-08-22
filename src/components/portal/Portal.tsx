@@ -717,7 +717,6 @@ export default function Portal({
       })),
     [trends.weekly],
   )
-  const hasWeeklyTerms = weeklyLanes.some((lane) => lane.terms.length > 0)
 
   const recentBanger = data.recentBangers[0] ?? null
   const historicalBanger = data.historicalBangers[0] ?? null
@@ -865,7 +864,7 @@ export default function Portal({
                 <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
                   {data.failures.trends ? (
                     <PanelUnavailable message="Trending terms are temporarily unavailable." />
-                  ) : hasWeeklyTerms ? (
+                  ) : (
                     <div
                       className={`flex items-center gap-2 pb-1 text-[9px] font-medium uppercase tracking-wide ${MUTED}`}
                     >
@@ -879,8 +878,8 @@ export default function Portal({
                         vs 28d
                       </span>
                     </div>
-                  ) : null}
-                  {!data.failures.trends && hasWeeklyTerms && (
+                  )}
+                  {!data.failures.trends && (
                     <div className="space-y-1">
                       {weeklyLanes.map((lane) => {
                         const laneMax = Math.max(
@@ -953,11 +952,6 @@ export default function Portal({
                           </section>
                         )
                       })}
-                    </div>
-                  )}
-                  {!data.failures.trends && !hasWeeklyTerms && (
-                    <div className={`py-8 text-center text-[13px] ${MUTED}`}>
-                      No trending terms in the last seven days.
                     </div>
                   )}
                 </div>

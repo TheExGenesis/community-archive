@@ -327,7 +327,7 @@ export function FileUploadDialog({
             <div className="mt-4 text-center text-sm">
               <Link
                 href="/data-policy"
-                className="text-primary hover:underline"
+                className="text-primary"
                 target="_blank"
               >
                 Read our Data Policy

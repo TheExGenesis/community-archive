@@ -160,7 +160,7 @@ export default function OptInForm({
       <div className="border-t border-border pt-6">
         <p className="text-sm text-muted-foreground">
           By opting in, you agree to our{' '}
-          <Link href="/data-policy" className="text-brand hover:underline">
+          <Link href="/data-policy" className="text-brand">
             Data Policy
           </Link>
           . Your public tweets will be archived and may persist even after

@@ -184,7 +184,7 @@ export function DigestEditionView({
                         action: 'story_opened',
                         surface: 'edition_cta',
                       }}
-                      className="mt-5 inline-flex rounded-sm text-sm font-semibold text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      className="mt-5 inline-flex rounded-sm text-sm font-semibold text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     >
                       Read the full story and surrounding conversation →
                     </PostHogLink>
@@ -248,7 +248,7 @@ export function DigestEditionView({
                   action: 'bangers_opened',
                   surface: 'sidebar',
                 }}
-                className="mt-4 inline-flex font-semibold text-brand hover:underline"
+                className="mt-4 inline-flex font-semibold text-brand"
               >
                 Explore today&apos;s bangers →
               </PostHogLink>
@@ -272,7 +272,7 @@ export function DigestEditionView({
                           action: 'recent_edition_opened',
                           surface: 'recent_editions',
                         }}
-                        className="block text-sm text-muted-foreground hover:text-brand hover:underline"
+                        className="block text-sm text-muted-foreground hover:text-brand"
                       >
                         {longDate(item.digestDate)}
                       </PostHogLink>

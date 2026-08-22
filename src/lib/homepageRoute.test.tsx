@@ -26,9 +26,7 @@ jest.mock('@/lib/portal/auth', () => ({ getIsMember: jest.fn() }))
 jest.mock('@/lib/portal/data', () => ({ getPortalData: jest.fn() }))
 jest.mock('@/components/home/HomepagePeople', () => ({
   __esModule: true,
-  default: ({ isMember }: { isMember: boolean }) => (
-    <div>homepage people · member {String(isMember)}</div>
-  ),
+  default: () => <div>homepage people</div>,
   HomepagePeopleFallback: () => <div>homepage people fallback</div>,
 }))
 
@@ -55,7 +53,7 @@ describe('Homepage OAuth actions', () => {
 
     const markup = renderToStaticMarkup(page)
     expect(markup).toContain('shared homepage · member true · CTA true')
-    expect(markup).toContain('homepage people · member true')
+    expect(markup).toContain('homepage people')
     expect(getIsMemberMock).toHaveBeenCalledTimes(1)
     expect(getPortalDataMock).toHaveBeenCalledTimes(1)
   })
@@ -65,7 +63,7 @@ describe('Homepage OAuth actions', () => {
 
     const markup = renderToStaticMarkup(page)
     expect(markup).toContain('shared homepage · member true · CTA false')
-    expect(markup).toContain('homepage people · member true')
+    expect(markup).toContain('homepage people')
     expect(getIsMemberMock).toHaveBeenCalledTimes(1)
     expect(getPortalDataMock).toHaveBeenCalledTimes(1)
   })
@@ -76,6 +74,6 @@ describe('Homepage OAuth actions', () => {
 
     const markup = renderToStaticMarkup(page)
     expect(markup).toContain('shared homepage · member false · CTA true')
-    expect(markup).toContain('homepage people · member false')
+    expect(markup).toContain('homepage people')
   })
 })

@@ -61,7 +61,7 @@ function ResourceLink({
       href={href}
       target={isExternal ? '_blank' : undefined}
       rel={isExternal ? 'noopener noreferrer' : undefined}
-      className="inline-flex items-center gap-1 font-medium text-brand hover:underline"
+      className="inline-flex items-center gap-1 font-medium text-brand"
     >
       {children}
       <ArrowUpRight className="h-4 w-4" aria-hidden="true" />

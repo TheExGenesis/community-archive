@@ -156,9 +156,8 @@ export default function TopMentionedUsers({
                     href={getUserLink(user)}
                     target={user.uploaded ? '_self' : '_blank'}
                     rel={user.uploaded ? '' : 'noopener noreferrer'}
-                    className=""
                   >
-                    <span className="hover:underline">
+                    <span>
                       {user.account_display_name || `@${user.screen_name}`}
                     </span>
                     {user.account_display_name && (

@@ -5,7 +5,6 @@ import { cookies } from 'next/headers'
 import HomepageSearch from '@/components/HomepageSearch'
 import Portal from '@/components/portal/Portal'
 import Testimonials from '@/components/home/Testimonials'
-import CorpusRibbon from '@/components/home/CorpusRibbon'
 import { formatNumber } from '@/lib/formatNumber'
 import type { PortalData } from '@/lib/portal/types'
 import { createServerClient } from '@/utils/supabase'
@@ -124,7 +123,7 @@ export default async function ClassicHomepage({
                 href="https://survivalandflourishing.fund/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-medium transition-colors hover:text-brand hover:underline"
+                className="font-medium transition-colors hover:text-brand"
               >
                 Survival and Flourishing Fund
               </Link>{' '}
@@ -133,17 +132,13 @@ export default async function ClassicHomepage({
                 href="https://x.com/VitalikButerin"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-medium transition-colors hover:text-brand hover:underline"
+                className="font-medium transition-colors hover:text-brand"
               >
                 Vitalik Buterin
               </Link>
             </p>
           </div>
         </div>
-
-        {!data.failures.historicalBangers && (
-          <CorpusRibbon tweets={data.historicalBangers} />
-        )}
       </section>
 
       <section className="bg-zinc-100/80 py-4 dark:bg-transparent sm:py-7">

@@ -229,7 +229,7 @@ export default function QuotingTweetsSidebar({
                   <button
                     type="button"
                     onClick={() => void loadMore()}
-                    className="mt-2 text-xs font-semibold text-brand hover:underline"
+                    className="mt-2 text-xs font-semibold text-brand"
                   >
                     Try again
                   </button>

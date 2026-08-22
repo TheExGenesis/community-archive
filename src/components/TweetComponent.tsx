@@ -213,7 +213,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
               href={part}
               target="_blank"
               rel="noopener noreferrer"
-              className="break-all text-brand underline-offset-2 hover:underline"
+              className="break-all text-brand underline-offset-2"
             >
               {part}
             </a>
@@ -347,7 +347,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
             <div className="mb-1 flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
               <Link
                 href={quotedProfileHref}
-                className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span className="text-sm font-bold text-foreground">
                   {quotedTweet.account_display_name}
@@ -516,7 +516,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
           <div className="min-w-0 leading-tight">
             <Link
               href={profileHref}
-              className="block rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div className="truncate text-sm font-semibold text-foreground">
                 {displayName}
@@ -553,7 +553,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
               <button
                 type="button"
                 onClick={() => setIsTextExpanded((expanded) => !expanded)}
-                className="text-xs font-medium text-brand hover:underline"
+                className="text-xs font-medium text-brand"
               >
                 {isTextExpanded ? 'Show less' : 'Show more'}
               </button>
@@ -651,7 +651,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <Link
               href={profileHref}
-              className="rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span className="font-bold text-foreground">{displayName}</span>{' '}
               <span className="text-muted-foreground">@{displayUsername}</span>
@@ -684,7 +684,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
         <button
           type="button"
           onClick={() => setIsTextExpanded((expanded) => !expanded)}
-          className="mb-2 text-sm font-medium text-brand hover:underline"
+          className="mb-2 text-sm font-medium text-brand"
         >
           {isTextExpanded ? 'Show less' : 'Show more'}
         </button>

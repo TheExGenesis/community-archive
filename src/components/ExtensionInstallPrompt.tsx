@@ -74,7 +74,7 @@ export default function ExtensionInstallPrompt({
           href={CHROME_EXTENSION_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="whitespace-nowrap font-bold text-brand hover:underline"
+          className="whitespace-nowrap font-bold text-brand"
         >
           Install the browser extension ↗
         </a>

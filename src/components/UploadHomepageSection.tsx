@@ -146,7 +146,7 @@ export default function UploadHomepageSection() {
               setState((prev) => ({ ...prev, showUploadButton: true }))
             }
           >
-            <button className="cursor-pointer text-sm font-bold text-brand hover:underline dark:text-brand">
+            <button className="cursor-pointer text-sm font-bold text-brand dark:text-brand">
               Upload a new archive, or delete your data. :)
             </button>
           </div>

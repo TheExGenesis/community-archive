@@ -226,7 +226,7 @@ export function DigestStoryView({
             <section className="mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800">
               <Link
                 href={`/tweets/${story.bangers[0].id}?from=digest&returnTo=${encodeURIComponent(returnTo)}`}
-                className="inline-flex text-sm font-semibold text-brand hover:underline"
+                className="inline-flex text-sm font-semibold text-brand"
               >
                 Open the lead banger and all archived replies →
               </Link>

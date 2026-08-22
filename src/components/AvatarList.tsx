@@ -104,7 +104,7 @@ const AvatarList = ({
             >
               <RecoverableArchiveAvatar avatar={avatar} compact={compact} />
               <span
-                className={`mt-1 w-full min-w-0 leading-tight [overflow-wrap:anywhere] hover:underline ${
+                className={`mt-1 w-full min-w-0 leading-tight [overflow-wrap:anywhere] ${
                   compact ? 'min-h-7 text-[11px]' : 'text-xs'
                 }`}
               >

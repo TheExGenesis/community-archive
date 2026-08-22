@@ -241,7 +241,7 @@ export function Workspace({
             type="button"
             onClick={onUndoDismiss}
             disabled={editSaving}
-            className="font-semibold text-primary hover:underline disabled:opacity-60"
+            className="font-semibold text-primary disabled:opacity-60"
           >
             Undo
           </button>

@@ -199,7 +199,7 @@ export default function UnifiedTweetList({
                   {onSearchSortChange ? (
                     <button
                       type="button"
-                      className="rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="rounded-sm underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       onClick={() =>
                         onSearchSortChange(
                           searchSort === 'newest' ? 'oldest' : 'newest',
@@ -235,7 +235,7 @@ export default function UnifiedTweetList({
                             ? 'Sort by likes, currently descending'
                             : 'Sort by likes'
                         }
-                        className={`rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        className={`rounded-sm underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                           searchSort === 'likes' ? 'text-foreground' : ''
                         }`}
                         onClick={() => onSearchSortChange('likes')}
@@ -249,7 +249,7 @@ export default function UnifiedTweetList({
                             ? 'Sort by reposts, currently descending'
                             : 'Sort by reposts'
                         }
-                        className={`rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        className={`rounded-sm underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                           searchSort === 'reposts' ? 'text-foreground' : ''
                         }`}
                         onClick={() => onSearchSortChange('reposts')}

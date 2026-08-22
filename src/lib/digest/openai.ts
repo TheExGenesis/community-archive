@@ -65,7 +65,8 @@ export const DIGEST_JSON_SCHEMA = {
             type: 'array',
             minItems: 1,
             maxItems: 18,
-            uniqueItems: true,
+            // OpenAI strict structured outputs do not support uniqueItems.
+            // The deterministic receiver rejects repeated indices instead.
             items: { type: 'integer', minimum: 0 },
           },
         },

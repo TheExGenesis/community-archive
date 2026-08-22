@@ -12,8 +12,8 @@ pnpm dev               # http://localhost:3000
 ```
 
 See [`docs/local-setup.md`](docs/local-setup.md) for the full local Supabase
-setup, and [`AGENTS.md`](AGENTS.md) for an architecture overview and operational
-notes.
+setup, and [`AGENTS.md`](AGENTS.md) for repository-specific safety and migration
+rules.
 
 ## Before opening a PR
 

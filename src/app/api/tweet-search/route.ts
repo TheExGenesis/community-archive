@@ -4,11 +4,15 @@ import {
   clickHouseSearchGatewayBaseUrl,
   isClickHouseReadsEnabled,
 } from '@/lib/clickhouseGateway'
+import { enforceBotId } from '@/lib/botIdServer'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 export async function GET(request: NextRequest) {
+  const botResponse = await enforceBotId()
+  if (botResponse) return botResponse
+
   if (!isClickHouseReadsEnabled()) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }

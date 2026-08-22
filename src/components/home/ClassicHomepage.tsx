@@ -79,9 +79,9 @@ export default async function ClassicHomepage({
 
   return (
     <main>
-      <section className="overflow-hidden bg-card pb-7 pt-14 dark:bg-background md:pt-20">
-        <div className="relative z-10 mx-auto w-full max-w-5xl space-y-9 px-4 text-center sm:px-6 lg:px-8">
-          <div className="space-y-3">
+      <section className="overflow-hidden bg-card pb-16 pt-24 dark:bg-background md:pb-24 md:pt-36">
+        <div className="relative z-10 mx-auto w-full max-w-5xl space-y-12 px-4 text-center sm:px-6 lg:px-8 md:space-y-16">
+          <div className="space-y-4">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
               Community Archive
             </h1>
@@ -108,13 +108,17 @@ export default async function ClassicHomepage({
           </div>
 
           {showCta ? (
-            <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} />
+            <div className="!mt-11 md:!mt-[50px]">
+              <DynamicHeroCTAButtons initialIsOptedIn={isOptedIn} />
+            </div>
           ) : isMember ? (
-            <HomepageSearch />
+            <div className="!mt-11 md:!mt-[50px]">
+              <HomepageSearch />
+            </div>
           ) : null}
 
           {/* The backers line is a footnote to the social proof above it. */}
-          <div>
+          <div className="!mt-6 md:!mt-[50px]">
             {homepagePeople}
 
             <p className="mt-1 text-xs text-muted-foreground/80">

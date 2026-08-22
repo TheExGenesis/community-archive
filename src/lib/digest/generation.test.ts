@@ -215,6 +215,7 @@ describe('daily digest generation contract', () => {
     })
 
     expect(edition.topBanger.id).toBe('1')
+    expect(edition.topBanger.communityAuthored).toBe(true)
     expect(edition.executiveSummary).toHaveLength(3)
     expect(edition.stories).toHaveLength(3)
     expect(edition.stories[0]).toMatchObject({
@@ -224,6 +225,8 @@ describe('daily digest generation contract', () => {
       replyCount: 12,
     })
     expect(edition.stories[0].commentary[0].id).toBe('11')
+    expect(edition.stories[0].bangers[0].communityAuthored).toBe(true)
+    expect(edition.stories[1].bangers[0].communityAuthored).toBeUndefined()
     expect(edition.stories[0].editorialNote).toContain('settled verdict')
     expect(edition.source).toEqual({
       candidateCount: 12,

@@ -44,6 +44,8 @@ export interface PortalTweet {
   replyCount?: number
   /** Distinct non-self replies plus quote posts from archive members. */
   interactionCount?: number
+  /** Frozen digest-time membership marker shown on community-authored bangers. */
+  communityAuthored?: boolean
 }
 
 export type PortalBangersScope = 'all' | 'members'

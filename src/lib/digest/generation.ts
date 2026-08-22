@@ -402,13 +402,21 @@ export function assembleDigestEditionContent(input: {
       candidate,
     ]),
   )
+  const markCommunityAuthorship = (row: DigestPromptCorpusRow): PortalTweet => {
+    const isCommunityAuthored =
+      row.kind === 'banger' &&
+      enrichedByBanger.get(row.tweetId)?.candidate.communityAuthored === true
+    return isCommunityAuthored
+      ? { ...row.tweet, communityAuthored: true }
+      : row.tweet
+  }
   const slugCounts = new Map<string, number>()
 
   const stories: DigestStory[] = parsed.stories.map((story) => {
     const indexedTweets = story.tweetIndices.map((index) => corpus[index])
     const storyBangers = indexedTweets
       .filter(({ kind }) => kind === 'banger')
-      .map(({ tweet }) => tweet)
+      .map(markCommunityAuthorship)
     const storyCommentary = indexedTweets
       .filter(({ kind }) => kind !== 'banger')
       .map(({ tweet }) => tweet)
@@ -454,8 +462,9 @@ export function assembleDigestEditionContent(input: {
     }
   })
 
-  const topBanger = corpus[parsed.representativeTweetIndex]?.tweet
-  if (!topBanger) throw new Error('Digest has no representative tweet')
+  const topBangerRow = corpus[parsed.representativeTweetIndex]
+  if (!topBangerRow) throw new Error('Digest has no representative tweet')
+  const topBanger = markCommunityAuthorship(topBangerRow)
 
   return {
     digestDate: input.digestDate,

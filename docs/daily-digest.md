@@ -215,6 +215,8 @@ The candidate corpus spans all authors and marks every banger with
 editorial preference: it favors coherent and relevant community-authored
 stories, but keeps non-community stories when they are unusually big,
 especially relevant, or needed to make a strong edition.
+The frozen marker is also copied onto selected banger snapshots so public
+digest tweet cards label community-authored posts as `Community author`.
 
 ## Nightly schedule and recovery
 

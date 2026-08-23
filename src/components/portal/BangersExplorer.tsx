@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, Search, X } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
+import { BangersInfoTip } from '@/components/portal/BangersInfoTip'
 import {
   Select,
   SelectContent,
@@ -592,9 +593,12 @@ export function BangersExplorer({
 
       <div className="min-h-12 mb-4 flex flex-wrap items-end justify-between gap-2 px-0.5">
         <div>
-          <h2 className="text-[19px] font-bold uppercase tracking-[0.035em]">
-            {bangersHeading({ year, period })}
-          </h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-[19px] font-bold uppercase tracking-[0.035em]">
+              {bangersHeading({ year, period })}
+            </h2>
+            <BangersInfoTip />
+          </div>
           <p
             aria-live="polite"
             className={`mt-0.5 inline-flex items-center gap-1.5 text-[12.5px] tabular-nums ${MUTED}`}

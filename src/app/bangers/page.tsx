@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { BangersExplorer } from '@/components/portal/BangersExplorer'
-import { BangersInfoTip } from '@/components/portal/BangersInfoTip'
 import { MUTED, SERIF } from '@/components/portal/styles'
 import { getInitialPortalBangersPage } from '@/lib/portal/data'
 import type {
@@ -61,17 +60,11 @@ export default async function BangersPage({
         </Link>
         <header className="mb-7 max-w-[760px]">
           <h1
-            className="mb-2 text-[34px] font-semibold leading-tight sm:text-[38px]"
+            className="text-[34px] font-semibold leading-tight sm:text-[38px]"
             style={SERIF}
           >
             Bangers
           </h1>
-          <p
-            className={`inline-flex items-center gap-1.5 text-[13.5px] leading-relaxed ${MUTED}`}
-          >
-            The best tweets in the Community Archive.
-            <BangersInfoTip />
-          </p>
         </header>
         <BangersExplorer
           key={`${scope}:${sort}:${period ?? year ?? 'all'}:${query}`}

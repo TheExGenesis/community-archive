@@ -54,7 +54,7 @@ export default async function BangersPage({
       <div className="mx-auto w-full max-w-[1280px] px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
         <Link
           href="/"
-          className={`mb-3 inline-flex text-[12.5px] font-semibold ${MUTED} hover:text-brand`}
+          className={`mb-2 inline-flex text-[12.5px] font-semibold ${MUTED} hover:text-brand`}
         >
           ← Dashboard
         </Link>

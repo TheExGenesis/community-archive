@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { BangersExplorer } from '@/components/portal/BangersExplorer'
+import { BangersInfoTip } from '@/components/portal/BangersInfoTip'
 import { MUTED, SERIF } from '@/components/portal/styles'
 import { getInitialPortalBangersPage } from '@/lib/portal/data'
 import type {
@@ -59,21 +60,17 @@ export default async function BangersPage({
           ← Dashboard
         </Link>
         <header className="mb-7 max-w-[760px]">
-          <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-brand">
-            <span aria-hidden="true">✦</span>
-            The archive&apos;s standout posts
-          </p>
           <h1
             className="mb-2 text-[34px] font-semibold leading-tight sm:text-[38px]"
             style={SERIF}
           >
             Bangers
           </h1>
-          <p className={`text-[13.5px] leading-relaxed ${MUTED}`}>
-            The archive&apos;s best tweets, ranked by distinct archived quotes
-            from archive uploaders and opted-in members. Quotes by the original
-            author do not count. Best of all time is selected by default, with
-            recent ranges available below.
+          <p
+            className={`inline-flex items-center gap-1.5 text-[13.5px] leading-relaxed ${MUTED}`}
+          >
+            The best tweets in the Community Archive.
+            <BangersInfoTip />
           </p>
         </header>
         <BangersExplorer

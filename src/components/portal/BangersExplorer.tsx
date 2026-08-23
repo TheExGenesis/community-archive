@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, Search, X } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
+import { BangersInfoTip } from '@/components/portal/BangersInfoTip'
 import {
   Select,
   SelectContent,
@@ -415,213 +416,189 @@ export function BangersExplorer({
   })
   return (
     <section aria-label="Browse bangers">
-      <div className={`${CARD} mb-6 p-4 shadow-sm sm:p-5`}>
-        <label className="block">
-          <span
-            className={`mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
-          >
-            Search
-          </span>
-          <span className="relative block">
-            <Search
-              aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
-            />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search all ranked bangers…"
-              className="h-10 w-full rounded-[3px] border border-zinc-300 bg-transparent pl-9 pr-9 text-[14px] outline-none transition placeholder:text-zinc-400 focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-[#3a3a40]"
-            />
-            {query ? (
-              <button
-                type="button"
-                onClick={() => setQuery('')}
-                aria-label="Clear search"
-                className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-sm text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-[#303036] dark:hover:text-white"
-              >
-                <X aria-hidden="true" className="h-4 w-4" />
-              </button>
-            ) : null}
-          </span>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <label className="relative block w-full sm:w-[280px]">
+          <span className="sr-only">Search</span>
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search all ranked bangers…"
+            className="h-9 w-full rounded-[3px] border border-zinc-300 bg-transparent pl-9 pr-9 text-[14px] outline-none transition placeholder:text-zinc-400 focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-[#3a3a40]"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              aria-label="Clear search"
+              className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-sm text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-[#303036] dark:hover:text-white"
+            >
+              <X aria-hidden="true" className="h-4 w-4" />
+            </button>
+          ) : null}
         </label>
 
-        <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <label>
-            <span
-              className={`mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
-            >
-              When
-            </span>
-            <Select
-              value={selectedTime}
-              onValueChange={(value) => {
-                const nextPeriod =
-                  value === 'today' ||
-                  value === 'week' ||
-                  value === 'three-months'
-                    ? value
-                    : undefined
-                const nextYear = value.startsWith('year-')
-                  ? Number(value.slice(5))
+        <div className="flex flex-wrap items-center gap-3">
+          <Select
+            value={selectedTime}
+            onValueChange={(value) => {
+              const nextPeriod =
+                value === 'today' ||
+                value === 'week' ||
+                value === 'three-months'
+                  ? value
                   : undefined
-                captureBangersAction({
-                  action: 'time_filter_changed',
+              const nextYear = value.startsWith('year-')
+                ? Number(value.slice(5))
+                : undefined
+              captureBangersAction({
+                action: 'time_filter_changed',
+                query,
+                scope,
+                sort,
+                year: nextYear,
+                period: nextPeriod,
+                resultCount: page.pagination.totalAvailable,
+              })
+              setIsNavigating(true)
+              router.push(
+                bangersHref({
                   query,
                   scope,
                   sort,
                   year: nextYear,
                   period: nextPeriod,
-                  resultCount: page.pagination.totalAvailable,
-                })
-                setIsNavigating(true)
-                router.push(
-                  bangersHref({
-                    query,
-                    scope,
-                    sort,
-                    year: nextYear,
-                    period: nextPeriod,
-                    allTime: value === 'all',
-                  }),
-                )
-              }}
+                  allTime: value === 'all',
+                }),
+              )
+            }}
+          >
+            <SelectTrigger
+              aria-label="Filter by time"
+              aria-busy={isNavigating}
+              disabled={isNavigating}
+              className="h-9 w-auto gap-2 rounded-[3px] border-zinc-300 bg-transparent px-3 text-[12px] font-semibold shadow-none focus:ring-brand/30 focus:ring-offset-0 dark:border-[#3a3a40]"
             >
-              <SelectTrigger
-                aria-label="Filter by time"
-                aria-busy={isNavigating}
-                disabled={isNavigating}
-                className="h-9 w-[148px] rounded-[3px] border-zinc-300 bg-transparent px-3 text-[12px] font-semibold shadow-none focus:ring-brand/30 focus:ring-offset-0 dark:border-[#3a3a40]"
-              >
-                <SelectValue />
-                {isNavigating ? (
-                  <Loader2
-                    aria-label="Loading bangers"
-                    className="ml-auto h-3.5 w-3.5 animate-spin"
-                  />
-                ) : null}
-              </SelectTrigger>
-              <SelectContent className="rounded-[3px]">
-                <SelectItem value="all">All time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">Last 7 days</SelectItem>
-                <SelectItem value="three-months">Last 3 months</SelectItem>
-                {availableYears.map((availableYear) => (
-                  <SelectItem
-                    key={availableYear}
-                    value={`year-${availableYear}`}
-                  >
-                    {availableYear}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </label>
+              <SelectValue />
+              {isNavigating ? (
+                <Loader2
+                  aria-label="Loading bangers"
+                  className="ml-auto h-3.5 w-3.5 animate-spin"
+                />
+              ) : null}
+            </SelectTrigger>
+            <SelectContent className="rounded-[3px]">
+              <SelectItem value="all">All time</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">Last 7 days</SelectItem>
+              <SelectItem value="three-months">Last 3 months</SelectItem>
+              {availableYears.map((availableYear) => (
+                <SelectItem key={availableYear} value={`year-${availableYear}`}>
+                  {availableYear}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          <div className="flex flex-wrap items-end gap-x-5 gap-y-3 lg:justify-end">
-            <div>
-              <span
-                className={`mb-1.5 block text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
-              >
-                Tweets by
-              </span>
-              <div className="flex">
-                <Link
-                  href={bangersHref({
+          <div className="flex" role="group" aria-label="Tweets by">
+            <Link
+              href={bangersHref({
+                query,
+                scope: 'all',
+                sort,
+                year,
+                period,
+                allTime: isAllTime,
+              })}
+              onClick={(event) => {
+                const href = event.currentTarget.getAttribute('href')
+                if (scope !== 'all') {
+                  captureBangersAction({
+                    action: 'scope_changed',
                     query,
                     scope: 'all',
                     sort,
                     year,
                     period,
-                    allTime: isAllTime,
-                  })}
-                  onClick={(event) => {
-                    const href = event.currentTarget.getAttribute('href')
-                    if (scope !== 'all') {
-                      captureBangersAction({
-                        action: 'scope_changed',
-                        query,
-                        scope: 'all',
-                        sort,
-                        year,
-                        period,
-                        resultCount: page.pagination.totalAvailable,
-                      })
-                    }
-                    if (
-                      event.button === 0 &&
-                      !event.metaKey &&
-                      !event.ctrlKey &&
-                      !event.shiftKey &&
-                      !event.altKey &&
-                      href !== currentReturnTo
-                    ) {
-                      setIsNavigating(true)
-                    }
-                  }}
-                  aria-current={scope === 'all' ? 'page' : undefined}
-                  className={`${segmentClassName} rounded-l-[3px] ${
-                    scope === 'all'
-                      ? activeSegmentClassName
-                      : idleSegmentClassName
-                  }`}
-                >
-                  Anyone
-                </Link>
-                <Link
-                  href={bangersHref({
+                    resultCount: page.pagination.totalAvailable,
+                  })
+                }
+                if (
+                  event.button === 0 &&
+                  !event.metaKey &&
+                  !event.ctrlKey &&
+                  !event.shiftKey &&
+                  !event.altKey &&
+                  href !== currentReturnTo
+                ) {
+                  setIsNavigating(true)
+                }
+              }}
+              aria-current={scope === 'all' ? 'page' : undefined}
+              className={`${segmentClassName} rounded-l-[3px] ${
+                scope === 'all' ? activeSegmentClassName : idleSegmentClassName
+              }`}
+            >
+              Anyone
+            </Link>
+            <Link
+              href={bangersHref({
+                query,
+                scope: 'members',
+                sort,
+                year,
+                period,
+                allTime: isAllTime,
+              })}
+              onClick={(event) => {
+                const href = event.currentTarget.getAttribute('href')
+                if (scope !== 'members') {
+                  captureBangersAction({
+                    action: 'scope_changed',
                     query,
                     scope: 'members',
                     sort,
                     year,
                     period,
-                    allTime: isAllTime,
-                  })}
-                  onClick={(event) => {
-                    const href = event.currentTarget.getAttribute('href')
-                    if (scope !== 'members') {
-                      captureBangersAction({
-                        action: 'scope_changed',
-                        query,
-                        scope: 'members',
-                        sort,
-                        year,
-                        period,
-                        resultCount: page.pagination.totalAvailable,
-                      })
-                    }
-                    if (
-                      event.button === 0 &&
-                      !event.metaKey &&
-                      !event.ctrlKey &&
-                      !event.shiftKey &&
-                      !event.altKey &&
-                      href !== currentReturnTo
-                    ) {
-                      setIsNavigating(true)
-                    }
-                  }}
-                  aria-current={scope === 'members' ? 'page' : undefined}
-                  className={`${segmentClassName} -ml-px rounded-r-[3px] ${
-                    scope === 'members'
-                      ? activeSegmentClassName
-                      : idleSegmentClassName
-                  }`}
-                >
-                  Archive members
-                </Link>
-              </div>
-            </div>
+                    resultCount: page.pagination.totalAvailable,
+                  })
+                }
+                if (
+                  event.button === 0 &&
+                  !event.metaKey &&
+                  !event.ctrlKey &&
+                  !event.shiftKey &&
+                  !event.altKey &&
+                  href !== currentReturnTo
+                ) {
+                  setIsNavigating(true)
+                }
+              }}
+              aria-current={scope === 'members' ? 'page' : undefined}
+              className={`${segmentClassName} -ml-px rounded-r-[3px] ${
+                scope === 'members'
+                  ? activeSegmentClassName
+                  : idleSegmentClassName
+              }`}
+            >
+              Archive members
+            </Link>
           </div>
         </div>
       </div>
 
       <div className="min-h-12 mb-4 flex flex-wrap items-end justify-between gap-2 px-0.5">
         <div>
-          <h2 className="text-[19px] font-bold uppercase tracking-[0.035em]">
-            {bangersHeading({ year, period })}
-          </h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-[19px] font-bold uppercase tracking-[0.035em]">
+              {bangersHeading({ year, period })}
+            </h2>
+            <BangersInfoTip />
+          </div>
           <p
             aria-live="polite"
             className={`mt-0.5 inline-flex items-center gap-1.5 text-[12.5px] tabular-nums ${MUTED}`}
@@ -665,7 +642,7 @@ export function BangersExplorer({
           <button
             type="button"
             onClick={clearFilters}
-            className="text-[12px] font-semibold text-brand hover:underline"
+            className="text-[12px] font-semibold text-brand"
           >
             Clear filters
           </button>
@@ -691,7 +668,7 @@ export function BangersExplorer({
       ) : (
         <div
           data-testid="bangers-masonry"
-          className="grid items-start gap-5"
+          className="grid items-start gap-3 lg:gap-4"
           style={{
             gridTemplateColumns: `repeat(${masonryColumnCount}, minmax(0, 1fr))`,
           }}
@@ -700,13 +677,12 @@ export function BangersExplorer({
             <div
               key={columnIndex}
               data-testid={`bangers-masonry-column-${columnIndex}`}
-              className="contents lg:block lg:space-y-6"
+              className="contents lg:block lg:space-y-4"
             >
               {column.map(({ tweet, order }) => (
                 <div
                   key={tweet.id}
                   data-masonry-order={order + 1}
-                  className="mb-6 lg:mb-0"
                   style={{ order }}
                 >
                   <TweetCard
@@ -743,7 +719,7 @@ export function BangersExplorer({
               })
               retryLoad()
             }}
-            className="mt-2 text-[12px] font-semibold text-brand hover:underline"
+            className="mt-2 text-[12px] font-semibold text-brand"
           >
             Try again
           </button>

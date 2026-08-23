@@ -54,27 +54,17 @@ export default async function BangersPage({
       <div className="mx-auto w-full max-w-[1280px] px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
         <Link
           href="/"
-          className={`mb-5 inline-flex text-[12.5px] font-semibold ${MUTED} hover:text-brand`}
+          className={`mb-2 inline-flex text-[12.5px] font-semibold ${MUTED} hover:text-brand`}
         >
           ← Dashboard
         </Link>
-        <header className="mb-7 max-w-[760px]">
-          <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-brand">
-            <span aria-hidden="true">✦</span>
-            The archive&apos;s standout posts
-          </p>
+        <header className="mb-5 max-w-[760px]">
           <h1
-            className="mb-2 text-[34px] font-semibold leading-tight sm:text-[38px]"
+            className="text-[34px] font-semibold leading-tight sm:text-[38px]"
             style={SERIF}
           >
             Bangers
           </h1>
-          <p className={`text-[13.5px] leading-relaxed ${MUTED}`}>
-            The archive&apos;s best tweets, ranked by distinct archived quotes
-            from archive uploaders and opted-in members. Quotes by the original
-            author do not count. Best of all time is selected by default, with
-            recent ranges available below.
-          </p>
         </header>
         <BangersExplorer
           key={`${scope}:${sort}:${period ?? year ?? 'all'}:${query}`}

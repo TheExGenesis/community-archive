@@ -197,8 +197,8 @@ describe('BangersExplorer', () => {
     expect(
       screen.getByRole('combobox', { name: 'Filter by time' }),
     ).toHaveTextContent('All time')
-    const when = screen.getByText('When')
-    const tweetsBy = screen.getByText('Tweets by')
+    const when = screen.getByRole('combobox', { name: 'Filter by time' })
+    const tweetsBy = screen.getByRole('group', { name: 'Tweets by' })
     expect(
       when.compareDocumentPosition(tweetsBy) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
@@ -207,7 +207,8 @@ describe('BangersExplorer', () => {
     expect(screen.getByTestId('bangers-masonry')).toHaveClass(
       'grid',
       'items-start',
-      'gap-5',
+      'gap-3',
+      'lg:gap-4',
     )
     expect(screen.getByTestId('bangers-masonry')).toHaveStyle({
       gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',

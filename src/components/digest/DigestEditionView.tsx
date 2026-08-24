@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
 import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
+import { DigestJingleButton } from '@/components/digest/DigestJingleButton'
 import { DigestMarkdown } from '@/components/digest/DigestMarkdown'
 import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
 import { buildSearchHref } from '@/lib/searchParams'
@@ -48,7 +49,10 @@ export function DigestEditionView({
 
         <header>
           <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-2.5 dark:border-zinc-200">
-            <div className={sectionLabel}>What Happened Yesterday</div>
+            <div className="flex items-center gap-2">
+              <DigestJingleButton />
+              <div className={sectionLabel}>What Happened Yesterday</div>
+            </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
               <PostHogLink
                 href="https://communityarchive.substack.com/subscribe"

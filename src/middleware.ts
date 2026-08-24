@@ -526,12 +526,13 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - images/ (static assets in /public/images, e.g. featured-app thumbnails)
+     * - audio/ (static assets in /public/audio, e.g. the digest jingle)
      * - icon.png / apple-icon.png (Next.js app-icon convention)
      * - favicon.ico (favicon file)
      * - robots.txt (crawler rules)
      * - sitemap.xml (sitemap)
      * - .well-known/workflow/ (authenticated Workflow queue delivery)
      */
-    '/((?!_next/static|_next/image|images/|icon\\.png|apple-icon\\.png|favicon\\.ico|robots\\.txt|sitemap\\.xml|\\.well-known/workflow/).*)',
+    '/((?!_next/static|_next/image|images/|audio/|icon\\.png|apple-icon\\.png|favicon\\.ico|robots\\.txt|sitemap\\.xml|\\.well-known/workflow/).*)',
   ],
 }

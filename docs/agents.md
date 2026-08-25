@@ -7,9 +7,9 @@ Guide for AI agents working with the Community Archive database.
 
 ## Choose an access method
 
-- **Bulk or corpus-wide analysis:** the historical Parquet artifact is private
-  while its exporter is rebuilt to enforce current consent. Scope work to
-  filtered API queries in the meantime.
+- **Bulk or corpus-wide analysis:** follow the consent-safe package from the
+  [latest GitHub Release](https://github.com/TheExGenesis/community-archive/releases/latest)
+  or its `latest.json` pointer; see [api-doc.md](./api-doc.md).
 - **Filtered or application queries:** use the read-only Supabase REST API
   described below and in [api-doc.md](./api-doc.md).
 - **One user's processed archive:** only the authenticated owner may request
@@ -215,8 +215,8 @@ WHERE um.mentioned_user_id = '1680757426889342977';
    case-insensitive comparison when the original casing is unknown. Public raw
    archive storage paths use lowercase usernames.
 2. **Pagination**: API responses are capped at 1,000 rows. Use `limit` and
-   `offset` with a stable `order`. Full-corpus bulk access is paused until the
-   Parquet exporter is policy-aware (see [api-doc.md](./api-doc.md)).
+   `offset` with a stable `order`. For full-corpus analysis, prefer the
+   policy-aware Parquet package (see [api-doc.md](./api-doc.md)).
 3. **Archive Uploads**: Multiple uploads per user are possible - `all_profile` can have multiple rows per `account_id` with different `archive_upload_id`
 4. **Retweets**: Check `retweets` table to distinguish retweets from original tweets
 5. **Quote Tweets**: Use `quote_tweets` to find quoted tweet relationships

@@ -1,16 +1,48 @@
-name: Bulk export disabled by consent policy
+name: Publish consent-safe bulk export release
 
 on:
+  schedule:
+    - cron: "30 8 * * *"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: public-export-release
+  cancel-in-progress: true
 
 jobs:
-  policy-gate:
+  publish-release:
+    name: Verify export and publish release
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Explain fail-closed state
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Build verified release notes
+        id: export
+        shell: bash
         run: |
-          echo "The historical Parquet exporter is disabled because it does not enforce current PostgreSQL consent."
-          echo "Do not restore a public export until every nested author is policy-filtered immediately before upload."
+          export_id="$(scripts/build-public-export-release-notes.sh public-export-release)"
+          echo "export_id=$export_id" >> "$GITHUB_OUTPUT"
+          cat public-export-release/RELEASE.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          export_id="${{ steps.export.outputs.export_id }}"
+          tag="public-export-$export_id"
+          if release_url="$(gh release view "$tag" --json url --jq .url 2>/dev/null)"; then
+            echo "Release already exists: $release_url"
+          else
+            release_url="$(gh release create "$tag" \
+              --target "$GITHUB_SHA" \
+              --title "Community Archive public export $export_id" \
+              --notes-file public-export-release/RELEASE.md \
+              --latest)"
+          fi
+          printf '\n## GitHub Release\n\n[%s](%s)\n' "$tag" "$release_url" >> "$GITHUB_STEP_SUMMARY"

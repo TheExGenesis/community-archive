@@ -1,9 +1,10 @@
 # API guide
 
-There are two currently supported ways to access Community Archive data:
+There are three currently supported ways to access Community Archive data:
 
-1. Query filtered records through the read-only Supabase REST API.
-2. Authenticated owners may download their own processed archive through the
+1. Download the consent-safe bulk Parquet package.
+2. Query filtered records through the read-only Supabase REST API.
+3. Authenticated owners may download their own processed archive through the
    policy-aware web endpoint.
 
 The website version of this guide is at
@@ -13,10 +14,16 @@ should start at
 
 ## Bulk Parquet export
 
-The historical `enriched_tweets.parquet` artifact is unavailable. Its exporter
-did not re-check current PostgreSQL consent for every nested author immediately
-before publication, so the bucket is private until a policy-aware replacement
-is implemented. Use filtered REST requests in the meantime.
+The current consent-safe package contains enriched `tweets.parquet`, separate
+`profiles.parquet`, and `manifest.json`. Start from the
+[`latest.json` pointer](https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/community-archive-public-export/latest.json)
+or the repository's [latest GitHub Release](https://github.com/TheExGenesis/community-archive/releases/latest).
+
+Follow `manifest_url` instead of bookmarking a versioned object. Each nightly
+publication re-checks current PostgreSQL membership and opt-outs, publishes the
+new package atomically, and removes the superseded package. Historical releases
+remain as a publication log, but their versioned file links expire after the
+next successful dump.
 
 ## REST API
 
@@ -120,8 +127,8 @@ for a complete example. Run it from the repository root with:
 pnpm script scripts/get_all_tweets_paginated.mts
 ```
 
-Full-corpus access is paused until the replacement Parquet exporter enforces
-current consent.
+For full-corpus access, prefer the bulk Parquet package instead of paginating
+the REST API.
 
 ## Raw user archives
 

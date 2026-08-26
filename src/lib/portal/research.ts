@@ -33,19 +33,25 @@ const RELEVANT_TITLE_KEYWORDS = [
   'social media',
   'hackathon',
   'sensemaking',
+  'serendipity',
   'epistemic garden',
 ]
 
-const isRelevant = (title: string): boolean => {
+const EXCLUDED_RESEARCH_URLS = new Set([
+  'https://xiqo.substack.com/p/the-community-archive-rises-from',
+])
+
+const isRelevant = (title: string, url: string): boolean => {
+  if (EXCLUDED_RESEARCH_URLS.has(url)) return false
   const lower = title.toLowerCase()
   return RELEVANT_TITLE_KEYWORDS.some((k) => lower.includes(k))
 }
 
 const FEATURED_RESEARCH_TITLES = [
+  'towards a pattern language of serendipity online',
   'agentic taste modeling',
   'a theory of tpot',
   'opportunity mining',
-  'discovering the postrat canon',
 ] as const
 
 /** Select the four editorial homepage posts in their intended display order. */
@@ -99,7 +105,7 @@ export async function getResearchPosts(limit = 12): Promise<ResearchPost[]> {
       const block = raw.split('</item>')[0]
       const title = pickTag(block, 'title')
       const url = pickTag(block, 'link')
-      if (!title || !url || !isRelevant(title)) return []
+      if (!title || !url || !isRelevant(title, url)) return []
       const pubDate = pickTag(block, 'pubDate')
       const image = block.match(/<enclosure url="([^"]+)"/)?.[1] ?? null
       return [

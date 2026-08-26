@@ -11,6 +11,7 @@ describe('frontend readiness health', () => {
       env: {
         CLICKHOUSE_ANALYTICS_API_URL:
           'https://analytics.community-archive.org/analytics',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: 'public-key',
         NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
         VERCEL_ENV: 'preview',
         VERCEL_GIT_COMMIT_SHA: '0123456789abcdef',
@@ -28,9 +29,13 @@ describe('frontend readiness health', () => {
       'https://example.supabase.co/auth/v1/health',
       'https://analytics.community-archive.org/health',
     ])
+    expect(fetchImpl.mock.calls[0][1]?.headers).toMatchObject({
+      apikey: 'public-key',
+    })
+    expect(JSON.stringify(result)).not.toContain('public-key')
   })
 
-  it('reports unhealthy without leaking dependency errors', async () => {
+  it('reports degraded when optional analytics is unavailable', async () => {
     const fetchImpl = jest
       .fn((_input: URL | RequestInfo, _init?: RequestInit) =>
         Promise.resolve(new Response('{}')),
@@ -41,6 +46,30 @@ describe('frontend readiness health', () => {
     const result = await checkFrontendHealth({
       env: {
         CLICKHOUSE_ANALYTICS_API_URL: 'https://analytics.example/analytics',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: 'public-key',
+        NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
+      },
+      fetchImpl,
+      timeoutMs: 100,
+    })
+
+    expect(result.status).toBe('degraded')
+    expect(result.dependencies.analyticsGateway.status).toBe('unavailable')
+    expect(JSON.stringify(result)).not.toContain('secret upstream response')
+  })
+
+  it('reports unhealthy when required Supabase Auth is unavailable', async () => {
+    const fetchImpl = jest
+      .fn((_input: URL | RequestInfo, _init?: RequestInit) =>
+        Promise.resolve(new Response('{}')),
+      )
+      .mockRejectedValueOnce(new Error('auth unavailable'))
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+
+    const result = await checkFrontendHealth({
+      env: {
+        CLICKHOUSE_ANALYTICS_API_URL: 'https://analytics.example/analytics',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: 'public-key',
         NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
       },
       fetchImpl,
@@ -48,8 +77,8 @@ describe('frontend readiness health', () => {
     })
 
     expect(result.status).toBe('unhealthy')
-    expect(result.dependencies.analyticsGateway.status).toBe('unavailable')
-    expect(JSON.stringify(result)).not.toContain('secret upstream response')
+    expect(result.dependencies.supabaseAuth.status).toBe('unavailable')
+    expect(result.dependencies.analyticsGateway.status).toBe('ok')
   })
 
   it('treats missing or malformed configuration as unavailable', async () => {

@@ -72,6 +72,22 @@
   `src/lib/tweetText.ts` for archive text normalization. Preserve complete text,
   media, and quoted-tweet payloads in adapters.
 
+## Community Gallery Design Authority
+
+For changes to `src/app/community/**`, `src/components/community/**`, or
+`src/lib/communityProjects*`, treat
+`docs/design/community-gallery/README.md` as the visual and interaction source
+of truth. Reproduce the supplied prototype at high fidelity; do not use generic
+site-building guidance or the existing implementation to redesign, simplify,
+consolidate, or add decorative treatments absent from the prototype. The
+repository-wide style guide applies only where the prototype is silent, and
+current user instructions always take precedence.
+
+The approved product scope is the gallery landing, project modal, and
+submission flow only. Do not add project-detail or creator pages, first-party
+Community Archive tools, fictional projects, or fictional engagement metrics.
+Verify affected desktop and mobile states against the prototype before handoff.
+
 ## Validation
 
 - Use the focused checks in `CONTRIBUTING.md` for the changed hot path. Ask

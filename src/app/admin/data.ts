@@ -201,7 +201,7 @@ export async function checkIsAdmin(): Promise<boolean> {
 }
 
 export async function requireAdmin(
-  loginReturnPath: '/admin' | '/social-graph' = '/admin',
+  loginReturnPath: '/admin' | '/social-graph' | '/settings' = '/admin',
 ) {
   // getCurrentUser is request-cached, so the root layout, page, and streamed
   // admin sections share one Supabase Auth round trip.

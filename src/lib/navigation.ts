@@ -9,6 +9,7 @@ export interface NavItem {
 
 export function navAnalyticsDestination(href: string): string {
   if (href.startsWith('/bangers')) return 'bangers'
+  if (href.startsWith('/community')) return 'community'
   if (href.startsWith('/digest')) return 'digest'
   if (href.startsWith('/docs')) return 'docs'
   if (href.startsWith('/research')) return 'research'
@@ -159,6 +160,7 @@ export const getPrimaryNav = (isMember: boolean, isAdmin = false): NavItem[] =>
         { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
         { href: '/user-dir', label: 'Users' },
+        { href: '/community', label: 'Gallery' },
         { href: '/trends', label: 'Trends' },
         { href: '/stream', label: 'Live stream' },
         ...(isAdmin
@@ -172,6 +174,7 @@ export const getPrimaryNav = (isMember: boolean, isAdmin = false): NavItem[] =>
         { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
         { href: '/user-dir', label: 'Users' },
+        { href: '/community', label: 'Gallery' },
         { href: '/docs', label: 'Docs' },
         { href: '/#upload-archive', label: 'Upload archive' },
       ]

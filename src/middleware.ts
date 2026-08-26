@@ -88,6 +88,8 @@ const IN_MEMORY_MAX_API_SG = 5
 // cannot consume the request that completes OAuth or persists consent.
 const IN_MEMORY_MAX_OPT_IN_DEFAULT = 10
 const IN_MEMORY_MAX_OPT_IN_SG = 5
+const IN_MEMORY_MAX_COMMUNITY_SUBMISSIONS_DEFAULT = 5
+const IN_MEMORY_MAX_COMMUNITY_SUBMISSIONS_SG = 3
 const IN_MEMORY_MAX_AUTH_CALLBACK_DEFAULT = 30
 const IN_MEMORY_MAX_AUTH_CALLBACK_SG = 10
 const CLEANUP_INTERVAL_MS = 5 * 60_000
@@ -134,6 +136,15 @@ function getApiRateLimitPolicy(
       maxRequests: isSG
         ? IN_MEMORY_MAX_OPT_IN_SG
         : IN_MEMORY_MAX_OPT_IN_DEFAULT,
+    }
+  }
+
+  if (pathname === '/api/community/submissions' && method === 'POST') {
+    return {
+      bucket: 'api:community-submissions',
+      maxRequests: isSG
+        ? IN_MEMORY_MAX_COMMUNITY_SUBMISSIONS_SG
+        : IN_MEMORY_MAX_COMMUNITY_SUBMISSIONS_DEFAULT,
     }
   }
 

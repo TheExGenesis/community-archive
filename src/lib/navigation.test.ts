@@ -3,6 +3,7 @@ import {
   getPrimaryNav,
   getTweetBackLink,
   isNavItemActive,
+  navAnalyticsDestination,
   tweetPermalinkHref,
   userProfileHref,
 } from './navigation'
@@ -23,11 +24,16 @@ describe('user profile navigation', () => {
 })
 
 describe('member navigation', () => {
+  it('maps Community navigation to its own analytics destination', () => {
+    expect(navAnalyticsDestination('/community')).toBe('community')
+  })
+
   it('uses the requested primary order without a redundant Home link', () => {
     expect(getPrimaryNav(true)).toEqual([
       { href: '/bangers?period=all', label: 'Bangers' },
       { href: '/digest', label: 'Digest' },
       { href: '/user-dir', label: 'Users' },
+      { href: '/community', label: 'Gallery' },
       { href: '/trends', label: 'Trends' },
       { href: '/stream', label: 'Live stream' },
       { href: '/research', label: 'Research' },
@@ -39,6 +45,7 @@ describe('member navigation', () => {
         { href: '/bangers?period=all', label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
         { href: '/search', label: 'Search' },
+        { href: '/community', label: 'Gallery' },
       ]),
     )
     expect(isNavItemActive('/bangers', '/bangers?period=all')).toBe(true)
@@ -63,6 +70,10 @@ describe('member navigation', () => {
       href: '/user-dir',
       label: 'Users',
     })
+    expect(getPrimaryNav(false)).toContainEqual({
+      href: '/community',
+      label: 'Gallery',
+    })
     expect(getPrimaryNav(true)).toContainEqual({
       href: '/trends',
       label: 'Trends',
@@ -86,6 +97,7 @@ describe('member navigation', () => {
       { href: '/bangers?period=all', label: 'Bangers' },
       { href: '/digest', label: 'Digest' },
       { href: '/user-dir', label: 'Users' },
+      { href: '/community', label: 'Gallery' },
       { href: '/trends', label: 'Trends' },
       { href: '/stream', label: 'Live stream' },
       adminGraphItem,

@@ -1,8 +1,11 @@
 import { requireAuth } from '@/lib/auth-utils'
+import { isAdminUser } from '@/app/admin/data'
+import { loadPendingCommunityProjects } from '@/lib/communityProjectDatabase'
 import { getPublicProfileSettings } from '@/lib/profileCuration'
 import { createServerAdminClient, createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import ProfileContent from '../profile/ProfileContent'
+import { CommunitySubmissionQueue } from './CommunitySubmissionQueue'
 
 const getTwitterUsername = (
   user: Awaited<ReturnType<typeof requireAuth>>['user'],
@@ -19,6 +22,7 @@ const getTwitterUsername = (
 
 export default async function SettingsPage() {
   const { user } = await requireAuth('/settings')
+  const isAdmin = isAdminUser(user)
   const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
   const admin = createServerAdminClient(cookieStore)
@@ -38,14 +42,19 @@ export default async function SettingsPage() {
         .maybeSingle()
     : admin.from('optin').select('*').eq('user_id', user.id).maybeSingle()
 
-  const [optInResponse, archivesResponse, tweetsResponse, settings] =
-    await Promise.all([
-      optInQuery,
-      twitterAccountId
-        ? supabase
-            .from('archive_upload')
-            .select(
-              `
+  const [
+    optInResponse,
+    archivesResponse,
+    tweetsResponse,
+    settings,
+    pendingCommunityProjects,
+  ] = await Promise.all([
+    optInQuery,
+    twitterAccountId
+      ? supabase
+          .from('archive_upload')
+          .select(
+            `
             id,
             account_id,
             upload_phase,
@@ -59,28 +68,38 @@ export default async function SettingsPage() {
               profile:all_profile(avatar_media_url)
             )
           `,
-            )
-            .eq('account_id', twitterAccountId)
-            .order('created_at', { ascending: false })
-        : Promise.resolve({ data: [], error: null }),
-      twitterAccountId
-        ? supabase
-            .from('tweets')
-            .select(
-              'tweet_id, created_at, full_text, favorite_count, retweet_count',
-            )
-            .eq('account_id', twitterAccountId)
-            .order('created_at', { ascending: false })
-            .limit(100)
-        : Promise.resolve({ data: [], error: null }),
-      twitterAccountId
-        ? getPublicProfileSettings(twitterAccountId)
-        : Promise.resolve({ downloadArchiveVisible: true }),
-    ])
+          )
+          .eq('account_id', twitterAccountId)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    twitterAccountId
+      ? supabase
+          .from('tweets')
+          .select(
+            'tweet_id, created_at, full_text, favorite_count, retweet_count',
+          )
+          .eq('account_id', twitterAccountId)
+          .order('created_at', { ascending: false })
+          .limit(100)
+      : Promise.resolve({ data: [], error: null }),
+    twitterAccountId
+      ? getPublicProfileSettings(twitterAccountId)
+      : Promise.resolve({ downloadArchiveVisible: true }),
+    isAdmin
+      ? loadPendingCommunityProjects().catch(() => [])
+      : Promise.resolve([]),
+  ])
 
   return (
     <main className="min-h-screen bg-card dark:bg-background">
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+        {isAdmin ? (
+          <div className="mb-8">
+            <CommunitySubmissionQueue
+              initialProjects={pendingCommunityProjects}
+            />
+          </div>
+        ) : null}
         <ProfileContent
           user={user}
           accountId={twitterAccountId}

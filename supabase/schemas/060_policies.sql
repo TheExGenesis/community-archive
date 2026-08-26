@@ -3,9 +3,16 @@
 ALTER TABLE "public"."digest_prompt_versions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_runs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_editions" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."community_projects" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Published digest editions are publicly readable"
   ON "public"."digest_editions"
+  FOR SELECT
+  TO "anon", "authenticated"
+  USING ("status" = 'published');
+
+CREATE POLICY "Published community projects are publicly readable"
+  ON "public"."community_projects"
   FOR SELECT
   TO "anon", "authenticated"
   USING ("status" = 'published');

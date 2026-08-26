@@ -5,7 +5,6 @@ jest.mock('next/cache', () => ({
 jest.mock('./analytics', () => ({
   fetchPortalBangersPage: jest.fn(),
   fetchPortalHistoricalBangers: jest.fn(),
-  fetchPortalLiveAnalytics: jest.fn(),
   fetchPortalRecentBangers: jest.fn(),
   fetchPortalTrends: jest.fn(),
 }))
@@ -32,7 +31,6 @@ import {
 import {
   fetchPortalBangersPage,
   fetchPortalHistoricalBangers,
-  fetchPortalLiveAnalytics,
   fetchPortalRecentBangers,
   fetchPortalTrends,
 } from './analytics'
@@ -45,10 +43,6 @@ const fetchPortalHistoricalBangersMock =
   >
 const fetchPortalBangersPageMock =
   fetchPortalBangersPage as jest.MockedFunction<typeof fetchPortalBangersPage>
-const fetchPortalLiveAnalyticsMock =
-  fetchPortalLiveAnalytics as jest.MockedFunction<
-    typeof fetchPortalLiveAnalytics
-  >
 const fetchPortalRecentBangersMock =
   fetchPortalRecentBangers as jest.MockedFunction<
     typeof fetchPortalRecentBangers
@@ -163,10 +157,6 @@ describe('portal page resilience', () => {
       weekly: [],
       computedAt: '2026-08-07T20:00:00.000Z',
     })
-    fetchPortalLiveAnalyticsMock.mockResolvedValue({
-      streamedLast24Hours: 25,
-      latestObservedAt: '2026-08-07T20:00:00.000Z',
-    })
     fetchPortalRecentBangersMock.mockResolvedValue([])
     fetchPortalHistoricalBangersMock.mockResolvedValue([])
     getResearchPostsMock.mockResolvedValue([])
@@ -178,6 +168,8 @@ describe('portal page resilience', () => {
           JSON.stringify({
             data: {
               totalTweets: '15334092',
+              tweetCountDeltaLast24Hours: '16441',
+              deltaStartAt: '2026-08-12 18:34:20.907',
               memberAccounts: '42',
               sourceUpdatedAt: '2026-08-13 18:34:09.903',
               collectedAt: '2026-08-13 18:34:20.907',
@@ -261,6 +253,7 @@ describe('portal page resilience', () => {
     await expect(getPortalData()).resolves.toMatchObject({
       stats: {
         totalTweets: 15_334_092,
+        tweetCountDeltaLast24Hours: 16_441,
         accountCount: 42,
         firstYear: 2007,
         currentYear: 2026,
@@ -275,20 +268,17 @@ describe('portal page resilience', () => {
     })
   })
 
-  test('preserves the shared ClickHouse counts when live analytics fails', async () => {
-    fetchPortalLiveAnalyticsMock.mockRejectedValueOnce(
-      new Error('live analytics unavailable'),
-    )
-
+  test('uses the shared corpus delta without a separate firehose query', async () => {
     await expect(getPortalData()).resolves.toMatchObject({
       stats: {
         totalTweets: 15_334_092,
+        tweetCountDeltaLast24Hours: 16_441,
         accountCount: 42,
         firstYear: 2007,
         currentYear: 2026,
       },
       failures: {
-        liveAnalytics: true,
+        liveAnalytics: false,
         memberCount: false,
         corpusRange: false,
       },
@@ -406,6 +396,8 @@ describe('portal reads', () => {
         JSON.stringify({
           data: {
             totalTweets: '15334092',
+            tweetCountDeltaLast24Hours: '16441',
+            deltaStartAt: '2026-08-12 18:34:20.907',
             memberAccounts: '658',
             sourceUpdatedAt: '2026-08-13 18:34:09.903',
             collectedAt: '2026-08-13 18:34:20.907',
@@ -421,6 +413,7 @@ describe('portal reads', () => {
 
     await expect(fetchPortalGlobalStats()).resolves.toEqual({
       totalTweets: 15_334_092,
+      tweetCountDeltaLast24Hours: 16_441,
       memberCount: 658,
       generatedAt: '2026-08-13T18:34:20.907Z',
     })

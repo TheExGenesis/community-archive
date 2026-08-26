@@ -59,6 +59,9 @@ const compact = (n: number) =>
     maximumFractionDigits: 1,
   }).format(n)
 
+const signedCount = (n: number) =>
+  `${n > 0 ? '+' : n < 0 ? '\u2212' : ''}${Math.abs(n).toLocaleString('en-US')}`
+
 const signInHref = (returnTo: string) =>
   `/login?redirect=${encodeURIComponent(returnTo)}`
 
@@ -297,7 +300,7 @@ function ArchiveOverview({
           note={
             failures.liveAnalytics
               ? 'Tweet totals are temporarily unavailable.'
-              : `+${stats.streamedLast24Hours.toLocaleString('en-US')} in the last 24h`
+              : `${signedCount(stats.tweetCountDeltaLast24Hours)} net in the last 24h`
           }
           noteClass={
             failures.liveAnalytics

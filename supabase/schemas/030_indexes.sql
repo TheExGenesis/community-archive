@@ -137,3 +137,5 @@ ON "private"."policy_storage_objects" USING "gin" ("username_hashes");
 CREATE INDEX IF NOT EXISTS "archive_clickhouse_delivery_pending_idx"
 ON "private"."archive_clickhouse_delivery" ("next_attempt_at", "archive_upload_id")
 WHERE ("delivery_state" = 'pending'::"text");
+CREATE INDEX IF NOT EXISTS "community_projects_status_submitted_at_idx"
+  ON "public"."community_projects" ("status", "submitted_at" DESC);

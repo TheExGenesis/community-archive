@@ -279,6 +279,75 @@ export type Database = {
           },
         ]
       }
+      community_projects: {
+        Row: {
+          archive_use: string
+          category: string
+          cover_mime_type: string | null
+          cover_storage_path: string | null
+          creator_handle: string | null
+          creator_name: string
+          description: string
+          featured: boolean
+          id: string
+          name: string
+          project_url: string
+          published_at: string | null
+          published_by: string | null
+          slug: string
+          source_post_url: string
+          status: string
+          submitted_at: string
+          submitted_by: string | null
+          submitter_username: string
+          tags: string[]
+        }
+        Insert: {
+          archive_use: string
+          category: string
+          cover_mime_type?: string | null
+          cover_storage_path?: string | null
+          creator_handle?: string | null
+          creator_name: string
+          description: string
+          featured?: boolean
+          id?: string
+          name: string
+          project_url: string
+          published_at?: string | null
+          published_by?: string | null
+          slug: string
+          source_post_url: string
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          submitter_username: string
+          tags?: string[]
+        }
+        Update: {
+          archive_use?: string
+          category?: string
+          cover_mime_type?: string | null
+          cover_storage_path?: string | null
+          creator_handle?: string | null
+          creator_name?: string
+          description?: string
+          featured?: boolean
+          id?: string
+          name?: string
+          project_url?: string
+          published_at?: string | null
+          published_by?: string | null
+          slug?: string
+          source_post_url?: string
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          submitter_username?: string
+          tags?: string[]
+        }
+        Relationships: []
+      }
       digest_editions: {
         Row: {
           content: Json
@@ -2363,4 +2432,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-

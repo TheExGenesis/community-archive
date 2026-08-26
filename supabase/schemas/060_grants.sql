@@ -102,3 +102,10 @@ GRANT ALL PRIVILEGES ON TABLE "public"."digest_editions" TO "service_role";
 GRANT USAGE, SELECT ON SEQUENCE "public"."digest_prompt_versions_version_seq" TO "service_role";
 GRANT USAGE, SELECT ON SEQUENCE "public"."digest_editions_issue_number_seq" TO "service_role";
 GRANT SELECT ON TABLE "public"."digest_editions" TO "anon", "authenticated";
+
+-- Community Gallery: public clients can read only rows allowed by RLS. All
+-- submissions and approvals are performed by authenticated server code after
+-- the appropriate identity gate.
+REVOKE ALL PRIVILEGES ON TABLE "public"."community_projects" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."community_projects" TO "service_role";
+GRANT SELECT ON TABLE "public"."community_projects" TO "anon", "authenticated";

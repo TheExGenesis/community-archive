@@ -159,7 +159,7 @@ export async function searchTweetPreviewsWithClickHouse(
   criteria: FilterCriteria,
   fetchImpl: typeof fetch = fetch,
 ): Promise<MappedClickHouseSearchResponse> {
-  return requestClickHouseSearch(criteria, 1, 3, fetchImpl, {
+  return requestClickHouseSearch(criteria, 1, 5, fetchImpl, {
     preview: true,
     excludeRetweets: criteria.excludeRetweets,
   })

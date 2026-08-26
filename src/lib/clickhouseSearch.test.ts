@@ -96,14 +96,14 @@ describe('searchTweetsWithClickHouse', () => {
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
-  test('requests three newest non-retweets as a progressive preview', async () => {
+  test('requests five newest non-retweets as a progressive preview', async () => {
     const fetchImpl = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
       text: jest.fn().mockResolvedValue(
         JSON.stringify({
           data: {
-            tweets: ['123', '122', '121'].map((tweetId) => ({
+            tweets: ['123', '122', '121', '120', '119'].map((tweetId) => ({
               tweetId,
               accountId: '42',
               createdAt: '2026-08-13 00:00:00.000',
@@ -131,7 +131,7 @@ describe('searchTweetsWithClickHouse', () => {
     )
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      '/api/tweet-search?q=Open+source&mode=phrase&limit=3&offset=0&preview=true&exclude_retweets=true',
+      '/api/tweet-search?q=Open+source&mode=phrase&limit=5&offset=0&preview=true&exclude_retweets=true',
       { cache: 'no-store' },
     )
     expect(tweets.definitiveEmpty).toBe(false)
@@ -139,6 +139,8 @@ describe('searchTweetsWithClickHouse', () => {
       '123',
       '122',
       '121',
+      '120',
+      '119',
     ])
   })
 

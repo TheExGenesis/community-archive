@@ -58,6 +58,44 @@ describe('CommunityGallery', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('shows the curated Tools cards in the requested order', async () => {
+    const user = userEvent.setup()
+    render(<CommunityGallery />)
+
+    expect(
+      screen
+        .getAllByRole('button')
+        .filter((button) =>
+          /Bangers\.page|Tweet Harvest|Semantic Search/.test(
+            button.textContent ?? '',
+          ),
+        )
+        .map((button) => button.textContent),
+    ).toEqual([
+      expect.stringContaining('Bangers.page'),
+      expect.stringContaining('Tweet Harvest'),
+      expect.stringContaining('Semantic Search'),
+    ])
+
+    await user.click(screen.getByRole('button', { name: 'Tools' }))
+
+    expect(
+      screen
+        .getAllByRole('button')
+        .filter((button) =>
+          /Bangers\.page|Tweet Harvest|Semantic Search|Malcolm Ocean's Links/.test(
+            button.textContent ?? '',
+          ),
+        )
+        .map((button) => button.textContent),
+    ).toEqual([
+      expect.stringContaining('Bangers.page'),
+      expect.stringContaining('Tweet Harvest'),
+      expect.stringContaining('Semantic Search'),
+      expect.stringContaining("Malcolm Ocean's Links"),
+    ])
+  })
+
   it('submits a project to the approval queue', async () => {
     const user = userEvent.setup()
     const FetchFormData = global.FormData

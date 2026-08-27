@@ -10,7 +10,6 @@ describe('community project catalog', () => {
       expect.arrayContaining([
         expect.objectContaining({ name: 'Ratio Radar' }),
         expect.objectContaining({ name: 'Bangers' }),
-        expect.objectContaining({ name: 'Semantic Search' }),
       ]),
     )
 
@@ -58,5 +57,21 @@ describe('community project catalog', () => {
         .map((project) => project.name)
         .sort((left, right) => left.localeCompare(right)),
     )
+  })
+
+  it('keeps the featured Tools order curated for the Gallery', () => {
+    const tools = filterCommunityProjects(
+      COMMUNITY_PROJECTS,
+      '',
+      'Tools',
+      'Featured',
+    )
+
+    expect(tools.map((project) => project.name)).toEqual([
+      'Bangers.page',
+      'Tweet Harvest',
+      'Semantic Search',
+      "Malcolm Ocean's Links",
+    ])
   })
 })

@@ -37,14 +37,14 @@ export default function HomepageSearch() {
     <div className="mx-auto w-full max-w-3xl">
       <form
         onSubmit={handleSubmit}
-        className="relative rounded-lg border border-border bg-card p-1.5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.10)] sm:p-2"
+        className="relative rounded-[50px] border border-border bg-card p-1.5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.10)] sm:p-2"
       >
         <UserSearchInput
           value={query}
           onValueChange={setQuery}
           placeholder="Search tweets, people, ideas"
           aria-label="Search Community Archive"
-          className="h-14 border-0 bg-transparent pl-3 pr-16 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-[360px]:text-base sm:pl-4 sm:text-lg"
+          className="h-14 rounded-[50px] border-0 bg-transparent pl-3 pr-16 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-[360px]:text-base sm:pl-4 sm:text-lg"
           autoComplete="off"
         />
         <Button

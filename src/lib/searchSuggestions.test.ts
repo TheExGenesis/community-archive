@@ -1,5 +1,6 @@
 import {
   getUsernameSearchToken,
+  getStandaloneUserSearchTerm,
   mergeUserSuggestions,
   rankUserSuggestions,
   replaceUsernameTokenWithFromFilter,
@@ -63,6 +64,42 @@ describe('username search suggestions', () => {
         3,
       ).map((user) => user.username),
     ).toEqual(['exgenesis', 'exgenesis_notes', 'alexgenesis'])
+  })
+
+  it('ranks the closest prefix completion before a more popular long prefix', () => {
+    expect(
+      rankUserSuggestions(
+        [
+          suggestion('ChristineNiles1', 10_000),
+          suggestion('christineist', 10),
+        ],
+        'christine',
+        2,
+      ).map((user) => user.username),
+    ).toEqual(['christineist', 'ChristineNiles1'])
+  })
+
+  it('matches display names and keeps close typo matches behind direct matches', () => {
+    expect(
+      rankUserSuggestions(
+        [
+          {
+            ...suggestion('random_handle', 10_000),
+            account_display_name: 'Christine Shiba',
+          },
+          suggestion('christineist', 10),
+          suggestion('christneist', 100),
+        ],
+        'christine',
+        3,
+      ).map((user) => user.username),
+    ).toEqual(['christineist', 'random_handle', 'christneist'])
+  })
+
+  it('recognizes only standalone username-shaped submitted searches', () => {
+    expect(getStandaloneUserSearchTerm('@ChristineIst')).toBe('christineist')
+    expect(getStandaloneUserSearchTerm('christine ist')).toBeNull()
+    expect(getStandaloneUserSearchTerm('from:christineist')).toBeNull()
   })
 
   it('keeps members first while deduplicating broader account matches', () => {

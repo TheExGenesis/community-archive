@@ -54,24 +54,46 @@ export function rankUserSuggestions(
   fragment: string,
   limit: number,
 ) {
-  const normalizedFragment = fragment.toLocaleLowerCase()
+  const normalizedFragment = fragment.trim().toLocaleLowerCase()
+
+  const rank = (user: UserSuggestion) => {
+    const username = user.username.toLocaleLowerCase()
+    const displayName = user.account_display_name.toLocaleLowerCase()
+
+    if (username === normalizedFragment) return [0, 1]
+    if (username.startsWith(normalizedFragment)) {
+      return [1, normalizedSimilarity(username, normalizedFragment)]
+    }
+    if (displayName === normalizedFragment) return [2, 1]
+    if (displayName.startsWith(normalizedFragment)) {
+      return [3, normalizedSimilarity(displayName, normalizedFragment)]
+    }
+    if (username.includes(normalizedFragment)) {
+      return [4, normalizedSimilarity(username, normalizedFragment)]
+    }
+    if (displayName.includes(normalizedFragment)) {
+      return [5, normalizedSimilarity(displayName, normalizedFragment)]
+    }
+
+    return [
+      6,
+      Math.max(
+        normalizedSimilarity(username, normalizedFragment),
+        normalizedSimilarity(displayName, normalizedFragment),
+      ),
+    ]
+  }
 
   return [...users]
     .sort((left, right) => {
       const leftUsername = left.username.toLocaleLowerCase()
       const rightUsername = right.username.toLocaleLowerCase()
-      const leftExact = leftUsername === normalizedFragment
-      const rightExact = rightUsername === normalizedFragment
-      if (leftExact !== rightExact) return leftExact ? -1 : 1
-
-      const leftPrefix = leftUsername.startsWith(normalizedFragment)
-      const rightPrefix = rightUsername.startsWith(normalizedFragment)
-      if (leftPrefix !== rightPrefix) return leftPrefix ? -1 : 1
-
-      const positionDifference =
-        leftUsername.indexOf(normalizedFragment) -
-        rightUsername.indexOf(normalizedFragment)
-      if (positionDifference !== 0) return positionDifference
+      const [leftTier, leftSimilarity] = rank(left)
+      const [rightTier, rightSimilarity] = rank(right)
+      if (leftTier !== rightTier) return leftTier - rightTier
+      if (leftSimilarity !== rightSimilarity) {
+        return rightSimilarity - leftSimilarity
+      }
 
       const followerDifference =
         (right.num_followers ?? -1) - (left.num_followers ?? -1)
@@ -80,6 +102,36 @@ export function rankUserSuggestions(
       return leftUsername.localeCompare(rightUsername)
     })
     .slice(0, limit)
+}
+
+function normalizedSimilarity(left: string, right: string) {
+  const longestLength = Math.max(left.length, right.length)
+  if (longestLength === 0) return 1
+  return 1 - levenshteinDistance(left, right) / longestLength
+}
+
+function levenshteinDistance(left: string, right: string) {
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index)
+
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    const current = [leftIndex]
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      current[rightIndex] = Math.min(
+        current[rightIndex - 1] + 1,
+        previous[rightIndex] + 1,
+        previous[rightIndex - 1] +
+          (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
+      )
+    }
+    previous = current
+  }
+
+  return previous[right.length]
+}
+
+export function getStandaloneUserSearchTerm(value: string) {
+  const match = value.trim().match(/^@?([a-z0-9_]{2,15})$/i)
+  return match?.[1].toLocaleLowerCase() ?? null
 }
 
 export function mergeUserSuggestions(

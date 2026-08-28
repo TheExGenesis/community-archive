@@ -94,12 +94,12 @@ describe('user suggestions', () => {
       { username: 'alexgenesis' },
     ])
     expect(fetchImpl).toHaveBeenCalledWith(
-      '/api/user-directory?limit=30&offset=0&sort_by=num_followers&sort_order=desc&search=exgenesis',
+      '/api/user-directory?limit=30&offset=0&sort_by=username&sort_order=asc&search=exgenesis',
       { cache: 'no-store' },
     )
   })
 
-  it('maps indexed all-account matches into fallback suggestions', async () => {
+  it('uses the ranked account RPC for handle, display-name, and fuzzy matches', async () => {
     const result = {
       data: [
         {
@@ -111,13 +111,8 @@ describe('user suggestions', () => {
       ],
       error: null,
     }
-    const query: Record<string, jest.Mock> = {}
-    query.select = jest.fn(() => query)
-    query.ilike = jest.fn(() => query)
-    query.order = jest.fn(() => query)
-    query.limit = jest.fn().mockResolvedValue(result)
-    const from = jest.fn(() => query)
-    const supabase = { schema: jest.fn(() => ({ from })) }
+    const rpc = jest.fn().mockResolvedValue(result)
+    const supabase = { schema: jest.fn(() => ({ rpc })) }
 
     await expect(
       fetchAccountSuggestions(supabase as any, 'other', 6),
@@ -131,9 +126,50 @@ describe('user suggestions', () => {
         num_followers: 50,
       },
     ])
-    expect(from).toHaveBeenCalledWith('all_account')
-    expect(query.ilike).toHaveBeenCalledWith('username', '%other%')
-    expect(query.limit).toHaveBeenCalledWith(30)
+    expect(rpc).toHaveBeenCalledWith('search_user_suggestions', {
+      search_text: 'other',
+      result_limit: 30,
+    })
+  })
+
+  it('falls back to a prefix query while the ranked RPC is being deployed', async () => {
+    const result = {
+      data: [
+        {
+          account_id: '456',
+          username: 'ChristineNiles1',
+          account_display_name: 'Christine Niles',
+          num_followers: 10_000,
+        },
+        {
+          account_id: '123',
+          username: 'christineist',
+          account_display_name: 'Christine Shiba',
+          num_followers: 10,
+        },
+      ],
+      error: null,
+    }
+    const query: Record<string, jest.Mock> = {}
+    query.select = jest.fn(() => query)
+    query.ilike = jest.fn(() => query)
+    query.order = jest.fn(() => query)
+    query.limit = jest.fn().mockResolvedValue(result)
+    const from = jest.fn(() => query)
+    const rpc = jest.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'function not found' },
+    })
+    const supabase = { schema: jest.fn(() => ({ from, rpc })) }
+
+    const suggestions = await fetchAccountSuggestions(
+      supabase as any,
+      'christine',
+      6,
+    )
+
+    expect(suggestions[0]).toMatchObject({ username: 'christineist' })
+    expect(query.ilike).toHaveBeenCalledWith('username', 'christine%')
   })
 })
 

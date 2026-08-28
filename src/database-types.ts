@@ -2210,6 +2210,18 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      search_user_suggestions: {
+        Args: {
+          search_text: string
+          result_limit?: number
+        }
+        Returns: {
+          account_id: string
+          username: string
+          account_display_name: string
+          num_followers: number | null
+        }[]
+      }
       search_tweets:
         | {
             Args: {

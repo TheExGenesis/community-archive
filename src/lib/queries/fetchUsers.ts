@@ -84,6 +84,8 @@ export const fetchMemberSuggestions = async (
   const page = await fetchUsers(
     {
       limit: Math.max(limit * 5, 30),
+      sortBy: 'username',
+      sortOrder: 'asc',
       search: normalizedFragment,
     },
     fetchImpl,
@@ -91,9 +93,14 @@ export const fetchMemberSuggestions = async (
 
   return rankUserSuggestions(
     page.users
-      .filter((user) =>
-        user.username.toLocaleLowerCase().includes(normalizedFragment),
-      )
+      .filter((user) => {
+        const username = user.username.toLocaleLowerCase()
+        const displayName = user.account_display_name.toLocaleLowerCase()
+        return (
+          username.includes(normalizedFragment) ||
+          displayName.includes(normalizedFragment)
+        )
+      })
       .map(
         ({
           account_id,
@@ -124,30 +131,52 @@ export const fetchAccountSuggestions = async (
   const normalizedFragment = normalizeSuggestionFragment(fragment)
   if (!normalizedFragment) return []
 
-  const escapedFragment = normalizedFragment.replace(/[\\%_]/g, '\\$&')
   const { data, error } = await supabase
     .schema('public')
-    .from('all_account')
-    .select('account_id, username, account_display_name, num_followers')
-    .ilike('username', `%${escapedFragment}%`)
-    .order('num_followers', { ascending: false, nullsFirst: false })
-    .limit(Math.max(limit * 5, 30))
+    .rpc('search_user_suggestions', {
+      search_text: normalizedFragment,
+      result_limit: Math.max(limit * 5, 30),
+    })
 
-  if (error) throw error
+  if (error) {
+    // Keep previews usable until the matching migration reaches their DB.
+    const escapedFragment = normalizedFragment.replace(/[\\%_]/g, '\\$&')
+    const fallback = await supabase
+      .schema('public')
+      .from('all_account')
+      .select('account_id, username, account_display_name, num_followers')
+      .ilike('username', `${escapedFragment}%`)
+      .order('username', { ascending: true })
+      .limit(Math.max(limit * 5, 30))
+
+    if (fallback.error) throw error
+    return rankUserSuggestions(
+      (fallback.data || []).map(mapAccountSuggestion),
+      normalizedFragment,
+      limit,
+    )
+  }
 
   return rankUserSuggestions(
-    (data || []).map((user) => ({
-      account_id: user.account_id,
-      directory_id: `account:${user.account_id}`,
-      username: user.username,
-      account_display_name: user.account_display_name,
-      avatar_media_url: null,
-      num_followers: user.num_followers,
-    })),
+    (data || []).map(mapAccountSuggestion),
     normalizedFragment,
     limit,
   )
 }
+
+const mapAccountSuggestion = (user: {
+  account_id: string
+  username: string
+  account_display_name: string
+  num_followers: number | null
+}): UserSuggestion => ({
+  account_id: user.account_id,
+  directory_id: `account:${user.account_id}`,
+  username: user.username,
+  account_display_name: user.account_display_name,
+  avatar_media_url: null,
+  num_followers: user.num_followers,
+})
 
 export const getUserData = async (
   supabase: SupabaseClient,

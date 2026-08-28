@@ -178,6 +178,18 @@ describe('UserSearchInput', () => {
     expect(groups[1]).toHaveAccessibleName('@exg_other')
   })
 
+  it('does not block fast account matches behind a slow member lookup', async () => {
+    mockedFetchMemberSuggestions.mockReturnValue(new Promise(() => undefined))
+    mockedFetchAccountSuggestions.mockResolvedValue([
+      suggestion('christineist', '456'),
+    ])
+    const input = renderSearch()
+
+    await userEvent.type(input, 'christine')
+
+    expect(await screen.findByText('@christineist')).toBeInTheDocument()
+  })
+
   it('skips the broader lookup when members fill the suggestion list', async () => {
     mockedFetchMemberSuggestions.mockResolvedValue(
       Array.from({ length: 6 }, (_, index) =>

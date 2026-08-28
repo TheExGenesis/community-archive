@@ -28,7 +28,8 @@ interface UserSearchInputProps extends Omit<InputProps, 'onChange' | 'value'> {
 }
 
 const SUGGESTION_LIMIT = 6
-const SUGGESTION_DELAY_MS = 200
+const SUGGESTION_DELAY_MS = 100
+const MEMBER_HEAD_START_MS = 100
 
 export default function UserSearchInput({
   value,
@@ -74,42 +75,66 @@ export default function UserSearchInput({
       requestId === requestIdRef.current &&
       document.activeElement === inputRef.current
 
+    let fallbackTimer: number | undefined
+    let memberSuggestions: UserSuggestion[] = []
+    let accountSuggestions: UserSuggestion[] = []
+    let accountRequest: Promise<void> | null = null
+
+    const renderSuggestions = () => {
+      if (!isCurrentRequest()) return
+      setSuggestions(
+        mergeUserSuggestions(
+          memberSuggestions,
+          accountSuggestions,
+          SUGGESTION_LIMIT,
+        ),
+      )
+    }
+
+    const startAccountLookup = () => {
+      if (accountRequest) return accountRequest
+      accountRequest = fetchAccountSuggestions(
+        supabase,
+        token.fragment,
+        SUGGESTION_LIMIT,
+      )
+        .then((users) => {
+          accountSuggestions = users
+          renderSuggestions()
+        })
+        .catch(() => {
+          // Keep any member suggestions visible if the broader lookup fails.
+        })
+      return accountRequest
+    }
+
     const timer = window.setTimeout(async () => {
-      let memberSuggestions: UserSuggestion[] = []
+      fallbackTimer = window.setTimeout(
+        startAccountLookup,
+        MEMBER_HEAD_START_MS,
+      )
+
       try {
         memberSuggestions = await fetchMemberSuggestions(
           token.fragment,
           SUGGESTION_LIMIT,
         )
         if (!isCurrentRequest()) return
-        setSuggestions(memberSuggestions)
+        renderSuggestions()
       } catch {
         if (!isCurrentRequest()) return
       }
 
-      if (memberSuggestions.length >= SUGGESTION_LIMIT) return
-
-      try {
-        const accountSuggestions = await fetchAccountSuggestions(
-          supabase,
-          token.fragment,
-          SUGGESTION_LIMIT,
-        )
-        if (!isCurrentRequest()) return
-        setSuggestions(
-          mergeUserSuggestions(
-            memberSuggestions,
-            accountSuggestions,
-            SUGGESTION_LIMIT,
-          ),
-        )
-      } catch {
-        // Keep any member suggestions visible if the broader lookup fails.
+      if (fallbackTimer !== undefined) {
+        window.clearTimeout(fallbackTimer)
+        fallbackTimer = undefined
       }
+      if (memberSuggestions.length < SUGGESTION_LIMIT) startAccountLookup()
     }, SUGGESTION_DELAY_MS)
 
     return () => {
       window.clearTimeout(timer)
+      if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer)
       if (requestIdRef.current === requestId) requestIdRef.current += 1
     }
   }, [supabase, token])

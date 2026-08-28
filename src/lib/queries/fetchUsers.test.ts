@@ -2,6 +2,7 @@ import { DirectoryUser } from '@/lib/types'
 import {
   buildDirectorySearchFilter,
   fetchAccountSuggestions,
+  fetchMemberDirectorySuggestions,
   fetchMemberSuggestions,
   fetchUsers,
   getDirectoryProfileHref,
@@ -97,6 +98,36 @@ describe('user suggestions', () => {
       '/api/user-directory?limit=30&offset=0&sort_by=username&sort_order=asc&search=exgenesis',
       { cache: 'no-store' },
     )
+  })
+
+  it('uses only the authoritative member directory as the browser fallback', async () => {
+    const result = {
+      data: [
+        directoryUser({
+          account_id: '123',
+          directory_id: 'archive:123',
+          username: 'christineist',
+          account_display_name: 'Christine Shiba',
+        }),
+      ],
+      error: null,
+    }
+    const query: Record<string, jest.Mock> = {}
+    query.select = jest.fn(() => query)
+    query.or = jest.fn(() => query)
+    query.order = jest.fn(() => query)
+    query.limit = jest.fn().mockResolvedValue(result)
+    const from = jest.fn(() => query)
+    const supabase = { schema: jest.fn(() => ({ from })) }
+
+    await expect(
+      fetchMemberDirectorySuggestions(supabase as any, 'christine', 6),
+    ).resolves.toMatchObject([{ username: 'christineist' }])
+    expect(from).toHaveBeenCalledWith('user_directory')
+    expect(query.or).toHaveBeenCalledWith(
+      'username.ilike."%christine%",account_display_name.ilike."%christine%"',
+    )
+    expect(query.limit).toHaveBeenCalledWith(30)
   })
 
   it('uses the ranked account RPC for handle, display-name, and fuzzy matches', async () => {

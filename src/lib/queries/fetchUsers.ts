@@ -123,6 +123,49 @@ export const fetchMemberSuggestions = async (
   )
 }
 
+export const fetchMemberDirectorySuggestions = async (
+  supabase: SupabaseClient,
+  fragment: string,
+  limit = 6,
+): Promise<UserSuggestion[]> => {
+  const normalizedFragment = normalizeSuggestionFragment(fragment)
+  if (!normalizedFragment) return []
+
+  const { data, error } = await supabase
+    .schema('public')
+    .from('user_directory')
+    .select(
+      'account_id, directory_id, username, account_display_name, avatar_media_url, num_followers',
+    )
+    .or(buildDirectorySearchFilter(normalizedFragment))
+    .order('username', { ascending: true })
+    .limit(Math.max(limit * 5, 30))
+
+  if (error) throw error
+
+  return rankUserSuggestions(
+    (data || []).map(
+      ({
+        account_id,
+        directory_id,
+        username,
+        account_display_name,
+        avatar_media_url,
+        num_followers,
+      }) => ({
+        account_id,
+        directory_id,
+        username,
+        account_display_name,
+        avatar_media_url,
+        num_followers,
+      }),
+    ),
+    normalizedFragment,
+    limit,
+  )
+}
+
 export const fetchAccountSuggestions = async (
   supabase: SupabaseClient,
   fragment: string,

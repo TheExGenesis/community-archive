@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input, InputProps } from '@/components/ui/input'
 import { userProfileHref } from '@/lib/navigation'
 import {
-  fetchAccountSuggestions,
+  fetchMemberDirectorySuggestions,
   fetchMemberSuggestions,
 } from '@/lib/queries/fetchUsers'
 import {
@@ -29,7 +29,7 @@ interface UserSearchInputProps extends Omit<InputProps, 'onChange' | 'value'> {
 
 const SUGGESTION_LIMIT = 6
 const SUGGESTION_DELAY_MS = 100
-const MEMBER_HEAD_START_MS = 100
+const MEMBER_DIRECTORY_FALLBACK_MS = 250
 
 export default function UserSearchInput({
   value,
@@ -77,41 +77,41 @@ export default function UserSearchInput({
 
     let fallbackTimer: number | undefined
     let memberSuggestions: UserSuggestion[] = []
-    let accountSuggestions: UserSuggestion[] = []
-    let accountRequest: Promise<void> | null = null
+    let directorySuggestions: UserSuggestion[] = []
+    let directoryRequest: Promise<void> | null = null
 
     const renderSuggestions = () => {
       if (!isCurrentRequest()) return
       setSuggestions(
         mergeUserSuggestions(
           memberSuggestions,
-          accountSuggestions,
+          directorySuggestions,
           SUGGESTION_LIMIT,
         ),
       )
     }
 
-    const startAccountLookup = () => {
-      if (accountRequest) return accountRequest
-      accountRequest = fetchAccountSuggestions(
+    const startDirectoryLookup = () => {
+      if (directoryRequest) return directoryRequest
+      directoryRequest = fetchMemberDirectorySuggestions(
         supabase,
         token.fragment,
         SUGGESTION_LIMIT,
       )
         .then((users) => {
-          accountSuggestions = users
+          directorySuggestions = users
           renderSuggestions()
         })
         .catch(() => {
-          // Keep any member suggestions visible if the broader lookup fails.
+          // Keep any gateway member suggestions visible if the fallback fails.
         })
-      return accountRequest
+      return directoryRequest
     }
 
     const timer = window.setTimeout(async () => {
       fallbackTimer = window.setTimeout(
-        startAccountLookup,
-        MEMBER_HEAD_START_MS,
+        startDirectoryLookup,
+        MEMBER_DIRECTORY_FALLBACK_MS,
       )
 
       try {
@@ -129,7 +129,7 @@ export default function UserSearchInput({
         window.clearTimeout(fallbackTimer)
         fallbackTimer = undefined
       }
-      if (memberSuggestions.length < SUGGESTION_LIMIT) startAccountLookup()
+      if (memberSuggestions.length < SUGGESTION_LIMIT) startDirectoryLookup()
     }, SUGGESTION_DELAY_MS)
 
     return () => {

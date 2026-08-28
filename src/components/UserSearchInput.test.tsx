@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import UserSearchInput from './UserSearchInput'
 import {
-  fetchAccountSuggestions,
+  fetchMemberDirectorySuggestions,
   fetchMemberSuggestions,
 } from '@/lib/queries/fetchUsers'
 import type { UserSuggestion } from '@/lib/searchSuggestions'
@@ -20,12 +20,14 @@ jest.mock('@/utils/supabase', () => ({
 }))
 
 jest.mock('@/lib/queries/fetchUsers', () => ({
-  fetchAccountSuggestions: jest.fn(),
+  fetchMemberDirectorySuggestions: jest.fn(),
   fetchMemberSuggestions: jest.fn(),
 }))
 
-const mockedFetchAccountSuggestions =
-  fetchAccountSuggestions as jest.MockedFunction<typeof fetchAccountSuggestions>
+const mockedFetchMemberDirectorySuggestions =
+  fetchMemberDirectorySuggestions as jest.MockedFunction<
+    typeof fetchMemberDirectorySuggestions
+  >
 const mockedFetchMemberSuggestions =
   fetchMemberSuggestions as jest.MockedFunction<typeof fetchMemberSuggestions>
 
@@ -66,13 +68,13 @@ const renderSearch = () => {
 
 const setDefaultSuggestions = () => {
   mockedFetchMemberSuggestions.mockResolvedValue([memberSuggestion])
-  mockedFetchAccountSuggestions.mockResolvedValue([])
+  mockedFetchMemberDirectorySuggestions.mockResolvedValue([])
 }
 
 describe('UserSearchInput', () => {
   beforeEach(() => {
     mockPush.mockReset()
-    mockedFetchAccountSuggestions.mockReset()
+    mockedFetchMemberDirectorySuggestions.mockReset()
     mockedFetchMemberSuggestions.mockReset()
   })
 
@@ -140,19 +142,19 @@ describe('UserSearchInput', () => {
       target: { value: 'exg', selectionStart: 3 },
     })
     expect(mockedFetchMemberSuggestions).not.toHaveBeenCalled()
-    expect(mockedFetchAccountSuggestions).not.toHaveBeenCalled()
+    expect(mockedFetchMemberDirectorySuggestions).not.toHaveBeenCalled()
 
     await waitFor(() =>
       expect(mockedFetchMemberSuggestions).toHaveBeenCalledTimes(1),
     )
   })
 
-  it('shows member matches before filling open slots from all accounts', async () => {
-    let resolveAccounts!: (users: UserSuggestion[]) => void
+  it('shows gateway members before filling open slots from the member directory', async () => {
+    let resolveDirectory!: (users: UserSuggestion[]) => void
     mockedFetchMemberSuggestions.mockResolvedValue([memberSuggestion])
-    mockedFetchAccountSuggestions.mockReturnValue(
+    mockedFetchMemberDirectorySuggestions.mockReturnValue(
       new Promise((resolve) => {
-        resolveAccounts = resolve
+        resolveDirectory = resolve
       }),
     )
     const input = renderSearch()
@@ -163,14 +165,14 @@ describe('UserSearchInput', () => {
         name: /Ex Genesis @exgenesis Profile/,
       }),
     ).toBeInTheDocument()
-    expect(mockedFetchAccountSuggestions).toHaveBeenCalledWith(
+    expect(mockedFetchMemberDirectorySuggestions).toHaveBeenCalledWith(
       expect.anything(),
       'exg',
       6,
     )
     expect(screen.queryByText('@exg_other')).not.toBeInTheDocument()
 
-    resolveAccounts([suggestion('exg_other', '456')])
+    resolveDirectory([suggestion('exg_other', '456')])
 
     expect(await screen.findByText('@exg_other')).toBeInTheDocument()
     const groups = screen.getAllByRole('group')
@@ -178,9 +180,9 @@ describe('UserSearchInput', () => {
     expect(groups[1]).toHaveAccessibleName('@exg_other')
   })
 
-  it('does not block fast account matches behind a slow member lookup', async () => {
+  it('does not block the member-directory fallback behind a slow gateway', async () => {
     mockedFetchMemberSuggestions.mockReturnValue(new Promise(() => undefined))
-    mockedFetchAccountSuggestions.mockResolvedValue([
+    mockedFetchMemberDirectorySuggestions.mockResolvedValue([
       suggestion('christineist', '456'),
     ])
     const input = renderSearch()
@@ -190,17 +192,17 @@ describe('UserSearchInput', () => {
     expect(await screen.findByText('@christineist')).toBeInTheDocument()
   })
 
-  it('skips the broader lookup when members fill the suggestion list', async () => {
+  it('skips the directory fallback when gateway members fill the list', async () => {
     mockedFetchMemberSuggestions.mockResolvedValue(
       Array.from({ length: 6 }, (_, index) =>
         suggestion(`exg_member_${index}`, String(index + 1)),
       ),
     )
-    mockedFetchAccountSuggestions.mockResolvedValue([])
+    mockedFetchMemberDirectorySuggestions.mockResolvedValue([])
     const input = renderSearch()
 
     await userEvent.type(input, 'exg')
     expect(await screen.findAllByRole('group')).toHaveLength(6)
-    expect(mockedFetchAccountSuggestions).not.toHaveBeenCalled()
+    expect(mockedFetchMemberDirectorySuggestions).not.toHaveBeenCalled()
   })
 })

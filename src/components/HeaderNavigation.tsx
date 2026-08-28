@@ -39,9 +39,6 @@ export default function HeaderNavigation({ items }: { items: NavItem[] }) {
                   className={cn(
                     navigationMenuTriggerStyle(),
                     'px-2.5 text-xs transition-colors duration-150 hover:bg-accent 2xl:px-4 2xl:text-sm',
-                    item.tone === 'muted'
-                      ? 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
-                      : '',
                     isActive ? 'bg-muted font-semibold' : '',
                   )}
                 >

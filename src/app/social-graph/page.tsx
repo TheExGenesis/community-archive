@@ -4,8 +4,9 @@ import { MUTED, SERIF } from '@/components/portal/styles'
 import {
   getTwitterProviderId,
   getTwitterUsername,
-  requireAdmin,
+  isAdminUser,
 } from '@/app/admin/data'
+import { getCurrentUser } from '@/lib/portal/auth'
 import { SocialGraphAdminControls } from './SocialGraphAdminControls'
 
 const SocialGraphExplorer = dynamic(() => import('./SocialGraphExplorer'), {
@@ -18,11 +19,14 @@ const SocialGraphExplorer = dynamic(() => import('./SocialGraphExplorer'), {
 export const metadata = { title: 'Social graph · Community Archive' }
 
 export default async function SocialGraphPage() {
-  const { user } = await requireAdmin('/social-graph')
-  const currentMember = {
-    accountId: getTwitterProviderId(user),
-    username: getTwitterUsername(user),
-  }
+  const user = await getCurrentUser()
+  const isAdmin = Boolean(user && isAdminUser(user))
+  const currentMember = user
+    ? {
+        accountId: getTwitterProviderId(user),
+        username: getTwitterUsername(user),
+      }
+    : { accountId: null, username: null }
 
   let snapshot
   try {
@@ -40,9 +44,11 @@ export default async function SocialGraphPage() {
             database query runs from this page, so it will recover when the next
             snapshot is published.
           </p>
-          <div className="mt-4 flex justify-start">
-            <SocialGraphAdminControls />
-          </div>
+          {isAdmin ? (
+            <div className="mt-4 flex justify-start">
+              <SocialGraphAdminControls />
+            </div>
+          ) : null}
         </div>
       </main>
     )
@@ -66,7 +72,7 @@ export default async function SocialGraphPage() {
             <p className={`text-[11px] ${MUTED}`}>
               Snapshot {new Date(snapshot.generatedAt).toLocaleString()}
             </p>
-            <SocialGraphAdminControls />
+            {isAdmin ? <SocialGraphAdminControls /> : null}
           </div>
         </div>
         <SocialGraphExplorer

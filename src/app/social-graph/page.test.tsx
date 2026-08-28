@@ -1,6 +1,13 @@
 /** @jest-environment jsdom */
 
-import { requireAdmin } from '@/app/admin/data'
+import '@testing-library/jest-dom'
+import { render, screen } from '@testing-library/react'
+import {
+  getTwitterProviderId,
+  getTwitterUsername,
+  isAdminUser,
+} from '@/app/admin/data'
+import { getCurrentUser } from '@/lib/portal/auth'
 import { getSocialGraphSnapshot } from '@/lib/socialGraph'
 import SocialGraphPage from './page'
 
@@ -10,7 +17,13 @@ jest.mock('next/dynamic', () => ({
 }))
 
 jest.mock('@/app/admin/data', () => ({
-  requireAdmin: jest.fn(),
+  getTwitterProviderId: jest.fn(),
+  getTwitterUsername: jest.fn(),
+  isAdminUser: jest.fn(),
+}))
+
+jest.mock('@/lib/portal/auth', () => ({
+  getCurrentUser: jest.fn(),
 }))
 
 jest.mock('@/lib/socialGraph', () => ({
@@ -18,24 +31,44 @@ jest.mock('@/lib/socialGraph', () => ({
 }))
 
 jest.mock('./SocialGraphAdminControls', () => ({
-  SocialGraphAdminControls: () => null,
+  SocialGraphAdminControls: () => <div>Refresh graph</div>,
 }))
 
-const requireAdminMock = jest.mocked(requireAdmin)
+const getCurrentUserMock = jest.mocked(getCurrentUser)
 const getSocialGraphSnapshotMock = jest.mocked(getSocialGraphSnapshot)
+const isAdminUserMock = jest.mocked(isAdminUser)
+const getTwitterProviderIdMock = jest.mocked(getTwitterProviderId)
+const getTwitterUsernameMock = jest.mocked(getTwitterUsername)
 
-describe('SocialGraphPage access', () => {
+describe('SocialGraphPage public access', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    getSocialGraphSnapshotMock.mockResolvedValue({
+      generatedAt: '2026-08-28T00:00:00.000Z',
+    } as never)
   })
 
-  it('enforces admin access before loading graph data', async () => {
-    const denial = new Error('not authorized')
-    requireAdminMock.mockRejectedValue(denial)
+  it('loads the graph for an anonymous visitor without admin controls', async () => {
+    getCurrentUserMock.mockResolvedValue(null)
 
-    await expect(SocialGraphPage()).rejects.toBe(denial)
+    render(await SocialGraphPage())
 
-    expect(requireAdminMock).toHaveBeenCalledWith('/social-graph')
-    expect(getSocialGraphSnapshotMock).not.toHaveBeenCalled()
+    expect(getSocialGraphSnapshotMock).toHaveBeenCalledTimes(1)
+    expect(screen.getByText('Mutual interaction map')).toBeInTheDocument()
+    expect(screen.queryByText('Refresh graph')).toBeNull()
+    expect(isAdminUserMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps refresh controls available to admins', async () => {
+    const user = { id: 'admin' } as never
+    getCurrentUserMock.mockResolvedValue(user)
+    isAdminUserMock.mockReturnValue(true)
+    getTwitterProviderIdMock.mockReturnValue('123')
+    getTwitterUsernameMock.mockReturnValue('admin')
+
+    render(await SocialGraphPage())
+
+    expect(screen.getByText('Refresh graph')).toBeInTheDocument()
+    expect(isAdminUserMock).toHaveBeenCalledWith(user)
   })
 })

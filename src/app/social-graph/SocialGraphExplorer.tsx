@@ -13,7 +13,9 @@ import Sigma from 'sigma'
 import type { NodeHoverDrawingFunction } from 'sigma/rendering'
 import {
   Clock3,
+  LocateFixed,
   Minus,
+  Network,
   Play,
   Plus,
   RotateCcw,
@@ -32,6 +34,7 @@ import {
   filterSocialGraph,
   followerCountToSlider,
   followerSliderToCount,
+  pinNodeInFilteredGraph,
 } from '@/lib/socialGraphFilter'
 import type { AdaptiveGraphResult } from '@/lib/socialGraphAdaptive'
 import { alignGraphLayout } from '@/lib/socialGraphProcrustes'
@@ -40,12 +43,15 @@ import type {
   SocialGraphWorkerResponse,
 } from '@/workers/socialGraph.worker'
 import {
+  communityDisplayLabel,
   getSocialGraphDefaultSettings,
-  nodeIdsForLabelCoverage,
+  labelSettingsForDensity,
+  nodeIdsForOverviewLabels,
   SOCIAL_GRAPH_DEFAULTS,
   updateYearRange,
 } from '@/lib/socialGraphView'
-import { MUTED, SERIF } from '@/components/portal/styles'
+import { MUTED } from '@/components/portal/styles'
+import { SocialGraphDetails, type DisplayCommunity } from './SocialGraphDetails'
 
 interface NodeAttributes {
   label: string
@@ -65,8 +71,9 @@ interface EdgeAttributes {
   strength: number
 }
 
-const NODE_HOVER_DELAY_MS = 1_000
+const NODE_HOVER_DELAY_MS = 200
 const STRENGTH_SLIDER_MAX = 3
+const EMPTY_CURRENT_MEMBER = { accountId: null, username: null }
 const ADAPTIVE_PALETTE = [
   '#2acf80',
   '#60a5fa',
@@ -90,8 +97,8 @@ function clusterMap(clusters: SocialGraphCluster[]) {
   return new Map(clusters.map((cluster) => [cluster.id, cluster]))
 }
 
-function nodeSize(followers: number): number {
-  return Math.max(2.5, Math.min(11, 2.5 + Math.log10(followers + 1) * 1.2))
+function nodeSize(visibleStrength: number): number {
+  return Math.max(2.8, Math.min(11, 2.8 + Math.log1p(visibleStrength) * 1.65))
 }
 
 function edgeSize(strength: number): number {
@@ -157,12 +164,23 @@ function createGraph(
   adaptive?: AdaptiveGraphResult,
 ): UndirectedGraph<NodeAttributes, EdgeAttributes> {
   const graph = new UndirectedGraph<NodeAttributes, EdgeAttributes>()
+  const visibleStrength = new Map(nodes.map((node) => [node.id, 0]))
+  for (const edge of edges) {
+    visibleStrength.set(
+      edge.source,
+      (visibleStrength.get(edge.source) || 0) + edge.strength,
+    )
+    visibleStrength.set(
+      edge.target,
+      (visibleStrength.get(edge.target) || 0) + edge.strength,
+    )
+  }
   for (const node of nodes) {
     graph.addNode(node.id, {
       label: node.label || `@${node.username}`,
       x: adaptive?.positions[node.id]?.x ?? node.x,
       y: adaptive?.positions[node.id]?.y ?? node.y,
-      size: nodeSize(node.followers),
+      size: nodeSize(visibleStrength.get(node.id) || 0),
       color: adaptive
         ? adaptive.communities[node.id] >= 0
           ? ADAPTIVE_PALETTE[
@@ -177,7 +195,7 @@ function createGraph(
     graph.addUndirectedEdgeWithKey(`edge:${index}`, edge.source, edge.target, {
       size: edgeSize(edge.strength),
       strength: edge.strength,
-      color: 'rgba(148, 163, 184, 0.24)',
+      color: 'rgba(100, 116, 139, 0.32)',
     })
   })
   return graph
@@ -368,8 +386,13 @@ function DualRangeSlider({
 
 export default function SocialGraphExplorer({
   snapshot,
+  currentMember = EMPTY_CURRENT_MEMBER,
 }: {
   snapshot: SocialGraphSnapshot
+  currentMember?: {
+    accountId: string | null
+    username: string | null
+  }
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const rendererRef = useRef<Sigma<NodeAttributes, EdgeAttributes> | null>(null)
@@ -396,11 +419,16 @@ export default function SocialGraphExplorer({
     [snapshot.stats, snapshot.temporal],
   )
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [focusHistory, setFocusHistory] = useState<string[]>([])
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(
     null,
   )
   const [query, setQuery] = useState('')
+  const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null)
+  const [pendingFocusNodeId, setPendingFocusNodeId] = useState<string | null>(
+    null,
+  )
   const [labelPercentage, setLabelPercentage] = useState<number>(
     defaultSettings.labelPercentage,
   )
@@ -436,24 +464,49 @@ export default function SocialGraphExplorer({
     () => new Map(snapshot.nodes.map((node) => [node.id, node])),
     [snapshot.nodes],
   )
-  const filtered = useMemo(
-    () =>
-      filterSocialGraph(snapshot, {
-        minimumFollowers: deferredMinimumFollowers,
-        minimumStrength: deferredMinimumStrength,
-        maximumNodes: deferredMaximumNodes,
-        startYear,
-        endYear,
-      }),
+  const currentFilters = useMemo(
+    () => ({
+      minimumFollowers: deferredMinimumFollowers,
+      minimumStrength: deferredMinimumStrength,
+      maximumNodes: deferredMaximumNodes,
+      startYear,
+      endYear,
+    }),
     [
-      snapshot,
+      deferredMaximumNodes,
       deferredMinimumFollowers,
       deferredMinimumStrength,
-      deferredMaximumNodes,
       endYear,
       startYear,
     ],
   )
+  const baseFiltered = useMemo(
+    () => filterSocialGraph(snapshot, currentFilters),
+    [snapshot, currentFilters],
+  )
+  const filtered = useMemo(
+    () =>
+      pinNodeInFilteredGraph(
+        snapshot,
+        baseFiltered,
+        pinnedNodeId,
+        currentFilters,
+      ),
+    [baseFiltered, currentFilters, pinnedNodeId, snapshot],
+  )
+  const baseVisibleNodeIds = useMemo(
+    () => new Set(baseFiltered.nodes.map((node) => node.id)),
+    [baseFiltered.nodes],
+  )
+  const currentMemberNode = useMemo(() => {
+    const username = currentMember.username?.toLowerCase()
+    return snapshot.nodes.find(
+      (node) =>
+        (currentMember.accountId !== null &&
+          node.accountId === currentMember.accountId) ||
+        (username !== undefined && node.username.toLowerCase() === username),
+    )
+  }, [currentMember, snapshot.nodes])
   const filteredSignature = useMemo(
     () =>
       `${filtered.nodes.map((node) => node.id).join(',')}|${filtered.edges.map((edge) => `${edge.source}:${edge.target}:${edge.strength}`).join(',')}`,
@@ -546,9 +599,27 @@ export default function SocialGraphExplorer({
     }
     return result
   }, [adaptiveIsCurrent, adaptiveResult, filtered.nodes])
+  const displayCommunities = useMemo<DisplayCommunity[]>(
+    () =>
+      activeLegendClusters.flatMap((community) => {
+        const members = filtered.nodes.filter(
+          (node) => communityByNode.get(node.id) === community.id,
+        )
+        if (!members.length) return []
+        const unconnected = community.id.includes('unconnected')
+        return [
+          {
+            ...community,
+            label: communityDisplayLabel(members, unconnected),
+            nodeCount: members.length,
+          },
+        ]
+      }),
+    [activeLegendClusters, communityByNode, filtered.nodes],
+  )
   const communityColorByNode = useMemo(() => {
     const colors = new Map(
-      activeLegendClusters.map((community) => [community.id, community.color]),
+      displayCommunities.map((community) => [community.id, community.color]),
     )
     return new Map(
       filtered.nodes.map((node) => [
@@ -556,7 +627,7 @@ export default function SocialGraphExplorer({
         colors.get(communityByNode.get(node.id) || '') || '#71717a',
       ]),
     )
-  }, [activeLegendClusters, communityByNode, filtered.nodes])
+  }, [communityByNode, displayCommunities, filtered.nodes])
   const selectedCommunityNodeIds = useMemo(
     () =>
       new Set(
@@ -572,16 +643,16 @@ export default function SocialGraphExplorer({
   )
   const labeledNodeIds = useMemo(
     () =>
-      nodeIdsForLabelCoverage(
+      nodeIdsForOverviewLabels(
         filtered.nodes,
-        labelPercentage,
         communityByNode,
-        selectedCommunityId,
+        Math.max(4, Math.round(8 + labelPercentage / 2)),
+        2,
       ),
-    [communityByNode, filtered.nodes, labelPercentage, selectedCommunityId],
+    [communityByNode, filtered.nodes, labelPercentage],
   )
   const selectedCommunity = selectedCommunityId
-    ? activeLegendClusters.find(
+    ? displayCommunities.find(
         (community) => community.id === selectedCommunityId,
       )
     : undefined
@@ -599,31 +670,96 @@ export default function SocialGraphExplorer({
   const selectedEdges = useMemo(
     () =>
       selectedNodeId
-        ? filtered.edges
-            .filter(
-              (edge) =>
-                edge.source === selectedNodeId ||
-                edge.target === selectedNodeId,
-            )
-            .slice(0, 8)
+        ? filtered.edges.filter(
+            (edge) =>
+              edge.source === selectedNodeId || edge.target === selectedNodeId,
+          )
         : [],
     [filtered.edges, selectedNodeId],
   )
+  const selectedNodeCommunity = selectedNodeId
+    ? displayCommunities.find(
+        (community) => community.id === communityByNode.get(selectedNodeId),
+      )
+    : undefined
+  const selectedCommunityMembers = useMemo(
+    () =>
+      selectedCommunityId
+        ? filtered.nodes.filter(
+            (node) => communityByNode.get(node.id) === selectedCommunityId,
+          )
+        : [],
+    [communityByNode, filtered.nodes, selectedCommunityId],
+  )
+  const selectedCommunityInternalEdges = useMemo(
+    () =>
+      selectedCommunityId
+        ? filtered.edges.filter(
+            (edge) =>
+              selectedCommunityNodeIds.has(edge.source) &&
+              selectedCommunityNodeIds.has(edge.target),
+          )
+        : [],
+    [filtered.edges, selectedCommunityId, selectedCommunityNodeIds],
+  )
+  const selectedCommunityBridges = useMemo(() => {
+    if (!selectedCommunityId) return []
+    const strengthByNode = new Map<string, number>()
+    for (const edge of filtered.edges) {
+      const sourceInside = selectedCommunityNodeIds.has(edge.source)
+      const targetInside = selectedCommunityNodeIds.has(edge.target)
+      if (sourceInside === targetInside) continue
+      const insideNode = sourceInside ? edge.source : edge.target
+      strengthByNode.set(
+        insideNode,
+        (strengthByNode.get(insideNode) || 0) + edge.strength,
+      )
+    }
+    return Array.from(strengthByNode)
+      .map(([nodeId, externalStrength]) => ({
+        node: nodeById.get(nodeId),
+        externalStrength,
+      }))
+      .filter(
+        (entry): entry is { node: SocialGraphNode; externalStrength: number } =>
+          Boolean(entry.node),
+      )
+      .sort((left, right) => right.externalStrength - left.externalStrength)
+  }, [filtered.edges, nodeById, selectedCommunityId, selectedCommunityNodeIds])
+  const isolatedNodeCount = useMemo(() => {
+    const connected = new Set<string>()
+    for (const edge of filtered.edges) {
+      connected.add(edge.source)
+      connected.add(edge.target)
+    }
+    return filtered.nodes.filter((node) => !connected.has(node.id)).length
+  }, [filtered.edges, filtered.nodes])
+  const visibleTieCountByNode = useMemo(() => {
+    const counts = new Map(filtered.nodes.map((node) => [node.id, 0]))
+    for (const edge of filtered.edges) {
+      counts.set(edge.source, (counts.get(edge.source) || 0) + 1)
+      counts.set(edge.target, (counts.get(edge.target) || 0) + 1)
+    }
+    return counts
+  }, [filtered.edges, filtered.nodes])
   const searchResults = useMemo(() => {
     const clean = query.trim().toLowerCase()
     if (!clean) return []
-    return filtered.nodes
+    return snapshot.nodes
       .filter(
         (node) =>
           node.username.toLowerCase().includes(clean) ||
           node.label.toLowerCase().includes(clean),
       )
       .slice(0, 8)
-  }, [filtered.nodes, query])
+  }, [query, snapshot.nodes])
 
   useEffect(() => {
     if (!containerRef.current) return
     const colors = themeColors(isDark)
+    const labelSettings = labelSettingsForDensity(
+      defaultSettings.labelPercentage,
+    )
     const renderer = new Sigma<NodeAttributes, EdgeAttributes>(
       createGraph(
         filtered.nodes,
@@ -640,9 +776,9 @@ export default function SocialGraphExplorer({
           color: colors.label,
         },
         defaultDrawNodeHover: drawThemeNodeHover(isDark),
-        labelDensity: 0.01,
+        labelDensity: labelSettings.density,
         labelFont: 'var(--font-manrope), sans-serif',
-        labelRenderedSizeThreshold: 10_000,
+        labelRenderedSizeThreshold: labelSettings.renderedSizeThreshold,
         labelSize: 12,
         minCameraRatio: 0.08,
         maxCameraRatio: 8,
@@ -653,7 +789,13 @@ export default function SocialGraphExplorer({
       },
     )
     renderer.on('clickNode', ({ node }) => {
-      setSelectedNodeId(node)
+      setSelectedNodeId((current) => {
+        if (current && current !== node) {
+          setFocusHistory((history) => [...history.slice(-7), current])
+        }
+        return node
+      })
+      setSelectedCommunityId(null)
       setHoveredNodeId(null)
     })
     renderer.on('enterNode', ({ node }) => {
@@ -687,7 +829,20 @@ export default function SocialGraphExplorer({
     filtered.edges,
     filtered.nodes,
     isDark,
+    defaultSettings.labelPercentage,
   ])
+
+  useEffect(() => {
+    const renderer = rendererRef.current
+    if (!renderer) return
+    const labelSettings = labelSettingsForDensity(labelPercentage)
+    renderer.setSetting('labelDensity', labelSettings.density)
+    renderer.setSetting(
+      'labelRenderedSizeThreshold',
+      labelSettings.renderedSizeThreshold,
+    )
+    renderer.refresh()
+  }, [labelPercentage])
 
   useEffect(() => {
     const worker = new Worker(
@@ -736,7 +891,7 @@ export default function SocialGraphExplorer({
       const isCommunityNode =
         !selectedCommunityId || selectedCommunityNodeIds.has(node)
       const showHover = node === focus
-      const forceLabel = labeledNodeIds.has(node)
+      const forceLabel = labeledNodeIds.has(node) || node === focus
 
       if (!isFocusNode || (!isCommunityNode && !focus)) {
         return {
@@ -801,13 +956,13 @@ export default function SocialGraphExplorer({
   useEffect(() => {
     if (
       selectedCommunityId &&
-      !activeLegendClusters.some(
+      !displayCommunities.some(
         (community) => community.id === selectedCommunityId,
       )
     ) {
       setSelectedCommunityId(null)
     }
-  }, [activeLegendClusters, selectedCommunityId])
+  }, [displayCommunities, selectedCommunityId])
 
   useEffect(() => {
     if (
@@ -818,10 +973,35 @@ export default function SocialGraphExplorer({
     }
   }, [filtered.nodes, selectedNodeId])
 
-  const focusNode = (nodeId: string) => {
+  useEffect(() => {
+    if (!pendingFocusNodeId) return
+    const frame = window.requestAnimationFrame(() => {
+      const renderer = rendererRef.current
+      const position = renderer?.getNodeDisplayData(pendingFocusNodeId)
+      if (!renderer || !position) return
+      const camera = renderer.getCamera()
+      camera.animate(
+        {
+          x: position.x,
+          y: position.y,
+          ratio: Math.max(0.12, Math.min(0.65, camera.ratio / 2)),
+        },
+        { duration: 350 },
+      )
+      setPendingFocusNodeId(null)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [filtered.nodes, pendingFocusNodeId])
+
+  const focusNode = (nodeId: string, rememberCurrent = true) => {
     const renderer = rendererRef.current
     const position = renderer?.getNodeDisplayData(nodeId)
+    if (!baseVisibleNodeIds.has(nodeId)) setPinnedNodeId(nodeId)
+    if (rememberCurrent && selectedNodeId && selectedNodeId !== nodeId) {
+      setFocusHistory((history) => [...history.slice(-7), selectedNodeId])
+    }
     setSelectedNodeId(nodeId)
+    setSelectedCommunityId(null)
     setQuery('')
     if (renderer && position) {
       const camera = renderer.getCamera()
@@ -833,17 +1013,110 @@ export default function SocialGraphExplorer({
         },
         { duration: 350 },
       )
+    } else {
+      setPendingFocusNodeId(nodeId)
     }
+  }
+
+  const focusPreviousNode = () => {
+    const previous = focusHistory.at(-1)
+    if (!previous) return
+    setFocusHistory((history) => history.slice(0, -1))
+    focusNode(previous, false)
+  }
+
+  const focusNodeSet = (nodeIds: Set<string>) => {
+    const renderer = rendererRef.current
+    if (!renderer || !nodeIds.size) return
+    const positions = Array.from(nodeIds).flatMap((nodeId) => {
+      const position = renderer.getNodeDisplayData(nodeId)
+      return position ? [position] : []
+    })
+    if (!positions.length) return
+    const minX = Math.min(...positions.map((position) => position.x))
+    const maxX = Math.max(...positions.map((position) => position.x))
+    const minY = Math.min(...positions.map((position) => position.y))
+    const maxY = Math.max(...positions.map((position) => position.y))
+    const extent = Math.max(maxX - minX, maxY - minY)
+    renderer.getCamera().animate(
+      {
+        x: (minX + maxX) / 2,
+        y: (minY + maxY) / 2,
+        ratio: Math.max(0.18, Math.min(1.1, extent * 1.8)),
+      },
+      { duration: 400 },
+    )
   }
 
   const toggleCommunity = (communityId: string) => {
     const isClearing = selectedCommunityId === communityId
     setSelectedCommunityId(isClearing ? null : communityId)
     setSelectedNodeId(null)
+    setFocusHistory([])
     setHoveredNodeId(null)
     hoverCandidateRef.current = null
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
     hoverTimerRef.current = null
+    if (!isClearing) {
+      const nodeIds = new Set(
+        filtered.nodes
+          .filter((node) => communityByNode.get(node.id) === communityId)
+          .map((node) => node.id),
+      )
+      window.requestAnimationFrame(() => focusNodeSet(nodeIds))
+    } else {
+      rendererRef.current?.getCamera().animatedReset()
+    }
+  }
+
+  const resetFilters = () => {
+    setMinimumFollowers(defaultSettings.minimumFollowers)
+    setStartYear(defaultSettings.startYear)
+    setEndYear(defaultSettings.endYear)
+    setMinimumStrength(defaultSettings.minimumStrength)
+    setMaximumNodes(defaultSettings.maximumNodes)
+    setLabelPercentage(defaultSettings.labelPercentage)
+    setPinnedNodeId(null)
+    setSelectedNodeId(null)
+    setFocusHistory([])
+    setSelectedCommunityId(null)
+    setHoveredNodeId(null)
+    setQuery('')
+    rendererRef.current?.getCamera().animatedReset()
+  }
+
+  const applyPreset = (preset: 'core' | 'balanced' | 'broad') => {
+    setPinnedNodeId(null)
+    setSelectedNodeId(null)
+    setFocusHistory([])
+    setSelectedCommunityId(null)
+    if (preset === 'balanced') {
+      resetFilters()
+      return
+    }
+    setMinimumFollowers(defaultSettings.minimumFollowers)
+    setStartYear(defaultSettings.startYear)
+    setEndYear(defaultSettings.endYear)
+    setMinimumStrength(
+      preset === 'core'
+        ? Math.min(
+            STRENGTH_SLIDER_MAX,
+            Math.max(0.6, defaultSettings.minimumStrength * 2),
+          )
+        : 0,
+    )
+    setMaximumNodes(
+      preset === 'core'
+        ? Math.min(360, snapshot.stats.nodeCount)
+        : snapshot.stats.nodeCount,
+    )
+  }
+
+  const exploreLargestGroup = () => {
+    const group = displayCommunities.find(
+      (community) => !community.id.includes('unconnected'),
+    )
+    if (group) toggleCommunity(group.id)
   }
 
   const zoom = (factor: number) => {
@@ -854,58 +1127,111 @@ export default function SocialGraphExplorer({
     })
   }
 
-  return (
-    <div className="grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)]">
-      <aside className="space-y-4 rounded-[4px] border border-zinc-200 bg-white p-4 dark:border-[#26262a] dark:bg-[#1b1b1e]">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Find a member"
-            aria-label="Find a member in the graph"
-            className="h-9 w-full rounded-[3px] border border-zinc-200 bg-transparent pl-8 pr-8 text-[13px] outline-none focus:border-brand dark:border-[#35353a]"
-          />
-          {query && (
-            <button
-              onClick={() => setQuery('')}
-              className="absolute right-2 top-2 h-5 w-5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-              aria-label="Clear member search"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-          {searchResults.length > 0 && (
-            <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-[3px] border border-zinc-200 bg-white shadow-xl dark:border-[#35353a] dark:bg-[#1b1b1e]">
-              {searchResults.map((node) => (
-                <button
-                  key={node.id}
-                  onClick={() => focusNode(node.id)}
-                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[12px] hover:bg-zinc-100 dark:hover:bg-[#26262a]"
-                >
-                  <span className="truncate">@{node.username}</span>
-                  <span className={MUTED}>{formatCount(node.followers)}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+  const hasDetails = Boolean(selectedNode || selectedCommunity)
 
-        <Slider
-          label="Minimum followers"
-          value={followerSlider}
-          displayValue={formatCount(minimumFollowers)}
-          min={0}
-          max={100}
-          step={1}
-          onChange={(nextSlider) =>
-            setMinimumFollowers(
-              followerSliderToCount(nextSlider, snapshot.stats.maxFollowers),
-            )
-          }
-        />
+  return (
+    <div
+      className={
+        hasDetails
+          ? 'grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_320px]'
+          : 'grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)]'
+      }
+    >
+      <aside className="space-y-4 rounded-[4px] border border-zinc-200 bg-white p-4 dark:border-[#26262a] dark:bg-[#1b1b1e]">
+        <section>
+          <h2 className="text-[13px] font-semibold">Start exploring</h2>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                currentMemberNode && focusNode(currentMemberNode.id)
+              }
+              disabled={!currentMemberNode}
+              title={
+                currentMemberNode
+                  ? `Find @${currentMemberNode.username}`
+                  : 'Your signed-in X account is not in this snapshot'
+              }
+              className="disabled:opacity-45 flex h-9 items-center justify-center gap-1.5 rounded-[3px] border border-zinc-200 px-2 text-[12px] font-medium hover:bg-zinc-50 disabled:cursor-not-allowed dark:border-[#35353a] dark:hover:bg-[#242428]"
+            >
+              <LocateFixed className="h-3.5 w-3.5 text-brand" />
+              Find yourself
+            </button>
+            <button
+              type="button"
+              onClick={exploreLargestGroup}
+              disabled={!displayCommunities.length}
+              className="disabled:opacity-45 flex h-9 items-center justify-center gap-1.5 rounded-[3px] border border-zinc-200 px-2 text-[12px] font-medium hover:bg-zinc-50 dark:border-[#35353a] dark:hover:bg-[#242428]"
+            >
+              <Network className="h-3.5 w-3.5 text-brand" />
+              Explore groups
+            </button>
+          </div>
+
+          <div className="relative mt-2">
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-zinc-400" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Find someone…"
+              aria-label="Find any archive member"
+              aria-expanded={Boolean(query)}
+              aria-controls="social-graph-search-results"
+              aria-autocomplete="list"
+              role="combobox"
+              className="h-9 w-full rounded-[3px] border border-zinc-200 bg-transparent pl-8 pr-8 text-[13px] outline-none focus:border-brand dark:border-[#35353a]"
+            />
+            {query ? (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                className="absolute right-2 top-2 h-5 w-5 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                aria-label="Clear member search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+            {query ? (
+              <div
+                id="social-graph-search-results"
+                role="listbox"
+                className="absolute z-20 mt-1 w-full overflow-hidden rounded-[3px] border border-zinc-200 bg-white shadow-xl dark:border-[#35353a] dark:bg-[#1b1b1e]"
+              >
+                {searchResults.length ? (
+                  searchResults.map((node) => {
+                    const inView = baseVisibleNodeIds.has(node.id)
+                    return (
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={selectedNodeId === node.id}
+                        key={node.id}
+                        onClick={() => focusNode(node.id)}
+                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[12px] hover:bg-zinc-100 dark:hover:bg-[#26262a]"
+                      >
+                        <span className="min-w-0 truncate">
+                          @{node.username}
+                        </span>
+                        <span className={`flex-shrink-0 ${MUTED}`}>
+                          {inView
+                            ? formatCount(node.followers)
+                            : 'Show with ties'}
+                        </span>
+                      </button>
+                    )
+                  })
+                ) : (
+                  <p className={`px-3 py-2 text-[12px] ${MUTED}`}>
+                    No archive member matches this search.
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </section>
+
         <DualRangeSlider
-          label="Interaction years"
+          label="Time period"
           startValue={startYear}
           endValue={endYear}
           min={snapshot.temporal.minYear}
@@ -915,34 +1241,69 @@ export default function SocialGraphExplorer({
             setEndYear(nextEndYear)
           }}
         />
-        <Slider
-          label="Mutual strength"
-          value={minimumStrength}
-          displayValue={`${minimumStrength.toFixed(2)} per 100`}
-          min={0}
-          max={STRENGTH_SLIDER_MAX}
-          step={0.05}
-          onChange={setMinimumStrength}
-        />
-        <Slider
-          label="Maximum nodes (centrality)"
-          value={maximumNodes}
-          displayValue={`${maximumNodes}`}
-          min={Math.min(50, snapshot.stats.nodeCount)}
-          max={snapshot.stats.nodeCount}
-          step={10}
-          onChange={setMaximumNodes}
-        />
 
         <details className="rounded-[3px] border border-zinc-200 dark:border-[#35353a]">
           <summary className="flex cursor-pointer list-none items-center gap-2 p-3 text-[12px] font-semibold [&::-webkit-details-marker]:hidden">
             <SlidersHorizontal className="h-3.5 w-3.5 text-brand" />
-            Advanced options
+            Refine view
           </summary>
           <div className="space-y-4 border-t border-zinc-200 p-3 dark:border-[#35353a]">
             <div>
+              <p className="text-[12px] font-medium">Presets</p>
+              <div className="mt-2 grid grid-cols-3 gap-1">
+                {(['core', 'balanced', 'broad'] as const).map((preset) => (
+                  <button
+                    type="button"
+                    key={preset}
+                    onClick={() => applyPreset(preset)}
+                    className="rounded-[3px] border border-zinc-200 px-1.5 py-1.5 text-[12px] capitalize hover:bg-zinc-50 dark:border-[#35353a] dark:hover:bg-[#242428]"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <p className={`mt-1.5 text-[12px] leading-relaxed ${MUTED}`}>
+                Balanced restores the current curated defaults.
+              </p>
+            </div>
+
+            <Slider
+              label="Minimum followers"
+              value={followerSlider}
+              displayValue={formatCount(minimumFollowers)}
+              min={0}
+              max={100}
+              step={1}
+              onChange={(nextSlider) =>
+                setMinimumFollowers(
+                  followerSliderToCount(
+                    nextSlider,
+                    snapshot.stats.maxFollowers,
+                  ),
+                )
+              }
+            />
+            <Slider
+              label="Minimum mutual attention"
+              value={minimumStrength}
+              displayValue={`${minimumStrength.toFixed(2)}% each`}
+              min={0}
+              max={STRENGTH_SLIDER_MAX}
+              step={0.05}
+              onChange={setMinimumStrength}
+            />
+            <Slider
+              label="People shown"
+              value={maximumNodes}
+              displayValue={`${maximumNodes}`}
+              min={Math.min(50, snapshot.stats.nodeCount)}
+              max={snapshot.stats.nodeCount}
+              step={10}
+              onChange={setMaximumNodes}
+            />
+            <div>
               <Slider
-                label="Names shown"
+                label="Name density"
                 value={labelPercentage}
                 displayValue={`${labelPercentage}%`}
                 min={0}
@@ -950,188 +1311,127 @@ export default function SocialGraphExplorer({
                 step={5}
                 onChange={setLabelPercentage}
               />
-              <p className={`mt-1.5 text-[10px] leading-relaxed ${MUTED}`}>
-                Uses centrality order. A selected community always shows all of
-                its visible names.
+              <p className={`mt-1.5 text-[12px] leading-relaxed ${MUTED}`}>
+                Representative names appear first. More names appear
+                automatically as you zoom in.
               </p>
             </div>
 
             <div className="space-y-2.5 border-t border-zinc-200 pt-3 dark:border-[#35353a]">
               <div>
-                <h2 className="text-[12px] font-semibold">
-                  Adaptive structure
-                </h2>
-                <p className={`mt-1 text-[10px] leading-relaxed ${MUTED}`}>
-                  Applied automatically on first load. Rerun after changing
-                  filters to adapt the surviving graph.
+                <h2 className="text-[12px] font-semibold">Groups and layout</h2>
+                <p className={`mt-1 text-[12px] leading-relaxed ${MUTED}`}>
+                  Recalculate the algorithmic groups using only the people and
+                  ties in this view.
                 </p>
               </div>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
-                <dt className={MUTED}>Clustering</dt>
-                <dd className="font-medium">Louvain</dd>
-                <dt className={MUTED}>Layout</dt>
-                <dd className="font-medium">Community force-directed</dd>
-              </dl>
               <button
                 type="button"
                 onClick={() => requestAdaptiveGraph()}
                 disabled={isAdapting || filtered.nodes.length < 2}
-                className="flex h-8 w-full items-center justify-center gap-1.5 rounded-[3px] bg-brand px-3 text-[11px] font-semibold text-zinc-950 disabled:cursor-wait disabled:opacity-60"
+                className="min-h-9 flex w-full items-center justify-center gap-1.5 rounded-[3px] bg-brand px-3 text-[12px] font-semibold text-zinc-950 disabled:cursor-wait disabled:opacity-60"
               >
                 {isAdapting ? (
                   <Clock3 className="h-3.5 w-3.5 animate-pulse" />
                 ) : (
                   <Play className="h-3.5 w-3.5" />
                 )}
-                {isAdapting ? 'Calculating…' : 'Recluster & relayout'}
+                {isAdapting
+                  ? 'Calculating…'
+                  : 'Recalculate groups for this view'}
               </button>
-              {adaptiveResult && (
-                <div className={`text-[10px] leading-relaxed ${MUTED}`}>
-                  <p>
-                    {adaptiveResult.communityCount} communities · modularity{' '}
-                    {adaptiveResult.modularity.toFixed(3)}
-                  </p>
-                  <p className="tabular-nums">
-                    Cluster {adaptiveResult.clusterMs.toFixed(1)} ms · layout{' '}
-                    {adaptiveResult.layoutMs.toFixed(1)} ms · total{' '}
-                    {adaptiveResult.totalMs.toFixed(1)} ms
-                  </p>
-                  {!adaptiveIsCurrent && (
-                    <p className="mt-1 text-amber-700 dark:text-amber-300">
-                      Filters changed; rerun to adapt this graph.
-                    </p>
-                  )}
-                </div>
-              )}
-              {adaptiveError && (
-                <p className="text-[10px] text-red-600 dark:text-red-400">
+              {adaptiveResult ? (
+                <p className={`text-[12px] leading-relaxed ${MUTED}`}>
+                  {adaptiveIsCurrent
+                    ? `${adaptiveResult.communityCount} groups in the current view.`
+                    : 'Filters changed; recalculate to update the groups.'}
+                </p>
+              ) : null}
+              {adaptiveError ? (
+                <p className="text-[12px] text-red-600 dark:text-red-400">
                   {adaptiveError}
                 </p>
-              )}
+              ) : null}
             </div>
+
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="min-h-9 flex w-full items-center justify-center gap-1.5 rounded-[3px] border border-zinc-200 px-3 text-[12px] font-medium hover:bg-zinc-50 dark:border-[#35353a] dark:hover:bg-[#242428]"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset filters
+            </button>
           </div>
         </details>
 
-        <div className="grid grid-cols-2 gap-2 border-y border-zinc-200 py-3 text-[11px] dark:border-[#2b2b30]">
+        <div className="grid grid-cols-3 gap-2 border-y border-zinc-200 py-3 text-[12px] dark:border-[#2b2b30]">
           <div>
-            <div className={MUTED}>Visible</div>
+            <div className={MUTED}>People</div>
             <div className="mt-0.5 font-semibold tabular-nums">
-              {filtered.nodes.length} nodes
+              {filtered.nodes.length}
             </div>
           </div>
           <div>
-            <div className={MUTED}>Structure</div>
+            <div className={MUTED}>Ties</div>
             <div className="mt-0.5 font-semibold tabular-nums">
-              {filtered.edges.length} edges
+              {filtered.edges.length}
+            </div>
+          </div>
+          <div>
+            <div className={MUTED}>No tie</div>
+            <div className="mt-0.5 font-semibold tabular-nums">
+              {isolatedNodeCount}
             </div>
           </div>
         </div>
 
-        {filtered.omittedEdgesForPerformance > 0 && (
-          <p className="rounded-[3px] border border-amber-500/25 bg-amber-500/10 p-2 text-[11px] text-amber-700 dark:text-amber-300">
-            {formatCount(filtered.omittedEdgesForPerformance)} weaker edges are
+        {pinnedNodeId && !baseVisibleNodeIds.has(pinnedNodeId) ? (
+          <p className="rounded-[3px] border border-brand/25 bg-brand/10 p-2 text-[12px] leading-relaxed">
+            Showing @{nodeById.get(pinnedNodeId)?.username} and their strongest
+            surviving ties outside the current people filters.
+          </p>
+        ) : null}
+
+        {filtered.omittedEdgesForPerformance > 0 ? (
+          <p className="rounded-[3px] border border-amber-500/25 bg-amber-500/10 p-2 text-[12px] text-amber-700 dark:text-amber-300">
+            {formatCount(filtered.omittedEdgesForPerformance)} weaker ties are
             hidden to keep interaction smooth.
           </p>
-        )}
+        ) : null}
 
-        {selectedNode && (
-          <div>
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <h2
-                  className="truncate text-[17px] font-semibold"
-                  style={SERIF}
-                >
-                  {selectedNode.label}
-                </h2>
-                <p className={`truncate text-[12px] ${MUTED}`}>
-                  @{selectedNode.username} ·{' '}
-                  {formatCount(selectedNode.followers)} followers
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedNodeId(null)}
-                aria-label="Clear selected member"
-                className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mt-3 space-y-2">
-              {selectedEdges.length ? (
-                selectedEdges.map((edge) => {
-                  const neighbor = nodeById.get(
-                    edge.source === selectedNode.id ? edge.target : edge.source,
-                  )
-                  if (!neighbor) return null
-                  return (
-                    <button
-                      key={`${edge.source}:${edge.target}`}
-                      onClick={() => focusNode(neighbor.id)}
-                      className="flex w-full items-center justify-between gap-2 text-left text-[11px] hover:text-brand"
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span
-                          className="h-2.5 w-2.5 flex-shrink-0 rounded-full ring-1 ring-black/10 dark:ring-white/10"
-                          style={{
-                            backgroundColor:
-                              communityColorByNode.get(neighbor.id) ||
-                              '#71717a',
-                          }}
-                          aria-hidden="true"
-                        />
-                        <span className="truncate">@{neighbor.username}</span>
-                      </span>
-                      <span className="tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
-                        {edge.strength.toFixed(2)} · {edge.mutualInteractions}×
-                      </span>
-                    </button>
-                  )
-                })
-              ) : (
-                <p className={`text-[11px] ${MUTED}`}>
-                  No edges survive the current filters.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div>
+        <section>
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-[13px] font-semibold">
-              {adaptiveIsCurrent ? 'Active communities' : 'Stable communities'}
-            </h2>
-            {selectedCommunity && (
+            <h2 className="text-[13px] font-semibold">Groups in this view</h2>
+            {selectedCommunity ? (
               <button
                 type="button"
                 onClick={() => toggleCommunity(selectedCommunity.id)}
-                className="text-[10px] text-zinc-500 hover:text-zinc-900 dark:text-[#a7a7b4] dark:hover:text-white"
+                className="text-[12px] text-zinc-500 hover:text-zinc-900 dark:text-[#a7a7b4] dark:hover:text-white"
               >
-                Show all
+                Back to all
               </button>
-            )}
+            ) : null}
           </div>
-          {selectedCommunity && (
-            <p className={`mt-1 text-[10px] leading-relaxed ${MUTED}`}>
-              Highlighting {selectedCommunity.label}; all visible names in this
-              community are shown.
-            </p>
-          )}
+          <p className={`mt-1 text-[12px] leading-relaxed ${MUTED}`}>
+            Algorithmic groups, named by representative people—not
+            self-identified communities.
+          </p>
           <div
-            className="mt-2 max-h-44 space-y-1 overflow-auto pr-1"
+            className="mt-2 max-h-52 space-y-1 overflow-auto pr-1"
             tabIndex={0}
-            aria-label="Community list"
+            aria-label="Groups in this graph view"
           >
-            {activeLegendClusters.slice(0, 14).map((cluster) => {
+            {displayCommunities.slice(0, 14).map((cluster) => {
               const isSelected = selectedCommunityId === cluster.id
               return (
                 <button
                   type="button"
                   key={cluster.id}
+                  title={cluster.label}
                   aria-pressed={isSelected}
                   onClick={() => toggleCommunity(cluster.id)}
-                  className={`flex w-full items-center justify-between gap-2 rounded-[3px] px-1.5 py-1 text-left text-[11px] transition-colors ${
+                  className={`flex w-full items-center justify-between gap-2 rounded-[3px] px-1.5 py-1.5 text-left text-[12px] transition-colors ${
                     isSelected
                       ? 'bg-zinc-100 font-medium dark:bg-[#2b2b30]'
                       : 'hover:bg-zinc-50 dark:hover:bg-[#242428]'
@@ -1141,6 +1441,7 @@ export default function SocialGraphExplorer({
                     <span
                       className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
                       style={{ backgroundColor: cluster.color }}
+                      aria-hidden="true"
                     />
                     <span className="truncate">{cluster.label}</span>
                   </span>
@@ -1149,34 +1450,29 @@ export default function SocialGraphExplorer({
               )
             })}
           </div>
-        </div>
+        </section>
 
-        <details className={`text-[11px] leading-relaxed ${MUTED}`}>
+        <details className={`text-[12px] leading-relaxed ${MUTED}`}>
           <summary className="cursor-pointer font-medium text-zinc-700 dark:text-[#d9d9de]">
-            How strength works
+            What a tie means
           </summary>
           <p className="mt-2">
-            For each direction, replies + quotes to this person are divided by
-            all replies + quotes from that account, then multiplied by 100. The
-            edge uses the weaker direction. Counts and denominators are
-            recomputed for the selected years. The node limit keeps the highest
-            weighted-degree accounts in that active graph. The default filters
-            are reclustered and laid out automatically; after filter changes,
-            the current layout stays fixed until you rerun it.
+            For each person, replies and quotes to the other are divided by all
+            of that person&apos;s outgoing replies and quotes. A line uses the
+            smaller percentage, so both people must direct attention to one
+            another. It does not measure friendship, agreement, or sentiment.
           </p>
         </details>
 
-        <details className={`text-[11px] leading-relaxed ${MUTED}`}>
+        <details className={`text-[12px] leading-relaxed ${MUTED}`}>
           <summary className="cursor-pointer font-medium text-zinc-700 dark:text-[#d9d9de]">
-            How clustering &amp; layout work
+            How groups and positions work
           </summary>
           <p className="mt-2">
-            Louvain finds groups with stronger mutual-interaction weight inside
-            the group than outside it. Community force-directed layout then
-            pulls connected accounts together, pushes overlapping nodes apart,
-            and gently anchors each community to its own region. Recluster &amp;
-            relayout uses only the currently visible nodes and edges; it does
-            not rewrite the stable communities in the daily snapshot.
+            Louvain finds people with stronger mutual-interaction weight inside
+            a group than outside it. The layout pulls tied people together and
+            separates overlaps. Position suggests structure, not a precise
+            social distance.
           </p>
         </details>
       </aside>
@@ -1185,10 +1481,15 @@ export default function SocialGraphExplorer({
         <div
           ref={containerRef}
           className="absolute inset-0"
-          aria-label="Interactive social graph"
+          aria-label="Interactive map of reciprocal replies and quotes. Use search or the group list for a structured way to select people."
         />
+        <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-[3px] border border-zinc-200 bg-white/90 px-2.5 py-1.5 text-[12px] shadow-sm backdrop-blur dark:border-[#35353a] dark:bg-[#1b1b1e]/90">
+          {filtered.nodes.length} of {snapshot.stats.nodeCount} people ·{' '}
+          {filtered.edges.length} ties · {isolatedNodeCount} with no visible tie
+        </div>
         <div className="absolute right-3 top-3 z-10 flex flex-col overflow-hidden rounded-[3px] border border-zinc-200 bg-white/90 shadow-sm backdrop-blur dark:border-[#35353a] dark:bg-[#1b1b1e]/90">
           <button
+            type="button"
             onClick={() => zoom(0.72)}
             className="p-2 hover:bg-zinc-100 dark:hover:bg-[#26262a]"
             aria-label="Zoom in"
@@ -1196,6 +1497,7 @@ export default function SocialGraphExplorer({
             <Plus className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={() => zoom(1.4)}
             className="border-y border-zinc-200 p-2 hover:bg-zinc-100 dark:border-[#35353a] dark:hover:bg-[#26262a]"
             aria-label="Zoom out"
@@ -1203,20 +1505,53 @@ export default function SocialGraphExplorer({
             <Minus className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={() => rendererRef.current?.getCamera().animatedReset()}
             className="p-2 hover:bg-zinc-100 dark:hover:bg-[#26262a]"
-            aria-label="Reset graph view"
+            aria-label="Reset camera"
           >
             <RotateCcw className="h-4 w-4" />
           </button>
         </div>
-        <div className="pointer-events-none absolute bottom-3 left-3 rounded-[3px] bg-white/80 px-2 py-1 text-[10px] text-zinc-500 backdrop-blur dark:bg-[#1b1b1e]/80 dark:text-[#a7a7b4]">
-          Scroll to zoom · drag to pan · click or hover 1s to inspect a node
+        <div className="pointer-events-none absolute bottom-3 left-3 rounded-[3px] border border-zinc-200 bg-white/90 px-2.5 py-2 text-[12px] leading-relaxed text-zinc-600 shadow-sm backdrop-blur dark:border-[#35353a] dark:bg-[#1b1b1e]/90 dark:text-[#c4c4cc]">
+          <div>
+            Larger node = stronger visible ties · thicker line = more mutual
+            attention · gray ring = no visible tie
+          </div>
+          <div className="mt-0.5 text-zinc-500 dark:text-[#a7a7b4]">
+            Scroll to zoom and reveal more names · drag to pan · click a person
+            to explore
+          </div>
         </div>
-        {isPending && (
+        {isPending ? (
           <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 animate-pulse bg-brand" />
-        )}
+        ) : null}
       </section>
+
+      <SocialGraphDetails
+        selectedNode={selectedNode}
+        selectedNodeCommunity={selectedNodeCommunity}
+        selectedEdges={selectedEdges}
+        selectedCommunity={selectedCommunity}
+        communityMembers={selectedCommunityMembers}
+        communityInternalEdges={selectedCommunityInternalEdges}
+        bridgeMembers={selectedCommunityBridges}
+        nodeById={nodeById}
+        communityColorByNode={communityColorByNode}
+        visibleTieCountByNode={visibleTieCountByNode}
+        startYear={startYear}
+        endYear={endYear}
+        onFocusNode={(nodeId) => focusNode(nodeId)}
+        canGoBack={focusHistory.length > 0}
+        onBack={focusPreviousNode}
+        onCloseNode={() => {
+          setSelectedNodeId(null)
+          setFocusHistory([])
+        }}
+        onCloseCommunity={() =>
+          selectedCommunityId && toggleCommunity(selectedCommunityId)
+        }
+      />
     </div>
   )
 }

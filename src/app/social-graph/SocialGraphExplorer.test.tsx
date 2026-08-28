@@ -129,11 +129,18 @@ describe('SocialGraphExplorer defaults', () => {
   })
 
   it('loads the curated filters and automatically adapts the visible graph', async () => {
-    render(<SocialGraphExplorer snapshot={snapshot} />)
+    render(
+      <SocialGraphExplorer
+        snapshot={snapshot}
+        currentMember={{ accountId: 'a', username: 'alpha' }}
+      />,
+    )
 
     expect(screen.getByText('517')).toBeInTheDocument()
-    expect(screen.getByText('0.30 per 100')).toBeInTheDocument()
+    expect(screen.getByText('0.30% each')).toBeInTheDocument()
     expect(screen.getByText('20%')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Find yourself' })).toBeEnabled()
+    expect(screen.getByText('Around @alpha, @beta')).toBeInTheDocument()
     expect(
       screen.getByRole('slider', { name: 'Interaction start year' }),
     ).toHaveAttribute('aria-valuenow', '2021')

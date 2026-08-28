@@ -184,7 +184,7 @@ OpenRouter key, or ClickHouse token with a `NEXT_PUBLIC_` prefix. Public digest
 reads use the normal anonymous Supabase client and the `status = 'published'`
 RLS policy.
 
-The current prompt uses `z-ai/glm-5.3` through OpenRouter, high reasoning
+The current prompt uses `z-ai/glm-5.3-flash` through OpenRouter, high reasoning
 effort, temperature `0.2`, and the model's 131,072-token maximum completion
 ceiling. Its
 one-call structured output requires exactly three summary bullets, a
@@ -224,7 +224,7 @@ digest tweet cards label community-authored posts as `Community author`.
 `community-archive-nightly-digest.timer` runs on `prod-firehose` at `06:15 UTC`
 every day. That is 10:15 PM PST or 11:15 PM PDT, fifteen minutes after the
 Community Archive editorial day closes. The oneshot Bun process ingests the
-candidate snapshot, sends one GLM-5.3 request, performs one repair request only
+candidate snapshot, sends one GLM-5.3-Flash request, performs one repair request only
 when deterministic validation rejects the first response, and stages and
 publishes the validated edition through Supabase.
 

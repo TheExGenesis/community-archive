@@ -221,7 +221,8 @@ export async function generateDigestWithModel(
       ],
       provider: { data_collection: 'deny', zdr: true },
       response_format:
-        request.model === 'z-ai/glm-5.3'
+        request.model === 'z-ai/glm-5.3' ||
+        request.model === 'z-ai/glm-5.3-flash'
           ? { type: 'json_object' }
           : {
               type: 'json_schema',

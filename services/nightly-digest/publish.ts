@@ -226,7 +226,7 @@ const getPrompt = async (db: SupabaseRest, promptVersionId?: string) => {
       select: '*',
       ...(promptVersionId
         ? { id: `eq.${promptVersionId}` }
-        : { model: 'eq.z-ai/glm-5.3' }),
+        : { model: 'eq.z-ai/glm-5.3-flash' }),
       order: 'version.desc',
       limit: '1',
     }),
@@ -235,7 +235,7 @@ const getPrompt = async (db: SupabaseRest, promptVersionId?: string) => {
     throw new Error(
       promptVersionId
         ? `Digest prompt ${promptVersionId} was not found`
-        : 'No z-ai/glm-5.3 digest prompt is configured',
+        : 'No z-ai/glm-5.3-flash digest prompt is configured',
     )
   }
   return mapPrompt(rows[0])

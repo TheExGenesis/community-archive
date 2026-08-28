@@ -2,9 +2,10 @@
 
 `community-archive-nightly-digest.timer` runs at 06:15 UTC (10:15 PM PST or
 11:15 PM PDT), after the 06:00 UTC editorial-day boundary. The oneshot Bun
-publisher reads candidates from the ClickHouse query gateway, asks GLM-5.3 for
-one JSON object, performs one bounded repair only when deterministic validation
-rejects the first response, then stages and publishes through Supabase.
+publisher reads candidates from the ClickHouse query gateway, asks
+GLM-5.3-Flash for one JSON object, performs one bounded repair only when
+deterministic validation rejects the first response, then stages and publishes
+through Supabase.
 
 The job is date-idempotent. It exits before generation when the date is already
 published, records a stable `systemd:YYYY-MM-DD` run identifier, preserves an

@@ -75,6 +75,7 @@ async function SparseProfileTweets({
   return (
     <ProfileTweetFallback
       avatarUrl={avatarUrl}
+      className="order-2 min-w-0 xl:col-start-1 xl:row-start-2"
       displayName={displayName}
       engagedTweets={withoutBangers(engaged.tweets)}
       recentTweets={withoutBangers(recent.tweets)}
@@ -144,27 +145,29 @@ async function ProfileArchiveContent({
   const navChapters: NavChapter[] = initialPage.yearCounts
 
   return (
-    <>
-      <ProfileArchive
-        accountId={accountId}
-        avatarUrl={avatarUrl}
-        basePath={basePath}
-        chapters={navChapters}
-        displayName={displayName}
-        initialYear={year}
-        initialPage={initialPage}
-      />
-      <Suspense fallback={null}>
-        <SparseProfileTweets
-          accountId={accountId}
-          avatarUrl={avatarUrl}
-          basePath={basePath}
-          displayName={displayName}
-          initialPage={initialPage}
-          initialYear={year}
-        />
-      </Suspense>
-    </>
+    <ProfileArchive
+      accountId={accountId}
+      avatarUrl={avatarUrl}
+      basePath={basePath}
+      chapters={navChapters}
+      displayName={displayName}
+      initialYear={year}
+      initialPage={initialPage}
+      supplementalTweets={
+        needsProfileTweetFallback(initialPage, year) ? (
+          <Suspense fallback={null}>
+            <SparseProfileTweets
+              accountId={accountId}
+              avatarUrl={avatarUrl}
+              basePath={basePath}
+              displayName={displayName}
+              initialPage={initialPage}
+              initialYear={year}
+            />
+          </Suspense>
+        ) : null
+      }
+    />
   )
 }
 

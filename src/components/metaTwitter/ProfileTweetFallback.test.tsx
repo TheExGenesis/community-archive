@@ -36,6 +36,7 @@ test('starts with most engaged tweets and can switch to recent tweets', async ()
   render(
     <ProfileTweetFallback
       avatarUrl={null}
+      className="order-2"
       displayName="Alice"
       engagedTweets={[tweet('101', 'Most engaged tweet')]}
       recentTweets={[tweet('102', 'Newest tweet')]}
@@ -44,6 +45,12 @@ test('starts with most engaged tweets and can switch to recent tweets', async ()
   )
 
   expect(screen.getByRole('heading', { name: 'More from Alice' })).toBeVisible()
+  expect(
+    screen.getByRole('heading', { name: 'More from Alice' }).closest('section'),
+  ).toHaveClass('order-2', 'pt-5')
+  expect(
+    screen.getByRole('heading', { name: 'More from Alice' }).closest('section'),
+  ).not.toHaveClass('mt-12')
   expect(screen.getByText('Most engaged tweet')).toBeVisible()
   expect(screen.queryByText('Newest tweet')).not.toBeInTheDocument()
 

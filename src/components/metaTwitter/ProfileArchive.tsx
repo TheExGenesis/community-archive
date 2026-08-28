@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ArchiveNav, archiveChapterHref, type NavChapter } from './ArchiveNav'
 import { Workspace } from './Workspace'
 import {
@@ -78,6 +78,7 @@ export function ProfileArchive({
   initialYear,
   initialPage,
   initialSidebar,
+  supplementalTweets,
 }: {
   accountId: string
   avatarUrl: string | null
@@ -87,6 +88,7 @@ export function ProfileArchive({
   initialYear: number | null
   initialPage: ProfileBangersPageState
   initialSidebar?: SidebarData
+  supplementalTweets?: ReactNode
 }) {
   const initialFeedKey = feedKey(initialYear, 'quotes')
   const initialScopeKey = scopeKey(initialYear)
@@ -840,6 +842,7 @@ export function ProfileArchive({
         onLoadMore={() => void loadMore()}
         loadMoreRef={loadMoreRef}
         returnTo={returnTo}
+        supplementalTweets={supplementalTweets}
         editing={editing && activeYear === null}
         editSaving={editSaving}
         editError={editError}

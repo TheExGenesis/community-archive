@@ -95,6 +95,9 @@ test('shows the initial canonical banger cards with media and profile return lin
       onLoadMore={onLoadMore}
       loadMoreRef={createRef<HTMLDivElement>()}
       returnTo="/user/alice?chapter=2025"
+      supplementalTweets={
+        <section data-testid="supplemental-tweets">More tweets</section>
+      }
     />,
   )
 
@@ -107,6 +110,17 @@ test('shows the initial canonical banger cards with media and profile return lin
   expect(
     screen.queryByRole('heading', { name: 'Bangers' }),
   ).not.toBeInTheDocument()
+  const supplementalTweets = screen.getByTestId('supplemental-tweets')
+  const mediaHeading = screen.getByRole('heading', { name: 'Media' })
+  expect(
+    supplementalTweets.compareDocumentPosition(mediaHeading) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
+  expect(mediaHeading.closest('aside')).toHaveClass(
+    'order-3',
+    'xl:col-start-2',
+    'xl:row-start-1',
+  )
   expect(
     screen.queryByText(
       '167 bangers · 2+ Community Archive member quote posts · self-quotes excluded',

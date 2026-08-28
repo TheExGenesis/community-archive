@@ -2,6 +2,7 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import TweetCard from '@/components/TweetCard'
+import { cn } from '@/lib/utils'
 import { profilePortalTweet } from '@/lib/metaTwitter/bangerPortalTweet'
 import type { ProfileTweet } from '@/lib/metaTwitter/types'
 
@@ -42,12 +43,14 @@ function TweetCards({
 
 export function ProfileTweetFallback({
   avatarUrl,
+  className,
   displayName,
   engagedTweets,
   recentTweets,
   returnTo,
 }: {
   avatarUrl: string | null
+  className?: string
   displayName: string
   engagedTweets: ProfileTweet[]
   recentTweets: ProfileTweet[]
@@ -58,9 +61,9 @@ export function ProfileTweetFallback({
   return (
     <section
       aria-labelledby="profile-more-tweets-heading"
-      className="mx-4 mb-8 mt-12 border-t border-border pt-8 sm:mx-6"
+      className={cn('border-t border-border pt-5', className)}
     >
-      <div className="mx-auto max-w-3xl">
+      <div className="w-full">
         <h2 id="profile-more-tweets-heading" className="text-xl font-extrabold">
           More from {displayName}
         </h2>
@@ -71,20 +74,20 @@ export function ProfileTweetFallback({
 
         <Tabs
           defaultValue={engagedTweets.length > 0 ? 'engagement' : 'recent'}
-          className="mt-4"
+          className="mt-3"
         >
           <TabsList aria-label="Profile tweet view">
             <TabsTrigger value="engagement">Most engaged</TabsTrigger>
             <TabsTrigger value="recent">Recent tweets</TabsTrigger>
           </TabsList>
-          <TabsContent value="engagement" className="mt-4">
+          <TabsContent value="engagement" className="mt-3">
             <TweetCards
               avatarUrl={avatarUrl}
               returnTo={returnTo}
               tweets={engagedTweets}
             />
           </TabsContent>
-          <TabsContent value="recent" className="mt-4">
+          <TabsContent value="recent" className="mt-3">
             <TweetCards
               avatarUrl={avatarUrl}
               returnTo={returnTo}

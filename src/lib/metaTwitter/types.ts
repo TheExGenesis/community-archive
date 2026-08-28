@@ -19,11 +19,14 @@ export interface ArchiveTweet {
   }[]
 }
 
-export interface BangerTweet extends ArchiveTweet {
-  quote_count: number
-  quoting_accounts: number
+export interface ProfileTweet extends ArchiveTweet {
   quote_tweet_id?: string | null
   quoted_tweet?: ArchiveTweet | null
+}
+
+export interface BangerTweet extends ProfileTweet {
+  quote_count: number
+  quoting_accounts: number
   curation?: {
     is_featured: boolean
     position: number | null

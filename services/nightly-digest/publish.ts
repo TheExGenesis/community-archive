@@ -287,7 +287,7 @@ async function generateValidated(input: {
     const userPrompt =
       attempt === 1
         ? input.renderedPrompt
-        : `${input.renderedPrompt}\n\nREPAIR THE REJECTED RESPONSE\nThe previous JSON was rejected by the deterministic receiver: ${lastError}\nReturn one corrected JSON object only. Do not add Markdown or prose. Preserve grounded content while fixing every validation error.\n\nREJECTED RESPONSE\n${JSON.stringify(rejectedOutput)}`
+        : `${input.renderedPrompt}\n\nREPAIR THE REJECTED RESPONSE\nThe previous JSON was rejected by the deterministic receiver: ${lastError}\nReturn one corrected JSON object only. Do not add Markdown or prose. Preserve grounded content while fixing every validation error. For character limits, target at least 10 characters below the stated maximum and recount after whitespace normalization.\n\nREJECTED RESPONSE\n${JSON.stringify(rejectedOutput)}`
     const generated = await generateDigestWithModel({
       runId: input.runId,
       model: input.prompt.model,

@@ -431,7 +431,7 @@ describe('daily digest generation contract', () => {
         },
       }),
     ).toThrow(
-      'Story 1 bullets must contain one to three non-empty strings of at most 220 characters',
+      'Story 1 bullets must contain one to three non-empty strings of at most 220 characters; bullet 1 has 221 normalized characters (maximum 220)',
     )
   })
 

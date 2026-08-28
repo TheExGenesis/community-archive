@@ -91,6 +91,27 @@ const cleanStringArray = (
   return cleaned.every((item): item is string => item !== null) ? cleaned : null
 }
 
+const describeStringArrayIssue = (
+  value: unknown,
+  itemLabel: string,
+  maxItems: number,
+  maxLength: number,
+): string => {
+  if (!Array.isArray(value)) return 'received a non-array value'
+  if (value.length === 0) return 'received no items'
+  if (value.length > maxItems)
+    return `received ${value.length} items (maximum ${maxItems})`
+  for (const [index, item] of value.entries()) {
+    if (typeof item !== 'string')
+      return `${itemLabel} ${index + 1} is not a string`
+    const normalized = item.trim().replace(/\s+/g, ' ')
+    if (!normalized) return `${itemLabel} ${index + 1} is empty`
+    if (normalized.length > maxLength)
+      return `${itemLabel} ${index + 1} has ${normalized.length} normalized characters (maximum ${maxLength})`
+  }
+  return 'received an invalid value'
+}
+
 const cleanIndexArray = (value: unknown, maxItems: number): number[] | null => {
   if (!Array.isArray(value) || value.length > maxItems) return null
   return value.every(
@@ -193,7 +214,7 @@ function parseModelDigest(
       )
     if (!bullets?.length)
       throw new Error(
-        `Story ${storyNumber} bullets must contain one to three non-empty strings of at most 220 characters`,
+        `Story ${storyNumber} bullets must contain one to three non-empty strings of at most 220 characters; ${describeStringArrayIssue(story.bullets, 'bullet', 3, 220)}`,
       )
     if (!editorialNote)
       throw new Error(

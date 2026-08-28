@@ -36,6 +36,7 @@ describe('member navigation', () => {
       { href: '/community', label: 'Gallery' },
       { href: '/trends', label: 'Trends' },
       { href: '/stream', label: 'Live stream' },
+      { href: '/social-graph', label: 'Graph' },
       { href: '/research', label: 'Research' },
     ])
     expect(getMobileNav(true)).toEqual(
@@ -46,6 +47,7 @@ describe('member navigation', () => {
         { href: '/digest', label: 'Digest' },
         { href: '/search', label: 'Search' },
         { href: '/community', label: 'Gallery' },
+        { href: '/social-graph', label: 'Graph' },
       ]),
     )
     expect(isNavItemActive('/bangers', '/bangers?period=all')).toBe(true)
@@ -80,31 +82,16 @@ describe('member navigation', () => {
     })
   })
 
-  it('shows the muted Graph shortcut only to admins', () => {
-    expect(getPrimaryNav(true)).not.toContainEqual(
-      expect.objectContaining({ href: '/social-graph' }),
-    )
-    expect(getMobileNav(true)).not.toContainEqual(
-      expect.objectContaining({ href: '/social-graph' }),
-    )
-
-    const adminGraphItem = {
+  it('shows Graph as a standard navigation item to every audience', () => {
+    const graphItem = {
       href: '/social-graph',
       label: 'Graph',
-      tone: 'muted',
     }
-    expect(getPrimaryNav(true, true)).toEqual([
-      { href: '/bangers?period=all', label: 'Bangers' },
-      { href: '/digest', label: 'Digest' },
-      { href: '/user-dir', label: 'Users' },
-      { href: '/community', label: 'Gallery' },
-      { href: '/trends', label: 'Trends' },
-      { href: '/stream', label: 'Live stream' },
-      adminGraphItem,
-      { href: '/research', label: 'Research' },
-    ])
-    expect(getMobileNav(true, true)).toContainEqual(adminGraphItem)
-    expect(getPrimaryNav(false, true)).toContainEqual(adminGraphItem)
+    expect(getPrimaryNav(false)).toContainEqual(graphItem)
+    expect(getPrimaryNav(true)).toContainEqual(graphItem)
+    expect(getPrimaryNav(true, true)).toContainEqual(graphItem)
+    expect(getMobileNav(false)).toContainEqual(graphItem)
+    expect(getMobileNav(true)).toContainEqual(graphItem)
   })
 })
 

@@ -11,14 +11,12 @@ jest.mock('next/navigation', () => ({
 jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 
 describe('HeaderNavigation', () => {
-  it('renders muted navigation items with a darker tint', () => {
+  it('renders Graph with the same styling as other navigation items', () => {
     render(
-      <HeaderNavigation
-        items={[{ href: '/social-graph', label: 'Graph', tone: 'muted' }]}
-      />,
+      <HeaderNavigation items={[{ href: '/social-graph', label: 'Graph' }]} />,
     )
 
-    expect(screen.getByRole('link', { name: 'Graph' })).toHaveClass(
+    expect(screen.getByRole('link', { name: 'Graph' })).not.toHaveClass(
       'bg-muted/70',
       'text-muted-foreground',
     )

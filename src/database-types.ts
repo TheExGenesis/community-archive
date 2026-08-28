@@ -1658,6 +1658,10 @@ export type Database = {
           deleted_private_tweet_user: number
         }[]
       }
+      delete_own_likes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       delete_own_tweets: {
         Args: {
           p_tweet_ids: string[]

@@ -1,5 +1,5 @@
 import React from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ProfileContent from './ProfileContent'
 
@@ -8,6 +8,28 @@ const originalFetch = global.fetch
 const mockLogInsert = jest.fn().mockResolvedValue({ error: null })
 const mockRpc = jest.fn()
 const mockUpdateDownloadArchiveVisibility = jest.fn()
+const mockTweetRange = jest.fn()
+const mockTweetTextSearch = jest.fn()
+const mockTweetQuery: Record<string, jest.Mock> = {}
+
+mockTweetQuery.select = jest.fn(() => mockTweetQuery)
+mockTweetQuery.eq = jest.fn(() => mockTweetQuery)
+mockTweetQuery.order = jest.fn(() => mockTweetQuery)
+mockTweetQuery.textSearch = mockTweetTextSearch.mockImplementation(
+  () => mockTweetQuery,
+)
+mockTweetQuery.range = mockTweetRange
+
+class IntersectionObserverMock {
+  static instances: IntersectionObserverMock[] = []
+
+  observe = jest.fn()
+  disconnect = jest.fn()
+
+  constructor(readonly callback: IntersectionObserverCallback) {
+    IntersectionObserverMock.instances.push(this)
+  }
+}
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: jest.fn() }),
@@ -21,7 +43,8 @@ jest.mock('@/hooks/useAuthAndArchive', () => ({
 
 jest.mock('@/utils/supabase', () => ({
   createBrowserClient: () => ({
-    from: () => ({ insert: mockLogInsert }),
+    from: (table: string) =>
+      table === 'tweets' ? mockTweetQuery : { insert: mockLogInsert },
     rpc: mockRpc,
     storage: { from: jest.fn() },
   }),
@@ -53,8 +76,12 @@ const user = {
 describe('ProfileContent opt-in preference', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    IntersectionObserverMock.instances = []
+    global.IntersectionObserver =
+      IntersectionObserverMock as unknown as typeof IntersectionObserver
     global.fetch = mockFetch
     mockUpdateDownloadArchiveVisibility.mockResolvedValue({ ok: true })
+    mockTweetRange.mockResolvedValue({ data: [], error: null })
   })
 
   afterAll(() => {
@@ -180,5 +207,133 @@ describe('ProfileContent opt-in preference', () => {
     )
     expect(await screen.findByText('Tweet deleted permanently')).toBeVisible()
     expect(screen.queryByText('A tweet I can remove')).not.toBeInTheDocument()
+  })
+
+  it('deletes only the owner like associations', async () => {
+    const interaction = userEvent.setup()
+    jest.spyOn(window, 'confirm').mockReturnValue(true)
+    mockRpc.mockResolvedValue({ data: 12, error: null })
+
+    render(
+      <ProfileContent
+        user={user}
+        accountId="twitter-123"
+        initialOptInData={null}
+        archives={[]}
+      />,
+    )
+
+    await interaction.click(screen.getByRole('tab', { name: 'My Tweets' }))
+    await interaction.click(
+      screen.getByRole('button', { name: 'Delete all likes' }),
+    )
+
+    await waitFor(() =>
+      expect(mockRpc).toHaveBeenCalledWith('delete_own_likes'),
+    )
+    expect(
+      await screen.findByText('12 likes were removed from your account'),
+    ).toBeVisible()
+  })
+
+  it('uses full-text search and replaces the visible tweet page', async () => {
+    const interaction = userEvent.setup()
+    mockTweetRange.mockResolvedValue({
+      data: [
+        {
+          tweet_id: 'search-result',
+          created_at: '2026-08-14T00:00:00.000Z',
+          full_text: 'The matching archival tweet',
+          favorite_count: 1,
+          retweet_count: 0,
+        },
+      ],
+      error: null,
+    })
+
+    render(
+      <ProfileContent
+        user={user}
+        accountId="twitter-123"
+        initialOptInData={null}
+        archives={[]}
+        initialTweets={[
+          {
+            tweet_id: 'initial',
+            created_at: '2026-08-15T00:00:00.000Z',
+            full_text: 'Initial recent tweet',
+            favorite_count: 0,
+            retweet_count: 0,
+          },
+        ]}
+      />,
+    )
+
+    await interaction.click(screen.getByRole('tab', { name: 'My Tweets' }))
+    await interaction.type(
+      screen.getByRole('searchbox', { name: 'Search your tweets' }),
+      'matching archival',
+    )
+
+    await waitFor(() =>
+      expect(mockTweetTextSearch).toHaveBeenCalledWith(
+        'fts',
+        'matching archival',
+        { config: 'english', type: 'websearch' },
+      ),
+    )
+    expect(mockTweetRange).toHaveBeenCalledWith(0, 10)
+    expect(await screen.findByText('The matching archival tweet')).toBeVisible()
+    expect(screen.queryByText('Initial recent tweet')).not.toBeInTheDocument()
+  })
+
+  it('loads the next ten tweets when the scroll sentinel intersects', async () => {
+    const interaction = userEvent.setup()
+    const initialTweets = Array.from({ length: 10 }, (_, index) => ({
+      tweet_id: `initial-${index}`,
+      created_at: `2026-08-${String(20 - index).padStart(2, '0')}T00:00:00.000Z`,
+      full_text: `Initial tweet ${index}`,
+      favorite_count: 0,
+      retweet_count: 0,
+    }))
+    mockTweetRange.mockResolvedValue({
+      data: [
+        {
+          tweet_id: 'next-page',
+          created_at: '2026-08-01T00:00:00.000Z',
+          full_text: 'Tweet from the next page',
+          favorite_count: 0,
+          retweet_count: 0,
+        },
+      ],
+      error: null,
+    })
+
+    render(
+      <ProfileContent
+        user={user}
+        accountId="twitter-123"
+        initialOptInData={null}
+        archives={[]}
+        initialTweets={initialTweets}
+        initialTweetsHaveMore
+      />,
+    )
+
+    await interaction.click(screen.getByRole('tab', { name: 'My Tweets' }))
+    await waitFor(() =>
+      expect(IntersectionObserverMock.instances).toHaveLength(1),
+    )
+
+    const observer = IntersectionObserverMock.instances[0]
+    await act(async () => {
+      observer.callback(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        observer as unknown as IntersectionObserver,
+      )
+    })
+
+    await waitFor(() => expect(mockTweetRange).toHaveBeenCalledWith(10, 20))
+    expect(await screen.findByText('Tweet from the next page')).toBeVisible()
   })
 })

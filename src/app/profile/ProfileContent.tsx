@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { User } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,6 +13,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { AlertCircle, Archive, Trash2, UserX, CheckCircle } from 'lucide-react'
+import {
+  AlertCircle,
+  Archive,
+  CheckCircle,
+  HeartOff,
+  Loader2,
+  Search,
+  Trash2,
+  UserX,
+} from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@/utils/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -33,6 +43,7 @@ import { ArchiveUploadButton } from '@/components/ArchiveUploadButton'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { updateOptIn } from '@/lib/optInApi'
 import { updateDownloadArchiveVisibility } from '@/app/user/[account_id]/actions'
+import { OWN_TWEETS_PAGE_SIZE, type OwnTweet } from '@/lib/ownTweetDeletion'
 
 interface ProfileContentProps {
   user: User
@@ -40,13 +51,8 @@ interface ProfileContentProps {
   initialDownloadArchiveVisible?: boolean
   initialOptInData: any
   archives: any[]
-  initialTweets?: Array<{
-    tweet_id: string
-    created_at: string
-    full_text: string
-    favorite_count: number | null
-    retweet_count: number | null
-  }>
+  initialTweets?: OwnTweet[]
+  initialTweetsHaveMore?: boolean
 }
 
 export default function ProfileContent({
@@ -56,6 +62,7 @@ export default function ProfileContent({
   initialOptInData,
   archives,
   initialTweets = [],
+  initialTweetsHaveMore = false,
 }: ProfileContentProps) {
   const router = useRouter()
   const { userMetadata } = useAuthAndArchive()
@@ -74,10 +81,23 @@ export default function ProfileContent({
   const [success, setSuccess] = useState<string | null>(null)
   const [deletingArchive, setDeletingArchive] = useState<string | null>(null)
   const [deletingTweetId, setDeletingTweetId] = useState<string | null>(null)
+  const [deletingLikes, setDeletingLikes] = useState(false)
   const [ownTweets, setOwnTweets] = useState(initialTweets)
+  const [tweetSearch, setTweetSearch] = useState('')
+  const [debouncedTweetSearch, setDebouncedTweetSearch] = useState('')
+  const [loadingTweets, setLoadingTweets] = useState(false)
+  const [loadingMoreTweets, setLoadingMoreTweets] = useState(false)
+  const [hasMoreTweets, setHasMoreTweets] = useState(initialTweetsHaveMore)
+  const [nextTweetOffset, setNextTweetOffset] = useState(initialTweets.length)
+  const [activeTab, setActiveTab] = useState('privacy')
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false)
   const [showOptOutDialog, setShowOptOutDialog] = useState(false)
-  const supabase = createBrowserClient()
+  const [supabase] = useState(createBrowserClient)
+  const [loadMoreTweetsTarget, setLoadMoreTweetsTarget] =
+    useState<HTMLDivElement | null>(null)
+  const tweetLoadMoreInFlightRef = useRef(false)
+  const tweetRequestVersionRef = useRef(0)
+  const skipInitialTweetLoadRef = useRef(true)
 
   const twitterUsername =
     userMetadata?.user_name ||
@@ -375,6 +395,194 @@ export default function ProfileContent({
     }
   }
 
+  const fetchOwnTweets = useCallback(
+    async (search: string, offset: number) => {
+      if (!accountId) return { tweets: [] as OwnTweet[], hasMore: false }
+
+      let query = supabase
+        .from('tweets')
+        .select(
+          'tweet_id, created_at, full_text, favorite_count, retweet_count',
+        )
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false })
+        .order('tweet_id', { ascending: false })
+
+      const normalizedSearch = search.trim()
+      if (normalizedSearch) {
+        query = query.textSearch('fts', normalizedSearch, {
+          config: 'english',
+          type: 'websearch',
+        })
+      }
+
+      const { data, error: tweetsError } = await query.range(
+        offset,
+        offset + OWN_TWEETS_PAGE_SIZE,
+      )
+      if (tweetsError) throw tweetsError
+
+      const rows = data || []
+      return {
+        tweets: rows.slice(0, OWN_TWEETS_PAGE_SIZE),
+        hasMore: rows.length > OWN_TWEETS_PAGE_SIZE,
+      }
+    },
+    [accountId, supabase],
+  )
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedTweetSearch(tweetSearch),
+      300,
+    )
+    return () => window.clearTimeout(timer)
+  }, [tweetSearch])
+
+  useEffect(() => {
+    if (skipInitialTweetLoadRef.current) {
+      skipInitialTweetLoadRef.current = false
+      return
+    }
+
+    let isCurrentRequest = true
+    const requestVersion = ++tweetRequestVersionRef.current
+
+    const reloadTweets = async () => {
+      setLoadingTweets(true)
+      setError(null)
+      try {
+        const page = await fetchOwnTweets(debouncedTweetSearch, 0)
+        if (
+          !isCurrentRequest ||
+          requestVersion !== tweetRequestVersionRef.current
+        ) {
+          return
+        }
+        setOwnTweets(page.tweets)
+        setHasMoreTweets(page.hasMore)
+        setNextTweetOffset(page.tweets.length)
+      } catch (err: any) {
+        if (!isCurrentRequest) return
+        setError(err.message || 'Failed to search your tweets')
+      } finally {
+        if (isCurrentRequest) setLoadingTweets(false)
+      }
+    }
+
+    void reloadTweets()
+    return () => {
+      isCurrentRequest = false
+    }
+  }, [debouncedTweetSearch, fetchOwnTweets])
+
+  const loadMoreTweets = useCallback(async () => {
+    if (
+      loadingTweets ||
+      loadingMoreTweets ||
+      !hasMoreTweets ||
+      tweetLoadMoreInFlightRef.current
+    ) {
+      return
+    }
+
+    const requestVersion = tweetRequestVersionRef.current
+    const offset = nextTweetOffset
+    tweetLoadMoreInFlightRef.current = true
+    setLoadingMoreTweets(true)
+    setError(null)
+
+    try {
+      const page = await fetchOwnTweets(debouncedTweetSearch, offset)
+      if (requestVersion !== tweetRequestVersionRef.current) return
+
+      setOwnTweets((currentTweets) => {
+        const existingIds = new Set(
+          currentTweets.map((tweet) => tweet.tweet_id),
+        )
+        return [
+          ...currentTweets,
+          ...page.tweets.filter((tweet) => !existingIds.has(tweet.tweet_id)),
+        ]
+      })
+      setHasMoreTweets(page.hasMore)
+      setNextTweetOffset(offset + page.tweets.length)
+    } catch (err: any) {
+      setError(err.message || 'Failed to load more tweets')
+    } finally {
+      tweetLoadMoreInFlightRef.current = false
+      setLoadingMoreTweets(false)
+    }
+  }, [
+    debouncedTweetSearch,
+    fetchOwnTweets,
+    hasMoreTweets,
+    loadingMoreTweets,
+    loadingTweets,
+    nextTweetOffset,
+  ])
+
+  useEffect(() => {
+    if (
+      activeTab !== 'tweets' ||
+      !loadMoreTweetsTarget ||
+      !hasMoreTweets ||
+      loadingTweets ||
+      loadingMoreTweets
+    ) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) void loadMoreTweets()
+      },
+      { rootMargin: '300px 0px' },
+    )
+    observer.observe(loadMoreTweetsTarget)
+    return () => observer.disconnect()
+  }, [
+    activeTab,
+    hasMoreTweets,
+    loadMoreTweetsTarget,
+    loadMoreTweets,
+    loadingMoreTweets,
+    loadingTweets,
+  ])
+
+  const handleDeleteLikes = async () => {
+    if (
+      !confirm(
+        'Delete all records that link your account to tweets you liked? The archived tweet text will remain. This cannot be undone.',
+      )
+    ) {
+      return
+    }
+
+    setDeletingLikes(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const { data, error: deleteError } =
+        await supabase.rpc('delete_own_likes')
+      if (deleteError) throw deleteError
+
+      const deletedLikes = data || 0
+      setSuccess(
+        `${deletedLikes} ${deletedLikes === 1 ? 'like was' : 'likes were'} removed from your account`,
+      )
+      capturePostHogEvent('own_likes_deleted', {
+        deleted_like_count: deletedLikes,
+      })
+      await logUserAction('delete_likes', { deleted_likes: deletedLikes })
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete likes')
+    } finally {
+      setDeletingLikes(false)
+    }
+  }
+
   const handleDeleteTweet = async (tweetId: string) => {
     if (
       !confirm(
@@ -401,6 +609,7 @@ export default function ProfileContent({
       setOwnTweets((tweets) =>
         tweets.filter((tweet) => tweet.tweet_id !== tweetId),
       )
+      setNextTweetOffset((offset) => Math.max(0, offset - 1))
       setSuccess('Tweet deleted permanently')
       capturePostHogEvent('own_tweet_deleted')
       await logUserAction('delete_tweet', { tweet_id: tweetId })
@@ -433,11 +642,12 @@ export default function ProfileContent({
       </Card>
 
       <Tabs
-        defaultValue="privacy"
+        value={activeTab}
         className="w-full"
-        onValueChange={(tab) =>
+        onValueChange={(tab) => {
+          setActiveTab(tab)
           capturePostHogEvent('settings_tab_selected', { tab })
-        }
+        }}
       >
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="privacy">Privacy Settings</TabsTrigger>
@@ -646,50 +856,115 @@ export default function ProfileContent({
         <TabsContent value="tweets" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Your Tweets</CardTitle>
+              <CardTitle>Delete Tweets and Likes</CardTitle>
               <CardDescription>
-                Permanently remove individual tweets from your archive. The most
-                recent 100 tweets are shown.
+                Permanently remove individual tweets or unlink your likes from
+                your account.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              {ownTweets.length === 0 ? (
+            <CardContent className="space-y-6">
+              <div className="flex flex-col justify-between gap-4 rounded-lg border p-4 sm:flex-row sm:items-center">
+                <div className="space-y-1">
+                  <p className="font-medium">Delete your likes</p>
+                  <p className="text-sm text-muted-foreground">
+                    Removes only the links between your account and tweets you
+                    liked. Archived tweet text remains available.
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="flex-shrink-0"
+                  onClick={handleDeleteLikes}
+                  disabled={deletingLikes || !accountId}
+                >
+                  <HeartOff className="mr-2 h-4 w-4" />
+                  {deletingLikes ? 'Deleting...' : 'Delete all likes'}
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="tweet-deletion-search">
+                  Search your tweets
+                </Label>
+                <div className="relative">
+                  <Search
+                    aria-hidden="true"
+                    className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input
+                    id="tweet-deletion-search"
+                    type="search"
+                    value={tweetSearch}
+                    onChange={(event) => setTweetSearch(event.target.value)}
+                    placeholder="Search the full text of your tweets"
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              {loadingTweets ? (
+                <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Searching tweets...
+                </div>
+              ) : ownTweets.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">
-                  No archived tweets found.
+                  {debouncedTweetSearch
+                    ? 'No tweets match your search.'
+                    : 'No archived tweets found.'}
                 </div>
               ) : (
-                <div className="divide-y rounded-lg border">
-                  {ownTweets.map((tweet) => (
-                    <div
-                      key={tweet.tweet_id}
-                      className="flex items-start justify-between gap-4 p-4"
-                    >
-                      <div className="min-w-0 space-y-2">
-                        <p className="whitespace-pre-wrap break-words text-sm">
-                          {tweet.full_text}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(tweet.created_at).toLocaleDateString()} ·{' '}
-                          {tweet.favorite_count || 0} likes ·{' '}
-                          {tweet.retweet_count || 0} reposts
-                        </p>
-                      </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="flex-shrink-0"
-                        onClick={() => handleDeleteTweet(tweet.tweet_id)}
-                        disabled={deletingTweetId !== null}
-                        aria-label={`Delete tweet ${tweet.tweet_id}`}
+                <>
+                  <div className="divide-y rounded-lg border">
+                    {ownTweets.map((tweet) => (
+                      <div
+                        key={tweet.tweet_id}
+                        className="flex items-start justify-between gap-4 p-4"
                       >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        {deletingTweetId === tweet.tweet_id
-                          ? 'Deleting...'
-                          : 'Delete'}
-                      </Button>
+                        <div className="min-w-0 space-y-2">
+                          <p className="whitespace-pre-wrap break-words text-sm">
+                            {tweet.full_text}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(tweet.created_at).toLocaleDateString()} ·{' '}
+                            {tweet.favorite_count || 0} likes ·{' '}
+                            {tweet.retweet_count || 0} reposts
+                          </p>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="flex-shrink-0"
+                          onClick={() => handleDeleteTweet(tweet.tweet_id)}
+                          disabled={deletingTweetId !== null}
+                          aria-label={`Delete tweet ${tweet.tweet_id}`}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          {deletingTweetId === tweet.tweet_id
+                            ? 'Deleting...'
+                            : 'Delete'}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  {hasMoreTweets ? (
+                    <div
+                      ref={setLoadMoreTweetsTarget}
+                      className="min-h-12 flex items-center justify-center gap-2 text-sm text-muted-foreground"
+                      aria-live="polite"
+                    >
+                      {loadingMoreTweets ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading more tweets...
+                        </>
+                      ) : (
+                        'Scroll to load more'
+                      )}
                     </div>
-                  ))}
-                </div>
+                  ) : null}
+                </>
               )}
             </CardContent>
           </Card>

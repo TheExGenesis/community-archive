@@ -6,6 +6,7 @@ import { createServerAdminClient, createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import ProfileContent from '../profile/ProfileContent'
 import { CommunitySubmissionQueue } from './CommunitySubmissionQueue'
+import { OWN_TWEETS_PAGE_SIZE } from '@/lib/ownTweetDeletion'
 
 const getTwitterUsername = (
   user: Awaited<ReturnType<typeof requireAuth>>['user'],
@@ -80,7 +81,8 @@ export default async function SettingsPage() {
           )
           .eq('account_id', twitterAccountId)
           .order('created_at', { ascending: false })
-          .limit(100)
+          .order('tweet_id', { ascending: false })
+          .limit(OWN_TWEETS_PAGE_SIZE + 1)
       : Promise.resolve({ data: [], error: null }),
     twitterAccountId
       ? getPublicProfileSettings(twitterAccountId)
@@ -106,7 +108,13 @@ export default async function SettingsPage() {
           initialDownloadArchiveVisible={settings.downloadArchiveVisible}
           initialOptInData={optInResponse.data}
           archives={archivesResponse.data || []}
-          initialTweets={tweetsResponse.data || []}
+          initialTweets={(tweetsResponse.data || []).slice(
+            0,
+            OWN_TWEETS_PAGE_SIZE,
+          )}
+          initialTweetsHaveMore={
+            (tweetsResponse.data?.length || 0) > OWN_TWEETS_PAGE_SIZE
+          }
         />
       </div>
     </main>

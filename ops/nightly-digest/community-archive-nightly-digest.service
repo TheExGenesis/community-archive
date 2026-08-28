@@ -2,6 +2,8 @@
 Description=Publish the Community Archive nightly digest
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=30min
+StartLimitBurst=2
 
 [Service]
 Type=oneshot
@@ -10,6 +12,8 @@ WorkingDirectory=/opt/community-archive-nightly-digest
 EnvironmentFile=/etc/community-archive-nightly-digest.env
 ExecStart=/root/.bun/bin/bun /opt/community-archive-nightly-digest/services/nightly-digest/publish.ts
 TimeoutStartSec=20min
+Restart=on-failure
+RestartSec=5min
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

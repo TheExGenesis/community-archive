@@ -233,15 +233,20 @@ already published, records the stable run identifier `systemd:YYYY-MM-DD`, does
 not replace an edition an editor published during generation, and publishes a
 completed automated run if an earlier database publication attempt failed.
 Generation or validation failure leaves the run failed and does not change the
-public edition.
+public edition. Systemd retries one failed execution after five minutes. That
+retry reuses the frozen candidates, prompt version, window, and rendered prompt
+on the existing run. Every provider response, validation error, and usage count
+is saved to the run before a repair attempt or publication.
 
 For a supervised no-write replay, run the publisher with
 `--date YYYY-MM-DD --dry-run`. To pause new nightly writes without affecting
 public reads, disable `community-archive-nightly-digest.timer`. Keep the legacy
 Vercel cron schedule absent and `DIGEST_AUTOMATION_ENABLED=false` so there is
-only one scheduler. To recover a failed date, inspect its saved run and
-`journalctl -u community-archive-nightly-digest.service`, then clone/revise and
-publish through the existing editorial path. Do not delete the run ledger.
+only one scheduler. To recover a date after its bounded retry is exhausted,
+inspect its saved run and `journalctl -u community-archive-nightly-digest.service`,
+then invoke the publisher with `--date YYYY-MM-DD`. A failed row is claimed and
+rerun with its saved inputs; completed and published rows remain idempotent. Do
+not delete the run ledger.
 
 ## Rollout gates
 

@@ -101,7 +101,8 @@ const describeStringArrayIssue = (
   if (value.length === 0) return 'received no items'
   if (value.length > maxItems)
     return `received ${value.length} items (maximum ${maxItems})`
-  for (const [index, item] of value.entries()) {
+  for (let index = 0; index < value.length; index += 1) {
+    const item = value[index]
     if (typeof item !== 'string')
       return `${itemLabel} ${index + 1} is not a string`
     const normalized = item.trim().replace(/\s+/g, ' ')

@@ -52,7 +52,9 @@ export const readGenerationExecutions = (
 export const withGenerationExecution = (
   rawResponse: unknown,
   execution: PersistedGenerationExecution,
-) => ({
+): Record<string, unknown> & {
+  executions: PersistedGenerationExecution[]
+} => ({
   ...(isRecord(rawResponse) ? rawResponse : {}),
   executions: [
     ...readGenerationExecutions(rawResponse).filter(

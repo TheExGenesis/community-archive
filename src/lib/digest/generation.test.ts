@@ -407,7 +407,32 @@ describe('daily digest generation contract', () => {
           ],
         },
       }),
-    ).toThrow('Story 1 is incomplete')
+    ).toThrow('Story 1 has an invalid category')
+  })
+
+  test('explains the hard limit when a story bullet is too long', () => {
+    expect(() =>
+      assembleDigestEditionContent({
+        runId: 'run-1',
+        digestDate: '2026-08-12',
+        windowStart: '2026-08-11T12:00:00.000Z',
+        windowEnd: '2026-08-12T12:00:00.000Z',
+        allCandidateCount: 3,
+        enrichedCandidates: candidates,
+        modelOutput: {
+          ...modelOutput,
+          stories: [
+            {
+              ...modelOutput.stories[0],
+              bullets: ['x'.repeat(221)],
+            },
+            ...modelOutput.stories.slice(1),
+          ],
+        },
+      }),
+    ).toThrow(
+      'Story 1 bullets must contain one to three non-empty strings of at most 220 characters',
+    )
   })
 
   test('accepts a concise paraphrased title and marks it as unquoted', () => {

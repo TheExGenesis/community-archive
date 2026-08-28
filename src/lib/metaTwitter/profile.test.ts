@@ -1,4 +1,4 @@
-const resolveAccountIdMock = jest.fn()
+const resolvePublicProfileIdentityMock = jest.fn()
 const getCachedProfileHeaderMock = jest.fn()
 const getClickHouseUserProfileMock = jest.fn()
 
@@ -8,7 +8,8 @@ jest.mock('react', () => ({
 }))
 
 jest.mock('@/lib/metaTwitter/data', () => ({
-  resolveAccountId: (...args: unknown[]) => resolveAccountIdMock(...args),
+  resolvePublicProfileIdentity: (...args: unknown[]) =>
+    resolvePublicProfileIdentityMock(...args),
   getCachedProfileHeader: (...args: unknown[]) =>
     getCachedProfileHeaderMock(...args),
 }))
@@ -44,7 +45,10 @@ beforeEach(() => {
 })
 
 test('prefers the authoritative archived profile', async () => {
-  resolveAccountIdMock.mockResolvedValue('42')
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: '42',
+    username: 'alice',
+  })
   getCachedProfileHeaderMock.mockResolvedValue(archivedProfile)
 
   await expect(resolveProfile('alice')).resolves.toEqual({
@@ -55,7 +59,10 @@ test('prefers the authoritative archived profile', async () => {
 })
 
 test('maps the analytical fallback to the shared profile shape', async () => {
-  resolveAccountIdMock.mockResolvedValue(null)
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: null,
+    username: 'bob',
+  })
   getClickHouseUserProfileMock.mockResolvedValue({
     user: {
       ...archivedProfile,
@@ -82,15 +89,19 @@ test('maps the analytical fallback to the shared profile shape', async () => {
   })
 })
 
-test('returns null when neither profile source can resolve the user', async () => {
-  resolveAccountIdMock.mockResolvedValue(null)
-  getClickHouseUserProfileMock.mockResolvedValue(null)
+test('does not load profile sources when the public policy identity is hidden', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue(null)
 
   await expect(resolveProfile('missing')).resolves.toBeNull()
+  expect(getCachedProfileHeaderMock).not.toHaveBeenCalled()
+  expect(getClickHouseUserProfileMock).not.toHaveBeenCalled()
 })
 
 test('backfills a missing archive avatar from the analytical profile', async () => {
-  resolveAccountIdMock.mockResolvedValue('42')
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: '42',
+    username: 'alice',
+  })
   getCachedProfileHeaderMock.mockResolvedValue({
     ...archivedProfile,
     avatar_media_url: null,
@@ -114,7 +125,10 @@ test('backfills a missing archive avatar from the analytical profile', async () 
 })
 
 test('keeps the archived media and skips the analytical lookup when both are present', async () => {
-  resolveAccountIdMock.mockResolvedValue('42')
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: '42',
+    username: 'alice',
+  })
   getCachedProfileHeaderMock.mockResolvedValue({
     ...archivedProfile,
     avatar_media_url: 'https://pbs.twimg.com/profile_images/9/archived.jpg',
@@ -130,7 +144,10 @@ test('keeps the archived media and skips the analytical lookup when both are pre
 })
 
 test('leaves media null when neither source has it', async () => {
-  resolveAccountIdMock.mockResolvedValue('42')
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: '42',
+    username: 'alice',
+  })
   getCachedProfileHeaderMock.mockResolvedValue({
     ...archivedProfile,
     avatar_media_url: '   ',
@@ -143,8 +160,11 @@ test('leaves media null when neither source has it', async () => {
   })
 })
 
-test('strips the archive prefix before the analytical lookup', async () => {
-  resolveAccountIdMock.mockResolvedValue('42')
+test('uses the policy-approved account ID for the analytical lookup', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: '42',
+    username: 'alice',
+  })
   getCachedProfileHeaderMock.mockResolvedValue({
     ...archivedProfile,
     avatar_media_url: null,
@@ -152,5 +172,5 @@ test('strips the archive prefix before the analytical lookup', async () => {
   getClickHouseUserProfileMock.mockResolvedValue(null)
 
   await resolveProfile('archive%3Aalice')
-  expect(getClickHouseUserProfileMock).toHaveBeenCalledWith('alice')
+  expect(getClickHouseUserProfileMock).toHaveBeenCalledWith('42')
 })

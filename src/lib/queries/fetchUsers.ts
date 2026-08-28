@@ -62,24 +62,73 @@ export const fetchUsers = async (
   return page
 }
 
-export const fetchUserSuggestions = async (
-  supabase: SupabaseClient,
-  fragment: string,
-  limit = 6,
-): Promise<UserSuggestion[]> => {
+const normalizeSuggestionFragment = (fragment: string) => {
   const normalizedFragment = fragment
     .trim()
     .replace(/^@/, '')
     .toLocaleLowerCase()
-  if (!/^[a-z0-9_]{2,15}$/.test(normalizedFragment)) return []
+
+  return /^[a-z0-9_]{2,15}$/.test(normalizedFragment)
+    ? normalizedFragment
+    : null
+}
+
+export const fetchMemberSuggestions = async (
+  fragment: string,
+  limit = 6,
+  fetchImpl: typeof fetch = fetch,
+): Promise<UserSuggestion[]> => {
+  const normalizedFragment = normalizeSuggestionFragment(fragment)
+  if (!normalizedFragment) return []
+
+  const page = await fetchUsers(
+    {
+      limit: Math.max(limit * 5, 30),
+      search: normalizedFragment,
+    },
+    fetchImpl,
+  )
+
+  return rankUserSuggestions(
+    page.users
+      .filter((user) =>
+        user.username.toLocaleLowerCase().includes(normalizedFragment),
+      )
+      .map(
+        ({
+          account_id,
+          directory_id,
+          username,
+          account_display_name,
+          avatar_media_url,
+          num_followers,
+        }) => ({
+          account_id,
+          directory_id,
+          username,
+          account_display_name,
+          avatar_media_url,
+          num_followers,
+        }),
+      ),
+    normalizedFragment,
+    limit,
+  )
+}
+
+export const fetchAccountSuggestions = async (
+  supabase: SupabaseClient,
+  fragment: string,
+  limit = 6,
+): Promise<UserSuggestion[]> => {
+  const normalizedFragment = normalizeSuggestionFragment(fragment)
+  if (!normalizedFragment) return []
 
   const escapedFragment = normalizedFragment.replace(/[\\%_]/g, '\\$&')
   const { data, error } = await supabase
     .schema('public')
-    .from('user_directory')
-    .select(
-      'directory_id, username, account_display_name, avatar_media_url, num_followers',
-    )
+    .from('all_account')
+    .select('account_id, username, account_display_name, num_followers')
     .ilike('username', `%${escapedFragment}%`)
     .order('num_followers', { ascending: false, nullsFirst: false })
     .limit(Math.max(limit * 5, 30))
@@ -87,7 +136,14 @@ export const fetchUserSuggestions = async (
   if (error) throw error
 
   return rankUserSuggestions(
-    (data as UserSuggestion[]) || [],
+    (data || []).map((user) => ({
+      account_id: user.account_id,
+      directory_id: `account:${user.account_id}`,
+      username: user.username,
+      account_display_name: user.account_display_name,
+      avatar_media_url: null,
+      num_followers: user.num_followers,
+    })),
     normalizedFragment,
     limit,
   )

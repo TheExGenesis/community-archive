@@ -8,6 +8,7 @@ export interface UsernameSearchToken {
 
 export type UserSuggestion = Pick<
   DirectoryUser,
+  | 'account_id'
   | 'directory_id'
   | 'username'
   | 'account_display_name'
@@ -79,4 +80,31 @@ export function rankUserSuggestions(
       return leftUsername.localeCompare(rightUsername)
     })
     .slice(0, limit)
+}
+
+export function mergeUserSuggestions(
+  memberSuggestions: UserSuggestion[],
+  accountSuggestions: UserSuggestion[],
+  limit: number,
+) {
+  const merged: UserSuggestion[] = []
+  const seenAccountIds = new Set<string>()
+  const seenUsernames = new Set<string>()
+
+  for (const suggestion of [...memberSuggestions, ...accountSuggestions]) {
+    const username = suggestion.username.toLocaleLowerCase()
+    if (
+      (suggestion.account_id && seenAccountIds.has(suggestion.account_id)) ||
+      seenUsernames.has(username)
+    ) {
+      continue
+    }
+
+    merged.push(suggestion)
+    if (suggestion.account_id) seenAccountIds.add(suggestion.account_id)
+    seenUsernames.add(username)
+    if (merged.length === limit) break
+  }
+
+  return merged
 }

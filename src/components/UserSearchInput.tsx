@@ -6,9 +6,13 @@ import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input, InputProps } from '@/components/ui/input'
 import { userProfileHref } from '@/lib/navigation'
-import { fetchUserSuggestions } from '@/lib/queries/fetchUsers'
+import {
+  fetchAccountSuggestions,
+  fetchMemberSuggestions,
+} from '@/lib/queries/fetchUsers'
 import {
   getUsernameSearchToken,
+  mergeUserSuggestions,
   replaceUsernameTokenWithFromFilter,
 } from '@/lib/searchSuggestions'
 import type {
@@ -66,22 +70,48 @@ export default function UserSearchInput({
     setActiveIndex(-1)
     if (!token) return
 
-    const timer = window.setTimeout(() => {
-      fetchUserSuggestions(supabase, token.fragment, SUGGESTION_LIMIT)
-        .then((users) => {
-          if (
-            requestId === requestIdRef.current &&
-            document.activeElement === inputRef.current
-          ) {
-            setSuggestions(users)
-          }
-        })
-        .catch(() => {
-          if (requestId === requestIdRef.current) setSuggestions([])
-        })
+    const isCurrentRequest = () =>
+      requestId === requestIdRef.current &&
+      document.activeElement === inputRef.current
+
+    const timer = window.setTimeout(async () => {
+      let memberSuggestions: UserSuggestion[] = []
+      try {
+        memberSuggestions = await fetchMemberSuggestions(
+          token.fragment,
+          SUGGESTION_LIMIT,
+        )
+        if (!isCurrentRequest()) return
+        setSuggestions(memberSuggestions)
+      } catch {
+        if (!isCurrentRequest()) return
+      }
+
+      if (memberSuggestions.length >= SUGGESTION_LIMIT) return
+
+      try {
+        const accountSuggestions = await fetchAccountSuggestions(
+          supabase,
+          token.fragment,
+          SUGGESTION_LIMIT,
+        )
+        if (!isCurrentRequest()) return
+        setSuggestions(
+          mergeUserSuggestions(
+            memberSuggestions,
+            accountSuggestions,
+            SUGGESTION_LIMIT,
+          ),
+        )
+      } catch {
+        // Keep any member suggestions visible if the broader lookup fails.
+      }
     }, SUGGESTION_DELAY_MS)
 
-    return () => window.clearTimeout(timer)
+    return () => {
+      window.clearTimeout(timer)
+      if (requestIdRef.current === requestId) requestIdRef.current += 1
+    }
   }, [supabase, token])
 
   useEffect(() => {
@@ -93,7 +123,12 @@ export default function UserSearchInput({
 
   const openProfile = (suggestion: UserSuggestion) => {
     closeSuggestions()
-    router.push(userProfileHref(suggestion.username, suggestion.directory_id))
+    router.push(
+      userProfileHref(
+        suggestion.username,
+        suggestion.account_id || suggestion.directory_id,
+      ),
+    )
   }
 
   const selectFromFilter = (suggestion: UserSuggestion) => {

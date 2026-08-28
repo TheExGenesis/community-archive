@@ -1,5 +1,6 @@
 import {
   getUsernameSearchToken,
+  mergeUserSuggestions,
   rankUserSuggestions,
   replaceUsernameTokenWithFromFilter,
   UserSuggestion,
@@ -9,6 +10,7 @@ const suggestion = (
   username: string,
   numFollowers: number | null = null,
 ): UserSuggestion => ({
+  account_id: username,
   directory_id: `archive:${username}`,
   username,
   account_display_name: username,
@@ -61,5 +63,20 @@ describe('username search suggestions', () => {
         3,
       ).map((user) => user.username),
     ).toEqual(['exgenesis', 'exgenesis_notes', 'alexgenesis'])
+  })
+
+  it('keeps members first while deduplicating broader account matches', () => {
+    const member = suggestion('archive_member', 10)
+
+    expect(
+      mergeUserSuggestions(
+        [member],
+        [
+          { ...member, directory_id: 'account:archive_member' },
+          suggestion('other_account', 10_000),
+        ],
+        6,
+      ).map((user) => user.username),
+    ).toEqual(['archive_member', 'other_account'])
   })
 })

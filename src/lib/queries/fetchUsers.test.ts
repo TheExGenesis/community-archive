@@ -1,6 +1,8 @@
 import { DirectoryUser } from '@/lib/types'
 import {
   buildDirectorySearchFilter,
+  fetchAccountSuggestions,
+  fetchMemberSuggestions,
   fetchUsers,
   getDirectoryProfileHref,
   getUserData,
@@ -58,6 +60,80 @@ describe('fetchUsers', () => {
       '/api/user-directory?limit=15&offset=30&sort_by=joined_at&sort_order=asc&search=alice',
       { cache: 'no-store' },
     )
+  })
+})
+
+describe('user suggestions', () => {
+  it('searches the bounded member-directory endpoint first', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        users: [
+          directoryUser({
+            account_id: '2',
+            directory_id: 'archive:2',
+            username: 'alexgenesis',
+            num_followers: 10_000,
+          }),
+          directoryUser({
+            account_id: '1',
+            directory_id: 'archive:1',
+            username: 'exgenesis',
+            num_followers: 10,
+          }),
+          directoryUser({ username: 'unrelated' }),
+        ],
+        hasMore: false,
+      }),
+    })
+
+    await expect(
+      fetchMemberSuggestions('ExGenesis', 6, fetchImpl as any),
+    ).resolves.toMatchObject([
+      { username: 'exgenesis' },
+      { username: 'alexgenesis' },
+    ])
+    expect(fetchImpl).toHaveBeenCalledWith(
+      '/api/user-directory?limit=30&offset=0&sort_by=num_followers&sort_order=desc&search=exgenesis',
+      { cache: 'no-store' },
+    )
+  })
+
+  it('maps indexed all-account matches into fallback suggestions', async () => {
+    const result = {
+      data: [
+        {
+          account_id: '456',
+          username: 'other_user',
+          account_display_name: 'Other User',
+          num_followers: 50,
+        },
+      ],
+      error: null,
+    }
+    const query: Record<string, jest.Mock> = {}
+    query.select = jest.fn(() => query)
+    query.ilike = jest.fn(() => query)
+    query.order = jest.fn(() => query)
+    query.limit = jest.fn().mockResolvedValue(result)
+    const from = jest.fn(() => query)
+    const supabase = { schema: jest.fn(() => ({ from })) }
+
+    await expect(
+      fetchAccountSuggestions(supabase as any, 'other', 6),
+    ).resolves.toEqual([
+      {
+        account_id: '456',
+        directory_id: 'account:456',
+        username: 'other_user',
+        account_display_name: 'Other User',
+        avatar_media_url: null,
+        num_followers: 50,
+      },
+    ])
+    expect(from).toHaveBeenCalledWith('all_account')
+    expect(query.ilike).toHaveBeenCalledWith('username', '%other%')
+    expect(query.limit).toHaveBeenCalledWith(30)
   })
 })
 

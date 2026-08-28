@@ -1,7 +1,11 @@
 import dynamic from 'next/dynamic'
 import { getSocialGraphSnapshot } from '@/lib/socialGraph'
 import { MUTED, SERIF } from '@/components/portal/styles'
-import { requireAdmin } from '@/app/admin/data'
+import {
+  getTwitterProviderId,
+  getTwitterUsername,
+  requireAdmin,
+} from '@/app/admin/data'
 import { SocialGraphAdminControls } from './SocialGraphAdminControls'
 
 const SocialGraphExplorer = dynamic(() => import('./SocialGraphExplorer'), {
@@ -14,7 +18,11 @@ const SocialGraphExplorer = dynamic(() => import('./SocialGraphExplorer'), {
 export const metadata = { title: 'Social graph · Community Archive' }
 
 export default async function SocialGraphPage() {
-  await requireAdmin('/social-graph')
+  const { user } = await requireAdmin('/social-graph')
+  const currentMember = {
+    accountId: getTwitterProviderId(user),
+    username: getTwitterUsername(user),
+  }
 
   let snapshot
   try {
@@ -46,12 +54,12 @@ export default async function SocialGraphPage() {
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-[26px] font-semibold" style={SERIF}>
-              Mutual interactions
+              Mutual interaction map
             </h1>
             <p className={`mt-1 max-w-3xl text-[13px] ${MUTED}`}>
-              Replies and quotes between archive members. Edge strength uses the
-              weaker direction, normalized by each person&apos;s total outgoing
-              interactions.
+              See who regularly replied to and quoted one another in the
+              archive. A tie measures the smaller share of attention in either
+              direction—not friendship, agreement, or total conversation.
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -61,7 +69,10 @@ export default async function SocialGraphPage() {
             <SocialGraphAdminControls />
           </div>
         </div>
-        <SocialGraphExplorer snapshot={snapshot} />
+        <SocialGraphExplorer
+          snapshot={snapshot}
+          currentMember={currentMember}
+        />
       </div>
     </main>
   )

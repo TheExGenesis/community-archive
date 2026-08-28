@@ -40,6 +40,25 @@ export interface CommunityProject {
  */
 export const COMMUNITY_PROJECTS: CommunityProject[] = [
   {
+    slug: 'bangers-page',
+    name: 'Bangers.page',
+    creator: 'Sam Clarke',
+    summary:
+      'Browse high-signal posts through a community-made thematic index.',
+    description:
+      'A third-party Community Archive build that organizes standout posts with high-quality thematic tags for a faster way into the corpus.',
+    archiveUse:
+      'Groups standout archived posts into thematic collections that can be browsed without writing a search query.',
+    category: 'Tools',
+    tags: ['Themes', 'Discovery', 'Curated browsing'],
+    projectUrl: 'https://bangers.page/',
+    sourceTweetId: '2089848291416850870',
+    image: '/images/community/bangers-page.jpg',
+    coverClass: 'from-[#f1eee6] via-[#d7e4ef] to-[#75c9eb]',
+    featured: true,
+    publishedAt: '2026-08-18',
+  },
+  {
     slug: 'tweet-harvest',
     name: 'Tweet Harvest',
     creator: 'Loopy',
@@ -96,6 +115,25 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     publishedAt: '2025-08-28',
   },
   {
+    slug: 'vector-search',
+    name: 'Semantic Search',
+    creator: 'Corbin',
+    creatorHandle: 'corbindreams',
+    summary: 'Search favorite accounts by meaning instead of exact wording.',
+    description:
+      'A focused vector-search interface for finding memorable posts from a hand-picked set of favorite accounts when native keyword search falls short.',
+    archiveUse:
+      'Indexes posts from selected archived accounts as vectors so related ideas can be found without exact keyword matches.',
+    category: 'Tools',
+    tags: ['Vector search', 'Reference', 'Favorite accounts'],
+    projectUrl: 'https://tweets-search-811136861157.us-central1.run.app',
+    sourceTweetId: '2087250967527870861',
+    image: '/images/community/tweet-semantic-search-cover.png',
+    coverClass: 'from-[#17171a] via-[#10516b] to-[#25aadf]',
+    featured: false,
+    publishedAt: '2026-08-11',
+  },
+  {
     slug: 'malcolm-ocean-links',
     name: "Malcolm Ocean's Links",
     creator: 'Malcolm Ocean',
@@ -111,25 +149,6 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     sourceTweetId: '2087049518177210837',
     image: '/images/community/malcolm-ocean-links-cover.png',
     coverClass: 'from-[#f4f0ff] via-[#b8a7ff] to-[#5940d6]',
-    featured: false,
-    publishedAt: '2026-08-11',
-  },
-  {
-    slug: 'vector-search',
-    name: 'Vector Search',
-    creator: 'Corbin',
-    creatorHandle: 'corbindreams',
-    summary: 'Search favorite accounts by meaning instead of exact wording.',
-    description:
-      'A focused vector-search interface for finding memorable posts from a hand-picked set of favorite accounts when native keyword search falls short.',
-    archiveUse:
-      'Indexes posts from selected archived accounts as vectors so related ideas can be found without exact keyword matches.',
-    category: 'Tools',
-    tags: ['Vector search', 'Reference', 'Favorite accounts'],
-    projectUrl: 'https://tweets-search-811136861157.us-central1.run.app',
-    sourceTweetId: '2087250967527870861',
-    image: '/images/community/tweet-semantic-search-cover.png',
-    coverClass: 'from-[#17171a] via-[#10516b] to-[#25aadf]',
     featured: false,
     publishedAt: '2026-08-11',
   },
@@ -151,25 +170,6 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     coverClass: 'from-[#352b70] via-[#7956d8] to-[#8bd2ee]',
     featured: false,
     publishedAt: '2026-08-16',
-  },
-  {
-    slug: 'bangers-page',
-    name: 'Bangers.page',
-    creator: 'Sam Clarke',
-    summary:
-      'Browse high-signal posts through a community-made thematic index.',
-    description:
-      'A third-party Community Archive build that organizes standout posts with high-quality thematic tags for a faster way into the corpus.',
-    archiveUse:
-      'Groups standout archived posts into thematic collections that can be browsed without writing a search query.',
-    category: 'Tools',
-    tags: ['Themes', 'Discovery', 'Curated browsing'],
-    projectUrl: 'https://bangers.page/',
-    sourceTweetId: '2089848291416850870',
-    image: '/images/community/bangers-page.jpg',
-    coverClass: 'from-[#f1eee6] via-[#d7e4ef] to-[#75c9eb]',
-    featured: false,
-    publishedAt: '2026-08-18',
   },
   {
     slug: 'followle',

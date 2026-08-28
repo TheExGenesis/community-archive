@@ -153,6 +153,26 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     publishedAt: '2026-08-11',
   },
   {
+    slug: 'distill',
+    name: 'Distill',
+    creator: '@selkrei',
+    creatorHandle: 'selkrei',
+    summary:
+      'Search Twitter exports and Community Archive data in seconds.',
+    description:
+      'A fast search workspace for exploring Twitter exports and Community Archive data, with focused results and cited source posts.',
+    archiveUse:
+      'Loads participating accounts from Community Archive and searches their archived posts to answer questions with links back to the source posts.',
+    category: 'Tools',
+    tags: ['Search', 'Twitter exports', 'Citations'],
+    projectUrl: 'https://distill.org/',
+    sourceTweetId: '2043785461877850421',
+    image: '/images/community/distill-cover.jpg',
+    coverClass: 'from-[#f7f8fb] via-[#d8e8ff] to-[#6e81f4]',
+    featured: false,
+    publishedAt: '2026-04-13',
+  },
+  {
     slug: 'community-archive-radio',
     name: 'Community Archive Radio',
     creator: 'Joshua',

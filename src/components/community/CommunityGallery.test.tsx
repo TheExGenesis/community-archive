@@ -16,7 +16,7 @@ describe('CommunityGallery', () => {
         name: 'Discover community-made tools, bots, visualizations, and more',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText('8 projects')).toBeInTheDocument()
+    expect(screen.getByText('9 projects')).toBeInTheDocument()
 
     await user.type(
       screen.getByRole('searchbox', { name: 'Search community projects' }),
@@ -83,7 +83,7 @@ describe('CommunityGallery', () => {
       screen
         .getAllByRole('button')
         .filter((button) =>
-          /Bangers\.page|Tweet Harvest|Semantic Search|Malcolm Ocean's Links/.test(
+          /Bangers\.page|Tweet Harvest|Semantic Search|Malcolm Ocean's Links|Distill/.test(
             button.textContent ?? '',
           ),
         )
@@ -93,6 +93,7 @@ describe('CommunityGallery', () => {
       expect.stringContaining('Tweet Harvest'),
       expect.stringContaining('Semantic Search'),
       expect.stringContaining("Malcolm Ocean's Links"),
+      expect.stringContaining('Distill'),
     ])
   })
 

@@ -399,6 +399,7 @@ export default function SocialGraphExplorer({
   const workerRef = useRef<Worker | null>(null)
   const workerRequestRef = useRef(0)
   const workerSignatureRef = useRef('')
+  const completedPresetRecalculationRef = useRef(0)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hoverCandidateRef = useRef<string | null>(null)
   const layoutReferenceRef = useRef(
@@ -448,6 +449,8 @@ export default function SocialGraphExplorer({
   )
   const [isAdapting, setIsAdapting] = useState(false)
   const [adaptiveError, setAdaptiveError] = useState<string | null>(null)
+  const [presetRecalculationRequest, setPresetRecalculationRequest] =
+    useState(0)
   const deferredMinimumFollowers = useDeferredValue(minimumFollowers)
   const deferredMinimumStrength = useDeferredValue(minimumStrength)
   const deferredMaximumNodes = useDeferredValue(maximumNodes)
@@ -883,6 +886,25 @@ export default function SocialGraphExplorer({
   }, [requestAdaptiveGraph])
 
   useEffect(() => {
+    if (
+      presetRecalculationRequest === 0 ||
+      completedPresetRecalculationRef.current === presetRecalculationRequest ||
+      isPending ||
+      !workerRef.current ||
+      filtered.nodes.length < 2
+    ) {
+      return
+    }
+    completedPresetRecalculationRef.current = presetRecalculationRequest
+    requestAdaptiveGraph()
+  }, [
+    filtered.nodes.length,
+    isPending,
+    presetRecalculationRequest,
+    requestAdaptiveGraph,
+  ])
+
+  useEffect(() => {
     const renderer = rendererRef.current
     if (!renderer) return
     const focus = hoveredNodeId || selectedNodeId
@@ -1086,6 +1108,7 @@ export default function SocialGraphExplorer({
   }
 
   const applyPreset = (preset: 'core' | 'balanced' | 'broad') => {
+    setPresetRecalculationRequest((request) => request + 1)
     setPinnedNodeId(null)
     setSelectedNodeId(null)
     setFocusHistory([])

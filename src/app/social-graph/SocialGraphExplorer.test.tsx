@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 
 import '@testing-library/jest-dom'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { SocialGraphSnapshot } from '@/lib/socialGraph'
 import SocialGraphExplorer from './SocialGraphExplorer'
 
@@ -16,6 +16,7 @@ jest.mock('sigma', () => ({
     kill: jest.fn(),
     setSetting: jest.fn(),
     refresh: jest.fn(),
+    getCamera: jest.fn(() => ({ animatedReset: jest.fn() })),
   })),
 }))
 
@@ -165,4 +166,26 @@ describe('SocialGraphExplorer defaults', () => {
       )
     })
   })
+
+  it.each(['core', 'balanced', 'broad'])(
+    'recalculates groups and layout after applying the %s preset',
+    async (preset) => {
+      render(
+        <SocialGraphExplorer
+          snapshot={snapshot}
+          currentMember={{ accountId: 'a', username: 'alpha' }}
+        />,
+      )
+
+      await waitFor(() => {
+        expect(workerInstances[0].postMessage).toHaveBeenCalledTimes(1)
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: preset }))
+
+      await waitFor(() => {
+        expect(workerInstances[0].postMessage).toHaveBeenCalledTimes(2)
+      })
+    },
+  )
 })

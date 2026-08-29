@@ -1,15 +1,17 @@
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import type { ReactNode } from 'react'
+import { Suspense, type ReactNode } from 'react'
 import { cookies } from 'next/headers'
 import HomepageSearch from '@/components/HomepageSearch'
-import Portal from '@/components/portal/Portal'
 import Testimonials from '@/components/home/Testimonials'
-import { formatNumber } from '@/lib/formatNumber'
 import type { PortalData } from '@/lib/portal/types'
 import { createServerClient } from '@/utils/supabase'
-import { getLatestDigestPreview } from '@/lib/digest/data'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
+import {
+  HomepagePortal,
+  HomepagePortalFallback,
+  HomepageStats,
+} from '@/components/home/HomepageDataSections'
 
 const DynamicHeroCTAButtons = dynamic(
   () => import('@/components/HeroCTAButtons'),
@@ -36,7 +38,7 @@ const DynamicUploadArchiveSection = dynamic(
 )
 
 interface ClassicHomepageProps {
-  data: PortalData
+  data: Promise<PortalData>
   homepagePeople: ReactNode
   isMember: boolean
   showCta: boolean
@@ -50,7 +52,6 @@ export default async function ClassicHomepage({
 }: ClassicHomepageProps) {
   const cookieStore = cookies()
   const supabase = createServerClient(cookieStore)
-  const digestPreview = await getLatestDigestPreview()
 
   let isOptedIn = false
   if (showCta && isMember) {
@@ -68,42 +69,25 @@ export default async function ClassicHomepage({
     }
   }
 
-  // Guests only need the weekly preview on the homepage. Keep the historical
-  // series out of their RSC payload; the full explorer remains login-only.
-  const homepageData: PortalData = isMember
-    ? data
-    : {
-        ...data,
-        trends: { ...data.trends, years: [], series: [] },
-      }
-
   return (
     <main>
       <section className="overflow-hidden bg-card pb-16 pt-24 dark:bg-background md:pb-24 md:pt-36">
-        <div className="relative z-10 mx-auto w-full max-w-5xl space-y-12 px-4 text-center sm:px-6 lg:px-8 md:space-y-16">
+        <div className="relative z-10 mx-auto w-full max-w-5xl space-y-12 px-4 text-center sm:px-6 md:space-y-16 lg:px-8">
           <div className="space-y-4">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
               Community Archive
             </h1>
             <p className="text-xl leading-8 text-muted-foreground">
-              {data.failures.liveAnalytics || data.failures.memberCount ? (
-                <>
-                  We preserve public conversations as open source
-                  infrastructure.
-                </>
-              ) : (
-                <>
-                  We preserve{' '}
-                  <strong className="font-semibold text-foreground">
-                    {formatNumber(data.stats.totalTweets)} public tweets
-                  </strong>{' '}
-                  from{' '}
-                  <strong className="font-semibold text-foreground">
-                    {formatNumber(data.stats.accountCount)} community members
-                  </strong>
-                  .
-                </>
-              )}
+              <Suspense
+                fallback={
+                  <>
+                    We preserve public conversations as open source
+                    infrastructure.
+                  </>
+                }
+              >
+                <HomepageStats data={data} />
+              </Suspense>
             </p>
           </div>
 
@@ -146,13 +130,9 @@ export default async function ClassicHomepage({
       </section>
 
       <section className="bg-zinc-100/80 py-4 dark:bg-transparent sm:py-7">
-        <Portal
-          data={homepageData}
-          view="home"
-          isMember={isMember}
-          digestPreview={digestPreview}
-          embedded
-        />
+        <Suspense fallback={<HomepagePortalFallback />}>
+          <HomepagePortal data={data} isMember={isMember} />
+        </Suspense>
       </section>
 
       <section

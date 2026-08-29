@@ -25,7 +25,8 @@ shown in the historical prototype.
 - Sticky filter row below the 56px app header. Category chips sit left; a
   compact segmented sort and small submit button sit right.
 - Default browsing is grouped into curated category sections with a Petrona
-  title, one-line blurb, “Browse all” action, and up to three projects.
+  title and one-line blurb. Show every project in each section, wrapping into
+  additional rows instead of hiding projects behind a “Browse all” action.
   Searching or choosing a category switches to a single filtered grid.
 - Project grids use three columns when space allows, 26px gaps, and do not
   stretch sections with fewer than three items beyond their natural card width.

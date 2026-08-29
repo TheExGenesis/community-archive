@@ -16,7 +16,7 @@ describe('CommunityGallery', () => {
         name: 'Discover community-made tools, bots, visualizations, and more',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText('9 projects')).toBeInTheDocument()
+    expect(screen.getByText('10 projects')).toBeInTheDocument()
 
     await user.type(
       screen.getByRole('searchbox', { name: 'Search community projects' }),
@@ -58,32 +58,18 @@ describe('CommunityGallery', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('shows the curated Tools cards in the requested order', async () => {
+  it('shows every curated Tools card across rows in the requested order', async () => {
     const user = userEvent.setup()
     render(<CommunityGallery />)
 
     expect(
-      screen
-        .getAllByRole('button')
-        .filter((button) =>
-          /Bangers\.page|Tweet Harvest|Semantic Search/.test(
-            button.textContent ?? '',
-          ),
-        )
-        .map((button) => button.textContent),
-    ).toEqual([
-      expect.stringContaining('Bangers.page'),
-      expect.stringContaining('Tweet Harvest'),
-      expect.stringContaining('Semantic Search'),
-    ])
-
-    await user.click(screen.getByRole('button', { name: 'Tools' }))
-
+      screen.queryByRole('button', { name: 'Browse all tools' }),
+    ).not.toBeInTheDocument()
     expect(
       screen
         .getAllByRole('button')
         .filter((button) =>
-          /Bangers\.page|Tweet Harvest|Semantic Search|Malcolm Ocean's Links|Distill/.test(
+          /Bangers\.page|Tweet Harvest|Semantic Search|Malcolm Ocean's Links|Distill|Tweetscope/.test(
             button.textContent ?? '',
           ),
         )
@@ -94,7 +80,11 @@ describe('CommunityGallery', () => {
       expect.stringContaining('Semantic Search'),
       expect.stringContaining("Malcolm Ocean's Links"),
       expect.stringContaining('Distill'),
+      expect.stringContaining('Tweetscope'),
     ])
+
+    await user.click(screen.getByRole('button', { name: 'Tools' }))
+    expect(screen.getByText('6 projects')).toBeInTheDocument()
   })
 
   it('submits a project to the approval queue', async () => {

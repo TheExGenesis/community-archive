@@ -5,7 +5,7 @@ import {
 
 describe('community project catalog', () => {
   it('contains only verified entries with source posts and no prototype filler', () => {
-    expect(COMMUNITY_PROJECTS).toHaveLength(9)
+    expect(COMMUNITY_PROJECTS).toHaveLength(10)
     expect(COMMUNITY_PROJECTS).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'Ratio Radar' }),
@@ -73,6 +73,7 @@ describe('community project catalog', () => {
       'Semantic Search',
       "Malcolm Ocean's Links",
       'Distill',
+      'Tweetscope',
     ])
   })
 })

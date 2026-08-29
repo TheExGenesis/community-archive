@@ -157,8 +157,7 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     name: 'Distill',
     creator: '@selkrei',
     creatorHandle: 'selkrei',
-    summary:
-      'Search Twitter exports and Community Archive data in seconds.',
+    summary: 'Search Twitter exports and Community Archive data in seconds.',
     description:
       'A fast search workspace for exploring Twitter exports and Community Archive data, with focused results and cited source posts.',
     archiveUse:
@@ -171,6 +170,26 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     coverClass: 'from-[#f7f8fb] via-[#d8e8ff] to-[#6e81f4]',
     featured: false,
     publishedAt: '2026-04-13',
+  },
+  {
+    slug: 'tweetscope',
+    name: 'Tweetscope',
+    creator: 'Kifah',
+    creatorHandle: 'maskys_',
+    summary: 'Explore an account through visual maps, topics, and search.',
+    description:
+      'A visual Twitter account explorer that groups posts into topics and threads, making it easier to find themes, filter an archive, and search by text or meaning.',
+    archiveUse:
+      'Uses Community Archive tweets to build topic and thread clusters, interactive maps, filters, and text and semantic search for individual accounts.',
+    category: 'Tools',
+    tags: ['Visual maps', 'Topic discovery', 'Semantic search'],
+    projectUrl: 'https://tweetscope.maskys.com/',
+    sourceTweetId: '2032969834670207435',
+    sourceUrl: 'https://x.com/maskys_/status/2032969834670207435',
+    image: '/images/community/tweetscope-cover.png',
+    coverClass: 'from-[#0f1420] via-[#13243a] to-[#327bb2]',
+    featured: false,
+    publishedAt: '2026-03-14',
   },
   {
     slug: 'community-archive-radio',

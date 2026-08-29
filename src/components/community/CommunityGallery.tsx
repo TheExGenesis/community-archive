@@ -613,27 +613,20 @@ export default function CommunityGallery({
 
         {projects.length && isCurated
           ? CURATED_SECTIONS.map((section) => {
-              const sectionProjects = projects
-                .filter((project) => project.category === section.category)
-                .slice(0, 3)
+              const sectionProjects = projects.filter(
+                (project) => project.category === section.category,
+              )
               if (!sectionProjects.length) return null
 
               return (
                 <section key={section.category} className="pb-12 pt-[38px]">
-                  <div className="mb-5 flex flex-wrap items-end justify-between gap-5">
+                  <div className="mb-5">
                     <div>
                       <h2 className="text-2xl font-bold">{section.category}</h2>
                       <p className="mt-1 text-[14.5px] text-muted-foreground">
                         {section.blurb}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setCategory(section.category)}
-                      className="text-sm font-semibold text-brand"
-                    >
-                      Browse all {section.category.toLowerCase()} ›
-                    </button>
                   </div>
                   <div
                     className="grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-[26px]"

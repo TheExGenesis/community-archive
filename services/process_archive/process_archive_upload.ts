@@ -17,8 +17,19 @@ import {
   type ArchivePolicyCandidate,
   type ArchivePolicyDecisions,
   attemptArchiveClickHouseDelivery,
+  buildArchiveClickHouseBatch,
+  buildArchiveTombstoneBatch,
+  collectArchivePolicyCandidates,
   createArchiveClickHouseManifest,
 } from './archive_clickhouse'
+import {
+  canonicalArchivePolicyVersion,
+  canonicalArchiveShadowEnabled,
+  ensureCanonicalArchivePendingReport,
+  pendingCanonicalArchiveReportIds,
+  publishCanonicalArchiveBatch,
+  safeCanonicalArchiveErrorCode,
+} from './canonical_archive'
 
 // Configuration
 const CONFIG = {
@@ -44,6 +55,13 @@ const CONFIG = {
     process.env.CLICKHOUSE_DATABASE || 'community_archive',
   CLICKHOUSE_USER: process.env.CLICKHOUSE_USER,
   CLICKHOUSE_PASSWORD: process.env.CLICKHOUSE_PASSWORD,
+  CANONICAL_ARCHIVE_RETRY_BATCH: Math.max(
+    1,
+    Math.min(
+      50,
+      parseInt(process.env.CANONICAL_ARCHIVE_RETRY_BATCH || '5', 10),
+    ),
+  ),
 } as const
 
 export async function createServerScriptClient() {
@@ -992,6 +1010,136 @@ async function resolveArchivePolicyDecisions(
   )
 }
 
+async function buildPolicySafeCanonicalArchiveBatch(
+  sql: Sql,
+  delivery: ArchiveClickHouseDelivery,
+  archive?: any,
+) {
+  const manifest = {
+    archiveUploadId: String(delivery.archive_upload_id),
+    accountId: String(delivery.account_id),
+    tweetIds: (delivery.tweet_ids ?? []).map(String),
+  }
+  return sql.begin(async (transaction) => {
+    const trx = transaction as unknown as Sql
+    await trx`SELECT public.lock_policy_account(${manifest.accountId})`
+    const [policy] = await trx`
+      SELECT public.policy_account_is_blocked(
+        ${manifest.accountId},
+        ${delivery.username ?? null}
+      ) AS blocked
+    `
+    const ownerBlocked = policy?.blocked === true
+    let decisions: ArchivePolicyDecisions = new Map()
+    let batch
+    if (ownerBlocked) {
+      batch = buildArchiveTombstoneBatch(manifest)
+    } else {
+      const source =
+        archive ??
+        (delivery.username
+          ? patchArchive(await loadArchiveData(delivery.username))
+          : null)
+      if (!source) {
+        throw new ArchiveClickHouseError('archive_source_unavailable')
+      }
+      const sourceManifest = createArchiveClickHouseManifest(
+        source,
+        manifest.archiveUploadId,
+      )
+      if (
+        sourceManifest.accountId !== manifest.accountId ||
+        sourceManifest.tweetIds.join(',') !== manifest.tweetIds.join(',')
+      ) {
+        throw new ArchiveClickHouseError('archive_manifest_mismatch')
+      }
+      decisions = await resolveArchivePolicyDecisions(
+        trx,
+        collectArchivePolicyCandidates(source),
+      )
+      batch = buildArchiveClickHouseBatch(source, manifest, decisions)
+    }
+    return {
+      batch,
+      manifest,
+      policyVersion: canonicalArchivePolicyVersion(
+        manifest,
+        ownerBlocked,
+        decisions,
+      ),
+    }
+  })
+}
+
+async function attemptCanonicalArchiveShadow(
+  sql: Sql,
+  delivery: ArchiveClickHouseDelivery,
+  archive?: any,
+): Promise<void> {
+  if (!canonicalArchiveShadowEnabled()) return
+  try {
+    ensureCanonicalArchivePendingReport(
+      String(delivery.archive_upload_id),
+      logsDir,
+    )
+    const prepared = await buildPolicySafeCanonicalArchiveBatch(
+      sql,
+      delivery,
+      archive,
+    )
+    const report = await publishCanonicalArchiveBatch({
+      ...prepared,
+      reportDir: logsDir,
+    })
+    logger.info(
+      `Canonical archive shadow ${report.status} (archive_upload_id=${delivery.archive_upload_id})`,
+    )
+  } catch (error) {
+    logger.warn(
+      `Canonical archive shadow remains pending (archive_upload_id=${delivery.archive_upload_id}, code=${safeCanonicalArchiveErrorCode(error)})`,
+    )
+  }
+}
+
+async function retryPendingCanonicalArchiveShadows(sql: Sql): Promise<void> {
+  if (!canonicalArchiveShadowEnabled()) return
+  const archiveUploadIds = pendingCanonicalArchiveReportIds(logsDir).slice(
+    0,
+    CONFIG.CANONICAL_ARCHIVE_RETRY_BATCH,
+  )
+  for (const archiveUploadId of archiveUploadIds) {
+    try {
+      const rows = await sql`
+        SELECT
+          upload.id AS archive_upload_id,
+          upload.account_id,
+          upload.username,
+          delivery.tweet_ids
+        FROM public.archive_upload AS upload
+        JOIN private.archive_clickhouse_delivery AS delivery
+          ON delivery.archive_upload_id = upload.id
+        WHERE upload.id = ${archiveUploadId}
+          AND upload.upload_phase = 'completed'
+        LIMIT 1
+      `
+      if (rows.length !== 1) {
+        logger.warn(
+          `Canonical archive retry skipped missing completed upload (archive_upload_id=${archiveUploadId})`,
+        )
+        continue
+      }
+      await attemptCanonicalArchiveShadow(
+        sql,
+        rows[0] as ArchiveClickHouseDelivery,
+      )
+    } catch {
+      logger.warn(
+        `Canonical archive retry failed without affecting archive processing (archive_upload_id=${archiveUploadId})`,
+      )
+    }
+  }
+}
+
 async function attemptClickHouseDelivery(
   sql: Sql,
   sink: ArchiveClickHouseSink,
@@ -1139,6 +1287,8 @@ async function main() {
       }
     }
 
+    await retryPendingCanonicalArchiveShadows(sql)
+
     logger.info('Fetching archive_upload records ready for processing...')
 
     const ready = await sql`
@@ -1210,6 +1360,20 @@ async function main() {
             archive,
           )
         }
+
+        await attemptCanonicalArchiveShadow(
+          sql,
+          {
+            archive_upload_id: archiveUploadId,
+            account_id,
+            tweet_ids: createArchiveClickHouseManifest(
+              archive,
+              archiveUploadId,
+            ).tweetIds,
+            username,
+          },
+          archive,
+        )
 
         // Force GC between accounts
         if (global.gc) {

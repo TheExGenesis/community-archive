@@ -352,7 +352,13 @@ test('delivery manifest is content-free and historical uploads are not seeded', 
     'await attemptClickHouseDelivery(',
     completion,
   )
-  assert.ok(completion >= 0 && directSink > completion)
+  const canonicalShadow = processor.indexOf(
+    'await attemptCanonicalArchiveShadow(',
+    directSink,
+  )
+  assert.ok(
+    completion >= 0 && directSink > completion && canonicalShadow > directSink,
+  )
   assert.match(processor, /jsonb_array_elements\(\$\{trx\.json\(candidates as never\)\}::jsonb\)/)
   assert.doesNotMatch(processor, /JSON\.stringify\(candidates\)/)
 })

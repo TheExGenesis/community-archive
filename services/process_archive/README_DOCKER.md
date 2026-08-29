@@ -67,6 +67,30 @@ MAX_MEMORY_MB=1000
 DEV_ARCHIVE_PATH=/path/to/test/archive.json
 ```
 
+### Disabled canonical queue shadow
+
+Newly completed uploads can publish the same policy-safe normalized batch to
+the retained canonical queue after the existing PostgreSQL and optional
+ClickHouse paths finish. This lane is inert unless
+`CANONICAL_ARCHIVE_SHADOW_PUBLISH_ENABLED=true`.
+
+```bash
+CANONICAL_ARCHIVE_SHADOW_PUBLISH_ENABLED=false
+CANONICAL_ARCHIVE_RETRY_BATCH=5
+CANONICAL_PUBLISH_URL=https://firehose-host/internal/canonical-ingest
+CANONICAL_PUBLISHER_API_KEY=replace-with-dedicated-runtime-secret
+CANONICAL_PUBLISH_BATCH_SIZE=100
+CANONICAL_PUBLISH_TIMEOUT_SECONDS=30
+```
+
+The publisher reloads PostgreSQL policy, and the firehose independently
+rechecks policy before accepting each batch. Failures never change an upload's
+completed state or its current ClickHouse delivery. IDs-only retry checkpoints
+are written under `logs/canonical_archive_<upload-id>.json`; the mounted logs
+directory lets later cron runs resume them without storing archive content or
+credentials. Do not enable the flag until the firehose publisher, retained
+stream, and queue-capacity alerting have been deployed and verified.
+
 ## Execution Options
 
 ### Option 1: Docker Compose Run (Recommended)

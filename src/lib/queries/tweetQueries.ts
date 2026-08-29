@@ -33,8 +33,6 @@ export interface FilterCriteria {
 export type TweetSearchSort = 'newest' | 'oldest' | 'likes' | 'reposts'
 
 const DEFAULT_PAGE_SIZE = 50
-const CLICKHOUSE_FILTER_PAGE_SIZE = 50
-const MAX_CLICKHOUSE_FILTER_PAGES = 10
 
 export function isRetweetText(text: string): boolean {
   return /^RT @[A-Za-z0-9_]+/.test(text)
@@ -130,33 +128,7 @@ async function searchClickHousePage(
   page: number,
   pageSize: number,
 ): Promise<TimelineTweet[]> {
-  if (!criteria.excludeRetweets) {
-    return searchTweetsWithClickHouse(criteria, page, pageSize)
-  }
-
-  const pageStart = (page - 1) * pageSize
-  const pageEnd = page * pageSize
-  const nonRetweets: TimelineTweet[] = []
-
-  // ClickHouse does not yet expose a retweet predicate, so scan bounded raw
-  // pages from the start to keep filtered pagination deterministic and full.
-  for (
-    let rawPage = 1;
-    rawPage <= MAX_CLICKHOUSE_FILTER_PAGES && nonRetweets.length < pageEnd;
-    rawPage += 1
-  ) {
-    const chunk = await searchTweetsWithClickHouse(
-      criteria,
-      rawPage,
-      CLICKHOUSE_FILTER_PAGE_SIZE,
-    )
-    nonRetweets.push(
-      ...chunk.filter((tweet) => !isRetweetText(tweet.full_text)),
-    )
-    if (chunk.length < CLICKHOUSE_FILTER_PAGE_SIZE) break
-  }
-
-  return nonRetweets.slice(pageStart, pageEnd)
+  return searchTweetsWithClickHouse(criteria, page, pageSize)
 }
 
 /**

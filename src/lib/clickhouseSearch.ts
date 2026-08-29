@@ -141,7 +141,9 @@ export async function searchTweetsWithClickHouse(
   pageSize: number,
   fetchImpl: typeof fetch = fetch,
 ): Promise<TimelineTweet[]> {
-  return requestClickHouseTweets(criteria, page, pageSize, fetchImpl)
+  return requestClickHouseTweets(criteria, page, pageSize, fetchImpl, {
+    excludeRetweets: criteria.excludeRetweets,
+  })
 }
 
 export function canPreviewTweetSearch(

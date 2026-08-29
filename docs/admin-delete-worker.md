@@ -17,6 +17,12 @@ operational tooling keeps working. The worker no longer exports content.
 5. The legacy retention sweep removes old contentful export folders immediately;
    paths below `tombstones/` are retained.
 
+An optional `CANONICAL_ADMIN_DELETE_SHADOW_PUBLISH_ENABLED=true` step runs only
+after item 4. It sends content-free account and tweet tombstones to the
+canonical publisher with a dedicated credential. Its failure is isolated from
+the established deletion result, and it is disabled by default. PostgreSQL
+remains the policy authority; this shadow copy is not a transactional outbox.
+
 The manifest contains only its format version, account ID, tweet IDs,
 `content_free: true`, and completion timestamp. It must not contain username,
 tweet text, profile fields, raw archives, opt-out reasons, requester identity, or

@@ -48,6 +48,7 @@ describe('searchTweetsWithClickHouse', () => {
         startDate: '2024-01-01',
         endDate: '2025-01-01',
         sort: 'likes',
+        excludeRetweets: true,
       },
       2,
       20,
@@ -55,7 +56,7 @@ describe('searchTweetsWithClickHouse', () => {
     )
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      '/api/tweet-search?q=Open+source&mode=phrase&limit=20&offset=20&from_user=alice&reply_to_user=bob&since=2024-01-01&until=2025-01-01&sort=likes',
+      '/api/tweet-search?q=Open+source&mode=phrase&limit=20&offset=20&from_user=alice&reply_to_user=bob&since=2024-01-01&until=2025-01-01&sort=likes&exclude_retweets=true',
       { cache: 'no-store' },
     )
     expect(tweets).toEqual([

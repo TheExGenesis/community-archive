@@ -5,7 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 import type { ArchiveClickHouseBatch } from './archive_clickhouse'
 import {
-  buildCanonicalArchiveEvents,
+  buildCanonicalArchiveMutations,
   canonicalArchivePolicyVersion,
   ensureCanonicalArchivePendingReport,
   pendingCanonicalArchiveReportIds,
@@ -107,39 +107,9 @@ function withPublisherEnvironment(
   })
 }
 
-test('archive event hashes match the firehose TypeScript contract fixture', () => {
-  const batch = emptyBatch()
-  batch.tweet_content_versions.push({
-    tweet_id: '5001',
-    account_id: '6001',
-    full_text: 'allowed content',
-    is_tombstone: 0,
-    source: 'archive_upload',
-    event_id: 'tweet:5001',
-    observed_at: '2026-08-29T03:00:00.000Z',
-  })
-  const [event] = buildCanonicalArchiveEvents(
-    batch,
-    manifest,
-    'policy-1',
-    '2026-08-29T03:10:00.000Z',
-  )
-
-  assert.equal(
-    event.payload_hash,
-    '21ca72ebb9cb0cc8133efb5a6618b75ae5a33d3c45bc131c34e27eabee8aab81',
-  )
-  assert.equal(
-    event.event_id,
-    '8d2454d7aff296ad3054b42955ace67dd7d1506e8c3df1b262994356ccb34170',
-  )
-})
-
 test('maps policy-safe sink rows and omits the serving projection', () => {
-  const events = buildCanonicalArchiveEvents(
+  const events = buildCanonicalArchiveMutations(
     fixtureBatch(),
-    manifest,
-    'policy-1',
   )
   const byType = new Map(events.map((event) => [event.entity_type, event]))
 
@@ -153,10 +123,8 @@ test('maps policy-safe sink rows and omits the serving projection', () => {
 })
 
 test('converts content-free policy rows to canonical tombstones', () => {
-  const events = buildCanonicalArchiveEvents(
+  const events = buildCanonicalArchiveMutations(
     fixtureBatch(true),
-    manifest,
-    'policy-1',
   )
   const account = events.find((event) => event.entity_type === 'account')
   const tweet = events.find((event) => event.entity_type === 'tweet_content')
@@ -167,9 +135,8 @@ test('converts content-free policy rows to canonical tombstones', () => {
   assert.equal(account?.operation, 'tombstone')
   assert.equal(account?.payload.is_tombstone, true)
   assert.equal(tweet?.operation, 'tombstone')
-  assert.equal(tweet?.payload.full_text, '')
-  assert.equal(provenance?.operation, 'tombstone')
-  assert.equal(provenance?.payload.is_tombstone, true)
+  assert.equal(tweet?.payload.full_text, undefined)
+  assert.equal(provenance, undefined)
 })
 
 test('policy version changes only when a relevant decision changes', () => {
@@ -183,7 +150,7 @@ test('policy version changes only when a relevant decision changes', () => {
   )
 })
 
-test('publisher checkpoints batches and skips them on a retry', async () => {
+test('publisher resubmits thin batches for server dedupe on retry', async () => {
   await withPublisherEnvironment(async () => {
     const directory = fs.mkdtempSync(
       path.join(os.tmpdir(), 'canonical-archive-'),
@@ -192,13 +159,14 @@ test('publisher checkpoints batches and skips them on a retry', async () => {
     const fetchImpl = (async (_input, init) => {
       const body = JSON.parse(String(init?.body))
       calls.push(
-        body.events.map((event: { event_id: string }) => event.event_id),
+        body.batches.map((event: { source_batch_id: string }) => event.source_batch_id),
       )
       return new Response(
         JSON.stringify({
-          accepted: body.events.map(
-            (event: { event_id: string }, index: number) => ({
-              event_id: event.event_id,
+          accepted: body.batches.map(
+            (event: { source_batch_id: string }, index: number) => ({
+              source_batch_id: event.source_batch_id,
+              event_id: 'a'.repeat(64),
               message_id: `1-${index}`,
               duplicate: false,
             }),
@@ -223,7 +191,7 @@ test('publisher checkpoints batches and skips them on a retry', async () => {
       )
       const report = JSON.parse(reportText)
       assert.equal(report.status, 'complete')
-      assert.equal(calls.length, 2)
+      assert.equal(calls.length, 4)
       assert.equal(calls.flat().length, 4)
       assert.equal(reportText.includes('publisher-secret'), false)
       assert.equal(reportText.includes('allowed content'), false)

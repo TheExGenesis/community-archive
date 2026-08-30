@@ -195,29 +195,41 @@ function ProjectDialog({
                 </p>
               </div>
               <DialogFooter>
-                <Button asChild variant="outline">
-                  <Link
-                    href={
-                      project.sourceUrl ?? `/tweets/${project.sourceTweetId}`
-                    }
-                    target={project.sourceUrl ? '_blank' : undefined}
-                    rel={project.sourceUrl ? 'noopener noreferrer' : undefined}
-                  >
-                    View source post
-                  </Link>
-                </Button>
+                {(project.sourceUrl || project.sourceTweetId) && (
+                  <Button asChild variant="outline">
+                    <Link
+                      href={
+                        project.sourceUrl ?? `/tweets/${project.sourceTweetId}`
+                      }
+                      target={project.sourceUrl ? '_blank' : undefined}
+                      rel={
+                        project.sourceUrl ? 'noopener noreferrer' : undefined
+                      }
+                    >
+                      View source post
+                    </Link>
+                  </Button>
+                )}
                 {project.projectUrl ? (
                   <Button
                     asChild
                     className="bg-brand text-brand-foreground hover:bg-brand/90"
                   >
-                    <a
+                    <Link
                       href={project.projectUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      target={
+                        project.projectUrl.startsWith('/')
+                          ? undefined
+                          : '_blank'
+                      }
+                      rel={
+                        project.projectUrl.startsWith('/')
+                          ? undefined
+                          : 'noopener noreferrer'
+                      }
                     >
                       Open project <ArrowUpRight className="ml-2 h-4 w-4" />
-                    </a>
+                    </Link>
                   </Button>
                 ) : null}
               </DialogFooter>

@@ -16,7 +16,7 @@ describe('CommunityGallery', () => {
         name: 'Discover community-made tools, bots, visualizations, and more',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText('10 projects')).toBeInTheDocument()
+    expect(screen.getByText('11 projects')).toBeInTheDocument()
 
     await user.type(
       screen.getByRole('searchbox', { name: 'Search community projects' }),
@@ -55,6 +55,29 @@ describe('CommunityGallery', () => {
     )
     expect(
       screen.queryByRole('link', { name: /View full page/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('opens the Conversation Map internally without inventing a source post', async () => {
+    const user = userEvent.setup()
+    render(<CommunityGallery />)
+    await user.click(
+      screen.getByRole('button', {
+        name: /Conversation Map.*Community Archive/i,
+      }),
+    )
+    expect(
+      screen.getByRole('dialog', { name: 'Conversation Map' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Open project/i })).toHaveAttribute(
+      'href',
+      '/conversation-map',
+    )
+    expect(
+      screen.getByRole('link', { name: /Open project/i }),
+    ).not.toHaveAttribute('target')
+    expect(
+      screen.queryByRole('link', { name: 'View source post' }),
     ).not.toBeInTheDocument()
   })
 

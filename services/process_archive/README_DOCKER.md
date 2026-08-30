@@ -91,7 +91,10 @@ directory lets later cron runs retry them without storing archive content or
 credentials. Each request contains one thin submission with at most
 `CANONICAL_PUBLISH_BATCH_SIZE` mutations (default/maximum 100), capped at 1 MiB.
 Firehose owns canonical IDs/hashes/policy stamps; retries resubmit to the server
-instead of trusting local completed-batch markers. Identifier-only tombstones
+instead of trusting local completed-batch markers. Canonical observation time
+comes from the existing delivery row's immutable `created_at`, including on
+retry; rebuilding the same archive must not manufacture new event versions.
+Missing source time fails only shadow publication. Identifier-only tombstones
 do not carry content or provenance edges. Source-retraction commands and
 user-facing delete actions are not enabled by this publisher.
 Do not enable the flag until the firehose publisher, retained

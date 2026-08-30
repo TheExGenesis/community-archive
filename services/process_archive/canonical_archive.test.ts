@@ -6,11 +6,13 @@ import test from 'node:test'
 import type { ArchiveClickHouseBatch } from './archive_clickhouse'
 import {
   buildCanonicalArchiveMutations,
+  canonicalArchiveObservedAt,
   canonicalArchivePolicyVersion,
   ensureCanonicalArchivePendingReport,
   pendingCanonicalArchiveReportIds,
   publishCanonicalArchiveBatch,
 } from './canonical_archive'
+import { buildArchiveClickHouseBatch, createArchiveClickHouseManifest } from './archive_clickhouse'
 
 const manifest = {
   archiveUploadId: '9',
@@ -120,6 +122,21 @@ test('maps policy-safe sink rows and omits the serving projection', () => {
     false,
   )
   assert.equal(JSON.stringify(events).includes('projection copy'), false)
+})
+
+test('rebuilding an archive on retry preserves source versions and canonical identity input', () => {
+  const sourceTime = '2026-08-30T12:00:00.000Z'
+  const archive = { account: [{ account: { accountId: '6001', username: 'alice', accountDisplayName: 'Alice' } }],
+    tweets: [{ tweet: { id_str: '5001', created_at: sourceTime, full_text: 'allowed content',
+      favorite_count: 2, retweet_count: 1, entities: { urls: [], user_mentions: [], media: [] } } }] }
+  const sourceManifest = createArchiveClickHouseManifest(archive, '9')
+  const rebuild = (value: unknown) => buildCanonicalArchiveMutations(buildArchiveClickHouseBatch(
+    archive, sourceManifest, new Map(), canonicalArchiveObservedAt(value),
+  ))
+  assert.deepEqual(rebuild(sourceTime), rebuild(new Date(sourceTime)))
+  assert(rebuild(sourceTime).every((mutation) => mutation.version === String(Date.parse(sourceTime))))
+  assert.throws(() => canonicalArchiveObservedAt(undefined), /source_time_missing/)
+  assert.throws(() => canonicalArchiveObservedAt('invalid'), /source_time_invalid/)
 })
 
 test('converts content-free policy rows to canonical tombstones', () => {

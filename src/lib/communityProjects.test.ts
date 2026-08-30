@@ -5,7 +5,7 @@ import {
 
 describe('community project catalog', () => {
   it('contains only verified entries with source posts and no prototype filler', () => {
-    expect(COMMUNITY_PROJECTS).toHaveLength(10)
+    expect(COMMUNITY_PROJECTS).toHaveLength(11)
     expect(COMMUNITY_PROJECTS).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'Ratio Radar' }),
@@ -14,7 +14,10 @@ describe('community project catalog', () => {
     )
 
     for (const project of COMMUNITY_PROJECTS) {
-      expect(project.sourceTweetId).toMatch(/^\d+$/)
+      if (project.slug === 'conversation-map') {
+        expect(project.projectUrl).toBe('/conversation-map')
+        expect(project.sourceTweetId).toBeUndefined()
+      } else expect(project.sourceTweetId).toMatch(/^\d+$/)
       expect(project.projectUrl ?? '').not.toContain('example.com')
       expect(project.image ?? '').not.toContain('pbs.twimg.com')
     }
@@ -44,7 +47,7 @@ describe('community project catalog', () => {
       'All',
       'Newest',
     )
-    expect(newest[0].name).toBe('Followle')
+    expect(newest[0].name).toBe('Conversation Map')
 
     const alphabetical = filterCommunityProjects(
       COMMUNITY_PROJECTS,

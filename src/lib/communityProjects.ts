@@ -25,7 +25,7 @@ export interface CommunityProject {
   category: CommunityProjectCategory
   tags: string[]
   projectUrl?: string
-  sourceTweetId: string
+  sourceTweetId?: string
   sourceUrl?: string
   image?: string
   coverClass: string
@@ -35,10 +35,26 @@ export interface CommunityProject {
 
 /**
  * Curated community-made projects verified against the public Community
- * Archive thread rooted at tweet 1961022793023119441. First-party Community
- * Archive tools and fictional prototype entries are intentionally excluded.
+ * Archive thread rooted at tweet 1961022793023119441, plus the explicitly
+ * requested first-party Conversation Map. Never fabricate a launch post.
  */
 export const COMMUNITY_PROJECTS: CommunityProject[] = [
+  {
+    slug: 'conversation-map',
+    name: 'Conversation Map',
+    creator: 'Community Archive',
+    summary: 'Explore a year of conversations, one memorable post at a time.',
+    description:
+      'A zoomable map of the most-quoted community posts each year. Scroll to uncover more labels, pan through time, and hover to read the original posts and images.',
+    archiveUse:
+      'Loads up to 200 member-authored posts per year from the archive’s current banger ranking. Height shows community quotes, with source links to Community Archive tweet pages.',
+    category: 'Experiments',
+    tags: ['Timeline', 'Conversations', 'Visualization'],
+    projectUrl: '/conversation-map',
+    coverClass: 'from-[#d7e4ef] via-[#8bd2ee] to-[#1e9bcd]',
+    featured: true,
+    publishedAt: '2026-08-30',
+  },
   {
     slug: 'bangers-page',
     name: 'Bangers.page',

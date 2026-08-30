@@ -87,8 +87,14 @@ The publisher reloads PostgreSQL policy, and the firehose independently
 rechecks policy before accepting each batch. Failures never change an upload's
 completed state or its current ClickHouse delivery. IDs-only retry checkpoints
 are written under `logs/canonical_archive_<upload-id>.json`; the mounted logs
-directory lets later cron runs resume them without storing archive content or
-credentials. Do not enable the flag until the firehose publisher, retained
+directory lets later cron runs retry them without storing archive content or
+credentials. Each request contains one thin submission with at most
+`CANONICAL_PUBLISH_BATCH_SIZE` mutations (default/maximum 100), capped at 1 MiB.
+Firehose owns canonical IDs/hashes/policy stamps; retries resubmit to the server
+instead of trusting local completed-batch markers. Identifier-only tombstones
+do not carry content or provenance edges. Source-retraction commands and
+user-facing delete actions are not enabled by this publisher.
+Do not enable the flag until the firehose publisher, retained
 stream, and queue-capacity alerting have been deployed and verified.
 
 ## Execution Options

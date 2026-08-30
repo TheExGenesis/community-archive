@@ -7,7 +7,6 @@ import type {
   ArchivePolicyDecisions,
 } from './archive_clickhouse'
 
-const SCHEMA_VERSION = 'canonical_ingest_v1'
 const SOURCE = 'archive_upload'
 const REPORT_VERSION = 1
 const MAX_BATCH_SIZE = 100
@@ -21,21 +20,13 @@ type CanonicalEntityType =
   | 'mention'
   | 'relationship'
 
-export interface CanonicalIngestEvent {
-  event_id: string
-  schema_version: typeof SCHEMA_VERSION
-  source: typeof SOURCE
-  source_run_id: string
+export interface CanonicalMutation {
   source_event_id: string
   entity_type: CanonicalEntityType
   entity_key: string
   operation: 'upsert' | 'tombstone'
-  observed_at: string
-  emitted_at: string
   version: string
-  policy_version: string
   payload: Record<string, unknown>
-  payload_hash: string
 }
 
 interface CanonicalPublishReport {
@@ -105,77 +96,6 @@ function assertPlainObject(
   }
 }
 
-function assertValidUnicode(value: string): void {
-  for (let index = 0; index < value.length; index += 1) {
-    const codeUnit = value.charCodeAt(index)
-    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
-      const next = value.charCodeAt(index + 1)
-      if (!(next >= 0xdc00 && next <= 0xdfff)) {
-        throw new CanonicalArchivePublisherError('invalid_unicode')
-      }
-      index += 1
-    } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
-      throw new CanonicalArchivePublisherError('invalid_unicode')
-    }
-  }
-}
-
-function serializeCanonicalJson(
-  value: unknown,
-  ancestors: Set<object>,
-): string {
-  if (value === null || typeof value === 'boolean') return JSON.stringify(value)
-  if (typeof value === 'string') {
-    assertValidUnicode(value)
-    return JSON.stringify(value)
-  }
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) {
-      throw new CanonicalArchivePublisherError('non_finite_number')
-    }
-    return JSON.stringify(value)
-  }
-  if (Array.isArray(value)) {
-    if (ancestors.has(value)) {
-      throw new CanonicalArchivePublisherError('cyclic_json')
-    }
-    ancestors.add(value)
-    try {
-      return `[${value
-        .map((item) => serializeCanonicalJson(item, ancestors))
-        .join(',')}]`
-    } finally {
-      ancestors.delete(value)
-    }
-  }
-  assertPlainObject(value, 'canonical_payload')
-  if (ancestors.has(value)) {
-    throw new CanonicalArchivePublisherError('cyclic_json')
-  }
-  ancestors.add(value)
-  try {
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => {
-        assertValidUnicode(key)
-        if (value[key] === undefined) {
-          throw new CanonicalArchivePublisherError('undefined_json_value')
-        }
-        return `${JSON.stringify(key)}:${serializeCanonicalJson(
-          value[key],
-          ancestors,
-        )}`
-      })
-      .join(',')}}`
-  } finally {
-    ancestors.delete(value)
-  }
-}
-
-export function canonicalJson(value: unknown): string {
-  return serializeCanonicalJson(value, new Set())
-}
-
 function versionForObservedAt(observedAt: string): string {
   const milliseconds = Date.parse(observedAt)
   if (!Number.isSafeInteger(milliseconds) || milliseconds < 0) {
@@ -217,33 +137,9 @@ function entityKey(
   return `${payload.tweet_id}|${payload.relationship_type}|${payload.related_tweet_id}`
 }
 
-function createEvent(
-  input: Omit<CanonicalIngestEvent, 'event_id' | 'payload_hash'>,
-) {
-  const payloadHash = sha256(canonicalJson(input.payload))
-  const eventId = sha256(
-    [
-      input.schema_version,
-      input.source,
-      input.source_run_id,
-      input.source_event_id,
-      input.entity_type,
-      input.entity_key,
-      input.operation,
-      input.version,
-      payloadHash,
-    ].join('\0'),
-  )
-  return { ...input, event_id: eventId, payload_hash: payloadHash }
-}
-
-export function buildCanonicalArchiveEvents(
+export function buildCanonicalArchiveMutations(
   batch: ArchiveClickHouseBatch,
-  manifest: ArchiveClickHouseManifest,
-  policyVersion: string,
-  emittedAt = new Date().toISOString(),
-): CanonicalIngestEvent[] {
-  const sourceRunId = `archive:${manifest.archiveUploadId}`
+): CanonicalMutation[] {
   const tweetAuthors = new Map(
     batch.tweet_content_versions.map((row) => [
       String(row.tweet_id),
@@ -255,7 +151,7 @@ export function buildCanonicalArchiveEvents(
       .filter((row) => row.is_tombstone === 1)
       .map((row) => String(row.tweet_id)),
   )
-  const byEntity = new Map<string, CanonicalIngestEvent>()
+  const byEntity = new Map<string, CanonicalMutation>()
 
   for (const [table, rows] of Object.entries(batch) as [
     keyof ArchiveClickHouseBatch,
@@ -264,7 +160,7 @@ export function buildCanonicalArchiveEvents(
     const entityType = TABLE_ENTITY_TYPES[table]
     if (!entityType) continue
     for (const row of rows) {
-      const payload = payloadWithoutProjectionMetadata(row)
+      let payload = payloadWithoutProjectionMetadata(row)
       if (payload.account_id === undefined) {
         const author = tweetAuthors.get(String(payload.tweet_id ?? ''))
         if (!author) {
@@ -282,20 +178,21 @@ export function buildCanonicalArchiveEvents(
       }
       const key = entityKey(entityType, payload)
       const observedAt = String(row.observed_at ?? '')
-      const event = createEvent({
-        schema_version: SCHEMA_VERSION,
-        source: SOURCE,
-        source_run_id: sourceRunId,
+      const tombstone = payload.is_tombstone === true
+      if (tombstone) {
+        if (entityType !== 'account' && entityType !== 'tweet_content') continue
+        payload = entityType === 'account'
+          ? { account_id: payload.account_id, is_tombstone: true }
+          : { account_id: payload.account_id, tweet_id: payload.tweet_id, is_tombstone: true }
+      }
+      const event: CanonicalMutation = {
         source_event_id: String(row.event_id ?? ''),
         entity_type: entityType,
         entity_key: key,
         operation: payload.is_tombstone === true ? 'tombstone' : 'upsert',
-        observed_at: observedAt,
-        emitted_at: emittedAt,
         version: versionForObservedAt(observedAt),
-        policy_version: policyVersion,
         payload,
-      })
+      }
       byEntity.set(`${entityType}\0${key}`, event)
     }
   }
@@ -391,34 +288,6 @@ function newReport(
   }
 }
 
-function loadReport(
-  reportPath: string,
-  manifest: ArchiveClickHouseManifest,
-  eventCount: number,
-  policyVersion: string,
-): CanonicalPublishReport {
-  try {
-    const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'))
-    if (
-      report.schema_version === REPORT_VERSION &&
-      report.archive_upload_id === manifest.archiveUploadId &&
-      report.source_run_id === `archive:${manifest.archiveUploadId}` &&
-      report.completed_batches !== null &&
-      typeof report.completed_batches === 'object' &&
-      !Array.isArray(report.completed_batches)
-    ) {
-      return {
-        ...report,
-        status: 'publishing',
-        event_count: eventCount,
-        policy_version: policyVersion,
-        updated_at: new Date().toISOString(),
-      }
-    }
-  } catch {}
-  return newReport(manifest, eventCount, policyVersion)
-}
-
 function writeReport(reportPath: string, report: CanonicalPublishReport): void {
   fs.mkdirSync(path.dirname(reportPath), { recursive: true })
   const temporaryPath = `${reportPath}.${process.pid}.${randomUUID()}.tmp`
@@ -468,15 +337,15 @@ function chunks<T>(values: T[], size: number): T[][] {
   return result
 }
 
-function batchHash(events: CanonicalIngestEvent[]): string {
-  return sha256(events.map((event) => event.event_id).join('\n'))
-}
-
 async function postBatch(
   config: PublisherConfig,
-  events: CanonicalIngestEvent[],
+  submission: { source: string; source_run_id: string; source_batch_id: string; observed_at: string; mutations: CanonicalMutation[] },
   fetchImpl: FetchLike,
 ): Promise<number> {
+  const requestBody = JSON.stringify({ batches: [submission] })
+  if (Buffer.byteLength(requestBody) > 1_048_576) {
+    throw new CanonicalArchivePublisherError('canonical_request_too_large')
+  }
   let response: Response
   try {
     response = await fetchImpl(config.endpoint, {
@@ -485,7 +354,7 @@ async function postBatch(
         'Content-Type': 'application/json',
         'X-API-Key': config.apiKey,
       },
-      body: JSON.stringify({ events }),
+      body: requestBody,
       signal: AbortSignal.timeout(config.timeoutMs),
     })
   } catch {
@@ -503,26 +372,15 @@ async function postBatch(
     throw new CanonicalArchivePublisherError('canonical_response_invalid')
   }
   assertPlainObject(body, 'canonical_response')
-  if (!Array.isArray(body.accepted) || body.accepted.length !== events.length) {
-    throw new CanonicalArchivePublisherError('canonical_receipts_incomplete')
-  }
-  const receipts = body.accepted as Record<string, unknown>[]
-  const expectedIds = new Set(events.map((event) => event.event_id))
-  const receivedIds = new Set(
-    receipts.map((receipt) => String(receipt.event_id)),
-  )
-  if (
-    receivedIds.size !== expectedIds.size ||
-    [...expectedIds].some((eventId) => !receivedIds.has(eventId)) ||
-    receipts.some(
-      (receipt) =>
-        !expectedIds.has(String(receipt.event_id)) ||
-        typeof receipt.duplicate !== 'boolean',
-    )
-  ) {
+  const receipts = body.accepted
+  const receipt = Array.isArray(receipts) ? receipts[0] : null
+  if (!Array.isArray(receipts) || receipts.length !== 1 ||
+      receipt?.source_batch_id !== submission.source_batch_id ||
+      !/^[a-f0-9]{64}$/.test(receipt?.event_id ?? '') ||
+      !/^\d+-\d+$/.test(receipt?.message_id ?? '') || typeof receipt?.duplicate !== 'boolean') {
     throw new CanonicalArchivePublisherError('canonical_receipts_invalid')
   }
-  return receipts.filter((receipt) => receipt.duplicate === true).length
+  return receipt.duplicate ? 1 : 0
 }
 
 export async function publishCanonicalArchiveBatch(options: {
@@ -534,17 +392,12 @@ export async function publishCanonicalArchiveBatch(options: {
 }): Promise<CanonicalPublishReport | { status: 'disabled' }> {
   if (!canonicalArchiveShadowEnabled()) return { status: 'disabled' }
   const config = publisherConfig()
-  const events = buildCanonicalArchiveEvents(
-    options.batch,
-    options.manifest,
-    options.policyVersion,
-  )
+  const events = buildCanonicalArchiveMutations(options.batch)
   const reportPath = canonicalArchiveReportPath(
     options.reportDir,
     options.manifest.archiveUploadId,
   )
-  const report = loadReport(
-    reportPath,
+  const report = newReport(
     options.manifest,
     events.length,
     options.policyVersion,
@@ -552,12 +405,13 @@ export async function publishCanonicalArchiveBatch(options: {
   writeReport(reportPath, report)
 
   try {
-    for (const eventBatch of chunks(events, config.batchSize)) {
-      const hash = batchHash(eventBatch)
-      if (report.completed_batches[hash]) continue
+    for (const [index, eventBatch] of chunks(events, config.batchSize).entries()) {
+      const hash = `batch-${index}`
       const duplicateCount = await postBatch(
         config,
-        eventBatch,
+        { source: SOURCE, source_run_id: `archive:${options.manifest.archiveUploadId}`,
+          source_batch_id: hash, observed_at: new Date(Number(eventBatch[0].version)).toISOString(),
+          mutations: eventBatch },
         options.fetchImpl ?? fetch,
       )
       report.completed_batches[hash] = {

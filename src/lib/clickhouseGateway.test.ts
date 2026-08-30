@@ -73,6 +73,17 @@ describe('ClickHouse analytics gateway requests', () => {
     )
   })
 
+  test('allows only the trending-term result limit', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['trending-terms'],
+      new URLSearchParams('limit=6&raw_sql=DROP'),
+      'https://analytics.example',
+    )
+    expect(target.toString()).toBe(
+      'https://analytics.example/trending-terms?limit=6',
+    )
+  })
+
   test('routes public search to its dedicated ClickHouse gateway', () => {
     expect(
       clickHouseSearchGatewayBaseUrl(

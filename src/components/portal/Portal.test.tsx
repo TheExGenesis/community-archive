@@ -1,6 +1,20 @@
 import { act, render, screen } from '@testing-library/react'
+import type { AnchorHTMLAttributes } from 'react'
 import Portal, { type PortalView } from './Portal'
 import type { PortalData, PortalTweet } from '@/lib/portal/types'
+
+jest.mock('next/link', () => ({
+  __esModule: true,
+  default: ({
+    href,
+    children,
+    ...props
+  }: AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={String(href)} {...props}>
+      {children}
+    </a>
+  ),
+}))
 
 jest.mock('./TweetRow', () => ({
   TweetRow: ({ tweet, noClamp }: { tweet: PortalTweet; noClamp?: boolean }) => (
@@ -205,6 +219,100 @@ describe.each<PortalView>(['home', 'stream'])(
     })
   },
 )
+
+describe('portal trending terms', () => {
+  beforeEach(() => {
+    jest.useFakeTimers()
+    jest.setSystemTime(Date.parse('2026-08-07T13:00:00.000Z'))
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ tweets: [], updateCursor: null }),
+    } as Response)
+  })
+
+  afterEach(() => {
+    jest.clearAllTimers()
+    jest.useRealTimers()
+    jest.restoreAllMocks()
+  })
+
+  test('labels the normalized 28-day comparison without re-ranking results', async () => {
+    const trendingData: PortalData = {
+      ...data,
+      trends: {
+        ...data.trends,
+        weekly: [
+          {
+            lane: 'emerging',
+            term: 'egregore',
+            last7: 11,
+            baseline28: 3,
+            currentAuthors: 6,
+            expected7: 6,
+            tweetDelta: 5,
+            deltaPct: 83,
+            status: 'comparable',
+          },
+          {
+            lane: 'rising',
+            term: 'claude',
+            last7: 746,
+            baseline28: 1_200,
+            currentAuthors: 85,
+            expected7: 500,
+            tweetDelta: 246,
+            deltaPct: 49,
+            status: 'comparable',
+          },
+          {
+            lane: 'falling',
+            term: 'alignment',
+            last7: 211,
+            baseline28: 1_600,
+            currentAuthors: 50,
+            expected7: 400,
+            tweetDelta: -189,
+            deltaPct: -47,
+            status: 'comparable',
+          },
+        ],
+      },
+    }
+
+    const { unmount } = render(<Portal data={trendingData} view="home" />)
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('vs 28d')).toHaveAttribute(
+      'title',
+      'Change in share of community tweets versus the preceding 28 days',
+    )
+    expect(screen.getByText('+83%')).toHaveAttribute(
+      'title',
+      expect.stringContaining(
+        '11 tweets from 6 authors in the last 7 days; 3 tweets in the preceding 28 days',
+      ),
+    )
+    expect(screen.getByText('Emerging')).toBeInTheDocument()
+    expect(screen.getByText('Rising')).toBeInTheDocument()
+    expect(screen.getByText('Falling')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'egregore' })).toHaveAttribute(
+      'href',
+      '/search?q=egregore',
+    )
+    expect(screen.getByText('−47%')).toHaveAttribute(
+      'title',
+      expect.stringContaining('Normalized expectation: 400 tweets (−189)'),
+    )
+    const termLabels = screen
+      .getAllByText(/^(egregore|claude|alignment)$/)
+      .map((element) => element.textContent)
+    expect(termLabels).toEqual(['egregore', 'claude', 'alignment'])
+
+    unmount()
+  })
+})
 
 describe('portal component failures', () => {
   beforeEach(() => {

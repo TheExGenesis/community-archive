@@ -9,24 +9,9 @@ import type {
   PortalTweet,
   TermSeries,
   TrendGranularity,
+  TrendLane,
   TermWeek,
 } from './types'
-
-/** Wider watchlist used for the weekly rising/cooling panels. */
-export const WATCHLIST = [
-  'ai agents',
-  'claude',
-  'jhana',
-  'egregore',
-  'tpot',
-  'vibecamp',
-  'sensemaking',
-  'moloch',
-  'meditation',
-  'alignment',
-  'psyop',
-  'wordcel',
-]
 
 type AnalyticsFetcher = typeof fetchAnalyticsGatewayJson
 // Keep corpus-scan fan-out aligned with the two-query production capacity.
@@ -50,6 +35,29 @@ interface ClickHouseTrendRow {
 
 interface ClickHouseTrendResponse {
   data: ClickHouseTrendRow[]
+}
+
+interface ClickHouseTrendingTermRow {
+  lane?: TrendLane
+  term: string
+  currentTweets: string | number
+  currentAuthors: string | number
+  baselineTweets: string | number
+  expectedTweets?: number
+  tweetDelta?: number
+  changePct: number
+}
+
+interface ClickHouseTrendingTermsResponse {
+  data: ClickHouseTrendingTermRow[]
+  lanes?: Record<TrendLane, ClickHouseTrendingTermRow[]>
+  query: {
+    windowDays: number
+    baselineDays: number
+    population: string
+    countMode: string
+    limit: number
+  }
 }
 
 interface ClickHouseSearchTweet {
@@ -162,18 +170,8 @@ function normalizeClickHouseTimestamp(value: string): string {
   return `${value.replace(' ', 'T')}Z`
 }
 
-function startOfUtcDay(date: Date): Date {
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-  )
-}
-
 function daysBefore(date: Date, days: number): Date {
   return new Date(date.getTime() - days * 86_400_000)
-}
-
-function utcDateParam(date: Date): string {
-  return date.toISOString().slice(0, 10)
 }
 
 async function runBatched<T>(
@@ -226,6 +224,90 @@ async function fetchTrend(
     throw new Error('ClickHouse word-trend returned an invalid response')
   }
   return response
+}
+
+export async function fetchPortalTrendingTerms(
+  limit = 6,
+  fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+): Promise<TermWeek[]> {
+  const safeLimit = Math.max(1, Math.min(20, Math.trunc(limit)))
+  const response = await fetcher<ClickHouseTrendingTermsResponse>(
+    ['trending-terms'],
+    new URLSearchParams({ limit: String(safeLimit) }),
+    { timeoutMs: 30_000 },
+  )
+  if (
+    !Array.isArray(response.data) ||
+    response.query?.windowDays !== 7 ||
+    response.query?.baselineDays !== 28 ||
+    response.query?.population !== 'community_members' ||
+    response.query?.countMode !== 'unique_tweets_containing_term'
+  ) {
+    throw new Error('ClickHouse trending-terms returned an invalid response')
+  }
+
+  const laneRows: Array<[TrendLane, ClickHouseTrendingTermRow[]]> =
+    response.lanes
+      ? [
+          ['emerging', response.lanes.emerging],
+          ['rising', response.lanes.rising],
+          ['falling', response.lanes.falling],
+        ]
+      : [['emerging', response.data]]
+  if (laneRows.some(([, rows]) => !Array.isArray(rows))) {
+    throw new Error('ClickHouse trending-terms returned invalid lanes')
+  }
+
+  return laneRows.flatMap(([lane, rows]) =>
+    rows.map((row) => {
+      if (typeof row.term !== 'string' || row.term.trim().length === 0) {
+        throw new Error('ClickHouse trending-terms returned an invalid term')
+      }
+      if (row.lane !== undefined && row.lane !== lane) {
+        throw new Error('ClickHouse trending-terms returned an invalid lane')
+      }
+      const last7 = safeCount(row.currentTweets, 'trending term tweet count')
+      const baseline28 = safeCount(
+        row.baselineTweets,
+        'trending term baseline tweet count',
+      )
+      const currentAuthors = safeCount(
+        row.currentAuthors,
+        'trending term author count',
+      )
+      if (!Number.isFinite(row.changePct)) {
+        throw new Error('ClickHouse trending-terms returned an invalid change')
+      }
+      const expected7 =
+        row.expectedTweets === undefined ? null : Number(row.expectedTweets)
+      const tweetDelta =
+        row.tweetDelta === undefined ? null : Number(row.tweetDelta)
+      if (
+        expected7 !== null &&
+        (!Number.isFinite(expected7) || expected7 < 0)
+      ) {
+        throw new Error(
+          'ClickHouse trending-terms returned an invalid expectation',
+        )
+      }
+      if (tweetDelta !== null && !Number.isFinite(tweetDelta)) {
+        throw new Error(
+          'ClickHouse trending-terms returned an invalid tweet delta',
+        )
+      }
+      return {
+        lane,
+        term: row.term,
+        last7,
+        baseline28,
+        currentAuthors,
+        expected7,
+        tweetDelta,
+        deltaPct: baseline28 > 0 ? Math.round(row.changePct) : null,
+        status: baseline28 > 0 ? 'comparable' : 'new',
+      }
+    }),
+  )
 }
 
 function ratePerHundredThousand(row: ClickHouseTrendRow): number {
@@ -551,7 +633,9 @@ export async function fetchPortalDailyInteractions(
     { timeoutMs: 30_000, revalidate: 300 },
   )
   if (!Array.isArray(response.data)) {
-    throw new Error('ClickHouse daily-interactions returned an invalid response')
+    throw new Error(
+      'ClickHouse daily-interactions returned an invalid response',
+    )
   }
 
   return response.data.map((row) => {
@@ -754,31 +838,17 @@ export async function fetchPortalTrends(
   // ClickHouse analytics gateway), rather than full ISO timestamps.
   const yearlyFrom = `${FIRST_TREND_YEAR}-01-01`
   const yearlyTo = `${currentYear + 1}-01-01`
-  const today = startOfUtcDay(now)
-  const from14 = daysBefore(today, 13)
-  const from7 = daysBefore(today, 6)
-  const weeklyTo = daysBefore(today, -1)
-
   const jobs: Array<() => Promise<ClickHouseTrendResponse>> = [
     ...CHART_TERMS.map(
       ({ term }) =>
         () =>
           fetchTrend(term, 'year', yearlyFrom, yearlyTo, fetcher),
     ),
-    ...WATCHLIST.map(
-      (term) => () =>
-        fetchTrend(
-          term,
-          'day',
-          utcDateParam(from14),
-          utcDateParam(weeklyTo),
-          fetcher,
-        ),
-    ),
   ]
-  const responses = await runBatched(jobs)
-  const yearlyResponses = responses.slice(0, CHART_TERMS.length)
-  const weeklyResponses = responses.slice(CHART_TERMS.length)
+  const [yearlyResponses, weekly] = await Promise.all([
+    runBatched(jobs),
+    fetchPortalTrendingTerms(2, fetcher),
+  ])
 
   const series: TermSeries[] = CHART_TERMS.map(({ term, color }, index) => {
     const rows = new Map<number, ClickHouseTrendRow>()
@@ -800,27 +870,6 @@ export async function fetchPortalTrends(
         const row = rows.get(year)
         return row ? ratePerHundredThousand(row) : 0
       }),
-    }
-  })
-
-  const weekly: TermWeek[] = WATCHLIST.map((term, index) => {
-    let last7 = 0
-    let prev7 = 0
-    for (const row of weeklyResponses[index].data) {
-      const bucket = new Date(normalizeClickHouseTimestamp(row.bucket))
-      if (Number.isNaN(bucket.getTime())) {
-        throw new Error('ClickHouse word-trend returned an invalid bucket')
-      }
-      const count = safeCount(row.tweets, 'weekly trend count')
-      if (bucket >= from7) last7 += count
-      else if (bucket >= from14) prev7 += count
-    }
-    return {
-      term,
-      last7,
-      prev7,
-      deltaPct: prev7 > 0 ? Math.round(((last7 - prev7) / prev7) * 100) : null,
-      status: prev7 > 0 ? 'comparable' : last7 > 0 ? 'new' : 'inactive',
     }
   })
 

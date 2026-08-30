@@ -104,6 +104,18 @@ function versionForObservedAt(observedAt: string): string {
   return String(milliseconds)
 }
 
+/** Use the existing delivery's immutable source time, never retry wall-clock time. */
+export function canonicalArchiveObservedAt(value: unknown): string {
+  if (!(value instanceof Date) && typeof value !== 'string') {
+    throw new CanonicalArchivePublisherError('archive_source_time_missing')
+  }
+  const milliseconds = value instanceof Date ? value.getTime() : Date.parse(value)
+  if (!Number.isSafeInteger(milliseconds) || milliseconds < 0) {
+    throw new CanonicalArchivePublisherError('archive_source_time_invalid')
+  }
+  return new Date(milliseconds).toISOString()
+}
+
 function payloadWithoutProjectionMetadata(
   row: Record<string, unknown>,
 ): Record<string, unknown> {

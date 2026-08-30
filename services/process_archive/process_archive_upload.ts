@@ -23,6 +23,7 @@ import {
   createArchiveClickHouseManifest,
 } from './archive_clickhouse'
 import {
+  canonicalArchiveObservedAt,
   canonicalArchivePolicyVersion,
   canonicalArchiveShadowEnabled,
   ensureCanonicalArchivePendingReport,
@@ -1023,6 +1024,13 @@ async function buildPolicySafeCanonicalArchiveBatch(
   return sql.begin(async (transaction) => {
     const trx = transaction as unknown as Sql
     await trx`SELECT public.lock_policy_account(${manifest.accountId})`
+    const [source] = await trx`
+      SELECT created_at
+      FROM private.archive_clickhouse_delivery
+      WHERE archive_upload_id = ${manifest.archiveUploadId}
+        AND account_id = ${manifest.accountId}
+    `
+    const observedAt = canonicalArchiveObservedAt(source?.created_at)
     const [policy] = await trx`
       SELECT public.policy_account_is_blocked(
         ${manifest.accountId},
@@ -1033,7 +1041,7 @@ async function buildPolicySafeCanonicalArchiveBatch(
     let decisions: ArchivePolicyDecisions = new Map()
     let batch
     if (ownerBlocked) {
-      batch = buildArchiveTombstoneBatch(manifest)
+      batch = buildArchiveTombstoneBatch(manifest, observedAt)
     } else {
       const source =
         archive ??
@@ -1057,7 +1065,7 @@ async function buildPolicySafeCanonicalArchiveBatch(
         trx,
         collectArchivePolicyCandidates(source),
       )
-      batch = buildArchiveClickHouseBatch(source, manifest, decisions)
+      batch = buildArchiveClickHouseBatch(source, manifest, decisions, observedAt)
     }
     return {
       batch,

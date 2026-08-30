@@ -91,6 +91,28 @@ const cleanStringArray = (
   return cleaned.every((item): item is string => item !== null) ? cleaned : null
 }
 
+const describeStringArrayIssue = (
+  value: unknown,
+  itemLabel: string,
+  maxItems: number,
+  maxLength: number,
+): string => {
+  if (!Array.isArray(value)) return 'received a non-array value'
+  if (value.length === 0) return 'received no items'
+  if (value.length > maxItems)
+    return `received ${value.length} items (maximum ${maxItems})`
+  for (let index = 0; index < value.length; index += 1) {
+    const item = value[index]
+    if (typeof item !== 'string')
+      return `${itemLabel} ${index + 1} is not a string`
+    const normalized = item.trim().replace(/\s+/g, ' ')
+    if (!normalized) return `${itemLabel} ${index + 1} is empty`
+    if (normalized.length > maxLength)
+      return `${itemLabel} ${index + 1} has ${normalized.length} normalized characters (maximum ${maxLength})`
+  }
+  return 'received an invalid value'
+}
+
 const cleanIndexArray = (value: unknown, maxItems: number): number[] | null => {
   if (!Array.isArray(value) || value.length > maxItems) return null
   return value.every(
@@ -180,16 +202,29 @@ function parseModelDigest(
     const bullets = cleanStringArray(story.bullets, 3, 220)
     const editorialNote = cleanText(story.editorial_note, 360)
     const tweetIndices = cleanIndexArray(story.tweet_indices, 18)
-    if (
-      !category ||
-      !title ||
-      !subtitle ||
-      !bullets?.length ||
-      !editorialNote ||
-      !tweetIndices?.length
-    ) {
-      throw new Error(`Story ${index + 1} is incomplete`)
-    }
+    const storyNumber = index + 1
+    if (!category)
+      throw new Error(`Story ${storyNumber} has an invalid category`)
+    if (!title)
+      throw new Error(
+        `Story ${storyNumber} title must be non-empty and at most 300 characters`,
+      )
+    if (!subtitle)
+      throw new Error(
+        `Story ${storyNumber} subtitle must be non-empty and at most 500 characters`,
+      )
+    if (!bullets?.length)
+      throw new Error(
+        `Story ${storyNumber} bullets must contain one to three non-empty strings of at most 220 characters; ${describeStringArrayIssue(story.bullets, 'bullet', 3, 220)}`,
+      )
+    if (!editorialNote)
+      throw new Error(
+        `Story ${storyNumber} editorial note must be non-empty and at most 360 characters`,
+      )
+    if (!tweetIndices?.length)
+      throw new Error(
+        `Story ${storyNumber} must contain one to eighteen nonnegative tweet indices`,
+      )
     const indexedTweets = tweetIndices.map((tweetIndex) => {
       const row = corpus[tweetIndex]
       if (!row) {

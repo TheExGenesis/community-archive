@@ -14,10 +14,19 @@ import {
   type DigestGenerationResponse,
 } from '@/lib/digest/openai'
 import type {
+  DigestCandidate,
   DigestEditionContent,
   DigestPromptVersion,
   DigestRunEvent,
 } from '@/lib/digest/types'
+import {
+  nextGenerationExecution,
+  readGenerationExecutions,
+  sumPersistedTokens,
+  withGenerationExecution,
+  type PersistedGenerationAttempt,
+  type PersistedGenerationExecution,
+} from './state'
 
 type JsonObject = Record<string, unknown>
 
@@ -37,6 +46,12 @@ interface RunRow {
   id: string
   status: string
   digest_date: string
+  prompt_version_id: string
+  window_start: string
+  window_end: string
+  candidates: DigestCandidate[]
+  model_request: Record<string, unknown> | null
+  raw_response: Record<string, unknown> | null
   parsed_output: DigestEditionContent | null
   events: DigestRunEvent[] | null
 }
@@ -194,7 +209,7 @@ const getAutomatedRun = async (db: SupabaseRest, digestDate: string) => {
   const rows = await db.select<RunRow>(
     'digest_runs',
     query({
-      select: 'id,status,digest_date,parsed_output,events',
+      select: '*',
       digest_date: `eq.${digestDate}`,
       workflow_run_id: `eq.systemd:${digestDate}`,
       order: 'created_at.desc',
@@ -204,17 +219,25 @@ const getAutomatedRun = async (db: SupabaseRest, digestDate: string) => {
   return rows[0] ?? null
 }
 
-const getPrompt = async (db: SupabaseRest) => {
+const getPrompt = async (db: SupabaseRest, promptVersionId?: string) => {
   const rows = await db.select<PromptRow>(
     'digest_prompt_versions',
     query({
       select: '*',
-      model: 'eq.z-ai/glm-5.3',
+      ...(promptVersionId
+        ? { id: `eq.${promptVersionId}` }
+        : { model: 'eq.z-ai/glm-5.3-flash' }),
       order: 'version.desc',
       limit: '1',
     }),
   )
-  if (!rows[0]) throw new Error('No z-ai/glm-5.3 digest prompt is configured')
+  if (!rows[0]) {
+    throw new Error(
+      promptVersionId
+        ? `Digest prompt ${promptVersionId} was not found`
+        : 'No z-ai/glm-5.3-flash digest prompt is configured',
+    )
+  }
   return mapPrompt(rows[0])
 }
 
@@ -246,16 +269,6 @@ const getContinuity = async (
   )
 }
 
-const sumTokens = (
-  attempts: DigestGenerationResponse[],
-  key: 'inputTokens' | 'outputTokens' | 'totalTokens',
-) => {
-  const values = attempts.map((attempt) => attempt[key])
-  return values.every((value): value is number => value !== null)
-    ? values.reduce((sum, value) => sum + value, 0)
-    : null
-}
-
 async function generateValidated(input: {
   runId: string
   digestDate: string
@@ -264,6 +277,7 @@ async function generateValidated(input: {
   candidates: EnrichedDigestCandidate[]
   prompt: DigestPromptVersion
   renderedPrompt: string
+  onAttempt?: (attempt: PersistedGenerationAttempt) => Promise<void>
 }) {
   const attempts: DigestGenerationResponse[] = []
   let lastError = ''
@@ -273,7 +287,7 @@ async function generateValidated(input: {
     const userPrompt =
       attempt === 1
         ? input.renderedPrompt
-        : `${input.renderedPrompt}\n\nREPAIR THE REJECTED RESPONSE\nThe previous JSON was rejected by the deterministic receiver: ${lastError}\nReturn one corrected JSON object only. Do not add Markdown or prose. Preserve grounded content while fixing every validation error.\n\nREJECTED RESPONSE\n${JSON.stringify(rejectedOutput)}`
+        : `${input.renderedPrompt}\n\nREPAIR THE REJECTED RESPONSE\nThe previous JSON was rejected by the deterministic receiver: ${lastError}\nReturn one corrected JSON object only. Do not add Markdown or prose. Preserve grounded content while fixing every validation error. For character limits, target at least 10 characters below the stated maximum and recount after whitespace normalization.\n\nREJECTED RESPONSE\n${JSON.stringify(rejectedOutput)}`
     const generated = await generateDigestWithModel({
       runId: input.runId,
       model: input.prompt.model,
@@ -285,9 +299,10 @@ async function generateValidated(input: {
     })
     attempts.push(generated)
     rejectedOutput = generated.output
+    let content: DigestEditionContent
     try {
       if (generated.outputError) throw new Error(generated.outputError)
-      const content = assembleDigestEditionContent({
+      content = assembleDigestEditionContent({
         runId: input.runId,
         digestDate: input.digestDate,
         windowStart: input.windowStart,
@@ -296,12 +311,37 @@ async function generateValidated(input: {
         enrichedCandidates: input.candidates,
         modelOutput: generated.output,
       })
-      return { attempts, content, generated }
     } catch (error) {
       lastError = describeError(error)
+      await input.onAttempt?.({
+        attempt,
+        recordedAt: new Date().toISOString(),
+        accepted: false,
+        error: lastError.slice(0, 4_000),
+        response: generated.response,
+        responseId: generated.responseId,
+        model: generated.model,
+        inputTokens: generated.inputTokens,
+        outputTokens: generated.outputTokens,
+        totalTokens: generated.totalTokens,
+      })
       log('model output rejected', { attempt, error: lastError })
       if (attempt === 2) throw error
+      continue
     }
+    await input.onAttempt?.({
+      attempt,
+      recordedAt: new Date().toISOString(),
+      accepted: true,
+      error: null,
+      response: generated.response,
+      responseId: generated.responseId,
+      model: generated.model,
+      inputTokens: generated.inputTokens,
+      outputTokens: generated.outputTokens,
+      totalTokens: generated.totalTokens,
+    })
+    return { attempts, content, generated }
   }
   throw new Error(lastError || 'Digest generation failed')
 }
@@ -363,7 +403,8 @@ export async function publishNightlyDigest(
   const digestDate = options.digestDate ?? getLatestCompletedDigestDate()
   const dryRun = options.dryRun === true
   const db = new SupabaseRest()
-  const window = getDigestDateWindow(digestDate)
+  let window = getDigestDateWindow(digestDate)
+  let existing: RunRow | null = null
 
   if (!dryRun) {
     const published = await getPublished(db, digestDate)
@@ -374,7 +415,7 @@ export async function publishNightlyDigest(
       })
       return { status: 'already-published', edition: published }
     }
-    const existing = await getAutomatedRun(db, digestDate)
+    existing = await getAutomatedRun(db, digestDate)
     if (existing?.status === 'completed') {
       const result = await publishCompletedRun(db, existing, digestDate)
       log('completed run publication recovered', {
@@ -384,79 +425,179 @@ export async function publishNightlyDigest(
       })
       return result
     }
-    if (existing) {
+    if (existing && existing.status !== 'failed') {
       throw new Error(
         `Automated run ${existing.id} already exists with status ${existing.status}`,
       )
     }
   }
 
-  const [prompt, snapshot, priorDigests] = await Promise.all([
-    getPrompt(db),
-    loadDigestCandidates(window.windowEnd, false),
-    getContinuity(db, digestDate),
-  ])
-  if (snapshot.candidates.length < 3) {
-    throw new Error(
-      `Only ${snapshot.candidates.length} digest candidates were found`,
-    )
-  }
-  const enrichedCandidates: EnrichedDigestCandidate[] = snapshot.candidates.map(
-    (candidate) => ({ candidate, commentary: [], totalReplyCount: 0 }),
-  )
-  const runId = crypto.randomUUID()
+  let prompt: DigestPromptVersion
+  let candidates: DigestCandidate[]
+  let enrichedCandidates: EnrichedDigestCandidate[]
+  let renderedPrompt: string
+  let events: DigestRunEvent[]
+  let rawResponse: Record<string, unknown> | null = null
+  let runId: string
+  let communityAuthoredCount: number
+  let executionNumber = 1
   const startedAt = new Date()
-  let events: DigestRunEvent[] = [
-    event(
-      'candidates',
-      'completed',
-      `Saved ${digestDate} candidates from all authors, with Community Archive authors marked for preference.`,
-      {
-        automation: !dryRun,
-        candidate_count: snapshot.candidates.length,
-        community_authored_count: snapshot.communityAuthoredCount,
-        interaction_fallback_count: snapshot.fallbackCount,
-        qualifying_banger_count: snapshot.bangerCount,
-      },
-    ),
-  ]
-  const renderedPrompt = renderDigestPrompt(prompt.userPromptTemplate, {
-    ...window,
-    candidates: enrichedCandidates,
-    priorDigests,
-  })
 
-  if (!dryRun) {
-    await db.insert<RunRow>('digest_runs', {
-      id: runId,
-      digest_date: digestDate,
-      status: 'running',
-      prompt_version_id: prompt.id,
-      window_start: window.windowStart,
-      window_end: window.windowEnd,
-      candidates: snapshot.candidates,
-      workflow_run_id: `systemd:${digestDate}`,
-      events,
-      started_at: startedAt.toISOString(),
-      created_by: null,
-      model: prompt.model,
-      model_request: {
-        promptVersion: prompt,
-        renderedUserPrompt: renderedPrompt,
-        candidateSnapshot: enrichedCandidates,
-        continuityContext: priorDigests,
+  if (existing?.status === 'failed') {
+    const storedPrompt = existing.model_request?.renderedUserPrompt
+    if (typeof storedPrompt !== 'string' || !storedPrompt) {
+      throw new Error(`Failed run ${existing.id} has no saved rendered prompt`)
+    }
+    if (!Array.isArray(existing.candidates) || existing.candidates.length < 3) {
+      throw new Error(`Failed run ${existing.id} has no reusable candidates`)
+    }
+    prompt = await getPrompt(db, existing.prompt_version_id)
+    candidates = existing.candidates
+    enrichedCandidates = candidates.map((candidate) => ({
+      candidate,
+      commentary: [],
+      totalReplyCount: 0,
+    }))
+    renderedPrompt = storedPrompt
+    runId = existing.id
+    rawResponse = existing.raw_response
+    window = {
+      digestDate,
+      windowStart: existing.window_start,
+      windowEnd: existing.window_end,
+    }
+    communityAuthoredCount = candidates.filter(
+      ({ communityAuthored }) => communityAuthored,
+    ).length
+    events = Array.isArray(existing.events) ? existing.events : []
+    executionNumber = nextGenerationExecution(events)
+    events = [
+      ...events,
+      event(
+        'generation',
+        'started',
+        'Retrying the failed automated digest with its saved inputs.',
+        {
+          automation: true,
+          execution: executionNumber,
+          retry: true,
+        },
+      ),
+    ]
+    const [claimed] = await db.update<RunRow>(
+      'digest_runs',
+      query({ id: `eq.${runId}`, status: 'eq.failed' }),
+      {
+        status: 'running',
+        error: null,
+        started_at: startedAt.toISOString(),
+        completed_at: null,
+        duration_ms: null,
+        updated_at: startedAt.toISOString(),
+        events,
       },
+    )
+    if (!claimed) throw new Error(`Failed run ${runId} could not be claimed`)
+    log('failed run claimed for retry', {
+      digestDate,
+      runId,
+      execution: executionNumber,
     })
+  } else {
+    const [newPrompt, snapshot, priorDigests] = await Promise.all([
+      getPrompt(db),
+      loadDigestCandidates(window.windowEnd, false),
+      getContinuity(db, digestDate),
+    ])
+    if (snapshot.candidates.length < 3) {
+      throw new Error(
+        `Only ${snapshot.candidates.length} digest candidates were found`,
+      )
+    }
+    prompt = newPrompt
+    candidates = snapshot.candidates
+    enrichedCandidates = candidates.map((candidate) => ({
+      candidate,
+      commentary: [],
+      totalReplyCount: 0,
+    }))
+    runId = crypto.randomUUID()
+    communityAuthoredCount = snapshot.communityAuthoredCount
+    events = [
+      event(
+        'candidates',
+        'completed',
+        `Saved ${digestDate} candidates from all authors, with Community Archive authors marked for preference.`,
+        {
+          automation: !dryRun,
+          candidate_count: candidates.length,
+          community_authored_count: communityAuthoredCount,
+          interaction_fallback_count: snapshot.fallbackCount,
+          qualifying_banger_count: snapshot.bangerCount,
+        },
+      ),
+      event('generation', 'started', 'Automated digest generation started.', {
+        automation: !dryRun,
+        execution: executionNumber,
+        retry: false,
+      }),
+    ]
+    renderedPrompt = renderDigestPrompt(prompt.userPromptTemplate, {
+      ...window,
+      candidates: enrichedCandidates,
+      priorDigests,
+    })
+
+    if (!dryRun) {
+      await db.insert<RunRow>('digest_runs', {
+        id: runId,
+        digest_date: digestDate,
+        status: 'running',
+        prompt_version_id: prompt.id,
+        window_start: window.windowStart,
+        window_end: window.windowEnd,
+        candidates,
+        workflow_run_id: `systemd:${digestDate}`,
+        events,
+        started_at: startedAt.toISOString(),
+        created_by: null,
+        model: prompt.model,
+        model_request: {
+          promptVersion: prompt,
+          renderedUserPrompt: renderedPrompt,
+          candidateSnapshot: enrichedCandidates,
+          continuityContext: priorDigests,
+        },
+      })
+    }
   }
 
   log('generation started', {
     digestDate,
     dryRun,
     runId,
-    candidateCount: snapshot.candidates.length,
-    communityAuthoredCount: snapshot.communityAuthoredCount,
+    candidateCount: candidates.length,
+    communityAuthoredCount,
     model: prompt.model,
+    execution: executionNumber,
   })
+
+  const executionAttempts: PersistedGenerationAttempt[] = []
+  const updateRawResponse = (
+    status: PersistedGenerationExecution['status'],
+    error: string | null,
+    completedAt: string | null,
+  ) => {
+    rawResponse = withGenerationExecution(rawResponse, {
+      execution: executionNumber,
+      startedAt: startedAt.toISOString(),
+      completedAt,
+      status,
+      error,
+      attempts: executionAttempts,
+    })
+    return readGenerationExecutions(rawResponse)
+  }
 
   try {
     const result = await generateValidated({
@@ -465,6 +606,27 @@ export async function publishNightlyDigest(
       candidates: enrichedCandidates,
       prompt,
       renderedPrompt,
+      onAttempt: async (attempt) => {
+        executionAttempts.push(attempt)
+        const executions = updateRawResponse('running', null, null)
+        if (dryRun) return
+        const [updated] = await db.update<RunRow>(
+          'digest_runs',
+          query({ id: `eq.${runId}`, status: 'eq.running' }),
+          {
+            raw_response: rawResponse,
+            response_id: attempt.responseId,
+            model: attempt.model,
+            input_tokens: sumPersistedTokens(executions, 'inputTokens'),
+            output_tokens: sumPersistedTokens(executions, 'outputTokens'),
+            total_tokens: sumPersistedTokens(executions, 'totalTokens'),
+            updated_at: attempt.recordedAt,
+          },
+        )
+        if (!updated) {
+          throw new Error(`Digest run ${runId} could not persist model attempt`)
+        }
+      },
     })
     const completedAt = new Date()
     const durationMs = completedAt.getTime() - startedAt.getTime()
@@ -494,20 +656,23 @@ export async function publishNightlyDigest(
       return { status: 'dry-run', content: result.content }
     }
 
+    const executions = updateRawResponse(
+      'completed',
+      null,
+      completedAt.toISOString(),
+    )
     const [completedRun] = await db.update<RunRow>(
       'digest_runs',
       query({ id: `eq.${runId}`, status: 'eq.running' }),
       {
         status: 'completed',
-        raw_response: {
-          attempts: result.attempts.map(({ response }) => response),
-        },
+        raw_response: rawResponse,
         parsed_output: result.content,
         response_id: result.generated.responseId,
         model: result.generated.model,
-        input_tokens: sumTokens(result.attempts, 'inputTokens'),
-        output_tokens: sumTokens(result.attempts, 'outputTokens'),
-        total_tokens: sumTokens(result.attempts, 'totalTokens'),
+        input_tokens: sumPersistedTokens(executions, 'inputTokens'),
+        output_tokens: sumPersistedTokens(executions, 'outputTokens'),
+        total_tokens: sumPersistedTokens(executions, 'totalTokens'),
         duration_ms: durationMs,
         error: null,
         completed_at: completedAt.toISOString(),
@@ -545,18 +710,34 @@ export async function publishNightlyDigest(
     const message = describeError(error)
     if (!dryRun) {
       const completedAt = new Date()
+      const executions = updateRawResponse(
+        'failed',
+        message.slice(0, 4_000),
+        completedAt.toISOString(),
+      )
+      const lastAttempt = executionAttempts.at(-1)
       await db.update<RunRow>(
         'digest_runs',
         query({ id: `eq.${runId}`, status: 'eq.running' }),
         {
           status: 'failed',
+          raw_response: rawResponse,
+          response_id: lastAttempt?.responseId ?? null,
+          model: lastAttempt?.model ?? prompt.model,
+          input_tokens: sumPersistedTokens(executions, 'inputTokens'),
+          output_tokens: sumPersistedTokens(executions, 'outputTokens'),
+          total_tokens: sumPersistedTokens(executions, 'totalTokens'),
           error: message.slice(0, 4_000),
           duration_ms: completedAt.getTime() - startedAt.getTime(),
           completed_at: completedAt.toISOString(),
           updated_at: completedAt.toISOString(),
           events: [
             ...events,
-            event('generation', 'failed', message.slice(0, 360)),
+            event('generation', 'failed', message.slice(0, 360), {
+              automation: true,
+              execution: executionNumber,
+              persisted_attempts: executionAttempts.length,
+            }),
           ],
         },
       )

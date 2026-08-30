@@ -257,39 +257,42 @@ describe('OpenAI digest adapter', () => {
     })
   })
 
-  test('uses JSON object mode for GLM because its schema mode is unreliable', async () => {
-    process.env.OPENROUTER_API_KEY = 'openrouter-test-key'
-    const fetcher = jest.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          id: 'gen_glm',
-          model: 'z-ai/glm-5.3',
-          choices: [
-            {
-              message: {
-                content:
-                  '{"executive_summary":[],"representative_tweet_index":0,"stories":[],"keywords":[]}',
+  test.each(['z-ai/glm-5.3', 'z-ai/glm-5.3-flash'])(
+    'uses JSON object mode for %s because GLM schema mode is unreliable',
+    async (model) => {
+      process.env.OPENROUTER_API_KEY = 'openrouter-test-key'
+      const fetcher = jest.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            id: 'gen_glm',
+            model,
+            choices: [
+              {
+                message: {
+                  content:
+                    '{"executive_summary":[],"representative_tweet_index":0,"stories":[],"keywords":[]}',
+                },
               },
-            },
-          ],
-        }),
-        { status: 200 },
-      ),
-    ) as jest.MockedFunction<typeof fetch>
+            ],
+          }),
+          { status: 200 },
+        ),
+      ) as jest.MockedFunction<typeof fetch>
 
-    await generateDigestWithModel(
-      {
-        runId: 'run-glm',
-        model: 'z-ai/glm-5.3',
-        systemPrompt: 'Return JSON.',
-        userPrompt: 'Indexed corpus',
-      },
-      fetcher,
-    )
+      await generateDigestWithModel(
+        {
+          runId: 'run-glm',
+          model,
+          systemPrompt: 'Return JSON.',
+          userPrompt: 'Indexed corpus',
+        },
+        fetcher,
+      )
 
-    const request = JSON.parse(String(fetcher.mock.calls[0][1]?.body))
-    expect(request.response_format).toEqual({ type: 'json_object' })
-  })
+      const request = JSON.parse(String(fetcher.mock.calls[0][1]?.body))
+      expect(request.response_format).toEqual({ type: 'json_object' })
+    },
+  )
 
   test('reports OpenRouter token exhaustion without storing response content in the error', async () => {
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key'

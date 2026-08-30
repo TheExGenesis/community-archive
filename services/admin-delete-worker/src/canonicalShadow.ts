@@ -1,26 +1,15 @@
-import { createHash } from 'node:crypto'
-
-const SCHEMA_VERSION = 'canonical_ingest_v1'
 const SOURCE = 'admin_delete'
 const MAX_BATCH_SIZE = 100
 
 type CanonicalAdminEntityType = 'account' | 'tweet_content'
 
-export interface CanonicalAdminDeleteEvent {
-  event_id: string
-  schema_version: typeof SCHEMA_VERSION
-  source: typeof SOURCE
-  source_run_id: string
+export interface CanonicalAdminDeleteMutation {
   source_event_id: string
   entity_type: CanonicalAdminEntityType
   entity_key: string
   operation: 'tombstone'
-  observed_at: string
-  emitted_at: string
   version: string
-  policy_version: string
   payload: Record<string, unknown>
-  payload_hash: string
 }
 
 export interface CanonicalAdminDeleteInput {
@@ -50,77 +39,6 @@ export function canonicalAdminDeleteShadowEnabled(): boolean {
   return process.env.CANONICAL_ADMIN_DELETE_SHADOW_PUBLISH_ENABLED === 'true'
 }
 
-function sha256(value: string): string {
-  return createHash('sha256').update(value, 'utf8').digest('hex')
-}
-
-function assertValidUnicode(value: string): void {
-  for (let index = 0; index < value.length; index += 1) {
-    const codeUnit = value.charCodeAt(index)
-    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
-      const next = value.charCodeAt(index + 1)
-      if (!(next >= 0xdc00 && next <= 0xdfff)) {
-        throw new CanonicalAdminDeleteShadowError('invalid_unicode')
-      }
-      index += 1
-    } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
-      throw new CanonicalAdminDeleteShadowError('invalid_unicode')
-    }
-  }
-}
-
-function canonicalJson(value: unknown, ancestors = new Set<object>()): string {
-  if (value === null || typeof value === 'boolean') return JSON.stringify(value)
-  if (typeof value === 'string') {
-    assertValidUnicode(value)
-    return JSON.stringify(value)
-  }
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) {
-      throw new CanonicalAdminDeleteShadowError('non_finite_number')
-    }
-    return JSON.stringify(value)
-  }
-  if (Array.isArray(value)) {
-    if (ancestors.has(value)) {
-      throw new CanonicalAdminDeleteShadowError('cyclic_json')
-    }
-    ancestors.add(value)
-    try {
-      return `[${value.map((item) => canonicalJson(item, ancestors)).join(',')}]`
-    } finally {
-      ancestors.delete(value)
-    }
-  }
-  if (
-    value === null ||
-    typeof value !== 'object' ||
-    (Object.getPrototypeOf(value) !== Object.prototype &&
-      Object.getPrototypeOf(value) !== null)
-  ) {
-    throw new CanonicalAdminDeleteShadowError('payload_not_plain_json')
-  }
-  if (ancestors.has(value)) {
-    throw new CanonicalAdminDeleteShadowError('cyclic_json')
-  }
-  ancestors.add(value)
-  try {
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => {
-        assertValidUnicode(key)
-        const child = (value as Record<string, unknown>)[key]
-        if (child === undefined) {
-          throw new CanonicalAdminDeleteShadowError('undefined_json_value')
-        }
-        return `${JSON.stringify(key)}:${canonicalJson(child, ancestors)}`
-      })
-      .join(',')}}`
-  } finally {
-    ancestors.delete(value)
-  }
-}
-
 function versionForObservedAt(observedAt: string): string {
   const milliseconds = Date.parse(observedAt)
   if (!Number.isSafeInteger(milliseconds) || milliseconds < 0) {
@@ -129,97 +47,21 @@ function versionForObservedAt(observedAt: string): string {
   return String(milliseconds)
 }
 
-function createEvent(input: {
-  sourceRunId: string
-  sourceEventId: string
-  entityType: CanonicalAdminEntityType
-  entityKey: string
-  observedAt: string
-  emittedAt: string
-  version: string
-  policyVersion: string
-  payload: Record<string, unknown>
-}): CanonicalAdminDeleteEvent {
-  const payloadHash = sha256(canonicalJson(input.payload))
-  const eventWithoutIdentity: Omit<
-    CanonicalAdminDeleteEvent,
-    'event_id' | 'payload_hash'
-  > = {
-    schema_version: SCHEMA_VERSION,
-    source: SOURCE,
-    source_run_id: input.sourceRunId,
-    source_event_id: input.sourceEventId,
-    entity_type: input.entityType,
-    entity_key: input.entityKey,
-    operation: 'tombstone' as const,
-    observed_at: input.observedAt,
-    emitted_at: input.emittedAt,
-    version: input.version,
-    policy_version: input.policyVersion,
-    payload: input.payload,
-  }
-  return {
-    ...eventWithoutIdentity,
-    payload_hash: payloadHash,
-    event_id: sha256(
-      [
-        eventWithoutIdentity.schema_version,
-        eventWithoutIdentity.source,
-        eventWithoutIdentity.source_run_id,
-        eventWithoutIdentity.source_event_id,
-        eventWithoutIdentity.entity_type,
-        eventWithoutIdentity.entity_key,
-        eventWithoutIdentity.operation,
-        eventWithoutIdentity.version,
-        payloadHash,
-      ].join('\0'),
-    ),
-  }
-}
-
-export function buildCanonicalAdminDeleteEvents(
-  input: CanonicalAdminDeleteInput,
-  emittedAt = new Date().toISOString(),
-): CanonicalAdminDeleteEvent[] {
+export function buildCanonicalAdminDeleteMutations(input: CanonicalAdminDeleteInput): CanonicalAdminDeleteMutation[] {
   const accountId = input.accountId?.trim()
   if (!accountId) return []
+  if (!/^[1-9][0-9]*$/.test(accountId) || input.tweetIds.some((id) => !/^[1-9][0-9]*$/.test(id))) {
+    throw new CanonicalAdminDeleteShadowError('canonical_identifiers_invalid')
+  }
   const version = versionForObservedAt(input.observedAt)
-  const sourceRunId = `admin-delete:${input.jobKey}`
-  const policyVersion = `admin-delete-policy-v1:${sha256(
-    `${accountId}\0${input.observedAt}`,
-  )}`
-  const accountEvent = createEvent({
-    sourceRunId,
-    sourceEventId: `account:${accountId}`,
-    entityType: 'account',
-    entityKey: accountId,
-    observedAt: input.observedAt,
-    emittedAt,
-    version,
-    policyVersion,
-    payload: { account_id: accountId, is_tombstone: true },
-  })
-  const tweetEvents = [...new Set(input.tweetIds.map(String))]
-    .sort()
-    .map((tweetId) =>
-      createEvent({
-        sourceRunId,
-        sourceEventId: `tweet:${tweetId}`,
-        entityType: 'tweet_content',
-        entityKey: tweetId,
-        observedAt: input.observedAt,
-        emittedAt,
-        version,
-        policyVersion,
-        payload: {
-          tweet_id: tweetId,
-          account_id: accountId,
-          full_text: '',
-          is_tombstone: true,
-        },
-      }),
-    )
-  return [accountEvent, ...tweetEvents]
+  return [
+    { source_event_id: `account:${accountId}`, entity_type: 'account', entity_key: accountId,
+      operation: 'tombstone', version, payload: { account_id: accountId, is_tombstone: true } },
+    ...[...new Set(input.tweetIds)].sort().map((tweetId): CanonicalAdminDeleteMutation => ({
+      source_event_id: `tweet:${tweetId}`, entity_type: 'tweet_content', entity_key: tweetId,
+      operation: 'tombstone', version, payload: { account_id: accountId, tweet_id: tweetId, is_tombstone: true },
+    })),
+  ]
 }
 
 function positiveNumber(name: string, fallback: number): number {
@@ -274,9 +116,11 @@ function chunks<T>(values: T[], size: number): T[][] {
 
 async function publishBatch(
   config: PublisherConfig,
-  events: CanonicalAdminDeleteEvent[],
+  submission: { source: string; source_run_id: string; source_batch_id: string; observed_at: string; mutations: CanonicalAdminDeleteMutation[] },
   fetchImpl: FetchLike,
 ): Promise<number> {
+  const requestBody = JSON.stringify({ batches: [submission] })
+  if (Buffer.byteLength(requestBody) > 1_048_576) throw new CanonicalAdminDeleteShadowError('canonical_request_too_large')
   let response: Response
   try {
     response = await fetchImpl(config.endpoint, {
@@ -285,7 +129,7 @@ async function publishBatch(
         'Content-Type': 'application/json',
         'X-API-Key': config.apiKey,
       },
-      body: JSON.stringify({ events }),
+      body: requestBody,
       signal: AbortSignal.timeout(config.timeoutMs),
     })
   } catch {
@@ -309,27 +153,14 @@ async function publishBatch(
   ) {
     throw new CanonicalAdminDeleteShadowError('canonical_receipt_invalid')
   }
-  const receipts = (body as { accepted: unknown[] }).accepted
-  const expected = new Set(events.map(({ event_id }) => event_id))
-  const received = new Set(
-    receipts.map((receipt) =>
-      String((receipt as { event_id?: unknown })?.event_id),
-    ),
-  )
-  if (
-    receipts.length !== events.length ||
-    received.size !== expected.size ||
-    [...expected].some((eventId) => !received.has(eventId)) ||
-    receipts.some(
-      (receipt) =>
-        typeof (receipt as { duplicate?: unknown })?.duplicate !== 'boolean',
-    )
-  ) {
+  const receipts = (body as { accepted: Record<string, unknown>[] }).accepted
+  const receipt = receipts[0]
+  if (receipts.length !== 1 || receipt?.source_batch_id !== submission.source_batch_id ||
+      !/^[a-f0-9]{64}$/.test(String(receipt?.event_id ?? '')) ||
+      !/^\d+-\d+$/.test(String(receipt?.message_id ?? '')) || typeof receipt?.duplicate !== 'boolean') {
     throw new CanonicalAdminDeleteShadowError('canonical_receipt_invalid')
   }
-  return receipts.filter(
-    (receipt) => (receipt as { duplicate: boolean }).duplicate,
-  ).length
+  return receipt.duplicate ? 1 : 0
 }
 
 export async function publishCanonicalAdminDeleteShadow(
@@ -339,14 +170,17 @@ export async function publishCanonicalAdminDeleteShadow(
   if (!canonicalAdminDeleteShadowEnabled()) {
     return { eventCount: 0, duplicateCount: 0, skipped: true }
   }
-  const events = buildCanonicalAdminDeleteEvents(input)
+  const events = buildCanonicalAdminDeleteMutations(input)
   if (events.length === 0) {
     return { eventCount: 0, duplicateCount: 0, skipped: true }
   }
   const config = publisherConfig()
   let duplicateCount = 0
-  for (const batch of chunks(events, config.batchSize)) {
-    duplicateCount += await publishBatch(config, batch, fetchImpl)
+  for (const [index, batch] of chunks(events, config.batchSize).entries()) {
+    duplicateCount += await publishBatch(config, {
+      source: SOURCE, source_run_id: `admin-delete:${input.jobKey}`, source_batch_id: `batch-${index}`,
+      observed_at: input.observedAt, mutations: batch,
+    }, fetchImpl)
   }
   return { eventCount: events.length, duplicateCount, skipped: false }
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, test } from 'node:test'
 import {
-  buildCanonicalAdminDeleteEvents,
+  buildCanonicalAdminDeleteMutations,
   canonicalAdminDeleteErrorCode,
   publishCanonicalAdminDeleteShadow,
 } from './canonicalShadow.ts'
@@ -38,13 +38,11 @@ afterEach(() => {
 })
 
 test('builds deterministic content-free account and tweet tombstones', () => {
-  const first = buildCanonicalAdminDeleteEvents(
+  const first = buildCanonicalAdminDeleteMutations(
     input,
-    '2026-08-29T03:10:00.000Z',
   )
-  const retried = buildCanonicalAdminDeleteEvents(
+  const retried = buildCanonicalAdminDeleteMutations(
     input,
-    '2026-08-29T03:20:00.000Z',
   )
 
   assert.equal(first.length, 3)
@@ -57,16 +55,15 @@ test('builds deterministic content-free account and tweet tombstones', () => {
     ],
   )
   assert.deepEqual(
-    first.map(({ event_id }) => event_id),
-    retried.map(({ event_id }) => event_id),
+    first,
+    retried,
   )
-  assert.ok(first.every(({ source }) => source === 'admin_delete'))
+  assert.ok(first.every((mutation) => !('event_id' in mutation) && !('policy_version' in mutation)))
   assert.ok(first.every(({ operation }) => operation === 'tombstone'))
   assert.doesNotMatch(JSON.stringify(first), /username|reason|requester/)
   assert.deepEqual(first[1].payload, {
     tweet_id: '5001',
     account_id: '6001',
-    full_text: '',
     is_tombstone: true,
   })
 })
@@ -102,12 +99,13 @@ test('publishes bounded batches with a dedicated credential', async () => {
       (init?.headers as Record<string, string>)['X-API-Key'],
       'publisher-secret',
     )
-    const body = JSON.parse(String(init?.body)) as { events: unknown[] }
-    batches.push(body.events)
+    const body = JSON.parse(String(init?.body)) as { batches: unknown[] }
+    batches.push(body.batches)
     return Response.json(
       {
-        accepted: body.events.map((event, index) => ({
-          event_id: (event as { event_id: string }).event_id,
+        accepted: body.batches.map((event, index) => ({
+          source_batch_id: (event as { source_batch_id: string }).source_batch_id,
+          event_id: 'a'.repeat(64),
           message_id: `1-${index}`,
           duplicate: index === 0,
         })),

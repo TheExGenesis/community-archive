@@ -23,6 +23,15 @@ canonical publisher with a dedicated credential. Its failure is isolated from
 the established deletion result, and it is disabled by default. PostgreSQL
 remains the policy authority; this shadow copy is not a transactional outbox.
 
+The shadow submits bounded mutation batches with identifier-only account/tweet
+tombstones. Firehose creates canonical IDs and rechecks the authoritative block;
+producer retries carry the same job ID, batch index and observation version.
+Queue acceptance is not proof of erasure. User-facing delete RPCs are unchanged.
+Before those can use this lane, add a transactional deletion intent/outbox,
+per-sink completion tracking, persistent replay suppression and physical cleanup
+of raw/replay copies. Source/archive retractions are reserved in the contract
+but are rejected until provenance-aware sink execution is implemented.
+
 The manifest contains only its format version, account ID, tweet IDs,
 `content_free: true`, and completion timestamp. It must not contain username,
 tweet text, profile fields, raw archives, opt-out reasons, requester identity, or

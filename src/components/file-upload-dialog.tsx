@@ -191,6 +191,10 @@ export function FileUploadDialog({
             <pre className="whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-sm text-foreground dark:bg-muted dark:text-foreground">
               {state.error}
             </pre>
+            <p className="text-sm text-muted-foreground">
+              Try signing out and back in, then retry the upload. If it still
+              fails, try a different browser.
+            </p>
           </div>
         ) : state.uploadStatus === 'not_started' ? (
           <div className="grid gap-4 py-4">

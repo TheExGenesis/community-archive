@@ -59,4 +59,23 @@ describe('community project catalog', () => {
         .sort((left, right) => left.localeCompare(right)),
     )
   })
+
+  it('sorts by like count, breaking ties with the newest project', () => {
+    const catalog = COMMUNITY_PROJECTS.map((project, index) => ({
+      ...project,
+      likeCount: project.slug === 'followle' ? 0 : index + 1,
+    }))
+
+    const mostLiked = filterCommunityProjects(catalog, '', 'All', 'Most liked')
+    expect(mostLiked[0].name).toBe('Bangers.page')
+    expect(mostLiked.at(-1)?.name).toBe('Followle')
+
+    const untouched = filterCommunityProjects(
+      COMMUNITY_PROJECTS,
+      '',
+      'All',
+      'Most liked',
+    )
+    expect(untouched[0].name).toBe('Followle')
+  })
 })

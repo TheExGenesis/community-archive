@@ -139,3 +139,7 @@ ON "private"."archive_clickhouse_delivery" ("next_attempt_at", "archive_upload_i
 WHERE ("delivery_state" = 'pending'::"text");
 CREATE INDEX IF NOT EXISTS "community_projects_status_submitted_at_idx"
   ON "public"."community_projects" ("status", "submitted_at" DESC);
+CREATE INDEX IF NOT EXISTS "community_project_likes_project_id_idx"
+  ON "public"."community_project_likes" ("project_id");
+CREATE INDEX IF NOT EXISTS "community_project_comments_project_id_created_at_idx"
+  ON "public"."community_project_comments" ("project_id", "created_at");

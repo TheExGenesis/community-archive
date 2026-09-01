@@ -4,6 +4,8 @@ ALTER TABLE "public"."digest_prompt_versions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_runs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_editions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."community_projects" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."community_project_likes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."community_project_comments" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Published digest editions are publicly readable"
   ON "public"."digest_editions"
@@ -16,6 +18,26 @@ CREATE POLICY "Published community projects are publicly readable"
   FOR SELECT
   TO "anon", "authenticated"
   USING ("status" = 'published');
+
+CREATE POLICY "Likes on published community projects are publicly readable"
+  ON "public"."community_project_likes"
+  FOR SELECT
+  TO "anon", "authenticated"
+  USING (EXISTS (
+    SELECT 1 FROM "public"."community_projects"
+    WHERE "community_projects"."id" = "community_project_likes"."project_id"
+      AND "community_projects"."status" = 'published'
+  ));
+
+CREATE POLICY "Comments on published community projects are publicly readable"
+  ON "public"."community_project_comments"
+  FOR SELECT
+  TO "anon", "authenticated"
+  USING (EXISTS (
+    SELECT 1 FROM "public"."community_projects"
+    WHERE "community_projects"."id" = "community_project_comments"."project_id"
+      AND "community_projects"."status" = 'published'
+  ));
 
 -- Storage policies for the private archives bucket. Writes are restricted to
 -- the folder named by trusted, server-controlled app_metadata; the upload

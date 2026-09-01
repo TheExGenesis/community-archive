@@ -11,7 +11,7 @@ export type CommunityProjectCategory = Exclude<
   'All'
 >
 
-export type CommunityProjectSort = 'Featured' | 'Newest' | 'A–Z'
+export type CommunityProjectSort = 'Featured' | 'Newest' | 'Most liked' | 'A–Z'
 
 export interface CommunityProject {
   databaseId?: string
@@ -31,6 +31,8 @@ export interface CommunityProject {
   coverClass: string
   featured: boolean
   publishedAt: string
+  likeCount?: number
+  commentCount?: number
 }
 
 /**
@@ -218,6 +220,11 @@ export function filterCommunityProjects(
 
   return [...filtered].sort((left, right) => {
     if (sort === 'Newest') {
+      return right.publishedAt.localeCompare(left.publishedAt)
+    }
+    if (sort === 'Most liked') {
+      const difference = (right.likeCount ?? 0) - (left.likeCount ?? 0)
+      if (difference !== 0) return difference
       return right.publishedAt.localeCompare(left.publishedAt)
     }
     if (sort === 'A–Z') return left.name.localeCompare(right.name)

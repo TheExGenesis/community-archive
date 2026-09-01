@@ -2,8 +2,16 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { FormEvent, useMemo, useState } from 'react'
-import { ArrowUpRight, CheckCircle2, Plus, Search } from 'lucide-react'
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  ArrowUpRight,
+  CheckCircle2,
+  Heart,
+  MessageCircle,
+  Plus,
+  Search,
+  Trash2,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -32,7 +40,275 @@ import {
 } from '@/lib/communityProjects'
 import { cn } from '@/utils/tailwind'
 
-const SORT_OPTIONS: CommunityProjectSort[] = ['Featured', 'Newest', 'A–Z']
+const SORT_OPTIONS: CommunityProjectSort[] = [
+  'Featured',
+  'Newest',
+  'Most liked',
+  'A–Z',
+]
+
+type LikeState = { liked: boolean; count: number }
+
+function LikeButton({
+  project,
+  state,
+  onToggle,
+  size = 'card',
+  isSignedIn = true,
+}: {
+  project: CommunityProject
+  state: LikeState
+  onToggle: (project: CommunityProject) => void
+  size?: 'card' | 'modal'
+  isSignedIn?: boolean
+}) {
+  const label = !isSignedIn
+    ? 'Sign in to like'
+    : `${state.liked ? 'Unlike' : 'Like'} ${project.name}`
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation()
+        onToggle(project)
+      }}
+      aria-pressed={state.liked}
+      aria-label={label}
+      title={label}
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1.5 rounded-full border font-semibold transition-colors',
+        size === 'modal'
+          ? 'h-9 border-border px-3.5 text-[13px]'
+          : 'h-7 border-transparent px-2 text-[12.5px]',
+        state.liked
+          ? 'text-brand hover:text-brand/80'
+          : 'text-muted-foreground hover:text-foreground',
+      )}
+    >
+      <Heart
+        className={cn('h-4 w-4', state.liked && 'fill-current')}
+        aria-hidden="true"
+      />
+      <span>{state.count}</span>
+    </button>
+  )
+}
+
+const MAX_COMMENT_LENGTH = 2000
+
+const LOGIN_REDIRECT = '/login?redirect=/community'
+
+interface ProjectComment {
+  id: string
+  content: string
+  username: string | null
+  displayName: string | null
+  createdAt: string
+  isOwn: boolean
+}
+
+function commentAuthor(comment: ProjectComment) {
+  return (
+    comment.displayName ??
+    (comment.username ? `@${comment.username}` : 'A member')
+  )
+}
+
+/**
+ * The detail modal's comment thread. Owns its own list state and fetches once
+ * per project id, so the parent never has to hand it a freshly built array.
+ */
+function ProjectComments({
+  projectId,
+  isSignedIn,
+  onCountChange,
+}: {
+  projectId: string
+  isSignedIn: boolean
+  onCountChange: (projectId: string, count: number) => void
+}) {
+  const [comments, setComments] = useState<ProjectComment[] | null>(null)
+  const [draft, setDraft] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    setComments(null)
+    setError(null)
+    setDraft('')
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/community/projects/${projectId}/comments`,
+        )
+        if (!response.ok) throw new Error('comments failed')
+        const result = (await response.json()) as {
+          comments?: ProjectComment[]
+        }
+        if (!active) return
+        setComments(result.comments ?? [])
+      } catch {
+        if (!active) return
+        setComments([])
+        setError('We could not load comments. Please try again.')
+      }
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [projectId])
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const content = draft.trim()
+    if (!content || submitting) return
+
+    setSubmitting(true)
+    setError(null)
+    try {
+      const response = await fetch(
+        `/api/community/projects/${projectId}/comments`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content }),
+        },
+      )
+      if (response.status === 401) {
+        window.location.href = LOGIN_REDIRECT
+        return
+      }
+      if (!response.ok) throw new Error('comment failed')
+      const result = (await response.json()) as { comment?: ProjectComment }
+      if (!result.comment) throw new Error('comment failed')
+
+      const next = [...(comments ?? []), result.comment]
+      setComments(next)
+      onCountChange(projectId, next.length)
+      setDraft('')
+    } catch {
+      setError('We could not post your comment. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const remove = async (commentId: string) => {
+    const previous = comments ?? []
+    setComments(previous.filter((comment) => comment.id !== commentId))
+    onCountChange(projectId, previous.length - 1)
+    try {
+      const response = await fetch(
+        `/api/community/projects/${projectId}/comments/${commentId}`,
+        { method: 'DELETE' },
+      )
+      if (!response.ok) throw new Error('delete failed')
+    } catch {
+      setComments(previous)
+      onCountChange(projectId, previous.length)
+      setError('We could not delete that comment. Please try again.')
+    }
+  }
+
+  return (
+    <section className="border-t border-border pt-4">
+      <h3 className="text-[10.5px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">
+        Comments
+      </h3>
+
+      {comments === null ? (
+        <p className="mt-3 text-sm text-muted-foreground">Loading comments…</p>
+      ) : comments.length === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">
+          No comments yet. Be the first to say something.
+        </p>
+      ) : (
+        <ul className="mt-3 flex flex-col gap-3">
+          {comments.map((comment) => (
+            <li
+              key={comment.id}
+              className="bg-muted/45 rounded-xl border border-border px-[18px] py-3"
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm font-bold">
+                  {commentAuthor(comment)}
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="text-[12.5px] text-muted-foreground">
+                    {new Date(comment.createdAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      timeZone: 'UTC',
+                    })}
+                  </span>
+                  {comment.isOwn ? (
+                    <button
+                      type="button"
+                      onClick={() => void remove(comment.id)}
+                      aria-label="Delete your comment"
+                      className="text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  ) : null}
+                </span>
+              </div>
+              <p className="mt-1.5 whitespace-pre-wrap text-sm leading-[1.6]">
+                {comment.content}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {error ? (
+        <p role="alert" className="mt-3 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+
+      {isSignedIn ? (
+        <form onSubmit={submit} className="mt-4 flex flex-col gap-2">
+          <label htmlFor="community-comment" className="sr-only">
+            Add a comment
+          </label>
+          <Textarea
+            id="community-comment"
+            name="comment"
+            value={draft}
+            maxLength={MAX_COMMENT_LENGTH}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Add a comment"
+            className="min-h-[80px]"
+          />
+          <div className="flex justify-end">
+            <Button
+              type="submit"
+              disabled={submitting || !draft.trim()}
+              className="bg-brand text-brand-foreground hover:bg-brand/90"
+            >
+              {submitting ? 'Posting…' : 'Post comment'}
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <p className="mt-4 text-sm text-muted-foreground">
+          <Link
+            href={LOGIN_REDIRECT}
+            className="font-semibold text-brand hover:underline"
+          >
+            Sign in
+          </Link>{' '}
+          to join the conversation.
+        </p>
+      )}
+    </section>
+  )
+}
 
 const CURATED_SECTIONS = [
   {
@@ -117,32 +393,42 @@ function ProjectCard({
   onOpen: () => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="group min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-4 focus-visible:ring-offset-background"
-    >
-      <ProjectCover project={project} />
-      <span className="mt-3 flex items-baseline justify-between gap-3">
-        <span className="text-[15.5px] font-bold tracking-[-0.005em]">
-          {project.name}
+    <div className="min-w-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="group block w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-4 focus-visible:ring-offset-background"
+      >
+        <ProjectCover project={project} />
+        <span className="mt-3 flex items-baseline justify-between gap-3">
+          <span className="text-[15.5px] font-bold tracking-[-0.005em]">
+            {project.name}
+          </span>
         </span>
-      </span>
-      <span className="mt-1 block text-[13.5px] text-muted-foreground">
-        by{' '}
-        <span className="font-semibold text-foreground">{project.creator}</span>{' '}
-        · Free
-      </span>
-    </button>
+        <span className="mt-1 block text-[13.5px] text-muted-foreground">
+          by{' '}
+          <span className="font-semibold text-foreground">
+            {project.creator}
+          </span>{' '}
+          · Free
+        </span>
+      </button>
+    </div>
   )
 }
 
 function ProjectDialog({
   project,
   onOpenChange,
+  likeState,
+  onToggleLike,
+  isSignedIn,
 }: {
   project: CommunityProject | null
   onOpenChange: (open: boolean) => void
+  likeState?: LikeState
+  onToggleLike: (project: CommunityProject) => void
+  isSignedIn: boolean
 }) {
   return (
     <Dialog open={Boolean(project)} onOpenChange={onOpenChange}>
@@ -175,6 +461,15 @@ function ProjectDialog({
                     })}
                   </div>
                 </div>
+                {likeState ? (
+                  <LikeButton
+                    project={project}
+                    state={likeState}
+                    onToggle={onToggleLike}
+                    size="modal"
+                    isSignedIn={isSignedIn}
+                  />
+                ) : null}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {project.tags.map((tag) => (
@@ -194,6 +489,8 @@ function ProjectDialog({
                   {project.archiveUse}
                 </p>
               </div>
+              {/* Comments are built (see ProjectComments + the comments API)
+                  but hidden from the gallery for now. */}
               <DialogFooter>
                 <Button asChild variant="outline">
                   <Link
@@ -478,9 +775,11 @@ function SubmissionDialog({
 export default function CommunityGallery({
   isSignedIn = true,
   publishedProjects = [],
+  likedProjectIds = [],
 }: {
   isSignedIn?: boolean
   publishedProjects?: CommunityProject[]
+  likedProjectIds?: string[]
 }) {
   const [query, setQuery] = useState('')
   const [category, setCategory] =
@@ -490,18 +789,110 @@ export default function CommunityGallery({
     useState<CommunityProject | null>(null)
   const [submissionOpen, setSubmissionOpen] = useState(false)
 
-  const catalog = useMemo(() => {
+  // Server-rendered like counts stay the source of truth; only projects the
+  // reader has toggled in this session carry a local override.
+  const [likeOverrides, setLikeOverrides] = useState<Record<string, LikeState>>(
+    {},
+  )
+
+  const serverLikes = useMemo(() => {
+    const liked = new Set(likedProjectIds)
+    return new Map<string, LikeState>(
+      publishedProjects
+        .filter((project) => project.databaseId)
+        .map((project) => [
+          project.databaseId!,
+          {
+            liked: liked.has(project.databaseId!),
+            count: project.likeCount ?? 0,
+          },
+        ]),
+    )
+  }, [publishedProjects, likedProjectIds])
+
+  const likes = useMemo(() => {
+    const merged: Record<string, LikeState> = Object.fromEntries(serverLikes)
+    return { ...merged, ...likeOverrides }
+  }, [serverLikes, likeOverrides])
+
+  const baseCatalog = useMemo(() => {
     const bySlug = new Map(
       COMMUNITY_PROJECTS.map((project) => [project.slug, project]),
     )
-    for (const project of publishedProjects) bySlug.set(project.slug, project)
+    for (const project of publishedProjects) {
+      // A backfilled database row has no uploaded cover; keep the curated
+      // catalog's artwork for the same slug so the card doesn't regress.
+      const curated = bySlug.get(project.slug)
+      bySlug.set(project.slug, {
+        ...project,
+        image: project.image ?? curated?.image,
+        coverClass: curated?.coverClass ?? project.coverClass,
+      })
+    }
     return Array.from(bySlug.values())
   }, [publishedProjects])
+
+  const catalog = useMemo(
+    () =>
+      baseCatalog.map((project) => {
+        const state = project.databaseId ? likes[project.databaseId] : undefined
+        return state ? { ...project, likeCount: state.count } : project
+      }),
+    [baseCatalog, likes],
+  )
 
   const projects = useMemo(
     () => filterCommunityProjects(catalog, query, category, sort),
     [catalog, category, query, sort],
   )
+
+  const toggleLike = useCallback(
+    (project: CommunityProject) => {
+      const id = project.databaseId
+      if (!id) return
+      if (!isSignedIn) {
+        window.location.href = '/login?redirect=/community'
+        return
+      }
+
+      const previous = likes[id] ?? { liked: false, count: 0 }
+      const next: LikeState = {
+        liked: !previous.liked,
+        count: Math.max(0, previous.count + (previous.liked ? -1 : 1)),
+      }
+      setLikeOverrides((current) => ({ ...current, [id]: next }))
+
+      void (async () => {
+        try {
+          const response = await fetch(`/api/community/projects/${id}/like`, {
+            method: next.liked ? 'POST' : 'DELETE',
+          })
+          if (response.status === 401) {
+            window.location.href = '/login?redirect=/community'
+            return
+          }
+          if (!response.ok) throw new Error('like failed')
+          const result = (await response.json()) as {
+            liked?: boolean
+            count?: number
+          }
+          setLikeOverrides((current) => ({
+            ...current,
+            [id]: {
+              liked: result.liked ?? next.liked,
+              count: result.count ?? next.count,
+            },
+          }))
+        } catch {
+          setLikeOverrides((current) => ({ ...current, [id]: previous }))
+        }
+      })()
+    },
+    [isSignedIn, likes],
+  )
+
+  const likeStateFor = (project: CommunityProject) =>
+    project.databaseId ? (likes[project.databaseId] ?? undefined) : undefined
 
   const isCurated = category === 'All' && query.trim() === ''
   const openSubmission = () => {
@@ -707,6 +1098,9 @@ export default function CommunityGallery({
       <ProjectDialog
         project={selectedProject}
         onOpenChange={(open) => !open && setSelectedProject(null)}
+        likeState={selectedProject ? likeStateFor(selectedProject) : undefined}
+        onToggleLike={toggleLike}
+        isSignedIn={isSignedIn}
       />
       <SubmissionDialog
         open={submissionOpen}

@@ -1,6 +1,37 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CommunityGallery from './CommunityGallery'
+import type { CommunityProject } from '@/lib/communityProjects'
+
+const PUBLISHED_PROJECT: CommunityProject = {
+  databaseId: '8c21b2b5-3530-4ec8-9729-07635b28b692',
+  slug: 'archive-quilt',
+  name: 'Archive Quilt',
+  creator: 'Ada',
+  summary: 'A visual map of recurring conversations.',
+  description: 'A visual map of recurring conversations.',
+  archiveUse: 'It groups public posts into visual conversation clusters.',
+  category: 'Tools',
+  tags: ['Visualization'],
+  projectUrl: 'https://example.org/archive-quilt',
+  sourceTweetId: '123',
+  sourceUrl: 'https://x.com/example/status/123',
+  coverClass: 'from-[#8BD2EE] via-[#75C9EB] to-[#25AADF]',
+  featured: false,
+  publishedAt: '2026-08-20',
+  likeCount: 2,
+  commentCount: 1,
+}
+
+async function openPublishedProject(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(
+    screen.getByRole('searchbox', { name: 'Search community projects' }),
+    'Archive Quilt',
+  )
+  await user.click(
+    screen.getByRole('button', { name: /Archive Quilt by Ada/i }),
+  )
+}
 
 describe('CommunityGallery', () => {
   afterEach(() => {
@@ -127,5 +158,122 @@ describe('CommunityGallery', () => {
     )
     const requestBody = fetchMock.mock.calls[0]?.[1]?.body as FormData
     expect(requestBody.get('projectName')).toBe('Archive Quilt')
+  })
+
+  it('optimistically likes a published project and calls the like API', async () => {
+    const user = userEvent.setup()
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ liked: true, count: 3 }),
+    } as Response)
+
+    render(
+      <CommunityGallery
+        isSignedIn
+        publishedProjects={[PUBLISHED_PROJECT]}
+        likedProjectIds={[]}
+      />,
+    )
+
+    await openPublishedProject(user)
+
+    const likeButton = screen.getByRole('button', {
+      name: 'Like Archive Quilt',
+    })
+    expect(likeButton).toHaveTextContent('2')
+
+    await user.click(likeButton)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/community/projects/${PUBLISHED_PROJECT.databaseId}/like`,
+      expect.objectContaining({ method: 'POST' }),
+    )
+    const liked = await screen.findByRole('button', {
+      name: 'Unlike Archive Quilt',
+    })
+    expect(liked).toHaveTextContent('3')
+  })
+
+  it('unlikes a project the signed-in user already liked', async () => {
+    const user = userEvent.setup()
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ liked: false, count: 1 }),
+    } as Response)
+
+    render(
+      <CommunityGallery
+        isSignedIn
+        publishedProjects={[PUBLISHED_PROJECT]}
+        likedProjectIds={[PUBLISHED_PROJECT.databaseId!]}
+      />,
+    )
+
+    await openPublishedProject(user)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Unlike Archive Quilt' }),
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/community/projects/${PUBLISHED_PROJECT.databaseId}/like`,
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+    const unliked = await screen.findByRole('button', {
+      name: 'Like Archive Quilt',
+    })
+    expect(unliked).toHaveTextContent('1')
+  })
+
+  it('shows the like count but does not call the API when signed out', async () => {
+    const user = userEvent.setup()
+    const fetchMock = jest.spyOn(global, 'fetch')
+
+    render(
+      <CommunityGallery
+        isSignedIn={false}
+        publishedProjects={[PUBLISHED_PROJECT]}
+      />,
+    )
+
+    await openPublishedProject(user)
+
+    const likeButton = screen.getByRole('button', {
+      name: 'Sign in to like',
+    })
+    expect(likeButton).toHaveAttribute('title', 'Sign in to like')
+    expect(likeButton).toHaveTextContent('2')
+
+    await user.click(likeButton)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(
+      screen.getByRole('button', { name: 'Sign in to like' }),
+    ).toHaveTextContent('2')
+  })
+
+  it('hides comments in the gallery for now', async () => {
+    const user = userEvent.setup()
+    const fetchMock = jest.spyOn(global, 'fetch')
+
+    render(
+      <CommunityGallery isSignedIn publishedProjects={[PUBLISHED_PROJECT]} />,
+    )
+    await openPublishedProject(user)
+
+    // The modal must not render the comment thread or fetch the comments API.
+    expect(screen.queryByText('Comments')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('offers a most liked sort option', async () => {
+    const user = userEvent.setup()
+    render(<CommunityGallery publishedProjects={[PUBLISHED_PROJECT]} />)
+
+    const sortButton = screen.getByRole('button', { name: 'Most liked' })
+    await user.click(sortButton)
+    expect(sortButton).toHaveAttribute('aria-pressed', 'true')
   })
 })

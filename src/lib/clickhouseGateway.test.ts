@@ -64,12 +64,12 @@ describe('ClickHouse analytics gateway requests', () => {
     const target = analyticsGatewayRequestUrl(
       ['trend-evidence'],
       new URLSearchParams(
-        'q=tpot&mode=all&since=2024-01-01&until=2026-01-01&limit=50&offset=40',
+        'q=tpot&mode=all&since=2024-01-01&until=2026-01-01&sort=oldest&limit=50&offset=40&raw_sql=DROP',
       ),
       'https://analytics.example',
     )
     expect(target.toString()).toBe(
-      'https://analytics.example/trend-evidence?q=tpot&mode=all&since=2024-01-01&until=2026-01-01&limit=50',
+      'https://analytics.example/trend-evidence?q=tpot&mode=all&since=2024-01-01&until=2026-01-01&sort=oldest&limit=50&offset=40',
     )
   })
 

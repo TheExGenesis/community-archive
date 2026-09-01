@@ -3,6 +3,7 @@ import {
   cachedTrendEvidence,
   hasCompleteTrendEvidence,
   storeTrendEvidence,
+  trendEvidenceNextOffset,
 } from './trendEvidenceCache'
 import type { PortalTweet } from './types'
 
@@ -70,7 +71,7 @@ describe('trend evidence cache', () => {
     expect(Array.from(cache.values())[0].term).toBe('term-1')
   })
 
-  test('uses a full page from a broader range without an exact-range top-up', () => {
+  test('requires an exact range page so selected periods remain pageable', () => {
     const cache = new Map()
     storeTrendEvidence(cache, {
       term: 'tpot',
@@ -88,7 +89,7 @@ describe('trend evidence cache', () => {
         since: '2026-01-01',
         until: '2027-01-01',
       }),
-    ).toBe(true)
+    ).toBe(false)
     expect(
       hasCompleteTrendEvidence(cache, 'tpot', {
         since: '2025-01-01',
@@ -96,5 +97,33 @@ describe('trend evidence cache', () => {
       }),
     ).toBe(false)
     expect(hasCompleteTrendEvidence(cache, 'tpot', null)).toBe(true)
+  })
+
+  test('appends pages and keeps oldest-first evidence separate', () => {
+    const cache = new Map()
+    storeTrendEvidence(cache, {
+      term: 'tpot',
+      range: null,
+      sort: 'oldest',
+      tweets: [tweet('1', '2024-01-01T00:00:00.000Z')],
+      nextOffset: 1,
+    })
+    storeTrendEvidence(
+      cache,
+      {
+        term: 'tpot',
+        range: null,
+        sort: 'oldest',
+        tweets: [tweet('2', '2025-01-01T00:00:00.000Z')],
+        nextOffset: null,
+      },
+      { append: true },
+    )
+
+    expect(
+      cachedTrendEvidence(cache, ['tpot'], null, 'oldest').map(({ id }) => id),
+    ).toEqual(['1', '2'])
+    expect(cachedTrendEvidence(cache, ['tpot'], null, 'newest')).toEqual([])
+    expect(trendEvidenceNextOffset(cache, 'tpot', null, 'oldest')).toBeNull()
   })
 })

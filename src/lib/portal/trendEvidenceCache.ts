@@ -1,5 +1,7 @@
 import type { PortalTweet } from './types'
 
+export type TrendEvidenceSort = 'newest' | 'oldest'
+
 export interface TrendEvidenceRange {
   /** Inclusive UTC date in YYYY-MM-DD form. */
   since: string
@@ -10,7 +12,9 @@ export interface TrendEvidenceRange {
 export interface TrendEvidenceCacheEntry {
   term: string
   range: TrendEvidenceRange | null
+  sort?: TrendEvidenceSort
   tweets: PortalTweet[]
+  nextOffset?: number | null
 }
 
 export const MAX_TREND_EVIDENCE_CACHE_ENTRIES = 96
@@ -30,17 +34,29 @@ function tweetFallsWithinRange(
 export function trendEvidenceCacheKey(
   term: string,
   range: TrendEvidenceRange | null,
+  sort: TrendEvidenceSort = 'newest',
 ): string {
-  return `${term}\u0000${range ? `${range.since}-${range.until}` : 'any'}`
+  return `${term}\u0000${range ? `${range.since}-${range.until}` : 'any'}\u0000${sort}`
 }
 
 export function storeTrendEvidence(
   cache: Map<string, TrendEvidenceCacheEntry>,
   entry: TrendEvidenceCacheEntry,
+  { append = false }: { append?: boolean } = {},
 ): void {
-  const key = trendEvidenceCacheKey(entry.term, entry.range)
+  const sort = entry.sort ?? 'newest'
+  const key = trendEvidenceCacheKey(entry.term, entry.range, sort)
+  const existing = append ? cache.get(key) : undefined
+  const tweets = new Map<string, PortalTweet>()
+  existing?.tweets.forEach((tweet) => tweets.set(tweet.id, tweet))
+  entry.tweets.forEach((tweet) => tweets.set(tweet.id, tweet))
   cache.delete(key)
-  cache.set(key, entry)
+  cache.set(key, {
+    ...entry,
+    sort,
+    tweets: Array.from(tweets.values()),
+    nextOffset: entry.nextOffset ?? null,
+  })
   while (cache.size > MAX_TREND_EVIDENCE_CACHE_ENTRIES) {
     const oldestKey = cache.keys().next().value
     if (oldestKey === undefined) return
@@ -57,37 +73,33 @@ export function hasCompleteTrendEvidence(
   cache: ReadonlyMap<string, TrendEvidenceCacheEntry>,
   term: string,
   range: TrendEvidenceRange | null,
-  limit = 30,
+  _limit = 30,
+  sort: TrendEvidenceSort = 'newest',
 ): boolean {
-  if (cache.has(trendEvidenceCacheKey(term, range))) return true
-  if (!range) return false
+  return cache.has(trendEvidenceCacheKey(term, range, sort))
+}
 
-  return Array.from(cache.values()).some((entry) => {
-    if (entry.term !== term) return false
-    if (
-      entry.range &&
-      (entry.range.since > range.since || entry.range.until < range.until)
-    ) {
-      return false
-    }
-    return (
-      entry.tweets.filter((tweet) => tweetFallsWithinRange(tweet, range))
-        .length >= limit
-    )
-  })
+export function trendEvidenceNextOffset(
+  cache: ReadonlyMap<string, TrendEvidenceCacheEntry>,
+  term: string,
+  range: TrendEvidenceRange | null,
+  sort: TrendEvidenceSort = 'newest',
+): number | null | undefined {
+  return cache.get(trendEvidenceCacheKey(term, range, sort))?.nextOffset
 }
 
 export function cachedTrendEvidence(
   cache: ReadonlyMap<string, TrendEvidenceCacheEntry>,
   includedTerms: string[],
   range: TrendEvidenceRange | null,
-  limit = 30,
+  sort: TrendEvidenceSort = 'newest',
 ): PortalTweet[] {
   const included = new Set(includedTerms)
   const unique = new Map<string, PortalTweet>()
 
   cache.forEach((entry) => {
     if (!included.has(entry.term)) return
+    if ((entry.sort ?? 'newest') !== sort) return
     for (const tweet of entry.tweets) {
       const createdAt = new Date(tweet.createdAt).getTime()
       if (!Number.isFinite(createdAt)) continue
@@ -96,11 +108,11 @@ export function cachedTrendEvidence(
     }
   })
 
-  return Array.from(unique.values())
-    .sort(
-      (left, right) =>
-        new Date(right.createdAt).getTime() -
-          new Date(left.createdAt).getTime() || right.id.localeCompare(left.id),
-    )
-    .slice(0, Math.max(1, limit))
+  const direction = sort === 'oldest' ? 1 : -1
+  return Array.from(unique.values()).sort(
+    (left, right) =>
+      direction *
+      (new Date(left.createdAt).getTime() -
+        new Date(right.createdAt).getTime() || left.id.localeCompare(right.id)),
+  )
 }

@@ -224,7 +224,7 @@ describe('ClickHouse-backed portal analytics', () => {
     expect(maxActive).toBe(2)
   })
 
-  test('merges included evidence and forwards a selected date range', async () => {
+  test('merges included evidence and forwards range, page, and order', async () => {
     const tweet = (tweetId: string, fullText: string, createdAt: string) => ({
       tweetId,
       accountId: '42',
@@ -276,17 +276,27 @@ describe('ClickHouse-backed portal analytics', () => {
 
     const result = await fetchPortalTrendEvidence(
       ['alpha', 'beta'],
-      { limit: 30, since: '2024-01-01', until: '2026-01-01' },
+      {
+        limit: 30,
+        offset: 60,
+        since: '2024-01-01',
+        sort: 'oldest',
+        until: '2026-01-01',
+      },
       fetcher,
     )
 
     expect(fetcher).toHaveBeenCalledTimes(2)
     expect(fetcherMock.mock.calls[0]?.[0]).toEqual(['trend-evidence'])
-    expect(result.map(({ id }) => id)).toEqual(['102', '101', '100'])
+    expect(result.tweets.map(({ id }) => id)).toEqual(['100', '101', '102'])
+    expect(result.nextOffset).toBeNull()
     expect(fetcherMock.mock.calls[0]?.[1]?.toString()).toContain(
       'since=2024-01-01&until=2026-01-01',
     )
-    expect(result[0]).toMatchObject({
+    expect(fetcherMock.mock.calls[0]?.[1]?.toString()).toContain(
+      'offset=60&sort=oldest',
+    )
+    expect(result.tweets[2]).toMatchObject({
       username: 'alice',
       createdAt: '2026-08-07T12:00:00.000Z',
       likes: 3,

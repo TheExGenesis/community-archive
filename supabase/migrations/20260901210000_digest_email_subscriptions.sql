@@ -6,6 +6,10 @@
 CREATE TABLE IF NOT EXISTS "public"."digest_email_subscriptions" (
     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     "email" text NOT NULL,
+    -- Trusted Twitter provider id captured when the subscriber was signed in,
+    -- so settings can show and manage the subscription. Nullable: guests
+    -- subscribe with just an email.
+    "account_id" text,
     "token" uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
     "confirmed_at" timestamptz,
     "unsubscribed_at" timestamptz,
@@ -30,6 +34,10 @@ ALTER TABLE "public"."digest_email_sends" OWNER TO "postgres";
 -- One subscription per address, case-insensitively.
 CREATE UNIQUE INDEX IF NOT EXISTS "digest_email_subscriptions_email_key"
   ON "public"."digest_email_subscriptions" (lower("email"));
+
+CREATE INDEX IF NOT EXISTS "digest_email_subscriptions_account_idx"
+  ON "public"."digest_email_subscriptions" ("account_id")
+  WHERE "account_id" IS NOT NULL;
 
 -- No policies on the email tables: service-role only.
 ALTER TABLE "public"."digest_email_subscriptions" ENABLE ROW LEVEL SECURITY;

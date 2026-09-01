@@ -8,6 +8,7 @@ import {
   upsertSubscription,
 } from '@/lib/digest/emailSubscriptions'
 import { sendEmail } from '@/lib/email'
+import { getAuthenticatedAccountId } from '@/lib/authenticatedAccount'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -29,7 +30,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const subscription = await upsertSubscription(email)
+    // Trusted provider identity from the session, when present, links the
+    // subscription to the account so settings can manage it.
+    const accountId = await getAuthenticatedAccountId()
+    const subscription = await upsertSubscription(email, accountId)
     if (!subscription.confirmedAt) {
       const confirmUrl = digestConfirmUrl(subscription.token)
       const result = await sendEmail({

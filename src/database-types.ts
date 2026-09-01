@@ -436,6 +436,7 @@ export type Database = {
       }
       digest_email_subscriptions: {
         Row: {
+          account_id: string | null
           confirmed_at: string | null
           created_at: string
           email: string
@@ -445,6 +446,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          account_id?: string | null
           confirmed_at?: string | null
           created_at?: string
           email: string
@@ -454,6 +456,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          account_id?: string | null
           confirmed_at?: string | null
           created_at?: string
           email?: string

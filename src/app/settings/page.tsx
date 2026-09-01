@@ -4,8 +4,16 @@ import { loadPendingCommunityProjects } from '@/lib/communityProjectDatabase'
 import { getPublicProfileSettings } from '@/lib/profileCuration'
 import { createServerAdminClient, createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
+import {
+  getSubscriptionForAccount,
+  maskSubscriptionEmail,
+} from '@/lib/digest/emailSubscriptions'
 import ProfileContent from '../profile/ProfileContent'
 import { CommunitySubmissionQueue } from './CommunitySubmissionQueue'
+import {
+  DigestEmailSettings,
+  type DigestEmailStatus,
+} from './DigestEmailSettings'
 
 const getTwitterUsername = (
   user: Awaited<ReturnType<typeof requireAuth>>['user'],
@@ -90,6 +98,18 @@ export default async function SettingsPage() {
       : Promise.resolve([]),
   ])
 
+  // Tolerate the subscriptions table not existing yet (pre-migration).
+  const digestSubscription = twitterAccountId
+    ? await getSubscriptionForAccount(twitterAccountId).catch(() => null)
+    : null
+  const digestEmailStatus: DigestEmailStatus = !digestSubscription
+    ? 'none'
+    : digestSubscription.unsubscribedAt
+      ? 'unsubscribed'
+      : digestSubscription.confirmedAt
+        ? 'subscribed'
+        : 'pending'
+
   return (
     <main className="min-h-screen bg-card dark:bg-background">
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
@@ -100,6 +120,14 @@ export default async function SettingsPage() {
             />
           </div>
         ) : null}
+        <DigestEmailSettings
+          initialStatus={digestEmailStatus}
+          initialEmail={
+            digestSubscription
+              ? maskSubscriptionEmail(digestSubscription.email)
+              : null
+          }
+        />
         <ProfileContent
           user={user}
           accountId={twitterAccountId}

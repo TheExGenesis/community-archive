@@ -422,6 +422,10 @@ ALTER TABLE "public"."digest_editions" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."digest_email_subscriptions" (
     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     "email" text NOT NULL,
+    -- Trusted Twitter provider id captured when the subscriber was signed in,
+    -- so settings can show and manage the subscription. Nullable: guests
+    -- subscribe with just an email.
+    "account_id" text,
     "token" uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
     "confirmed_at" timestamptz,
     "unsubscribed_at" timestamptz,

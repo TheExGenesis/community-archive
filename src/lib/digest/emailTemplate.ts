@@ -105,9 +105,9 @@ export function renderDigestEmail(
   const storiesHtml = content.stories
     .map(
       (story) => `
-      <table role="presentation" width="100%" style="margin:0 0 20px;">
+      <table role="presentation" width="100%" style="margin:24px 0 20px;">
         <tr><td>
-          <h2 style="margin:0 0 4px;font-family:${HEADING_FONT};font-size:23px;line-height:1.3;">
+          <h2 style="margin:0 0 4px;font-family:${HEADING_FONT};font-size:26px;line-height:1.3;">
             <a href="${editionUrl}#${escapeHtml(story.slug)}" style="color:#111827;text-decoration:none;">${escapeHtml(story.title)}</a>
           </h2>
           <p style="margin:0 0 8px;color:#374151;font-size:14px;line-height:1.5;">${escapeHtml(story.subtitle)}</p>

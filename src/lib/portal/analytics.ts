@@ -336,17 +336,31 @@ export async function fetchPortalTrendSeries(
 
 interface PortalTrendEvidenceOptions {
   limit?: number
+  offset?: number
   since?: string
+  sort?: 'newest' | 'oldest'
   until?: string
 }
 
-/** Latest posts counted by at least one included trend in an optional period. */
+export interface PortalTrendEvidencePage {
+  tweets: PortalTweet[]
+  nextOffset: number | null
+}
+
+/** Chronological page of posts counted by an included trend in a period. */
 export async function fetchPortalTrendEvidence(
   includeTerms: string[],
-  { limit = 30, since, until }: PortalTrendEvidenceOptions = {},
+  {
+    limit = 30,
+    offset = 0,
+    since,
+    sort = 'newest',
+    until,
+  }: PortalTrendEvidenceOptions = {},
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
-): Promise<PortalTweet[]> {
+): Promise<PortalTrendEvidencePage> {
   const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
+  const safeOffset = Math.max(0, Math.min(5_000, Math.trunc(offset)))
   const candidateLimit = Math.min(50, Math.max(safeLimit * 2, 30))
   const responses = await runBatched(
     includeTerms.map(
@@ -358,6 +372,8 @@ export async function fetchPortalTrendEvidence(
               q: term,
               mode: 'all',
               limit: String(candidateLimit),
+              offset: String(safeOffset),
+              sort,
             })
             if (since) params.set('since', since)
             if (until) params.set('until', until)
@@ -372,10 +388,19 @@ export async function fetchPortalTrendEvidence(
   )
 
   const unique = new Map<string, PortalTweet>()
+  let hasMore = false
   for (const response of responses) {
     if (!Array.isArray(response.data?.tweets)) {
       throw new Error('ClickHouse search returned an invalid response')
     }
+    if (
+      response.data.nextOffset !== null &&
+      (!Number.isSafeInteger(response.data.nextOffset) ||
+        response.data.nextOffset <= safeOffset)
+    ) {
+      throw new Error('ClickHouse search returned an invalid next offset')
+    }
+    hasMore ||= response.data.nextOffset !== null
     for (const row of response.data.tweets) {
       if (
         !/^\d{1,32}$/.test(row.tweetId) ||
@@ -418,13 +443,24 @@ export async function fetchPortalTrendEvidence(
     }
   }
 
-  return Array.from(unique.values())
+  const direction = sort === 'oldest' ? 1 : -1
+  const tweets = Array.from(unique.values())
     .sort(
       (left, right) =>
-        new Date(right.createdAt).getTime() -
-          new Date(left.createdAt).getTime() || right.id.localeCompare(left.id),
+        direction *
+        (new Date(left.createdAt).getTime() -
+          new Date(right.createdAt).getTime() ||
+          left.id.localeCompare(right.id)),
     )
     .slice(0, safeLimit)
+  return {
+    tweets,
+    nextOffset:
+      (hasMore || unique.size > safeLimit) &&
+      safeOffset + tweets.length <= 5_000
+        ? safeOffset + tweets.length
+        : null,
+  }
 }
 
 export async function fetchPortalLiveAnalytics(
@@ -551,7 +587,9 @@ export async function fetchPortalDailyInteractions(
     { timeoutMs: 30_000, revalidate: 300 },
   )
   if (!Array.isArray(response.data)) {
-    throw new Error('ClickHouse daily-interactions returned an invalid response')
+    throw new Error(
+      'ClickHouse daily-interactions returned an invalid response',
+    )
   }
 
   return response.data.map((row) => {

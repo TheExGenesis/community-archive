@@ -348,7 +348,7 @@ describe('TrendsExplorer request isolation', () => {
     expect(screen.getByRole('button', { name: 'Clear range' })).toBeVisible()
   })
 
-  test('skips a range top-up when a broader cache has a full page', async () => {
+  test('loads an exact range page even when broader cached evidence is visible', async () => {
     jest.useFakeTimers()
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime })
     const tweets = Array.from({ length: 30 }, (_, index) =>
@@ -368,9 +368,75 @@ describe('TrendsExplorer request isolation', () => {
     expect(screen.getByText('tweet-2026-0')).toBeVisible()
     expect(
       screen.queryByText('Updating this period in the background…'),
-    ).not.toBeInTheDocument()
+    ).toBeInTheDocument()
     act(() => jest.advanceTimersByTime(1_200))
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+  })
+
+  test('loads the next evidence page when the sidebar nears its end', async () => {
+    const firstPage = Array.from({ length: 30 }, (_, index) =>
+      feedTweet(String(index), 2026),
+    )
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ tweets: firstPage, nextOffset: 30 }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          tweets: [feedTweet('older', 2025)],
+          nextOffset: null,
+        }),
+      } as Response)
+
+    render(<TrendsExplorer initialTrends={successfulTrends} />)
+
+    expect(await screen.findByText('tweet-2026-0')).toBeVisible()
+    const sidebar = screen.getByLabelText('Matching tweets')
+    Object.defineProperties(sidebar, {
+      clientHeight: { configurable: true, value: 760 },
+      scrollHeight: { configurable: true, value: 1_000 },
+      scrollTop: { configurable: true, value: 200, writable: true },
+    })
+    fireEvent.scroll(sidebar)
+
+    expect(await screen.findByText('tweet-2025-older')).toBeVisible()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(String(fetchMock.mock.calls[1][0])).toContain('offset=30')
+    expect(String(fetchMock.mock.calls[1][0])).toContain('sort=newest')
+    expect(screen.getByText('End of matching tweets.')).toBeVisible()
+  })
+
+  test('sorts evidence oldest first within the active period', async () => {
+    const user = userEvent.setup()
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async (url) => {
+        const requestUrl = new URL(String(url), 'https://example.com')
+        const oldest = requestUrl.searchParams.get('sort') === 'oldest'
+        return {
+          ok: true,
+          json: async () => ({
+            tweets: [
+              feedTweet(oldest ? 'first' : 'latest', oldest ? 2025 : 2026),
+            ],
+            nextOffset: null,
+          }),
+        } as Response
+      })
+
+    render(<TrendsExplorer initialTrends={successfulTrends} />)
+
+    expect(await screen.findByText('tweet-2026-latest')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Oldest first' }))
+
+    expect(await screen.findByText('tweet-2025-first')).toBeVisible()
+    expect(screen.queryByText('tweet-2026-latest')).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).includes('sort=oldest')),
+    ).toBe(true)
   })
 
   test('does not query during a pointer drag and debounces after release', async () => {

@@ -55,6 +55,12 @@ function optionalDate(value: string | null, label: string): string | undefined {
   return value
 }
 
+function boundedOffset(value: string | null): number {
+  if (value === null) return 0
+  if (!/^\d+$/.test(value)) throw new Error('Choose a valid page offset')
+  return Math.min(5_000, Number(value))
+}
+
 export async function GET(request: NextRequest) {
   if (!(await getIsMember())) {
     return privateJson({ error: 'Sign in to explore trends' }, 401)
@@ -88,17 +94,21 @@ export async function GET(request: NextRequest) {
       }
       const since = optionalDate(params.get('since'), 'start')
       const until = optionalDate(params.get('until'), 'end')
+      const offset = boundedOffset(params.get('offset'))
+      const sort = params.get('sort') === 'oldest' ? 'oldest' : 'newest'
       if (since && until && since >= until) {
         throw new Error('Choose an end date after the start date')
       }
+      const page = await fetchPortalTrendEvidence(includeTerms, {
+        limit: 30,
+        offset,
+        since,
+        sort,
+        until,
+      })
       return privateJson({
-        tweets: await enrichPortalTweets(
-          await fetchPortalTrendEvidence(includeTerms, {
-            limit: 30,
-            since,
-            until,
-          }),
-        ),
+        tweets: await enrichPortalTweets(page.tweets),
+        nextOffset: page.nextOffset,
       })
     }
 

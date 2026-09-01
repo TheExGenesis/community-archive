@@ -101,11 +101,14 @@ describe('portal trends route', () => {
   })
 
   test('forwards included terms and a selected date range to evidence search', async () => {
-    fetchPortalTrendEvidenceMock.mockResolvedValue([])
+    fetchPortalTrendEvidenceMock.mockResolvedValue({
+      tweets: [],
+      nextOffset: null,
+    })
 
     const response = await GET(
       new NextRequest(
-        'https://community-archive.org/api/portal/trends?view=feed&include=Alpha&include=Beta&since=2022-01-01&until=2025-01-01',
+        'https://community-archive.org/api/portal/trends?view=feed&include=Alpha&include=Beta&since=2022-01-01&until=2025-01-01&offset=60&sort=oldest',
       ),
     )
 
@@ -114,7 +117,9 @@ describe('portal trends route', () => {
       ['alpha', 'beta'],
       {
         limit: 30,
+        offset: 60,
         since: '2022-01-01',
+        sort: 'oldest',
         until: '2025-01-01',
       },
     )

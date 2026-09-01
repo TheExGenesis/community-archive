@@ -10,10 +10,12 @@ import {
   hasCompleteTrendEvidence,
   storeTrendEvidence,
   trendEvidenceCacheKey,
+  trendEvidenceNextOffset,
 } from '@/lib/portal/trendEvidenceCache'
 import type {
   TrendEvidenceCacheEntry,
   TrendEvidenceRange,
+  TrendEvidenceSort,
 } from '@/lib/portal/trendEvidenceCache'
 import {
   clampTrendRange,
@@ -39,6 +41,7 @@ type FeedFilter = 'include' | 'off'
 
 interface FeedResponse {
   tweets: PortalTweet[]
+  nextOffset: number | null
   error?: string
 }
 
@@ -79,6 +82,7 @@ type TrendsExplorerAction =
   | 'chart_series_toggled'
   | 'evidence_filter_toggled'
   | 'evidence_refreshed'
+  | 'evidence_sort_changed'
   | 'granularity_changed'
   | 'retry_defaults'
   | 'scale_changed'
@@ -115,9 +119,16 @@ async function requestTrendSeries(
 async function requestTrendEvidence(
   term: string,
   range: TrendEvidenceRange | null,
+  sort: TrendEvidenceSort,
+  offset: number,
   signal: AbortSignal,
-): Promise<PortalTweet[]> {
-  const params = new URLSearchParams({ view: 'feed', include: term })
+): Promise<FeedResponse> {
+  const params = new URLSearchParams({
+    view: 'feed',
+    include: term,
+    offset: String(offset),
+    sort,
+  })
   if (range) {
     params.set('since', range.since)
     params.set('until', range.until)
@@ -129,10 +140,16 @@ async function requestTrendEvidence(
   if (!response.ok) {
     throw new Error(body?.error || `Could not load tweets for ${term}`)
   }
-  if (!body || !Array.isArray(body.tweets)) {
+  if (
+    !body ||
+    !Array.isArray(body.tweets) ||
+    (body.nextOffset !== undefined &&
+      body.nextOffset !== null &&
+      !Number.isSafeInteger(body.nextOffset))
+  ) {
     throw new Error('The tweet feed returned an invalid response')
   }
-  return body.tweets
+  return { tweets: body.tweets, nextOffset: body.nextOffset ?? null }
 }
 
 function sameEvidenceRange(
@@ -307,6 +324,8 @@ export default function TrendsExplorer({
     initialLoadFailed ? 'The default trends could not be loaded.' : null,
   )
   const [isLoadingEvidence, setIsLoadingEvidence] = useState(true)
+  const [isLoadingMoreEvidence, setIsLoadingMoreEvidence] = useState(false)
+  const [evidenceSort, setEvidenceSort] = useState<TrendEvidenceSort>('newest')
   const [feedError, setFeedError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [selectedRange, setSelectedRange] = useState<TrendRange | null>(
@@ -321,6 +340,8 @@ export default function TrendsExplorer({
   const [, setEvidenceCacheVersion] = useState(0)
   const [dragStartBucket, setDragStartBucket] = useState<string | null>(null)
   const chartRef = useRef<SVGSVGElement>(null)
+  const evidenceScrollRef = useRef<HTMLDivElement>(null)
+  const evidenceSentinelRef = useRef<HTMLDivElement>(null)
   const seriesRequestIdRef = useRef(0)
   const evidenceCacheRef = useRef<Map<string, TrendEvidenceCacheEntry>>(
     new Map(),
@@ -328,7 +349,7 @@ export default function TrendsExplorer({
   const evidenceRequestsRef = useRef(
     new Map<
       string,
-      { controller: AbortController; promise: Promise<PortalTweet[]> }
+      { controller: AbortController; promise: Promise<FeedResponse> }
     >(),
   )
   const evidenceRequestSignatureRef = useRef('')
@@ -373,6 +394,7 @@ export default function TrendsExplorer({
     evidenceCacheRef.current,
     includeTerms,
     selectedEvidenceRange,
+    evidenceSort,
   )
   const captureExplorerAction = (
     action: TrendsExplorerAction,
@@ -465,6 +487,7 @@ export default function TrendsExplorer({
       includeTerms,
       requestedRange,
       refreshKey,
+      evidenceSort,
     })
     evidenceRequestSignatureRef.current = signature
     if (includeTerms.length === 0) {
@@ -483,6 +506,7 @@ export default function TrendsExplorer({
           term,
           requestedRange,
           EVIDENCE_PAGE_SIZE,
+          evidenceSort,
         ),
     )
     if (termsToLoad.length === 0) {
@@ -494,34 +518,45 @@ export default function TrendsExplorer({
     const loadEvidence = async () => {
       setIsLoadingEvidence(true)
       setFeedError(null)
-      const results: PromiseSettledResult<PortalTweet[]>[] = []
+      const results: PromiseSettledResult<FeedResponse>[] = []
       for (const term of termsToLoad) {
-        const key = trendEvidenceCacheKey(term, requestedRange)
-        let request = evidenceRequestsRef.current.get(key)
+        const cacheKey = trendEvidenceCacheKey(
+          term,
+          requestedRange,
+          evidenceSort,
+        )
+        const requestKey = `${cacheKey}\u0000initial`
+        let request = evidenceRequestsRef.current.get(requestKey)
         if (!request) {
           const controller = new AbortController()
-          let promise: Promise<PortalTweet[]>
+          let promise: Promise<FeedResponse>
           promise = requestTrendEvidence(
             term,
             requestedRange,
+            evidenceSort,
+            0,
             controller.signal,
           )
-            .then((tweets) => {
+            .then((page) => {
               storeTrendEvidence(evidenceCacheRef.current, {
                 term,
                 range: requestedRange,
-                tweets,
+                sort: evidenceSort,
+                tweets: page.tweets,
+                nextOffset: page.nextOffset,
               })
               setEvidenceCacheVersion((version) => version + 1)
-              return tweets
+              return page
             })
             .finally(() => {
-              if (evidenceRequestsRef.current.get(key)?.promise === promise) {
-                evidenceRequestsRef.current.delete(key)
+              if (
+                evidenceRequestsRef.current.get(requestKey)?.promise === promise
+              ) {
+                evidenceRequestsRef.current.delete(requestKey)
               }
             })
           request = { controller, promise }
-          evidenceRequestsRef.current.set(key, request)
+          evidenceRequestsRef.current.set(requestKey, request)
         }
         try {
           results.push({ status: 'fulfilled', value: await request.promise })
@@ -541,17 +576,137 @@ export default function TrendsExplorer({
             : 'Could not load matching tweets',
         )
       }
-      setIsLoadingEvidence(
-        includeTerms.some((term) =>
-          evidenceRequestsRef.current.has(
-            trendEvidenceCacheKey(term, requestedRange),
-          ),
-        ),
-      )
+      setIsLoadingEvidence(false)
     }
 
     void loadEvidence()
-  }, [includeTerms, refreshKey, requestedRange])
+  }, [evidenceSort, includeTerms, refreshKey, requestedRange])
+
+  const hasMoreEvidence = includeTerms.some(
+    (term) =>
+      typeof trendEvidenceNextOffset(
+        evidenceCacheRef.current,
+        term,
+        requestedRange,
+        evidenceSort,
+      ) === 'number',
+  )
+
+  const loadMoreEvidence = useCallback(async () => {
+    if (
+      isLoadingEvidence ||
+      isLoadingMoreEvidence ||
+      !sameEvidenceRange(selectedEvidenceRange, requestedRange)
+    ) {
+      return
+    }
+    const pages = includeTerms.flatMap((term) => {
+      const offset = trendEvidenceNextOffset(
+        evidenceCacheRef.current,
+        term,
+        requestedRange,
+        evidenceSort,
+      )
+      return typeof offset === 'number' ? [{ term, offset }] : []
+    })
+    if (pages.length === 0) return
+
+    setIsLoadingMoreEvidence(true)
+    setFeedError(null)
+    const signature = evidenceRequestSignatureRef.current
+    const failures: unknown[] = []
+    for (const { term, offset } of pages) {
+      const cacheKey = trendEvidenceCacheKey(term, requestedRange, evidenceSort)
+      const requestKey = `${cacheKey}\u0000${offset}`
+      let request = evidenceRequestsRef.current.get(requestKey)
+      if (!request) {
+        const controller = new AbortController()
+        let promise: Promise<FeedResponse>
+        promise = requestTrendEvidence(
+          term,
+          requestedRange,
+          evidenceSort,
+          offset,
+          controller.signal,
+        )
+          .then((page) => {
+            storeTrendEvidence(
+              evidenceCacheRef.current,
+              {
+                term,
+                range: requestedRange,
+                sort: evidenceSort,
+                tweets: page.tweets,
+                nextOffset: page.nextOffset,
+              },
+              { append: true },
+            )
+            setEvidenceCacheVersion((version) => version + 1)
+            return page
+          })
+          .finally(() => {
+            if (
+              evidenceRequestsRef.current.get(requestKey)?.promise === promise
+            ) {
+              evidenceRequestsRef.current.delete(requestKey)
+            }
+          })
+        request = { controller, promise }
+        evidenceRequestsRef.current.set(requestKey, request)
+      }
+      try {
+        await request.promise
+      } catch (error) {
+        failures.push(error)
+      }
+    }
+    if (
+      failures.length > 0 &&
+      evidenceRequestSignatureRef.current === signature
+    ) {
+      const failure = failures[0]
+      setFeedError(
+        failure instanceof Error
+          ? failure.message
+          : 'Could not load more matching tweets',
+      )
+    }
+    setIsLoadingMoreEvidence(false)
+  }, [
+    evidenceSort,
+    includeTerms,
+    isLoadingEvidence,
+    isLoadingMoreEvidence,
+    requestedRange,
+    selectedEvidenceRange,
+  ])
+
+  useEffect(() => {
+    const root = evidenceScrollRef.current
+    const target = evidenceSentinelRef.current
+    if (
+      !root ||
+      !target ||
+      !hasMoreEvidence ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void loadMoreEvidence()
+        }
+      },
+      { root, rootMargin: '160px 0px' },
+    )
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [hasMoreEvidence, loadMoreEvidence])
+
+  useEffect(() => {
+    if (evidenceScrollRef.current) evidenceScrollRef.current.scrollTop = 0
+  }, [evidenceSort, selectedEvidenceRange])
 
   const removeTerm = (term: string) => {
     captureExplorerAction('term_removed', {
@@ -796,6 +951,7 @@ export default function TrendsExplorer({
               term,
               selectedEvidenceRange,
               EVIDENCE_PAGE_SIZE,
+              evidenceSort,
             ),
         )))
 
@@ -1372,21 +1528,54 @@ export default function TrendsExplorer({
                 <p className={`mt-0.5 text-[11.5px] ${MUTED}`}>
                   {selectedRange
                     ? `Posts from ${bucketLabel(selectedRange.start, granularity)}–${bucketLabel(selectedRange.end, granularity)} matching any included trend.`
-                    : 'Latest posts matching any included trend.'}
+                    : evidenceSort === 'newest'
+                      ? 'Latest posts matching any included trend.'
+                      : 'First posts matching any included trend.'}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  captureExplorerAction('evidence_refreshed')
-                  setRequestedRange(selectedEvidenceRange)
-                  setRefreshKey((key) => key + 1)
-                }}
-                disabled={isLoadingEvidence || includeTerms.length === 0}
-                className={`text-[11.5px] font-semibold ${MUTED} hover:text-brand disabled:opacity-40`}
-              >
-                Refresh
-              </button>
+              <div className="flex items-center gap-2">
+                <div
+                  className="inline-flex rounded-[4px] border border-zinc-300 p-0.5 dark:border-[#34343a]"
+                  aria-label="Tweet order"
+                >
+                  {(['newest', 'oldest'] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={evidenceSort === option}
+                      onClick={() => {
+                        if (evidenceSort === option) return
+                        captureExplorerAction('evidence_sort_changed')
+                        setFeedError(null)
+                        setEvidenceSort(option)
+                      }}
+                      className={`rounded-[3px] px-2 py-1 text-[10.5px] font-semibold transition-colors ${
+                        evidenceSort === option
+                          ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                          : `${MUTED} hover:text-foreground`
+                      }`}
+                    >
+                      {option === 'newest' ? 'Newest first' : 'Oldest first'}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    captureExplorerAction('evidence_refreshed')
+                    setRequestedRange(selectedEvidenceRange)
+                    setRefreshKey((key) => key + 1)
+                  }}
+                  disabled={
+                    isLoadingEvidence ||
+                    isLoadingMoreEvidence ||
+                    includeTerms.length === 0
+                  }
+                  className={`text-[11.5px] font-semibold ${MUTED} hover:text-brand disabled:opacity-40`}
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
 
             <div className={`${CARD} mb-3 p-3`}>
@@ -1440,8 +1629,21 @@ export default function TrendsExplorer({
             </div>
 
             <div
+              ref={evidenceScrollRef}
               className={`${CARD} max-h-[760px] overflow-y-auto`}
+              aria-label="Matching tweets"
               aria-live="polite"
+              onScroll={(event) => {
+                const element = event.currentTarget
+                if (
+                  element.scrollHeight -
+                    element.scrollTop -
+                    element.clientHeight <
+                  160
+                ) {
+                  void loadMoreEvidence()
+                }
+              }}
             >
               {isUpdatingEvidence && evidence.length === 0 && (
                 <div className={`px-4 py-12 text-center text-[13px] ${MUTED}`}>
@@ -1485,6 +1687,23 @@ export default function TrendsExplorer({
                   returnTo={returnTo}
                 />
               ))}
+              <div ref={evidenceSentinelRef} className="h-px" />
+              {isLoadingMoreEvidence && (
+                <div className={`px-4 py-3 text-center text-[11.5px] ${MUTED}`}>
+                  Loading more tweets…
+                </div>
+              )}
+              {!isLoadingEvidence &&
+                !isLoadingMoreEvidence &&
+                !feedError &&
+                evidence.length > 0 &&
+                !hasMoreEvidence && (
+                  <div
+                    className={`border-t border-zinc-100 px-4 py-3 text-center text-[10.5px] dark:border-[#202023] ${MUTED}`}
+                  >
+                    End of matching tweets.
+                  </div>
+                )}
             </div>
           </aside>
         </div>

@@ -14,7 +14,7 @@ describe('renderDigestEmail', () => {
       LINKS,
     )
 
-    expect(subject).toBe('Community Archive Digest — August 11, 2026')
+    expect(subject).toBe('Community Archive Digest — Tuesday, August 11, 2026')
     const editionUrl = `${LINKS.siteUrl}/digest/${AUGUST_11_MOCK_DIGEST.digestDate}`
     expect(html).toContain(editionUrl)
     expect(html).toContain(LINKS.unsubscribeUrl)

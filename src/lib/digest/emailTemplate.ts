@@ -75,9 +75,15 @@ const tweetToText = (tweet: PortalTweet) =>
       : []),
   ].join('\n')
 
+// Gmail strips webfont imports, so both stacks lean on solid fallbacks:
+// Petrona degrades to Georgia, Manrope to the system sans stack.
+const HEADING_FONT = `Petrona, Georgia, 'Times New Roman', serif`
+const BODY_FONT = `Manrope, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`
+
 const formatDigestDate = (digestDate: string) =>
   new Date(`${digestDate}T00:00:00Z`).toLocaleDateString('en-US', {
     timeZone: 'UTC',
+    weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -101,8 +107,8 @@ export function renderDigestEmail(
       (story) => `
       <table role="presentation" width="100%" style="margin:0 0 20px;">
         <tr><td>
-          <h2 style="margin:0 0 4px;font-size:18px;line-height:1.3;">
-            <a href="${editionUrl}#${escapeHtml(story.slug)}" style="color:#1d4ed8;text-decoration:none;">${escapeHtml(story.title)}</a>
+          <h2 style="margin:0 0 4px;font-family:${HEADING_FONT};font-size:19px;line-height:1.3;">
+            <a href="${editionUrl}#${escapeHtml(story.slug)}" style="color:#111827;text-decoration:none;">${escapeHtml(story.title)}</a>
           </h2>
           <p style="margin:0 0 8px;color:#374151;font-size:14px;line-height:1.5;">${escapeHtml(story.subtitle)}</p>
           <ul style="margin:0 0 10px;padding-left:20px;color:#374151;font-size:14px;line-height:1.5;">
@@ -127,9 +133,11 @@ export function renderDigestEmail(
     ${renderTweetCard(content.topBanger, links.siteUrl)}`
 
   const html = `
-  <div style="margin:0 auto;max-width:600px;padding:24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827;">
+  <style>@import url('https://fonts.googleapis.com/css2?family=Petrona:wght@500;600&family=Manrope:wght@400;500;700&display=swap');</style>
+  <div style="margin:0 auto;max-width:600px;padding:24px;font-family:${BODY_FONT};color:#111827;">
+    <img src="${links.siteUrl}/images/email-logo.png" width="48" height="48" alt="Community Archive" style="display:block;margin:0 0 12px;" />
     <p style="margin:0 0 4px;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;color:#6b7280;">Community Archive Daily Digest</p>
-    <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;">${escapeHtml(prettyDate)}</h1>
+    <h1 style="margin:0 0 16px;font-family:${HEADING_FONT};font-size:26px;line-height:1.25;color:#111827;">${escapeHtml(prettyDate)}</h1>
     <ul style="margin:0 0 24px;padding-left:20px;font-size:15px;line-height:1.5;">${summaryHtml}</ul>
     ${topBangerHtml}
     ${storiesHtml}

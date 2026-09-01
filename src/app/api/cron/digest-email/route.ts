@@ -37,14 +37,24 @@ async function loadPublishedEdition(digestDate?: string) {
   return data ? mapDigestEdition(data) : null
 }
 
+// Vercel's scheduler calls cron paths with GET; operators can POST a specific
+// {digestDate}. Both send the latest published edition by default.
+export async function GET(request: Request) {
+  return handleSend(request)
+}
+
 export async function POST(request: Request) {
+  return handleSend(request)
+}
+
+async function handleSend(request: Request) {
   if (!isAuthorizedDigestCronRequest(request)) {
     return new NextResponse('Unauthorized', { status: 401 })
   }
 
   let requestedDate: unknown
   try {
-    const body = await request.clone().text()
+    const body = request.method === 'POST' ? await request.clone().text() : ''
     if (body) ({ digestDate: requestedDate } = JSON.parse(body))
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })

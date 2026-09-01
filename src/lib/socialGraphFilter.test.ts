@@ -2,6 +2,7 @@ import {
   filterSocialGraph,
   followerCountToSlider,
   followerSliderToCount,
+  pinNodeInFilteredGraph,
 } from './socialGraphFilter'
 import type { SocialGraphSnapshot } from './socialGraph'
 
@@ -164,5 +165,22 @@ describe('social graph filtering', () => {
     expect(count).toBeGreaterThan(900)
     expect(count).toBeLessThan(1_100)
     expect(followerCountToSlider(count, 1_000_000)).toBeCloseTo(50, 0)
+  })
+
+  it('pins a filtered-out member with reciprocal ties that survive the view', () => {
+    const filters = {
+      minimumFollowers: 5,
+      minimumStrength: 5,
+      maximumNodes: 2,
+      ...allYears,
+    }
+    const filtered = filterSocialGraph(snapshot, filters)
+    const pinned = pinNodeInFilteredGraph(snapshot, filtered, 'c', filters)
+
+    expect(pinned.nodes.map((node) => node.id)).toContain('c')
+    expect(pinned.edges).toEqual([
+      expect.objectContaining({ source: 'a', target: 'c', strength: 6.6667 }),
+      ...filtered.edges,
+    ])
   })
 })

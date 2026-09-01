@@ -242,6 +242,75 @@ export type Database = {
           },
         ]
       }
+      community_projects: {
+        Row: {
+          archive_use: string
+          category: string
+          cover_mime_type: string | null
+          cover_storage_path: string | null
+          creator_handle: string | null
+          creator_name: string
+          description: string
+          featured: boolean
+          id: string
+          name: string
+          project_url: string
+          published_at: string | null
+          published_by: string | null
+          slug: string
+          source_post_url: string
+          status: string
+          submitted_at: string
+          submitted_by: string | null
+          submitter_username: string
+          tags: string[]
+        }
+        Insert: {
+          archive_use: string
+          category: string
+          cover_mime_type?: string | null
+          cover_storage_path?: string | null
+          creator_handle?: string | null
+          creator_name: string
+          description: string
+          featured?: boolean
+          id?: string
+          name: string
+          project_url: string
+          published_at?: string | null
+          published_by?: string | null
+          slug: string
+          source_post_url: string
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          submitter_username: string
+          tags?: string[]
+        }
+        Update: {
+          archive_use?: string
+          category?: string
+          cover_mime_type?: string | null
+          cover_storage_path?: string | null
+          creator_handle?: string | null
+          creator_name?: string
+          description?: string
+          featured?: boolean
+          id?: string
+          name?: string
+          project_url?: string
+          published_at?: string | null
+          published_by?: string | null
+          slug?: string
+          source_post_url?: string
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          submitter_username?: string
+          tags?: string[]
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           conversation_id: string | null
@@ -2208,6 +2277,18 @@ export type Database = {
           username: string
           account_display_name: string
           media: Json
+        }[]
+      }
+      search_user_suggestions: {
+        Args: {
+          search_text: string
+          result_limit?: number
+        }
+        Returns: {
+          account_id: string
+          username: string
+          account_display_name: string
+          num_followers: number
         }[]
       }
       set_limit: {

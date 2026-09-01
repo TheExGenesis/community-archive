@@ -13,12 +13,13 @@ export type FrontendHealthResult = {
     supabaseAuth: HealthDependency
   }
   service: 'community-archive-web'
-  status: 'healthy' | 'unhealthy'
+  status: 'degraded' | 'healthy' | 'unhealthy'
 }
 
 type HealthEnvironment = {
   [name: string]: string | undefined
   CLICKHOUSE_ANALYTICS_API_URL?: string
+  NEXT_PUBLIC_SUPABASE_ANON_KEY?: string
   NEXT_PUBLIC_SUPABASE_URL?: string
   VERCEL_ENV?: string
   VERCEL_GIT_COMMIT_SHA?: string
@@ -38,6 +39,7 @@ async function checkDependency(
   url: URL | undefined,
   fetchImpl: typeof fetch,
   timeoutMs: number,
+  headers: Record<string, string> = {},
 ): Promise<HealthDependency> {
   const startedAt = performance.now()
   if (!url) {
@@ -47,7 +49,7 @@ async function checkDependency(
   try {
     const response = await fetchImpl(url, {
       cache: 'no-store',
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', ...headers },
       signal: AbortSignal.timeout(timeoutMs),
     })
     return {
@@ -90,6 +92,9 @@ export async function checkFrontendHealth({
       supabaseHealthUrl(env.NEXT_PUBLIC_SUPABASE_URL),
       fetchImpl,
       timeoutMs,
+      env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        ? { apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY }
+        : {},
     ),
     checkDependency(
       analyticsHealthUrl(env.CLICKHOUSE_ANALYTICS_API_URL),
@@ -97,8 +102,12 @@ export async function checkFrontendHealth({
       timeoutMs,
     ),
   ])
-  const healthy =
-    supabaseAuth.status === 'ok' && analyticsGateway.status === 'ok'
+  const status =
+    supabaseAuth.status !== 'ok'
+      ? 'unhealthy'
+      : analyticsGateway.status === 'ok'
+        ? 'healthy'
+        : 'degraded'
 
   return {
     build: {
@@ -107,6 +116,6 @@ export async function checkFrontendHealth({
     },
     dependencies: { analyticsGateway, supabaseAuth },
     service: 'community-archive-web',
-    status: healthy ? 'healthy' : 'unhealthy',
+    status,
   }
 }

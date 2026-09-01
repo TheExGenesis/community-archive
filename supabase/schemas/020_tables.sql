@@ -444,6 +444,47 @@ CREATE TABLE IF NOT EXISTS "public"."digest_edition_comments" (
 );
 ALTER TABLE "public"."digest_edition_comments" OWNER TO "postgres";
 
+-- Moderated Community Gallery submissions. Signed-in users submit through the
+-- server; only published rows are exposed to public clients. Covers remain in
+-- a private Storage bucket and are served through a status-gated route.
+CREATE TABLE IF NOT EXISTS "public"."community_projects" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "slug" text NOT NULL UNIQUE,
+    "name" text NOT NULL,
+    "project_url" text NOT NULL,
+    "creator_name" text NOT NULL,
+    "creator_handle" text,
+    "category" text NOT NULL,
+    "description" text NOT NULL,
+    "archive_use" text NOT NULL,
+    "source_post_url" text NOT NULL,
+    "tags" text[] NOT NULL DEFAULT ARRAY[]::text[],
+    "cover_storage_path" text,
+    "cover_mime_type" text,
+    "submitted_by" uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+    "submitter_username" text NOT NULL,
+    "status" text NOT NULL DEFAULT 'pending',
+    "featured" boolean NOT NULL DEFAULT false,
+    "submitted_at" timestamptz NOT NULL DEFAULT now(),
+    "published_by" uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+    "published_at" timestamptz,
+    CONSTRAINT "community_projects_name_length" CHECK (char_length(name) BETWEEN 1 AND 120),
+    CONSTRAINT "community_projects_creator_name_length" CHECK (char_length(creator_name) BETWEEN 1 AND 120),
+    CONSTRAINT "community_projects_creator_handle_length" CHECK (creator_handle IS NULL OR char_length(creator_handle) BETWEEN 1 AND 80),
+    CONSTRAINT "community_projects_description_length" CHECK (char_length(description) BETWEEN 1 AND 360),
+    CONSTRAINT "community_projects_archive_use_length" CHECK (char_length(archive_use) BETWEEN 1 AND 500),
+    CONSTRAINT "community_projects_category_check" CHECK (category IN ('Tools', 'Experiments', 'Research', 'Games')),
+    CONSTRAINT "community_projects_status_check" CHECK (status IN ('pending', 'published')),
+    CONSTRAINT "community_projects_tags_count" CHECK (cardinality(tags) <= 8),
+    CONSTRAINT "community_projects_cover_pair" CHECK ((cover_storage_path IS NULL) = (cover_mime_type IS NULL)),
+    CONSTRAINT "community_projects_cover_mime" CHECK (cover_mime_type IS NULL OR cover_mime_type IN ('image/png', 'image/jpeg', 'image/webp')),
+    CONSTRAINT "community_projects_publication_state" CHECK (
+      (status = 'published' AND published_at IS NOT NULL)
+      OR (status = 'pending' AND published_at IS NULL AND published_by IS NULL)
+    )
+);
+ALTER TABLE "public"."community_projects" OWNER TO "postgres";
+
 -- Public profile preferences. PostgreSQL remains authoritative for this
 -- owner-controlled policy state; analytical stores only consume the result.
 CREATE TABLE IF NOT EXISTS "public"."profile_settings" (

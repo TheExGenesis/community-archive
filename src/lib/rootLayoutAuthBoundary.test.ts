@@ -20,7 +20,7 @@ describe('root layout authentication boundary', () => {
     expect(layout).toContain('<NavigationAudienceProvider>')
   })
 
-  test('checks the session after hydration and preserves route-level guards', () => {
+  test('checks the session after hydration and preserves private route guards', () => {
     const audience = read('src/components/NavigationAudience.tsx')
     const adminPage = read('src/app/admin/page.tsx')
     const graphPage = read('src/app/social-graph/page.tsx')
@@ -30,6 +30,7 @@ describe('root layout authentication boundary', () => {
       audience.indexOf("fetch('/api/auth/navigation'"),
     )
     expect(adminPage).toContain('await requireAdmin()')
-    expect(graphPage).toContain("await requireAdmin('/social-graph')")
+    expect(graphPage).not.toContain('requireAdmin')
+    expect(graphPage).toContain('await getCurrentUser()')
   })
 })

@@ -105,6 +105,8 @@ CREATE INDEX IF NOT EXISTS "idx_all_account_lower_username"
 -- both exact and wildcard ILIKE lookups.
 CREATE INDEX IF NOT EXISTS "idx_all_account_username_trgm"
   ON "public"."all_account" USING "gin" ("username" "public"."gin_trgm_ops");
+CREATE INDEX IF NOT EXISTS "idx_all_account_display_name_trgm"
+  ON "public"."all_account" USING "gin" ("account_display_name" "public"."gin_trgm_ops");
 
 -- private.tweet_user: every get_streaming_stats_* function filters on created_at.
 CREATE INDEX IF NOT EXISTS "idx_tweet_user_created_at"
@@ -143,3 +145,5 @@ ON "private"."policy_storage_objects" USING "gin" ("username_hashes");
 CREATE INDEX IF NOT EXISTS "archive_clickhouse_delivery_pending_idx"
 ON "private"."archive_clickhouse_delivery" ("next_attempt_at", "archive_upload_id")
 WHERE ("delivery_state" = 'pending'::"text");
+CREATE INDEX IF NOT EXISTS "community_projects_status_submitted_at_idx"
+  ON "public"."community_projects" ("status", "submitted_at" DESC);

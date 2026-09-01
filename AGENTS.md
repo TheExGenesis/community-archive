@@ -1,247 +1,96 @@
-# Community Archive Agent Guide
+# Community Archive
 
-This is the canonical repository guidance for coding agents. It applies to the
-entire repository. The current user request takes precedence, and executable
-code and configuration take precedence over dated documentation.
+## Orientation
 
-## Project Map
+- Start with `README.md`, `CONTRIBUTING.md`, and `docs/README.md`. Use
+  `docs/local-setup.md` for local development.
+- Treat executable code, `supabase/config.toml`, schemas, migrations, package
+  scripts, and CI workflows as authoritative. Dated notes and audits are not
+  current configuration.
 
-Community Archive preserves Twitter/X archive exports in a searchable public
-dataset and exposes the data for applications and research.
+## Data Authority And Privacy
 
-- Web app: Next.js 14 App Router, React 18, Tailwind CSS, and shadcn/ui.
-- Backend: Supabase PostgreSQL, Auth, and Storage.
-- Server state: TanStack Query.
-- Archive processing: Docker worker under `services/process_archive/`.
-- Tests: Jest and Testing Library.
+- Supabase/PostgreSQL is authoritative for authentication, membership, consent,
+  uploads, opt-outs, and transactional policy state. ClickHouse is a rebuildable
+  analytical projection, never the write authority for those decisions.
+- A member has uploaded an archive or explicitly opted in. Explicit opt-out
+  takes precedence in every public, ingestion, and analytical serving path.
+- Preserve the archive privacy boundary: process archive data locally where
+  designed and never add private messages or unrelated sensitive data to
+  uploaded or public datasets.
+- For text-fidelity diagnosis, treat the stored archive JSON as original and
+  `public.tweets.full_text` as a normalized projection. Compare the archive
+  object before seeking an external recovery source.
 
-The upload path is:
+## Authentication And Data Access
 
-1. A user authenticates through Supabase Auth.
-2. The browser validates and parses the archive.
-3. Archive data is stored in Supabase Storage and an `archive_upload` row moves
-   from `uploading` to `ready_for_commit`.
-4. `services/process_archive/` claims the upload, marks it `committing`, writes
-   the normalized PostgreSQL records, and marks it `completed` or `failed`.
+- Never trust `user_metadata` for authorization or identity; it is
+  client-mutable. Use trusted provider identity from `app_metadata` or
+  `auth.users.identities[].identity_data`.
+- `createServerAdminClient` carries the user's session and is not elevated.
+  Use `createServerServiceRoleClient` only for explicitly authorized server-side
+  operations, and never expose service-role credentials to clients.
+- PostgREST may cap result sets. Any path that must return every matching row
+  must paginate with stable ordering; counts should use a head-only exact count.
 
-Text fidelity has a separate source-of-truth boundary: the uploaded archive
-JSON in Supabase Storage preserves the original tweet text, while
-`public.tweets.full_text` is a normalized projection. The archive processor's
-text sanitization can remove control characters such as line feeds, so a
-flattened database value is not sufficient evidence that the original archive
-had no line breaks. For fidelity-sensitive diagnosis or recovery, compare the
-stored archive object before considering any external text source.
+## Supabase Schema Changes
 
-Important locations:
+- `supabase/schemas/` is the declarative source of truth,
+  `supabase/migrations/` is applied history, and `src/database-types.ts` is the
+  generated client contract. Keep all affected artifacts aligned.
+- Follow `docs/supabase-declarative-schemas.md` and `docs/staging.md`. Same-repo
+  pull requests that change `supabase/**` synchronize the shared staging
+  database; fork pull requests do not receive its secrets.
+- Production migration is manual. Before merging a pull request with migrations,
+  run `pnpm migrations:check`; apply to production only when explicitly
+  authorized, then verify the ledger again. Otherwise mark the pull request as
+  requiring a production migration.
 
-- `src/app/`: pages, server actions, and API routes.
-- `src/app/admin/`: administrative UI and actions.
-- `src/lib/`: business logic, queries, and archive-upload code.
-- `src/components/`: application components; primitives live in `ui/`.
-- `src/utils/supabase.ts`: browser, server, script, and service-role clients.
-- `services/process_archive/`: archive processor and its deployment docs.
-- `supabase/schemas/`: declarative database source of truth.
-- `supabase/migrations/`: applied migration history.
-- `src/database-types.ts`: generated database types.
-- `scripts/`: maintenance, migration, and data utilities.
-- `docs/README.md`: documentation map.
+## Conversation Recovery
 
-## Working Safely
+- Persist source conversation and reply metadata at ingestion. When a parent or
+  conversation ID is missing, record pending recovery in the same PostgreSQL
+  transaction; ingestion writers must not call Twitter/X syndication directly.
+- The dedicated recovery service owns traversal, retries, and persistence.
+  Apply consent independently to every recovered author at the final write
+  boundary, and never persist an opted-out node's content or identifying data.
+- Keep renderer hydration external and non-persistent; do not reuse it for
+  recovery-service writes.
 
-- Inspect the branch and working tree before editing. Preserve unrelated user
-  changes and never sweep them into a commit.
-- Keep unrelated topics on separate branches or worktrees. Do not silently
-  switch branches, discard work, or close an existing task.
-- Treat `.env*`, database URLs, service-role keys, access tokens, and user
-  archive data as sensitive. Do not print, document, or commit them.
-- Recheck live infrastructure before making placement or capacity decisions.
-  Dated host RAM, disk, and workload snapshots are not authoritative.
-- Production mutations require explicit authorization in the current task.
-  This includes deploys, `supabase db push`, deletes, backfills, worker starts,
-  and changes to live infrastructure.
-- Prefer read-only diagnosis first. Consent to edit code does not imply consent
-  to deploy it or modify production data.
+## Analytics And Rendering
 
-## Database And Migration Workflow
+- Use ClickHouse for supported corpus-scale reads and Supabase for auth, writes,
+  consent, editorial data, and records absent from ClickHouse. Add a narrow
+  gateway endpoint rather than falling back to production Supabase corpus reads.
+- Keep a portal record on the same source for its list and detail routes. A
+  cacheable analytical API must return a non-cacheable non-2xx on upstream
+  failure, never a successful empty payload.
+- Treat new gateway routes as gateway-first dependencies: verify and release the
+  gateway before a frontend that requires them. The gateway contract and
+  production procedure live in the control-panel repository.
+- Use `src/components/TweetCard.tsx` for full-fidelity tweet rendering and
+  `src/lib/tweetText.ts` for archive text normalization. Preserve complete text,
+  media, and quoted-tweet payloads in adapters.
 
-The declarative schema is authoritative. For schema changes:
+## Community Gallery Design Authority
 
-1. Edit the appropriate file in `supabase/schemas/`.
-2. Generate a migration with `supabase db diff -f <descriptive_name>`.
-3. Review the generated SQL in `supabase/migrations/`.
-4. Regenerate `src/database-types.ts` when the schema changes.
-5. Run focused schema, type, and application tests.
+For changes to `src/app/community/**`, `src/components/community/**`, or
+`src/lib/communityProjects*`, treat
+`docs/design/community-gallery/README.md` as the visual and interaction source
+of truth. Reproduce the supplied prototype at high fidelity; do not use generic
+site-building guidance or the existing implementation to redesign, simplify,
+consolidate, or add decorative treatments absent from the prototype. The
+repository-wide style guide applies only where the prototype is silent, and
+current user instructions always take precedence.
 
-Do not hand-edit migration history unless the task specifically requires a
-repair and the user understands the consequences.
+The approved product scope is the gallery landing, project modal, and
+submission flow only. Do not add project-detail or creator pages, first-party
+Community Archive tools, fictional projects, or fictional engagement metrics.
+Verify affected desktop and mobile states against the prototype before handoff.
 
-Staging synchronization is automatic; production synchronization is not:
+## Validation
 
-- `.github/workflows/sync-staging-db.yaml` runs for same-repository PRs and
-  pushes to `main` that touch `supabase/**` or the sync script.
-- The workflow serializes staging updates and regenerates database types on PR
-  branches. Fork PRs are skipped because they cannot access staging secrets.
-- Supabase's managed PR preview may rerun `supabase/seed.sql` against the same
-  preview database after a new commit, including the workflow's generated-types
-  bot commit. Keep seed inserts idempotent and, when schema or seed data changes,
-  verify that the seed loads twice without a database reset.
-- Editing only `supabase/schemas/` is insufficient. Generate and commit the
-  migration that the workflow can apply.
-- Before merging a PR with migrations, run the read-only
-  `pnpm migrations:check`. If production is behind, report the pending
-  migration in the PR or handoff.
-- Never turn that finding into a production `supabase db push` unless the user
-  explicitly authorizes the production change in the current task.
-
-## Supabase Invariants And Gotchas
-
-- The project PostgREST limit is 1,000 rows. Any operation requiring every row
-  must paginate with a stable `.order()` on a unique or indexed column. For
-  counts, prefer `.select('*', { count: 'exact', head: true })`.
-- `createServerAdminClient` is not service-role admin; it preserves the user's
-  JWT through the SSR helper. Use `createServerServiceRoleClient` only in
-  trusted server-only code that genuinely requires elevation.
-- `user_metadata` is client-mutable and must not establish identity or
-  authorization. Prefer provider identity from trusted JWT app metadata or
-  `auth.users.identities`.
-- `PostgrestError` is not an `Error` subclass. Do not rely on
-  `instanceof Error`; use the project's error-description helpers.
-- Upload phases use the PostgreSQL `upload_phase_enum`. Preserve the existing
-  claim-before-process sequencing and failure handling when changing workers.
-
-## Conversation And Thread Recovery
-
-- Treat `public.conversations` and archived `reply_to_tweet_id` links as the
-  primary source for thread structure.
-- Every ingestion writer should persist a source-supplied conversation ID when
-  one is present and preserve source reply metadata. When it is missing, record
-  pending recovery in the same PostgreSQL transaction; do not call Twitter/X
-  syndication from archive, Firehose, or Autorefresh writers.
-- A dedicated conversation-recovery service owns local-first resolution,
-  syndication requests, leases, retries, and persistent recovered writes.
-  `reply_to_user_id` can signal an incomplete reply but is not a traversable
-  parent pointer. Bound traversal, track visited tweet IDs, and keep partial or
-  failed walks unresolved instead of guessing a head.
-- Apply authoritative consent policy separately to every recovered tweet at
-  recovery service's final PostgreSQL write boundary. A recovered tweet may be
-  ingested only when its own author is absent from both
-  `public.optin.explicit_optout` and `tes.blocked_scraping_users`. An opted-out
-  node may be traversed in memory by ID to find the root, but its identifying
-  account/profile fields, tweet content, media, and authored relationships must
-  never be persisted. Eligible tweets elsewhere in the chain may still be
-  stored with syndication provenance.
-- Keep renderer hydration external and non-persistent. Do not reuse the
-  renderer-facing syndication client for recovery-service persistence.
-
-## Analytics Data Sources
-
-- Use ClickHouse for corpus-scale read analytics and portal tweet records when
-  a supported gateway endpoint exists, including summaries, trends, stream
-  entries, bangers, and tweet detail payloads. A record surfaced by a
-  ClickHouse-backed portal list must keep using ClickHouse on its detail route;
-  do not rehydrate it from the staging or production Supabase project. If the
-  gateway lacks a required portal corpus endpoint, add a narrow endpoint rather
-  than a production Supabase read fallback. Cache expensive snapshots at an
-  interval appropriate to the UI.
-- Keep resilient page fallbacks separate from publicly cacheable analytical API
-  responses. A route that emits `s-maxage` must preserve upstream availability:
-  return a non-cacheable non-2xx response on upstream failure, and never turn a
-  failure into an empty successful payload that the CDN or client will remember
-  as real data. Clients may keep the last successful value, but retryable
-  failures must remain distinguishable from a legitimate empty result.
-- The control-plane query gateway permits only one authenticated `/search` or
-  `/analytics/search` request at a time and returns `503` with `Retry-After: 1`
-  for overlap. Serialize multi-search fan-out in server callers; this limit does
-  not apply to `/analytics/word-trend`. The source of truth is
-  `TheExGenesis/community-archive-control-panel` under
-  `ops/clickhouse-query-gateway/server.mjs` and `docs/clickhouse-operations.md`.
-- Keep Supabase authoritative for authentication, writes, canonical membership,
-  consent/policy state, editorial application data, and records not represented
-  in ClickHouse. Do not use the daily ClickHouse `memberAccounts` summary as the
-  live uploader-plus-opt-in count.
-- Develop and verify analytics changes locally first. For production-backed
-  ClickHouse QA, retrieve the query-gateway bearer token from its authoritative
-  host at command runtime without printing or persisting it. Use preview builds
-  only for final staging verification.
-- A signed-in render of `/` calls the ClickHouse-backed portal data layer, so
-  Supabase development credentials alone cannot exercise that page; the
-  analytics gateway URL and token are also required. For visual-only portal QA,
-  prefer a representative fixture-backed harness. Configure the real gateway
-  only when analytics behavior itself is under test, and never substitute a
-  production Supabase read for missing ClickHouse access.
-- Treat every new or changed query-gateway route as a gateway-first release.
-  Once its focused tests, type-check, bundle, and review are high-confidence,
-  merge and deploy the gateway instead of leaving deployment as a follow-up.
-  Verify gateway health, smoke-test the changed route and one neighboring route
-  with runtime-only authentication, and only then merge or deploy a dependent
-  frontend PR. Link the gateway PR and production verification in the frontend
-  PR so the dependency cannot be mistaken for completed work.
-
-## Development And Verification
-
-### Tweet rendering
-
-- Always use `src/components/TweetCard.tsx` as the canonical full-fidelity
-  tweet renderer for product surfaces. Data adapters must preserve complete text,
-  attached media, and quoted-tweet payload (including the quoted tweet's media)
-  before rendering. Do not introduce a surface-specific partial tweet renderer;
-  make intentionally compact variants explicit through the canonical component.
-- Normalize archive text with `src/lib/tweetText.ts`; do not add another local
-  HTML-entity decoder to a tweet surface.
-
-### Progressive collection rendering
-
-- For large result sets, optimize the first screen rather than blocking on the
-  complete collection. Server-render only the first useful items and the small
-  supporting summaries visible above the fold, then immediately continue the
-  active result set in the background.
-- Preload a shallow first page for adjacent tabs, chapters, or filters after the
-  active view is useful. Fetch deeper pages only as the user scrolls. Preserve
-  shareable URLs, browser history, deterministic server-side sorting, and a
-  manual accessible load-more fallback alongside infinite scroll.
-
-Use Node 20 from `.nvmrc` and pnpm. Prefer the narrowest relevant check, then
-expand verification in proportion to risk.
-
-For non-interactive smoke checks against SSO-protected Vercel previews, follow
-`docs/staging.md`. Do not disable deployment protection to make a preview
-machine-readable.
-
-```bash
-pnpm dev                 # Next.js with local Supabase
-pnpm dev-remote-db       # Next.js with configured remote development DB
-pnpm type-check
-pnpm lint
-pnpm format-check
-pnpm test
-pnpm test:server
-pnpm test:db             # Requires the database test environment
-pnpm build
-```
-
-Every Husky pre-commit run regenerates database types through
-`scripts/pre-commit.sh`, including commits without schema changes. In the
-default local mode, start Docker and local Supabase with `supabase start`, and
-define `SUPABASE_AUTH_TWITTER_CLIENT_ID` and `SUPABASE_AUTH_TWITTER_SECRET` in
-`.env` so the Supabase CLI can parse `supabase/config.toml`. When
-`NEXT_PUBLIC_USE_REMOTE_DEV_DB=true` is set in `.env`, the hook instead runs
-`pnpm gen-types` against the configured remote project and requires
-`SUPABASE_ACCESS_TOKEN`.
-
-For archive-worker commands and environment requirements, use
-`services/process_archive/README_DOCKER.md` rather than copying deployment
-instructions here.
-
-## Git And Documentation Hygiene
-
-- Make focused changes and run relevant checks before handoff.
-- Keep commits atomic and stage only paths belonging to the task.
-- Do not commit or push unless the user requested it or the active workflow
-  explicitly includes publication.
-- Update this file only with stable, project-specific instructions that are
-  costly or risky to rediscover.
-- Put temporary audits, refactor backlogs, incident narratives, and dated
-  infrastructure inventories in issues or timestamped documentation, not in
-  this always-loaded file.
-- Prefer links to canonical code, workflows, and runbooks over duplicated
-  explanations that can drift.
+- Use the focused checks in `CONTRIBUTING.md` for the changed hot path. Ask
+  before broad tests, live writes, production migration, or deployment.
+- For archive-worker commands and deployment requirements, follow
+  `services/process_archive/README_DOCKER.md`.

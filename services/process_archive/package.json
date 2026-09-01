@@ -12,7 +12,7 @@
     "start:stream": "set NODE_OPTIONS=--expose-gc && tsx --env-file=.env process_stream.ts",
     "start:copy": "npm run start",
     "smoke:runtime": "node --expose-gc runtime_smoke_test.cjs",
-    "test:archive-clickhouse": "node --import tsx --test archive_clickhouse.test.ts",
+    "test:archive-clickhouse": "node --import tsx --test archive_clickhouse.test.ts canonical_archive.test.ts",
     "run": "set NODE_OPTIONS=--expose-gc && tsx --env-file=.env process.ts",
     "docker:build": "cd ../../ && docker build -f services/process_archive/Dockerfile -t process-archive .",
     "docker:run": "docker compose run --rm process-archive",

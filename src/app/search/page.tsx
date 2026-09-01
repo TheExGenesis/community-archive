@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import { capturePostHogEvent } from '@/lib/posthog'
+import UserMatchResults from '@/components/UserMatchResults'
 
 const starterSearches = [
   { label: 'Open source', query: 'open source' },
@@ -115,19 +116,22 @@ function SearchPageContent() {
 
         <div className={hasSearch ? 'mt-5' : 'mt-10'}>
           {hasSearch ? (
-            <TweetList
-              key={tweetListKey}
-              filterCriteria={filterCriteria}
-              resultsHeading="Search results"
-              resultsDescription={searchDescription}
-              collapseLongTweets
-              compact
-              permalinkOrigin="search"
-              permalinkReturnTo={`/search?${tweetListKey}`}
-              onSearchSortChange={
-                canSortSearchResults ? handleSortChange : undefined
-              }
-            />
+            <>
+              <UserMatchResults query={cleanRawText} />
+              <TweetList
+                key={tweetListKey}
+                filterCriteria={filterCriteria}
+                resultsHeading="Search results"
+                resultsDescription={searchDescription}
+                collapseLongTweets
+                compact
+                permalinkOrigin="search"
+                permalinkReturnTo={`/search?${tweetListKey}`}
+                onSearchSortChange={
+                  canSortSearchResults ? handleSortChange : undefined
+                }
+              />
+            </>
           ) : (
             <div className="rounded-lg border border-dashed border-border bg-card px-6 py-10 text-center sm:px-10">
               <SlidersHorizontal className="mx-auto h-8 w-8 text-muted-foreground" />

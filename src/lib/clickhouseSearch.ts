@@ -141,7 +141,9 @@ export async function searchTweetsWithClickHouse(
   pageSize: number,
   fetchImpl: typeof fetch = fetch,
 ): Promise<TimelineTweet[]> {
-  return requestClickHouseTweets(criteria, page, pageSize, fetchImpl)
+  return requestClickHouseTweets(criteria, page, pageSize, fetchImpl, {
+    excludeRetweets: criteria.excludeRetweets,
+  })
 }
 
 export function canPreviewTweetSearch(
@@ -159,7 +161,7 @@ export async function searchTweetPreviewsWithClickHouse(
   criteria: FilterCriteria,
   fetchImpl: typeof fetch = fetch,
 ): Promise<MappedClickHouseSearchResponse> {
-  return requestClickHouseSearch(criteria, 1, 3, fetchImpl, {
+  return requestClickHouseSearch(criteria, 1, 5, fetchImpl, {
     preview: true,
     excludeRetweets: criteria.excludeRetweets,
   })

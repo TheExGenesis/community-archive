@@ -44,6 +44,8 @@ export interface SyndicatedTweet {
   account_display_name: string
   created_at: string
   full_text: string
+  // Always null: the syndication endpoint does not report reposts. Kept so the
+  // shape stays ThreadTweet-compatible.
   retweet_count: number | null
   favorite_count: number
   avatar_media_url?: string
@@ -140,10 +142,10 @@ export async function fetchSyndicatedTweet(
     account_display_name: data.user?.name ?? '',
     created_at: data.created_at ?? '',
     full_text: data.text ?? '',
-    retweet_count:
-      typeof data.conversation_count === 'number'
-        ? data.conversation_count
-        : null,
+    // The syndication payload carries no repost count. `conversation_count` is
+    // the reply count, so reading it here rendered replies under the repost
+    // icon. Leave the metric unknown rather than surfacing a wrong number.
+    retweet_count: null,
     favorite_count:
       typeof data.favorite_count === 'number' ? data.favorite_count : 0,
     avatar_media_url: data.user?.profile_image_url_https,

@@ -4,7 +4,7 @@ import { cache } from 'react'
 import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
 import {
   getCachedProfileHeader,
-  resolveAccountId,
+  resolvePublicProfileIdentity,
 } from '@/lib/metaTwitter/data'
 import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
 
@@ -19,14 +19,6 @@ const normalizeMediaUrl = (value: string | null | undefined): string | null => {
   return trimmed ? trimmed : null
 }
 
-const analyticalLookupKey = (param: string): string => {
-  try {
-    return decodeURIComponent(param).replace(/^(archive|optin):/, '')
-  } catch {
-    return param
-  }
-}
-
 /**
  * Archive uploads frequently omit profile media, so an account can resolve to a
  * complete-looking archived profile that still renders a placeholder avatar.
@@ -36,7 +28,7 @@ const analyticalLookupKey = (param: string): string => {
  */
 async function withBackfilledMedia(
   profile: ProfileHeaderData,
-  param: string,
+  accountId: string,
 ): Promise<ProfileHeaderData> {
   const avatar = normalizeMediaUrl(profile.avatar_media_url)
   const header = normalizeMediaUrl(profile.header_media_url)
@@ -44,7 +36,7 @@ async function withBackfilledMedia(
     return { ...profile, avatar_media_url: avatar, header_media_url: header }
   }
 
-  const fallback = await getClickHouseUserProfile(analyticalLookupKey(param))
+  const fallback = await getClickHouseUserProfile(accountId)
   return {
     ...profile,
     avatar_media_url:
@@ -60,18 +52,22 @@ async function withBackfilledMedia(
  */
 export const resolveProfile = cache(
   async (param: string): Promise<ResolvedProfile | null> => {
-    const archiveAccountId = await resolveAccountId(param)
-    if (archiveAccountId) {
-      const profile = await getCachedProfileHeader(archiveAccountId)
+    const publicIdentity = await resolvePublicProfileIdentity(param)
+    if (!publicIdentity) return null
+
+    if (publicIdentity.accountId) {
+      const profile = await getCachedProfileHeader(publicIdentity.accountId)
       if (profile) {
         return {
-          accountId: archiveAccountId,
-          profile: await withBackfilledMedia(profile, param),
+          accountId: publicIdentity.accountId,
+          profile: await withBackfilledMedia(profile, publicIdentity.accountId),
         }
       }
     }
 
-    const clickHouseProfile = await getClickHouseUserProfile(param)
+    const clickHouseProfile = await getClickHouseUserProfile(
+      publicIdentity.accountId ?? publicIdentity.username,
+    )
     const accountId = clickHouseProfile?.user.account_id
     if (!clickHouseProfile || !accountId) return null
     const user = clickHouseProfile.user

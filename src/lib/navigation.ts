@@ -4,11 +4,11 @@ import { isTwitterUsername } from './apiInputValidation'
 export interface NavItem {
   href: string
   label: string
-  tone?: 'muted'
 }
 
 export function navAnalyticsDestination(href: string): string {
   if (href.startsWith('/bangers')) return 'bangers'
+  if (href.startsWith('/community')) return 'community'
   if (href.startsWith('/digest')) return 'digest'
   if (href.startsWith('/docs')) return 'docs'
   if (href.startsWith('/research')) return 'research'
@@ -153,25 +153,27 @@ export function getTweetBackLink(searchParams?: {
  * built on it, and how to contribute.
  * Logged in: the portal workspace — the member's daily views of the data.
  */
-export const getPrimaryNav = (isMember: boolean, isAdmin = false): NavItem[] =>
-  isMember || isAdmin
+export const getPrimaryNav = (
+  isMember: boolean,
+  _isAdmin = false,
+): NavItem[] =>
+  isMember || _isAdmin
     ? [
         { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
         { href: '/user-dir', label: 'Users' },
+        { href: '/community', label: 'Gallery' },
         { href: '/trends', label: 'Trends' },
         { href: '/stream', label: 'Live stream' },
-        ...(isAdmin
-          ? ([
-              { href: '/social-graph', label: 'Graph', tone: 'muted' },
-            ] satisfies NavItem[])
-          : []),
+        { href: '/social-graph', label: 'Graph' },
         { href: '/research', label: 'Research' },
       ]
     : [
         { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
         { href: '/user-dir', label: 'Users' },
+        { href: '/community', label: 'Gallery' },
+        { href: '/social-graph', label: 'Graph' },
         { href: '/docs', label: 'Docs' },
         { href: '/#upload-archive', label: 'Upload archive' },
       ]

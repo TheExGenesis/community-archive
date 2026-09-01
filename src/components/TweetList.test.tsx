@@ -53,9 +53,13 @@ const previewTweet = {
   media: [],
 }
 
-const previewTweets = ['preview-1', 'preview-2', 'preview-3'].map(
-  (tweet_id) => ({ ...previewTweet, tweet_id }),
-)
+const previewTweets = [
+  'preview-1',
+  'preview-2',
+  'preview-3',
+  'preview-4',
+  'preview-5',
+].map((tweet_id) => ({ ...previewTweet, tweet_id }))
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -105,7 +109,7 @@ describe('TweetList progressive search', () => {
     )
 
     expect(await screen.findByTestId('tweet-ids')).toHaveTextContent(
-      'preview-1,preview-2,preview-3',
+      'preview-1,preview-2,preview-3,preview-4,preview-5',
     )
     expect(screen.getByRole('status')).toHaveTextContent(
       'Loading the remaining results…',

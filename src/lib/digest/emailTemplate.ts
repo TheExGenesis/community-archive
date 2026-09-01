@@ -80,23 +80,31 @@ const tweetToText = (tweet: PortalTweet) =>
 const HEADING_FONT = `Petrona, Georgia, 'Times New Roman', serif`
 const BODY_FONT = `Manrope, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`
 
-const formatDigestDate = (digestDate: string) =>
-  new Date(`${digestDate}T00:00:00Z`).toLocaleDateString('en-US', {
+// "Tuesday, August 11" + ", 2026"; the year is hidden on narrow screens so
+// the headline stays on one line.
+const formatDigestDateParts = (digestDate: string) => {
+  const date = new Date(`${digestDate}T00:00:00Z`)
+  const dayPart = date.toLocaleDateString('en-US', {
     timeZone: 'UTC',
     weekday: 'long',
-    year: 'numeric',
     month: 'long',
     day: 'numeric',
   })
+  const year = date.toLocaleDateString('en-US', {
+    timeZone: 'UTC',
+    year: 'numeric',
+  })
+  return { dayPart, year, full: `${dayPart}, ${year}` }
+}
 
 export function renderDigestEmail(
   edition: DigestEdition,
   links: DigestEmailLinks,
 ): RenderedDigestEmail {
   const { content } = edition
-  const prettyDate = formatDigestDate(edition.digestDate)
+  const prettyDate = formatDigestDateParts(edition.digestDate)
   const editionUrl = `${links.siteUrl}/digest/${edition.digestDate}`
-  const subject = `Community Archive Digest — ${prettyDate}`
+  const subject = `Community Archive Digest — ${prettyDate.full}`
 
   const summaryHtml = content.executiveSummary
     .map((line) => `<li style="margin:0 0 6px;">${escapeHtml(line)}</li>`)
@@ -133,11 +141,17 @@ export function renderDigestEmail(
     ${renderTweetCard(content.topBanger, links.siteUrl)}`
 
   const html = `
-  <style>@import url('https://fonts.googleapis.com/css2?family=Petrona:wght@500;600&family=Manrope:wght@400;500;700&display=swap');</style>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Petrona:wght@500;600&family=Manrope:wght@400;500;700&display=swap');
+    @media (max-width: 480px) {
+      .digest-h1 { font-size: 27px !important; }
+      .digest-year { display: none !important; }
+    }
+  </style>
   <div style="margin:0 auto;max-width:600px;padding:24px;font-family:${BODY_FONT};color:#111827;">
     <img src="${links.siteUrl}/images/email-logo.png" width="48" height="48" alt="Community Archive" style="display:block;margin:0 0 12px;" />
     <p style="margin:0 0 4px;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#9ca3af;">Community Archive Daily Digest</p>
-    <h1 style="margin:0 0 16px;font-family:${HEADING_FONT};font-size:30px;line-height:1.2;color:#111827;">${escapeHtml(prettyDate)}</h1>
+    <h1 class="digest-h1" style="margin:0 0 16px;font-family:${HEADING_FONT};font-size:30px;line-height:1.2;color:#111827;">${escapeHtml(prettyDate.dayPart)}<span class="digest-year">, ${escapeHtml(prettyDate.year)}</span></h1>
     <ul style="margin:0 0 24px;padding-left:20px;font-size:14px;line-height:1.5;">${summaryHtml}</ul>
     ${topBangerHtml}
     ${storiesHtml}
@@ -152,7 +166,7 @@ export function renderDigestEmail(
   </div>`
 
   const text = [
-    `Community Archive Daily Digest — ${prettyDate}`,
+    `Community Archive Daily Digest — ${prettyDate.full}`,
     '',
     ...content.executiveSummary.map((line) => `* ${line}`),
     '',

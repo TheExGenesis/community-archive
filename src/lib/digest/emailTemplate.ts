@@ -138,7 +138,7 @@ export function renderDigestEmail(
     <img src="${links.siteUrl}/images/email-logo.png" width="48" height="48" alt="Community Archive" style="display:block;margin:0 0 12px;" />
     <p style="margin:0 0 4px;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#9ca3af;">Community Archive Daily Digest</p>
     <h1 style="margin:0 0 16px;font-family:${HEADING_FONT};font-size:30px;line-height:1.2;color:#111827;">${escapeHtml(prettyDate)}</h1>
-    <ul style="margin:0 0 24px;padding-left:20px;font-size:15px;line-height:1.5;">${summaryHtml}</ul>
+    <ul style="margin:0 0 24px;padding-left:20px;font-size:14px;line-height:1.5;">${summaryHtml}</ul>
     ${topBangerHtml}
     ${storiesHtml}
     <p style="margin:0 0 32px;">

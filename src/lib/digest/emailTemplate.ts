@@ -129,14 +129,14 @@ export function renderDigestEmail(
     .join('')
 
   const topBangerHtml = `
-    <p style="margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#6b7280;">Top tweet</p>
+    <p style="margin:0 0 8px;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#9ca3af;">Top tweet</p>
     ${renderTweetCard(content.topBanger, links.siteUrl)}`
 
   const html = `
   <style>@import url('https://fonts.googleapis.com/css2?family=Petrona:wght@500;600&family=Manrope:wght@400;500;700&display=swap');</style>
   <div style="margin:0 auto;max-width:600px;padding:24px;font-family:${BODY_FONT};color:#111827;">
     <img src="${links.siteUrl}/images/email-logo.png" width="48" height="48" alt="Community Archive" style="display:block;margin:0 0 12px;" />
-    <p style="margin:0 0 4px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#6b7280;">Community Archive Daily Digest</p>
+    <p style="margin:0 0 4px;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#9ca3af;">Community Archive Daily Digest</p>
     <h1 style="margin:0 0 16px;font-family:${HEADING_FONT};font-size:30px;line-height:1.2;color:#111827;">${escapeHtml(prettyDate)}</h1>
     <ul style="margin:0 0 24px;padding-left:20px;font-size:15px;line-height:1.5;">${summaryHtml}</ul>
     ${topBangerHtml}

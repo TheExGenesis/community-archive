@@ -212,6 +212,43 @@ describe('CommunityGallery', () => {
     expect(requestBody.get('projectName')).toBe('Archive Quilt')
   })
 
+  it('likes a project straight from its gallery card', async () => {
+    const user = userEvent.setup()
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ liked: true, count: 3 }),
+    } as Response)
+
+    render(
+      <CommunityGallery
+        isSignedIn
+        publishedProjects={[PUBLISHED_PROJECT]}
+        likedProjectIds={[]}
+      />,
+    )
+
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search community projects' }),
+      'Archive Quilt',
+    )
+
+    const cardLike = screen.getByRole('button', { name: 'Like Archive Quilt' })
+    expect(cardLike).toHaveTextContent('2')
+
+    await user.click(cardLike)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/community/projects/${PUBLISHED_PROJECT.databaseId}/like`,
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(
+      await screen.findByRole('button', { name: 'Unlike Archive Quilt' }),
+    ).toHaveTextContent('3')
+    // The card like must not open the project modal.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('optimistically likes a published project and calls the like API', async () => {
     const user = userEvent.setup()
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({

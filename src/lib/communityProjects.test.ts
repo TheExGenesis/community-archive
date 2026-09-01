@@ -62,6 +62,39 @@ describe('community project catalog', () => {
     )
   })
 
+  it('sorts by like count, breaking ties with the newest project', () => {
+    const catalog = COMMUNITY_PROJECTS.map((project) => ({
+      ...project,
+      likeCount:
+        project.slug === 'bangers-page'
+          ? 10
+          : project.slug === 'followle'
+            ? 0
+            : 1,
+    }))
+
+    const mostLiked = filterCommunityProjects(catalog, '', 'All', 'Most liked')
+    expect(mostLiked[0].name).toBe('Bangers.page')
+    expect(mostLiked.at(-1)?.name).toBe('Followle')
+
+    // With no like counts at all, Most liked degrades to the Newest order.
+    const untouched = filterCommunityProjects(
+      COMMUNITY_PROJECTS,
+      '',
+      'All',
+      'Most liked',
+    )
+    const newest = filterCommunityProjects(
+      COMMUNITY_PROJECTS,
+      '',
+      'All',
+      'Newest',
+    )
+    expect(untouched.map((project) => project.name)).toEqual(
+      newest.map((project) => project.name),
+    )
+  })
+
   it('keeps the featured Tools order curated for the Gallery', () => {
     const tools = filterCommunityProjects(
       COMMUNITY_PROJECTS,

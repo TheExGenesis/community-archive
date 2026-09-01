@@ -242,6 +242,76 @@ export type Database = {
           },
         ]
       }
+      community_project_comments: {
+        Row: {
+          content: string
+          created_at: string
+          deleted_at: string | null
+          display_name: string | null
+          id: string
+          project_id: string
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          id?: string
+          project_id: string
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          id?: string
+          project_id?: string
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_project_comments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "community_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_project_likes: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_project_likes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "community_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       community_projects: {
         Row: {
           archive_use: string

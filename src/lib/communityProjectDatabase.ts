@@ -36,8 +36,12 @@ function sourceTweetId(sourceUrl: string) {
 
 export function mapCommunityProjectRow(
   row: CommunityProjectRow,
+  likeCount = 0,
+  commentCount = 0,
 ): CommunityProject {
   return {
+    likeCount,
+    commentCount,
     databaseId: row.id,
     slug: row.slug,
     name: row.name,
@@ -60,6 +64,16 @@ export function mapCommunityProjectRow(
   }
 }
 
+type CommunityProjectLikeRow = {
+  project_id: string
+  user_id: string
+}
+
+type CommunityProjectCommentRow = {
+  project_id: string
+  deleted_at: string | null
+}
+
 export async function loadPublishedCommunityProjects(): Promise<
   CommunityProject[]
 > {
@@ -76,8 +90,82 @@ export async function loadPublishedCommunityProjects(): Promise<
     return []
   }
 
-  return ((data ?? []) as unknown as CommunityProjectRow[]).map(
-    mapCommunityProjectRow,
+  const rows = (data ?? []) as unknown as CommunityProjectRow[]
+  const projectIds = rows.map((row) => row.id)
+  const [likeCounts, commentCounts] = await Promise.all([
+    loadCommunityProjectLikeCounts(projectIds),
+    loadCommunityProjectCommentCounts(projectIds),
+  ])
+
+  return rows.map((row) =>
+    mapCommunityProjectRow(
+      row,
+      likeCounts.get(row.id) ?? 0,
+      commentCounts.get(row.id) ?? 0,
+    ),
+  )
+}
+
+async function loadCommunityProjectCommentCounts(
+  projectIds: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>()
+  if (!projectIds.length) return counts
+
+  const admin = createServerServiceRoleClient()
+  const { data, error } = await admin
+    .from('community_project_comments')
+    .select('project_id, deleted_at')
+    .in('project_id', projectIds)
+    .is('deleted_at', null)
+
+  if (error) return counts
+
+  for (const comment of (data ??
+    []) as unknown as CommunityProjectCommentRow[]) {
+    counts.set(comment.project_id, (counts.get(comment.project_id) ?? 0) + 1)
+  }
+  return counts
+}
+
+async function loadCommunityProjectLikeCounts(
+  projectIds: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>()
+  if (!projectIds.length) return counts
+
+  const admin = createServerServiceRoleClient()
+  const { data, error } = await admin
+    .from('community_project_likes')
+    .select('project_id, user_id')
+    .in('project_id', projectIds)
+
+  if (error) return counts
+
+  for (const like of (data ?? []) as unknown as CommunityProjectLikeRow[]) {
+    counts.set(like.project_id, (counts.get(like.project_id) ?? 0) + 1)
+  }
+  return counts
+}
+
+/**
+ * Database ids of the published projects the given user has liked. Returns an
+ * empty list when signed out or when the likes table is unavailable.
+ */
+export async function loadCommunityProjectLikesForUser(
+  userId: string | null | undefined,
+): Promise<string[]> {
+  if (!userId) return []
+
+  const admin = createServerServiceRoleClient()
+  const { data, error } = await admin
+    .from('community_project_likes')
+    .select('project_id, user_id')
+    .eq('user_id', userId)
+
+  if (error) return []
+  return ((data ?? []) as unknown as CommunityProjectLikeRow[]).map(
+    (like) => like.project_id,
   )
 }
 

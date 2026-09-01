@@ -109,6 +109,13 @@ GRANT SELECT ON TABLE "public"."digest_editions" TO "anon", "authenticated";
 REVOKE ALL PRIVILEGES ON TABLE "public"."community_projects" FROM "anon", "authenticated";
 GRANT ALL PRIVILEGES ON TABLE "public"."community_projects" TO "service_role";
 GRANT SELECT ON TABLE "public"."community_projects" TO "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."community_project_likes" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."community_project_likes" TO "service_role";
+GRANT SELECT ON TABLE "public"."community_project_likes" TO "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."community_project_comments" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."community_project_comments" TO "service_role";
+GRANT SELECT ON TABLE "public"."community_project_comments" TO "anon", "authenticated";
+
 
 REVOKE ALL ON FUNCTION private.community_archive_monitoring_membership()
   FROM PUBLIC, anon, authenticated, service_role;

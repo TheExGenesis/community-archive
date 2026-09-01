@@ -25,6 +25,24 @@ describe('renderDigestEmail', () => {
     }
   })
 
+  it('renders the top banger and per-story tweet cards', () => {
+    const { html, text } = renderDigestEmail(AUGUST_11_MOCK_DIGEST, LINKS)
+    const { topBanger, stories } = AUGUST_11_MOCK_DIGEST.content
+
+    expect(html).toContain('Top tweet')
+    expect(html).toContain(`@${topBanger.username}`)
+    expect(html).toContain(`${LINKS.siteUrl}/tweets/${topBanger.id}`)
+    expect(text).toContain(`@${topBanger.username}`)
+    const firstTweet = stories[0].bangers[0]
+    expect(html).toContain(`${LINKS.siteUrl}/tweets/${firstTweet.id}`)
+    // At most two tweets render per story; the rest link back to the site.
+    const thirdTweet = stories.find((s) => s.bangers.length > 2)?.bangers[2]
+    if (thirdTweet) {
+      expect(html).not.toContain(`${LINKS.siteUrl}/tweets/${thirdTweet.id}`)
+      expect(html).toContain('more tweet')
+    }
+  })
+
   it('escapes HTML in model-authored copy', () => {
     const edition = {
       ...AUGUST_11_MOCK_DIGEST,

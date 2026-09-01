@@ -414,6 +414,36 @@ CREATE TABLE IF NOT EXISTS "public"."digest_editions" (
 );
 ALTER TABLE "public"."digest_editions" OWNER TO "postgres";
 
+-- Reader appreciation for a published edition. One like per user per edition;
+-- writes go through the API's service-role client after session verification.
+CREATE TABLE IF NOT EXISTS "public"."digest_edition_likes" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "edition_id" uuid NOT NULL REFERENCES "public"."digest_editions"("id") ON DELETE CASCADE,
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "digest_edition_likes_edition_user_key" UNIQUE ("edition_id", "user_id")
+);
+ALTER TABLE "public"."digest_edition_likes" OWNER TO "postgres";
+
+-- Reader comments on a published edition. The display identity is captured at
+-- write time so rendering never joins auth.users; writes go through the API's
+-- service-role client after session verification. Deletes are soft so a thread
+-- keeps its shape.
+CREATE TABLE IF NOT EXISTS "public"."digest_edition_comments" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "edition_id" uuid NOT NULL REFERENCES "public"."digest_editions"("id") ON DELETE CASCADE,
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "content" text NOT NULL,
+    "username" text,
+    "display_name" text,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "updated_at" timestamptz NOT NULL DEFAULT now(),
+    "deleted_at" timestamptz,
+    CONSTRAINT "digest_edition_comments_content_length_check"
+      CHECK (char_length("content") BETWEEN 1 AND 2000)
+);
+ALTER TABLE "public"."digest_edition_comments" OWNER TO "postgres";
+
 -- Public profile preferences. PostgreSQL remains authoritative for this
 -- owner-controlled policy state; analytical stores only consume the result.
 CREATE TABLE IF NOT EXISTS "public"."profile_settings" (

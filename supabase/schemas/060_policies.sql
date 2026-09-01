@@ -4,11 +4,40 @@ ALTER TABLE "public"."digest_prompt_versions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_runs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_editions" ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE "public"."digest_edition_likes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."digest_edition_comments" ENABLE ROW LEVEL SECURITY;
+
 CREATE POLICY "Published digest editions are publicly readable"
   ON "public"."digest_editions"
   FOR SELECT
   TO "anon", "authenticated"
   USING ("status" = 'published');
+
+-- Like counts are a public signal on published editions. Writes stay
+-- service-role only; the API verifies the session before inserting or deleting.
+CREATE POLICY "Published digest edition likes are publicly readable"
+  ON "public"."digest_edition_likes"
+  FOR SELECT
+  TO "anon", "authenticated"
+  USING (EXISTS (
+    SELECT 1
+    FROM "public"."digest_editions" AS "edition"
+    WHERE "edition"."id" = "digest_edition_likes"."edition_id"
+      AND "edition"."status" = 'published'
+  ));
+
+-- Comments are a public signal on published editions. Writes stay service-role
+-- only; the API verifies the session before inserting or soft-deleting.
+CREATE POLICY "Published digest edition comments are publicly readable"
+  ON "public"."digest_edition_comments"
+  FOR SELECT
+  TO "anon", "authenticated"
+  USING (EXISTS (
+    SELECT 1
+    FROM "public"."digest_editions" AS "edition"
+    WHERE "edition"."id" = "digest_edition_comments"."edition_id"
+      AND "edition"."status" = 'published'
+  ));
 
 -- Storage policies for the private archives bucket. Writes are restricted to
 -- the folder named by trusted, server-controlled app_metadata; the upload

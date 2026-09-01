@@ -102,3 +102,11 @@ GRANT ALL PRIVILEGES ON TABLE "public"."digest_editions" TO "service_role";
 GRANT USAGE, SELECT ON SEQUENCE "public"."digest_prompt_versions_version_seq" TO "service_role";
 GRANT USAGE, SELECT ON SEQUENCE "public"."digest_editions_issue_number_seq" TO "service_role";
 GRANT SELECT ON TABLE "public"."digest_editions" TO "anon", "authenticated";
+
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_edition_likes" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_edition_likes" TO "service_role";
+GRANT SELECT ON TABLE "public"."digest_edition_likes" TO "anon", "authenticated";
+
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" TO "service_role";
+GRANT SELECT ON TABLE "public"."digest_edition_comments" TO "anon", "authenticated";

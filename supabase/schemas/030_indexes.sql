@@ -128,6 +128,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS "digest_editions_one_published_per_date_idx"
 CREATE INDEX IF NOT EXISTS "digest_editions_public_archive_idx"
   ON "public"."digest_editions" ("digest_date" DESC, "published_at" DESC)
   WHERE "status" = 'published';
+
+CREATE INDEX IF NOT EXISTS "digest_edition_likes_edition_idx"
+  ON "public"."digest_edition_likes" ("edition_id");
+
+CREATE INDEX IF NOT EXISTS "digest_edition_comments_edition_created_idx"
+  ON "public"."digest_edition_comments" ("edition_id", "created_at");
 CREATE INDEX IF NOT EXISTS "policy_storage_objects_account_ids_idx"
 ON "private"."policy_storage_objects" USING "gin" ("account_ids");
 

@@ -7,11 +7,40 @@ ALTER TABLE "public"."community_projects" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."community_project_likes" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."community_project_comments" ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE "public"."digest_edition_likes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."digest_edition_comments" ENABLE ROW LEVEL SECURITY;
+
 CREATE POLICY "Published digest editions are publicly readable"
   ON "public"."digest_editions"
   FOR SELECT
   TO "anon", "authenticated"
   USING ("status" = 'published');
+
+-- Like counts are a public signal on published editions. Writes stay
+-- service-role only; the API verifies the session before inserting or deleting.
+CREATE POLICY "Published digest edition likes are publicly readable"
+  ON "public"."digest_edition_likes"
+  FOR SELECT
+  TO "anon", "authenticated"
+  USING (EXISTS (
+    SELECT 1
+    FROM "public"."digest_editions" AS "edition"
+    WHERE "edition"."id" = "digest_edition_likes"."edition_id"
+      AND "edition"."status" = 'published'
+  ));
+
+-- Comments are a public signal on published editions. Writes stay service-role
+-- only; the API verifies the session before inserting or soft-deleting.
+CREATE POLICY "Published digest edition comments are publicly readable"
+  ON "public"."digest_edition_comments"
+  FOR SELECT
+  TO "anon", "authenticated"
+  USING (EXISTS (
+    SELECT 1
+    FROM "public"."digest_editions" AS "edition"
+    WHERE "edition"."id" = "digest_edition_comments"."edition_id"
+      AND "edition"."status" = 'published'
+  ));
 
 CREATE POLICY "Published community projects are publicly readable"
   ON "public"."community_projects"

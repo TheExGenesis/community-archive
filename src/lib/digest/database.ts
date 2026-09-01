@@ -61,6 +61,25 @@ export interface DigestEditionRow {
   updated_at: string
 }
 
+export interface DigestEditionLikeRow {
+  id: string
+  edition_id: string
+  user_id: string
+  created_at: string
+}
+
+export interface DigestEditionCommentRow {
+  id: string
+  edition_id: string
+  user_id: string
+  content: string
+  username: string | null
+  display_name: string | null
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
 type TableDefinition<Row, Insert, Update> = {
   Row: Row
   Insert: Insert
@@ -101,6 +120,18 @@ type DigestDatabase = {
             'digest_date' | 'version' | 'source_run_id' | 'content'
           >,
         Partial<DigestEditionRow>
+      >
+      digest_edition_likes: TableDefinition<
+        DigestEditionLikeRow,
+        Partial<DigestEditionLikeRow> &
+          Pick<DigestEditionLikeRow, 'edition_id' | 'user_id'>,
+        Partial<DigestEditionLikeRow>
+      >
+      digest_edition_comments: TableDefinition<
+        DigestEditionCommentRow,
+        Partial<DigestEditionCommentRow> &
+          Pick<DigestEditionCommentRow, 'edition_id' | 'user_id' | 'content'>,
+        Partial<DigestEditionCommentRow>
       >
     }
     Views: { [_ in never]: never }

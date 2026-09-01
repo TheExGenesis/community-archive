@@ -16,6 +16,7 @@ function post(title: string): ResearchPost {
 
 test('selects the four featured research posts in editorial order', () => {
   const selected = selectFeaturedResearchPosts([
+    post('The Switchboard Operator Benchmark'),
     post('epistemic garden recap | lab notes #1'),
     post(
       'discovering the postrat canon in the community archive | lab notes #4',
@@ -27,14 +28,14 @@ test('selects the four featured research posts in editorial order', () => {
   ])
 
   expect(selected.map(({ title }) => title)).toEqual([
+    'The Switchboard Operator Benchmark',
     'Towards a Pattern Language of Serendipity Online',
     'Agentic Taste Modeling | lab notes #8',
     'a theory of tpot (postrat twitter)',
-    'opportunity mining | lab notes #6',
   ])
 })
 
-test('shows the serendipity post and hides the phoenix post', async () => {
+test('shows the featured research posts and hides the phoenix post', async () => {
   const item = (title: string, url: string) => `
     <item>
       <title><![CDATA[${title}]]></title>
@@ -43,6 +44,10 @@ test('shows the serendipity post and hides the phoenix post', async () => {
       <description><![CDATA[Excerpt]]></description>
     </item>`
   const xml = `<rss><channel>
+    ${item(
+      'The Switchboard Operator Benchmark',
+      'https://xiqo.substack.com/p/the-switchboard-operator-benchmark',
+    )}
     ${item(
       'Towards a Pattern Language of Serendipity Online',
       'https://xiqo.substack.com/p/why-do-i-care-about-twitter-so-much',
@@ -60,6 +65,7 @@ test('shows the serendipity post and hides the phoenix post', async () => {
   const posts = await getResearchPosts(24)
 
   expect(posts.map(({ url }) => url)).toEqual([
+    'https://xiqo.substack.com/p/the-switchboard-operator-benchmark',
     'https://xiqo.substack.com/p/why-do-i-care-about-twitter-so-much',
   ])
   fetchSpy.mockRestore()

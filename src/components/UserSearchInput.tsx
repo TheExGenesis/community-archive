@@ -6,9 +6,13 @@ import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input, InputProps } from '@/components/ui/input'
 import { userProfileHref } from '@/lib/navigation'
-import { fetchUserSuggestions } from '@/lib/queries/fetchUsers'
+import {
+  fetchMemberDirectorySuggestions,
+  fetchMemberSuggestions,
+} from '@/lib/queries/fetchUsers'
 import {
   getUsernameSearchToken,
+  mergeUserSuggestions,
   replaceUsernameTokenWithFromFilter,
 } from '@/lib/searchSuggestions'
 import type {
@@ -24,7 +28,8 @@ interface UserSearchInputProps extends Omit<InputProps, 'onChange' | 'value'> {
 }
 
 const SUGGESTION_LIMIT = 6
-const SUGGESTION_DELAY_MS = 200
+const SUGGESTION_DELAY_MS = 100
+const MEMBER_DIRECTORY_FALLBACK_MS = 250
 
 export default function UserSearchInput({
   value,
@@ -66,22 +71,72 @@ export default function UserSearchInput({
     setActiveIndex(-1)
     if (!token) return
 
-    const timer = window.setTimeout(() => {
-      fetchUserSuggestions(supabase, token.fragment, SUGGESTION_LIMIT)
+    const isCurrentRequest = () =>
+      requestId === requestIdRef.current &&
+      document.activeElement === inputRef.current
+
+    let fallbackTimer: number | undefined
+    let memberSuggestions: UserSuggestion[] = []
+    let directorySuggestions: UserSuggestion[] = []
+    let directoryRequest: Promise<void> | null = null
+
+    const renderSuggestions = () => {
+      if (!isCurrentRequest()) return
+      setSuggestions(
+        mergeUserSuggestions(
+          memberSuggestions,
+          directorySuggestions,
+          SUGGESTION_LIMIT,
+        ),
+      )
+    }
+
+    const startDirectoryLookup = () => {
+      if (directoryRequest) return directoryRequest
+      directoryRequest = fetchMemberDirectorySuggestions(
+        supabase,
+        token.fragment,
+        SUGGESTION_LIMIT,
+      )
         .then((users) => {
-          if (
-            requestId === requestIdRef.current &&
-            document.activeElement === inputRef.current
-          ) {
-            setSuggestions(users)
-          }
+          directorySuggestions = users
+          renderSuggestions()
         })
         .catch(() => {
-          if (requestId === requestIdRef.current) setSuggestions([])
+          // Keep any gateway member suggestions visible if the fallback fails.
         })
+      return directoryRequest
+    }
+
+    const timer = window.setTimeout(async () => {
+      fallbackTimer = window.setTimeout(
+        startDirectoryLookup,
+        MEMBER_DIRECTORY_FALLBACK_MS,
+      )
+
+      try {
+        memberSuggestions = await fetchMemberSuggestions(
+          token.fragment,
+          SUGGESTION_LIMIT,
+        )
+        if (!isCurrentRequest()) return
+        renderSuggestions()
+      } catch {
+        if (!isCurrentRequest()) return
+      }
+
+      if (fallbackTimer !== undefined) {
+        window.clearTimeout(fallbackTimer)
+        fallbackTimer = undefined
+      }
+      if (memberSuggestions.length < SUGGESTION_LIMIT) startDirectoryLookup()
     }, SUGGESTION_DELAY_MS)
 
-    return () => window.clearTimeout(timer)
+    return () => {
+      window.clearTimeout(timer)
+      if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer)
+      if (requestIdRef.current === requestId) requestIdRef.current += 1
+    }
   }, [supabase, token])
 
   useEffect(() => {
@@ -93,7 +148,12 @@ export default function UserSearchInput({
 
   const openProfile = (suggestion: UserSuggestion) => {
     closeSuggestions()
-    router.push(userProfileHref(suggestion.username, suggestion.directory_id))
+    router.push(
+      userProfileHref(
+        suggestion.username,
+        suggestion.account_id || suggestion.directory_id,
+      ),
+    )
   }
 
   const selectFromFilter = (suggestion: UserSuggestion) => {

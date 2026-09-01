@@ -5,17 +5,19 @@ import {
 
 describe('community project catalog', () => {
   it('contains only verified entries with source posts and no prototype filler', () => {
-    expect(COMMUNITY_PROJECTS).toHaveLength(8)
+    expect(COMMUNITY_PROJECTS).toHaveLength(11)
     expect(COMMUNITY_PROJECTS).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'Ratio Radar' }),
         expect.objectContaining({ name: 'Bangers' }),
-        expect.objectContaining({ name: 'Semantic Search' }),
       ]),
     )
 
     for (const project of COMMUNITY_PROJECTS) {
-      expect(project.sourceTweetId).toMatch(/^\d+$/)
+      if (project.slug === 'conversation-map') {
+        expect(project.projectUrl).toBe('/conversation-map')
+        expect(project.sourceTweetId).toBeUndefined()
+      } else expect(project.sourceTweetId).toMatch(/^\d+$/)
       expect(project.projectUrl ?? '').not.toContain('example.com')
       expect(project.image ?? '').not.toContain('pbs.twimg.com')
     }
@@ -45,7 +47,7 @@ describe('community project catalog', () => {
       'All',
       'Newest',
     )
-    expect(newest[0].name).toBe('Followle')
+    expect(newest[0].name).toBe('Conversation Map')
 
     const alphabetical = filterCommunityProjects(
       COMMUNITY_PROJECTS,
@@ -61,21 +63,53 @@ describe('community project catalog', () => {
   })
 
   it('sorts by like count, breaking ties with the newest project', () => {
-    const catalog = COMMUNITY_PROJECTS.map((project, index) => ({
+    const catalog = COMMUNITY_PROJECTS.map((project) => ({
       ...project,
-      likeCount: project.slug === 'followle' ? 0 : index + 1,
+      likeCount:
+        project.slug === 'bangers-page'
+          ? 10
+          : project.slug === 'followle'
+            ? 0
+            : 1,
     }))
 
     const mostLiked = filterCommunityProjects(catalog, '', 'All', 'Most liked')
     expect(mostLiked[0].name).toBe('Bangers.page')
     expect(mostLiked.at(-1)?.name).toBe('Followle')
 
+    // With no like counts at all, Most liked degrades to the Newest order.
     const untouched = filterCommunityProjects(
       COMMUNITY_PROJECTS,
       '',
       'All',
       'Most liked',
     )
-    expect(untouched[0].name).toBe('Followle')
+    const newest = filterCommunityProjects(
+      COMMUNITY_PROJECTS,
+      '',
+      'All',
+      'Newest',
+    )
+    expect(untouched.map((project) => project.name)).toEqual(
+      newest.map((project) => project.name),
+    )
+  })
+
+  it('keeps the featured Tools order curated for the Gallery', () => {
+    const tools = filterCommunityProjects(
+      COMMUNITY_PROJECTS,
+      '',
+      'Tools',
+      'Featured',
+    )
+
+    expect(tools.map((project) => project.name)).toEqual([
+      'Bangers.page',
+      'Tweet Harvest',
+      'Semantic Search',
+      "Malcolm Ocean's Links",
+      'Distill',
+      'Tweetscope',
+    ])
   })
 })

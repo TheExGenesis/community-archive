@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react'
 import ClassicHomepage from './ClassicHomepage'
 import type { PortalData } from '@/lib/portal/types'
 import { createServerClient } from '@/utils/supabase'
-import { getLatestDigestPreview } from '@/lib/digest/data'
 
 jest.mock('next/headers', () => ({ cookies: jest.fn(() => ({})) }))
 jest.mock('next/dynamic', () => {
@@ -27,16 +26,14 @@ jest.mock('@/components/home/Testimonials', () => ({
   __esModule: true,
   default: () => <div data-testid="testimonials" />,
 }))
-jest.mock('@/components/portal/Portal', () => ({
-  __esModule: true,
-  default: () => <div data-testid="shared-dashboard" />,
+jest.mock('@/components/home/HomepageDataSections', () => ({
+  HomepageStats: () => <>14.0M public tweets from 700 community members.</>,
+  HomepagePortal: () => <div data-testid="shared-dashboard" />,
+  HomepagePortalFallback: () => <div data-testid="dashboard-fallback" />,
 }))
 jest.mock('@/components/ExtensionInstallPrompt', () => ({
   __esModule: true,
   default: () => null,
-}))
-jest.mock('@/lib/digest/data', () => ({
-  getLatestDigestPreview: jest.fn(),
 }))
 jest.mock('@/utils/supabase', () => ({ createServerClient: jest.fn() }))
 
@@ -71,14 +68,13 @@ const data = {
 describe('ClassicHomepage audience actions', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    ;(getLatestDigestPreview as jest.Mock).mockResolvedValue(null)
     ;(createServerClient as jest.Mock).mockReturnValue({})
   })
 
   it('keeps search above the shared dashboard for signed-in members', async () => {
     render(
       await ClassicHomepage({
-        data,
+        data: Promise.resolve(data),
         homepagePeople: <div data-testid="homepage-people" />,
         isMember: true,
         showCta: false,
@@ -94,7 +90,7 @@ describe('ClassicHomepage audience actions', () => {
   it('keeps the CTA above the same dashboard for guests', async () => {
     render(
       await ClassicHomepage({
-        data,
+        data: Promise.resolve(data),
         homepagePeople: <div data-testid="homepage-people" />,
         isMember: false,
         showCta: true,
@@ -110,7 +106,7 @@ describe('ClassicHomepage audience actions', () => {
   it('states the totals plainly, with no counter to animate them', async () => {
     render(
       await ClassicHomepage({
-        data,
+        data: Promise.resolve(data),
         homepagePeople: <div data-testid="homepage-people" />,
         isMember: false,
         showCta: true,

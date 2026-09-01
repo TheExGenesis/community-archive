@@ -34,6 +34,7 @@ const RELEVANT_TITLE_KEYWORDS = [
   'hackathon',
   'sensemaking',
   'serendipity',
+  'switchboard operator',
   'epistemic garden',
 ]
 
@@ -48,10 +49,10 @@ const isRelevant = (title: string, url: string): boolean => {
 }
 
 const FEATURED_RESEARCH_TITLES = [
+  'the switchboard operator benchmark',
   'towards a pattern language of serendipity online',
   'agentic taste modeling',
   'a theory of tpot',
-  'opportunity mining',
 ] as const
 
 /** Select the four editorial homepage posts in their intended display order. */

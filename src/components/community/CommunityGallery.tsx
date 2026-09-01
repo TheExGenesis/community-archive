@@ -492,29 +492,41 @@ function ProjectDialog({
               {/* Comments are built (see ProjectComments + the comments API)
                   but hidden from the gallery for now. */}
               <DialogFooter>
-                <Button asChild variant="outline">
-                  <Link
-                    href={
-                      project.sourceUrl ?? `/tweets/${project.sourceTweetId}`
-                    }
-                    target={project.sourceUrl ? '_blank' : undefined}
-                    rel={project.sourceUrl ? 'noopener noreferrer' : undefined}
-                  >
-                    View source post
-                  </Link>
-                </Button>
+                {(project.sourceUrl || project.sourceTweetId) && (
+                  <Button asChild variant="outline">
+                    <Link
+                      href={
+                        project.sourceUrl ?? `/tweets/${project.sourceTweetId}`
+                      }
+                      target={project.sourceUrl ? '_blank' : undefined}
+                      rel={
+                        project.sourceUrl ? 'noopener noreferrer' : undefined
+                      }
+                    >
+                      View source post
+                    </Link>
+                  </Button>
+                )}
                 {project.projectUrl ? (
                   <Button
                     asChild
                     className="bg-brand text-brand-foreground hover:bg-brand/90"
                   >
-                    <a
+                    <Link
                       href={project.projectUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      target={
+                        project.projectUrl.startsWith('/')
+                          ? undefined
+                          : '_blank'
+                      }
+                      rel={
+                        project.projectUrl.startsWith('/')
+                          ? undefined
+                          : 'noopener noreferrer'
+                      }
                     >
                       Open project <ArrowUpRight className="ml-2 h-4 w-4" />
-                    </a>
+                    </Link>
                   </Button>
                 ) : null}
               </DialogFooter>
@@ -1004,27 +1016,20 @@ export default function CommunityGallery({
 
         {projects.length && isCurated
           ? CURATED_SECTIONS.map((section) => {
-              const sectionProjects = projects
-                .filter((project) => project.category === section.category)
-                .slice(0, 3)
+              const sectionProjects = projects.filter(
+                (project) => project.category === section.category,
+              )
               if (!sectionProjects.length) return null
 
               return (
                 <section key={section.category} className="pb-12 pt-[38px]">
-                  <div className="mb-5 flex flex-wrap items-end justify-between gap-5">
+                  <div className="mb-5">
                     <div>
                       <h2 className="text-2xl font-bold">{section.category}</h2>
                       <p className="mt-1 text-[14.5px] text-muted-foreground">
                         {section.blurb}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setCategory(section.category)}
-                      className="text-sm font-semibold text-brand"
-                    >
-                      Browse all {section.category.toLowerCase()} ›
-                    </button>
                   </div>
                   <div
                     className="grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-[26px]"

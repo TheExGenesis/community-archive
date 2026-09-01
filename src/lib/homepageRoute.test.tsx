@@ -27,7 +27,6 @@ jest.mock('@/lib/portal/data', () => ({ getPortalData: jest.fn() }))
 jest.mock('@/components/home/HomepagePeople', () => ({
   __esModule: true,
   default: () => <div>homepage people</div>,
-  HomepagePeopleFallback: () => <div>homepage people fallback</div>,
 }))
 
 const getIsMemberMock = getIsMember as jest.MockedFunction<typeof getIsMember>
@@ -46,6 +45,16 @@ describe('Homepage OAuth actions', () => {
 
   it('renders at request time so portal fallback data is not frozen at build time', () => {
     expect(homepageRenderingMode).toBe('force-dynamic')
+  })
+
+  it('returns the homepage shell without waiting for portal analytics', async () => {
+    getPortalDataMock.mockReturnValue(new Promise(() => undefined))
+
+    const page = await Homepage({ searchParams: {} })
+    const markup = renderToStaticMarkup(page)
+
+    expect(markup).toContain('homepage people')
+    expect(getPortalDataMock).toHaveBeenCalledTimes(1)
   })
 
   it('keeps an authenticated OAuth return on the opt-in completion surface', async () => {

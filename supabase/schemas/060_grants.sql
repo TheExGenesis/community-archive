@@ -115,3 +115,27 @@ GRANT SELECT ON TABLE "public"."community_project_likes" TO "anon", "authenticat
 REVOKE ALL PRIVILEGES ON TABLE "public"."community_project_comments" FROM "anon", "authenticated";
 GRANT ALL PRIVILEGES ON TABLE "public"."community_project_comments" TO "service_role";
 GRANT SELECT ON TABLE "public"."community_project_comments" TO "anon", "authenticated";
+
+
+REVOKE ALL ON FUNCTION private.community_archive_monitoring_membership()
+  FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION private.community_archive_monitoring_activity_day(integer)
+  FROM PUBLIC, anon, authenticated, service_role;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_roles WHERE rolname = 'archive_metrics_exporter'
+  ) THEN
+    REVOKE SELECT ON public.optin, public.user_action_log
+      FROM archive_metrics_exporter;
+    GRANT USAGE ON SCHEMA private TO archive_metrics_exporter;
+    GRANT EXECUTE
+      ON FUNCTION private.community_archive_monitoring_membership()
+      TO archive_metrics_exporter;
+    GRANT EXECUTE
+      ON FUNCTION private.community_archive_monitoring_activity_day(integer)
+      TO archive_metrics_exporter;
+  END IF;
+END;
+$$;

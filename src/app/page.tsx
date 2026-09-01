@@ -1,8 +1,5 @@
-import { Suspense } from 'react'
 import ClassicHomepage from '@/components/home/ClassicHomepage'
-import HomepagePeople, {
-  HomepagePeopleFallback,
-} from '@/components/home/HomepagePeople'
+import HomepagePeople from '@/components/home/HomepagePeople'
 import { hasPendingOptInAction } from '@/lib/homepageAccess'
 import { getIsMember } from '@/lib/portal/auth'
 import { getPortalData } from '@/lib/portal/data'
@@ -24,17 +21,18 @@ interface HomepageProps {
 }
 
 export default async function Homepage({ searchParams }: HomepageProps = {}) {
-  const [isMember, data] = await Promise.all([getIsMember(), getPortalData()])
+  // Start the heavier portal request immediately, but do not hold the hero or
+  // curated people behind it. ClassicHomepage streams the data-dependent
+  // regions through their own Suspense boundaries.
+  const data = getPortalData()
+  const isMember = await getIsMember()
+
   return (
     <ClassicHomepage
       data={data}
       isMember={isMember}
       showCta={!isMember || hasPendingOptInAction(searchParams?.action)}
-      homepagePeople={
-        <Suspense fallback={<HomepagePeopleFallback />}>
-          <HomepagePeople />
-        </Suspense>
-      }
+      homepagePeople={<HomepagePeople />}
     />
   )
 }

@@ -242,43 +242,6 @@ export type Database = {
           },
         ]
       }
-      conversations: {
-        Row: {
-          conversation_id: string | null
-          tweet_id: string
-        }
-        Insert: {
-          conversation_id?: string | null
-          tweet_id: string
-        }
-        Update: {
-          conversation_id?: string | null
-          tweet_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversations_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "enriched_tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "conversations_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "tweets"
-            referencedColumns: ["tweet_id"]
-          },
-          {
-            foreignKeyName: "conversations_tweet_id_fkey"
-            columns: ["tweet_id"]
-            isOneToOne: true
-            referencedRelation: "tweets_w_conversation_id"
-            referencedColumns: ["tweet_id"]
-          },
-        ]
-      }
       community_project_comments: {
         Row: {
           content: string
@@ -417,6 +380,43 @@ export type Database = {
           tags?: string[]
         }
         Relationships: []
+      }
+      conversations: {
+        Row: {
+          conversation_id: string | null
+          tweet_id: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          tweet_id: string
+        }
+        Update: {
+          conversation_id?: string | null
+          tweet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_tweet_id_fkey"
+            columns: ["tweet_id"]
+            isOneToOne: true
+            referencedRelation: "enriched_tweets"
+            referencedColumns: ["tweet_id"]
+          },
+          {
+            foreignKeyName: "conversations_tweet_id_fkey"
+            columns: ["tweet_id"]
+            isOneToOne: true
+            referencedRelation: "tweets"
+            referencedColumns: ["tweet_id"]
+          },
+          {
+            foreignKeyName: "conversations_tweet_id_fkey"
+            columns: ["tweet_id"]
+            isOneToOne: true
+            referencedRelation: "tweets_w_conversation_id"
+            referencedColumns: ["tweet_id"]
+          },
+        ]
       }
       digest_editions: {
         Row: {
@@ -2349,6 +2349,18 @@ export type Database = {
           media: Json
         }[]
       }
+      search_user_suggestions: {
+        Args: {
+          search_text: string
+          result_limit?: number
+        }
+        Returns: {
+          account_id: string
+          username: string
+          account_display_name: string
+          num_followers: number
+        }[]
+      }
       set_limit: {
         Args: {
           "": number
@@ -2502,3 +2514,4 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+

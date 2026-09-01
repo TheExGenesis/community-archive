@@ -56,9 +56,6 @@ export default function MobileNavigation({ items }: { items: NavItem[] }) {
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'cursor-pointer py-2.5',
-                  item.tone === 'muted'
-                    ? 'bg-muted/70 text-muted-foreground focus:bg-muted focus:text-foreground'
-                    : '',
                   isActive ? 'bg-muted font-medium' : '',
                 )}
               >

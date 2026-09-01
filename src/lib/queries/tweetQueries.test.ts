@@ -111,7 +111,7 @@ describe('retweet filtering', () => {
     expect(result.tweets.map((tweet) => tweet.tweet_id)).toEqual(['original'])
   })
 
-  it('tops up filtered ClickHouse pages with original tweets', async () => {
+  it('requests one server-filtered ClickHouse page for retweet exclusion', async () => {
     process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH = 'true'
     const clickHouseTweet = (id: string, fullText: string) => ({
       tweet_id: id,
@@ -127,20 +127,11 @@ describe('retweet filtering', () => {
       },
       media: [],
     })
-    mockClickHouseSearch
-      .mockResolvedValueOnce([
-        ...Array.from({ length: 35 }, (_, index) =>
-          clickHouseTweet(`rt-${index}`, `RT @alice: result ${index}`),
-        ),
-        ...Array.from({ length: 15 }, (_, index) =>
-          clickHouseTweet(`original-${index}`, `Original result ${index}`),
-        ),
-      ])
-      .mockResolvedValueOnce(
-        Array.from({ length: 20 }, (_, index) =>
-          clickHouseTweet(`more-${index}`, `More original ${index}`),
-        ),
-      )
+    mockClickHouseSearch.mockResolvedValueOnce(
+      Array.from({ length: 20 }, (_, index) =>
+        clickHouseTweet(`original-${index}`, `Original result ${index}`),
+      ),
+    )
 
     const result = await fetchTweets(
       buildMockSupabase(),
@@ -153,7 +144,12 @@ describe('retweet filtering', () => {
       20,
     )
 
-    expect(mockClickHouseSearch).toHaveBeenCalledTimes(2)
+    expect(mockClickHouseSearch).toHaveBeenCalledTimes(1)
+    expect(mockClickHouseSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ excludeRetweets: true }),
+      1,
+      20,
+    )
     expect(result.tweets).toHaveLength(20)
     expect(
       result.tweets.every((tweet) => !isRetweetText(tweet.full_text)),

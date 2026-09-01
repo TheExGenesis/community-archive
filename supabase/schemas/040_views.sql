@@ -123,6 +123,18 @@ WITH archived_members AS (
         OR lower(o.username) = lower(a.username)
       )
   ) oi ON true
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.optin blocked
+    WHERE blocked.explicit_optout IS TRUE
+      AND blocked.twitter_user_id = a.account_id
+  )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.optin blocked
+      WHERE blocked.explicit_optout IS TRUE
+        AND lower(blocked.username) = lower(a.username)
+    )
 ),
 opted_in_candidates AS (
   SELECT
@@ -157,6 +169,20 @@ opted_in_candidates AS (
     LIMIT 1
   ) p ON true
   WHERE o.opted_in = true
+    AND o.explicit_optout IS NOT TRUE
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.optin blocked
+      WHERE blocked.explicit_optout IS TRUE
+        AND o.twitter_user_id IS NOT NULL
+        AND blocked.twitter_user_id = o.twitter_user_id
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.optin blocked
+      WHERE blocked.explicit_optout IS TRUE
+        AND lower(blocked.username) = lower(o.username)
+    )
     AND NOT EXISTS (
       SELECT 1
       FROM archived_members archived

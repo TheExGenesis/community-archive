@@ -62,36 +62,164 @@ export const fetchUsers = async (
   return page
 }
 
-export const fetchUserSuggestions = async (
-  supabase: SupabaseClient,
-  fragment: string,
-  limit = 6,
-): Promise<UserSuggestion[]> => {
+const normalizeSuggestionFragment = (fragment: string) => {
   const normalizedFragment = fragment
     .trim()
     .replace(/^@/, '')
     .toLocaleLowerCase()
-  if (!/^[a-z0-9_]{2,15}$/.test(normalizedFragment)) return []
 
-  const escapedFragment = normalizedFragment.replace(/[\\%_]/g, '\\$&')
+  return /^[a-z0-9_]{2,15}$/.test(normalizedFragment)
+    ? normalizedFragment
+    : null
+}
+
+export const fetchMemberSuggestions = async (
+  fragment: string,
+  limit = 6,
+  fetchImpl: typeof fetch = fetch,
+): Promise<UserSuggestion[]> => {
+  const normalizedFragment = normalizeSuggestionFragment(fragment)
+  if (!normalizedFragment) return []
+
+  const page = await fetchUsers(
+    {
+      limit: Math.max(limit * 5, 30),
+      sortBy: 'username',
+      sortOrder: 'asc',
+      search: normalizedFragment,
+    },
+    fetchImpl,
+  )
+
+  return rankUserSuggestions(
+    page.users
+      .filter((user) => {
+        const username = user.username.toLocaleLowerCase()
+        const displayName = user.account_display_name.toLocaleLowerCase()
+        return (
+          username.includes(normalizedFragment) ||
+          displayName.includes(normalizedFragment)
+        )
+      })
+      .map(
+        ({
+          account_id,
+          directory_id,
+          username,
+          account_display_name,
+          avatar_media_url,
+          num_followers,
+        }) => ({
+          account_id,
+          directory_id,
+          username,
+          account_display_name,
+          avatar_media_url,
+          num_followers,
+        }),
+      ),
+    normalizedFragment,
+    limit,
+  )
+}
+
+export const fetchMemberDirectorySuggestions = async (
+  supabase: SupabaseClient,
+  fragment: string,
+  limit = 6,
+): Promise<UserSuggestion[]> => {
+  const normalizedFragment = normalizeSuggestionFragment(fragment)
+  if (!normalizedFragment) return []
+
   const { data, error } = await supabase
     .schema('public')
     .from('user_directory')
     .select(
-      'directory_id, username, account_display_name, avatar_media_url, num_followers',
+      'account_id, directory_id, username, account_display_name, avatar_media_url, num_followers',
     )
-    .ilike('username', `%${escapedFragment}%`)
-    .order('num_followers', { ascending: false, nullsFirst: false })
+    .or(buildDirectorySearchFilter(normalizedFragment))
+    .order('username', { ascending: true })
     .limit(Math.max(limit * 5, 30))
 
   if (error) throw error
 
   return rankUserSuggestions(
-    (data as UserSuggestion[]) || [],
+    (data || []).map(
+      ({
+        account_id,
+        directory_id,
+        username,
+        account_display_name,
+        avatar_media_url,
+        num_followers,
+      }) => ({
+        account_id,
+        directory_id,
+        username,
+        account_display_name,
+        avatar_media_url,
+        num_followers,
+      }),
+    ),
     normalizedFragment,
     limit,
   )
 }
+
+export const fetchAccountSuggestions = async (
+  supabase: SupabaseClient,
+  fragment: string,
+  limit = 6,
+): Promise<UserSuggestion[]> => {
+  const normalizedFragment = normalizeSuggestionFragment(fragment)
+  if (!normalizedFragment) return []
+
+  const { data, error } = await supabase
+    .schema('public')
+    .rpc('search_user_suggestions', {
+      search_text: normalizedFragment,
+      result_limit: Math.max(limit * 5, 30),
+    })
+
+  if (error) {
+    // Keep previews usable until the matching migration reaches their DB.
+    const escapedFragment = normalizedFragment.replace(/[\\%_]/g, '\\$&')
+    const fallback = await supabase
+      .schema('public')
+      .from('all_account')
+      .select('account_id, username, account_display_name, num_followers')
+      .ilike('username', `${escapedFragment}%`)
+      .order('username', { ascending: true })
+      .limit(Math.max(limit * 5, 30))
+
+    if (fallback.error) throw error
+    return rankUserSuggestions(
+      (fallback.data || []).map(mapAccountSuggestion),
+      normalizedFragment,
+      limit,
+    )
+  }
+
+  return rankUserSuggestions(
+    (data || []).map(mapAccountSuggestion),
+    normalizedFragment,
+    limit,
+  )
+}
+
+const mapAccountSuggestion = (user: {
+  account_id: string
+  username: string
+  account_display_name: string
+  num_followers: number | null
+}): UserSuggestion => ({
+  account_id: user.account_id,
+  directory_id: `account:${user.account_id}`,
+  username: user.username,
+  account_display_name: user.account_display_name,
+  avatar_media_url: null,
+  num_followers: user.num_followers,
+})
 
 export const getUserData = async (
   supabase: SupabaseClient,

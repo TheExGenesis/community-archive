@@ -25,7 +25,7 @@ export interface CommunityProject {
   category: CommunityProjectCategory
   tags: string[]
   projectUrl?: string
-  sourceTweetId: string
+  sourceTweetId?: string
   sourceUrl?: string
   image?: string
   coverClass: string
@@ -37,10 +37,45 @@ export interface CommunityProject {
 
 /**
  * Curated community-made projects verified against the public Community
- * Archive thread rooted at tweet 1961022793023119441. First-party Community
- * Archive tools and fictional prototype entries are intentionally excluded.
+ * Archive thread rooted at tweet 1961022793023119441, plus the explicitly
+ * requested first-party Conversation Map. Never fabricate a launch post.
  */
 export const COMMUNITY_PROJECTS: CommunityProject[] = [
+  {
+    slug: 'conversation-map',
+    name: 'Conversation Map',
+    creator: 'Community Archive',
+    summary: 'Explore a year of conversations, one memorable post at a time.',
+    description:
+      'A zoomable map of the most-quoted community posts each year. Scroll to uncover more labels, pan through time, and hover to read the original posts and images.',
+    archiveUse:
+      'Loads up to 200 member-authored posts per year from the archive’s current banger ranking. Height shows community quotes, with source links to Community Archive tweet pages.',
+    category: 'Experiments',
+    tags: ['Timeline', 'Conversations', 'Visualization'],
+    projectUrl: '/conversation-map',
+    coverClass: 'from-[#d7e4ef] via-[#8bd2ee] to-[#1e9bcd]',
+    featured: true,
+    publishedAt: '2026-08-30',
+  },
+  {
+    slug: 'bangers-page',
+    name: 'Bangers.page',
+    creator: 'Sam Clarke',
+    summary:
+      'Browse high-signal posts through a community-made thematic index.',
+    description:
+      'A third-party Community Archive build that organizes standout posts with high-quality thematic tags for a faster way into the corpus.',
+    archiveUse:
+      'Groups standout archived posts into thematic collections that can be browsed without writing a search query.',
+    category: 'Tools',
+    tags: ['Themes', 'Discovery', 'Curated browsing'],
+    projectUrl: 'https://bangers.page/',
+    sourceTweetId: '2089848291416850870',
+    image: '/images/community/bangers-page.jpg',
+    coverClass: 'from-[#f1eee6] via-[#d7e4ef] to-[#75c9eb]',
+    featured: true,
+    publishedAt: '2026-08-18',
+  },
   {
     slug: 'tweet-harvest',
     name: 'Tweet Harvest',
@@ -98,6 +133,25 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     publishedAt: '2025-08-28',
   },
   {
+    slug: 'vector-search',
+    name: 'Semantic Search',
+    creator: 'Corbin',
+    creatorHandle: 'corbindreams',
+    summary: 'Search favorite accounts by meaning instead of exact wording.',
+    description:
+      'A focused vector-search interface for finding memorable posts from a hand-picked set of favorite accounts when native keyword search falls short.',
+    archiveUse:
+      'Indexes posts from selected archived accounts as vectors so related ideas can be found without exact keyword matches.',
+    category: 'Tools',
+    tags: ['Vector search', 'Reference', 'Favorite accounts'],
+    projectUrl: 'https://tweets-search-811136861157.us-central1.run.app',
+    sourceTweetId: '2087250967527870861',
+    image: '/images/community/tweet-semantic-search-cover.png',
+    coverClass: 'from-[#17171a] via-[#10516b] to-[#25aadf]',
+    featured: false,
+    publishedAt: '2026-08-11',
+  },
+  {
     slug: 'malcolm-ocean-links',
     name: "Malcolm Ocean's Links",
     creator: 'Malcolm Ocean',
@@ -117,23 +171,43 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     publishedAt: '2026-08-11',
   },
   {
-    slug: 'vector-search',
-    name: 'Vector Search',
-    creator: 'Corbin',
-    creatorHandle: 'corbindreams',
-    summary: 'Search favorite accounts by meaning instead of exact wording.',
+    slug: 'distill',
+    name: 'Distill',
+    creator: '@selkrei',
+    creatorHandle: 'selkrei',
+    summary: 'Search Twitter exports and Community Archive data in seconds.',
     description:
-      'A focused vector-search interface for finding memorable posts from a hand-picked set of favorite accounts when native keyword search falls short.',
+      'A fast search workspace for exploring Twitter exports and Community Archive data, with focused results and cited source posts.',
     archiveUse:
-      'Indexes posts from selected archived accounts as vectors so related ideas can be found without exact keyword matches.',
+      'Loads participating accounts from Community Archive and searches their archived posts to answer questions with links back to the source posts.',
     category: 'Tools',
-    tags: ['Vector search', 'Reference', 'Favorite accounts'],
-    projectUrl: 'https://tweets-search-811136861157.us-central1.run.app',
-    sourceTweetId: '2087250967527870861',
-    image: '/images/community/tweet-semantic-search-cover.png',
-    coverClass: 'from-[#17171a] via-[#10516b] to-[#25aadf]',
+    tags: ['Search', 'Twitter exports', 'Citations'],
+    projectUrl: 'https://distill.org/',
+    sourceTweetId: '2043785461877850421',
+    image: '/images/community/distill-cover.jpg',
+    coverClass: 'from-[#f7f8fb] via-[#d8e8ff] to-[#6e81f4]',
     featured: false,
-    publishedAt: '2026-08-11',
+    publishedAt: '2026-04-13',
+  },
+  {
+    slug: 'tweetscope',
+    name: 'Tweetscope',
+    creator: 'Kifah',
+    creatorHandle: 'maskys_',
+    summary: 'Explore an account through visual maps, topics, and search.',
+    description:
+      'A visual Twitter account explorer that groups posts into topics and threads, making it easier to find themes, filter an archive, and search by text or meaning.',
+    archiveUse:
+      'Uses Community Archive tweets to build topic and thread clusters, interactive maps, filters, and text and semantic search for individual accounts.',
+    category: 'Tools',
+    tags: ['Visual maps', 'Topic discovery', 'Semantic search'],
+    projectUrl: 'https://tweetscope.maskys.com/',
+    sourceTweetId: '2032969834670207435',
+    sourceUrl: 'https://x.com/maskys_/status/2032969834670207435',
+    image: '/images/community/tweetscope-cover.png',
+    coverClass: 'from-[#0f1420] via-[#13243a] to-[#327bb2]',
+    featured: false,
+    publishedAt: '2026-03-14',
   },
   {
     slug: 'community-archive-radio',
@@ -153,25 +227,6 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     coverClass: 'from-[#352b70] via-[#7956d8] to-[#8bd2ee]',
     featured: false,
     publishedAt: '2026-08-16',
-  },
-  {
-    slug: 'bangers-page',
-    name: 'Bangers.page',
-    creator: 'Sam Clarke',
-    summary:
-      'Browse high-signal posts through a community-made thematic index.',
-    description:
-      'A third-party Community Archive build that organizes standout posts with high-quality thematic tags for a faster way into the corpus.',
-    archiveUse:
-      'Groups standout archived posts into thematic collections that can be browsed without writing a search query.',
-    category: 'Tools',
-    tags: ['Themes', 'Discovery', 'Curated browsing'],
-    projectUrl: 'https://bangers.page/',
-    sourceTweetId: '2089848291416850870',
-    image: '/images/community/bangers-page.jpg',
-    coverClass: 'from-[#f1eee6] via-[#d7e4ef] to-[#75c9eb]',
-    featured: false,
-    publishedAt: '2026-08-18',
   },
   {
     slug: 'followle',

@@ -313,8 +313,21 @@ export async function middleware(request: NextRequest) {
   const isServerAction =
     request.method === 'POST' && request.headers.has('next-action')
 
+  // Machine-to-machine routes that carry their own credentials: cron routes
+  // require the CRON_SECRET bearer token (Vercel's cron caller sends a short
+  // non-browser UA), and one-click unsubscribe POSTs come from mailbox
+  // provider servers holding a per-subscription token.
+  const machineAuthRoute =
+    pathname.startsWith('/api/cron/') ||
+    pathname === '/api/digest/email/unsubscribe'
+
   // ── Stage 1: Bot User-Agent Detection (all routes) ──────────────────────
-  if (!previewBot && !publicDocumentationRoute && !monitoringHealthRoute) {
+  if (
+    !previewBot &&
+    !publicDocumentationRoute &&
+    !monitoringHealthRoute &&
+    !machineAuthRoute
+  ) {
     // Block empty or missing UA
     if (!ua || ua.trim().length === 0) {
       return blocked(403, 'Forbidden')

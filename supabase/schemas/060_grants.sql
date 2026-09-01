@@ -102,6 +102,11 @@ GRANT ALL PRIVILEGES ON TABLE "public"."digest_editions" TO "service_role";
 GRANT USAGE, SELECT ON SEQUENCE "public"."digest_prompt_versions_version_seq" TO "service_role";
 GRANT USAGE, SELECT ON SEQUENCE "public"."digest_editions_issue_number_seq" TO "service_role";
 GRANT SELECT ON TABLE "public"."digest_editions" TO "anon", "authenticated";
+-- Email subscriptions hold addresses and capability tokens: service-role only.
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_email_subscriptions" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_email_sends" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_email_subscriptions" TO "service_role";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_email_sends" TO "service_role";
 
 -- Community Gallery: public clients can read only rows allowed by RLS. All
 -- submissions and approvals are performed by authenticated server code after

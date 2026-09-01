@@ -12,6 +12,7 @@ export type SendEmailInput = {
   text?: string
   replyTo?: string
   from?: string
+  headers?: Record<string, string>
 }
 
 export type SendEmailResult =
@@ -30,7 +31,7 @@ function getResendClient(): Resend {
 }
 
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
-  const { to, subject, html, text, replyTo, from = DEFAULT_FROM } = input
+  const { to, subject, html, text, replyTo, headers, from = DEFAULT_FROM } = input
 
   let resend: Resend
   try {
@@ -46,6 +47,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     html,
     text,
     replyTo,
+    headers,
   })
 
   if (error) {

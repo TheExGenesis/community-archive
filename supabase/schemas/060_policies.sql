@@ -3,6 +3,9 @@
 ALTER TABLE "public"."digest_prompt_versions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_runs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_editions" ENABLE ROW LEVEL SECURITY;
+-- No policies on the email tables: service-role only.
+ALTER TABLE "public"."digest_email_subscriptions" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."digest_email_sends" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."community_projects" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Published digest editions are publicly readable"

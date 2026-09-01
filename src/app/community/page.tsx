@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import CommunityGallery from '@/components/community/CommunityGallery'
-import { loadPublishedCommunityProjects } from '@/lib/communityProjectDatabase'
+import {
+  loadCommunityProjectLikesForUser,
+  loadPublishedCommunityProjects,
+} from '@/lib/communityProjectDatabase'
 import { getCurrentUser } from '@/lib/portal/auth'
 
 export const metadata: Metadata = {
@@ -35,10 +38,13 @@ export default async function CommunityPage() {
     loadPublishedCommunityProjects(),
   ])
 
+  const likedProjectIds = await loadCommunityProjectLikesForUser(user?.id)
+
   return (
     <CommunityGallery
       isSignedIn={Boolean(user)}
       publishedProjects={publishedProjects}
+      likedProjectIds={likedProjectIds}
     />
   )
 }

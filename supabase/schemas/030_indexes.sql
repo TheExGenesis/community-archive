@@ -138,6 +138,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS "digest_editions_one_published_per_date_idx"
 CREATE INDEX IF NOT EXISTS "digest_editions_public_archive_idx"
   ON "public"."digest_editions" ("digest_date" DESC, "published_at" DESC)
   WHERE "status" = 'published';
+
+CREATE INDEX IF NOT EXISTS "digest_edition_likes_edition_idx"
+  ON "public"."digest_edition_likes" ("edition_id");
+
+CREATE INDEX IF NOT EXISTS "digest_edition_comments_edition_created_idx"
+  ON "public"."digest_edition_comments" ("edition_id", "created_at");
 CREATE INDEX IF NOT EXISTS "policy_storage_objects_account_ids_idx"
 ON "private"."policy_storage_objects" USING "gin" ("account_ids");
 
@@ -149,3 +155,7 @@ ON "private"."archive_clickhouse_delivery" ("next_attempt_at", "archive_upload_i
 WHERE ("delivery_state" = 'pending'::"text");
 CREATE INDEX IF NOT EXISTS "community_projects_status_submitted_at_idx"
   ON "public"."community_projects" ("status", "submitted_at" DESC);
+CREATE INDEX IF NOT EXISTS "community_project_likes_project_id_idx"
+  ON "public"."community_project_likes" ("project_id");
+CREATE INDEX IF NOT EXISTS "community_project_comments_project_id_created_at_idx"
+  ON "public"."community_project_comments" ("project_id", "created_at");

@@ -447,6 +447,36 @@ CREATE TABLE IF NOT EXISTS "public"."digest_email_sends" (
 );
 ALTER TABLE "public"."digest_email_sends" OWNER TO "postgres";
 
+-- Reader appreciation for a published edition. One like per user per edition;
+-- writes go through the API's service-role client after session verification.
+CREATE TABLE IF NOT EXISTS "public"."digest_edition_likes" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "edition_id" uuid NOT NULL REFERENCES "public"."digest_editions"("id") ON DELETE CASCADE,
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "digest_edition_likes_edition_user_key" UNIQUE ("edition_id", "user_id")
+);
+ALTER TABLE "public"."digest_edition_likes" OWNER TO "postgres";
+
+-- Reader comments on a published edition. The display identity is captured at
+-- write time so rendering never joins auth.users; writes go through the API's
+-- service-role client after session verification. Deletes are soft so a thread
+-- keeps its shape.
+CREATE TABLE IF NOT EXISTS "public"."digest_edition_comments" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "edition_id" uuid NOT NULL REFERENCES "public"."digest_editions"("id") ON DELETE CASCADE,
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "content" text NOT NULL,
+    "username" text,
+    "display_name" text,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "updated_at" timestamptz NOT NULL DEFAULT now(),
+    "deleted_at" timestamptz,
+    CONSTRAINT "digest_edition_comments_content_length_check"
+      CHECK (char_length("content") BETWEEN 1 AND 2000)
+);
+ALTER TABLE "public"."digest_edition_comments" OWNER TO "postgres";
+
 -- Moderated Community Gallery submissions. Signed-in users submit through the
 -- server; only published rows are exposed to public clients. Covers remain in
 -- a private Storage bucket and are served through a status-gated route.
@@ -487,6 +517,36 @@ CREATE TABLE IF NOT EXISTS "public"."community_projects" (
     )
 );
 ALTER TABLE "public"."community_projects" OWNER TO "postgres";
+
+-- Community Gallery likes. One row per (project, signed-in user); writes are
+-- performed by server code after the session identity gate, and counts are
+-- readable for any published project.
+CREATE TABLE IF NOT EXISTS "public"."community_project_likes" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "project_id" uuid NOT NULL REFERENCES public.community_projects(id) ON DELETE CASCADE,
+    "user_id" uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "community_project_likes_project_user_key" UNIQUE ("project_id", "user_id")
+);
+ALTER TABLE "public"."community_project_likes" OWNER TO "postgres";
+
+-- Community Gallery comments. Soft-deleted so a reader can retract a comment
+-- without breaking the thread. The commenter's Twitter username and display
+-- name are persisted at write time from the trusted session identity, so the
+-- public list never needs to join auth.users.
+CREATE TABLE IF NOT EXISTS "public"."community_project_comments" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "project_id" uuid NOT NULL REFERENCES public.community_projects(id) ON DELETE CASCADE,
+    "user_id" uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    "content" text NOT NULL,
+    "username" text,
+    "display_name" text,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "deleted_at" timestamptz,
+    CONSTRAINT "community_project_comments_content_length"
+      CHECK (char_length("content") >= 1 AND char_length("content") <= 2000)
+);
+ALTER TABLE "public"."community_project_comments" OWNER TO "postgres";
 
 -- Public profile preferences. PostgreSQL remains authoritative for this
 -- owner-controlled policy state; analytical stores only consume the result.

@@ -17,8 +17,9 @@ const pillClasses =
   'rounded-full bg-brand px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 dark:text-brand-foreground dark:focus-visible:ring-offset-[#111114]'
 
 function SubscribeControl() {
+  // Nullable outside the app router (e.g. bare jsdom renders).
   const searchParams = useSearchParams()
-  const redirectMessage = REDIRECT_MESSAGES[searchParams.get('email') ?? '']
+  const redirectMessage = REDIRECT_MESSAGES[searchParams?.get('email') ?? '']
   const [phase, setPhase] = useState<Phase>('idle')
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)

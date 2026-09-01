@@ -46,7 +46,7 @@ describe('DigestEditionView', () => {
     expect(screen.queryByText('The Daily Digest')).not.toBeInTheDocument()
   })
 
-  test('links to the Community Archive Substack subscription page', () => {
+  test('offers the inline email subscribe control', () => {
     render(
       <DigestEditionView
         edition={AUGUST_11_MOCK_DIGEST}
@@ -54,19 +54,14 @@ describe('DigestEditionView', () => {
       />,
     )
 
-    const subscribeLink = screen.getByRole('link', {
-      name: 'Subscribe to Community Archive on Substack',
-    })
-
-    expect(subscribeLink).toHaveAttribute(
-      'href',
-      'https://communityarchive.substack.com/subscribe',
-    )
-    expect(subscribeLink).toHaveAttribute('target', '_blank')
-    expect(subscribeLink).not.toHaveAttribute(
-      'href',
-      expect.stringContaining('xiqo.substack.com'),
-    )
+    expect(
+      screen.getByRole('button', { name: 'Subscribe' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', {
+        name: 'Subscribe to Community Archive on Substack',
+      }),
+    ).not.toBeInTheDocument()
   })
 
   test('shows the editorial lab shortcut only to admins', () => {

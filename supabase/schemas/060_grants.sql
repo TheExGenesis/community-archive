@@ -108,12 +108,27 @@ REVOKE ALL PRIVILEGES ON TABLE "public"."digest_email_sends" FROM "anon", "authe
 GRANT ALL PRIVILEGES ON TABLE "public"."digest_email_subscriptions" TO "service_role";
 GRANT ALL PRIVILEGES ON TABLE "public"."digest_email_sends" TO "service_role";
 
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_edition_likes" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_edition_likes" TO "service_role";
+GRANT SELECT ON TABLE "public"."digest_edition_likes" TO "anon", "authenticated";
+
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" TO "service_role";
+GRANT SELECT ON TABLE "public"."digest_edition_comments" TO "anon", "authenticated";
+
 -- Community Gallery: public clients can read only rows allowed by RLS. All
 -- submissions and approvals are performed by authenticated server code after
 -- the appropriate identity gate.
 REVOKE ALL PRIVILEGES ON TABLE "public"."community_projects" FROM "anon", "authenticated";
 GRANT ALL PRIVILEGES ON TABLE "public"."community_projects" TO "service_role";
 GRANT SELECT ON TABLE "public"."community_projects" TO "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."community_project_likes" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."community_project_likes" TO "service_role";
+GRANT SELECT ON TABLE "public"."community_project_likes" TO "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."community_project_comments" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."community_project_comments" TO "service_role";
+GRANT SELECT ON TABLE "public"."community_project_comments" TO "anon", "authenticated";
+
 
 REVOKE ALL ON FUNCTION private.community_archive_monitoring_membership()
   FROM PUBLIC, anon, authenticated, service_role;

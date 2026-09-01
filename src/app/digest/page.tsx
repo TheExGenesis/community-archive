@@ -2,8 +2,14 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { checkIsAdmin } from '@/app/admin/data'
 import { DigestEditionView } from '@/components/digest/DigestEditionView'
-import { getPublishedDigest, listPublishedDigestDays } from '@/lib/digest/data'
+import {
+  getDigestCommentCount,
+  getDigestLikeState,
+  getPublishedDigest,
+  listPublishedDigestDays,
+} from '@/lib/digest/data'
 import { getDigestMetadata } from '@/lib/digest/metadata'
+import { getCurrentUser } from '@/lib/portal/auth'
 
 export const revalidate = 300
 
@@ -18,11 +24,20 @@ export default async function DigestPage() {
     checkIsAdmin(),
   ])
   if (edition) {
+    const [likes, user, commentCount] = await Promise.all([
+      getDigestLikeState(edition),
+      getCurrentUser(),
+      getDigestCommentCount(edition),
+    ])
     return (
       <DigestEditionView
         edition={edition}
         archive={archive}
         isAdmin={isAdmin}
+        likeCount={likes.count}
+        likedByViewer={likes.likedByViewer}
+        isSignedIn={Boolean(user)}
+        commentCount={commentCount}
       />
     )
   }

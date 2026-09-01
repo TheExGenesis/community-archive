@@ -2,6 +2,8 @@ import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
 import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
 import { DigestJingleButton } from '@/components/digest/DigestJingleButton'
+import { DigestComments } from '@/components/digest/DigestComments'
+import { DigestLikeButton } from '@/components/digest/DigestLikeButton'
 import { DigestMarkdown } from '@/components/digest/DigestMarkdown'
 import { DigestSubscribeButton } from '@/components/digest/DigestSubscribeButton'
 import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
@@ -25,10 +27,18 @@ export function DigestEditionView({
   edition,
   archive,
   isAdmin = false,
+  likeCount = 0,
+  likedByViewer = false,
+  isSignedIn = false,
+  commentCount = 0,
 }: {
   edition: DigestEdition
   archive: DigestCalendarDay[]
   isAdmin?: boolean
+  likeCount?: number
+  likedByViewer?: boolean
+  isSignedIn?: boolean
+  commentCount?: number
 }) {
   const content = edition.content
   const returnTo = `/digest/${edition.digestDate}`
@@ -55,6 +65,14 @@ export function DigestEditionView({
               <div className={sectionLabel}>What Happened Yesterday</div>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
+              {edition.isPreview ? null : (
+                <DigestLikeButton
+                  editionId={edition.id}
+                  initialCount={likeCount}
+                  initialLiked={likedByViewer}
+                  isSignedIn={isSignedIn}
+                />
+              )}
               <DigestSubscribeButton />
               {isAdmin ? (
                 <Link
@@ -283,6 +301,14 @@ export function DigestEditionView({
             ? 'Prototype assembled from a frozen research snapshot. Tweet text and engagement were hydrated for this preview; editorial summaries come from the cluster memo.'
             : 'Curated automatically from the previous 24 hours of archive bangers and reviewed in the editorial lab before publication.'}
         </footer>
+
+        {edition.isPreview ? null : (
+          <DigestComments
+            editionId={edition.id}
+            initialCount={commentCount}
+            isSignedIn={isSignedIn}
+          />
+        )}
       </article>
     </main>
   )

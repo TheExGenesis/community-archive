@@ -388,24 +388,41 @@ function ProjectCover({
 function ProjectCard({
   project,
   onOpen,
+  likeState,
+  onToggleLike,
+  isSignedIn,
 }: {
   project: CommunityProject
   onOpen: () => void
+  likeState?: LikeState
+  onToggleLike: (project: CommunityProject) => void
+  isSignedIn: boolean
 }) {
   return (
-    <div className="min-w-0">
+    <div className="relative min-w-0">
       <button
         type="button"
         onClick={onOpen}
         className="group block w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-4 focus-visible:ring-offset-background"
       >
         <ProjectCover project={project} />
-        <span className="mt-3 flex items-baseline justify-between gap-3">
+        {/* Leave room on the right for the like button layered on top. */}
+        <span
+          className={cn(
+            'mt-3 flex items-baseline justify-between gap-3',
+            likeState && 'pr-14',
+          )}
+        >
           <span className="text-[15.5px] font-bold tracking-[-0.005em]">
             {project.name}
           </span>
         </span>
-        <span className="mt-1 block text-[13.5px] text-muted-foreground">
+        <span
+          className={cn(
+            'mt-1 block text-[13.5px] text-muted-foreground',
+            likeState && 'pr-14',
+          )}
+        >
           by{' '}
           <span className="font-semibold text-foreground">
             {project.creator}
@@ -413,6 +430,16 @@ function ProjectCard({
           · Free
         </span>
       </button>
+      {likeState ? (
+        <div className="absolute bottom-0 right-0">
+          <LikeButton
+            project={project}
+            state={likeState}
+            onToggle={onToggleLike}
+            isSignedIn={isSignedIn}
+          />
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -1040,6 +1067,9 @@ export default function CommunityGallery({
                         key={project.slug}
                         project={project}
                         onOpen={() => setSelectedProject(project)}
+                        likeState={likeStateFor(project)}
+                        onToggleLike={toggleLike}
+                        isSignedIn={isSignedIn}
                       />
                     ))}
                   </div>
@@ -1065,6 +1095,9 @@ export default function CommunityGallery({
                   key={project.slug}
                   project={project}
                   onOpen={() => setSelectedProject(project)}
+                  likeState={likeStateFor(project)}
+                  onToggleLike={toggleLike}
+                  isSignedIn={isSignedIn}
                 />
               ))}
             </div>

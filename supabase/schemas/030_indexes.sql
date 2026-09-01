@@ -117,6 +117,14 @@ CREATE INDEX IF NOT EXISTS "digest_runs_date_created_idx"
 CREATE INDEX IF NOT EXISTS "digest_runs_prompt_version_idx"
   ON "public"."digest_runs" ("prompt_version_id");
 
+-- One subscription per address, case-insensitively.
+CREATE UNIQUE INDEX IF NOT EXISTS "digest_email_subscriptions_email_key"
+  ON "public"."digest_email_subscriptions" (lower("email"));
+
+CREATE INDEX IF NOT EXISTS "digest_email_subscriptions_account_idx"
+  ON "public"."digest_email_subscriptions" ("account_id")
+  WHERE "account_id" IS NOT NULL;
+
 CREATE UNIQUE INDEX IF NOT EXISTS "digest_runs_one_nightly_run_per_date_idx"
   ON "public"."digest_runs" ("digest_date")
   WHERE "created_by" IS NULL

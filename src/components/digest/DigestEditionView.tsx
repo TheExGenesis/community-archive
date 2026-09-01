@@ -5,6 +5,7 @@ import { DigestJingleButton } from '@/components/digest/DigestJingleButton'
 import { DigestComments } from '@/components/digest/DigestComments'
 import { DigestLikeButton } from '@/components/digest/DigestLikeButton'
 import { DigestMarkdown } from '@/components/digest/DigestMarkdown'
+import { DigestSubscribeButton } from '@/components/digest/DigestSubscribeButton'
 import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
 import { buildSearchHref } from '@/lib/searchParams'
 import { MUTED, SERIF } from '@/components/portal/styles'
@@ -72,17 +73,7 @@ export function DigestEditionView({
                   isSignedIn={isSignedIn}
                 />
               )}
-              <PostHogLink
-                href="https://communityarchive.substack.com/subscribe"
-                target="_blank"
-                rel="noreferrer"
-                eventName="digest_action"
-                eventProperties={{ action: 'subscribed', surface: 'subscribe' }}
-                aria-label="Subscribe to Community Archive on Substack"
-                className="rounded-full bg-brand px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 dark:text-brand-foreground dark:focus-visible:ring-offset-[#111114]"
-              >
-                Subscribe
-              </PostHogLink>
+              <DigestSubscribeButton />
               {isAdmin ? (
                 <Link
                   href="/admin/digest"

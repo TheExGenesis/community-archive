@@ -468,6 +468,75 @@ export type Database = {
           },
         ]
       }
+      digest_email_sends: {
+        Row: {
+          edition_id: string
+          message_id: string | null
+          sent_at: string
+          subscription_id: string
+        }
+        Insert: {
+          edition_id: string
+          message_id?: string | null
+          sent_at?: string
+          subscription_id: string
+        }
+        Update: {
+          edition_id?: string
+          message_id?: string | null
+          sent_at?: string
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_email_sends_edition_id_fkey"
+            columns: ["edition_id"]
+            isOneToOne: false
+            referencedRelation: "digest_editions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "digest_email_sends_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "digest_email_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      digest_email_subscriptions: {
+        Row: {
+          account_id: string | null
+          confirmed_at: string | null
+          created_at: string
+          email: string
+          id: string
+          token: string
+          unsubscribed_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          token?: string
+          unsubscribed_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          token?: string
+          unsubscribed_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       digest_prompt_versions: {
         Row: {
           created_at: string

@@ -115,6 +115,7 @@
     "react-markdown": "10.1.0",
     "recharts": "^2.15.1",
     "remark-gfm": "4.0.1",
+    "resend": "^6.25.0",
     "sigma": "3.0.3",
     "supabase": "^1.226.4",
     "tailwind-merge": "^2.6.0",

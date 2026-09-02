@@ -5,6 +5,7 @@ import { archiveChapterHref } from './ArchiveNav'
 import { ProfileArchive } from './ProfileArchive'
 import { ProfileEditButton } from './ProfileEditButton'
 import { ProfileEditingProvider } from './ProfileEditingContext'
+import { configuredSectionsByYear } from '@/lib/metaTwitter/sectionConfig'
 import type { BangerTweet } from '@/lib/metaTwitter/types'
 import { mutateProfileCuration } from '@/app/user/[account_id]/actions'
 
@@ -774,4 +775,185 @@ test('does not start a stale chapter preload over an in-flight active feed', asy
       String(input).includes('offset=0&limit=2&sort=quotes&year=2025'),
     ),
   ).toHaveLength(1)
+})
+
+const CURATED_ACCOUNT_ID = '826134955549790208'
+const curatedSections = configuredSectionsByYear(CURATED_ACCOUNT_ID)!
+
+test('opens a chapter subsection and titles the workspace with its quote', async () => {
+  const user = userEvent.setup()
+  jest.spyOn(global, 'fetch').mockImplementation(() => new Promise(() => {}))
+  const [section] = curatedSections[2025]
+  const [otherSection] = curatedSections[2024]
+
+  renderProfileArchive(
+    <ProfileArchive
+      accountId={CURATED_ACCOUNT_ID}
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      displayName="Alice"
+      sectionsByYear={curatedSections}
+      initialYear={2025}
+      initialPage={{
+        tweets: [banger(1, 2025)],
+        yearCounts: chapters,
+        total: 1,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+
+  // Every chapter lists its sections, open or not.
+  expect(
+    screen.getByRole('link', { name: `${otherSection.title}, 2024` }),
+  ).toBeVisible()
+
+  await user.click(screen.getByRole('link', { name: `${section.title}, 2025` }))
+
+  expect(window.location.pathname + window.location.search).toBe(
+    `/user/alice?chapter=2025&section=${section.slug}`,
+  )
+  expect(screen.getByRole('heading', { name: section.title })).toBeVisible()
+  // One per breakpoint: the compact nav marks the year, the wide nav the
+  // section it lists under that year.
+  expect(screen.getAllByRole('link', { current: 'page' })).toHaveLength(2)
+
+  // A section from another chapter switches chapters with it.
+  await user.click(
+    screen.getByRole('link', { name: `${otherSection.title}, 2024` }),
+  )
+  expect(window.location.pathname + window.location.search).toBe(
+    `/user/alice?chapter=2024&section=${otherSection.slug}`,
+  )
+  expect(
+    screen.getByRole('heading', { name: otherSection.title }),
+  ).toBeVisible()
+
+  // Leaving the chapter drops the section from the URL.
+  await user.click(screen.getByRole('link', { name: '2024 3' }))
+  expect(window.location.pathname + window.location.search).toBe(
+    '/user/alice?chapter=2024',
+  )
+  expect(screen.getByRole('heading', { name: 'Best of 2024' })).toBeVisible()
+})
+
+test('restores a subsection from an initial URL and from browser history', async () => {
+  const user = userEvent.setup()
+  jest.spyOn(global, 'fetch').mockImplementation(() => new Promise(() => {}))
+  const [section] = curatedSections[2025]
+  window.history.replaceState(
+    null,
+    '',
+    `/user/alice?chapter=2025&section=${section.slug}`,
+  )
+
+  renderProfileArchive(
+    <ProfileArchive
+      accountId={CURATED_ACCOUNT_ID}
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      displayName="Alice"
+      sectionsByYear={curatedSections}
+      initialYear={2025}
+      initialSectionSlug={section.slug}
+      initialPage={{
+        tweets: [banger(1, 2025)],
+        yearCounts: chapters,
+        total: 1,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+
+  expect(screen.getByRole('heading', { name: section.title })).toBeVisible()
+
+  await user.click(screen.getByRole('link', { name: '2025 4' }))
+  expect(screen.getByRole('heading', { name: 'Best of 2025' })).toBeVisible()
+
+  act(() => {
+    window.history.back()
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: section.title })).toBeVisible(),
+  )
+})
+
+test('filters a chapter down to the selected section, catch-all included', async () => {
+  const user = userEvent.setup()
+  jest.spyOn(global, 'fetch').mockImplementation(() => new Promise(() => {}))
+  const sections = curatedSections[2025]
+  const [curated] = sections
+  const everythingElse = sections[sections.length - 1]
+  const tweets = [
+    { ...banger(1, 2025), tweet_id: curated.tweetIds[0], full_text: 'curated' },
+    { ...banger(2, 2025), tweet_id: '999', full_text: 'uncurated' },
+  ]
+
+  renderProfileArchive(
+    <ProfileArchive
+      accountId={CURATED_ACCOUNT_ID}
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      displayName="Alice"
+      sectionsByYear={curatedSections}
+      initialYear={2025}
+      initialPage={{
+        tweets,
+        yearCounts: chapters,
+        total: tweets.length,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+
+  // The whole chapter until a section narrows it.
+  expect(screen.getByText('curated')).toBeVisible()
+  expect(screen.getByText('uncurated')).toBeVisible()
+
+  await user.click(screen.getByRole('link', { name: `${curated.title}, 2025` }))
+  expect(screen.getByText('curated')).toBeVisible()
+  expect(screen.queryByText('uncurated')).not.toBeInTheDocument()
+
+  await user.click(
+    screen.getByRole('link', { name: `${everythingElse.title}, 2025` }),
+  )
+  expect(screen.getByText('uncurated')).toBeVisible()
+  expect(screen.queryByText('curated')).not.toBeInTheDocument()
+})
+
+test('shows no sections when none are provided', () => {
+  jest.spyOn(global, 'fetch').mockImplementation(() => new Promise(() => {}))
+
+  renderProfileArchive(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/bob"
+      chapters={chapters}
+      displayName="Bob"
+      initialYear={null}
+      initialPage={{
+        tweets: [banger(1, 2025)],
+        yearCounts: chapters,
+        total: 7,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={initialSidebar}
+    />,
+  )
+
+  // Sectionless chapters stay directly clickable.
+  expect(screen.getAllByRole('link', { name: '2025 4' })).not.toHaveLength(0)
 })

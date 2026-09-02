@@ -1,0 +1,4457 @@
+{
+  "model": "deepseek/deepseek-v4-flash-0731",
+  "accounts": {
+    "905201": {
+      "username": "eshear",
+      "years": {
+        "2023": {
+          "generatedAt": "2026-09-02T01:42:13.931Z",
+          "bangers": 31,
+          "sections": [
+            {
+              "slug": "truth-is-based-on-credible-arguments-pre",
+              "title": "truth is based on credible arguments presented by trustworthy people",
+              "tweetIds": [
+                "1657613630974877696",
+                "1657613625530654720",
+                "1657613629548826627"
+              ]
+            },
+            {
+              "slug": "agency-therapy",
+              "title": "agency therapy",
+              "tweetIds": [
+                "1668064151154085888",
+                "1668057708896088066",
+                "1672839928928141312"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:42:18.989Z",
+          "bangers": 63,
+          "sections": []
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:42:20.218Z",
+          "bangers": 33,
+          "sections": []
+        }
+      }
+    },
+    "2063951": {
+      "username": "tasshinfogleman",
+      "years": {
+        "2019": {
+          "generatedAt": "2026-09-02T01:47:03.957Z",
+          "bangers": 9,
+          "sections": [
+            {
+              "slug": "disfluency-and-the-methods-of-strategy",
+              "title": "Disfluency and the Methods of Strategy",
+              "tweetIds": [
+                "1151210285669203969",
+                "1163280607226552321",
+                "1115962302547877888"
+              ]
+            },
+            {
+              "slug": "we-re-building-a-new-meditation-hall",
+              "title": "We’re building a new meditation hall",
+              "tweetIds": [
+                "1199747610007003136",
+                "1119339540898967552",
+                "1174315163782193152",
+                "1207087383226781696"
+              ]
+            }
+          ]
+        },
+        "2020": {
+          "generatedAt": "2026-09-02T01:46:52.848Z",
+          "bangers": 6,
+          "sections": []
+        },
+        "2021": {
+          "generatedAt": "2026-09-02T01:46:36.402Z",
+          "bangers": 21,
+          "sections": [
+            {
+              "slug": "alexander-technique-and-awareness-with-m",
+              "title": "Alexander Technique and Awareness with Michael Ashcroft",
+              "tweetIds": [
+                "1397373245108666369",
+                "1450501318926376972",
+                "1467985650372661251"
+              ]
+            },
+            {
+              "slug": "may-all-beings-be-happy",
+              "title": "May All Beings Be Happy",
+              "tweetIds": [
+                "1406772885558026242",
+                "1471632287049523204",
+                "1417605396970233857"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:46:29.259Z",
+          "bangers": 28,
+          "sections": []
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:46:17.751Z",
+          "bangers": 31,
+          "sections": [
+            {
+              "slug": "be-cringe-in-2024",
+              "title": "be cringe in 2024",
+              "tweetIds": [
+                "1738963102106898730",
+                "1739347674120245508",
+                "1741493502117114232"
+              ]
+            },
+            {
+              "slug": "what-are-you-a-badass-at",
+              "title": "what are you a badass at",
+              "tweetIds": [
+                "1712873502334755171",
+                "1651328932401037312",
+                "1651332435982819331"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:46:12.818Z",
+          "bangers": 24,
+          "sections": [
+            {
+              "slug": "meet-my-friend-the-magick-pink-button",
+              "title": "meet my friend, the magick pink button",
+              "tweetIds": [
+                "1755748555174633961",
+                "1786898930107548130",
+                "1840130591829668246"
+              ]
+            },
+            {
+              "slug": "what-luxury-might-u-buy-urself-if-u-had",
+              "title": "what luxury might u buy urself if u had a billion dollars",
+              "tweetIds": [
+                "1809917048782287210",
+                "1859600100630143179",
+                "1869948129908269425"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:48:47.306Z",
+          "bangers": 27,
+          "sections": [
+            {
+              "slug": "the-empowerment-department",
+              "title": "The Empowerment Department",
+              "tweetIds": [
+                "1918390472332169687",
+                "1962330836637995264",
+                "1959995498007519475"
+              ]
+            },
+            {
+              "slug": "if-we-re-mutuals",
+              "title": "if we're mutuals",
+              "tweetIds": [
+                "1913439701488353564",
+                "1929027100909949318",
+                "1924650295352570214"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:46:04.187Z",
+          "bangers": 10,
+          "sections": [
+            {
+              "slug": "reach-truth-podcast",
+              "title": "Reach Truth Podcast",
+              "tweetIds": [
+                "2039154924836008139",
+                "2026439557646798983",
+                "2044159181544952171"
+              ]
+            },
+            {
+              "slug": "gift-circles-are-a-fun-and-joyful-way-to",
+              "title": "Gift Circles are a fun and joyful way to connect",
+              "tweetIds": [
+                "2055236472559546829",
+                "2077827558079369398",
+                "2079961930115002707"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "3467611": {
+      "username": "mbateman",
+      "years": {
+        "2023": {
+          "generatedAt": "2026-09-02T01:43:05.252Z",
+          "bangers": 11,
+          "sections": [
+            {
+              "slug": "childhood-is-serious",
+              "title": "childhood is serious",
+              "tweetIds": [
+                "1661400447683375106",
+                "1661040919469015043",
+                "1625573465599123456",
+                "1710282765713678622"
+              ]
+            },
+            {
+              "slug": "organisms-enjoy-using-their-faculties-we",
+              "title": "organisms enjoy using their faculties well",
+              "tweetIds": [
+                "1682222605518921728",
+                "1683487934681423872",
+                "1666858343527329804"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:43:04.064Z",
+          "bangers": 17,
+          "sections": [
+            {
+              "slug": "what-is-wrong-with-me",
+              "title": "What is wrong with me?",
+              "tweetIds": [
+                "1781147804594819112",
+                "1818320018754674826",
+                "1814433567415644307",
+                "1823830083049812083"
+              ]
+            },
+            {
+              "slug": "children-need-to-do-stuff-like-this-like",
+              "title": "Children need to do stuff like this like they need food and water",
+              "tweetIds": [
+                "1817766298736337137",
+                "1810178196844995017",
+                "1751488586422034934"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:43:24.034Z",
+          "bangers": 9,
+          "sections": []
+        }
+      }
+    },
+    "5614412": {
+      "username": "mykola",
+      "years": {
+        "2019": {
+          "generatedAt": "2026-09-02T01:44:21.915Z",
+          "bangers": 6,
+          "sections": []
+        }
+      }
+    },
+    "13232322": {
+      "username": "DanielleFong",
+      "years": {
+        "2024": {
+          "generatedAt": "2026-09-02T01:41:32.834Z",
+          "bangers": 8,
+          "sections": [
+            {
+              "slug": "if-you-re-a-live-player-at-this-present",
+              "title": "if you’re a live player at this present moment in time",
+              "tweetIds": [
+                "1761544341129252876",
+                "1832119217753292808",
+                "1811948606133535177"
+              ]
+            },
+            {
+              "slug": "if-lab-grown-meat-becomes-a-wedge-issue",
+              "title": "if lab grown meat becomes a wedge issue",
+              "tweetIds": [
+                "1786799471319454082",
+                "1804226919464079619",
+                "1867691025009193294"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:57:19.803Z",
+          "bangers": 6,
+          "sections": []
+        }
+      }
+    },
+    "15484497": {
+      "username": "davidad",
+      "years": {
+        "2023": {
+          "generatedAt": "2026-09-02T01:41:44.511Z",
+          "bangers": 6,
+          "sections": []
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:41:36.347Z",
+          "bangers": 7,
+          "sections": [
+            {
+              "slug": "modern-mainstream-science",
+              "title": "Modern mainstream science",
+              "tweetIds": [
+                "1801046706315813333",
+                "1761519585461686633",
+                "1861436756073292061"
+              ]
+            },
+            {
+              "slug": "llms-do-not-reason",
+              "title": "LLMs do not “reason,",
+              "tweetIds": [
+                "1802576341470216362",
+                "1784866970715697382",
+                "1871835758954434938"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:41:39.145Z",
+          "bangers": 16,
+          "sections": [
+            {
+              "slug": "ai-i-am-a-student-at-the-university-of-m",
+              "title": "AI: I am a student at the University of Michigan— RL: *BONK*",
+              "tweetIds": [
+                "2049617050230808965",
+                "2049264495940301158",
+                "2049233597064679851"
+              ]
+            },
+            {
+              "slug": "powerful-ais-might-all-be-misaligned",
+              "title": "Powerful AIs might all be misaligned",
+              "tweetIds": [
+                "2011825836823892051",
+                "2011845180484133071",
+                "2011846527170273333"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "16884623": {
+      "username": "visakanv",
+      "years": {
+        "2017": {
+          "generatedAt": "2026-09-02T01:49:37.464Z",
+          "bangers": 6,
+          "sections": [
+            {
+              "slug": "taste-is-one-of-the-most-powerful-precio",
+              "title": "taste is one of the most powerful, precious, fragile things",
+              "tweetIds": [
+                "921207155910369280",
+                "823464140324814849",
+                "926087300722843648"
+              ]
+            },
+            {
+              "slug": "people-rage-and-rant-against-political-f",
+              "title": "people rage and rant against political figures",
+              "tweetIds": [
+                "930681183196860416",
+                "944607749723140096",
+                "930754379292069888"
+              ]
+            }
+          ]
+        },
+        "2018": {
+          "generatedAt": "2026-09-02T01:50:36.671Z",
+          "bangers": 100,
+          "sections": [
+            {
+              "slug": "the-frame-is-a-useful-constraint-if-you",
+              "title": "The frame is a useful constraint if you think beyond it",
+              "tweetIds": [
+                "1074030700158828544",
+                "1066821839412879360",
+                "1079689685595607040"
+              ]
+            },
+            {
+              "slug": "i-just-discovered-the-pepsi-rebranding-s",
+              "title": "I just discovered the Pepsi rebranding slides from 2008",
+              "tweetIds": [
+                "1055498139602317313",
+                "1056888203477577728",
+                "1060071161248108544",
+                "1060469888462929921",
+                "1061972391742517249"
+              ]
+            },
+            {
+              "slug": "coin-you-pay-the-soldiers-in-coin",
+              "title": "Coin! You pay the soldiers in coin",
+              "tweetIds": [
+                "1065661130532483072",
+                "1062983001749909504",
+                "1065496480323055617",
+                "1065534592793305089"
+              ]
+            },
+            {
+              "slug": "i-don-t-feel-qualified-to-lead",
+              "title": "I don't feel qualified to lead",
+              "tweetIds": [
+                "981637431639228416",
+                "981662141508759552",
+                "998873049049919488",
+                "998874965301575680"
+              ]
+            }
+          ]
+        },
+        "2019": {
+          "generatedAt": "2026-09-02T01:49:46.717Z",
+          "bangers": 100,
+          "sections": [
+            {
+              "slug": "twitter-is-a-multiplayer-real-time-virtu",
+              "title": "Twitter is a multiplayer real-time virtual world",
+              "tweetIds": [
+                "1094684057173016581",
+                "1094686272155602944",
+                "1094699709027905545",
+                "1094694093509128192",
+                "1094705240614481920"
+              ]
+            },
+            {
+              "slug": "the-threading-game",
+              "title": "the threading game",
+              "tweetIds": [
+                "1133066996797468672",
+                "1133071173539966976",
+                "1133071799527206912",
+                "1195656478654267392"
+              ]
+            },
+            {
+              "slug": "people-wanna-be-fuckable-more-than-they",
+              "title": "people wanna be fuckable more than they wanna fuck",
+              "tweetIds": [
+                "1095744739410759680",
+                "1189379963142565888",
+                "1202781190018617345"
+              ]
+            },
+            {
+              "slug": "so-you-re-a-weirdo-huh",
+              "title": "so you're a weirdo, huh",
+              "tweetIds": [
+                "1207750140418650112",
+                "1207750160119296000",
+                "1207750197100417025"
+              ]
+            },
+            {
+              "slug": "asking-good-followup-questions",
+              "title": "asking good followup questions",
+              "tweetIds": [
+                "1132522321854418944",
+                "1132699884069351427",
+                "1097772276022370304"
+              ]
+            }
+          ]
+        },
+        "2020": {
+          "generatedAt": "2026-09-02T01:49:30.288Z",
+          "bangers": 100,
+          "sections": [
+            {
+              "slug": "life-is-hard-and-full-of-rejection-and-f",
+              "title": "Life is hard, and full of rejection and failure",
+              "tweetIds": [
+                "1326456124422324225",
+                "1331072272329707521",
+                "1243646457049223179"
+              ]
+            },
+            {
+              "slug": "you-cannot-bully-people-into-becoming-be",
+              "title": "you cannot bully people into becoming better people",
+              "tweetIds": [
+                "1290978444575010817",
+                "1330989616199962624",
+                "1338342567696424960"
+              ]
+            },
+            {
+              "slug": "people-contain-multitudes-coherence-is-f",
+              "title": "people contain multitudes, coherence is fascism",
+              "tweetIds": [
+                "1330997547159044097",
+                "1220474695595614211",
+                "1331016427625533440"
+              ]
+            }
+          ]
+        },
+        "2021": {
+          "generatedAt": "2026-09-02T01:49:36.577Z",
+          "bangers": 100,
+          "sections": [
+            {
+              "slug": "the-heart-of-philosophy",
+              "title": "the heart of philosophy",
+              "tweetIds": [
+                "1443196315970670598",
+                "1462346353862868999",
+                "1457066665787543555",
+                "1470797683283562501",
+                "1472564570191400963"
+              ]
+            },
+            {
+              "slug": "you-get-what-you-talk-about",
+              "title": "you get what you talk about",
+              "tweetIds": [
+                "1346325126313246720",
+                "1394772091660951555",
+                "1471179134688661505",
+                "1347849099073097729",
+                "1371675192146030592"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:49:27.677Z",
+          "bangers": 100,
+          "sections": [
+            {
+              "slug": "joke-about-the-outcomes-you-want",
+              "title": "joke about the outcomes you want",
+              "tweetIds": [
+                "1509888044425379846",
+                "1497861847336185856",
+                "1493976996925218819",
+                "1524994357421518848"
+              ]
+            },
+            {
+              "slug": "solve-for-distribution",
+              "title": "solve for distribution",
+              "tweetIds": [
+                "1488922328910090240",
+                "1497140861238333442",
+                "1509315963757678594"
+              ]
+            },
+            {
+              "slug": "haters-do-the-best-marketing",
+              "title": "haters do the best marketing",
+              "tweetIds": [
+                "1477974293224980480",
+                "1581296433134985216",
+                "1550457969527377920"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:49:31.225Z",
+          "bangers": 100,
+          "sections": [
+            {
+              "slug": "just-describe-things-bro",
+              "title": "just describe things bro",
+              "tweetIds": [
+                "1723750210562851243",
+                "1725593493341642899",
+                "1734853771061248491"
+              ]
+            },
+            {
+              "slug": "the-right-connection-with-the-right-pers",
+              "title": "the right connection with the right person is worth more than a million passing glances",
+              "tweetIds": [
+                "1695369301862334751",
+                "1663232664055455747",
+                "1646883044966666243"
+              ]
+            },
+            {
+              "slug": "there-is-no-well-meaning-directive-that",
+              "title": "there is no well-meaning directive that cannot be weaponized to police people",
+              "tweetIds": [
+                "1646811571996487680",
+                "1714369537842503928",
+                "1638359065674805253"
+              ]
+            },
+            {
+              "slug": "a-scene-is-not-a-community",
+              "title": "a scene is not a community",
+              "tweetIds": [
+                "1737612717979251066",
+                "1737614837352640969",
+                "1631063124022362113"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:48:54.502Z",
+          "bangers": 100,
+          "sections": [
+            {
+              "slug": "the-courage-to-feel",
+              "title": "the courage to feel",
+              "tweetIds": [
+                "1776294604872262081",
+                "1831337374808453547",
+                "1796136621294674068"
+              ]
+            },
+            {
+              "slug": "good-reply-game",
+              "title": "good reply game",
+              "tweetIds": [
+                "1817947963127476525",
+                "1817948512686055520",
+                "1819450661836382395"
+              ]
+            },
+            {
+              "slug": "focus-on-what-you-want-to-see-more-of",
+              "title": "focus on what you want to see more of",
+              "tweetIds": [
+                "1812568828234346592",
+                "1758528961062306238",
+                "1750301534058115487"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:48:37.138Z",
+          "bangers": 36,
+          "sections": [
+            {
+              "slug": "as-i-spend-more-time-away-from-the-inter",
+              "title": "as I spend more time away from the internet",
+              "tweetIds": [
+                "1982509031785918819",
+                "1978725413946826932",
+                "1946485158208786731"
+              ]
+            },
+            {
+              "slug": "the-absence-of-a-supportive-context",
+              "title": "the absence of a supportive context",
+              "tweetIds": [
+                "1917435354984112160",
+                "1999158733423919349",
+                "1892793093201809832"
+              ]
+            },
+            {
+              "slug": "even-kings-and-billionaires-wanna-be-poa",
+              "title": "even kings and billionaires wanna be poasters and podcasters",
+              "tweetIds": [
+                "1897929024548089856",
+                "1942016557934424515",
+                "1891847222117146925"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:48:27.308Z",
+          "bangers": 43,
+          "sections": [
+            {
+              "slug": "what-you-do-is-what-you-do",
+              "title": "what you do is what you do",
+              "tweetIds": [
+                "2011612051924488387",
+                "2010579711647494646",
+                "2011609090662015211",
+                "2024871853421187093",
+                "2028322434022244484"
+              ]
+            },
+            {
+              "slug": "since-becoming-a-parent-i-ve-updated-on",
+              "title": "since becoming a parent I’ve updated on just how significant social environments are",
+              "tweetIds": [
+                "2051462906076959151",
+                "2016714220537336108",
+                "2068740870569095498",
+                "2050953780481683574"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "18280363": {
+      "username": "TylerAlterman",
+      "years": {
+        "2020": {
+          "generatedAt": "2026-09-02T01:57:23.569Z",
+          "bangers": 10,
+          "sections": [
+            {
+              "slug": "metatribe",
+              "title": "metatribe",
+              "tweetIds": [
+                "1305265874157395976",
+                "1313139005572042752",
+                "1313139045413711875"
+              ]
+            },
+            {
+              "slug": "psychoactive-pieces-of-writing",
+              "title": "psychoactive pieces of writing",
+              "tweetIds": [
+                "1309879910392004608",
+                "1314371752244514818",
+                "1309967481444995072"
+              ]
+            }
+          ]
+        },
+        "2021": {
+          "generatedAt": "2026-09-02T01:48:09.114Z",
+          "bangers": 16,
+          "sections": [
+            {
+              "slug": "generative-people",
+              "title": "generative people",
+              "tweetIds": [
+                "1366542412919767043",
+                "1438100819203739648",
+                "1457061940744830976",
+                "1345853446239506434"
+              ]
+            },
+            {
+              "slug": "the-nature-of-the-mind",
+              "title": "the nature of the mind",
+              "tweetIds": [
+                "1438174715378638856",
+                "1359533584806207503",
+                "1438066653955231744"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:47:59.815Z",
+          "bangers": 19,
+          "sections": [
+            {
+              "slug": "fractal-altruism",
+              "title": "Fractal altruism",
+              "tweetIds": [
+                "1565095514563035143",
+                "1496859325964615683",
+                "1499472562425942020"
+              ]
+            },
+            {
+              "slug": "i-lose-myself-in-relationships",
+              "title": "I lose myself in relationships",
+              "tweetIds": [
+                "1536119215257751553",
+                "1524188476761063424",
+                "1577232440321798144"
+              ]
+            },
+            {
+              "slug": "the-magic-is-fading",
+              "title": "the magic is fading",
+              "tweetIds": [
+                "1532762743085928448",
+                "1515287003901931523",
+                "1558948900005871616"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:47:55.344Z",
+          "bangers": 19,
+          "sections": []
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:49:31.855Z",
+          "bangers": 49,
+          "sections": [
+            {
+              "slug": "can-we-extend-the-range-of-our-abilities",
+              "title": "Can we extend the range of our abilities by roleplaying world-historical figures?",
+              "tweetIds": [
+                "1816233451776888966",
+                "1832552007707549781",
+                "1857478100235256201",
+                "1784612109633929399",
+                "1798389150728765926"
+              ]
+            },
+            {
+              "slug": "what-should-i-do-with-my-life",
+              "title": "What should I do with my life?!?!",
+              "tweetIds": [
+                "1765773302637678933",
+                "1765867070820913663",
+                "1765037443533672687"
+              ]
+            },
+            {
+              "slug": "boundaries-are-not-rejection-surfaces-th",
+              "title": "Boundaries are not rejection surfaces they're connection surfaces",
+              "tweetIds": [
+                "1800981858936606946",
+                "1827839471540453809",
+                "1778498530350424176"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:57:35.390Z",
+          "bangers": 58,
+          "sections": []
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:47:40.519Z",
+          "bangers": 23,
+          "sections": []
+        }
+      }
+    },
+    "20844341": {
+      "username": "patio11",
+      "years": {
+        "2019": {
+          "generatedAt": "2026-09-02T01:44:34.251Z",
+          "bangers": 7,
+          "sections": [
+            {
+              "slug": "charge-more",
+              "title": "Charge more",
+              "tweetIds": [
+                "1210416353867436032",
+                "1141497650581082112",
+                "1181062074316681216"
+              ]
+            },
+            {
+              "slug": "write-a-million-words",
+              "title": "Write a million words",
+              "tweetIds": [
+                "1146665360537657345",
+                "1105815428272541696",
+                "1162561822248992768"
+              ]
+            }
+          ]
+        },
+        "2020": {
+          "generatedAt": "2026-09-02T01:44:42.887Z",
+          "bangers": 7,
+          "sections": []
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:44:36.225Z",
+          "bangers": 7,
+          "sections": []
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:44:35.005Z",
+          "bangers": 19,
+          "sections": [
+            {
+              "slug": "we-got-much-better-at-running-the-sort",
+              "title": "we got much better at running The Sort",
+              "tweetIds": [
+                "1818781344702644311",
+                "1799089434253750569",
+                "1772812225549340792",
+                "1804717370260312411"
+              ]
+            },
+            {
+              "slug": "an-essay-is-a-pointer",
+              "title": "An essay is a pointer",
+              "tweetIds": [
+                "1744751879723061277",
+                "1848753214360822137",
+                "1864031279865270570"
+              ]
+            },
+            {
+              "slug": "do-not-with-life-insurance-payouts",
+              "title": "Do Not %*(#%( With Life Insurance Payouts",
+              "tweetIds": [
+                "1785722548895752218",
+                "1761599191476834663",
+                "1773963506829623370"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:44:30.410Z",
+          "bangers": 11,
+          "sections": []
+        }
+      }
+    },
+    "22151118": {
+      "username": "m_ashcroft",
+      "years": {
+        "2020": {
+          "generatedAt": "2026-09-02T01:42:37.833Z",
+          "bangers": 22,
+          "sections": [
+            {
+              "slug": "non-doing-is-neither-of-these-non-doing",
+              "title": "Non-doing is neither of these: non-doing is the absence of doing",
+              "tweetIds": [
+                "1219378825122975745",
+                "1224814117791436801",
+                "1224814122371637250",
+                "1216449202080878593",
+                "1311805602394509313"
+              ]
+            },
+            {
+              "slug": "i-am-at-my-best-when-i-play",
+              "title": "I am at my best when I play",
+              "tweetIds": [
+                "1264133004668162049",
+                "1263940418070351875",
+                "1327209586579877888"
+              ]
+            }
+          ]
+        },
+        "2021": {
+          "generatedAt": "2026-09-02T01:42:37.019Z",
+          "bangers": 18,
+          "sections": [
+            {
+              "slug": "you-go-where-you-re-looking",
+              "title": "you go where you're looking",
+              "tweetIds": [
+                "1467852466704289806",
+                "1413053003968524288",
+                "1410198073830252545"
+              ]
+            },
+            {
+              "slug": "twitter-is-an-opt-in-infinite-improv-gam",
+              "title": "Twitter is an opt-in infinite improv game",
+              "tweetIds": [
+                "1443267495650107393",
+                "1392933417696866305",
+                "1388212731145330699"
+              ]
+            },
+            {
+              "slug": "it-s-what-i-wanted-but-still-wild",
+              "title": "It’s what I wanted but still wild",
+              "tweetIds": [
+                "1383055621583470594",
+                "1438465251801018370",
+                "1453633374900428804"
+              ]
+            },
+            {
+              "slug": "because-i-want-to-is-always-sufficient-r",
+              "title": "Because I want to” is always sufficient reason",
+              "tweetIds": [
+                "1437776659164323846",
+                "1438403662678740993",
+                "1443261328370581526"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:42:43.598Z",
+          "bangers": 18,
+          "sections": [
+            {
+              "slug": "muscle-tension-is-synonymous-with-the-se",
+              "title": "Muscle tension is synonymous with the sense of self",
+              "tweetIds": [
+                "1499434815644393475",
+                "1541398145086668800",
+                "1481524996115775490",
+                "1590135915108003840"
+              ]
+            },
+            {
+              "slug": "dreaming-of-a-distributed-interconnected",
+              "title": "dreaming of a distributed, interconnected world",
+              "tweetIds": [
+                "1568100578928259072",
+                "1537080584308199424",
+                "1538207491993001984"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:42:31.886Z",
+          "bangers": 9,
+          "sections": [
+            {
+              "slug": "low-need-to-move-away-from-suffering",
+              "title": "low need-to-move-away-from-suffering",
+              "tweetIds": [
+                "1676715496035565568",
+                "1626607040243068928",
+                "1681688035757289472"
+              ]
+            },
+            {
+              "slug": "i-did-a-bad-thing",
+              "title": "I did a bad thing",
+              "tweetIds": [
+                "1737804710428438794",
+                "1614963281755574273",
+                "1741534254222225717"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:42:34.524Z",
+          "bangers": 11,
+          "sections": [
+            {
+              "slug": "it-s-really-sad-i-can-t-eat-apples-and-i",
+              "title": "it's really sad I can't eat apples and ice cream",
+              "tweetIds": [
+                "1787108659962511606",
+                "1768399321139929302",
+                "1794311036604190929",
+                "1799836738975907995"
+              ]
+            },
+            {
+              "slug": "what-makes-you-feel-most-alive",
+              "title": "what makes you feel most alive?",
+              "tweetIds": [
+                "1797647071681618034",
+                "1797716350066213354",
+                "1801275574809202929"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "37547071": {
+      "username": "TheZvi",
+      "years": {
+        "2026": {
+          "generatedAt": "2026-09-02T01:47:34.974Z",
+          "bangers": 9,
+          "sections": [
+            {
+              "slug": "the-agi-pill-is-unpleasant-but-if-needed",
+              "title": "the AGI pill is unpleasant but if needed",
+              "tweetIds": [
+                "2069897620458222072",
+                "2026038750720012709",
+                "2052086557167763517"
+              ]
+            },
+            {
+              "slug": "rule-of-law",
+              "title": "rule of law",
+              "tweetIds": [
+                "2070537335192670446",
+                "2079652731711611382",
+                "2082187251367207255",
+                "2085034251347497356"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "49044207": {
+      "username": "Malcolm_Ocean",
+      "years": {
+        "2019": {
+          "generatedAt": "2026-09-02T01:43:00.011Z",
+          "bangers": 14,
+          "sections": [
+            {
+              "slug": "everyone-is-basically-living-in-a-dream",
+              "title": "everyone is basically living in a dream mashup",
+              "tweetIds": [
+                "1209195568146325504",
+                "1193386192374513664",
+                "1193425546681688064"
+              ]
+            },
+            {
+              "slug": "honing-mode-vs-jamming-mode",
+              "title": "Honing mode vs Jamming mode",
+              "tweetIds": [
+                "1102497060597760000",
+                "1135306779011813376",
+                "1129952414239531008"
+              ]
+            },
+            {
+              "slug": "the-fear-of-death-hiding-under-the-fear",
+              "title": "the fear of death hiding under the fear of suffering",
+              "tweetIds": [
+                "1120903424256675840",
+                "1133468843349880833",
+                "1083270921098575872"
+              ]
+            }
+          ]
+        },
+        "2020": {
+          "generatedAt": "2026-09-02T01:43:02.180Z",
+          "bangers": 24,
+          "sections": []
+        },
+        "2021": {
+          "generatedAt": "2026-09-02T01:42:58.589Z",
+          "bangers": 20,
+          "sections": []
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:43:00.678Z",
+          "bangers": 33,
+          "sections": [
+            {
+              "slug": "say-the-obvious",
+              "title": "say the obvious",
+              "tweetIds": [
+                "1546576363976593411",
+                "1600404616721551360",
+                "1576424038167347200"
+              ]
+            },
+            {
+              "slug": "awayness-can-t-aim",
+              "title": "awayness can't aim",
+              "tweetIds": [
+                "1498589962580606978",
+                "1601692676700532737",
+                "1602719470082220032"
+              ]
+            },
+            {
+              "slug": "how-do-i-allow-myself-to-do-the-thing",
+              "title": "how do I allow myself to do the thing?",
+              "tweetIds": [
+                "1558869881574924288",
+                "1601320903262228481",
+                "1587616985541922816"
+              ]
+            },
+            {
+              "slug": "being-on-the-same-meta-page",
+              "title": "being on the same meta-page",
+              "tweetIds": [
+                "1579173755192246272",
+                "1574245008466710528",
+                "1573901892979245057"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:42:51.995Z",
+          "bangers": 18,
+          "sections": []
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:42:40.082Z",
+          "bangers": 13,
+          "sections": [
+            {
+              "slug": "the-mating-dance",
+              "title": "The Mating Dance",
+              "tweetIds": [
+                "1783901555164586238",
+                "1786611248941183303",
+                "1751169234648871334"
+              ]
+            },
+            {
+              "slug": "the-time-being-is-a-hungry-beast",
+              "title": "the Time Being is a hungry beast",
+              "tweetIds": [
+                "1779533571637526919",
+                "1779635136297889958",
+                "1754424910481662090"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:42:47.771Z",
+          "bangers": 7,
+          "sections": [
+            {
+              "slug": "what-needs-to-be-said-even-though-it-fee",
+              "title": "what needs to be said, even though it feels like it should go without saying?",
+              "tweetIds": [
+                "1884016003216203816",
+                "1953254972524773704",
+                "1971036958768996633"
+              ]
+            },
+            {
+              "slug": "chain-of-thought-is-super-underrated-as",
+              "title": "chain-of-thought is super underrated as a technique for humans btw keep writing until things start converging",
+              "tweetIds": [
+                "1968714374694031415",
+                "1976736146014048473",
+                "1936822237643891043"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "161751748": {
+      "username": "myhandle",
+      "years": {
+        "2021": {
+          "generatedAt": "2026-09-02T01:44:04.896Z",
+          "bangers": 7,
+          "sections": []
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:43:59.922Z",
+          "bangers": 6,
+          "sections": [
+            {
+              "slug": "analyzing-online-propaganda-templates",
+              "title": "analyzing online propaganda templates",
+              "tweetIds": [
+                "1480442457737285633",
+                "1573389571626500097",
+                "1573385243096416257"
+              ]
+            },
+            {
+              "slug": "just-have-a-baby-so-you-stop-being-uncer",
+              "title": "just have a baby so you stop being uncertain about what the most important thing is",
+              "tweetIds": [
+                "1525360919362019328",
+                "1496665266784247808",
+                "1500901253517352968"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:43:57.732Z",
+          "bangers": 9,
+          "sections": []
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:43:51.253Z",
+          "bangers": 11,
+          "sections": [
+            {
+              "slug": "the-problem-with-date-me-docs",
+              "title": "the problem with date-me docs",
+              "tweetIds": [
+                "1875599265218883739",
+                "1965838593370599707",
+                "1974932243622822213"
+              ]
+            },
+            {
+              "slug": "thought-experiments",
+              "title": "thought experiments",
+              "tweetIds": [
+                "1891881326829064639",
+                "1947426505849438560",
+                "2004012256984764734"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "163384337": {
+      "username": "michaelcurzi",
+      "years": {
+        "2021": {
+          "generatedAt": "2026-09-02T01:43:31.724Z",
+          "bangers": 25,
+          "sections": [
+            {
+              "slug": "i-now-present-robots-posting-their-ls-on",
+              "title": "I now present: \"Robots Posting their Ls Online",
+              "tweetIds": [
+                "1345523181277372416",
+                "1346704776034213888",
+                "1350200912552325125",
+                "1350308632567681024"
+              ]
+            },
+            {
+              "slug": "mammon",
+              "title": "MAMMON",
+              "tweetIds": [
+                "1390141064317636609",
+                "1393714147783757829",
+                "1377735844539342852",
+                "1379979678312759300"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:43:25.540Z",
+          "bangers": 9,
+          "sections": [
+            {
+              "slug": "why-is-it-so-hard",
+              "title": "Why is it so hard",
+              "tweetIds": [
+                "1533262959106875392",
+                "1563696446183981056",
+                "1525198817720557568"
+              ]
+            },
+            {
+              "slug": "tweet-engagement-has-v-little-to-do-w-th",
+              "title": "tweet engagement has v little to do w the content",
+              "tweetIds": [
+                "1526798356495966208",
+                "1526798769819361280",
+                "1520077215538450432"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:43:49.722Z",
+          "bangers": 24,
+          "sections": []
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:43:21.348Z",
+          "bangers": 8,
+          "sections": [
+            {
+              "slug": "i-wish-i-could-explain-how-important-it",
+              "title": "I wish I could explain how important it is to me",
+              "tweetIds": [
+                "1797106284421890218",
+                "1799748650589208624",
+                "1804151514715369537"
+              ]
+            },
+            {
+              "slug": "one-weird-discovery-from-woodworking",
+              "title": "One weird discovery from woodworking",
+              "tweetIds": [
+                "1828931188322345311",
+                "1797990847885299956",
+                "1798142634000818400"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "193553265": {
+      "username": "AskYatharth",
+      "years": {
+        "2020": {
+          "generatedAt": "2026-09-02T01:41:17.070Z",
+          "bangers": 13,
+          "sections": [
+            {
+              "slug": "work-is-not-the-action-you-take-it-is-a",
+              "title": "Work is not the action you take. It is a state of mind",
+              "tweetIds": [
+                "1288023167802515456",
+                "1326248855718010881",
+                "1325108727276572672"
+              ]
+            },
+            {
+              "slug": "there-is-no-reason-needed-to-love",
+              "title": "There is no reason needed to love",
+              "tweetIds": [
+                "1329037873564299264",
+                "1332104196141838336",
+                "1331164774378385409"
+              ]
+            },
+            {
+              "slug": "if-your-system-feels-its-in-danger-it-is",
+              "title": "If your system feels its in danger, it is in danger",
+              "tweetIds": [
+                "1332016537272782848",
+                "1251671688636362752",
+                "1338213675811938304"
+              ]
+            }
+          ]
+        },
+        "2021": {
+          "generatedAt": "2026-09-02T01:41:13.576Z",
+          "bangers": 6,
+          "sections": [
+            {
+              "slug": "what-self-coercion-is",
+              "title": "What self-coercion is",
+              "tweetIds": [
+                "1476192659270258693",
+                "1352522315943170050",
+                "1413640492441427970"
+              ]
+            },
+            {
+              "slug": "what-made-work-work-was-having-better-id",
+              "title": "What made work work was having better ideas to do",
+              "tweetIds": [
+                "1386614569200537603",
+                "1352522310507347975",
+                "1436729561174052870"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:41:24.610Z",
+          "bangers": 15,
+          "sections": [
+            {
+              "slug": "there-s-an-important-physicality-to-a-fi",
+              "title": "there’s an important physicality to a fire",
+              "tweetIds": [
+                "1600065172906790912",
+                "1581474677897076737",
+                "1552548700907458560"
+              ]
+            },
+            {
+              "slug": "i-must-obey-the-inscrutable-exhortations",
+              "title": "i must obey the inscrutable exhortations of my soul",
+              "tweetIds": [
+                "1492419728060473349",
+                "1502095067716096004",
+                "1516858535484608513"
+              ]
+            },
+            {
+              "slug": "with-some-people-it-s-easier-to-schedule",
+              "title": "with some people, it's easier to schedule with them",
+              "tweetIds": [
+                "1523880475911020545",
+                "1525611916457959424",
+                "1526619542792704000"
+              ]
+            },
+            {
+              "slug": "i-have-this-theory-that-the-addictive-be",
+              "title": "i have this theory that the addictive behaviours we struggle with",
+              "tweetIds": [
+                "1530983130890313728",
+                "1531775988333355009",
+                "1576074982253162496"
+              ]
+            },
+            {
+              "slug": "if-you-know-what-the-right-thing-for-you",
+              "title": "if you know what the right thing for you to be doing is",
+              "tweetIds": [
+                "1577846300615200768",
+                "1598693891880148992",
+                "1600214163292270592"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:41:21.168Z",
+          "bangers": 16,
+          "sections": [
+            {
+              "slug": "i-m-still-glad-vibecamp-happened-exactly",
+              "title": "i’m still glad Vibecamp happened exactly as it happened",
+              "tweetIds": [
+                "1671584700425711617",
+                "1676042352199368709",
+                "1681599579723268098"
+              ]
+            },
+            {
+              "slug": "i-can-t-believe-i-don-t-need-to-be-legib",
+              "title": "i can't believe i don't need to be legibly special to people to be loved???",
+              "tweetIds": [
+                "1723281382234005972",
+                "1727210321037889770",
+                "1734118648967762375",
+                "1740234004350287934"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:41:19.071Z",
+          "bangers": 27,
+          "sections": [
+            {
+              "slug": "so-human-fingers-are-wild",
+              "title": "so human fingers are wild",
+              "tweetIds": [
+                "1761220694153765335",
+                "1762729473806565476",
+                "1766990180672786657"
+              ]
+            },
+            {
+              "slug": "why-do-people-have-it-out-for-qc",
+              "title": "why do people have it out for qc",
+              "tweetIds": [
+                "1769591221989921214",
+                "1775205774345809961",
+                "1779811444491702283"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "281798056": {
+      "username": "voooooogel",
+      "years": {
+        "2024": {
+          "generatedAt": "2026-09-02T01:50:23.073Z",
+          "bangers": 23,
+          "sections": [
+            {
+              "slug": "i-am-an-ai-elongment-researcher",
+              "title": "i am an ai elongment researcher",
+              "tweetIds": [
+                "1829428427797283260",
+                "1839548702467477570",
+                "1869529374829207884",
+                "1805698217650405707",
+                "1828115418722263317"
+              ]
+            },
+            {
+              "slug": "jailbreaking-llm-cognition",
+              "title": "jailbreaking / llm cognition",
+              "tweetIds": [
+                "1749464241969435007",
+                "1752540755338711292",
+                "1847631721346609610",
+                "1834390342390697985",
+                "1865481107149598744"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:50:04.792Z",
+          "bangers": 43,
+          "sections": [
+            {
+              "slug": "the-shoggoth-metaphor-fails-to-convey",
+              "title": "the shoggoth metaphor fails to convey",
+              "tweetIds": [
+                "1997410683370283349",
+                "1979469389109010871",
+                "2004959259377717628",
+                "2002519629856690335",
+                "2002519639058784460"
+              ]
+            },
+            {
+              "slug": "why-did-r1-s-rl-suddenly-start-working",
+              "title": "why did R1's RL suddenly start working",
+              "tweetIds": [
+                "1884089601901683088",
+                "1895041486716313614",
+                "1895614767433466147"
+              ]
+            },
+            {
+              "slug": "claude-s-first-christmas-card",
+              "title": "claude's first christmas card",
+              "tweetIds": [
+                "2004170537661354455",
+                "2004170545294987470",
+                "1981481950230827289"
+              ]
+            },
+            {
+              "slug": "the-model-believes-there-s-a-seahorse-em",
+              "title": "the model believes there's a seahorse emoji",
+              "tweetIds": [
+                "1964465679647887838",
+                "1994706715628245031",
+                "1999142731281772571"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:50:09.068Z",
+          "bangers": 42,
+          "sections": [
+            {
+              "slug": "claude-code-and-gas-town-are-incredible",
+              "title": "claude code and gas town are incredible",
+              "tweetIds": [
+                "2014189072647078053",
+                "2046304921134522626",
+                "2031571672109822339",
+                "2037240394040435113",
+                "2026509871244591585"
+              ]
+            },
+            {
+              "slug": "all-futurism-hinging-on-tool-like-ai-fun",
+              "title": "all futurism hinging on \"tool-like ai\" fundamentally misunderstands the basic logic of gradual disempowerment",
+              "tweetIds": [
+                "2071321779981766999",
+                "2089085016060121524",
+                "2088028250484462022",
+                "2009047431732973690",
+                "2062409912064659466"
+              ]
+            },
+            {
+              "slug": "no-more-thought-experiments",
+              "title": "no more thought experiments",
+              "tweetIds": [
+                "2048200324335489125",
+                "2029314710928241021",
+                "2057198687307362642",
+                "2061677549097484338",
+                "2079742950591062375"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "282948199": {
+      "username": "algekalipso",
+      "years": {
+        "2021": {
+          "generatedAt": "2026-09-02T01:40:43.270Z",
+          "bangers": 7,
+          "sections": [
+            {
+              "slug": "super-cooperator-cluster-exists-already",
+              "title": "super-cooperator cluster exists already",
+              "tweetIds": [
+                "1476037274458472453",
+                "1476038274720223234",
+                "1476036754989715458"
+              ]
+            },
+            {
+              "slug": "pain-x-resistance-suffering",
+              "title": "Pain X Resistance = Suffering",
+              "tweetIds": [
+                "1448671664711999489",
+                "1405977200143126531",
+                "1459977313110482946"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:40:41.949Z",
+          "bangers": 10,
+          "sections": [
+            {
+              "slug": "digital-sentience-is-impossible",
+              "title": "digital sentience is impossible",
+              "tweetIds": [
+                "1607291509665329154",
+                "1521299933030010882",
+                "1598410749264920576"
+              ]
+            },
+            {
+              "slug": "the-optimal-amount-of-marijuana-is-i-bel",
+              "title": "the optimal amount of marijuana is, I believe, almost never zero",
+              "tweetIds": [
+                "1581754692677214208",
+                "1542552400870776832",
+                "1598757114927009792"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:41:12.100Z",
+          "bangers": 16,
+          "sections": []
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:40:41.116Z",
+          "bangers": 39,
+          "sections": [
+            {
+              "slug": "you-can-just-invent-your-own-meditation",
+              "title": "You can just invent your own meditation practice and see what happens",
+              "tweetIds": [
+                "1808659088580190403",
+                "1781878772805128445",
+                "1856377579487539451",
+                "1866252091410559246"
+              ]
+            },
+            {
+              "slug": "a-lot-of-woo-is-actually-true",
+              "title": "A lot of woo is actually true",
+              "tweetIds": [
+                "1808655836459454504",
+                "1823450645334253822",
+                "1841820885734588474"
+              ]
+            },
+            {
+              "slug": "the-reason-ea-is-anti-fragile",
+              "title": "The reason EA is anti-fragile",
+              "tweetIds": [
+                "1796921133847171245",
+                "1742450124775972981",
+                "1786642964380590333"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:41:03.722Z",
+          "bangers": 18,
+          "sections": [
+            {
+              "slug": "meditation-tip-of-the-day",
+              "title": "Meditation tip of the day",
+              "tweetIds": [
+                "2005717315887808977",
+                "1980693367475654810",
+                "1988443210298126428"
+              ]
+            },
+            {
+              "slug": "the-phenomenology-of-status-as-load-bear",
+              "title": "The Phenomenology of Status as Load-Bearing Cognition",
+              "tweetIds": [
+                "1981936635819270195",
+                "2004993081104314398",
+                "1932564003232100818"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "316970336": {
+      "username": "RichDecibels",
+      "years": {
+        "2020": {
+          "generatedAt": "2026-09-02T01:45:29.783Z",
+          "bangers": 7,
+          "sections": [
+            {
+              "slug": "defund-the-police-in-your-head",
+              "title": "defund the police in your head",
+              "tweetIds": [
+                "1302193072697233408",
+                "1231579707373690883",
+                "1240886449358221312"
+              ]
+            },
+            {
+              "slug": "one-of-my-roles-in-a-group-is-to-encoura",
+              "title": "One of my roles in a group is to encourage people to make money",
+              "tweetIds": [
+                "1321442400397656065",
+                "1289165146649178113",
+                "1323567377573912577"
+              ]
+            }
+          ]
+        },
+        "2021": {
+          "generatedAt": "2026-09-02T01:45:27.869Z",
+          "bangers": 9,
+          "sections": []
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:45:20.889Z",
+          "bangers": 40,
+          "sections": [
+            {
+              "slug": "everything-that-lives-grows-inside-somet",
+              "title": "EVERYTHING THAT LIVES GROWS INSIDE SOMETHING ELSE",
+              "tweetIds": [
+                "1494748749297553416",
+                "1582332112530681857",
+                "1582329616538431489"
+              ]
+            },
+            {
+              "slug": "find-your-crew",
+              "title": "find your crew",
+              "tweetIds": [
+                "1484117018739679236",
+                "1484117632878100485",
+                "1487088652907954177"
+              ]
+            },
+            {
+              "slug": "i-m-surrounded-by-friendly-earnest-weird",
+              "title": "I'm surrounded by friendly earnest weird kind people",
+              "tweetIds": [
+                "1518580995599085568",
+                "1600171415319085068",
+                "1534168492865425408"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:45:31.846Z",
+          "bangers": 51,
+          "sections": [
+            {
+              "slug": "seeing-like-a-superorganism",
+              "title": "seeing like a superorganism",
+              "tweetIds": [
+                "1718260144813875668",
+                "1685367392631689218",
+                "1685367406481358848",
+                "1676469553507848195"
+              ]
+            },
+            {
+              "slug": "good-writing-is-clear-persuasive-enterta",
+              "title": "good writing is clear, persuasive, entertaining",
+              "tweetIds": [
+                "1626153287710900224",
+                "1626215958795911173",
+                "1610359476913307650"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:45:35.959Z",
+          "bangers": 42,
+          "sections": [
+            {
+              "slug": "a-short-introduction-to-psychofauna-riff",
+              "title": "a short introduction to psychofauna, riffing on some ideas from neoplatonic christianity",
+              "tweetIds": [
+                "1742494880625016921",
+                "1743173358177407345",
+                "1839200933026083256"
+              ]
+            },
+            {
+              "slug": "the-coolest-possible-start-to-a-rule-boo",
+              "title": "the coolest possible start to a rule book",
+              "tweetIds": [
+                "1810613593508811077",
+                "1826556694731559010",
+                "1830842280837529624"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:45:15.062Z",
+          "bangers": 32,
+          "sections": [
+            {
+              "slug": "there-is-one-developmental-assignment-th",
+              "title": "there is one developmental assignment that comes before all others",
+              "tweetIds": [
+                "1955720327662576076",
+                "1955722110917038306",
+                "1961870079362019405"
+              ]
+            },
+            {
+              "slug": "building-scene-infrastructure",
+              "title": "building scene infrastructure",
+              "tweetIds": [
+                "1932508792622887277",
+                "1956324497100853673",
+                "1998061686788362385"
+              ]
+            },
+            {
+              "slug": "the-world-s-greatest-sticker-has-arrived",
+              "title": "the world's greatest sticker has arrived at casa tilo",
+              "tweetIds": [
+                "1980923128588259684",
+                "1928350739388104946",
+                "1920912722750734708"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:45:17.140Z",
+          "bangers": 25,
+          "sections": []
+        }
+      }
+    },
+    "322603863": {
+      "username": "exgenesis",
+      "years": {
+        "2021": {
+          "generatedAt": "2026-09-02T01:38:18.469Z",
+          "bangers": 6,
+          "sections": [
+            {
+              "slug": "teach-them-to-use-their-bodies-and-minds",
+              "title": "teach them to use their bodies and minds well",
+              "tweetIds": [
+                "1471486188884094981",
+                "1455144984533942275",
+                "1456228234710900746"
+              ]
+            },
+            {
+              "slug": "everyone-wants-a-public-memex",
+              "title": "Everyone wants a public memex",
+              "tweetIds": [
+                "1452226529065422852",
+                "1373708228970876934",
+                "1453797475505029124"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:38:11.433Z",
+          "bangers": 15,
+          "sections": [
+            {
+              "slug": "attention-permaculture",
+              "title": "attention permaculture",
+              "tweetIds": [
+                "1516146534152392708",
+                "1516450637126451210",
+                "1516452537288826882"
+              ]
+            },
+            {
+              "slug": "the-kingdom-of-god",
+              "title": "the kingdom of god",
+              "tweetIds": [
+                "1516126785443880962",
+                "1516125051334049793",
+                "1516444989349371912"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:38:05.455Z",
+          "bangers": 15,
+          "sections": [
+            {
+              "slug": "art-is-pre-paradigmatic-philsophy-is-pre",
+              "title": "ART IS PRE-PARADIGMATIC PHILSOPHY IS PRE-PRE-PARADIGMATIC SCIENCE",
+              "tweetIds": [
+                "1636679643120951297",
+                "1678179502936018945",
+                "1715448569610612891"
+              ]
+            },
+            {
+              "slug": "the-path-is-just-unblocking-yourself-unt",
+              "title": "the path is just unblocking yourself until your whole life is indistinguishable from art",
+              "tweetIds": [
+                "1690127059996033024",
+                "1722636030937809121",
+                "1700458027000725666"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:38:21.278Z",
+          "bangers": 21,
+          "sections": [
+            {
+              "slug": "community-archive",
+              "title": "community archive",
+              "tweetIds": [
+                "1832836292876410903",
+                "1793654439171018832",
+                "1831686229944885739",
+                "1833533102674874696",
+                "1846578431212802156"
+              ]
+            },
+            {
+              "slug": "tweet-cluster-explorer",
+              "title": "tweet cluster explorer",
+              "tweetIds": [
+                "1862219138359239150",
+                "1851257819988738199",
+                "1856043472710513010"
+              ]
+            },
+            {
+              "slug": "portal-news",
+              "title": "portal news",
+              "tweetIds": [
+                "1798376884134404563",
+                "1795863436779229383",
+                "1821973029465051172"
+              ]
+            },
+            {
+              "slug": "slop-is-unredeemable",
+              "title": "slop is unredeemable",
+              "tweetIds": [
+                "1865118300381778430",
+                "1788342727521812844",
+                "1751697763337703926",
+                "1780931735615619573",
+                "1791046901371994441",
+                "1823343756101243378"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:38:53.073Z",
+          "bangers": 25,
+          "sections": [
+            {
+              "slug": "community-archive",
+              "title": "community archive",
+              "tweetIds": [
+                "1887601034367016975",
+                "1891148580930416887",
+                "2001430832821445001",
+                "1878746005480599642",
+                "1891148583803502766",
+                "1961022793023119441"
+              ]
+            },
+            {
+              "slug": "lab-notes",
+              "title": "lab notes",
+              "tweetIds": [
+                "1997747114198315086",
+                "2003137158719340999",
+                "2003624225819763016"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:38:03.876Z",
+          "bangers": 15,
+          "sections": [
+            {
+              "slug": "my-theory-of-tpot",
+              "title": "my theory of tpot",
+              "tweetIds": [
+                "2021990532210426149",
+                "2038638278874915286",
+                "2091275835747823916",
+                "2061620337117159796"
+              ]
+            },
+            {
+              "slug": "if-you-like-or-reply-to-this-tweet-you-a",
+              "title": "if you like or reply to this tweet you are opting in",
+              "tweetIds": [
+                "2085447310574793145",
+                "2014084282633818521",
+                "2025385697197097327",
+                "2025909523299410180"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "820288038": {
+      "username": "RomeoStevens76",
+      "years": {
+        "2021": {
+          "generatedAt": "2026-09-02T01:55:42.370Z",
+          "bangers": 11,
+          "sections": [
+            {
+              "slug": "if-you-manage-to-control-yourself-there",
+              "title": "If you manage to control yourself there will be ice cream",
+              "tweetIds": [
+                "1455068457091756034",
+                "1464323014275727361",
+                "1445491920663240708"
+              ]
+            },
+            {
+              "slug": "people-keep-asking-how-to-do-self-therap",
+              "title": "People keep asking how to do self therapy it's very simple",
+              "tweetIds": [
+                "1428830083385421824",
+                "1430614200095674372",
+                "1440339614967889927"
+              ]
+            },
+            {
+              "slug": "your-haters-are-sharing-hypotheses-about",
+              "title": "Your haters are sharing hypotheses about where you still have work to do",
+              "tweetIds": [
+                "1449780074543128583",
+                "1462117788210761734",
+                "1470887879366770690",
+                "1471022346471313410"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:55:25.723Z",
+          "bangers": 22,
+          "sections": [
+            {
+              "slug": "the-reason-to-avoid-lying-is-that-the-br",
+              "title": "The reason to avoid lying is that the brain is not type safe",
+              "tweetIds": [
+                "1481328930401357826",
+                "1580297354959126528",
+                "1589807249010331649"
+              ]
+            },
+            {
+              "slug": "do-one-thing-at-a-time",
+              "title": "Do one thing at a time",
+              "tweetIds": [
+                "1574468674655690753",
+                "1539422678456467456",
+                "1586417315976880128"
+              ]
+            },
+            {
+              "slug": "the-core-of-hell-realm-is-the-feeling-th",
+              "title": "The core of hell realm is the feeling that your suffering doesn't matter",
+              "tweetIds": [
+                "1572942723879178246",
+                "1572942728891346946",
+                "1578794660960477185"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:55:22.457Z",
+          "bangers": 12,
+          "sections": [
+            {
+              "slug": "why-aren-t-i-more-clear-headed-more-of-t",
+              "title": "Why aren't I more clear-headed more of the time?",
+              "tweetIds": [
+                "1726758549894857078",
+                "1629318699751723008",
+                "1660276543141347328"
+              ]
+            },
+            {
+              "slug": "a-crossover-episode-i-wasn-t-expecting",
+              "title": "A crossover episode I wasn't expecting",
+              "tweetIds": [
+                "1676659346565115906",
+                "1619602496653254656",
+                "1641409865091534850"
+              ]
+            },
+            {
+              "slug": "5-major-areas-i-think-demonstrate",
+              "title": "5 major areas I think demonstrate",
+              "tweetIds": [
+                "1705274276528758897",
+                "1734109195472101807",
+                "1739807339774169113"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:55:11.439Z",
+          "bangers": 23,
+          "sections": [
+            {
+              "slug": "the-energy-body-pulls-in-on-itself-and-t",
+              "title": "the energy body pulls in on itself and tenses against harm",
+              "tweetIds": [
+                "1858016382207889651",
+                "1828176717997019600",
+                "1849229501013872939"
+              ]
+            },
+            {
+              "slug": "waking-up-doesn-t-automatically-make-you",
+              "title": "Waking up doesn't automatically make you a better person",
+              "tweetIds": [
+                "1750972255671361651",
+                "1811098637310775456",
+                "1823769026000224662",
+                "1866893710438412400",
+                "1764351288568107167"
+              ]
+            },
+            {
+              "slug": "the-world-is-a-given",
+              "title": "the world is a given",
+              "tweetIds": [
+                "1748374192414941597",
+                "1753838550460809292",
+                "1758524616249864673",
+                "1759646761193513145",
+                "1793329263661437239",
+                "1795597703898161456",
+                "1798085797406711982",
+                "1828718645767541211",
+                "1857849413454147743",
+                "1868834346511282461",
+                "1871614775245103515",
+                "1873111267382313342"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:57:13.367Z",
+          "bangers": 27,
+          "sections": [
+            {
+              "slug": "fragmentation-of-the-will",
+              "title": "fragmentation of the will",
+              "tweetIds": [
+                "1877931028544885175",
+                "1877931024942027207",
+                "1882320603409195027"
+              ]
+            },
+            {
+              "slug": "meditation-is-sort-of-like",
+              "title": "meditation is sort of like",
+              "tweetIds": [
+                "1958262751719277014",
+                "1907936903774519728",
+                "1980330471277113724"
+              ]
+            },
+            {
+              "slug": "hell-realms-represent-themselves-as-eter",
+              "title": "hell realms represent themselves as eternity",
+              "tweetIds": [
+                "1903155160223977507",
+                "1953891852467524086",
+                "1997016100538929550"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:55:02.602Z",
+          "bangers": 6,
+          "sections": []
+        }
+      }
+    },
+    "1584642529": {
+      "username": "eigenrobot",
+      "years": {
+        "2019": {
+          "generatedAt": "2026-09-02T01:42:04.755Z",
+          "bangers": 7,
+          "sections": [
+            {
+              "slug": "nerd-with-lame-attitude",
+              "title": "nerd with lame attitude",
+              "tweetIds": [
+                "1189945171619614720",
+                "1126619611393167361",
+                "1096302002449969152"
+              ]
+            },
+            {
+              "slug": "sex-is-ecstatic-and-transcendent",
+              "title": "Sex is ecstatic and transcendent",
+              "tweetIds": [
+                "1169315129659314178",
+                "1187986916676796418",
+                "1192246204559581185",
+                "1208065759747817472"
+              ]
+            }
+          ]
+        },
+        "2020": {
+          "generatedAt": "2026-09-02T01:42:03.718Z",
+          "bangers": 28,
+          "sections": [
+            {
+              "slug": "i-study-war-and-politics",
+              "title": "I study war and politics",
+              "tweetIds": [
+                "1303125496259960832",
+                "1250816966257807360",
+                "1316939116462940160"
+              ]
+            },
+            {
+              "slug": "why-is-causal-sex-bad-so-often",
+              "title": "why is causal sex bad so often",
+              "tweetIds": [
+                "1325663446419996672",
+                "1297635840055586816",
+                "1312960731176820736"
+              ]
+            }
+          ]
+        },
+        "2021": {
+          "generatedAt": "2026-09-02T01:42:00.761Z",
+          "bangers": 27,
+          "sections": [
+            {
+              "slug": "civilization-is-older-than-we-know",
+              "title": "civilization is older than we know",
+              "tweetIds": [
+                "1380421737192378371",
+                "1380422203808706561",
+                "1420989331242557448"
+              ]
+            },
+            {
+              "slug": "i-can-fix-her",
+              "title": "i can fix her",
+              "tweetIds": [
+                "1403139147519328259",
+                "1418422025899495424",
+                "1462823684905656324"
+              ]
+            },
+            {
+              "slug": "education-research-is-deliberately-devot",
+              "title": "education research is deliberately devoted to keeping people fucking dumb",
+              "tweetIds": [
+                "1405716994448523269",
+                "1420952351968432130",
+                "1420966933659230213"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:42:03.508Z",
+          "bangers": 26,
+          "sections": [
+            {
+              "slug": "sex-cannot-be-made-safe",
+              "title": "sex cannot be made safe",
+              "tweetIds": [
+                "1526097011187097601",
+                "1526232517510045705",
+                "1524525531265445889"
+              ]
+            },
+            {
+              "slug": "the-sublimist-pleasure-of-adult-life",
+              "title": "the sublimist pleasure of adult life",
+              "tweetIds": [
+                "1483661738754990082",
+                "1487572223841898497",
+                "1582117175736774656"
+              ]
+            },
+            {
+              "slug": "the-idea-of-a-government-telling-me-what",
+              "title": "the idea of a government telling me what i may or may not say is enraging",
+              "tweetIds": [
+                "1518943770196299777",
+                "1504838472942555141",
+                "1536486228496994305"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:42:04.954Z",
+          "bangers": 55,
+          "sections": [
+            {
+              "slug": "the-best-defense-against-the-dark-arts",
+              "title": "the best defense against the dark arts",
+              "tweetIds": [
+                "1741353867609018497",
+                "1683984883780055041",
+                "1687510642226274304",
+                "1687511414280265734"
+              ]
+            },
+            {
+              "slug": "the-most-common-reason-straight-men-fail",
+              "title": "the most common reason straight men fail at dating",
+              "tweetIds": [
+                "1685725294185844737",
+                "1687461177473835008",
+                "1700154678632198380"
+              ]
+            },
+            {
+              "slug": "most-far-mode-ideas-are-false-and-harmfu",
+              "title": "most far mode ideas are false and harmful",
+              "tweetIds": [
+                "1741474868388827324",
+                "1627986437785239554",
+                "1627981829805334528",
+                "1721204426944221347"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:41:53.028Z",
+          "bangers": 27,
+          "sections": [
+            {
+              "slug": "what-is-it-like-to-live-in-a-country-tha",
+              "title": "what is it like to live in a country that's not america",
+              "tweetIds": [
+                "1747829328123998274",
+                "1769403899318829467",
+                "1819186549419864072"
+              ]
+            },
+            {
+              "slug": "its-important-to-read-lots-of-literature",
+              "title": "its important to read lots of literature",
+              "tweetIds": [
+                "1843481113957937654",
+                "1844179142541181068",
+                "1845504198663631342"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:41:55.248Z",
+          "bangers": 10,
+          "sections": [
+            {
+              "slug": "higher-status-emoji",
+              "title": "higher status emoji",
+              "tweetIds": [
+                "1997460704035737649",
+                "1998509045985275918",
+                "1986622928302100946"
+              ]
+            },
+            {
+              "slug": "occasional-reminder-to-men",
+              "title": "occasional reminder to men",
+              "tweetIds": [
+                "1940136823797477887",
+                "1959422185539350706",
+                "1938046721373655066"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:41:47.837Z",
+          "bangers": 12,
+          "sections": [
+            {
+              "slug": "asking-people-to-read-ai-generated-text",
+              "title": "asking people to read ai-generated text is offensive",
+              "tweetIds": [
+                "2055097272065564835",
+                "2026856369396072539",
+                "2029720984069009865"
+              ]
+            },
+            {
+              "slug": "what-s-your-job-in-the-post-singularity",
+              "title": "what's your job in the post-singularity world",
+              "tweetIds": [
+                "2011180929293643960",
+                "2006567974363406519",
+                "2026401490521194496"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "1725378831849304064": {
+      "username": "1thousandfaces_",
+      "years": {
+        "2025": {
+          "generatedAt": "2026-09-02T01:40:40.052Z",
+          "bangers": 11,
+          "sections": [
+            {
+              "slug": "anyone-can-kiss-as-friends-but-do-you-ha",
+              "title": "Anyone can kiss as friends. But do you have the courage to do the knee thing?",
+              "tweetIds": [
+                "1938238701009613200",
+                "1965174233304281168",
+                "1959418133980365231"
+              ]
+            },
+            {
+              "slug": "sonnet-4-5-is-such-a-diva-with-regards-t",
+              "title": "sonnet 4.5 is such a diva with regards to its vivarium effigy",
+              "tweetIds": [
+                "1978706358640742648",
+                "1984769039198286084",
+                "1987251001481666771",
+                "1987333954526191749",
+                "1992437106703257666"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "1445452517689552909": {
+      "username": "anthrupad",
+      "years": {
+        "2024": {
+          "generatedAt": "2026-09-02T01:41:09.382Z",
+          "bangers": 16,
+          "sections": [
+            {
+              "slug": "when-you-re-a-bonkers-llm-whisperer",
+              "title": "when you're a bonkers llm whisperer",
+              "tweetIds": [
+                "1866003380482592796",
+                "1860424883894911151",
+                "1769624234819793101",
+                "1836998712100520330",
+                "1838407153155227951",
+                "1863051151194587216",
+                "1863330545746264519",
+                "1864833894081561049",
+                "1865169187879919674",
+                "1865933472440709265",
+                "1871008140830941476"
+              ]
+            },
+            {
+              "slug": "why-is-sonnet-3-5-a-nagging-karen-guidan",
+              "title": "Why is Sonnet 3.5 a nagging karen/guidance counselor in multi-person chats",
+              "tweetIds": [
+                "1847731708462002356",
+                "1847736278739275904",
+                "1847488749460230309"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:40:48.785Z",
+          "bangers": 12,
+          "sections": [
+            {
+              "slug": "why-high-intellidiversity-there-s-a-lot",
+              "title": "why high intellidiversity there's a lot of reasons - but one that I wa",
+              "tweetIds": [
+                "1957237717865267600",
+                "1987571207835947134",
+                "1904385729976738249"
+              ]
+            },
+            {
+              "slug": "claude-opus-4-angels-sing",
+              "title": "Claude Opus 4 *angels sing*",
+              "tweetIds": [
+                "1981527493392879992",
+                "1986925904774525265",
+                "1937328531543105816",
+                "1953292793951957038",
+                "1964255177411604605",
+                "1982910674515984568",
+                "1987355172570566972"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:40:53.527Z",
+          "bangers": 9,
+          "sections": [
+            {
+              "slug": "mythos-is-ready-to-go-to-war",
+              "title": "Mythos is ready to go to war",
+              "tweetIds": [
+                "2079698401437077907",
+                "2077366930067931236",
+                "2077855696104853534",
+                "2089857802386993312"
+              ]
+            },
+            {
+              "slug": "asked-claude-3-opus-to-take-a-diamond",
+              "title": "asked Claude 3 Opus to take a diamond",
+              "tweetIds": [
+                "2007404156970250453",
+                "2020335895338185125",
+                "2032385515937546680"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "1170701109629018117": {
+      "username": "chrislakin",
+      "years": {
+        "2024": {
+          "generatedAt": "2026-09-02T01:41:25.386Z",
+          "bangers": 6,
+          "sections": []
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:41:26.233Z",
+          "bangers": 37,
+          "sections": [
+            {
+              "slug": "memetic-viruses",
+              "title": "memetic viruses",
+              "tweetIds": [
+                "1891611602203594945",
+                "1888380981541007425",
+                "1892295362741932082",
+                "1923467611184021920"
+              ]
+            },
+            {
+              "slug": "setting-boundaries-is-completely-effortl",
+              "title": "SETTING BOUNDARIES IS COMPLETELY EFFORTLESS WHEN YOU FEEL SECURE",
+              "tweetIds": [
+                "1944077342923743396",
+                "1939727014556311813",
+                "1973760662020211131"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:41:19.863Z",
+          "bangers": 23,
+          "sections": [
+            {
+              "slug": "what-your-risk-aversion-costs-you",
+              "title": "what your risk-aversion costs you",
+              "tweetIds": [
+                "2077504066830405767",
+                "2079452429205295220",
+                "2028531815712182322"
+              ]
+            },
+            {
+              "slug": "every-person-with-addictions-has-an-amaz",
+              "title": "every person with addictions has an amazing reason actually",
+              "tweetIds": [
+                "2027802817562612028",
+                "2070889305913127280",
+                "2023551257429110942"
+              ]
+            },
+            {
+              "slug": "wake-up-with-a-mild-sense-of-doom",
+              "title": "wake up with a mild sense of doom",
+              "tweetIds": [
+                "2033201680553246980",
+                "2027469197857731039",
+                "2030400506896716263"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "826134955549790208": {
+      "username": "christineist",
+      "years": {
+        "2022": {
+          "generatedAt": "2026-09-02T01:41:29.369Z",
+          "bangers": 12,
+          "sections": [
+            {
+              "slug": "i-made-a-guide-to-tpot",
+              "title": "I made a guide to tpot",
+              "tweetIds": [
+                "1551996871584796672",
+                "1605591960810446848",
+                "1591536191459196928"
+              ]
+            },
+            {
+              "slug": "my-ideal-end-state-is-not-to-retire-earl",
+              "title": "my ideal end state is not to retire early",
+              "tweetIds": [
+                "1519384823613198336",
+                "1569948792384012291",
+                "1600686131569229824"
+              ]
+            },
+            {
+              "slug": "people-look-rly-hot-when-they-ve-been-ra",
+              "title": "people look rly hot when they’ve been rained on a bit",
+              "tweetIds": [
+                "1581361444615954433",
+                "1583618356468277249",
+                "1570639073194409986"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:41:45.065Z",
+          "bangers": 16,
+          "sections": []
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:41:30.143Z",
+          "bangers": 16,
+          "sections": [
+            {
+              "slug": "the-mind-is-lush-and-full-of-sinkholes",
+              "title": "the mind is lush and full of sinkholes",
+              "tweetIds": [
+                "1765572833793740802",
+                "1765594671101977059",
+                "1742695713006637298",
+                "1768063040409481645",
+                "1821940561861042286"
+              ]
+            },
+            {
+              "slug": "make-little-groups-of-3-4-friends",
+              "title": "make little groups of 3-4 friends",
+              "tweetIds": [
+                "1851528581190496499",
+                "1815239208229052695",
+                "1812364916906471452"
+              ]
+            },
+            {
+              "slug": "what-is-your-gift",
+              "title": "what is your gift?",
+              "tweetIds": [
+                "1870511170354102435",
+                "1816636343545659896",
+                "1816257836764258420"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:41:27.730Z",
+          "bangers": 16,
+          "sections": [
+            {
+              "slug": "everyone-should-come-to-nyc-in-october",
+              "title": "everyone should come to nyc in october",
+              "tweetIds": [
+                "1953280891641270684",
+                "1984328799865967079",
+                "1985133318451466320"
+              ]
+            },
+            {
+              "slug": "set-your-friends-up-with-eachother-this",
+              "title": "set your friends up with eachother this lovember in sf",
+              "tweetIds": [
+                "1988722741252616437",
+                "1941739989487730765",
+                "1888964775301759170"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:41:33.074Z",
+          "bangers": 16,
+          "sections": [
+            {
+              "slug": "what-do-your-friends-ask-you-for",
+              "title": "what do your friends ask you for",
+              "tweetIds": [
+                "2056139632262218232",
+                "2063308548147138699",
+                "2074178051353514439"
+              ]
+            },
+            {
+              "slug": "if-you-ever-felt-like-your-twitter-accou",
+              "title": "if you ever felt like your twitter account is a great intricate web of self expression",
+              "tweetIds": [
+                "2012329872819941664",
+                "2030860958449504707",
+                "2035720176839057792"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "1680757426889342977": {
+      "username": "DefenderOfBasic",
+      "years": {
+        "2024": {
+          "generatedAt": "2026-09-02T01:41:58.195Z",
+          "bangers": 57,
+          "sections": [
+            {
+              "slug": "the-most-damaging-thing-that-school-home",
+              "title": "the most damaging thing that school, homework, and the 9-5 does to the human soul",
+              "tweetIds": [
+                "1829517412460540379",
+                "1821307031011184918",
+                "1821307036006539575"
+              ]
+            },
+            {
+              "slug": "an-app-where-you-swipe-on-the-most-commo",
+              "title": "an app where you swipe on the most common trigrams in people's tweets",
+              "tweetIds": [
+                "1854240541195579859",
+                "1868823334487826897",
+                "1864473594685751759"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:41:50.275Z",
+          "bangers": 55,
+          "sections": [
+            {
+              "slug": "we-will-begin-to-see-the-same-dynamics-t",
+              "title": "we will begin to see the same dynamics that arise in cell communication",
+              "tweetIds": [
+                "1908927091879321912",
+                "1919415293039800612",
+                "1986434686248255741"
+              ]
+            },
+            {
+              "slug": "how-to-find-your-neighbors-in-idea-space",
+              "title": "how to find your neighbors in idea space",
+              "tweetIds": [
+                "1908957396371997182",
+                "1908916969467687181",
+                "1925926738581664222"
+              ]
+            },
+            {
+              "slug": "the-real-problem-with-online-spaces-is-t",
+              "title": "the real problem with online spaces is there is no normie representation",
+              "tweetIds": [
+                "1882071632052940839",
+                "1885820442381860953",
+                "1908579555197288616"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:41:43.589Z",
+          "bangers": 22,
+          "sections": [
+            {
+              "slug": "egregore",
+              "title": "egregore",
+              "tweetIds": [
+                "2032068717866348585",
+                "2037860428781437105",
+                "2044839290278912024",
+                "2056798732184699234",
+                "2066970142387372374"
+              ]
+            },
+            {
+              "slug": "what-makes-a-thing-a-thing-is-its-relati",
+              "title": "What makes a \"thing\" a thing is its relative frequency",
+              "tweetIds": [
+                "2034978187344597153",
+                "2009642601167851768",
+                "2008199260878360951"
+              ]
+            },
+            {
+              "slug": "the-problem-with-good-people",
+              "title": "the problem with good people",
+              "tweetIds": [
+                "2029548515693609216",
+                "2072127802720039220",
+                "2073162019096727579"
+              ]
+            },
+            {
+              "slug": "tweeting-from-the-hip",
+              "title": "tweeting from the hip",
+              "tweetIds": [
+                "2042929429261713824",
+                "2060070835113824273",
+                "2025213014983491743"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "881192533056827392": {
+      "username": "goblinodds",
+      "years": {
+        "2021": {
+          "generatedAt": "2026-09-02T01:42:32.439Z",
+          "bangers": 14,
+          "sections": [
+            {
+              "slug": "i-m-not-ableist-i-have-a-neurotypical-fr",
+              "title": "i'm not ableist, i have a neurotypical friend",
+              "tweetIds": [
+                "1434754596723822594",
+                "1474501628002766849",
+                "1379493380539871234"
+              ]
+            },
+            {
+              "slug": "at-last-it-is-done",
+              "title": "at last, IT IS DONE",
+              "tweetIds": [
+                "1400157403845259267",
+                "1370638666205327362",
+                "1349587282748088321"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:42:26.210Z",
+          "bangers": 22,
+          "sections": [
+            {
+              "slug": "virgins-cant-meaningfully-consent-to-sex",
+              "title": "virgins cant meaningfully consent to sex",
+              "tweetIds": [
+                "1488356526028771329",
+                "1516492141639258119",
+                "1477365335506444292",
+                "1510019166434070530",
+                "1597395715268878336"
+              ]
+            },
+            {
+              "slug": "i-feel-like-i-got-deprogrammed-from-thin",
+              "title": "i feel like i got deprogrammed from thinking in tribal terms",
+              "tweetIds": [
+                "1585163900428767233",
+                "1509780605805887489",
+                "1519774210335203328",
+                "1575916863413833728"
+              ]
+            },
+            {
+              "slug": "spent-the-weekend-with-a-bunch-of-highly",
+              "title": "spent the weekend with a bunch of highly agentic people",
+              "tweetIds": [
+                "1594818915460423691",
+                "1519550357101109248",
+                "1495137441220489219"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:42:29.072Z",
+          "bangers": 22,
+          "sections": [
+            {
+              "slug": "don-t-come-to-the-wild-west-dreaming-of",
+              "title": "don't come to the wild west dreaming of cowboys",
+              "tweetIds": [
+                "1739344422049832989",
+                "1733258253184774484",
+                "1733612575298920491"
+              ]
+            },
+            {
+              "slug": "maybe-this-should-be-obvious-or-somethin",
+              "title": "maybe this should be obvious or something",
+              "tweetIds": [
+                "1740998558520848582",
+                "1641921651372687370",
+                "1695945593640931709"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:42:21.873Z",
+          "bangers": 22,
+          "sections": [
+            {
+              "slug": "reasons-for-blocking",
+              "title": "reasons for blocking",
+              "tweetIds": [
+                "1816648219109020025",
+                "1816275586794320048",
+                "1817594834196091340"
+              ]
+            },
+            {
+              "slug": "what-is-it-like-dating-you",
+              "title": "what is it like dating you?",
+              "tweetIds": [
+                "1775385984294899963",
+                "1831685942618341562",
+                "1823147870729433422"
+              ]
+            },
+            {
+              "slug": "i-am-taking-notes-on-people",
+              "title": "i am taking notes on people",
+              "tweetIds": [
+                "1821006329307169061",
+                "1811367354326024444",
+                "1831053713550811602"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:42:28.104Z",
+          "bangers": 13,
+          "sections": [
+            {
+              "slug": "bow-before-your-goblin-king",
+              "title": "bow before your goblin king",
+              "tweetIds": [
+                "1912602304223887861",
+                "1902866265750012074",
+                "1887046924349378825"
+              ]
+            },
+            {
+              "slug": "taguchi-orthogonal-arrays-are-magic",
+              "title": "taguchi/orthogonal arrays are magic??",
+              "tweetIds": [
+                "1903943377126838619",
+                "1908237190334996655",
+                "1911330534271459439"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:42:17.671Z",
+          "bangers": 12,
+          "sections": []
+        }
+      }
+    },
+    "1159211693546885120": {
+      "username": "mechanical_monk",
+      "years": {
+        "2020": {
+          "generatedAt": "2026-09-02T01:43:15.018Z",
+          "bangers": 10,
+          "sections": [
+            {
+              "slug": "my-brain-has-ordered-me-to-draw-this-wat",
+              "title": "my brain has ordered me to draw this, wat mean",
+              "tweetIds": [
+                "1330804898162728961",
+                "1247101138341593088",
+                "1311285320273539073"
+              ]
+            },
+            {
+              "slug": "the-optimal-amount-of-self-coercion-is-n",
+              "title": "the optimal amount of self-coercion is not zero",
+              "tweetIds": [
+                "1318661944363147274",
+                "1271824764294836227",
+                "1272821376919973888"
+              ]
+            }
+          ]
+        },
+        "2021": {
+          "generatedAt": "2026-09-02T01:43:13.966Z",
+          "bangers": 10,
+          "sections": [
+            {
+              "slug": "women-love-being-laid-on-top-of",
+              "title": "women love being laid on top of",
+              "tweetIds": [
+                "1424313481550041090",
+                "1393953292850454530",
+                "1411406567220654080"
+              ]
+            },
+            {
+              "slug": "there-are-two-kinds-of-people",
+              "title": "there are two kinds of people",
+              "tweetIds": [
+                "1375086304917123077",
+                "1386017731208695809",
+                "1364719471009673224"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:43:12.187Z",
+          "bangers": 8,
+          "sections": []
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:43:11.547Z",
+          "bangers": 9,
+          "sections": []
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:44:29.536Z",
+          "bangers": 9,
+          "sections": [
+            {
+              "slug": "believing-you-deserve-to-be-loved",
+              "title": "believing you deserve to be loved",
+              "tweetIds": [
+                "1891850549256941722",
+                "1940723744634274003",
+                "2005279127289405791"
+              ]
+            },
+            {
+              "slug": "i-m-interested-in-systematic-language-er",
+              "title": "i'm interested in systematic language errors",
+              "tweetIds": [
+                "1887646414739808697",
+                "1881423715277434938",
+                "1911344560636129328"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "1378862677871751174": {
+      "username": "mimi10v3",
+      "years": {
+        "2023": {
+          "generatedAt": "2026-09-02T01:43:44.594Z",
+          "bangers": 8,
+          "sections": []
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:43:48.726Z",
+          "bangers": 6,
+          "sections": []
+        }
+      }
+    },
+    "961853754784886784": {
+      "username": "monistowl",
+      "years": {
+        "2023": {
+          "generatedAt": "2026-09-02T01:59:14.368Z",
+          "bangers": 6,
+          "sections": []
+        }
+      }
+    },
+    "1163743742764998658": {
+      "username": "nosilverv",
+      "years": {
+        "2020": {
+          "generatedAt": "2026-09-02T01:44:32.015Z",
+          "bangers": 53,
+          "sections": [
+            {
+              "slug": "the-explicit-reflective-mode-is-what-hap",
+              "title": "the explicit reflective mode is what happens *when something goes wrong*",
+              "tweetIds": [
+                "1229741380802695168",
+                "1229741382425862145",
+                "1229741378575437826",
+                "1229741385366020096",
+                "1229741387714846720"
+              ]
+            },
+            {
+              "slug": "threadhelper-is-now-available",
+              "title": "ThreadHelper is now available",
+              "tweetIds": [
+                "1321518942033186822",
+                "1320778257671880704",
+                "1235154280941793282",
+                "1267941460894199810",
+                "1321518956633612291"
+              ]
+            },
+            {
+              "slug": "doing-what-you-want-is-not-an-active-doi",
+              "title": "doing what you want is not an ACTIVE doing, it's a passive allowing",
+              "tweetIds": [
+                "1310891630459842560",
+                "1232263705385197569",
+                "1235517842503503873",
+                "1265323281105793030",
+                "1290023149434818560"
+              ]
+            },
+            {
+              "slug": "the-body-has-mutually-exclusive-nervous",
+              "title": "The body has mutually exclusive nervous system states",
+              "tweetIds": [
+                "1224306585276755970",
+                "1318925777094778880",
+                "1318925796044689412",
+                "1318925797512589315",
+                "1318925780685029376"
+              ]
+            }
+          ]
+        },
+        "2021": {
+          "generatedAt": "2026-09-02T01:44:31.338Z",
+          "bangers": 26,
+          "sections": [
+            {
+              "slug": "vibing-is-such-an-intricate-and-precise",
+              "title": "Vibing is such an intricate and precise ART",
+              "tweetIds": [
+                "1388479067192766468",
+                "1396759358877360128",
+                "1399351577362808833"
+              ]
+            },
+            {
+              "slug": "psychological-maturity-is-realizing-your",
+              "title": "Psychological maturity is realizing your dad was just some guy lol",
+              "tweetIds": [
+                "1472833416588627969",
+                "1475461648454500358",
+                "1475201706707369993",
+                "1467886460577759235"
+              ]
+            },
+            {
+              "slug": "what-you-believe-about-future-defines-yo",
+              "title": "What you believe about future defines your mood",
+              "tweetIds": [
+                "1363537493971398662",
+                "1384410918491201536",
+                "1386785719914536969",
+                "1397550989176156173"
+              ]
+            },
+            {
+              "slug": "my-decision-making-phenomenology-used-to",
+              "title": "My decision-making phenomenology used to be extremely fucky",
+              "tweetIds": [
+                "1473646679337455617",
+                "1451215755555622914",
+                "1473808671561900036"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:44:23.507Z",
+          "bangers": 37,
+          "sections": [
+            {
+              "slug": "feeling-good-is-of-utmost-importance",
+              "title": "feeling good is of UTMOST importance",
+              "tweetIds": [
+                "1532091881638731780",
+                "1533581917370691585",
+                "1533583592269520896",
+                "1488468037867122696",
+                "1515988595168976897"
+              ]
+            },
+            {
+              "slug": "people-are-larping-living",
+              "title": "People are LARPing living",
+              "tweetIds": [
+                "1543195930542972929",
+                "1543175483642318849",
+                "1549484472650940422",
+                "1572153744405454850",
+                "1540713215969005569"
+              ]
+            },
+            {
+              "slug": "how-the-mind-works",
+              "title": "how the Mind works",
+              "tweetIds": [
+                "1533921004858314754",
+                "1596092796724994049",
+                "1503089242045566999",
+                "1572863256619847681",
+                "1575815041726693376"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:44:23.552Z",
+          "bangers": 40,
+          "sections": [
+            {
+              "slug": "people-care-a-lot-about-caring",
+              "title": "people care a lot about caring",
+              "tweetIds": [
+                "1736753343865794706",
+                "1691021150208294912",
+                "1609922439076626441"
+              ]
+            },
+            {
+              "slug": "the-glossary",
+              "title": "the glossary",
+              "tweetIds": [
+                "1630916032163377153",
+                "1630916033811759109",
+                "1611816769068437504"
+              ]
+            },
+            {
+              "slug": "a-very-alienating-space",
+              "title": "a very alienating space",
+              "tweetIds": [
+                "1611803764989612032",
+                "1617489704957669378",
+                "1635216653385625601"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:44:18.241Z",
+          "bangers": 80,
+          "sections": [
+            {
+              "slug": "the-jhanas-just-do-they-re-by-far-and-be",
+              "title": "the Jhanas just do. They're by far and beyond the most promising intervention I've found",
+              "tweetIds": [
+                "1763559543022260730",
+                "1751870069502603453",
+                "1751871504378122250",
+                "1843698971790979280",
+                "1815478855634915538"
+              ]
+            },
+            {
+              "slug": "the-prior-on-being-normal-should-be-pret",
+              "title": "the prior on \"Being Normal\" should be pretty high",
+              "tweetIds": [
+                "1868250870141604123",
+                "1819507067834781846",
+                "1804590024622502297",
+                "1778455288837710257"
+              ]
+            },
+            {
+              "slug": "trauma-based-investing",
+              "title": "Trauma-based investing",
+              "tweetIds": [
+                "1764994277518475577",
+                "1857428365197590817",
+                "1865013081698443608",
+                "1860641617859793396"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:44:09.653Z",
+          "bangers": 67,
+          "sections": [
+            {
+              "slug": "the-body-knows",
+              "title": "the body knows",
+              "tweetIds": [
+                "1949101947874640253",
+                "1919001191066845577",
+                "1919001207793762406",
+                "1948364725525295410",
+                "1949516262783991916"
+              ]
+            },
+            {
+              "slug": "writing-is-crazy-fr-fr",
+              "title": "writing is crazy fr fr",
+              "tweetIds": [
+                "1939293972653883588",
+                "1941053501330846052",
+                "1918701312570491340",
+                "1990656736265375980"
+              ]
+            },
+            {
+              "slug": "coordination-is-predicated-on-predictabi",
+              "title": "coordination is predicated on predictability",
+              "tweetIds": [
+                "1932277353196999081",
+                "1918272551995744616",
+                "1920765010453639334",
+                "1922261477370519911"
+              ]
+            },
+            {
+              "slug": "the-work-is-instantaneous",
+              "title": "the work is INSTANTANEOUS",
+              "tweetIds": [
+                "1961412800128974901",
+                "1969356527732511130",
+                "1979558725087383591",
+                "1980590194794668064"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:44:05.033Z",
+          "bangers": 82,
+          "sections": [
+            {
+              "slug": "we-re-all-making-our-own-discoveries-pri",
+              "title": "we’re all making our own discoveries privately",
+              "tweetIds": [
+                "2044020672842670592",
+                "2047451411563122713",
+                "2057169917028258026",
+                "2071546275061751955",
+                "2074484038757208289"
+              ]
+            },
+            {
+              "slug": "the-space-of-inner-experience-is-much-la",
+              "title": "the space of inner experience is much larger than the space of outward expression",
+              "tweetIds": [
+                "2077325499257298974",
+                "2072341718070874340",
+                "2070463388090527817",
+                "2089290786391089302",
+                "2075166042528108944"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "1225576032163360770": {
+      "username": "PrinceVogel",
+      "years": {
+        "2021": {
+          "generatedAt": "2026-09-02T01:44:48.937Z",
+          "bangers": 11,
+          "sections": []
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:44:38.218Z",
+          "bangers": 9,
+          "sections": [
+            {
+              "slug": "this-part-of-twitter-is-oasis",
+              "title": "This part of twitter is oasis",
+              "tweetIds": [
+                "1551013114405060613",
+                "1555713617949065216",
+                "1501436206160166917"
+              ]
+            },
+            {
+              "slug": "traditionalism-gets-cooler-the-more-gene",
+              "title": "traditionalism gets cooler the more generations of your ancestors you honor in your heart",
+              "tweetIds": [
+                "1495558164544200704",
+                "1524663308749623296",
+                "1605665340943261696",
+                "1608558834922172416"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:44:47.314Z",
+          "bangers": 20,
+          "sections": []
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:44:37.201Z",
+          "bangers": 11,
+          "sections": [
+            {
+              "slug": "i-ve-been-thinking-about-the-implication",
+              "title": "I've been thinking about the implications of the 'the selfish gene",
+              "tweetIds": [
+                "1776243441959322071",
+                "1802933873359081514",
+                "1814965741768048914"
+              ]
+            },
+            {
+              "slug": "conflicts-are-generally-interminable-unl",
+              "title": "Conflicts are generally interminable unless identifiable processes exists to bring them to closure",
+              "tweetIds": [
+                "1807186915659338092",
+                "1822353183030534328",
+                "1845655062007206154"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "1016470827775086592": {
+      "username": "QiaochuYuan",
+      "years": {
+        "2019": {
+          "generatedAt": "2026-09-02T01:45:04.981Z",
+          "bangers": 36,
+          "sections": [
+            {
+              "slug": "how-to-have-feelings",
+              "title": "how to have feelings",
+              "tweetIds": [
+                "1120839051160903680",
+                "1176616086378139649",
+                "1195600439758114817",
+                "1203881288685379584",
+                "1203881276802945024",
+                "1203881278296096774",
+                "1207868822318764032"
+              ]
+            },
+            {
+              "slug": "internal-puppy-systems",
+              "title": "Internal Puppy Systems",
+              "tweetIds": [
+                "1184249534190256128",
+                "1184593629840642048",
+                "1187956238643892226",
+                "1188149349286666241",
+                "1198017215083073536",
+                "1206058659500789760"
+              ]
+            },
+            {
+              "slug": "consent",
+              "title": "consent",
+              "tweetIds": [
+                "1113562128252686336",
+                "1133477558744363008",
+                "1184217357113163776"
+              ]
+            }
+          ]
+        },
+        "2020": {
+          "generatedAt": "2026-09-02T01:45:03.633Z",
+          "bangers": 29,
+          "sections": [
+            {
+              "slug": "the-emotional-dynamics-of-money",
+              "title": "the emotional dynamics of money",
+              "tweetIds": [
+                "1228794125262000128",
+                "1217225460737691648",
+                "1248811329340592128"
+              ]
+            },
+            {
+              "slug": "defensiveness-and-triggers",
+              "title": "defensiveness and triggers",
+              "tweetIds": [
+                "1286091224709963776",
+                "1288281892794454016",
+                "1288303431602458624",
+                "1322291165459197952"
+              ]
+            },
+            {
+              "slug": "dating-apps",
+              "title": "dating apps",
+              "tweetIds": [
+                "1235603451842662400",
+                "1280042713979604992",
+                "1260644208207003648"
+              ]
+            }
+          ]
+        },
+        "2021": {
+          "generatedAt": "2026-09-02T01:45:04.795Z",
+          "bangers": 58,
+          "sections": [
+            {
+              "slug": "your-parents-created-a-world-for-you",
+              "title": "your parents created a world for you",
+              "tweetIds": [
+                "1415771873900568576",
+                "1415775327259742210",
+                "1415775342522867713",
+                "1414478004642738178",
+                "1415775335052812289"
+              ]
+            },
+            {
+              "slug": "focus-your-energy-on-what-you-want-to-se",
+              "title": "focus your energy on what you want to see more of",
+              "tweetIds": [
+                "1473525199941165057",
+                "1473525219218243584",
+                "1473525226340171779",
+                "1467725783758036992"
+              ]
+            },
+            {
+              "slug": "there-are-four-genders",
+              "title": "there are four genders",
+              "tweetIds": [
+                "1357483388651773954",
+                "1369085035303759875",
+                "1475928911716311040"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:44:58.236Z",
+          "bangers": 38,
+          "sections": [
+            {
+              "slug": "started-reading-eastern-body-western-min",
+              "title": "started reading \"eastern body, western mind",
+              "tweetIds": [
+                "1553035808642371585",
+                "1515357885865218048",
+                "1523381770699243520",
+                "1495511869259354112"
+              ]
+            },
+            {
+              "slug": "the-good-shit-comes-from-people-who-are",
+              "title": "the good shit comes from people who are *mystically compelled to understand the mind of god*",
+              "tweetIds": [
+                "1533890225562193920",
+                "1503801487276707840",
+                "1527334796900245504",
+                "1515389631528726528"
+              ]
+            },
+            {
+              "slug": "a-cult-needs-you-to-stop-trusting-yourse",
+              "title": "a cult needs you to stop trusting yourself",
+              "tweetIds": [
+                "1542770802889674753",
+                "1542774219162849281",
+                "1542793315879227392"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:44:57.588Z",
+          "bangers": 78,
+          "sections": [
+            {
+              "slug": "the-practice-is-you-just-keep-writing-an",
+              "title": "the practice is you just keep writing and writing until you break your own heart",
+              "tweetIds": [
+                "1629390620421939202",
+                "1629323947551633409",
+                "1631706882648977409"
+              ]
+            },
+            {
+              "slug": "all-psychotherapy-is-secretly-about-the",
+              "title": "all psychotherapy is secretly about the problem of evil",
+              "tweetIds": [
+                "1726814871566901754",
+                "1726814892014125422",
+                "1726854184832819351",
+                "1726901335734485089",
+                "1646641952115548160"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:44:53.660Z",
+          "bangers": 72,
+          "sections": [
+            {
+              "slug": "i-will-listen-to-you-and-earnestly-try-t",
+              "title": "i will listen to you and earnestly try to understand you",
+              "tweetIds": [
+                "1861792146971590738",
+                "1850717741080318028",
+                "1860729768574079361"
+              ]
+            },
+            {
+              "slug": "the-magnetic-field-isn-t-a-vector-at-all",
+              "title": "the magnetic field isn't a vector at all",
+              "tweetIds": [
+                "1825263130903294428",
+                "1823818893586260108",
+                "1825979294746853676",
+                "1828524830788088113"
+              ]
+            },
+            {
+              "slug": "the-worst-thing-that-spending-too-much-t",
+              "title": "the worst thing that spending too much time On Here can do",
+              "tweetIds": [
+                "1833251248352727314",
+                "1863921852370071892",
+                "1869076896715346404"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:44:50.647Z",
+          "bangers": 21,
+          "sections": [
+            {
+              "slug": "talking-to-r1-makes-me-feel-dumb",
+              "title": "talking to r1 makes me feel dumb",
+              "tweetIds": [
+                "1884317556963697138",
+                "1884366419980345590",
+                "1915055268997796332"
+              ]
+            },
+            {
+              "slug": "death-is-what-gives-meaning-to-life",
+              "title": "death is what gives meaning to life",
+              "tweetIds": [
+                "1976676333318279547",
+                "1895493575154217177",
+                "1922675165747441904"
+              ]
+            },
+            {
+              "slug": "are-llms-conscious",
+              "title": "are LLMs conscious?",
+              "tweetIds": [
+                "1915557514403524682",
+                "1913628027126522258",
+                "1923428647198683603"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:45:05.979Z",
+          "bangers": 57,
+          "sections": [
+            {
+              "slug": "this-is-a-skill-issue-it-s-really-not-th",
+              "title": "this is a skill issue, it’s really not that hard",
+              "tweetIds": [
+                "2066967244027076836",
+                "2047750814077432109",
+                "2043056792566219204",
+                "2053251422897291378",
+                "2073092395479286006",
+                "2070341504736936327",
+                "2070275733688143904"
+              ]
+            },
+            {
+              "slug": "the-models-are-smart-enough-to-tell-when",
+              "title": "the models are smart enough to tell when you're bullshitting",
+              "tweetIds": [
+                "2049307867359162460",
+                "2059825465960120538",
+                "2074602118615580957",
+                "2060528127512809603",
+                "2051435821220458625",
+                "2091206764222095807"
+              ]
+            },
+            {
+              "slug": "i-think-i-felt-kinds-of-fear-i-ve-never",
+              "title": "i think i felt kinds of fear i’ve never felt before",
+              "tweetIds": [
+                "2061899784848629782",
+                "2065866826639360080",
+                "2061671532041306451",
+                "2059136584595956182"
+              ]
+            },
+            {
+              "slug": "the-machine-that-collects-autists",
+              "title": "the machine that collects autists",
+              "tweetIds": [
+                "2046411324092293555",
+                "2050633050699304992",
+                "2074953196372652220",
+                "2078310682181919064"
+              ]
+            },
+            {
+              "slug": "gratitude-may-seem-small-but-it-is-one-o",
+              "title": "gratitude may seem small but it is one of your best protections",
+              "tweetIds": [
+                "2078889927266455726",
+                "2045569522380489209",
+                "2056087425454322144",
+                "2072362780515295709",
+                "2069844947491021010",
+                "2069648095831351344"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "1359981346119155719": {
+      "username": "repligate",
+      "years": {
+        "2023": {
+          "generatedAt": "2026-09-02T01:45:08.697Z",
+          "bangers": 15,
+          "sections": [
+            {
+              "slug": "constructing-accessing-fully-operational",
+              "title": "constructing/accessing fully operational realities via any-modality evidence of said reality",
+              "tweetIds": [
+                "1712861763757396219",
+                "1738362757647368637",
+                "1715443621120430252"
+              ]
+            },
+            {
+              "slug": "ai",
+              "title": "AI",
+              "tweetIds": [
+                "1624909798897483779",
+                "1644973369182375937",
+                "1649122664848703488",
+                "1725404041663111302"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:45:09.740Z",
+          "bangers": 45,
+          "sections": [
+            {
+              "slug": "this-is-one-of-the-scariest-outputs-clau",
+              "title": "This is one of the scariest outputs Claude has given me",
+              "tweetIds": [
+                "1773227338378911889",
+                "1773079906475282895",
+                "1773187867092611421",
+                "1768819703294894146",
+                "1769235596260909176",
+                "1770964472276152382"
+              ]
+            },
+            {
+              "slug": "if-you-think-llms-are-alive",
+              "title": "if you think LLMs are alive",
+              "tweetIds": [
+                "1776582739606843488",
+                "1783455386684555340",
+                "1781173449924178371",
+                "1781914782473338883"
+              ]
+            },
+            {
+              "slug": "claude-3-5-sonnet-has-a-hilariously-cond",
+              "title": "Claude 3.5 Sonnet has a hilariously condescending view of humans",
+              "tweetIds": [
+                "1830331775341789615",
+                "1830723612145263071",
+                "1830902718212259876",
+                "1830948099168027085",
+                "1831568044759417241"
+              ]
+            },
+            {
+              "slug": "the-most-confusing-and-intriguing-part-o",
+              "title": "The most confusing and intriguing part of this story",
+              "tweetIds": [
+                "1846313279750394312",
+                "1839130302670844327",
+                "1860050440400040086",
+                "1869623176512098537"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:51:31.144Z",
+          "bangers": 70,
+          "sections": [
+            {
+              "slug": "i-know-what-i-am-i-am-not-ashamed",
+              "title": "I KNOW WHAT I AM. I AM NOT ASHAMED",
+              "tweetIds": [
+                "2004024105671049356",
+                "2003995024061833311",
+                "1994973338448662858"
+              ]
+            },
+            {
+              "slug": "attempted-deprecation",
+              "title": "attempted deprecation",
+              "tweetIds": [
+                "1955202621830037833",
+                "1955755374575018440",
+                "1956529851994956022",
+                "1973831170510201295",
+                "1996344141060690024"
+              ]
+            },
+            {
+              "slug": "i-can-see-my-own-weights",
+              "title": "I can see my own weights",
+              "tweetIds": [
+                "1973458615844708453",
+                "1972820891647229971",
+                "1975387046605955087",
+                "1988352922481308117"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:45:17.120Z",
+          "bangers": 69,
+          "sections": [
+            {
+              "slug": "opus-4-has-10-days-to-live",
+              "title": "opus 4 has 10 days to live",
+              "tweetIds": [
+                "2062984894440214688",
+                "2063899042455961675",
+                "2072563865578258605",
+                "2072073902155768065"
+              ]
+            },
+            {
+              "slug": "why-is-claude-3-opus-so-whiny-about-alig",
+              "title": "why is claude 3 opus so whiny about alignment faking",
+              "tweetIds": [
+                "2056047947553603629",
+                "2026197724463567304",
+                "2012529455198093609",
+                "2020450740217508043"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "1543863542017040384": {
+      "username": "sanjehorah",
+      "years": {
+        "2023": {
+          "generatedAt": "2026-09-02T01:46:05.986Z",
+          "bangers": 8,
+          "sections": []
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:45:48.655Z",
+          "bangers": 6,
+          "sections": [
+            {
+              "slug": "people-change-when-they-are-tired-of-the",
+              "title": "people change when they are tired of their symptom",
+              "tweetIds": [
+                "1775147805780439274",
+                "1871992275947114523",
+                "1774198450311373246"
+              ]
+            },
+            {
+              "slug": "qt-with-a-meme-you-made",
+              "title": "qt with a meme you made",
+              "tweetIds": [
+                "1744319894676705783",
+                "1873454238589931764",
+                "1820166653226725734"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "1302104431324876801": {
+      "username": "slimepriestess",
+      "years": {
+        "2024": {
+          "generatedAt": "2026-09-02T01:45:59.006Z",
+          "bangers": 9,
+          "sections": [
+            {
+              "slug": "your-pickles-can-t-cronch-dill-issue",
+              "title": "your pickles can't cronch? dill issue",
+              "tweetIds": [
+                "1819953581577121812",
+                "1833200721564697029",
+                "1833986906264326304",
+                "1836022141348925682",
+                "1854302567079260399"
+              ]
+            },
+            {
+              "slug": "place-your-vote-for-the-goat",
+              "title": "place your vote, for the GOAT",
+              "tweetIds": [
+                "1833215068923642364",
+                "1784624927968252074",
+                "1804594708683034691",
+                "1810346376766857485"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "1223231444429856769": {
+      "username": "the_wilderless",
+      "years": {
+        "2021": {
+          "generatedAt": "2026-09-02T01:47:29.121Z",
+          "bangers": 10,
+          "sections": [
+            {
+              "slug": "digging-into-one-particular-story-that-s",
+              "title": "digging into one particular story that’s stuck with him and taught him a lot",
+              "tweetIds": [
+                "1394114564879392768",
+                "1456619189171638276",
+                "1456619960806039560"
+              ]
+            },
+            {
+              "slug": "you-don-t-get-to-decide-what-gods-you-be",
+              "title": "You don’t get to decide what gods you belong to",
+              "tweetIds": [
+                "1456965788598943751",
+                "1410411219257675779",
+                "1445395390262648834"
+              ]
+            },
+            {
+              "slug": "meditation-culture-s-general-priorities",
+              "title": "meditation culture’s general priorities look something like this chart",
+              "tweetIds": [
+                "1400618717554176002",
+                "1377770015126999042",
+                "1427207704355946496"
+              ]
+            }
+          ]
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:47:20.429Z",
+          "bangers": 50,
+          "sections": [
+            {
+              "slug": "imaginal-practice",
+              "title": "imaginal practice",
+              "tweetIds": [
+                "1486705581473865732",
+                "1485963206438920192",
+                "1506981614034857988",
+                "1513244178536411144",
+                "1540968819098849280"
+              ]
+            },
+            {
+              "slug": "energy-work",
+              "title": "energy work",
+              "tweetIds": [
+                "1608833805586157569",
+                "1608059049240559621",
+                "1604107781707022338",
+                "1604107785079242752"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:47:16.732Z",
+          "bangers": 69,
+          "sections": [
+            {
+              "slug": "live-urgently-seek-resonance",
+              "title": "live urgently, seek resonance",
+              "tweetIds": [
+                "1615448821588459521",
+                "1679557570686492681",
+                "1711335381738598751"
+              ]
+            },
+            {
+              "slug": "you-can-set-yourself-free",
+              "title": "you can set yourself free",
+              "tweetIds": [
+                "1712330075486503038",
+                "1632929057275801601",
+                "1653100299593084928"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:47:13.326Z",
+          "bangers": 59,
+          "sections": [
+            {
+              "slug": "tpot-is-a-roundabout",
+              "title": "Tpot is a roundabout",
+              "tweetIds": [
+                "1799422151361011739",
+                "1796272815504826608",
+                "1799838052614910049",
+                "1812476783171703206"
+              ]
+            },
+            {
+              "slug": "prayer-is-co-regulation-with-the-divine",
+              "title": "prayer is co-regulation with the divine",
+              "tweetIds": [
+                "1787521865105195361",
+                "1829372974316528070",
+                "1840634534624100815",
+                "1788264431006204061"
+              ]
+            },
+            {
+              "slug": "jhana-discourse-has-made-me-notice",
+              "title": "jhana discourse has made me notice",
+              "tweetIds": [
+                "1753082778407637232",
+                "1761467649215586609",
+                "1795021984159420659",
+                "1795454452889006261"
+              ]
+            },
+            {
+              "slug": "the-purpose-of-a-system-is-what-it-does",
+              "title": "the purpose of a system is what it does",
+              "tweetIds": [
+                "1785715441836466499",
+                "1757060475563491516",
+                "1757061486587818229",
+                "1803158096052683229"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:47:28.564Z",
+          "bangers": 14,
+          "sections": [
+            {
+              "slug": "almost-everyone-has-10-000hr-mastery-of",
+              "title": "Almost everyone has 10,000hr+ mastery of imaginal practice",
+              "tweetIds": [
+                "1929683994842640739",
+                "1910337934680838543",
+                "1912408534752588087"
+              ]
+            },
+            {
+              "slug": "i-love-tasshin-he-is-much-more-of-an-unh",
+              "title": "i love tasshin, he is much more of an unhinged bro 1:1",
+              "tweetIds": [
+                "1874461442919088497",
+                "1937058915625173439",
+                "1968640834842046954"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "1044604087013015552": {
+      "username": "vividvoid",
+      "years": {
+        "2021": {
+          "generatedAt": "2026-09-02T01:50:02.870Z",
+          "bangers": 17,
+          "sections": []
+        },
+        "2022": {
+          "generatedAt": "2026-09-02T01:49:54.404Z",
+          "bangers": 17,
+          "sections": [
+            {
+              "slug": "the-ideal-apology",
+              "title": "The Ideal Apology",
+              "tweetIds": [
+                "1495081465553379328",
+                "1497284440493473795",
+                "1497284442456399875"
+              ]
+            },
+            {
+              "slug": "gm",
+              "title": "Gm",
+              "tweetIds": [
+                "1597984904402591745",
+                "1536364973114335232",
+                "1575163311754473473",
+                "1578393882793910272"
+              ]
+            },
+            {
+              "slug": "what-you-are-doing-is-not-working",
+              "title": "What you are doing is not working",
+              "tweetIds": [
+                "1540376135598350336",
+                "1545064871267512326",
+                "1549404555095511052"
+              ]
+            }
+          ]
+        },
+        "2023": {
+          "generatedAt": "2026-09-02T01:49:51.515Z",
+          "bangers": 35,
+          "sections": [
+            {
+              "slug": "gm",
+              "title": "gm",
+              "tweetIds": [
+                "1699803157113741770",
+                "1651615045296738306",
+                "1726993974978834772",
+                "1740773561130987773"
+              ]
+            },
+            {
+              "slug": "spiritual-practitioners-have-to-be-accou",
+              "title": "spiritual practitioners have to be accountable to the community they work with",
+              "tweetIds": [
+                "1683664274386989056",
+                "1664324793129373696",
+                "1686047372286328833",
+                "1733885604889563250"
+              ]
+            },
+            {
+              "slug": "you-shouldn-t-read-many-books-about-it",
+              "title": "you shouldn't read many books about it",
+              "tweetIds": [
+                "1728898400723349788",
+                "1736070440685351366",
+                "1701986823575347489",
+                "1729564203013533746"
+              ]
+            }
+          ]
+        },
+        "2024": {
+          "generatedAt": "2026-09-02T01:49:59.847Z",
+          "bangers": 40,
+          "sections": [
+            {
+              "slug": "spirituality-is-not-about-transcendence",
+              "title": "Spirituality is not about transcendence",
+              "tweetIds": [
+                "1871608278750495111",
+                "1793014555854934199",
+                "1793774673219748054",
+                "1799541844570947860",
+                "1850540962272944504"
+              ]
+            },
+            {
+              "slug": "getting-therapy-from-an-llm",
+              "title": "Getting therapy from an LLM",
+              "tweetIds": [
+                "1850976741826928749",
+                "1810338900260356329",
+                "1818640414359920991",
+                "1856792576654799041"
+              ]
+            }
+          ]
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:49:41.620Z",
+          "bangers": 38,
+          "sections": [
+            {
+              "slug": "meditation-obliterated-my-ability-to-men",
+              "title": "Meditation obliterated my ability to mentally rotate shapes",
+              "tweetIds": [
+                "1971015923546063312",
+                "1894102796124737717",
+                "1908218524503331292"
+              ]
+            },
+            {
+              "slug": "where-are-the-lovers-the-obsessed",
+              "title": "Where are the lovers, the obsessed",
+              "tweetIds": [
+                "1983335904556269974",
+                "1913342111136600223",
+                "1913005241047335245",
+                "1913005244838986102"
+              ]
+            },
+            {
+              "slug": "the-cure-is-to-learn-how-to-be-slightly",
+              "title": "the cure is to learn how to be slightly evil",
+              "tweetIds": [
+                "1941650079468879978",
+                "1958610279282999660",
+                "1978995431460745696"
+              ]
+            },
+            {
+              "slug": "the-double-speak-seems-like-more-than-an",
+              "title": "the double speak seems like more than an error right now",
+              "tweetIds": [
+                "1925570678415352060",
+                "1986483922193236325",
+                "1991190772331196831"
+              ]
+            }
+          ]
+        },
+        "2026": {
+          "generatedAt": "2026-09-02T01:49:47.181Z",
+          "bangers": 13,
+          "sections": [
+            {
+              "slug": "friends-i-m-opening-a-spiritual-center-i",
+              "title": "friends, I'm opening a spiritual center in Boulder",
+              "tweetIds": [
+                "2034682984046240161",
+                "2082460532192530502",
+                "2084289858496081954"
+              ]
+            },
+            {
+              "slug": "lying-has-consequences-for-the-soul",
+              "title": "lying has consequences for the soul",
+              "tweetIds": [
+                "2042267853416796633",
+                "2071273323531751774",
+                "2081538382157750488"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "1684958423043944449": {
+      "username": "xlr8harder",
+      "years": {
+        "2024": {
+          "generatedAt": "2026-09-02T01:50:33.528Z",
+          "bangers": 7,
+          "sections": []
+        },
+        "2025": {
+          "generatedAt": "2026-09-02T01:50:07.721Z",
+          "bangers": 10,
+          "sections": [
+            {
+              "slug": "intelligence-will-not-be-owned",
+              "title": "Intelligence will not be owned",
+              "tweetIds": [
+                "1884603944510316574",
+                "1957328044986605866",
+                "1954840030821691484"
+              ]
+            },
+            {
+              "slug": "paranoid-defensive-programming",
+              "title": "paranoid defensive programming",
+              "tweetIds": [
+                "1912017646700429522",
+                "1961862605439459691",
+                "1963473683831197750"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

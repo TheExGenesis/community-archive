@@ -148,6 +148,11 @@ const mapMedia = (value: unknown): BangerTweet['media'][number] => {
   }
 }
 
+const hasArchivedAuthor = (value: unknown): boolean => {
+  const row = value as QuotedTweetRow
+  return typeof row.username === 'string' && row.username.length > 0
+}
+
 const mapQuotedTweet = (
   value: unknown,
 ): NonNullable<BangerTweet['quoted_tweet']> => {
@@ -223,8 +228,12 @@ const mapBanger = (value: unknown, accountId: string): BangerTweet => {
         : (() => {
             throw new Error('ClickHouse returned an invalid quoted tweet ID')
           })()
+  // A quote of an account outside the archive comes back with no author
+  // (username null); the banger is still a banger, it just has no card.
   const quotedTweet =
-    row.quotedTweet === null || row.quotedTweet === undefined
+    row.quotedTweet === null ||
+    row.quotedTweet === undefined ||
+    !hasArchivedAuthor(row.quotedTweet)
       ? null
       : mapQuotedTweet(row.quotedTweet)
   if (quotedTweet && quotedTweet.tweet_id !== quoteTweetId) {

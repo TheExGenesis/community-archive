@@ -23,9 +23,11 @@ import {
   createArchiveClickHouseManifest,
 } from './archive_clickhouse'
 import {
+  CanonicalArchivePublisherError,
   canonicalArchiveObservedAt,
   canonicalArchivePolicyVersion,
-  canonicalArchiveShadowEnabled,
+  canonicalArchivePublishingEnabled,
+  canonicalArchiveQueueFirstEnabled,
   ensureCanonicalArchivePendingReport,
   pendingCanonicalArchiveReportIds,
   publishCanonicalArchiveBatch,
@@ -926,10 +928,8 @@ function patchArchive(archive: any): any {
 }
 
 // Main processing function
-async function processSingleArchive(sql: Sql, username: string, archiveUploadId: number): Promise<any> {
-  logger.debug(`Loading archive for optimized processing (current memory: ${getMemoryUsageMB()}MB)`)
-  
-  const archive = await loadArchiveData(username)
+async function processSingleArchive(sql: Sql, archive: any, archiveUploadId: number): Promise<any> {
+  logger.debug(`Preparing archive for optimized processing (current memory: ${getMemoryUsageMB()}MB)`)
   
   // Determine processing strategy based on size
   const tweetsCount = archive.tweets?.length || 0
@@ -1015,6 +1015,7 @@ async function buildPolicySafeCanonicalArchiveBatch(
   sql: Sql,
   delivery: ArchiveClickHouseDelivery,
   archive?: any,
+  sourceObservedAt?: unknown,
 ) {
   const manifest = {
     archiveUploadId: String(delivery.archive_upload_id),
@@ -1024,13 +1025,18 @@ async function buildPolicySafeCanonicalArchiveBatch(
   return sql.begin(async (transaction) => {
     const trx = transaction as unknown as Sql
     await trx`SELECT public.lock_policy_account(${manifest.accountId})`
-    const [source] = await trx`
-      SELECT created_at
-      FROM private.archive_clickhouse_delivery
-      WHERE archive_upload_id = ${manifest.archiveUploadId}
-        AND account_id = ${manifest.accountId}
-    `
-    const observedAt = canonicalArchiveObservedAt(source?.created_at)
+    let observedAt: string
+    if (sourceObservedAt !== undefined) {
+      observedAt = canonicalArchiveObservedAt(sourceObservedAt)
+    } else {
+      const [source] = await trx`
+        SELECT created_at
+        FROM private.archive_clickhouse_delivery
+        WHERE archive_upload_id = ${manifest.archiveUploadId}
+          AND account_id = ${manifest.accountId}
+      `
+      observedAt = canonicalArchiveObservedAt(source?.created_at)
+    }
     const [policy] = await trx`
       SELECT public.policy_account_is_blocked(
         ${manifest.accountId},
@@ -1079,12 +1085,40 @@ async function buildPolicySafeCanonicalArchiveBatch(
   })
 }
 
+async function publishCanonicalArchiveQueueFirst(
+  sql: Sql,
+  delivery: ArchiveClickHouseDelivery,
+  archive: any,
+  sourceObservedAt: unknown,
+): Promise<void> {
+  ensureCanonicalArchivePendingReport(
+    String(delivery.archive_upload_id),
+    logsDir,
+  )
+  const prepared = await buildPolicySafeCanonicalArchiveBatch(
+    sql,
+    delivery,
+    archive,
+    sourceObservedAt,
+  )
+  const report = await publishCanonicalArchiveBatch({
+    ...prepared,
+    reportDir: logsDir,
+  })
+  if (report.status !== 'complete') {
+    throw new CanonicalArchivePublisherError('canonical_queue_first_incomplete')
+  }
+  logger.info(
+    `Canonical archive queue-first complete (archive_upload_id=${delivery.archive_upload_id})`,
+  )
+}
+
 async function attemptCanonicalArchiveShadow(
   sql: Sql,
   delivery: ArchiveClickHouseDelivery,
   archive?: any,
 ): Promise<void> {
-  if (!canonicalArchiveShadowEnabled()) return
+  if (!canonicalArchivePublishingEnabled()) return
   try {
     ensureCanonicalArchivePendingReport(
       String(delivery.archive_upload_id),
@@ -1110,7 +1144,7 @@ async function attemptCanonicalArchiveShadow(
 }
 
 async function retryPendingCanonicalArchiveShadows(sql: Sql): Promise<void> {
-  if (!canonicalArchiveShadowEnabled()) return
+  if (!canonicalArchivePublishingEnabled()) return
   const archiveUploadIds = pendingCanonicalArchiveReportIds(logsDir).slice(
     0,
     CONFIG.CANONICAL_ARCHIVE_RETRY_BATCH,
@@ -1317,9 +1351,10 @@ async function main() {
     let archives_processed = 0
 
     for (const row of ready) {
-      const { id: archiveUploadId, account_id, username } = row
+      const { id: archiveUploadId, account_id, username, archive_at } = row
       logger.info(`Processing account ${account_id} with optimized batches (archive_upload_id=${archiveUploadId})`)
 
+      let queueFirstPending = false
       try {
         // Mark as committing
         const updateResult = await sql`
@@ -1334,8 +1369,31 @@ async function main() {
           continue
         }
 
-        // Process archive with optimized batch inserts
-        const archive = await processSingleArchive(sql, username, archiveUploadId)
+        const archive = await loadArchiveData(username)
+        const archiveManifest = createArchiveClickHouseManifest(
+          archive,
+          archiveUploadId,
+        )
+        const delivery = {
+          archive_upload_id: archiveUploadId,
+          account_id,
+          tweet_ids: archiveManifest.tweetIds,
+          username,
+        }
+
+        if (canonicalArchiveQueueFirstEnabled()) {
+          queueFirstPending = true
+          await publishCanonicalArchiveQueueFirst(
+            sql,
+            delivery,
+            archive,
+            archive_at,
+          )
+          queueFirstPending = false
+        }
+
+        // Process archive with optimized compatibility inserts.
+        await processSingleArchive(sql, archive, archiveUploadId)
 
         // Mark as completed
         const completeResult = await sql`
@@ -1356,32 +1414,14 @@ async function main() {
           await attemptClickHouseDelivery(
             sql,
             clickHouseSink,
-            {
-              archive_upload_id: archiveUploadId,
-              account_id,
-              tweet_ids: createArchiveClickHouseManifest(
-                archive,
-                archiveUploadId,
-              ).tweetIds,
-              username,
-            },
+            delivery,
             archive,
           )
         }
 
-        await attemptCanonicalArchiveShadow(
-          sql,
-          {
-            archive_upload_id: archiveUploadId,
-            account_id,
-            tweet_ids: createArchiveClickHouseManifest(
-              archive,
-              archiveUploadId,
-            ).tweetIds,
-            username,
-          },
-          archive,
-        )
+        if (!canonicalArchiveQueueFirstEnabled()) {
+          await attemptCanonicalArchiveShadow(sql, delivery, archive)
+        }
 
         // Force GC between accounts
         if (global.gc) {
@@ -1395,7 +1435,7 @@ async function main() {
         try {
           await sql`
             UPDATE public.archive_upload
-            SET upload_phase = 'failed'
+            SET upload_phase = ${queueFirstPending ? 'ready_for_commit' : 'failed'}
             WHERE id = ${archiveUploadId}
           `
         } catch (statusError) {

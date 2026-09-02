@@ -77,6 +77,14 @@ export function canonicalArchiveShadowEnabled(): boolean {
   return process.env.CANONICAL_ARCHIVE_SHADOW_PUBLISH_ENABLED === 'true'
 }
 
+export function canonicalArchiveQueueFirstEnabled(): boolean {
+  return process.env.CANONICAL_ARCHIVE_QUEUE_FIRST_ENABLED === 'true'
+}
+
+export function canonicalArchivePublishingEnabled(): boolean {
+  return canonicalArchiveShadowEnabled() || canonicalArchiveQueueFirstEnabled()
+}
+
 function sha256(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex')
 }
@@ -402,7 +410,7 @@ export async function publishCanonicalArchiveBatch(options: {
   reportDir: string
   fetchImpl?: FetchLike
 }): Promise<CanonicalPublishReport | { status: 'disabled' }> {
-  if (!canonicalArchiveShadowEnabled()) return { status: 'disabled' }
+  if (!canonicalArchivePublishingEnabled()) return { status: 'disabled' }
   const config = publisherConfig()
   const events = buildCanonicalArchiveMutations(options.batch)
   const reportPath = canonicalArchiveReportPath(

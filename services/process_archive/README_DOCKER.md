@@ -76,6 +76,7 @@ ClickHouse paths finish. This lane is inert unless
 
 ```bash
 CANONICAL_ARCHIVE_SHADOW_PUBLISH_ENABLED=false
+CANONICAL_ARCHIVE_QUEUE_FIRST_ENABLED=false
 CANONICAL_ARCHIVE_RETRY_BATCH=5
 CANONICAL_PUBLISH_URL=https://firehose-host/internal/canonical-ingest
 CANONICAL_PUBLISHER_API_KEY=replace-with-dedicated-runtime-secret
@@ -99,6 +100,15 @@ do not carry content or provenance edges. Source-retraction commands and
 user-facing delete actions are not enabled by this publisher.
 Do not enable the flag until the firehose publisher, retained
 stream, and queue-capacity alerting have been deployed and verified.
+
+After every required canonical consumer is caught up and healthy, set
+`CANONICAL_ARCHIVE_QUEUE_FIRST_ENABLED=true`. The worker then loads and
+policy-checks the archive, durably publishes it to the canonical queue, and
+only afterward performs the existing PostgreSQL and optional ClickHouse
+writes. A queue failure restores the upload to `ready_for_commit` for a later
+retry without writing corpus rows. The upload state itself remains
+authoritative in PostgreSQL. Queue-first suppresses the redundant post-write
+shadow copy; compatibility writes remain enabled during migration.
 
 ## Execution Options
 

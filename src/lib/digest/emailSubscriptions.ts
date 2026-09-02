@@ -51,9 +51,10 @@ export const isValidSubscriptionEmail = (email: string) => {
 }
 
 /**
- * Create or revive the subscription for an address and return it. Called only
- * from the subscribe endpoint, so a previously unsubscribed address returns to
- * pending (never straight to confirmed) and gets a fresh confirmation email.
+ * Create or revive the subscription for an address and return it active.
+ * Single opt-in: confirmed_at is stamped on insert, on revival of an
+ * unsubscribed row, and on any legacy row still waiting on the old
+ * confirmation link.
  */
 export async function upsertSubscription(
   email: string,
@@ -71,12 +72,12 @@ export async function upsertSubscription(
   if (existing.data) {
     const patch: {
       unsubscribed_at?: null
-      confirmed_at?: null
+      confirmed_at?: string
       account_id?: string
     } = {}
-    if (existing.data.unsubscribed_at) {
-      patch.unsubscribed_at = null
-      patch.confirmed_at = null
+    if (existing.data.unsubscribed_at) patch.unsubscribed_at = null
+    if (existing.data.unsubscribed_at || !existing.data.confirmed_at) {
+      patch.confirmed_at = new Date().toISOString()
     }
     // Backfill the association, but never overwrite one account's claim on an
     // address with another's.
@@ -94,7 +95,11 @@ export async function upsertSubscription(
 
   const inserted = await admin
     .from('digest_email_subscriptions')
-    .insert({ email: normalized, account_id: accountId ?? null })
+    .insert({
+      email: normalized,
+      account_id: accountId ?? null,
+      confirmed_at: new Date().toISOString(),
+    })
     .select(SUBSCRIPTION_COLUMNS)
     .single()
   if (inserted.error) throw inserted.error
@@ -117,22 +122,6 @@ export async function getSubscriptionForAccount(
   return result.data ? mapRow(result.data) : null
 }
 
-/** Returns the confirmed subscription, or null for an unknown/unsubscribed token. */
-export async function confirmSubscription(
-  token: string,
-): Promise<DigestEmailSubscription | null> {
-  const admin = createServerServiceRoleClient()
-  const result = await admin
-    .from('digest_email_subscriptions')
-    .update({ confirmed_at: new Date().toISOString() })
-    .eq('token', token)
-    .is('unsubscribed_at', null)
-    .select(SUBSCRIPTION_COLUMNS)
-    .maybeSingle()
-  if (result.error) throw result.error
-  return result.data ? mapRow(result.data) : null
-}
-
 /** Returns false only for an unknown token; unsubscribing twice succeeds. */
 export async function unsubscribe(token: string): Promise<boolean> {
   const admin = createServerServiceRoleClient()
@@ -146,7 +135,7 @@ export async function unsubscribe(token: string): Promise<boolean> {
   return Boolean(result.data)
 }
 
-/** Confirmed, not unsubscribed, and not yet sent this edition. */
+/** Active (confirmed_at set), not unsubscribed, and not yet sent this edition. */
 export async function listUnsentRecipients(
   editionId: string,
 ): Promise<DigestEmailSubscription[]> {

@@ -414,11 +414,12 @@ CREATE TABLE IF NOT EXISTS "public"."digest_editions" (
 );
 ALTER TABLE "public"."digest_editions" OWNER TO "postgres";
 
--- Daily Digest email subscriptions. Consent is explicit: a row exists only
--- after someone submits their address, sends happen only after confirmed_at
--- is set (double opt-in), and unsubscribed_at permanently wins over both.
--- Service-role only; tokens are the sole credential in confirm/unsubscribe
--- links, so rows must never be readable by anon or authenticated clients.
+-- Daily Digest email subscriptions. Single opt-in: a row exists only after
+-- someone submits their address, confirmed_at is stamped at that moment,
+-- sends go only to rows with confirmed_at set, and unsubscribed_at
+-- permanently wins over both. Service-role only; tokens are the sole
+-- credential in unsubscribe links, so rows must never be readable by anon or
+-- authenticated clients.
 CREATE TABLE IF NOT EXISTS "public"."digest_email_subscriptions" (
     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     "email" text NOT NULL,

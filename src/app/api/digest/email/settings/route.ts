@@ -13,15 +13,12 @@ const maskEmail = maskSubscriptionEmail
 
 const subscriptionStatus = (subscription: {
   email: string
-  confirmedAt: string | null
   unsubscribedAt: string | null
 }) => ({
   email: maskEmail(subscription.email),
   status: subscription.unsubscribedAt
     ? ('unsubscribed' as const)
-    : subscription.confirmedAt
-      ? ('subscribed' as const)
-      : ('pending' as const),
+    : ('subscribed' as const),
 })
 
 export async function GET() {
@@ -36,7 +33,7 @@ export async function GET() {
 }
 
 // The only settings action is unsubscribe; re-subscribing goes through the
-// regular subscribe endpoint so it always re-runs the double opt-in.
+// regular subscribe endpoint.
 export async function POST(request: Request) {
   const accountId = await getAuthenticatedAccountId()
   if (!accountId) {

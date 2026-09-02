@@ -347,6 +347,13 @@ test('delivery manifest is content-free and historical uploads are not seeded', 
     ),
     'utf8',
   )
+  const queueFirst = processor.indexOf(
+    'await publishCanonicalArchiveQueueFirst(',
+  )
+  const compatibilityWrite = processor.indexOf(
+    'await processSingleArchive(',
+    queueFirst,
+  )
   const completion = processor.indexOf("SET upload_phase = 'completed'")
   const directSink = processor.indexOf(
     'await attemptClickHouseDelivery(',
@@ -357,7 +364,9 @@ test('delivery manifest is content-free and historical uploads are not seeded', 
     directSink,
   )
   assert.ok(
-    completion >= 0 && directSink > completion && canonicalShadow > directSink,
+    queueFirst >= 0 && compatibilityWrite > queueFirst &&
+      completion > compatibilityWrite && directSink > completion &&
+      canonicalShadow > directSink,
   )
   assert.match(processor, /jsonb_array_elements\(\$\{trx\.json\(candidates as never\)\}::jsonb\)/)
   assert.doesNotMatch(processor, /JSON\.stringify\(candidates\)/)

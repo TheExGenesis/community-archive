@@ -277,6 +277,34 @@ test('preserves a dangling quoted-tweet ID for the deleted-card placeholder', as
   })
 })
 
+test('drops the quote card when the quoted author is outside the archive', async () => {
+  const row = banger('100', '8', 2025)
+  const fetcher = jest.fn(async () => ({
+    data: [
+      {
+        ...row,
+        quotedTweet: {
+          ...row.quotedTweet,
+          username: null,
+          accountDisplayName: null,
+        },
+      },
+    ],
+    pagination: {
+      limit: 100,
+      offset: 0,
+      nextOffset: null,
+      totalAvailable: 1,
+      yearCounts: [{ year: 2025, count: 1 }],
+    },
+    query: queryScope(),
+  })) as unknown as AnalyticsGatewayFetcher
+
+  await expect(fetchProfileBangers('42', fetcher)).resolves.toMatchObject({
+    tweets: [{ tweet_id: '100', quote_tweet_id: '200', quoted_tweet: null }],
+  })
+})
+
 test('rejects mismatched quoted-tweet content', async () => {
   const row = banger('100', '8', 2025)
   const fetcher = jest.fn(async () => ({

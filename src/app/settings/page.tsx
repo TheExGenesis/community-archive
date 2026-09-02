@@ -106,9 +106,7 @@ export default async function SettingsPage() {
     ? 'none'
     : digestSubscription.unsubscribedAt
       ? 'unsubscribed'
-      : digestSubscription.confirmedAt
-        ? 'subscribed'
-        : 'pending'
+      : 'subscribed'
 
   return (
     <main className="min-h-screen bg-card dark:bg-background">

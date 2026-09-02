@@ -2,11 +2,10 @@
 
 import { useState } from 'react'
 
-export type DigestEmailStatus = 'none' | 'pending' | 'subscribed' | 'unsubscribed'
+export type DigestEmailStatus = 'none' | 'subscribed' | 'unsubscribed'
 
 const STATUS_COPY: Record<DigestEmailStatus, string> = {
   none: 'Not subscribed.',
-  pending: 'Confirmation pending — check your inbox.',
   subscribed: 'Subscribed.',
   unsubscribed: 'Unsubscribed.',
 }
@@ -65,13 +64,13 @@ export function DigestEmailSettings({
       body: JSON.stringify({ email: emailInput }),
     })
     if (body) {
-      setStatus('pending')
-      setMaskedEmail(null)
+      setStatus('subscribed')
+      setMaskedEmail(body.email ?? null)
       setEmailInput('')
     }
   }
 
-  const active = status === 'subscribed' || status === 'pending'
+  const active = status === 'subscribed'
 
   return (
     <section className="mb-8 rounded-lg border bg-card p-6">

@@ -5,9 +5,8 @@ import { useSearchParams } from 'next/navigation'
 
 type Phase = 'idle' | 'open' | 'submitting' | 'done'
 
-// Confirm/unsubscribe redirects land on /digest?email=<status>.
+// Unsubscribe redirects land on /digest?email=<status>.
 const REDIRECT_MESSAGES: Record<string, string> = {
-  confirmed: 'Subscription confirmed ✓',
   unsubscribed: 'Unsubscribed ✓',
   invalid: 'That link is invalid or expired.',
   error: 'Something went wrong. Please try again.',
@@ -57,7 +56,7 @@ function SubscribeControl() {
   if (phase === 'done') {
     return (
       <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-400">
-        Check your inbox ✓
+        Subscribed ✓
       </span>
     )
   }
@@ -109,7 +108,7 @@ function SubscribeControl() {
           disabled={phase === 'submitting'}
           className={`${pillClasses} disabled:opacity-60`}
         >
-          {phase === 'submitting' ? 'Sending…' : 'Subscribe'}
+          {phase === 'submitting' ? 'Subscribing…' : 'Subscribe'}
         </button>
       </form>
       <span className="absolute right-0 top-full mt-1 whitespace-nowrap pr-2 text-[11px] text-zinc-500 dark:text-zinc-400">

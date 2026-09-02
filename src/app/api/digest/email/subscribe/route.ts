@@ -1,20 +1,17 @@
 import { NextResponse } from 'next/server'
 import {
-  digestConfirmUrl,
-  digestUnsubscribeUrl,
-} from '@/lib/digest/emailLinks'
-import {
   isValidSubscriptionEmail,
+  maskSubscriptionEmail,
   upsertSubscription,
 } from '@/lib/digest/emailSubscriptions'
-import { sendEmail } from '@/lib/email'
 import { getAuthenticatedAccountId } from '@/lib/authenticatedAccount'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-// Public endpoint. The response never reveals whether an address was already
-// subscribed — the state difference only shows up in the recipient's inbox.
+// Public endpoint. Single opt-in: submitting an address subscribes it
+// immediately. The response never reveals whether an address was already
+// subscribed.
 export async function POST(request: Request) {
   let email: unknown
   try {
@@ -34,28 +31,10 @@ export async function POST(request: Request) {
     // subscription to the account so settings can manage it.
     const accountId = await getAuthenticatedAccountId()
     const subscription = await upsertSubscription(email, accountId)
-    if (!subscription.confirmedAt) {
-      const confirmUrl = digestConfirmUrl(subscription.token)
-      const result = await sendEmail({
-        to: subscription.email,
-        subject: 'Confirm your Community Archive Daily Digest subscription',
-        html: `
-          <div style="margin:0 auto;max-width:600px;padding:24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827;">
-            <h1 style="margin:0 0 16px;font-size:20px;">Confirm your subscription</h1>
-            <p style="margin:0 0 16px;font-size:15px;line-height:1.5;">Click the link below to start receiving the Community Archive Daily Digest. If you didn't request this, you can ignore this email — you won't be subscribed.</p>
-            <p style="margin:0 0 24px;"><a href="${confirmUrl}" style="color:#1d4ed8;">Confirm subscription</a></p>
-            <p style="margin:0;color:#6b7280;font-size:12px;"><a href="${digestUnsubscribeUrl(subscription.token)}" style="color:#6b7280;">Unsubscribe</a></p>
-          </div>`,
-        text: `Confirm your Community Archive Daily Digest subscription: ${confirmUrl}\n\nIf you didn't request this, ignore this email and you won't be subscribed.`,
-      })
-      if (!result.ok) {
-        console.error('Digest confirmation email failed:', result.error)
-        return NextResponse.json(
-          { error: 'Could not send the confirmation email. Please try again.' },
-          { status: 502 },
-        )
-      }
-    }
+    return NextResponse.json({
+      status: 'subscribed',
+      email: maskSubscriptionEmail(subscription.email),
+    })
   } catch (error) {
     console.error(
       'Digest subscribe failed:',
@@ -66,9 +45,4 @@ export async function POST(request: Request) {
       { status: 500 },
     )
   }
-
-  return NextResponse.json(
-    { status: 'pending', message: 'Check your inbox to confirm.' },
-    { status: 202 },
-  )
 }

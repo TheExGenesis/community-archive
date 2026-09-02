@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Fragment, type MouseEvent, type ReactNode } from 'react'
+import { Fragment, type MouseEvent } from 'react'
 import { formatNumber } from '@/lib/formatNumber'
 import type { ChapterSection } from '@/lib/metaTwitter/chapterSections'
 
@@ -33,7 +33,6 @@ export function ArchiveNav({
   activeSectionSlug = null,
   onSelect,
   onSelectSection,
-  footer,
 }: {
   basePath: string
   chapters: NavChapter[]
@@ -44,7 +43,6 @@ export function ArchiveNav({
   onSelect?: (year: number | null) => void
   onSelectSection?: (year: number, slug: string | null) => void
   /** Rendered after the chapter list; wide layout only. */
-  footer?: ReactNode
 }) {
   const intercepts = (event: MouseEvent<HTMLAnchorElement>) =>
     event.button === 0 &&
@@ -159,7 +157,6 @@ export function ArchiveNav({
           </Fragment>
         )
       })}
-      {footer ? <div className="hidden lg:block">{footer}</div> : null}
     </nav>
   )
 }

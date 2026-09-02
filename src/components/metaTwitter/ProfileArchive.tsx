@@ -91,7 +91,6 @@ export function ProfileArchive({
   initialPage,
   initialSidebar,
   sectionsByYear = EMPTY_SECTIONS_BY_YEAR,
-  sectionsNote = null,
 }: {
   accountId: string
   avatarUrl: string | null
@@ -105,7 +104,6 @@ export function ProfileArchive({
   /** Curated or generated sections per chapter year, catch-alls included. */
   sectionsByYear?: SectionsByYear
   /** Shown under the chapter list, e.g. why there are no sections. */
-  sectionsNote?: string | null
 }) {
   const initialFeedKey = feedKey(initialYear, 'quotes')
   const initialScopeKey = scopeKey(initialYear)
@@ -901,13 +899,6 @@ export function ProfileArchive({
         activeSectionSlug={activeSection?.slug ?? null}
         onSelect={selectChapter}
         onSelectSection={selectSection}
-        footer={
-          sectionsNote ? (
-            <p className="mt-3 border-t border-border px-3 pt-3 text-xs leading-relaxed text-muted-foreground">
-              {sectionsNote}
-            </p>
-          ) : null
-        }
       />
       <Workspace
         key={`${activeKey}:${activeFeed ? 'ready' : 'loading'}`}

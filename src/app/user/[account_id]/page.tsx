@@ -22,7 +22,6 @@ import {
   curatedSectionsByYear,
   type SectionsByYear,
 } from '@/lib/metaTwitter/chapterSections'
-import { getGeneratedSections } from '@/lib/metaTwitter/generatedSections'
 
 interface PageProps {
   params: { account_id: string }
@@ -91,29 +90,10 @@ async function ProfileArchiveContent({
 
   const navChapters: NavChapter[] = initialPage.yearCounts
 
-  // Hand-curated sections win; anyone else gets a one-time generated split,
-  // cached server-side. When banger data is unavailable we make no claim
-  // about sections at all.
-  let sectionsByYear: SectionsByYear = {}
-  let sectionsNote: string | null = null
-  if (initialPage.available) {
-    const curated = curatedSectionsByYear(accountId)
-    if (curated) {
-      sectionsByYear = curated
-    } else {
-      const bangerCount = navChapters.reduce(
-        (total, chapter) => total + chapter.count,
-        0,
-      )
-      const generated = await getGeneratedSections(accountId, bangerCount)
-      if (generated.status === 'generated') {
-        sectionsByYear = generated.sectionsByYear
-      } else if (generated.status === 'insufficient') {
-        sectionsNote =
-          'Not enough widely-quoted posts yet to split this archive into sections.'
-      }
-    }
-  }
+  // Sections are hand-curated per account; when banger data is unavailable
+  // we make no claim about them at all.
+  const sectionsByYear: SectionsByYear =
+    (initialPage.available && curatedSectionsByYear(accountId)) || {}
 
   return (
     <ProfileArchive
@@ -126,7 +106,6 @@ async function ProfileArchiveContent({
       initialSectionSlug={year === candidateYear ? candidateSection : null}
       initialPage={initialPage}
       sectionsByYear={sectionsByYear}
-      sectionsNote={sectionsNote}
     />
   )
 }

@@ -932,33 +932,7 @@ test('filters a chapter down to the selected section, catch-all included', async
   expect(screen.queryByText('curated')).not.toBeInTheDocument()
 })
 
-test('shows the sections note under the chapter list', () => {
-  jest.spyOn(global, 'fetch').mockImplementation(() => new Promise(() => {}))
-
-  renderProfileArchive(
-    <ProfileArchive
-      accountId="43"
-      avatarUrl={null}
-      basePath="/user/carol"
-      chapters={[{ year: 2025, count: 2 }]}
-      displayName="Carol"
-      initialYear={null}
-      initialPage={{
-        tweets: [],
-        yearCounts: [{ year: 2025, count: 2 }],
-        total: 2,
-        nextOffset: null,
-        available: true,
-      }}
-      initialSidebar={initialSidebar}
-      sectionsNote="Not enough widely-quoted posts yet to split this archive into sections."
-    />,
-  )
-
-  expect(screen.getByText(/Not enough widely-quoted posts yet/)).toBeVisible()
-})
-
-test('shows no note or sections when none are provided', () => {
+test('shows no sections when none are provided', () => {
   jest.spyOn(global, 'fetch').mockImplementation(() => new Promise(() => {}))
 
   renderProfileArchive(
@@ -980,9 +954,6 @@ test('shows no note or sections when none are provided', () => {
     />,
   )
 
-  expect(
-    screen.queryByText(/Not enough widely-quoted posts/),
-  ).not.toBeInTheDocument()
   // Sectionless chapters stay directly clickable.
   expect(screen.getAllByRole('link', { name: '2025 4' })).not.toHaveLength(0)
 })

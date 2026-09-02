@@ -3471,11 +3471,8 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT COUNT(*) FILTER (
-    WHERE opted_in IS TRUE
-      AND explicit_optout IS NOT TRUE
-  )::double precision
-  FROM public.optin;
+  SELECT COUNT(*)::double precision
+  FROM public.user_directory;
 END;
 $$;
 ALTER FUNCTION private.community_archive_monitoring_membership() OWNER TO postgres;

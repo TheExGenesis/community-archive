@@ -418,6 +418,79 @@ export type Database = {
           },
         ]
       }
+      digest_edition_comments: {
+        Row: {
+          content: string
+          created_at: string
+          deleted_at: string | null
+          display_name: string | null
+          edition_id: string
+          id: string
+          updated_at: string
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          edition_id: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          edition_id?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_edition_comments_edition_id_fkey"
+            columns: ["edition_id"]
+            isOneToOne: false
+            referencedRelation: "digest_editions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      digest_edition_likes: {
+        Row: {
+          created_at: string
+          edition_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          edition_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          edition_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_edition_likes_edition_id_fkey"
+            columns: ["edition_id"]
+            isOneToOne: false
+            referencedRelation: "digest_editions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       digest_editions: {
         Row: {
           content: Json

@@ -1,4 +1,7 @@
-import { resolveProfileChapterYear } from './profilePagination'
+import {
+  needsProfileTweetFallback,
+  resolveProfileChapterYear,
+} from './profilePagination'
 
 test('preserves a requested chapter when its scoped request is unavailable', () => {
   expect(
@@ -13,4 +16,32 @@ test('rejects an unknown chapter only after a successful scoped request', () => 
       yearCounts: [{ year: 2024, count: 3 }],
     }),
   ).toBeNull()
+})
+
+test('supplements only profiles with fewer than two overall bangers', () => {
+  expect(
+    needsProfileTweetFallback(
+      { available: true, total: 1, yearCounts: [{ year: 2025, count: 1 }] },
+      null,
+    ),
+  ).toBe(true)
+  expect(
+    needsProfileTweetFallback(
+      {
+        available: true,
+        total: 1,
+        yearCounts: [
+          { year: 2025, count: 1 },
+          { year: 2024, count: 1 },
+        ],
+      },
+      2025,
+    ),
+  ).toBe(false)
+  expect(
+    needsProfileTweetFallback(
+      { available: false, total: 0, yearCounts: [] },
+      null,
+    ),
+  ).toBe(false)
 })

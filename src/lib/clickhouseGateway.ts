@@ -110,6 +110,13 @@ export function analyticsGatewayRequestUrl(
     cleanPath.length === 3 &&
     cleanPath[0] === 'user' &&
     /^\d{1,20}$/.test(cleanPath[1]) &&
+    cleanPath[2] === 'tweets'
+  ) {
+    allowedParams = new Set(['limit', 'sort'])
+  } else if (
+    cleanPath.length === 3 &&
+    cleanPath[0] === 'user' &&
+    /^\d{1,20}$/.test(cleanPath[1]) &&
     cleanPath[2] === 'sidebar'
   ) {
     allowedParams = new Set(['year', 'media_limit', 'people_limit'])

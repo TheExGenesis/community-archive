@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { ProfileHeader } from '@/components/metaTwitter/ProfileHeader'
 import type { NavChapter } from '@/components/metaTwitter/ArchiveNav'
 import { ProfileArchive } from '@/components/metaTwitter/ProfileArchive'
+import { ProfileTweetFallback } from '@/components/metaTwitter/ProfileTweetFallback'
 import { ProfileArchiveSkeleton } from '@/components/metaTwitter/ProfilePageSkeleton'
 import { ProfileEditingProvider } from '@/components/metaTwitter/ProfileEditingContext'
 import { userProfileHref } from '@/lib/navigation'
@@ -14,14 +15,73 @@ import {
 import { getAuthenticatedAccountId } from '@/lib/authenticatedAccount'
 import {
   PROFILE_BANGERS_INITIAL_LIMIT,
+  needsProfileTweetFallback,
   resolveProfileChapterYear,
+  type ProfileBangersPageState,
 } from '@/lib/metaTwitter/profilePagination'
 import { getCachedArchivedAt } from '@/lib/metaTwitter/data'
 import { resolveProfile } from '@/lib/metaTwitter/profile'
+import { getProfileTweets } from '@/lib/metaTwitter/profileTweets'
+import type { ProfileTweet } from '@/lib/metaTwitter/types'
 
 interface PageProps {
   params: { account_id: string }
   searchParams: { chapter?: string; username?: string }
+}
+
+async function SparseProfileTweets({
+  accountId,
+  avatarUrl,
+  basePath,
+  displayName,
+  initialPage,
+  initialYear,
+}: {
+  accountId: string
+  avatarUrl: string | null
+  basePath: string
+  displayName: string
+  initialPage: ProfileBangersPageState
+  initialYear: number | null
+}) {
+  let sparseOverallPage = initialPage
+  const mayNeedFallback = needsProfileTweetFallback(initialPage, initialYear)
+
+  if (mayNeedFallback && initialYear !== null) {
+    sparseOverallPage = await getCuratedProfileBangersPage(accountId, {
+      limit: PROFILE_BANGERS_INITIAL_LIMIT,
+    })
+  }
+
+  if (
+    !sparseOverallPage.available ||
+    sparseOverallPage.total >= PROFILE_BANGERS_INITIAL_LIMIT
+  ) {
+    return null
+  }
+
+  const [engaged, recent] = await Promise.all([
+    getProfileTweets(accountId, 'engagement'),
+    getProfileTweets(accountId, 'recent'),
+  ])
+  if (!engaged.available && !recent.available) return null
+
+  const bangerIds = new Set(
+    sparseOverallPage.tweets.map((tweet) => tweet.tweet_id),
+  )
+  const withoutBangers = (tweets: ProfileTweet[]) =>
+    tweets.filter((tweet) => !bangerIds.has(tweet.tweet_id))
+
+  return (
+    <ProfileTweetFallback
+      avatarUrl={avatarUrl}
+      className="order-2 min-w-0 xl:col-start-1 xl:row-start-2"
+      displayName={displayName}
+      engagedTweets={withoutBangers(engaged.tweets)}
+      recentTweets={withoutBangers(recent.tweets)}
+      returnTo={basePath}
+    />
+  )
 }
 
 export async function generateMetadata({
@@ -93,6 +153,20 @@ async function ProfileArchiveContent({
       displayName={displayName}
       initialYear={year}
       initialPage={initialPage}
+      supplementalTweets={
+        needsProfileTweetFallback(initialPage, year) ? (
+          <Suspense fallback={null}>
+            <SparseProfileTweets
+              accountId={accountId}
+              avatarUrl={avatarUrl}
+              basePath={basePath}
+              displayName={displayName}
+              initialPage={initialPage}
+              initialYear={year}
+            />
+          </Suspense>
+        ) : null
+      }
     />
   )
 }

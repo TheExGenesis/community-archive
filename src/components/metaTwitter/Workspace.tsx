@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent, type RefObject } from 'react'
+import { useState, type FormEvent, type ReactNode, type RefObject } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import {
@@ -65,6 +65,7 @@ export function Workspace({
   onLoadMore,
   loadMoreRef,
   returnTo,
+  supplementalTweets,
   editing = false,
   editSaving = false,
   editError = null,
@@ -98,6 +99,7 @@ export function Workspace({
   onLoadMore: () => void
   loadMoreRef: RefObject<HTMLDivElement>
   returnTo: string
+  supplementalTweets?: ReactNode
   editing?: boolean
   editSaving?: boolean
   editError?: string | null
@@ -251,7 +253,7 @@ export function Workspace({
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[1fr_280px]">
         <section
           aria-labelledby="profile-bangers-heading"
-          className="flex flex-col gap-3"
+          className="order-1 flex flex-col gap-3 xl:col-start-1 xl:row-start-1"
         >
           {!bangersAvailable && (
             <div className="rounded-lg border border-dashed border-border p-7 text-center text-sm text-muted-foreground">
@@ -368,7 +370,9 @@ export function Workspace({
           )}
         </section>
 
-        <aside className="flex flex-col gap-5">
+        {supplementalTweets}
+
+        <aside className="order-3 flex flex-col gap-5 xl:col-start-2 xl:row-span-2 xl:row-start-1">
           <section aria-labelledby="profile-media-heading">
             <h3
               id="profile-media-heading"

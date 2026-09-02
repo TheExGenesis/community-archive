@@ -24,3 +24,15 @@ export const resolveProfileChapterYear = (
     ? candidateYear
     : null
 }
+
+export const needsProfileTweetFallback = (
+  page: Pick<ProfileBangersPageState, 'available' | 'total' | 'yearCounts'>,
+  activeYear: number | null,
+): boolean => {
+  if (!page.available) return false
+  const overallCount =
+    activeYear === null
+      ? page.total
+      : page.yearCounts.reduce((total, chapter) => total + chapter.count, 0)
+  return overallCount < PROFILE_BANGERS_INITIAL_LIMIT
+}

@@ -1,4 +1,4 @@
-import type { ArchiveTweet, BangerTweet } from './types'
+import type { ArchiveTweet, BangerTweet, ProfileTweet } from './types'
 import type {
   PortalMedia,
   PortalQuotedTweet,
@@ -20,7 +20,7 @@ function portalMedia(tweet: ArchiveTweet): PortalMedia[] {
   })
 }
 
-function portalQuotedTweet(tweet: BangerTweet): PortalQuotedTweet | undefined {
+function portalQuotedTweet(tweet: ProfileTweet): PortalQuotedTweet | undefined {
   if (tweet.quoted_tweet) {
     const quoted = tweet.quoted_tweet
     return {
@@ -56,8 +56,8 @@ function portalQuotedTweet(tweet: BangerTweet): PortalQuotedTweet | undefined {
  * Keep this adapter client-safe: Workspace sorts and progressively reveals the
  * cards in the browser.
  */
-export function bangerPortalTweet(
-  tweet: BangerTweet,
+export function profilePortalTweet(
+  tweet: ProfileTweet,
   fallbackAvatarUrl?: string | null,
 ): PortalTweet {
   return {
@@ -73,6 +73,15 @@ export function bangerPortalTweet(
     rts: tweet.retweet_count ?? 0,
     media: portalMedia(tweet),
     quotedTweet: portalQuotedTweet(tweet),
+  }
+}
+
+export function bangerPortalTweet(
+  tweet: BangerTweet,
+  fallbackAvatarUrl?: string | null,
+): PortalTweet {
+  return {
+    ...profilePortalTweet(tweet, fallbackAvatarUrl),
     quoteCount: tweet.quote_count,
   }
 }

@@ -220,6 +220,24 @@ describe('ClickHouse analytics gateway requests', () => {
     ).toThrow('Unsupported ClickHouse analytics endpoint')
   })
 
+  test('allows only profile tweet sort and limit parameters', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['user', '42', 'tweets'],
+      new URLSearchParams('limit=6&sort=recent&raw_sql=DROP'),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/user/42/tweets?limit=6&sort=recent',
+    )
+    expect(() =>
+      analyticsGatewayRequestUrl(
+        ['user', 'not-an-id', 'tweets'],
+        new URLSearchParams(),
+        'https://stream.example/analytics',
+      ),
+    ).toThrow('Unsupported ClickHouse analytics endpoint')
+  })
+
   test('allows a core user read to omit interactions', () => {
     const target = analyticsGatewayRequestUrl(
       ['user', 'alice'],

@@ -68,6 +68,12 @@ test('maps year-scoped ClickHouse media and interactions for the sidebar', async
         screen_name: 'bob',
         name: 'Bob',
         interactions: 9,
+        interaction_counts: {
+          mentions: 2,
+          replies: 3,
+          quotes: 1,
+          reposts: 3,
+        },
         avatar_media_url:
           'https://pbs.twimg.com/profile_images/7/avatar_normal.jpg',
         in_archive: true,

@@ -21,6 +21,12 @@ import { resolveProfile } from '@/lib/metaTwitter/profile'
 import type { SectionsByYear } from '@/lib/metaTwitter/chapterSections'
 import { configuredSectionsByYear } from '@/lib/metaTwitter/sectionConfig'
 
+// Uncached profiles wait on the analytics gateway for the header media backfill
+// and the first banger page. When the gateway is slow those can exceed Vercel's
+// 15s default, which aborts the RSC stream mid-render and surfaces client-side
+// as "Connection closed". Match the other ClickHouse-backed pages.
+export const maxDuration = 60
+
 interface PageProps {
   params: { account_id: string }
   searchParams: { chapter?: string; section?: string; username?: string }

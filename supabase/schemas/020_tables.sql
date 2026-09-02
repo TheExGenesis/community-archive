@@ -106,6 +106,46 @@ ALTER TABLE "private"."archive_clickhouse_delivery" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE "private"."archive_clickhouse_delivery" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
 COMMENT ON TABLE "private"."archive_clickhouse_delivery" IS 'Content-free stable-ID retry control for independent new archive ClickHouse delivery; never a source for content reconstruction or historical backfill.';
 
+-- Content-free commit receipts and entity ordering guards for the independent
+-- canonical PostgreSQL queue consumer. These tables are intentionally private
+-- and unavailable to every Data API role, including service_role.
+CREATE TABLE IF NOT EXISTS "private"."canonical_ingest_receipts" (
+    "event_id" "text" PRIMARY KEY,
+    "stream_id" "text" UNIQUE NOT NULL,
+    "source" "text" NOT NULL,
+    "source_batch_id_hash" "text" NOT NULL,
+    "payload_hash" "text" NOT NULL,
+    "mutation_count" integer NOT NULL,
+    "committed_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "canonical_ingest_receipts_event_id_check" CHECK (("event_id" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "canonical_ingest_receipts_stream_id_check" CHECK (("stream_id" ~ '^[0-9]+-[0-9]+$'::"text")),
+    CONSTRAINT "canonical_ingest_receipts_source_check" CHECK (("source" = ANY (ARRAY['extension'::"text", 'autorefresh'::"text", 'archive_upload'::"text", 'manual'::"text", 'backfill'::"text", 'admin_delete'::"text", 'user_delete'::"text"]))),
+    CONSTRAINT "canonical_ingest_receipts_source_batch_hash_check" CHECK (("source_batch_id_hash" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "canonical_ingest_receipts_payload_hash_check" CHECK (("payload_hash" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "canonical_ingest_receipts_mutation_count_check" CHECK ((("mutation_count" > 0) AND ("mutation_count" <= 500)))
+);
+ALTER TABLE "private"."canonical_ingest_receipts" OWNER TO "postgres";
+ALTER TABLE "private"."canonical_ingest_receipts" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "private"."canonical_ingest_receipts" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
+COMMENT ON TABLE "private"."canonical_ingest_receipts" IS 'Content-free commit receipts for the canonical PostgreSQL queue consumer.';
+
+CREATE TABLE IF NOT EXISTS "private"."canonical_ingest_entity_versions" (
+    "entity_type" "text" NOT NULL,
+    "entity_key_hash" "text" NOT NULL,
+    "version" numeric(40, 0) NOT NULL,
+    "event_id" "text" NOT NULL,
+    "applied_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "canonical_ingest_entity_versions_pkey" PRIMARY KEY ("entity_type", "entity_key_hash"),
+    CONSTRAINT "canonical_ingest_entity_versions_type_check" CHECK (("entity_type" = ANY (ARRAY['account'::"text", 'tweet_content'::"text", 'tweet_engagement'::"text", 'media'::"text", 'url'::"text", 'mention'::"text", 'relationship'::"text", 'archive_upload'::"text"]))),
+    CONSTRAINT "canonical_ingest_entity_versions_key_hash_check" CHECK (("entity_key_hash" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "canonical_ingest_entity_versions_version_check" CHECK (("version" >= (0)::numeric)),
+    CONSTRAINT "canonical_ingest_entity_versions_event_id_check" CHECK (("event_id" ~ '^[0-9a-f]{64}$'::"text"))
+);
+ALTER TABLE "private"."canonical_ingest_entity_versions" OWNER TO "postgres";
+ALTER TABLE "private"."canonical_ingest_entity_versions" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "private"."canonical_ingest_entity_versions" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
+COMMENT ON TABLE "private"."canonical_ingest_entity_versions" IS 'Content-free latest-version guards for idempotent canonical PostgreSQL projection.';
+
 -- public.all_account
 CREATE TABLE IF NOT EXISTS "public"."all_account" (
     "account_id" "text" NOT NULL,

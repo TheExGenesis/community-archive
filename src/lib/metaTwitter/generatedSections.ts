@@ -206,7 +206,7 @@ const getCachedGeneratedSections = unstable_cache(
     )
     return parseGeneratedSections(raw, byYear)
   },
-  ['meta-twitter-generated-sections-v1'],
+  ['meta-twitter-generated-sections-v2'],
   { revalidate: REVALIDATE_SECONDS },
 )
 

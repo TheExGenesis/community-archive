@@ -144,7 +144,7 @@ export function ArchiveNav({
                     )
                   }
                   aria-current={sectionActive ? 'page' : undefined}
-                  // Titles like "everything else" repeat across chapters.
+                  // Titles like "other" repeat across chapters.
                   aria-label={`${section.title}, ${chapter.year}`}
                   className={`hidden rounded-lg px-3 py-1.5 text-[13px] leading-snug lg:mt-0.5 lg:line-clamp-2 lg:block ${
                     sectionActive

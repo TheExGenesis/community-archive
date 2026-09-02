@@ -193,7 +193,7 @@ const CURATED_SECTIONS: Record<string, Record<number, ChapterSection[]>> = {
 
 const otherSection = (): ChapterSection => ({
   slug: OTHER_SECTION_SLUG,
-  title: 'everything else',
+  title: 'other',
   tweetIds: [],
 })
 

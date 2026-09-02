@@ -5,7 +5,7 @@ import { archiveChapterHref } from './ArchiveNav'
 import { ProfileArchive } from './ProfileArchive'
 import { ProfileEditButton } from './ProfileEditButton'
 import { ProfileEditingProvider } from './ProfileEditingContext'
-import { curatedSectionsByYear } from '@/lib/metaTwitter/chapterSections'
+import { configuredSectionsByYear } from '@/lib/metaTwitter/sectionConfig'
 import type { BangerTweet } from '@/lib/metaTwitter/types'
 import { mutateProfileCuration } from '@/app/user/[account_id]/actions'
 
@@ -778,7 +778,7 @@ test('does not start a stale chapter preload over an in-flight active feed', asy
 })
 
 const CURATED_ACCOUNT_ID = '826134955549790208'
-const curatedSections = curatedSectionsByYear(CURATED_ACCOUNT_ID)!
+const curatedSections = configuredSectionsByYear(CURATED_ACCOUNT_ID)!
 
 test('opens a chapter subsection and titles the workspace with its quote', async () => {
   const user = userEvent.setup()

@@ -18,10 +18,8 @@ import {
 } from '@/lib/metaTwitter/profilePagination'
 import { getCachedArchivedAt } from '@/lib/metaTwitter/data'
 import { resolveProfile } from '@/lib/metaTwitter/profile'
-import {
-  curatedSectionsByYear,
-  type SectionsByYear,
-} from '@/lib/metaTwitter/chapterSections'
+import type { SectionsByYear } from '@/lib/metaTwitter/chapterSections'
+import { configuredSectionsByYear } from '@/lib/metaTwitter/sectionConfig'
 
 interface PageProps {
   params: { account_id: string }
@@ -90,10 +88,10 @@ async function ProfileArchiveContent({
 
   const navChapters: NavChapter[] = initialPage.yearCounts
 
-  // Sections are hand-curated per account; when banger data is unavailable
-  // we make no claim about them at all.
+  // Sections are configured per account (curated or generated offline); when
+  // banger data is unavailable we make no claim about them at all.
   const sectionsByYear: SectionsByYear =
-    (initialPage.available && curatedSectionsByYear(accountId)) || {}
+    (initialPage.available && configuredSectionsByYear(accountId)) || {}
 
   return (
     <ProfileArchive

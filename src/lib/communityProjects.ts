@@ -53,6 +53,7 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     category: 'Experiments',
     tags: ['Timeline', 'Conversations', 'Visualization'],
     projectUrl: '/conversation-map',
+    image: '/images/community/conversation-map-cover.png',
     coverClass: 'from-[#d7e4ef] via-[#8bd2ee] to-[#1e9bcd]',
     featured: true,
     publishedAt: '2026-08-30',

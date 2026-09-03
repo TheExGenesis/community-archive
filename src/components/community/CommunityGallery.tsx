@@ -351,6 +351,7 @@ function ProjectCover({
             alt={`Preview of ${project.name}`}
             fill
             sizes={modal ? '620px' : '(max-width: 940px) 100vw, 33vw'}
+            unoptimized={project.image.startsWith('/api/community/projects/')}
             className="object-cover"
           />
           {modal ? (

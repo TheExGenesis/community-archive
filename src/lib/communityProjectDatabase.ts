@@ -56,7 +56,7 @@ export function mapCommunityProjectRow(
     sourceTweetId: sourceTweetId(row.source_post_url),
     sourceUrl: row.source_post_url,
     image: row.cover_storage_path
-      ? `/api/community/projects/${row.id}/cover`
+      ? `/api/community/projects/${row.id}/cover?v=${encodeURIComponent(row.cover_storage_path)}`
       : undefined,
     coverClass: 'from-[#8BD2EE] via-[#75C9EB] to-[#25AADF]',
     featured: row.featured,

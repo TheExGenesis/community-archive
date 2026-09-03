@@ -17,6 +17,9 @@ describe('community project catalog', () => {
       if (project.slug === 'conversation-map') {
         expect(project.projectUrl).toBe('/conversation-map')
         expect(project.sourceTweetId).toBeUndefined()
+        expect(project.image).toBe(
+          '/images/community/conversation-map-cover.png',
+        )
       } else expect(project.sourceTweetId).toMatch(/^\d+$/)
       expect(project.projectUrl ?? '').not.toContain('example.com')
       expect(project.image ?? '').not.toContain('pbs.twimg.com')

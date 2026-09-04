@@ -18,6 +18,7 @@ export interface ExportArgs {
 export interface ExportResult {
   export_prefix: string
   archive_files_copied: string[]
+  tweet_ids: string[]
   row_counts: Record<string, number>
   phase_ms: Record<string, number>
 }
@@ -88,6 +89,7 @@ export async function exportAndDelete(
   return {
     export_prefix,
     archive_files_copied: [],
+    tweet_ids: tweetIds.map((row) => row.tweet_id),
     row_counts: {
       all_account: args.accountId ? 1 : 0,
       tweets: tweetIds.length,

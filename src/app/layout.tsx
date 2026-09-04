@@ -2,6 +2,7 @@ import { Petrona, Manrope } from 'next/font/google'
 import ThemeProvider from '@/providers/ThemeProvider'
 import NextTopLoader from 'nextjs-toploader'
 import { Analytics } from '@vercel/analytics/react'
+import { BotIdClient } from 'botid/client'
 import './globals.css'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import ReactQueryProvider from '@/providers/ReactQueryProvider'
@@ -21,6 +22,7 @@ import {
   AudienceMobileNavigation,
   NavigationAudienceProvider,
 } from '@/components/NavigationAudience'
+import { BOT_ID_PROTECTED_ROUTES } from '@/lib/botIdRoutes'
 
 const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
   ssr: false,
@@ -62,6 +64,9 @@ export default function RootLayout({
       className={`${manrope.className} ${petrona.variable} antialiased`}
       suppressHydrationWarning={true}
     >
+      <head>
+        <BotIdClient protect={BOT_ID_PROTECTED_ROUTES} />
+      </head>
       <body className="bg-background text-foreground transition-colors duration-300">
         <NextTopLoader showSpinner={false} height={3} color="#2acf80" />
         <PostHogProvider>

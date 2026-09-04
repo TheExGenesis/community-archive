@@ -278,4 +278,17 @@ describe('ClickHouse analytics gateway requests', () => {
       ),
     ).toThrow('Unsupported ClickHouse analytics endpoint')
   })
+
+  test('allows only stable tweet-thread cursor parameters', () => {
+    const target = analyticsGatewayRequestUrl(
+      ['tweet', '2085375983708692599', 'thread'],
+      new URLSearchParams(
+        'limit=12&after=2026-08-20T12%3A00%3A00.000Z&after_id=2085375983708692600&offset=12',
+      ),
+      'https://stream.example/analytics',
+    )
+    expect(target.toString()).toBe(
+      'https://stream.example/analytics/tweet/2085375983708692599/thread?limit=12&after=2026-08-20T12%3A00%3A00.000Z&after_id=2085375983708692600',
+    )
+  })
 })

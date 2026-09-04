@@ -1,18 +1,137 @@
-import React from 'react'
+'use client'
+
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import TweetComponent from './TweetComponent'
-import { ConversationTree, ThreadTweet } from '@/lib/threadUtils'
+import {
+  buildConversationTree,
+  type ConversationTree,
+  type ThreadTweet,
+} from '@/lib/threadTree'
 
 interface ThreadViewProps {
   tree: ConversationTree
   highlightTweetId?: string
   className?: string
+  totalCount?: number
+  nextCursor?: ThreadCursor | null
+}
+
+interface ThreadCursor {
+  createdAt: string
+  tweetId: string
+}
+
+interface ThreadPageResponse {
+  tweets: ThreadTweet[]
+  totalCount: number
+  nextCursor: ThreadCursor | null
+  error?: string
+}
+
+const PAGE_SIZE = 12
+
+function realTweets(tree: ConversationTree): ThreadTweet[] {
+  return Object.values(tree.tweets).filter(
+    (tweet) => !tweet.is_deleted_placeholder,
+  )
 }
 
 export const ThreadView: React.FC<ThreadViewProps> = ({
-  tree,
+  tree: initialTree,
   highlightTweetId,
   className = '',
+  totalCount: initialTotalCount,
+  nextCursor: initialNextCursor,
 }) => {
+  const [tree, setTree] = useState(initialTree)
+  const [totalCount, setTotalCount] = useState(
+    () => initialTotalCount ?? realTweets(initialTree).length,
+  )
+  const [nextCursor, setNextCursor] = useState<ThreadCursor | null>(
+    initialNextCursor ?? null,
+  )
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const loadingRef = useRef(false)
+  const requestControllerRef = useRef<AbortController | null>(null)
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || !highlightTweetId || loadingRef.current) return
+
+    const controller = new AbortController()
+    requestControllerRef.current = controller
+    loadingRef.current = true
+    setIsLoading(true)
+    setLoadError(null)
+
+    try {
+      const searchParams = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        after: nextCursor.createdAt,
+        after_id: nextCursor.tweetId,
+      })
+      const response = await fetch(
+        `/api/tweets/${encodeURIComponent(highlightTweetId)}/thread?${searchParams}`,
+        { signal: controller.signal },
+      )
+      const body = (await response
+        .json()
+        .catch(() => null)) as ThreadPageResponse | null
+      if (!response.ok || !body || !Array.isArray(body.tweets)) {
+        throw new Error(body?.error || 'Could not load more of this thread')
+      }
+
+      setTree((current) =>
+        buildConversationTree(
+          Array.from(
+            new Map(
+              [...realTweets(current), ...body.tweets].map((tweet) => [
+                tweet.tweet_id,
+                tweet,
+              ]),
+            ).values(),
+          ),
+        ),
+      )
+      setTotalCount(body.totalCount)
+      setNextCursor(body.nextCursor)
+    } catch (error) {
+      if (controller.signal.aborted) return
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : 'Could not load more of this thread',
+      )
+    } finally {
+      if (!controller.signal.aborted) {
+        loadingRef.current = false
+        setIsLoading(false)
+      }
+    }
+  }, [highlightTweetId, nextCursor])
+
+  useEffect(() => {
+    const target = loadMoreRef.current
+    if (!target || !nextCursor) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) void loadMore()
+      },
+      { rootMargin: '320px 0px' },
+    )
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [loadMore, nextCursor])
+
+  useEffect(
+    () => () => {
+      requestControllerRef.current?.abort()
+    },
+    [],
+  )
+
   // Convert ThreadTweet to TweetData format for TweetComponent
   const convertToTweetData = (tweet: ThreadTweet) => ({
     tweet_id: tweet.tweet_id,
@@ -75,7 +194,7 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
 
         {children.length > 0 && (
           <div className="thread-children">
-            {children
+            {[...children]
               .sort((a, b) => {
                 const tweetA = tree.tweets[a]
                 const tweetB = tree.tweets[b]
@@ -109,17 +228,12 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
     )
   }
 
-  // Header count excludes placeholders.
-  const realCount = Object.values(tree.tweets).filter(
-    (t) => !t.is_deleted_placeholder,
-  ).length
-
   return (
     <div className={`thread-view ${className}`}>
       <div className="mb-5 flex items-center justify-between gap-4">
         <h2 className="text-xl font-semibold text-foreground">Thread</h2>
         <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-          {realCount} {realCount === 1 ? 'tweet' : 'tweets'}
+          {totalCount} {totalCount === 1 ? 'tweet' : 'tweets'}
         </span>
       </div>
       <div className="thread-container">
@@ -129,6 +243,41 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
           </React.Fragment>
         ))}
       </div>
+
+      {loadError ? (
+        <div className="py-4 text-center">
+          <p className="text-xs text-red-600 dark:text-red-400">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => void loadMore()}
+            className="mt-2 text-xs font-semibold text-brand hover:underline"
+          >
+            Try again
+          </button>
+        </div>
+      ) : null}
+
+      {nextCursor ? (
+        <div
+          ref={loadMoreRef}
+          className="min-h-16 flex items-center justify-center py-3"
+        >
+          <button
+            type="button"
+            onClick={() => void loadMore()}
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 text-xs font-semibold text-brand disabled:cursor-wait disabled:opacity-60"
+          >
+            {isLoading ? (
+              <Loader2
+                aria-hidden="true"
+                className="h-3.5 w-3.5 animate-spin"
+              />
+            ) : null}
+            {isLoading ? 'Loading thread…' : 'Load more of this thread'}
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }

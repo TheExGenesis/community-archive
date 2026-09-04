@@ -70,7 +70,7 @@ export interface PortalBangersPage {
 export interface PortalStats {
   totalTweets: number
   accountCount: number
-  streamedLast24Hours: number
+  tweetCountDeltaLast24Hours: number
   joinedThisWeek: number
   firstYear: number
   currentYear: number

@@ -47,7 +47,7 @@ const data: PortalData = {
   stats: {
     totalTweets: 14_000_000,
     accountCount: 600,
-    streamedLast24Hours: 2_400,
+    tweetCountDeltaLast24Hours: 2_400,
     joinedThisWeek: 3,
     firstYear: 2006,
     currentYear: 2026,
@@ -122,7 +122,9 @@ describe.each<PortalView>(['home', 'stream'])(
       expect(screen.getByText('fresh tweet')).toBeInTheDocument()
       expectCorpusCount()
       if (view === 'home') {
-        expect(screen.getByText('+2,400 in the last 24h')).toBeInTheDocument()
+        expect(
+          screen.getByText('+2,400 net in the last 24h'),
+        ).toBeInTheDocument()
       }
 
       await act(async () => {

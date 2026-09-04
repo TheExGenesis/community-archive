@@ -7,7 +7,6 @@ import {
 import {
   fetchPortalBangersPage,
   fetchPortalHistoricalBangers,
-  fetchPortalLiveAnalytics,
   fetchPortalRecentBangers,
   fetchPortalTrends,
 } from './analytics'
@@ -49,6 +48,7 @@ interface PortalCorpusRange {
 
 interface PortalGlobalStats {
   totalTweets: number
+  tweetCountDeltaLast24Hours: number
   memberCount: number
   generatedAt: string
 }
@@ -56,6 +56,8 @@ interface PortalGlobalStats {
 interface ClickHouseSummaryResponse {
   data: {
     totalTweets: unknown
+    tweetCountDeltaLast24Hours: unknown
+    deltaStartAt: unknown
     memberAccounts: unknown
     sourceUpdatedAt: unknown
     collectedAt: unknown
@@ -248,6 +250,17 @@ function portalClickHouseCount(value: unknown, label: string): number {
   return portalSnapshotCount(Number(value), label)
 }
 
+function portalClickHouseDelta(value: unknown, label: string): number {
+  if (
+    (typeof value !== 'string' && typeof value !== 'number') ||
+    (typeof value === 'string' && !/^-?\d+$/.test(value)) ||
+    !Number.isSafeInteger(Number(value))
+  ) {
+    throw new Error(`Portal ${label} returned an invalid response`)
+  }
+  return Number(value)
+}
+
 /** Shared ClickHouse-backed counts used by every public count display. */
 export async function fetchPortalGlobalStats(): Promise<PortalGlobalStats> {
   const response = await fetchAnalyticsGatewayJson<ClickHouseSummaryResponse>(
@@ -259,6 +272,10 @@ export async function fetchPortalGlobalStats(): Promise<PortalGlobalStats> {
     totalTweets: portalClickHouseCount(
       response.data.totalTweets,
       'ClickHouse corpus tweet count',
+    ),
+    tweetCountDeltaLast24Hours: portalClickHouseDelta(
+      response.data.tweetCountDeltaLast24Hours,
+      'ClickHouse 24-hour corpus delta',
     ),
     memberCount: portalClickHouseCount(
       response.data.memberAccounts,
@@ -741,11 +758,6 @@ const getCachedGlobalStats = unstable_cache(
   ['portal-global-stats-v1'],
   { revalidate: 60 },
 )
-const getCachedLiveAnalytics = unstable_cache(
-  async (_sourceKey: string) => fetchPortalLiveAnalytics(),
-  ['portal-live-analytics-v1'],
-  { revalidate: 300 },
-)
 const getCachedJoinedThisWeek = unstable_cache(
   async (_sourceKey: string) => fetchPortalJoinedThisWeek(),
   ['portal-joined-this-week-v1'],
@@ -949,7 +961,6 @@ export async function getPortalData(
     trends,
     corpusRange,
     globalStats,
-    liveAnalytics,
     joinedThisWeek,
     initialStream,
     research,
@@ -981,23 +992,11 @@ export async function getPortalData(
       () => getCachedGlobalStats(sourceKey),
       {
         totalTweets: 0,
+        tweetCountDeltaLast24Hours: 0,
         memberCount: 0,
         generatedAt: new Date().toISOString(),
       },
     ),
-    view === 'home'
-      ? loadPortalComponentData(
-          'live-analytics',
-          () => getCachedLiveAnalytics(sourceKey),
-          {
-            streamedLast24Hours: 0,
-            latestObservedAt: null,
-          },
-        )
-      : Promise.resolve({
-          data: { streamedLast24Hours: 0, latestObservedAt: null },
-          failed: false,
-        }),
     view === 'home'
       ? loadPortalComponentData(
           'joined-this-week',
@@ -1038,7 +1037,7 @@ export async function getPortalData(
   const stats: PortalStats = {
     totalTweets: globalStats.data.totalTweets,
     accountCount: globalStats.data.memberCount,
-    streamedLast24Hours: liveAnalytics.data.streamedLast24Hours,
+    tweetCountDeltaLast24Hours: globalStats.data.tweetCountDeltaLast24Hours,
     joinedThisWeek: joinedThisWeek.data,
     firstYear: corpusRange.data.firstYear,
     currentYear: corpusRange.data.currentYear,
@@ -1060,7 +1059,7 @@ export async function getPortalData(
     recentBangers: recentBangers.data,
     historicalBangers: historicalBangers.data,
     failures: {
-      liveAnalytics: globalStats.failed || liveAnalytics.failed,
+      liveAnalytics: globalStats.failed,
       memberCount: globalStats.failed,
       joinedThisWeek: joinedThisWeek.failed,
       corpusRange: corpusRange.failed,

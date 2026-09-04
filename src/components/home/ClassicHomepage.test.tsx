@@ -41,7 +41,7 @@ const data = {
   stats: {
     totalTweets: 14_000_000,
     accountCount: 700,
-    streamedLast24Hours: 0,
+    tweetCountDeltaLast24Hours: 0,
     joinedThisWeek: 0,
     firstYear: 2006,
     currentYear: 2026,

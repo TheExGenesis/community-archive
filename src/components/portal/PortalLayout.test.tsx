@@ -34,7 +34,7 @@ const data: PortalData = {
   stats: {
     totalTweets: 14_000_000,
     accountCount: 600,
-    streamedLast24Hours: 2_400,
+    tweetCountDeltaLast24Hours: 2_400,
     joinedThisWeek: 3,
     firstYear: 2006,
     currentYear: 2026,

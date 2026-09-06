@@ -557,3 +557,18 @@ test('homepage weekly snapshot makes no historical corpus requests', async () =>
     expect(call[1].get('bucket')).toBe('day')
   }
 })
+
+test('explorer snapshot requests historical charts without twelve unused weekly queries', async () => {
+  const fetcher = jest.fn(async () => ({ data: [] }))
+  const result = await fetchPortalTrends(
+    new Date('2026-09-06T00:00:00Z'),
+    fetcher as unknown as AnalyticsFetcher,
+    true,
+    false,
+  )
+  expect(result.series.length).toBeGreaterThan(0)
+  expect(result.weekly).toEqual([])
+  expect(fetcher).toHaveBeenCalledTimes(result.series.length)
+  for (const call of (fetcher as jest.Mock).mock.calls)
+    expect(call[1].get('bucket')).toBe('year')
+})

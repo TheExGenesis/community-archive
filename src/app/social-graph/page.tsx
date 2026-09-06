@@ -19,6 +19,10 @@ const SocialGraphExplorer = dynamic(() => import('./SocialGraphExplorer'), {
 export const metadata = { title: 'Social graph · Community Archive' }
 
 export default async function SocialGraphPage() {
+  const snapshotResult = getSocialGraphSnapshot().then(
+    (snapshot) => ({ snapshot, error: null }),
+    (error: unknown) => ({ snapshot: null, error }),
+  )
   const user = await getCurrentUser()
   const isAdmin = Boolean(user && isAdminUser(user))
   const currentMember = user
@@ -30,7 +34,9 @@ export default async function SocialGraphPage() {
 
   let snapshot
   try {
-    snapshot = await getSocialGraphSnapshot()
+    const result = await snapshotResult
+    if (!result.snapshot) throw result.error
+    snapshot = result.snapshot
   } catch (error) {
     console.error('Social graph snapshot request failed:', error)
     return (

@@ -54,8 +54,8 @@ The existing PostHog integration already captures Web Vitals. The additional
 when the start was observed, `elapsed_ms`. It emits after two animation frames;
 this is a readiness proxy, not LCP or a guarantee that images have painted.
 
-Page categories are home, directory, profile, tweet, search, and Bangers. Every
-category has a `navigation_shell` marker. Data markers are homepage stats, digest,
+Page categories include home, directory, profile, tweet, search, and the navbar
+routes listed below. Every category has a `navigation_shell` marker. Data markers are homepage stats, digest,
 stream, profile header/feed, and directory rows. Shell and usable data must be
 analyzed separately. Document time starts at navigation start; client-link time
 starts at click capture; history time starts at `popstate`. Unobserved programmatic
@@ -96,3 +96,33 @@ panels, requires no unopened chapter requests, checks hover/focus prefetch,
 checks viewport/deduplicated previews, and verifies the timezone boundary. Keep
 these behavioral assertions when changing data composition; a `Suspense` wrapper
 alone is not evidence of independent loading.
+
+## Other navbar routes
+
+- Published Digest pages wait only for the edition. Likes, admin controls,
+  calendars, recent editions, and discussion have independent Suspense slots.
+  Metadata and page share a request-local edition read; there is no shared cache
+  of viewer state. Preview/editor props still work without streamed slots.
+- Gallery renders its published catalog before session/liked-project state.
+  Searching and opening cards work immediately; account actions are disabled
+  until the streamed session arrives. The session update preserves filters and
+  local like overrides. The submission form downloads when first opened.
+- Live Stream starts its feed and optional corpus total independently. Its client
+  entry imports the shared polling/pagination hook without the homepage panels.
+- Users renders its first page before the optional corpus count. Searching and
+  pagination retain their current behavior.
+- Trends retains its sign-in gate and loads historical chart series without the
+  twelve weekly queries needed only by homepage panels. The explorer has its own
+  five-minute cache key, keeping full-snapshot consumers unchanged.
+- Graph starts its public snapshot and identity reads together. Its loading
+  boundary downloads the graph engine while the snapshot is in flight.
+- Bangers renders its heading before rankings arrive. Search imports tweet
+  results only when they are needed. Missing route loading boundaries now cover
+  Digest, Gallery, Graph, Trends, and Research, enabling partial route prefetch.
+- Docs and Research already render from static/hourly cached content; there is
+  no reason to introduce another data or caching layer for their landing pages.
+
+The additional readiness categories are Digest, Gallery, Graph, Stream, Trends,
+Research, and Docs. Usable-data markers include `digest_article`,
+`gallery_catalog`, `stream_feed`, and `bangers_results`. A shell marker alone is
+never evidence that a graph or chart is usable.

@@ -2,7 +2,7 @@
 
 import { useReportSectionReady } from '@/components/PagePerformance'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Search } from 'lucide-react'
 
@@ -28,12 +28,14 @@ export const USERS_PER_PAGE = 15
 
 interface UserDirectoryClientProps {
   totalCount: number | null
+  totalCountSlot?: ReactNode
   initialUsers: DirectoryUser[] | null
   initialHasMore: boolean
 }
 
 export default function UserDirectoryClient({
   totalCount,
+  totalCountSlot,
   initialUsers,
   initialHasMore,
 }: UserDirectoryClientProps) {
@@ -219,13 +221,19 @@ export default function UserDirectoryClient({
             Archive.
           </p>
           <p className="mt-2 text-sm font-medium text-muted-foreground">
-            {loading && users.length === 0
-              ? 'Loading users…'
-              : debouncedSearch
-                ? `${users.length}${hasMore ? '+' : ''} matching users`
-                : totalCount === null
-                  ? `${users.length}${hasMore ? '+' : ''} users`
-                  : `${users.length} of ${totalCount.toLocaleString()} users`}
+            {loading && users.length === 0 ? (
+              'Loading users…'
+            ) : debouncedSearch ? (
+              `${users.length}${hasMore ? '+' : ''} matching users`
+            ) : totalCountSlot ? (
+              <>
+                {users.length} of {totalCountSlot} users
+              </>
+            ) : totalCount === null ? (
+              `${users.length}${hasMore ? '+' : ''} users`
+            ) : (
+              `${users.length} of ${totalCount.toLocaleString()} users`
+            )}
           </p>
         </div>
 

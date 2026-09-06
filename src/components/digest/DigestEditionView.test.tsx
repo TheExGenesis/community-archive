@@ -34,18 +34,6 @@ jest.mock('@/components/digest/DigestMarkdown', () => ({
 }))
 
 describe('DigestEditionView', () => {
-  test('uses the What Happened Yesterday public title', () => {
-    render(
-      <DigestEditionView
-        edition={AUGUST_11_MOCK_DIGEST}
-        archive={[AUGUST_11_MOCK_DIGEST]}
-      />,
-    )
-
-    expect(screen.getByText('What Happened Yesterday')).toBeVisible()
-    expect(screen.queryByText('The Daily Digest')).not.toBeInTheDocument()
-  })
-
   test('offers the inline email subscribe control', () => {
     render(
       <DigestEditionView

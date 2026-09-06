@@ -21,7 +21,7 @@
     "dev:validateimport": "tsx --env-file=.env scripts/validate_db_import.ts",
     "dev:downloadarchive": "tsx --env-file=.env scripts/download_supabase_storage.mts",
     "dev:testconversationids": "tsx --env-file=.env scripts/testConversationIds.ts",
-    "dev:generate-mock-archives": "node tests/db-insertion/fixtures/generate-mock-archives.js",
+    "dev:generate-mock-archives": "tsx tests/db-insertion/fixtures/generate-mock-archives.ts",
     "build": "NODE_ENV=production next build",
     "start": "next start",
     "lint": "next lint",

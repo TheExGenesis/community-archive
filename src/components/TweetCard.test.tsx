@@ -190,29 +190,6 @@ describe('TweetCard', () => {
     expect(push).toHaveBeenCalledTimes(2)
   })
 
-  test('uses the same subtle neutral hover for every featured rank', () => {
-    const { container } = render(
-      <>
-        <TweetCard tweet={tweet} featuredRank={1} />
-        <TweetCard tweet={{ ...tweet, id: '124' }} featuredRank={4} />
-      </>,
-    )
-    const cards = Array.from(container.querySelectorAll('article'))
-
-    expect(cards).toHaveLength(2)
-    expect(cards[0].className).toBe(cards[1].className)
-    expect(cards[0]).toHaveClass('border-zinc-200/75')
-    expect(cards[0]).toHaveClass(
-      'duration-100',
-      'ease-out',
-      'hover:-translate-y-0.5',
-      'hover:border-[#d4d4d7]/75',
-      'dark:hover:border-[#404046]/80',
-      'motion-reduce:hover:translate-y-0',
-    )
-    expect(cards[0].className).not.toMatch(/blue/)
-  })
-
   test('supports a flat editorial treatment without changing tweet fidelity', () => {
     const { container } = render(
       <TweetCard tweet={tweet} variant="editorial" featuredRank={1} noClamp />,

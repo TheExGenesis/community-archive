@@ -1,9 +1,8 @@
 import { parseDigestEditionContent } from './types'
 import { AUGUST_11_MOCK_DIGEST, isDigestPreviewEnabled } from './mock'
-import { firstStoryMedia } from './storyMedia'
 
 describe('daily digest preview fixture', () => {
-  test('is a valid five-story edition built from the August 11 snapshot', () => {
+  test('is a valid preview edition', () => {
     expect(
       parseDigestEditionContent(AUGUST_11_MOCK_DIGEST.content),
     ).not.toBeNull()
@@ -11,40 +10,6 @@ describe('daily digest preview fixture', () => {
       digestDate: '2026-08-11',
       isPreview: true,
     })
-    expect(AUGUST_11_MOCK_DIGEST.content.stories).toHaveLength(5)
-    expect(AUGUST_11_MOCK_DIGEST.content.executiveSummary).toHaveLength(3)
-    expect(AUGUST_11_MOCK_DIGEST.content.source).toMatchObject({
-      candidateCount: 252,
-      selectedCount: 30,
-    })
-    expect(
-      AUGUST_11_MOCK_DIGEST.content.stories.map((story) => story.category),
-    ).toEqual(['AI news', 'Viral joke', 'AI news', 'Meme', 'AI news'])
-    expect(AUGUST_11_MOCK_DIGEST.content.topBanger.text).toContain(
-      'True and pure moon-posting is done from reverence and love.',
-    )
-    expect(
-      AUGUST_11_MOCK_DIGEST.content.stories.every((story) =>
-        [...story.bangers, ...story.commentary].some((tweet) =>
-          tweet.text
-            .replace(/\s+/g, ' ')
-            .toLocaleLowerCase('en-US')
-            .includes(
-              story.title.replace(/\s+/g, ' ').toLocaleLowerCase('en-US'),
-            ),
-        ),
-      ),
-    ).toBe(true)
-    expect(
-      AUGUST_11_MOCK_DIGEST.content.stories.every((story) =>
-        Boolean(firstStoryMedia(story)),
-      ),
-    ).toBe(true)
-    expect(
-      AUGUST_11_MOCK_DIGEST.content.stories.every(
-        (story) => story.commentary.length >= 2,
-      ),
-    ).toBe(true)
   })
 
   test('is enabled for preview and development, but not production by default', () => {

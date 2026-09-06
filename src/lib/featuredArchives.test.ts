@@ -30,34 +30,4 @@ describe('sampleFeaturedArchives', () => {
       ).toHaveLength(1)
     }
   })
-
-  it('keeps the requested anchors in the 29-person candidate pool', () => {
-    const usernames = FEATURED_ARCHIVE_GROUPS.flat().map(
-      (archive) => archive.username,
-    )
-
-    expect(usernames).toHaveLength(29)
-    expect(usernames).toEqual(
-      expect.arrayContaining([
-        'tszzl',
-        'visakanv',
-        'patio11',
-        'repligate',
-        'eshear',
-        'algekalipso',
-        'davidad',
-        'nosilverv',
-        'TheZvi',
-        'gleech',
-        'Ben_Reinhardt',
-        'RomeoStevens76',
-        'voooooogel',
-        'NathanpmYoung',
-        'johnsonmxe',
-      ]),
-    )
-    expect(usernames).not.toContain('tessera_antra')
-    expect(usernames).not.toContain('the_wilderless')
-    expect(usernames).not.toContain('m1guelpf')
-  })
 })

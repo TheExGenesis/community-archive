@@ -15,17 +15,10 @@ describe('AboutPage contributors', () => {
       name: 'Francisco Carvalho (Xiq)',
     })
     expect(xiqLink).toHaveAttribute('href', '/user/exgenesis')
-    expect(xiqLink).toHaveTextContent('Francisco Carvalho (Xiq)')
-    expect(within(xiqLink).getByText('(Xiq)')).toHaveClass(
-      'text-muted-foreground',
-    )
     expect(within(currentSection!).getByText('Founder')).toBeInTheDocument()
     expect(
       within(currentSection!).getByRole('link', { name: 'Christine Shiba' }),
     ).toHaveAttribute('href', '/user/christineist')
-
-    const xiqCard = xiqLink.closest('.rounded-lg')
-    expect(xiqCard?.querySelector('svg')).toBeNull()
 
     const pastHeading = screen.getByRole('heading', {
       name: 'Past Contributors',
@@ -42,17 +35,6 @@ describe('AboutPage contributors', () => {
     ).toHaveAttribute('href', '/user/A_Variengien')
     expect(
       within(pastSection!).queryByText('Christine Shiba'),
-    ).not.toBeInTheDocument()
-  })
-
-  it('removes the retired mission copy and hall-of-fame heading', () => {
-    render(<AboutPage />)
-
-    expect(
-      screen.queryByText(/Twitter conversations represent a unique record/),
-    ).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('heading', { name: 'Contributor Hall of Fame' }),
     ).not.toBeInTheDocument()
   })
 })

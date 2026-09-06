@@ -18,6 +18,7 @@ import {
 import { Archive } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { formatNumber } from '@/lib/formatNumber'
+import { HighlightedText } from '@/components/HighlightedText'
 import { decodeTweetText } from '@/lib/tweetText'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
 import ImageLightbox from '@/components/ImageLightbox'
@@ -101,6 +102,7 @@ interface TweetComponentProps {
   compact?: boolean
   permalinkOrigin?: TweetOrigin
   permalinkReturnTo?: string
+  highlightQuery?: string
   isPermalinkPage?: boolean
 }
 
@@ -118,6 +120,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
   permalinkOrigin,
   permalinkReturnTo,
   isPermalinkPage = false,
+  highlightQuery,
 }) => {
   const [isTextExpanded, setIsTextExpanded] = React.useState(false)
   // Support both interface formats for backwards compatibility
@@ -203,25 +206,22 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
 
     // Simple URL detection and conversion to links for any remaining URLs
     const urlRegex = /(https?:\/\/[^\s]+)/g
-    return formattedText
-      .split(urlRegex)
-      .map((part, index) => {
-        if (urlRegex.test(part)) {
-          return (
-            <a
-              key={index}
-              href={part}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="break-all text-brand underline-offset-2"
-            >
-              {part}
-            </a>
-          )
-        }
-        return part
-      })
-      .filter((part) => part !== '') // Remove empty strings
+    return formattedText.split(urlRegex).map((part, index) => {
+      if (urlRegex.test(part)) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-all text-brand underline-offset-2"
+          >
+            <HighlightedText text={part} query={highlightQuery} />
+          </a>
+        )
+      }
+      return <HighlightedText key={index} text={part} query={highlightQuery} />
+    })
   }
 
   const renderMedia = () => {

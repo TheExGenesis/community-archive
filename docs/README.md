@@ -1,5 +1,7 @@
 # Docs
 
+- [Use cases](./use-cases.md) examples of things to discover or build with the archive.
+
 - [Agent entry point](https://www.community-archive.org/llms.txt) machine-readable index of the docs and API usage.
 - [Website docs](https://www.community-archive.org/docs) quickstart for agents, developers, and researchers.
 - [API docs](./api-doc.md) how owners download their private raw JSON or query the public database API.

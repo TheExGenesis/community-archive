@@ -117,6 +117,8 @@ describe('ClickHouse-backed portal analytics', () => {
     ).toEqual([10, 0, 0, 0, 0, 0, 0, 40])
     expect(trends.weekly.find(({ term }) => term === 'tpot')).toEqual({
       term: 'tpot',
+      sinceDate: '2026-08-01',
+      untilDate: '2026-08-07',
       last7: 8,
       prev7: 4,
       deltaPct: 100,

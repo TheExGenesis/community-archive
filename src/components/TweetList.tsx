@@ -325,6 +325,7 @@ export default function TweetList({
   return (
     <div className={compact ? 'space-y-5' : 'space-y-8'}>
       <UnifiedTweetList
+        highlightQuery={filterCriteria.rawSearchQuery}
         tweets={rawTweets}
         isLoading={isLoading}
         emptyMessage="No tweets to display for the current filters."

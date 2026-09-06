@@ -5,6 +5,7 @@ import { Search, UserRound } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input, InputProps } from '@/components/ui/input'
+import { buildSearchParams } from '@/lib/searchParams'
 import { userProfileHref } from '@/lib/navigation'
 import {
   fetchMemberDirectorySuggestions,
@@ -166,6 +167,7 @@ export default function UserSearchInput({
 
     onValueChange(replacement.value)
     closeSuggestions()
+    router.push(`/search?${buildSearchParams(replacement.value).toString()}`)
     const restoreCaret = () => {
       inputRef.current?.focus()
       inputRef.current?.setSelectionRange(

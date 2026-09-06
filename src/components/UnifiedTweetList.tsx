@@ -8,6 +8,7 @@ import type { TweetOrigin } from '@/lib/navigation'
 import type { TweetSearchSort } from '@/lib/queries/tweetQueries'
 
 interface UnifiedTweetListProps {
+  highlightQuery?: string
   tweets: any[]
   isLoading?: boolean
   emptyMessage?: string
@@ -31,6 +32,7 @@ interface UnifiedTweetListProps {
  */
 export default function UnifiedTweetList({
   tweets,
+  highlightQuery,
   isLoading = false,
   emptyMessage = 'No tweets found',
   className = 'space-y-4',
@@ -271,9 +273,10 @@ export default function UnifiedTweetList({
                 <div
                   key={tweet.tweet_id}
                   role="row"
-                  className="hover:bg-muted/35 transition-colors"
+                  className="transition-colors hover:bg-muted/35"
                 >
                   <TweetComponent
+                    highlightQuery={highlightQuery}
                     tweet={tweet}
                     collapseLongText={collapseLongTweets}
                     compact
@@ -293,6 +296,7 @@ export default function UnifiedTweetList({
               className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/20 sm:p-5"
             >
               <TweetComponent
+                highlightQuery={highlightQuery}
                 tweet={tweet}
                 collapseLongText={collapseLongTweets}
                 permalinkOrigin={permalinkOrigin}

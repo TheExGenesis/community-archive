@@ -127,8 +127,8 @@ export async function mutateProfileCuration(input: ProfileCurationMutation) {
   if (input.action === 'restore') {
     const { error } = await supabase
       .from('profile_curation')
-      .delete()
-      .match(target)
+      .update({ is_hidden: false })
+      .match({ ...target, is_hidden: true })
     if (error) throw error
     revalidateProfile(input.accountId)
     return { ok: true as const }

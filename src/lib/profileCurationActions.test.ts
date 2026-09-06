@@ -7,7 +7,9 @@ import { fetchClickHouseTweetPageData } from '@/lib/clickhouseTweetPage'
 
 const mockGetUser = jest.fn()
 const mockUpsert = jest.fn()
-const mockFrom = jest.fn(() => ({ upsert: mockUpsert }))
+const mockMatch = jest.fn()
+const mockUpdate = jest.fn(() => ({ match: mockMatch }))
+const mockFrom = jest.fn(() => ({ upsert: mockUpsert, update: mockUpdate }))
 const mockRevalidatePath = jest.fn()
 
 jest.mock('next/headers', () => ({ cookies: jest.fn(async () => ({})) }))
@@ -32,6 +34,7 @@ describe('owner profile server actions', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockUpsert.mockResolvedValue({ error: null })
+    mockMatch.mockResolvedValue({ error: null })
     mockFetchTweet.mockResolvedValue(null)
   })
 
@@ -100,6 +103,44 @@ describe('owner profile server actions', () => {
       },
       { onConflict: 'account_id,section,item_id' },
     )
+  })
+
+  test.each(['bangers', 'people'] as const)(
+    'restores hidden %s without deleting featured, ordered, or manually added entries',
+    async (section) => {
+      mockGetUser.mockResolvedValue({
+        data: { user: { app_metadata: { provider_id: '42' } } },
+        error: null,
+      })
+      await mutateProfileCuration({
+        action: 'restore',
+        accountId: '42',
+        section,
+      })
+      expect(mockUpdate).toHaveBeenCalledWith({ is_hidden: false })
+      expect(mockMatch).toHaveBeenCalledWith({
+        account_id: '42',
+        section,
+        is_hidden: true,
+      })
+      expect(mockUpsert).not.toHaveBeenCalled()
+    },
+  )
+
+  test('surfaces a failed restore without invalidating the current profile', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { app_metadata: { provider_id: '42' } } },
+      error: null,
+    })
+    mockMatch.mockResolvedValue({ error: new Error('Restore failed') })
+    await expect(
+      mutateProfileCuration({
+        action: 'restore',
+        accountId: '42',
+        section: 'bangers',
+      }),
+    ).rejects.toThrow('Restore failed')
+    expect(mockRevalidatePath).not.toHaveBeenCalled()
   })
 
   test('keeps Download Archive visible unless the owner turns it off', async () => {

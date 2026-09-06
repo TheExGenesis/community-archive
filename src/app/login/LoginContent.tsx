@@ -21,7 +21,7 @@ export default function LoginContent({ redirectUrl }: LoginContentProps) {
             </p>
             {redirectUrl && (
               <p className="mt-2 text-sm text-brand">
-                You&apos;ll be redirected to: {decodeURIComponent(redirectUrl)}
+                You&apos;ll be redirected to: {redirectUrl}
               </p>
             )}
           </div>

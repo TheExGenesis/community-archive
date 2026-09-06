@@ -1,5 +1,5 @@
 import React from 'react'
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import TweetList from './TweetList'
 import { fetchTweets } from '@/lib/queries/tweetQueries'
@@ -208,4 +208,174 @@ describe('TweetList progressive search', () => {
       screen.queryByText('Loading the remaining results…'),
     ).not.toBeInTheDocument()
   })
+})
+
+describe('search request scheduling and cancellation', () => {
+  beforeEach(() => {
+    jest.resetAllMocks()
+    ;(canPreviewTweetSearch as jest.Mock).mockReturnValue(false)
+  })
+  afterEach(() => jest.useRealTimers())
+
+  it('starts the canonical query despite an unresolved preview and ignores a late preview', async () => {
+    jest.useFakeTimers()
+    const preview = deferred<{
+      tweets: typeof previewTweets
+      definitiveEmpty: boolean
+    }>()
+    ;(canPreviewTweetSearch as jest.Mock).mockReturnValue(true)
+    ;(searchTweetPreviewsWithClickHouse as jest.Mock).mockReturnValue(
+      preview.promise,
+    )
+    ;(fetchTweets as jest.Mock).mockResolvedValue({
+      tweets: [{ ...previewTweet, tweet_id: 'canonical' }],
+      totalCount: null,
+      error: null,
+    })
+    render(<TweetList filterCriteria={{ rawSearchQuery: 'archive' }} />)
+    await act(async () => {
+      jest.advanceTimersByTime(250)
+    })
+    expect(fetchTweets).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('tweet-ids')).toHaveTextContent('canonical')
+    await act(async () => {
+      preview.resolve({ tweets: previewTweets, definitiveEmpty: false })
+    })
+    expect(screen.getByTestId('tweet-ids')).toHaveTextContent('canonical')
+    expect(
+      (searchTweetPreviewsWithClickHouse as jest.Mock).mock.calls[0][2].aborted,
+    ).toBe(true)
+  })
+
+  it('shows the canonical page while quote bodies are still loading', async () => {
+    const enriched = deferred<any>()
+    ;(fetchTweets as jest.Mock).mockImplementation(
+      (_client, _criteria, _page, _size, options) => {
+        options.onBaseTweets([{ ...previewTweet, tweet_id: 'canonical' }])
+        return enriched.promise
+      },
+    )
+    render(
+      <TweetList
+        filterCriteria={{ rawSearchQuery: 'archive', includeQuoteTweets: true }}
+      />,
+    )
+    expect(await screen.findByTestId('tweet-ids')).toHaveTextContent(
+      'canonical',
+    )
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Loading quoted tweets…',
+    )
+    await act(async () => {
+      enriched.resolve({
+        tweets: [{ ...previewTweet, tweet_id: 'canonical' }],
+        totalCount: null,
+        error: null,
+      })
+    })
+    expect(screen.queryByText('Loading quoted tweets…')).not.toBeInTheDocument()
+  })
+
+  it('aborts obsolete searches and rejects late results and quote updates', async () => {
+    const old = deferred<any>()
+    const current = deferred<any>()
+    ;(fetchTweets as jest.Mock)
+      .mockReturnValueOnce(old.promise)
+      .mockReturnValueOnce(current.promise)
+    const { rerender, unmount } = render(
+      <TweetList filterCriteria={{ rawSearchQuery: 'old' }} />,
+    )
+    const oldOptions = (fetchTweets as jest.Mock).mock.calls[0][4]
+    rerender(<TweetList filterCriteria={{ rawSearchQuery: 'new' }} />)
+    expect(oldOptions.signal.aborted).toBe(true)
+    await act(async () => {
+      current.resolve({
+        tweets: [{ ...previewTweet, tweet_id: 'current' }],
+        totalCount: null,
+        error: null,
+      })
+    })
+    await act(async () => {
+      oldOptions.onBaseTweets(previewTweets)
+      old.resolve({ tweets: previewTweets, totalCount: null, error: null })
+    })
+    expect(screen.getByTestId('tweet-ids')).toHaveTextContent('current')
+    const currentSignal = (fetchTweets as jest.Mock).mock.calls[1][4].signal
+    unmount()
+    expect(currentSignal.aborted).toBe(true)
+  })
+
+  it('does not repeat an equivalent search after a parent rerender', async () => {
+    ;(fetchTweets as jest.Mock).mockResolvedValue({
+      tweets: previewTweets,
+      totalCount: null,
+      error: null,
+    })
+    const { rerender } = render(
+      <TweetList filterCriteria={{ rawSearchQuery: 'archive' }} />,
+    )
+    await screen.findByTestId('tweet-ids')
+    rerender(<TweetList filterCriteria={{ rawSearchQuery: 'archive' }} />)
+    expect(fetchTweets).toHaveBeenCalledTimes(1)
+  })
+})
+
+test('retries a failed search explicitly without changing its filters', async () => {
+  jest.resetAllMocks()
+  const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {})
+  ;(canPreviewTweetSearch as jest.Mock).mockReturnValue(false)
+  ;(fetchTweets as jest.Mock)
+    .mockResolvedValueOnce({
+      tweets: [],
+      totalCount: null,
+      error: new Error('Temporarily unavailable'),
+    })
+    .mockResolvedValueOnce({
+      tweets: previewTweets,
+      totalCount: null,
+      error: null,
+    })
+  render(
+    <TweetList
+      filterCriteria={{ rawSearchQuery: 'archive', fromUsername: 'alice' }}
+    />,
+  )
+  fireEvent.click(await screen.findByRole('button', { name: 'Retry search' }))
+  expect(await screen.findByTestId('tweet-ids')).toHaveTextContent('preview-1')
+  expect((fetchTweets as jest.Mock).mock.calls[1][1]).toEqual({
+    rawSearchQuery: 'archive',
+    fromUsername: 'alice',
+  })
+  errorLog.mockRestore()
+})
+
+test('a cancelled late preview cannot replace a completed search error', async () => {
+  jest.resetAllMocks()
+  jest.useFakeTimers()
+  const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {})
+  const preview = deferred<{
+    tweets: typeof previewTweets
+    definitiveEmpty: boolean
+  }>()
+  ;(canPreviewTweetSearch as jest.Mock).mockReturnValue(true)
+  ;(searchTweetPreviewsWithClickHouse as jest.Mock).mockReturnValue(
+    preview.promise,
+  )
+  ;(fetchTweets as jest.Mock).mockResolvedValue({
+    tweets: [],
+    totalCount: null,
+    error: new Error('Search unavailable'),
+  })
+  render(<TweetList filterCriteria={{ rawSearchQuery: 'archive' }} />)
+  await act(async () => {
+    jest.advanceTimersByTime(250)
+  })
+  expect(screen.getByText('Search could not be completed')).toBeVisible()
+  await act(async () => {
+    preview.resolve({ tweets: previewTweets, definitiveEmpty: false })
+  })
+  expect(screen.queryByTestId('tweet-ids')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Retry search' })).toBeVisible()
+  errorLog.mockRestore()
+  jest.useRealTimers()
 })

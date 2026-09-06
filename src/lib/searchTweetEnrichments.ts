@@ -28,14 +28,19 @@ function deletedQuotedTweet(tweetId: string) {
 export async function enrichSearchTweets(
   supabase: SupabaseClient,
   tweets: TimelineTweet[],
+  signal?: AbortSignal,
 ): Promise<TimelineTweet[]> {
   if (tweets.length === 0) return tweets
 
   const tweetIds = tweets.map((tweet) => tweet.tweet_id)
-  const { data: quoteRows, error: quoteError } = await supabase
+  signal?.throwIfAborted()
+  const quoteQuery = supabase
     .from('quote_tweets')
     .select('tweet_id, quoted_tweet_id')
     .in('tweet_id', tweetIds)
+  if (signal) quoteQuery.abortSignal(signal)
+  const { data: quoteRows, error: quoteError } = await quoteQuery
+  signal?.throwIfAborted()
 
   if (quoteError) {
     console.warn('Could not load quote relationships for search:', quoteError)
@@ -48,7 +53,7 @@ export async function enrichSearchTweets(
   const quotedTweetIds = Array.from(
     new Set(quoteRelations.map((row) => row.quoted_tweet_id)),
   )
-  const { data: quotedRows, error: quotedError } = await supabase
+  const quotedQuery = supabase
     .from('tweets')
     .select(
       `
@@ -75,6 +80,9 @@ export async function enrichSearchTweets(
       `,
     )
     .in('tweet_id', quotedTweetIds)
+  if (signal) quotedQuery.abortSignal(signal)
+  const { data: quotedRows, error: quotedError } = await quotedQuery
+  signal?.throwIfAborted()
 
   if (quotedError) {
     console.warn('Could not load quoted tweets for search:', quotedError)

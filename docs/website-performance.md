@@ -126,3 +126,31 @@ The additional readiness categories are Digest, Gallery, Graph, Stream, Trends,
 Research, and Docs. Usable-data markers include `digest_article`,
 `gallery_catalog`, `stream_feed`, and `bangers_results`. A shell marker alone is
 never evidence that a graph or chart is usable.
+
+## Search request path
+
+Search gives its five-result preview at most 250 ms before starting the canonical
+page. A fast, definitively empty preview still avoids the second query. A slow
+preview can overlap one canonical request; canonical results take precedence and
+cancel any remaining preview. This bounds the preview's added latency without
+changing query terms, phrase matching, filters, ordering, or page size.
+
+Canonical tweet text, authors, media, and engagement render before optional
+quoted-tweet bodies finish. Quotes are attached afterward; CSV export waits for
+the complete enrichment. Load-more retains the established page ordering.
+Equivalent parent rerenders do not restart searches. Changing filters, retrying,
+or unmounting cancels obsolete browser requests and prevents their late results
+or enrichment callbacks from replacing the active search. Cancellation also
+reaches Supabase reads and the Vercel proxy's upstream fetch; database-side query
+termination remains the gateway's responsibility.
+
+When ClickHouse text search is enabled, its failures return an actionable error
+and retry control instead of starting another corpus scan against PostgreSQL.
+The existing PostgreSQL path remains available for unsupported/filter-only reads
+and environments with ClickHouse search disabled. Search responses remain
+private and uncached, and this change introduces no database or policy changes.
+
+`search_results_received` measures from the start of each list request to its
+preview/canonical response, with only `phase`, `result_count`, `elapsed_ms`, and
+`page`. It measures data availability, not paint or navigation time, and includes
+no query text, account names, filters, or URLs.

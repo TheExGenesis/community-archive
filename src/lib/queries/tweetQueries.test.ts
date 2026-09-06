@@ -199,7 +199,7 @@ describe('fetchTweets — exact phrase search via FTS simple', () => {
     expect(result.tweets[0].tweet_id).toBe('ch-1')
   })
 
-  it('falls back to the existing RPC when ClickHouse is unavailable', async () => {
+  it('fails without a second corpus scan when ClickHouse is unavailable', async () => {
     process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH = 'true'
     mockClickHouseSearch.mockRejectedValueOnce(new Error('gateway down'))
     mockRpcSearch.mockResolvedValueOnce([makeRpcTweet('pg-1')])
@@ -215,8 +215,10 @@ describe('fetchTweets — exact phrase search via FTS simple', () => {
     )
 
     expect(mockClickHouseSearch).toHaveBeenCalledTimes(1)
-    expect(mockRpcSearch).toHaveBeenCalledTimes(1)
-    expect(result.tweets[0].tweet_id).toBe('pg-1')
+    expect(mockRpcSearch).not.toHaveBeenCalled()
+    expect(mockRpcExactPhrase).not.toHaveBeenCalled()
+    expect(result.error.message).toBe('gateway down')
+    expect(result.tweets).toEqual([])
   })
 
   it('does not silently ignore a non-default sort when ClickHouse is disabled', async () => {
@@ -417,5 +419,71 @@ describe('fetchTweets — direct profile embeds', () => {
     expect(result.tweets[0].account.profile?.avatar_media_url).toBe(
       'https://example.com/avatar.jpg',
     )
+  })
+})
+
+describe('progressive canonical results', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH = 'true'
+  })
+  afterEach(() => delete process.env.NEXT_PUBLIC_ENABLE_CLICKHOUSE_SEARCH)
+
+  it('publishes filtered search hits without waiting for quote enrichment', async () => {
+    let finishQuotes!: (result: { data: never[]; error: null }) => void
+    const quoteRows = new Promise<{ data: never[]; error: null }>((resolve) => {
+      finishQuotes = resolve
+    })
+    const builder = {
+      select: jest.fn().mockReturnThis(),
+      in: jest.fn().mockReturnValue(quoteRows),
+    }
+    const client = { from: jest.fn().mockReturnValue(builder) } as any
+    const tweet = makeRpcTweet('canonical', 'Useful results')
+    mockClickHouseSearch.mockResolvedValueOnce([
+      tweet,
+      makeRpcTweet('retweet', 'RT @alice: duplicated'),
+    ])
+    const onBaseTweets = jest.fn()
+    const complete = fetchTweets(
+      client,
+      {
+        searchQuery: 'archive',
+        rawSearchQuery: 'archive',
+        includeQuoteTweets: true,
+        excludeRetweets: true,
+      },
+      1,
+      20,
+      { onBaseTweets },
+    )
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(onBaseTweets).toHaveBeenCalledWith([tweet])
+    finishQuotes({ data: [], error: null })
+    expect((await complete).tweets).toEqual([tweet])
+  })
+
+  it('propagates cancellation without falling back to PostgreSQL', async () => {
+    const controller = new AbortController()
+    let rejectSearch!: (error: Error) => void
+    mockClickHouseSearch.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        rejectSearch = reject
+      }),
+    )
+    const result = fetchTweets(
+      buildMockSupabase(),
+      { searchQuery: 'archive', rawSearchQuery: 'archive' },
+      1,
+      20,
+      { signal: controller.signal },
+    )
+    expect(mockClickHouseSearch.mock.calls[0][4]).toBe(controller.signal)
+    controller.abort()
+    rejectSearch(new DOMException('Cancelled', 'AbortError'))
+    await expect(result).rejects.toMatchObject({ name: 'AbortError' })
+    expect(mockRpcSearch).not.toHaveBeenCalled()
   })
 })

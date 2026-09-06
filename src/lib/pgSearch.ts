@@ -189,7 +189,8 @@ export async function searchTweets(
   supabase: SupabaseClient<Database>,
   searchParams: SearchParams,
   limit: number = 50,
-  offset: number = 0
+  offset: number = 0,
+  signal?: AbortSignal
 ): Promise<SearchTweetRpcResponseItem[] | null> {
   const params = {
     search_query: searchParams.search_query,
@@ -201,7 +202,10 @@ export async function searchTweets(
     offset_: offset
   };
 
-  const { data, error } = await supabase.rpc('search_tweets', params);
+  const query = supabase.rpc('search_tweets', params);
+  if (signal) query.abortSignal(signal);
+  const { data, error } = await query;
+  signal?.throwIfAborted();
 
   if (error) {
     console.error('Error calling search_tweets RPC:', error);
@@ -228,9 +232,10 @@ export async function searchTweetsExactPhrase(
   supabase: SupabaseClient,
   params: ExactPhraseParams,
   limit: number = 50,
-  offset: number = 0
+  offset: number = 0,
+  signal?: AbortSignal
 ): Promise<SearchTweetRpcResponseItem[] | null> {
-  const { data, error } = await supabase.rpc('search_tweets_exact_phrase', {
+  const query = supabase.rpc('search_tweets_exact_phrase', {
     exact_phrase: params.exact_phrase,
     from_user: params.from_user || undefined,
     to_user: params.to_user || undefined,
@@ -239,6 +244,9 @@ export async function searchTweetsExactPhrase(
     limit_: limit,
     offset_: offset,
   });
+  if (signal) query.abortSignal(signal);
+  const { data, error } = await query;
+  signal?.throwIfAborted();
 
   if (error) {
     console.error('Error calling search_tweets_exact_phrase RPC:', error);

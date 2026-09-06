@@ -859,6 +859,8 @@ export async function fetchPortalTrends(
     }
     return {
       term,
+      sinceDate: utcDateParam(from7),
+      untilDate: utcDateParam(today),
       last7,
       prev7,
       deltaPct: prev7 > 0 ? Math.round(((last7 - prev7) / prev7) * 100) : null,

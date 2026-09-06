@@ -41,6 +41,7 @@ export default function UserDirectoryClient({
   const [loading, setLoading] = useState(initialUsers === null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
   useReportSectionReady('directory_rows', !loading && !error)
   const [sortKey, setSortKey] = useState<SortKey>('num_followers')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
@@ -99,6 +100,8 @@ export default function UserDirectoryClient({
         }
       } catch (err) {
         if (!isCurrentRequest) return
+        setUsers([])
+        setHasMore(false)
         setError('We could not load users. Please try again.')
         console.error('Error fetching users:', err)
       } finally {
@@ -110,7 +113,7 @@ export default function UserDirectoryClient({
     return () => {
       isCurrentRequest = false
     }
-  }, [debouncedSearch, sortKey, sortOrder])
+  }, [debouncedSearch, retryCount, sortKey, sortOrder])
 
   const loadMore = useCallback(async () => {
     if (loading || loadingMore || !hasMore || loadMoreInFlightRef.current) {
@@ -328,7 +331,14 @@ export default function UserDirectoryClient({
                     colSpan={4}
                     className="h-40 text-center text-sm text-red-600 dark:text-red-400"
                   >
-                    {error}
+                    <p role="alert">{error}</p>
+                    <Button
+                      variant="outline"
+                      className="mt-3"
+                      onClick={() => setRetryCount((count) => count + 1)}
+                    >
+                      Retry loading users
+                    </Button>
                   </TableCell>
                 </TableRow>
               ) : users.length === 0 ? (
@@ -432,6 +442,8 @@ export default function UserDirectoryClient({
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Loading…
                 </>
+              ) : error ? (
+                'Retry loading more users'
               ) : (
                 'Load more users'
               )}

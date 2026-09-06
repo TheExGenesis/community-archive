@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createBrowserClient } from '@/utils/supabase'
 import {
   ChartContainer,
@@ -93,6 +93,7 @@ function getStatsRange(viewMode: ViewMode, timeOffset: number) {
 }
 
 const StreamMonitor = () => {
+  const queryClient = useQueryClient()
   const [viewMode, setViewMode] = useState<ViewMode>('7d')
   const [timeOffset, setTimeOffset] = useState(0)
   const [showStreamedOnly, setShowStreamedOnly] = useState(true)
@@ -165,14 +166,20 @@ const StreamMonitor = () => {
   const chartLoading = statsLoading
   const chartError = statsError
   const sourceMetric = showStreamedOnly
-    ? scrapingStats?.summary?.sourceMessages || 0
-    : scrapingStats?.summary?.sourceCount || 0
-  const sourceMetricLoading = statsLoading
+    ? scrapingStats?.summary?.sourceMessages
+    : scrapingStats?.summary?.sourceCount
+  const formatMetric = (value: number | undefined) =>
+    statsLoading
+      ? '...'
+      : statsError || value == null
+        ? 'Unavailable'
+        : value.toLocaleString()
 
   // Query for latest tweets with pagination
   const {
     data: tweetsData,
     isLoading: tweetsLoading,
+    isFetching: tweetsFetching,
     error: tweetsError,
     refetch: refetchTweets,
   } = useQuery({
@@ -198,8 +205,14 @@ const StreamMonitor = () => {
         // Fresh load or refresh - replace all tweets
         setLoadedTweets(tweetsData)
       } else {
-        // Load more - append to existing tweets
-        setLoadedTweets((prev) => [...prev, ...tweetsData])
+        // Pages can overlap as new tweets arrive or the current page refetches.
+        setLoadedTweets((prev) =>
+          Array.from(
+            new Map(
+              [...prev, ...tweetsData].map((tweet) => [tweet.tweet_id, tweet]),
+            ).values(),
+          ),
+        )
       }
     }
   }, [tweetsData, tweetOffset])
@@ -263,14 +276,6 @@ const StreamMonitor = () => {
     }
   }
 
-  const getTotalTweets = () => {
-    return scrapingStats?.summary?.totalTweets || 0
-  }
-
-  const getAverageTweetsPerPeriod = () => {
-    return scrapingStats?.summary?.avgTweetsPerPeriod || 0
-  }
-
   const averageUnit =
     viewMode === '24h' ? 'hour' : viewMode === '7d' ? 'day' : 'week'
 
@@ -279,14 +284,24 @@ const StreamMonitor = () => {
   }
 
   const refreshLatestTweets = async () => {
-    setTweetOffset(0)
-    await refetchTweets()
+    if (tweetOffset === 0) {
+      await refetchTweets()
+    } else {
+      // Mark the first page stale before switching back to it. Refetching here
+      // would use the old offset and request another later page instead.
+      await queryClient.invalidateQueries({
+        queryKey: ['streamMonitorTweets', 0],
+        exact: true,
+        refetchType: 'none',
+      })
+      setTweetOffset(0)
+    }
   }
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h1 className="mb-2 text-3xl font-bold text-foreground">
               Stream Monitor
@@ -327,7 +342,7 @@ const StreamMonitor = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-brand">
-              {getTotalTweets().toLocaleString()}
+              {formatMetric(scrapingStats?.summary?.totalTweets)}
             </div>
           </CardContent>
         </Card>
@@ -343,7 +358,7 @@ const StreamMonitor = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {getAverageTweetsPerPeriod().toLocaleString()}
+              {formatMetric(scrapingStats?.summary?.avgTweetsPerPeriod)}
             </div>
           </CardContent>
         </Card>
@@ -379,7 +394,7 @@ const StreamMonitor = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {sourceMetricLoading ? '...' : sourceMetric}
+              {formatMetric(sourceMetric)}
             </div>
           </CardContent>
         </Card>
@@ -387,7 +402,7 @@ const StreamMonitor = () => {
 
       <Card className="mb-8">
         <CardHeader>
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <CardTitle>
                 {showStreamedOnly
@@ -397,13 +412,19 @@ const StreamMonitor = () => {
               <CardDescription>{getTimeRangeLabel()}</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handlePrevious}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrevious}
+                aria-label="Previous time period"
+              >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleNext}
+                aria-label="Next time period"
                 disabled={timeOffset === 0}
               >
                 <ChevronRight className="h-4 w-4" />
@@ -413,7 +434,7 @@ const StreamMonitor = () => {
           <Tabs
             value={viewMode}
             onValueChange={(v) => {
-              setViewMode(v as any)
+              setViewMode(v as ViewMode)
               setTimeOffset(0)
             }}
           >
@@ -470,9 +491,11 @@ const StreamMonitor = () => {
               onClick={refreshLatestTweets}
               variant="outline"
               size="sm"
-              disabled={tweetsLoading}
+              disabled={tweetsFetching}
             >
-              {tweetsLoading ? 'Refreshing...' : 'Refresh'}
+              {tweetsFetching && tweetOffset === 0
+                ? 'Refreshing...'
+                : 'Refresh'}
             </Button>
           </CardTitle>
           <CardDescription>
@@ -481,32 +504,46 @@ const StreamMonitor = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {tweetsLoading ? (
+          {tweetsLoading && loadedTweets.length === 0 ? (
             <div className="flex items-center justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-brand"></div>
             </div>
-          ) : tweetsError ? (
-            <div className="flex items-center justify-center py-8 text-red-600 dark:text-red-400">
-              Error loading tweets
-            </div>
           ) : (
             <>
-              <UnifiedTweetList
-                tweets={loadedTweets}
-                isLoading={false}
-                emptyMessage="No tweets available"
-                showCsvExport={true}
-                csvFilename="stream_monitor_tweets.csv"
-              />
+              {(!tweetsError || loadedTweets.length > 0) && (
+                <UnifiedTweetList
+                  tweets={loadedTweets}
+                  isLoading={false}
+                  emptyMessage="No tweets available"
+                  showCsvExport={true}
+                  csvFilename="stream_monitor_tweets.csv"
+                />
+              )}
 
-              {loadedTweets.length > 0 && (
+              {tweetsError && (
+                <p
+                  role="alert"
+                  className="pt-4 text-center text-red-600 dark:text-red-400"
+                >
+                  Could not load tweets. Please try again.
+                </p>
+              )}
+              {(tweetsError ||
+                tweetsLoading ||
+                tweetsData?.length === tweetsPerPage) && (
                 <div className="flex justify-center pt-4">
                   <Button
-                    onClick={loadMoreTweets}
+                    onClick={
+                      tweetsError ? () => void refetchTweets() : loadMoreTweets
+                    }
                     variant="outline"
-                    disabled={tweetsLoading}
+                    disabled={tweetsFetching}
                   >
-                    {tweetsLoading ? 'Loading...' : 'Load More'}
+                    {tweetsFetching
+                      ? 'Loading...'
+                      : tweetsError
+                        ? 'Retry loading tweets'
+                        : 'Load More'}
                   </Button>
                 </div>
               )}

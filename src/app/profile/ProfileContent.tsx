@@ -448,9 +448,9 @@ export default function ProfileContent({
         <TabsContent value="privacy" className="space-y-4">
           <Card>
             <CardHeader className="space-y-1.5">
-              <CardTitle>Public Profile</CardTitle>
+              <CardTitle>Profile controls</CardTitle>
               <CardDescription>
-                Choose which owner actions appear to visitors
+                Choose which controls you see on your profile
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -460,8 +460,8 @@ export default function ProfileContent({
                     Show Download Archive
                   </Label>
                   <div className="text-sm text-muted-foreground">
-                    Visible by default. Turn this off to hide the button from
-                    your public profile.
+                    Only you can see and use this button. Turn it off to hide it
+                    when viewing your own profile.
                   </div>
                 </div>
                 <Switch

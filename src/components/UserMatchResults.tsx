@@ -27,9 +27,9 @@ export default function UserMatchResults({ query }: { query?: string }) {
     let active = true
     let memberMatches: UserSuggestion[] = []
     let accountMatches: UserSuggestion[] = []
+    setMatches([])
 
     if (!searchTerm) {
-      setMatches([])
       return () => {
         active = false
       }

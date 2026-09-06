@@ -10,6 +10,14 @@ module.exports = {
       screens: { '2xl': '1400px' },
     },
     extend: {
+      // Intermediate alpha values used by banners and interaction states.
+      opacity: {
+        15: '0.15',
+        35: '0.35',
+        45: '0.45',
+        55: '0.55',
+        85: '0.85',
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',

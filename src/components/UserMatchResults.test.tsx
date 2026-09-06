@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import UserMatchResults from './UserMatchResults'
 import {
@@ -50,5 +50,20 @@ describe('UserMatchResults', () => {
 
     expect(fetchAccountSuggestions).not.toHaveBeenCalled()
     expect(fetchMemberSuggestions).not.toHaveBeenCalled()
+  })
+  it('clears old people while a different query is loading or fails', async () => {
+    const { rerender } = render(<UserMatchResults query="christine" />)
+    await screen.findByRole('link', { name: /Christine Shiba/ })
+    jest.mocked(fetchAccountSuggestions).mockRejectedValue(new Error('offline'))
+    jest.mocked(fetchMemberSuggestions).mockRejectedValue(new Error('offline'))
+
+    await act(async () => rerender(<UserMatchResults query="exgenesis" />))
+
+    expect(
+      screen.queryByRole('link', { name: /Christine Shiba/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: /People matching/ }),
+    ).not.toBeInTheDocument()
   })
 })

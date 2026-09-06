@@ -200,6 +200,12 @@ export function ProfileHeader({
               <Stat value={profile.num_following} label="Following" />
               <Stat value={profile.num_likes} label="Likes" />
             </div>
+            <Link
+              href={`/search?${new URLSearchParams({ fromUser: profile.username, sort: 'newest' })}`}
+              className="self-start text-sm font-medium text-brand underline-offset-4 hover:underline lg:self-end"
+            >
+              Latest tweets →
+            </Link>
           </div>
         </div>
       </div>

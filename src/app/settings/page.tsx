@@ -53,9 +53,9 @@ export default async function SettingsPage() {
   const [
     optInResponse,
     archivesResponse,
-    tweetsResponse,
     settings,
     pendingCommunityProjects,
+    digestSubscription,
   ] = await Promise.all([
     optInQuery,
     twitterAccountId
@@ -81,27 +81,16 @@ export default async function SettingsPage() {
           .order('created_at', { ascending: false })
       : Promise.resolve({ data: [], error: null }),
     twitterAccountId
-      ? supabase
-          .from('tweets')
-          .select(
-            'tweet_id, created_at, full_text, favorite_count, retweet_count',
-          )
-          .eq('account_id', twitterAccountId)
-          .order('created_at', { ascending: false })
-          .limit(100)
-      : Promise.resolve({ data: [], error: null }),
-    twitterAccountId
       ? getPublicProfileSettings(twitterAccountId)
       : Promise.resolve({ downloadArchiveVisible: true }),
     isAdmin
       ? loadPendingCommunityProjects().catch(() => [])
       : Promise.resolve([]),
+    twitterAccountId
+      ? getSubscriptionForAccount(twitterAccountId).catch(() => null)
+      : Promise.resolve(null),
   ])
 
-  // Tolerate the subscriptions table not existing yet (pre-migration).
-  const digestSubscription = twitterAccountId
-    ? await getSubscriptionForAccount(twitterAccountId).catch(() => null)
-    : null
   const digestEmailStatus: DigestEmailStatus = !digestSubscription
     ? 'none'
     : digestSubscription.unsubscribedAt
@@ -132,7 +121,6 @@ export default async function SettingsPage() {
           initialDownloadArchiveVisible={settings.downloadArchiveVisible}
           initialOptInData={optInResponse.data}
           archives={archivesResponse.data || []}
-          initialTweets={tweetsResponse.data || []}
         />
       </div>
     </main>

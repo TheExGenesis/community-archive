@@ -732,7 +732,9 @@ const getCachedExplorerTrends = unstable_cache(
   async (_sourceKey: string) =>
     fetchPortalTrends(new Date(), undefined, true, false),
   ['portal-explorer-trends-v1'],
-  { revalidate: 300 },
+  // Preserve the historical seed's daily refresh; query pruning must not
+  // increase how often corpus-wide analytical queries run.
+  { revalidate: 86_400 },
 )
 
 const getCachedTrendsSnapshot = unstable_cache(

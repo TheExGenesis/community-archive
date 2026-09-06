@@ -113,7 +113,7 @@ alone is not evidence of independent loading.
   pagination retain their current behavior.
 - Trends retains its sign-in gate and loads historical chart series without the
   twelve weekly queries needed only by homepage panels. The explorer has its own
-  five-minute cache key, keeping full-snapshot consumers unchanged.
+  daily cache key, keeping full-snapshot consumers unchanged.
 - Graph starts its public snapshot and identity reads together. Its loading
   boundary downloads the graph engine while the snapshot is in flight.
 - Bangers renders its heading before rankings arrive. Search imports tweet

@@ -350,7 +350,9 @@ export default function UserDirectoryClient({
                           alt={`${user.account_display_name}'s avatar`}
                         />
                         <AvatarFallback>
-                          {user.account_display_name.charAt(0).toUpperCase()}
+                          {Array.from(
+                            user.account_display_name,
+                          )[0]?.toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">

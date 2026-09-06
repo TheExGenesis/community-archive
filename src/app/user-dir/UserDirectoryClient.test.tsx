@@ -52,6 +52,19 @@ describe('UserDirectoryClient', () => {
     })
   })
 
+  test('keeps a non-BMP display-name initial intact for server hydration', () => {
+    render(
+      <UserDirectoryClient
+        totalCount={1}
+        initialUsers={[{ ...directoryUser(1), account_display_name: '𒐪' }]}
+        initialHasMore={false}
+      />,
+    )
+    // Both the name and avatar fallback must contain the complete code point.
+    // A lone UTF-16 surrogate becomes U+FFFD when the server sends UTF-8 HTML.
+    expect(screen.getAllByText('𒐪')).toHaveLength(2)
+  })
+
   test('records profile opens using aggregate directory context', async () => {
     const initialUsers = [directoryUser(1)]
     render(

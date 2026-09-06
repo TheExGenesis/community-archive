@@ -728,6 +728,15 @@ async function fetchPortalJoinedThisWeek(): Promise<number> {
 
 // Arguments participate in the cache key, keeping staging/prod sources and
 // deployment environments isolated even when the Data Cache survives deploys.
+const getCachedExplorerTrends = unstable_cache(
+  async (_sourceKey: string) =>
+    fetchPortalTrends(new Date(), undefined, true, false),
+  ['portal-explorer-trends-v1'],
+  // Preserve the historical seed's daily refresh; query pruning must not
+  // increase how often corpus-wide analytical queries run.
+  { revalidate: 86_400 },
+)
+
 const getCachedTrendsSnapshot = unstable_cache(
   async (_sourceKey: string) => fetchPortalTrends(),
   ['portal-trends-snapshot-v1'],
@@ -955,7 +964,7 @@ export async function getInitialPortalBangersPage(
 
 /** Cached corpus-wide seed series for the authenticated trends explorer. */
 export async function getPortalTrendSnapshot(): Promise<PortalTrends> {
-  return getCachedTrendsSnapshot(portalDataSourceKey())
+  return getCachedExplorerTrends(portalDataSourceKey())
 }
 
 export async function getPortalData(
@@ -1179,3 +1188,19 @@ export function startHomepageData() {
 }
 
 export type HomepageData = ReturnType<typeof startHomepageData>
+
+/** Public feed and optional total have independent failure/streaming boundaries. */
+export function startStreamData() {
+  return {
+    tweets: loadPortalComponentData(
+      'initial-stream',
+      () => getPortalStreamPage(30),
+      [],
+    ),
+    stats: loadPortalComponentData(
+      'global-stats',
+      () => getCachedGlobalStats(portalDataSourceKey()),
+      { totalTweets: 0, memberCount: 0, generatedAt: new Date().toISOString() },
+    ),
+  }
+}

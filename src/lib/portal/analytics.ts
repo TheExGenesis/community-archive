@@ -783,6 +783,7 @@ export async function fetchPortalTrends(
   now = new Date(),
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
   includeHistory = true,
+  includeWeekly = true,
 ): Promise<PortalTrends> {
   const currentYear = now.getUTCFullYear()
   const years = Array.from(
@@ -799,13 +800,14 @@ export async function fetchPortalTrends(
   const weeklyTo = daysBefore(today, -1)
 
   const chartTerms = includeHistory ? CHART_TERMS : []
+  const weeklyTerms = includeWeekly ? WATCHLIST : []
   const jobs: Array<() => Promise<ClickHouseTrendResponse>> = [
     ...chartTerms.map(
       ({ term }) =>
         () =>
           fetchTrend(term, 'year', yearlyFrom, yearlyTo, fetcher),
     ),
-    ...WATCHLIST.map(
+    ...weeklyTerms.map(
       (term) => () =>
         fetchTrend(
           term,
@@ -843,7 +845,7 @@ export async function fetchPortalTrends(
     }
   })
 
-  const weekly: TermWeek[] = WATCHLIST.map((term, index) => {
+  const weekly: TermWeek[] = weeklyTerms.map((term, index) => {
     let last7 = 0
     let prev7 = 0
     for (const row of weeklyResponses[index].data) {

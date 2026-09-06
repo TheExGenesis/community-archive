@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
 import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
@@ -31,6 +32,7 @@ export function DigestEditionView({
   likedByViewer = false,
   isSignedIn = false,
   commentCount = 0,
+  slots = {},
 }: {
   edition: DigestEdition
   archive: DigestCalendarDay[]
@@ -39,6 +41,9 @@ export function DigestEditionView({
   likedByViewer?: boolean
   isSignedIn?: boolean
   commentCount?: number
+  slots?: Partial<
+    Record<'likes' | 'admin' | 'calendar' | 'recent' | 'comments', ReactNode>
+  >
 }) {
   const content = edition.content
   const returnTo = `/digest/${edition.digestDate}`
@@ -65,23 +70,25 @@ export function DigestEditionView({
               <div className={sectionLabel}>What Happened Yesterday</div>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
-              {edition.isPreview ? null : (
-                <DigestLikeButton
-                  editionId={edition.id}
-                  initialCount={likeCount}
-                  initialLiked={likedByViewer}
-                  isSignedIn={isSignedIn}
-                />
-              )}
+              {slots.likes ??
+                (edition.isPreview ? null : (
+                  <DigestLikeButton
+                    editionId={edition.id}
+                    initialCount={likeCount}
+                    initialLiked={likedByViewer}
+                    isSignedIn={isSignedIn}
+                  />
+                ))}
               <DigestSubscribeButton />
-              {isAdmin ? (
-                <Link
-                  href="/admin/digest"
-                  className="rounded-full bg-zinc-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-brand transition-colors hover:bg-blue-100 hover:text-blue-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:bg-zinc-800 dark:hover:bg-blue-950 dark:hover:text-blue-100"
-                >
-                  Editorial lab →
-                </Link>
-              ) : null}
+              {slots.admin ??
+                (isAdmin ? (
+                  <Link
+                    href="/admin/digest"
+                    className="rounded-full bg-zinc-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-brand transition-colors hover:bg-blue-100 hover:text-blue-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:bg-zinc-800 dark:hover:bg-blue-950 dark:hover:text-blue-100"
+                  >
+                    Editorial lab →
+                  </Link>
+                ) : null)}
               <div
                 className={`text-[11.5px] uppercase tracking-[0.18em] ${MUTED}`}
               >
@@ -216,11 +223,13 @@ export function DigestEditionView({
           </div>
 
           <aside className="mt-2 border-zinc-200 pt-10 dark:border-zinc-800 lg:sticky lg:top-24 lg:mt-0 lg:border-l lg:py-0 lg:pl-10">
-            <DigestDaySelector
-              currentDate={edition.digestDate}
-              availableDays={archive}
-              variant="editorial"
-            />
+            {slots.calendar ?? (
+              <DigestDaySelector
+                currentDate={edition.digestDate}
+                availableDays={archive}
+                variant="editorial"
+              />
+            )}
 
             <section className="mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800">
               <h2 className="text-[19px] font-semibold" style={SERIF}>
@@ -267,32 +276,12 @@ export function DigestEditionView({
               </PostHogLink>
             </section>
 
-            {archive.length > 1 ? (
-              <section className="mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800">
-                <h2 className="text-[19px] font-semibold" style={SERIF}>
-                  Recent editions
-                </h2>
-                <div className="mt-4 space-y-2">
-                  {archive
-                    .filter((item) => item.digestDate !== edition.digestDate)
-                    .slice(0, 6)
-                    .map((item) => (
-                      <PostHogLink
-                        key={item.digestDate}
-                        href={`/digest/${item.digestDate}`}
-                        eventName="digest_action"
-                        eventProperties={{
-                          action: 'recent_edition_opened',
-                          surface: 'recent_editions',
-                        }}
-                        className="block text-sm text-muted-foreground hover:text-brand"
-                      >
-                        {longDate(item.digestDate)}
-                      </PostHogLink>
-                    ))}
-                </div>
-              </section>
-            ) : null}
+            {slots.recent ?? (
+              <DigestRecentEditions
+                archive={archive}
+                currentDate={edition.digestDate}
+              />
+            )}
           </aside>
         </div>
 
@@ -302,14 +291,54 @@ export function DigestEditionView({
             : 'Curated automatically from the previous 24 hours of archive bangers and reviewed in the editorial lab before publication.'}
         </footer>
 
-        {edition.isPreview ? null : (
-          <DigestComments
-            editionId={edition.id}
-            initialCount={commentCount}
-            isSignedIn={isSignedIn}
-          />
-        )}
+        {slots.comments ??
+          (edition.isPreview ? null : (
+            <DigestComments
+              editionId={edition.id}
+              initialCount={commentCount}
+              isSignedIn={isSignedIn}
+            />
+          ))}
       </article>
     </main>
+  )
+}
+
+export function DigestRecentEditions({
+  archive,
+  currentDate,
+}: {
+  archive: DigestCalendarDay[]
+  currentDate: string
+}) {
+  return (
+    <>
+      {archive.length > 1 ? (
+        <section className="mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800">
+          <h2 className="text-[19px] font-semibold" style={SERIF}>
+            Recent editions
+          </h2>
+          <div className="mt-4 space-y-2">
+            {archive
+              .filter((item) => item.digestDate !== currentDate)
+              .slice(0, 6)
+              .map((item) => (
+                <PostHogLink
+                  key={item.digestDate}
+                  href={`/digest/${item.digestDate}`}
+                  eventName="digest_action"
+                  eventProperties={{
+                    action: 'recent_edition_opened',
+                    surface: 'recent_editions',
+                  }}
+                  className="block text-sm text-muted-foreground hover:text-brand"
+                >
+                  {longDate(item.digestDate)}
+                </PostHogLink>
+              ))}
+          </div>
+        </section>
+      ) : null}
+    </>
   )
 }

@@ -34,6 +34,13 @@ export function performancePage(pathname: string) {
   if (pathname.startsWith('/tweets/')) return 'tweet'
   if (pathname === '/search') return 'search'
   if (pathname === '/bangers') return 'bangers'
+  if (pathname === '/digest' || pathname.startsWith('/digest/')) return 'digest'
+  if (pathname === '/community') return 'gallery'
+  if (pathname === '/social-graph') return 'graph'
+  if (pathname === '/stream') return 'stream'
+  if (pathname === '/trends') return 'trends'
+  if (pathname === '/research') return 'research'
+  if (pathname === '/docs') return 'docs'
   return null
 }
 

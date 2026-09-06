@@ -5,6 +5,7 @@
 - [API docs](./api-doc.md) how owners download their private raw JSON or query the public database API.
 - [Declarative schemas](./supabase-declarative-schemas.md) how to evolve the database using ordered schema files and migrations.
 - [Daily Digest](./daily-digest.md) explains the editorial lab, reproducible generation runs, publication boundary, and rollout gates.
+- [Website architecture](./website-architecture.md) feature ownership, tweet contracts, and client state boundaries.
 - [Website performance](./website-performance.md) loading boundaries, selective prefetch, and measurement semantics.
 - [Archive insertion performance plan](./archive-insertion-performance-plan.md) testable staged/COPY and membership design that preserves the Supabase contract.
 - [Quickstart Jupyter notebook](https://colab.research.google.com/drive/109XOgTWj-sajpAYhDCNPfts5zvdkpi_s) that you can run in your browser. Shows how to fetch all tweets for a given user in Python, and do some basic analysis like find the most common used phrases, and plot the amount of likes over time.

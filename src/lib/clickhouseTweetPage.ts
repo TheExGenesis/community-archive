@@ -1,4 +1,4 @@
-import type { TweetData } from '@/components/TweetComponent'
+import type { TweetData, ArchiveTweetResponse } from '@/lib/tweets/types'
 import { fetchAnalyticsGatewayJson } from './clickhouseGateway'
 import {
   buildConversationTree,
@@ -111,7 +111,7 @@ function toTweetData(
   quoteTweetId: string | null,
   quote: ClickHouseTweetDetail | null,
   retweetedTweetId: string | null,
-): TweetData {
+): ArchiveTweetResponse {
   const username = tweet.username || 'unknown_user'
   return {
     tweet_id: tweet.tweetId,

@@ -1,4 +1,4 @@
-import type { TweetData } from '@/components/TweetComponent'
+import type { TweetData, ArchiveTweetResponse } from '@/lib/tweets/types'
 import { fetchAnalyticsGatewayJson } from './clickhouseGateway'
 
 interface ClickHouseQuotePost {
@@ -49,7 +49,7 @@ function timestamp(value: string): string {
 function quotePost(
   tweet: ClickHouseQuotePost,
   targetTweetId: string,
-): TweetData {
+): ArchiveTweetResponse {
   if (
     !/^\d{1,20}$/.test(tweet.tweetId) ||
     !/^\d{1,20}$/.test(tweet.accountId) ||

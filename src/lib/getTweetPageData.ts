@@ -5,7 +5,7 @@ import {
   ThreadTweet,
   buildConversationTree,
 } from './threadUtils'
-import { TweetData } from '@/components/TweetComponent'
+import type { TweetData, ArchiveTweetResponse } from '@/lib/tweets/types'
 import {
   fetchSyndicatedTweets,
   type SyndicatedTweet,
@@ -238,7 +238,7 @@ async function fetchClickHousePage(
   }
 }
 
-function buildQuotingTweetData(tweet: RpcQuotingTweet): TweetData {
+function buildQuotingTweetData(tweet: RpcQuotingTweet): ArchiveTweetResponse {
   return {
     tweet_id: tweet.tweet_id,
     account_id: tweet.account_id,
@@ -316,7 +316,7 @@ function buildTweetData(
   mentionedUsers: RpcMentionedUser[],
   quotedTweets: RpcQuotedTweet[],
   syndicated: Map<string, SyndicatedTweet | null>,
-): TweetData {
+): ArchiveTweetResponse {
   const tweetMedia = media.map((m) => ({
     media_url: m.media_url,
     media_type: m.media_type,

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, Quote } from 'lucide-react'
 import TweetCard from '@/components/TweetCard'
-import type { TweetData } from '@/components/TweetComponent'
+import type { TweetData } from '@/lib/tweets/types'
 import { formatNumber } from '@/lib/formatNumber'
 import type {
   PortalMedia,

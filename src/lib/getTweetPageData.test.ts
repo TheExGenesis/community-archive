@@ -1,4 +1,4 @@
-import type { TweetData } from '@/components/TweetComponent'
+import type { TweetData } from '@/lib/tweets/types'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@/utils/supabase'
 import { isClickHouseReadsEnabled } from './clickhouseGateway'

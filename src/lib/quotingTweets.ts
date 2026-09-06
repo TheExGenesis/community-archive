@@ -1,6 +1,6 @@
 import 'server-only'
 
-import type { TweetData, TweetMedia } from '@/components/TweetComponent'
+import type { TweetData, TweetMedia } from '@/lib/tweets/types'
 import { fetchClickHouseQuotePosts } from '@/lib/clickhouseQuotePosts'
 import { isClickHouseReadsEnabled } from '@/lib/clickhouseGateway'
 import { createServerClient } from '@/utils/supabase'

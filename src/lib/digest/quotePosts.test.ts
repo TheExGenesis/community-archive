@@ -1,4 +1,4 @@
-import type { TweetData } from '@/components/TweetComponent'
+import type { TweetData } from '@/lib/tweets/types'
 import { getQuotingTweetsPage } from '@/lib/quotingTweets'
 import type { PortalTweet } from '@/lib/portal/types'
 import { loadDigestQuotePosts } from './quotePosts'

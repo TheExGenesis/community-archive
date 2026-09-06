@@ -1,4 +1,4 @@
-import type { TweetData } from '@/components/TweetComponent'
+import type { TweetData } from '@/lib/tweets/types'
 import type { PortalMedia, PortalQuotedTweet, PortalTweet } from './types'
 
 function portalMedia(media: TweetData['media']): PortalMedia[] {

@@ -137,3 +137,28 @@ describe('UnifiedTweetList compact view', () => {
     ])
   })
 })
+
+test('renders a nested search result through the normalized tweet boundary', () => {
+  const { username, account_display_name, avatar_media_url, ...content } = tweet
+  render(
+    <UnifiedTweetList
+      tweets={[
+        {
+          ...content,
+          account: {
+            username,
+            account_display_name,
+            profile: { avatar_media_url },
+          },
+        },
+      ]}
+      compact
+    />,
+  )
+  expect(screen.getByText('Archive User')).toBeVisible()
+  expect(screen.getByText('Quoted User')).toBeVisible()
+  expect(screen.getByAltText('Tweet image 1')).toBeVisible()
+  expect(
+    screen.getAllByRole('link', { name: "View @archive_user's profile" })[0],
+  ).toHaveAttribute('href', '/user/archive_user')
+})

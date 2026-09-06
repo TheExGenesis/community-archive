@@ -2,6 +2,25 @@
 
 This guide walks you through deploying the process_archive service to a server for cronjob execution.
 
+## Multi-image repair
+
+The PostgreSQL processor and ClickHouse/canonical archive adapter share the
+same extraction rule: prefer `extended_entities.media` so all attachments survive.
+The helper lives beside the worker so the flattened Docker layout can import it.
+
+The historical audit is read-only and defaults to ten completed uploads:
+
+```bash
+pnpm tsx scripts/repair_archive_media.mts --limit=10
+pnpm tsx scripts/repair_archive_media.mts --username=example
+```
+
+`--apply` is disabled. This older audit reads the current archive object by
+username, so it is only a candidate finder, not proof of historical version
+completeness. Historical repair must use stable owner identity, current consent,
+and the canonical ingestion contract for both sinks; do not restore media with
+an isolated PostgreSQL upsert. Review a bounded replay separately.
+
 ## Prerequisites
 
 - **Server with Docker installed** (Linux/Ubuntu recommended)

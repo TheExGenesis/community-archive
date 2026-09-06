@@ -194,4 +194,41 @@ describe('UserDirectoryClient', () => {
       expect.objectContaining({ limit: 15, offset: 0 }),
     )
   })
+  test('retries a failed search from the first page without showing unrelated users', async () => {
+    const log = jest.spyOn(console, 'error').mockImplementation(() => {})
+    mockFetchUsers.mockRejectedValueOnce(new Error('offline'))
+    mockFetchUsers.mockResolvedValueOnce({
+      users: [directoryUser(2)],
+      hasMore: false,
+    })
+    render(
+      <UserDirectoryClient
+        totalCount={20}
+        initialUsers={[directoryUser(1)]}
+        initialHasMore
+      />,
+    )
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search users' }), {
+      target: { value: 'member_2' },
+    })
+    const retry = await screen.findByRole('button', {
+      name: 'Retry loading users',
+    })
+    expect(
+      screen.queryByRole('link', { name: /Member 1/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Load more users' }),
+    ).not.toBeInTheDocument()
+    fireEvent.click(retry)
+
+    expect(
+      await screen.findByRole('link', { name: /Member 2/ }),
+    ).toBeInTheDocument()
+    expect(mockFetchUsers).toHaveBeenLastCalledWith(
+      expect.objectContaining({ offset: 0, search: 'member_2' }),
+    )
+    log.mockRestore()
+  })
 })

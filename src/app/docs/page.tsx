@@ -152,7 +152,6 @@ export default function DocsPage() {
                 while current PostgreSQL policy permits it.
               </p>
               <p className="mt-4 break-all font-mono text-xs leading-5 text-muted-foreground">
-                {API_URL}
                 https://www.community-archive.org/api/archive/&lt;username&gt;
               </p>
             </article>

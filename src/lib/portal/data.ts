@@ -1,4 +1,5 @@
 import 'server-only'
+import { measureServerRead } from '@/lib/performance/server'
 import { unstable_cache } from 'next/cache'
 import {
   clickHouseAnalyticsGatewayBaseUrl,
@@ -10,6 +11,7 @@ import {
   fetchPortalLiveAnalytics,
   fetchPortalRecentBangers,
   fetchPortalTrends,
+  fetchPortalWeeklyTrends,
 } from './analytics'
 import { getResearchPosts, selectFeaturedResearchPosts } from './research'
 import { selectHomepageStream } from './stream'
@@ -756,18 +758,31 @@ const getCachedHomepageStreamCandidates = unstable_cache(
   ['portal-home-stream-candidates-v1'],
   { revalidate: 60 },
 )
-const getCachedHistoricalBangers = unstable_cache(
-  async (_sourceKey: string, day: string) => {
-    const ranked = await fetchPortalHistoricalBangers(100)
-    return enrichPortalTweets(
-      selectDailyBangers(ranked, new Date(`${day}T12:00:00.000Z`)),
-    )
-  },
-  ['portal-bangers-v6'],
+const getCachedHistoricalCandidates = unstable_cache(
+  async (_sourceKey: string) => fetchPortalHistoricalBangers(100),
+  ['portal-historical-candidates-v1'],
+  { revalidate: 86_400 },
+)
+const getCachedHistoricalSelection = unstable_cache(
+  async (_sourceKey: string, selected: PortalTweet[]) =>
+    enrichPortalTweets(selected),
+  ['portal-historical-selection-v1'],
+  { revalidate: 86_400 },
+)
+async function getCachedHistoricalBangers(sourceKey: string, day: string) {
+  const candidates = await getCachedHistoricalCandidates(sourceKey)
+  return getCachedHistoricalSelection(
+    sourceKey,
+    selectDailyBangers(candidates, new Date(`${day}T12:00:00.000Z`)),
+  )
+}
+const getCachedWeeklyTrends = unstable_cache(
+  async (_sourceKey: string) => fetchPortalWeeklyTrends(),
+  ['portal-weekly-trends-v1'],
   { revalidate: 86_400 },
 )
 const getCachedRecentBangers = unstable_cache(
-  async (_sourceKey: string, _day: string) =>
+  async (_sourceKey: string) =>
     enrichPortalTweets(
       selectDailyRecentBangers(await fetchPortalRecentBangers(50, 24)),
     ),
@@ -851,7 +866,10 @@ export async function loadPortalComponentData<T>(
   fallback: T,
 ): Promise<{ data: T; failed: boolean }> {
   try {
-    return { data: await loader(), failed: false }
+    return {
+      data: await measureServerRead(`homepage.${section}`, loader),
+      failed: false,
+    }
   } catch (error) {
     console.error(
       JSON.stringify({
@@ -1023,7 +1041,7 @@ export async function getPortalData(
     view === 'home'
       ? loadPortalComponentData(
           'recent-bangers',
-          () => getCachedRecentBangers(sourceKey, today),
+          () => getCachedRecentBangers(sourceKey),
           [],
         )
       : Promise.resolve({ data: [], failed: false }),
@@ -1072,3 +1090,92 @@ export async function getPortalData(
     },
   }
 }
+
+/**
+ * Start independent section promises. Never return Promise.all here: the hero,
+ * stream, digest and cards have separate Suspense boundaries and failure states.
+ */
+export function startHomepageData() {
+  const sourceKey = portalDataSourceKey()
+  const today = new Date().toISOString().slice(0, 10)
+  const globalStats = loadPortalComponentData(
+    'global-stats',
+    () => getCachedGlobalStats(sourceKey),
+    {
+      totalTweets: 0,
+      memberCount: 0,
+      generatedAt: new Date().toISOString(),
+    },
+  )
+  const liveAnalytics = loadPortalComponentData(
+    'live-analytics',
+    () => getCachedLiveAnalytics(sourceKey),
+    { streamedLast24Hours: 0, latestObservedAt: null },
+  )
+  const joinedThisWeek = loadPortalComponentData(
+    'joined-this-week',
+    () => getCachedJoinedThisWeek(sourceKey),
+    0,
+  )
+  const corpusRange = loadPortalComponentData(
+    'corpus-range',
+    () => getCachedCorpusRange(sourceKey),
+    { firstYear: 0, currentYear: 0 },
+  )
+  const overview = Promise.all([
+    globalStats,
+    liveAnalytics,
+    joinedThisWeek,
+    corpusRange,
+  ]).then(([global, live, joined, range]) => ({
+    stats: {
+      totalTweets: global.data.totalTweets,
+      accountCount: global.data.memberCount,
+      generatedAt: global.data.generatedAt,
+      streamedLast24Hours: live.data.streamedLast24Hours,
+      joinedThisWeek: joined.data,
+      ...range.data,
+    },
+    failures: {
+      liveAnalytics: global.failed || live.failed,
+      memberCount: global.failed,
+      joinedThisWeek: joined.failed,
+      corpusRange: range.failed,
+    },
+  }))
+  return {
+    globalStats,
+    overview,
+    stream: loadPortalComponentData(
+      'initial-stream',
+      async () =>
+        selectHomepageStream(
+          await getCachedHomepageStreamCandidates(sourceKey),
+          30,
+        ),
+      [],
+    ),
+    recentBangers: loadPortalComponentData(
+      'recent-bangers',
+      () => getCachedRecentBangers(sourceKey),
+      [],
+    ),
+    historicalBangers: loadPortalComponentData(
+      'historical-bangers',
+      () => getCachedHistoricalBangers(sourceKey, today),
+      [],
+    ),
+    trends: loadPortalComponentData(
+      'weekly-trends',
+      () => getCachedWeeklyTrends(sourceKey),
+      [],
+    ),
+    research: loadPortalComponentData(
+      'research',
+      async () => selectFeaturedResearchPosts(await getResearchPosts(24)),
+      [],
+    ),
+  }
+}
+
+export type HomepageData = ReturnType<typeof startHomepageData>

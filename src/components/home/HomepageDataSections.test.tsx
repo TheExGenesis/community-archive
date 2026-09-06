@@ -1,65 +1,60 @@
 import { render, screen } from '@testing-library/react'
-import type { PortalData } from '@/lib/portal/types'
+import type { HomepageData } from '@/lib/portal/data'
+import {
+  HomepageStats,
+  HomepageStream,
+  HomepageBanger,
+  HomepageResearch,
+  HomepageTrends,
+  HomepageDigest,
+} from './HomepageDataSections'
 import { getLatestDigestPreview } from '@/lib/digest/data'
-import { HomepagePortal, HomepageStats } from './HomepageDataSections'
 
+jest.mock('@/lib/digest/data', () => ({ getLatestDigestPreview: jest.fn() }))
 jest.mock('@/components/portal/Portal', () => ({
-  __esModule: true,
-  default: ({ data }: { data: PortalData }) => (
-    <div data-testid="portal" data-years={data.trends.years.length} />
+  HomepageLiveStream: ({ tweets }: { tweets: unknown[] }) => (
+    <div>Stream: {tweets.length}</div>
   ),
+  HomeBangerPanel: ({ failed }: { failed: boolean }) => (
+    <div>Banger failed: {String(failed)}</div>
+  ),
+  HomeResearchPanel: () => <div>Research</div>,
+  HomeTrendsPanel: () => <div>Weekly trends</div>,
+  DigestHero: () => <div>Digest</div>,
 }))
-jest.mock('@/lib/digest/data', () => ({
-  getLatestDigestPreview: jest.fn().mockResolvedValue(null),
-}))
 
-const data = {
-  stats: {
-    totalTweets: 14_000_000,
-    accountCount: 700,
-    streamedLast24Hours: 0,
-    joinedThisWeek: 0,
-    firstYear: 2006,
-    currentYear: 2026,
-    generatedAt: '2026-08-12T00:00:00.000Z',
-  },
-  trends: {
-    years: [2026],
-    series: [],
-    weekly: [],
-    computedAt: '',
-  },
-  initialStream: [],
-  research: [],
-  recentBangers: [],
-  historicalBangers: [],
-  failures: {
-    liveAnalytics: false,
-    memberCount: false,
-    joinedThisWeek: false,
-    corpusRange: false,
-    trends: false,
-    initialStream: false,
-    research: false,
-    recentBangers: false,
-    historicalBangers: false,
-  },
-} satisfies PortalData
-
-beforeEach(() => {
-  jest.clearAllMocks()
-})
-
-it('renders the resolved homepage totals', async () => {
-  render(await HomepageStats({ data: Promise.resolve(data) }))
-
-  expect(screen.getByText(/14\.0M public tweets/)).toBeInTheDocument()
-  expect(screen.getByText(/700 community members/)).toBeInTheDocument()
-})
-
-it('keeps historical trend series out of the guest payload', async () => {
-  render(await HomepagePortal({ data: Promise.resolve(data), isMember: false }))
-
-  expect(screen.getByTestId('portal')).toHaveAttribute('data-years', '0')
-  expect(getLatestDigestPreview).toHaveBeenCalledTimes(1)
+test('renders ready panels while trends and the digest remain pending', async () => {
+  const pending = new Promise<never>(() => undefined)
+  ;(getLatestDigestPreview as jest.Mock).mockReturnValue(pending)
+  const data: HomepageData = {
+    globalStats: Promise.resolve({
+      data: {
+        totalTweets: 14_000_000,
+        memberCount: 700,
+        generatedAt: '2026-09-06T00:00:00Z',
+      },
+      failed: false,
+    }),
+    overview: pending,
+    stream: Promise.resolve({ data: [], failed: false }),
+    recentBangers: Promise.resolve({ data: [], failed: true }),
+    historicalBangers: pending,
+    research: Promise.resolve({ data: [], failed: false }),
+    trends: pending,
+  }
+  void HomepageDigest()
+  void HomepageTrends({ data: data.trends, isMember: false })
+  render(
+    <>
+      {await HomepageStats({ data: data.globalStats })}
+      {await HomepageStream({ data: data.stream })}
+      {await HomepageBanger({ data: data.recentBangers })}
+      {await HomepageResearch({ data: data.research })}
+    </>,
+  )
+  expect(screen.getByText(/14.0M public tweets/)).toBeInTheDocument()
+  expect(screen.getByText('Stream: 0')).toBeInTheDocument()
+  expect(screen.getByText('Research')).toBeInTheDocument()
+  expect(screen.getByText('Banger failed: true')).toBeInTheDocument()
+  expect(screen.queryByText('Weekly trends')).not.toBeInTheDocument()
 })

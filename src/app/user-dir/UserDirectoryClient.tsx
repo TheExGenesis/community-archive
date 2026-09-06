@@ -1,5 +1,7 @@
 'use client'
 
+import { useReportSectionReady } from '@/components/PagePerformance'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Search } from 'lucide-react'
@@ -17,22 +19,12 @@ import {
 } from '@/components/ui/table'
 import { MembershipStatusIcon } from '@/components/MembershipStatusIcon'
 import { formatNumber } from '@/lib/formatNumber'
+import { formatDirectoryDate as formatJoinedDate } from '@/lib/directoryDate'
 import { fetchUsers, getDirectoryProfileHref } from '@/lib/queries/fetchUsers'
 import { DirectoryUser, SortKey } from '@/lib/types'
 import { capturePostHogEvent } from '@/lib/posthog'
 
 export const USERS_PER_PAGE = 15
-
-const joinedDateFormatter = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-})
-
-function formatJoinedDate(date: string | null) {
-  if (!date) return '—'
-  return joinedDateFormatter.format(new Date(date))
-}
 
 interface UserDirectoryClientProps {
   totalCount: number | null
@@ -49,6 +41,7 @@ export default function UserDirectoryClient({
   const [loading, setLoading] = useState(initialUsers === null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useReportSectionReady('directory_rows', !loading && !error)
   const [sortKey, setSortKey] = useState<SortKey>('num_followers')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [hasMore, setHasMore] = useState(initialHasMore)

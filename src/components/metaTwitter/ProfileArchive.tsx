@@ -1,5 +1,7 @@
 'use client'
 
+import { useReportSectionReady } from '@/components/PagePerformance'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArchiveNav, archiveChapterHref, type NavChapter } from './ArchiveNav'
 import { Workspace } from './Workspace'
@@ -374,6 +376,7 @@ export function ProfileArchive({
   const activeNextOffset = activeFeed?.nextOffset
   const activeFeedLoading = Boolean(loadingFeeds[activeKey])
   const activeFeedFailed = Boolean(failedFeeds[activeKey])
+  useReportSectionReady('profile_feed', activeFeedLoaded && !activeFeedFailed)
   const activeScopeKey = scopeKey(activeYear)
   const activeMedia = mediaByScope[activeScopeKey]
   const activePeople = peopleByScope[activeScopeKey]
@@ -462,26 +465,27 @@ export function ProfileArchive({
     void loadPeople(activeYear)
   }, [activeYear, loadPeople])
 
-  useEffect(() => {
-    const initialFill = loadNextPage(initialYear, 'quotes')
-    void initialFill.finally(() => {
-      const scopes = [null, ...chapters.map((chapter) => chapter.year)].filter(
-        (year) => year !== initialYear,
+  // Only speculative chapter reads are gated; choosing a chapter always loads it.
+  const preloadingChapter = useRef(false)
+  const prefetchChapter = useCallback(
+    (year: number | null) => {
+      if (
+        preloadingChapter.current ||
+        feedsRef.current[feedKey(year, 'quotes')]
       )
-      void Promise.allSettled(
-        scopes.map((year) => {
-          const key = feedKey(year, 'quotes')
-          const alreadyLoading = Array.from(feedRequests.current.keys()).some(
-            (requestKey) => requestKey.startsWith(`${key}:`),
-          )
-          if (feedsRef.current[key] || alreadyLoading) {
-            return Promise.resolve()
-          }
-          return loadFeedPage(year, 'quotes', 0, PROFILE_BANGERS_PRELOAD_LIMIT)
-        }),
-      )
-    })
-  }, [chapters, initialYear, loadFeedPage, loadNextPage])
+        return
+      preloadingChapter.current = true
+      void loadFeedPage(
+        year,
+        'quotes',
+        0,
+        PROFILE_BANGERS_PRELOAD_LIMIT,
+      ).finally(() => {
+        preloadingChapter.current = false
+      })
+    },
+    [loadFeedPage],
+  )
 
   useEffect(() => {
     const target = loadMoreRef.current
@@ -898,6 +902,7 @@ export function ProfileArchive({
         sectionsByYear={sectionsByYear}
         activeSectionSlug={activeSection?.slug ?? null}
         onSelect={selectChapter}
+        onIntent={prefetchChapter}
         onSelectSection={selectSection}
       />
       <Workspace

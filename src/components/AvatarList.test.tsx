@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import AvatarList from './AvatarList'
 
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ prefetch: jest.fn() }),
+}))
+
 jest.mock('@/components/ui/avatar', () => ({
   Avatar: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>

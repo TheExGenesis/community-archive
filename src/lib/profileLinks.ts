@@ -1,4 +1,5 @@
 import 'server-only'
+import { unstable_cache } from 'next/cache'
 
 import type { ResolvedProfileLink } from '@/lib/metaTwitter/types'
 
@@ -68,3 +69,10 @@ export async function resolveProfileLinks(
   )
   return Promise.all(Array.from(urls, resolveUrl))
 }
+
+/** Optional link expansion is streamed separately from the profile header. */
+export const getCachedProfileLinks = unstable_cache(
+  resolveProfileLinks,
+  ['profile-links-v1'],
+  { revalidate: 604_800 },
+)

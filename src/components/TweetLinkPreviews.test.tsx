@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import type { ImgHTMLAttributes } from 'react'
 import { TweetLinkPreviews } from './TweetLinkPreviews'
 
@@ -54,4 +54,46 @@ test('loads Article covers directly from the authenticated image proxy', async (
     `/api/link-preview/image?hash=${'a'.repeat(64)}`,
   )
   expect(image).toHaveAttribute('data-unoptimized', 'true')
+})
+
+test('waits for the viewport and shares concurrent requests for the same tweet', async () => {
+  const callbacks: IntersectionObserverCallback[] = []
+  const OriginalObserver = global.IntersectionObserver
+  global.IntersectionObserver = class {
+    constructor(callback: IntersectionObserverCallback) {
+      callbacks.push(callback)
+    }
+    observe() {}
+    disconnect() {}
+  } as unknown as typeof IntersectionObserver
+  let finish!: (value: Response) => void
+  const fetchMock = jest.spyOn(global, 'fetch').mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve
+    }),
+  )
+  try {
+    render(
+      <>
+        <TweetLinkPreviews tweetId="88" />
+        <TweetLinkPreviews tweetId="88" />
+      </>,
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
+    act(() =>
+      callbacks.forEach((callback) =>
+        callback(
+          [{ isIntersecting: true } as IntersectionObserverEntry],
+          {} as IntersectionObserver,
+        ),
+      ),
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      finish(new Response(JSON.stringify({ previews: [] })))
+      await Promise.resolve()
+    })
+  } finally {
+    global.IntersectionObserver = OriginalObserver
+  }
 })

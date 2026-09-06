@@ -4,12 +4,12 @@ import { Suspense, type ReactNode } from 'react'
 import { cookies } from 'next/headers'
 import HomepageSearch from '@/components/HomepageSearch'
 import Testimonials from '@/components/home/Testimonials'
-import type { PortalData } from '@/lib/portal/types'
+import type { HomepageData } from '@/lib/portal/data'
+import HomepageUpload from './HomepageUpload'
 import { createServerClient } from '@/utils/supabase'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 import {
   HomepagePortal,
-  HomepagePortalFallback,
   HomepageStats,
 } from '@/components/home/HomepageDataSections'
 
@@ -27,18 +27,8 @@ const DynamicHeroCTAButtons = dynamic(
   },
 )
 
-const DynamicUploadArchiveSection = dynamic(
-  () => import('@/components/UploadArchiveSection'),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-48 w-full animate-pulse rounded-lg bg-muted dark:bg-card" />
-    ),
-  },
-)
-
 interface ClassicHomepageProps {
-  data: Promise<PortalData>
+  data: HomepageData
   homepagePeople: ReactNode
   isMember: boolean
   showCta: boolean
@@ -86,7 +76,7 @@ export default async function ClassicHomepage({
                   </>
                 }
               >
-                <HomepageStats data={data} />
+                <HomepageStats data={data.globalStats} />
               </Suspense>
             </p>
           </div>
@@ -130,9 +120,7 @@ export default async function ClassicHomepage({
       </section>
 
       <section className="bg-zinc-100/80 py-4 dark:bg-transparent sm:py-7">
-        <Suspense fallback={<HomepagePortalFallback />}>
-          <HomepagePortal data={data} isMember={isMember} />
-        </Suspense>
+        <HomepagePortal data={data} isMember={isMember} />
       </section>
 
       <section
@@ -140,7 +128,7 @@ export default async function ClassicHomepage({
         className="scroll-mt-16 overflow-hidden bg-muted py-12 dark:bg-card md:py-16 lg:py-20"
       >
         <div className="relative z-10 mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8">
-          <DynamicUploadArchiveSection />
+          <HomepageUpload />
           <ExtensionInstallPrompt
             surface="home"
             className="mx-auto mt-8 max-w-3xl"

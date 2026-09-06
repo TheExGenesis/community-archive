@@ -19,7 +19,7 @@ jest.mock('@/lib/clickhouseUserProfile', () => ({
     getClickHouseUserProfileMock(...args),
 }))
 
-import { resolveProfile } from './profile'
+import { resolveProfile, resolveProfileCore } from './profile'
 
 const archivedProfile = {
   account_id: '42',
@@ -172,5 +172,23 @@ test('uses the policy-approved account ID for the analytical lookup', async () =
   getClickHouseUserProfileMock.mockResolvedValue(null)
 
   await resolveProfile('archive%3Aalice')
-  expect(getClickHouseUserProfileMock).toHaveBeenCalledWith('42')
+  expect(getClickHouseUserProfileMock).toHaveBeenCalledWith('42', {
+    tweetLimit: 1,
+  })
+})
+
+test('renders the core profile while optional media never settles', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: '42',
+    username: 'alice',
+  })
+  getCachedProfileHeaderMock.mockResolvedValue({
+    ...archivedProfile,
+    header_media_url: null,
+  })
+  getClickHouseUserProfileMock.mockReturnValue(new Promise(() => undefined))
+  await expect(resolveProfileCore('alice')).resolves.toMatchObject({
+    profile: { account_display_name: 'Alice', header_media_url: null },
+  })
+  expect(getClickHouseUserProfileMock).not.toHaveBeenCalled()
 })

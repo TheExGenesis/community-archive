@@ -10,6 +10,7 @@ import type { BangerTweet } from '@/lib/metaTwitter/types'
 import { mutateProfileCuration } from '@/app/user/[account_id]/actions'
 
 jest.mock('next/navigation', () => ({
+  usePathname: () => '/user/alice',
   useRouter: () => ({ push: jest.fn() }),
 }))
 jest.mock('next/image', () => ({
@@ -380,7 +381,7 @@ test('preserves modified-click behavior on chapter links', async () => {
       initialSidebar={initialSidebar}
     />,
   )
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+  expect(fetchMock).not.toHaveBeenCalled()
 
   let defaultPrevented: boolean | undefined
   document.addEventListener(
@@ -423,7 +424,7 @@ test('restores the selected chapter from browser history', async () => {
       initialSidebar={initialSidebar}
     />,
   )
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+  expect(fetchMock).not.toHaveBeenCalled()
 
   await user.click(screen.getByRole('link', { name: '2025 4' }))
   window.history.pushState(null, '', '/user/alice?chapter=2024')
@@ -436,7 +437,7 @@ test('restores the selected chapter from browser history', async () => {
   )
 })
 
-test('fills the active feed, preloads shallow chapter pages, and continues at the scroll sentinel', async () => {
+test('fills the active feed, preloads chapters only on intent, and continues at the scroll sentinel', async () => {
   const fetchMock = jest.spyOn(global, 'fetch').mockImplementation((input) => {
     const url = new URL(String(input), 'https://community-archive.org')
     const offset = Number(url.searchParams.get('offset') ?? 0)
@@ -488,12 +489,18 @@ test('fills the active feed, preloads shallow chapter pages, and continues at th
 
   expect(screen.getAllByRole('article')).toHaveLength(2)
   await screen.findByText('Banger 4')
+  expect(
+    fetchMock.mock.calls.filter(([input]) =>
+      String(input).includes('limit=2&sort=quotes&year='),
+    ),
+  ).toHaveLength(0)
+  fireEvent.mouseEnter(screen.getByRole('link', { name: '2025 4' }))
   await waitFor(() =>
     expect(
       fetchMock.mock.calls.filter(([input]) =>
         String(input).includes('limit=2&sort=quotes&year='),
       ),
-    ).toHaveLength(2),
+    ).toHaveLength(1),
   )
 
   const callback = TestIntersectionObserver.callbacks.at(-1)
@@ -750,7 +757,7 @@ test('does not start a stale chapter preload over an in-flight active feed', asy
       fetchMock.mock.calls.some(([input]) =>
         String(input).includes('year=2024'),
       ),
-    ).toBe(true),
+    ).toBe(false),
   )
   expect(
     fetchMock.mock.calls.filter(([input]) =>

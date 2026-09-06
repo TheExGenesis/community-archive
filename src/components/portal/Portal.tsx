@@ -261,7 +261,7 @@ function ArchiveMetric({
   )
 }
 
-function ArchiveOverview({
+export function ArchiveOverview({
   stats,
   generatedDate,
   failures,
@@ -346,7 +346,7 @@ function ArchiveOverview({
  * every morning, so it runs full width above the dashboard grid, marked by an
  * accent rule along its top edge rather than a filled surface.
  */
-function DigestHero({ preview }: { preview: DigestPreview | null }) {
+export function DigestHero({ preview }: { preview: DigestPreview | null }) {
   if (!preview) {
     return (
       <div
@@ -485,6 +485,254 @@ export default function Portal({
 }) {
   const { stats, trends } = data
 
+  const { visible, streamUnavailable, loadMoreTarget, isLoadingMore, hasMore } =
+    usePortalStream(data, view)
+
+  const recentBanger = data.recentBangers[0] ?? null
+  const historicalBanger = data.historicalBangers[0] ?? null
+
+  const generatedDate = useMemo(() => {
+    const d = new Date(stats.generatedAt)
+    return `${d.toLocaleDateString('en-GB', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    })} · ${String(d.getUTCHours()).padStart(2, '0')}:${String(
+      d.getUTCMinutes(),
+    ).padStart(2, '0')} UTC`
+  }, [stats.generatedAt])
+
+  const Root = embedded ? 'div' : 'main'
+
+  return (
+    <Root className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
+      {/* ------------------------------------------------ Home ---------- */}
+      {view === 'home' && (
+        <HomePortalLayout
+          overview={
+            <ArchiveOverview
+              stats={stats}
+              generatedDate={generatedDate}
+              failures={data.failures}
+            />
+          }
+          digest={<DigestHero preview={digestPreview} />}
+          stream={
+            <HomeStreamPanel
+              visible={visible}
+              streamUnavailable={streamUnavailable}
+            />
+          }
+          bangers={
+            <>
+              <HomeBangerPanel
+                tweet={recentBanger}
+                failed={data.failures.recentBangers}
+              />
+              <HomeBangerPanel
+                historical
+                tweet={historicalBanger}
+                failed={data.failures.historicalBangers}
+              />
+            </>
+          }
+          trends={
+            <HomeTrendsPanel
+              weekly={trends.weekly}
+              failed={data.failures.trends}
+              isMember={isMember}
+            />
+          }
+          research={
+            <HomeResearchPanel
+              research={data.research}
+              failed={data.failures.research}
+            />
+          }
+        />
+      )}
+
+      {/* ------------------------------------------------ Stream -------- */}
+      {view === 'stream' && (
+        <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
+          <Link
+            href="/"
+            className={`mb-2 inline-flex items-center text-[12.5px] font-semibold ${MUTED} hover:text-brand`}
+          >
+            ← Dashboard
+          </Link>
+          <LiveStreamHeading
+            stats={stats}
+            unavailable={data.failures.liveAnalytics}
+          />
+          <div className={`mb-3.5 text-[13px] ${MUTED}`}>
+            Tweets arriving from the{' '}
+            <a
+              href={CHROME_EXTENSION_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-brand"
+            >
+              browser extension
+            </a>{' '}
+            firehose, as contributors read their timelines.
+          </div>
+          <ExtensionInstallPrompt surface="stream" className="mb-3.5" />
+          <div className={`${CARD} overflow-hidden`}>
+            {visible.map((t, i) => (
+              <TweetCard
+                key={t.id}
+                tweet={t}
+                animate={i === 0}
+                showArchivedBadge
+                origin="stream"
+                returnTo="/stream"
+              />
+            ))}
+            {visible.length === 0 && streamUnavailable && (
+              <PanelUnavailable message="Live stream is temporarily unavailable." />
+            )}
+            {visible.length === 0 && !streamUnavailable && (
+              <div className={`px-4 py-8 text-center text-[13px] ${MUTED}`}>
+                Waiting for the firehose…
+              </div>
+            )}
+          </div>
+          <div
+            ref={loadMoreTarget}
+            aria-live="polite"
+            className={`py-5 text-center text-[12.5px] ${MUTED}`}
+          >
+            {isLoadingMore
+              ? 'Loading older tweets…'
+              : hasMore
+                ? 'Scroll for older tweets'
+                : visible.length > 0
+                  ? 'You’ve reached the end.'
+                  : ''}
+          </div>
+        </div>
+      )}
+    </Root>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  note,
+  noteClass,
+}: {
+  label: string
+  value: string
+  note: string
+  noteClass?: string
+}) {
+  return (
+    <div className={`${CARD} px-4 py-3.5`}>
+      <div
+        className={`mb-1.5 text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
+      >
+        {label}
+      </div>
+      <div className="text-[27px] font-semibold tabular-nums" style={SERIF}>
+        {value}
+      </div>
+      <div className={`mt-0.5 text-[12px] ${noteClass ?? MUTED}`}>{note}</div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Field notes view
+// ---------------------------------------------------------------------------
+
+export function PortalNotes({
+  initialArticleId,
+}: {
+  initialArticleId?: string
+}) {
+  const [articleId, setArticleId] = useState<string | null>(
+    initialArticleId ?? null,
+  )
+  const article = PORTAL_ARTICLES.find((a) => a.id === articleId)
+
+  if (article) {
+    return (
+      <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
+        <button
+          onClick={() => setArticleId(null)}
+          className="mb-4 text-[13px] font-semibold text-brand"
+        >
+          ← All field notes
+        </button>
+        <div className="max-w-[680px]">
+          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-brand">
+            {article.tag}
+          </div>
+          <h1
+            className="mb-2.5 text-[32px] font-semibold leading-tight"
+            style={SERIF}
+          >
+            {article.title}
+          </h1>
+          <div className={`mb-6 text-[13px] ${MUTED}`}>{article.meta}</div>
+          <div
+            className={`flex flex-col gap-4 text-[15.5px] leading-[1.75] ${BODY}`}
+          >
+            {article.paras.map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
+      <h1 className="mb-1.5 text-[26px] font-semibold" style={SERIF}>
+        AI field notes
+      </h1>
+      <div className={`mb-[18px] text-[13px] ${MUTED}`}>
+        Short essays from inside the archive: how ideas enter the canon, mutate,
+        and fade.
+      </div>
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        {PORTAL_ARTICLES.map((a) => (
+          <button
+            key={a.id}
+            onClick={() => setArticleId(a.id)}
+            className={`${CARD} p-[18px] text-left transition-colors hover:border-zinc-300 hover:bg-zinc-50 dark:hover:border-[#3f3f46] dark:hover:bg-[#1f1f23]`}
+          >
+            <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-brand">
+              {a.tag}
+            </div>
+            <div
+              className="mb-2 text-[19px] font-semibold leading-snug"
+              style={SERIF}
+            >
+              {a.title}
+            </div>
+            <div className={`mb-2.5 text-[13px] leading-normal ${MUTED}`}>
+              {a.excerpt}
+            </div>
+            <div className={`text-[12px] ${FAINT}`}>{a.meta}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function usePortalStream(
+  data: Pick<PortalData, 'initialStream'> & {
+    failures: Pick<PortalData['failures'], 'initialStream'>
+  },
+  view: PortalView,
+) {
   // ---- live stream state -------------------------------------------------
   const [visible, setVisible] = useState<PortalTweet[]>(data.initialStream)
   const [streamUnavailable, setStreamUnavailable] = useState(
@@ -670,488 +918,333 @@ export default function Portal({
     return () => observer.disconnect()
   }, [hasMore, loadMore, view])
 
-  // ---- derived trend views ----------------------------------------------
-  const weeklyRanked = useMemo(
-    () =>
-      trends.weekly
-        .filter((term) => term.last7 > 0)
-        .sort((a, b) => b.last7 - a.last7),
-    [trends.weekly],
-  )
-  const weeklyBars = weeklyRanked.slice(0, 6)
-  const maxWeekly = Math.max(...weeklyBars.map((w) => w.last7), 1)
-
-  const recentBanger = data.recentBangers[0] ?? null
-  const historicalBanger = data.historicalBangers[0] ?? null
-
-  const generatedDate = useMemo(() => {
-    const d = new Date(stats.generatedAt)
-    return `${d.toLocaleDateString('en-GB', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'UTC',
-    })} · ${String(d.getUTCHours()).padStart(2, '0')}:${String(
-      d.getUTCMinutes(),
-    ).padStart(2, '0')} UTC`
-  }, [stats.generatedAt])
-
-  const Root = embedded ? 'div' : 'main'
-
-  return (
-    <Root className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
-      {/* ------------------------------------------------ Home ---------- */}
-      {view === 'home' && (
-        <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
-          <ArchiveOverview
-            stats={stats}
-            generatedDate={generatedDate}
-            failures={data.failures}
-          />
-
-          <DigestHero preview={digestPreview} />
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
-            <div className="flex h-full min-h-0 flex-col gap-4 lg:overflow-hidden">
-              <div
-                className={`${CARD} flex min-h-[420px] flex-col lg:h-[420px] lg:min-h-[420px] lg:flex-none lg:overflow-hidden lg:[contain:size]`}
-              >
-                <PanelHeader
-                  title="Live stream"
-                  live
-                  action={{
-                    label: 'Open firehose',
-                    href: '/stream',
-                    analyticsDestination: 'live_stream',
-                  }}
-                />
-                <div
-                  role="region"
-                  aria-label="Live tweet stream"
-                  tabIndex={0}
-                  className="flex max-h-[420px] flex-col overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60 lg:max-h-none lg:min-h-0 lg:flex-1 [&::-webkit-scrollbar]:hidden"
-                >
-                  {visible.slice(0, HOME_LIVE_STREAM_LIMIT).map((t, i) => (
-                    <TweetCard
-                      key={t.id}
-                      tweet={t}
-                      compact
-                      noClamp
-                      animate={i === 0}
-                      clickable
-                      origin="home"
-                      returnTo="/"
-                    />
-                  ))}
-                  {visible.length === 0 && streamUnavailable && (
-                    <PanelUnavailable message="Live stream is temporarily unavailable." />
-                  )}
-                  {visible.length === 0 && !streamUnavailable && (
-                    <div
-                      className={`px-4 py-8 text-center text-[13px] ${MUTED}`}
-                    >
-                      Waiting for the firehose…
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {(recentBanger ||
-                historicalBanger ||
-                data.failures.recentBangers ||
-                data.failures.historicalBangers) && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {(recentBanger || data.failures.recentBangers) && (
-                    <div className={`${CARD} min-w-0 overflow-hidden`}>
-                      <PanelHeader
-                        title="Banger of the moment"
-                        action={{
-                          label: 'Recent bangers',
-                          href: BANGERS_WEEK_HREF,
-                          analyticsDestination: 'recent_bangers',
-                        }}
-                      />
-                      {recentBanger ? (
-                        <TweetCard
-                          tweet={recentBanger}
-                          collapsible
-                          clickable
-                          origin="home"
-                          returnTo="/"
-                        />
-                      ) : (
-                        <PanelUnavailable message="Recent bangers are temporarily unavailable." />
-                      )}
-                    </div>
-                  )}
-
-                  {(historicalBanger || data.failures.historicalBangers) && (
-                    <div className={`${CARD} min-w-0 overflow-hidden`}>
-                      <PanelHeader
-                        title="Historical Banger"
-                        action={{
-                          label: 'All-time bangers',
-                          href: BANGERS_ALL_TIME_HREF,
-                          analyticsDestination: 'all_time_bangers',
-                        }}
-                      />
-                      {historicalBanger ? (
-                        <TweetCard
-                          tweet={historicalBanger}
-                          collapsible
-                          showDate
-                          clickable
-                          origin="home"
-                          returnTo="/"
-                        />
-                      ) : (
-                        <PanelUnavailable message="Historical bangers are temporarily unavailable." />
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <div className={`${CARD} flex flex-col`}>
-                <PanelHeader
-                  title="Trending terms · 7 days"
-                  action={{
-                    label: isMember ? 'Trends explorer' : 'Sign in for Trends',
-                    href: isMember ? '/trends' : signInHref('/trends'),
-                    analyticsDestination: 'trends',
-                  }}
-                />
-                <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
-                  {data.failures.trends ? (
-                    <PanelUnavailable message="Trending terms are temporarily unavailable." />
-                  ) : weeklyBars.length > 0 ? (
-                    <div
-                      className={`flex items-center gap-2 pb-1 text-[9px] font-medium uppercase tracking-wide ${MUTED}`}
-                    >
-                      <span className="w-[82px]" />
-                      <span className="w-[46px] text-right">Tweets</span>
-                      <span className="flex-1">Volume</span>
-                      <span className="w-[46px] text-right">Change</span>
-                    </div>
-                  ) : null}
-                  {!data.failures.trends &&
-                    weeklyBars.map((b) => (
-                      <div
-                        key={b.term}
-                        className="flex items-center gap-2 py-[6px]"
-                      >
-                        <span className="w-[82px] truncate text-[12px] font-semibold">
-                          {b.term}
-                        </span>
-                        <span className="w-[46px] text-right text-[11px] tabular-nums text-muted-foreground">
-                          {b.last7.toLocaleString('en-US')}
-                        </span>
-                        <div
-                          className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]"
-                          role="img"
-                          aria-label={`${b.term}: ${b.last7.toLocaleString('en-US')} tweets in the last seven days`}
-                          title={`${b.last7.toLocaleString('en-US')} tweets in the last 7 days; bar is relative to ${weeklyBars[0].term}`}
-                        >
-                          <div
-                            className="h-full rounded bg-chart-accent"
-                            style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
-                          />
-                        </div>
-                        <span
-                          title={`${b.last7.toLocaleString('en-US')} tweets vs ${b.prev7.toLocaleString('en-US')} in the previous 7 days`}
-                          className={`w-[46px] text-right text-[11px] font-bold tabular-nums ${
-                            b.status === 'inactive'
-                              ? MUTED
-                              : (b.deltaPct ?? 0) >= 0
-                                ? 'text-[#16a34a] dark:text-[#2acf80]'
-                                : 'text-[#dc2626] dark:text-[#f87171]'
-                          }`}
-                        >
-                          {fmtDelta(b)}
-                        </span>
-                      </div>
-                    ))}
-                  {!data.failures.trends && weeklyBars.length === 0 && (
-                    <div className={`py-8 text-center text-[13px] ${MUTED}`}>
-                      No watchlist activity in the last seven days.
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className={CARD}>
-                <PanelHeader
-                  title="Featured research"
-                  action={{
-                    label: 'All research',
-                    href: '/research',
-                    analyticsDestination: 'research',
-                  }}
-                />
-                <div className="flex flex-col">
-                  {data.failures.research ? (
-                    <PanelUnavailable message="Featured research is temporarily unavailable." />
-                  ) : (
-                    data.research.slice(0, 4).map((post) => (
-                      <a
-                        key={post.url}
-                        href={post.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() =>
-                          captureDashboardDestination(
-                            'research_article',
-                            'list',
-                            true,
-                          )
-                        }
-                        className="group flex items-start gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div
-                            className="flex items-baseline gap-1.5 text-[15.5px] font-semibold leading-snug"
-                            style={SERIF}
-                          >
-                            {post.title}
-                            <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
-                          </div>
-                          {post.excerpt && (
-                            <div
-                              className={`mt-1 line-clamp-2 text-[12.5px] leading-normal ${MUTED}`}
-                            >
-                              {post.excerpt}
-                            </div>
-                          )}
-                          <div className={`mt-1 text-[12px] ${MUTED}`}>
-                            {RESEARCH_SOURCE.name}
-                            {post.date &&
-                              ` · ${new Date(post.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
-                          </div>
-                        </div>
-                        {post.image && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={post.image}
-                            alt=""
-                            loading="lazy"
-                            className="mt-0.5 h-14 w-20 flex-shrink-0 rounded-[4px] border border-zinc-200 object-cover dark:border-[#26262a]"
-                          />
-                        )}
-                      </a>
-                    ))
-                  )}
-                  {!data.failures.research && data.research.length === 0 && (
-                    <a
-                      href={RESEARCH_SOURCE.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() =>
-                        captureDashboardDestination(
-                          'research_article',
-                          'list',
-                          true,
-                        )
-                      }
-                      className={`px-4 py-6 text-center text-[13px] ${MUTED} hover:text-brand`}
-                    >
-                      Read the latest research at {RESEARCH_SOURCE.name} →
-                    </a>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-col gap-3">
-                <UtilityLink
-                  href={ARCHIVE_EXPORT_URL}
-                  destination="data_export"
-                  title="Bulk export paused"
-                  note="Why the historical Parquet file is private"
-                  action="Details"
-                  icon={<FaDatabase className="h-[17px] w-[17px]" />}
-                />
-                <UtilityLink
-                  href={COMMUNITY_BUILDS_URL}
-                  destination="community_builds"
-                  title="Community Builds"
-                  note="Projects made with Community Archive data"
-                  action="Explore"
-                  icon={<FaUsers className="h-[17px] w-[17px]" />}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ------------------------------------------------ Stream -------- */}
-      {view === 'stream' && (
-        <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
-          <Link
-            href="/"
-            className={`mb-2 inline-flex items-center text-[12.5px] font-semibold ${MUTED} hover:text-brand`}
-          >
-            ← Dashboard
-          </Link>
-          <LiveStreamHeading
-            stats={stats}
-            unavailable={data.failures.liveAnalytics}
-          />
-          <div className={`mb-3.5 text-[13px] ${MUTED}`}>
-            Tweets arriving from the{' '}
-            <a
-              href={CHROME_EXTENSION_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-brand"
-            >
-              browser extension
-            </a>{' '}
-            firehose, as contributors read their timelines.
-          </div>
-          <ExtensionInstallPrompt surface="stream" className="mb-3.5" />
-          <div className={`${CARD} overflow-hidden`}>
-            {visible.map((t, i) => (
-              <TweetCard
-                key={t.id}
-                tweet={t}
-                animate={i === 0}
-                showArchivedBadge
-                origin="stream"
-                returnTo="/stream"
-              />
-            ))}
-            {visible.length === 0 && streamUnavailable && (
-              <PanelUnavailable message="Live stream is temporarily unavailable." />
-            )}
-            {visible.length === 0 && !streamUnavailable && (
-              <div className={`px-4 py-8 text-center text-[13px] ${MUTED}`}>
-                Waiting for the firehose…
-              </div>
-            )}
-          </div>
-          <div
-            ref={loadMoreTarget}
-            aria-live="polite"
-            className={`py-5 text-center text-[12.5px] ${MUTED}`}
-          >
-            {isLoadingMore
-              ? 'Loading older tweets…'
-              : hasMore
-                ? 'Scroll for older tweets'
-                : visible.length > 0
-                  ? 'You’ve reached the end.'
-                  : ''}
-          </div>
-        </div>
-      )}
-    </Root>
-  )
+  return { visible, streamUnavailable, loadMoreTarget, isLoadingMore, hasMore }
 }
 
-function StatCard({
-  label,
-  value,
-  note,
-  noteClass,
-}: {
-  label: string
-  value: string
-  note: string
-  noteClass?: string
-}) {
+export function HomePortalLayout({
+  overview,
+  digest,
+  stream,
+  bangers,
+  trends,
+  research,
+}: Record<
+  'overview' | 'digest' | 'stream' | 'bangers' | 'trends' | 'research',
+  ReactNode
+>) {
   return (
-    <div className={`${CARD} px-4 py-3.5`}>
-      <div
-        className={`mb-1.5 text-[11px] font-bold uppercase tracking-[0.08em] ${MUTED}`}
-      >
-        {label}
+    <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
+      {overview}
+      {digest}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+        <div className="flex h-full min-h-0 flex-col gap-4 lg:overflow-hidden">
+          {stream}
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{bangers}</div>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {trends}
+          {research}
+          <div className="flex flex-col gap-3">
+            <UtilityLink
+              href={ARCHIVE_EXPORT_URL}
+              destination="data_export"
+              title="Bulk export paused"
+              note="Why the historical Parquet file is private"
+              action="Details"
+              icon={<FaDatabase className="h-[17px] w-[17px]" />}
+            />
+            <UtilityLink
+              href={COMMUNITY_BUILDS_URL}
+              destination="community_builds"
+              title="Community Builds"
+              note="Projects made with Community Archive data"
+              action="Explore"
+              icon={<FaUsers className="h-[17px] w-[17px]" />}
+            />
+          </div>
+        </div>
       </div>
-      <div className="text-[27px] font-semibold tabular-nums" style={SERIF}>
-        {value}
-      </div>
-      <div className={`mt-0.5 text-[12px] ${noteClass ?? MUTED}`}>{note}</div>
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Field notes view
-// ---------------------------------------------------------------------------
-
-export function PortalNotes({
-  initialArticleId,
+function HomeStreamPanel({
+  visible,
+  streamUnavailable,
 }: {
-  initialArticleId?: string
+  visible: PortalTweet[]
+  streamUnavailable: boolean
 }) {
-  const [articleId, setArticleId] = useState<string | null>(
-    initialArticleId ?? null,
-  )
-  const article = PORTAL_ARTICLES.find((a) => a.id === articleId)
-
-  if (article) {
-    return (
-      <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
-        <button
-          onClick={() => setArticleId(null)}
-          className="mb-4 text-[13px] font-semibold text-brand"
-        >
-          ← All field notes
-        </button>
-        <div className="max-w-[680px]">
-          <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-brand">
-            {article.tag}
+  return (
+    <div
+      className={`${CARD} flex min-h-[420px] flex-col lg:h-[420px] lg:min-h-[420px] lg:flex-none lg:overflow-hidden lg:[contain:size]`}
+    >
+      <PanelHeader
+        title="Live stream"
+        live
+        action={{
+          label: 'Open firehose',
+          href: '/stream',
+          analyticsDestination: 'live_stream',
+        }}
+      />
+      <div
+        role="region"
+        aria-label="Live tweet stream"
+        tabIndex={0}
+        className="flex max-h-[420px] flex-col overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60 lg:max-h-none lg:min-h-0 lg:flex-1 [&::-webkit-scrollbar]:hidden"
+      >
+        {visible.slice(0, HOME_LIVE_STREAM_LIMIT).map((t, i) => (
+          <TweetCard
+            key={t.id}
+            tweet={t}
+            compact
+            noClamp
+            animate={i === 0}
+            clickable
+            origin="home"
+            returnTo="/"
+          />
+        ))}
+        {visible.length === 0 && streamUnavailable && (
+          <PanelUnavailable message="Live stream is temporarily unavailable." />
+        )}
+        {visible.length === 0 && !streamUnavailable && (
+          <div className={`px-4 py-8 text-center text-[13px] ${MUTED}`}>
+            Waiting for the firehose…
           </div>
-          <h1
-            className="mb-2.5 text-[32px] font-semibold leading-tight"
-            style={SERIF}
-          >
-            {article.title}
-          </h1>
-          <div className={`mb-6 text-[13px] ${MUTED}`}>{article.meta}</div>
-          <div
-            className={`flex flex-col gap-4 text-[15.5px] leading-[1.75] ${BODY}`}
-          >
-            {article.paras.map((p, i) => (
-              <p key={i}>{p}</p>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
-    )
-  }
+    </div>
+  )
+}
+
+export function HomepageLiveStream({
+  tweets,
+  failed,
+}: {
+  tweets: PortalTweet[]
+  failed: boolean
+}) {
+  const { visible, streamUnavailable } = usePortalStream(
+    { initialStream: tweets, failures: { initialStream: failed } },
+    'home',
+  )
+  return (
+    <HomeStreamPanel visible={visible} streamUnavailable={streamUnavailable} />
+  )
+}
+
+export function HomeBangerPanel({
+  tweet,
+  failed,
+  historical = false,
+}: {
+  tweet: PortalTweet | null
+  failed: boolean
+  historical?: boolean
+}) {
+  if (!tweet && !failed) return null
+  return (
+    <div className={`${CARD} min-w-0 overflow-hidden`}>
+      <PanelHeader
+        title={historical ? 'Historical Banger' : 'Banger of the moment'}
+        action={{
+          label: historical ? 'All-time bangers' : 'Recent bangers',
+          href: historical ? BANGERS_ALL_TIME_HREF : BANGERS_WEEK_HREF,
+          analyticsDestination: historical
+            ? 'all_time_bangers'
+            : 'recent_bangers',
+        }}
+      />
+      {tweet ? (
+        <TweetCard
+          tweet={tweet}
+          collapsible
+          showDate={historical}
+          clickable
+          origin="home"
+          returnTo="/"
+        />
+      ) : (
+        <PanelUnavailable
+          message={
+            historical
+              ? 'Historical bangers are temporarily unavailable.'
+              : 'Recent bangers are temporarily unavailable.'
+          }
+        />
+      )}
+    </div>
+  )
+}
+
+export function HomeTrendsPanel({
+  weekly,
+  failed,
+  isMember,
+}: {
+  weekly: TermWeek[]
+  failed: boolean
+  isMember: boolean
+}) {
+  // ---- derived trend views ----------------------------------------------
+  const weeklyRanked = useMemo(
+    () =>
+      weekly.filter((term) => term.last7 > 0).sort((a, b) => b.last7 - a.last7),
+    [weekly],
+  )
+  const weeklyBars = weeklyRanked.slice(0, 6)
+  const maxWeekly = Math.max(...weeklyBars.map((w) => w.last7), 1)
 
   return (
-    <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6">
-      <h1 className="mb-1.5 text-[26px] font-semibold" style={SERIF}>
-        AI field notes
-      </h1>
-      <div className={`mb-[18px] text-[13px] ${MUTED}`}>
-        Short essays from inside the archive: how ideas enter the canon, mutate,
-        and fade.
-      </div>
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-        {PORTAL_ARTICLES.map((a) => (
-          <button
-            key={a.id}
-            onClick={() => setArticleId(a.id)}
-            className={`${CARD} p-[18px] text-left transition-colors hover:border-zinc-300 hover:bg-zinc-50 dark:hover:border-[#3f3f46] dark:hover:bg-[#1f1f23]`}
+    <div className={`${CARD} flex flex-col`}>
+      <PanelHeader
+        title="Trending terms · 7 days"
+        action={{
+          label: isMember ? 'Trends explorer' : 'Sign in for Trends',
+          href: isMember ? '/trends' : signInHref('/trends'),
+          analyticsDestination: 'trends',
+        }}
+      />
+      <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
+        {failed ? (
+          <PanelUnavailable message="Trending terms are temporarily unavailable." />
+        ) : weeklyBars.length > 0 ? (
+          <div
+            className={`flex items-center gap-2 pb-1 text-[9px] font-medium uppercase tracking-wide ${MUTED}`}
           >
-            <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-brand">
-              {a.tag}
+            <span className="w-[82px]" />
+            <span className="w-[46px] text-right">Tweets</span>
+            <span className="flex-1">Volume</span>
+            <span className="w-[46px] text-right">Change</span>
+          </div>
+        ) : null}
+        {!failed &&
+          weeklyBars.map((b) => (
+            <div key={b.term} className="flex items-center gap-2 py-[6px]">
+              <span className="w-[82px] truncate text-[12px] font-semibold">
+                {b.term}
+              </span>
+              <span className="w-[46px] text-right text-[11px] tabular-nums text-muted-foreground">
+                {b.last7.toLocaleString('en-US')}
+              </span>
+              <div
+                className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]"
+                role="img"
+                aria-label={`${b.term}: ${b.last7.toLocaleString('en-US')} tweets in the last seven days`}
+                title={`${b.last7.toLocaleString('en-US')} tweets in the last 7 days; bar is relative to ${weeklyBars[0].term}`}
+              >
+                <div
+                  className="h-full rounded bg-chart-accent"
+                  style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
+                />
+              </div>
+              <span
+                title={`${b.last7.toLocaleString('en-US')} tweets vs ${b.prev7.toLocaleString('en-US')} in the previous 7 days`}
+                className={`w-[46px] text-right text-[11px] font-bold tabular-nums ${
+                  b.status === 'inactive'
+                    ? MUTED
+                    : (b.deltaPct ?? 0) >= 0
+                      ? 'text-[#16a34a] dark:text-[#2acf80]'
+                      : 'text-[#dc2626] dark:text-[#f87171]'
+                }`}
+              >
+                {fmtDelta(b)}
+              </span>
             </div>
-            <div
-              className="mb-2 text-[19px] font-semibold leading-snug"
-              style={SERIF}
+          ))}
+        {!failed && weeklyBars.length === 0 && (
+          <div className={`py-8 text-center text-[13px] ${MUTED}`}>
+            No watchlist activity in the last seven days.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function HomeResearchPanel({
+  research,
+  failed,
+}: {
+  research: PortalData['research']
+  failed: boolean
+}) {
+  return (
+    <div className={CARD}>
+      <PanelHeader
+        title="Featured research"
+        action={{
+          label: 'All research',
+          href: '/research',
+          analyticsDestination: 'research',
+        }}
+      />
+      <div className="flex flex-col">
+        {failed ? (
+          <PanelUnavailable message="Featured research is temporarily unavailable." />
+        ) : (
+          research.slice(0, 4).map((post) => (
+            <a
+              key={post.url}
+              href={post.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() =>
+                captureDashboardDestination('research_article', 'list', true)
+              }
+              className="group flex items-start gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
             >
-              {a.title}
-            </div>
-            <div className={`mb-2.5 text-[13px] leading-normal ${MUTED}`}>
-              {a.excerpt}
-            </div>
-            <div className={`text-[12px] ${FAINT}`}>{a.meta}</div>
-          </button>
-        ))}
+              <div className="min-w-0 flex-1">
+                <div
+                  className="flex items-baseline gap-1.5 text-[15.5px] font-semibold leading-snug"
+                  style={SERIF}
+                >
+                  {post.title}
+                  <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
+                </div>
+                {post.excerpt && (
+                  <div
+                    className={`mt-1 line-clamp-2 text-[12.5px] leading-normal ${MUTED}`}
+                  >
+                    {post.excerpt}
+                  </div>
+                )}
+                <div className={`mt-1 text-[12px] ${MUTED}`}>
+                  {RESEARCH_SOURCE.name}
+                  {post.date &&
+                    ` · ${new Date(post.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}`}
+                </div>
+              </div>
+              {post.image && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={post.image}
+                  alt=""
+                  loading="lazy"
+                  className="mt-0.5 h-14 w-20 flex-shrink-0 rounded-[4px] border border-zinc-200 object-cover dark:border-[#26262a]"
+                />
+              )}
+            </a>
+          ))
+        )}
+        {!failed && research.length === 0 && (
+          <a
+            href={RESEARCH_SOURCE.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() =>
+              captureDashboardDestination('research_article', 'list', true)
+            }
+            className={`px-4 py-6 text-center text-[13px] ${MUTED} hover:text-brand`}
+          >
+            Read the latest research at {RESEARCH_SOURCE.name} →
+          </a>
+        )}
       </div>
     </div>
   )

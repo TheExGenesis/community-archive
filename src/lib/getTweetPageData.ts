@@ -98,6 +98,13 @@ interface RpcResult {
 interface TweetPageResult {
   tweet: TweetData | null
   threadTree: ConversationTree | null
+  threadPage?: {
+    totalCount: number
+    nextCursor: {
+      createdAt: string
+      tweetId: string
+    } | null
+  } | null
   quotingTweets: TweetData[]
   quotingTweetCount: number
 }
@@ -225,7 +232,15 @@ async function fetchClickHousePage(
     ])
     if (!page) return null
     return {
-      ...page,
+      tweet: page.tweet,
+      threadTree: page.threadTree,
+      threadPage:
+        page.totalCount > 1
+          ? {
+              totalCount: page.totalCount,
+              nextCursor: page.nextCursor,
+            }
+          : null,
       quotingTweets: quotePosts.tweets,
       quotingTweetCount: quotePosts.totalCount,
     }

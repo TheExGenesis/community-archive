@@ -47,11 +47,31 @@ interface ClickHouseTweetThreadResponse {
     tweet: ClickHouseThreadTweet
     conversationTweets: ClickHouseThreadTweet[]
   }
+  query: {
+    total: string | number
+    nextCursor: {
+      createdAt: string
+      tweetId: string
+    } | null
+  }
+}
+
+export interface TweetThreadCursor {
+  createdAt: string
+  tweetId: string
 }
 
 export interface ClickHouseTweetThreadPageData {
   tweet: TweetData
   threadTree: ConversationTree | null
+  threadTweets: ThreadTweet[]
+  totalCount: number
+  nextCursor: TweetThreadCursor | null
+}
+
+interface TweetThreadPageOptions {
+  limit?: number
+  after?: TweetThreadCursor | null
 }
 
 function count(value: string | number | null): number {
@@ -192,12 +212,19 @@ export async function fetchClickHouseTweetPageData(
 export async function fetchClickHouseTweetThreadPageData(
   tweetId: string,
   fetcher = fetchAnalyticsGatewayJson,
+  options: TweetThreadPageOptions = {},
 ): Promise<ClickHouseTweetThreadPageData | null> {
   if (!/^\d{1,20}$/.test(tweetId)) return null
 
+  const limit = Math.max(1, Math.min(50, Math.trunc(options.limit || 12)))
+  const searchParams = new URLSearchParams({ limit: String(limit) })
+  if (options.after) {
+    searchParams.set('after', options.after.createdAt)
+    searchParams.set('after_id', options.after.tweetId)
+  }
   const response = await fetcher<ClickHouseTweetThreadResponse>(
     ['tweet', tweetId, 'thread'],
-    new URLSearchParams(),
+    searchParams,
     { revalidate: 3600 },
   )
   if (!response.data?.tweet) return null
@@ -207,7 +234,8 @@ export async function fetchClickHouseTweetThreadPageData(
   if (!nodes.some((tweet) => tweet.tweetId === selected.tweetId)) {
     nodes.push(selected)
   }
-  const threadTweets = nodes.map(toThreadTweet)
+  const pageTweets = (response.data.conversationTweets || []).map(toThreadTweet)
+  const treeTweets = nodes.map(toThreadTweet)
   return {
     tweet: toTweetData(
       selected,
@@ -216,6 +244,9 @@ export async function fetchClickHouseTweetThreadPageData(
       selected.retweetedTweetId,
     ),
     threadTree:
-      threadTweets.length > 1 ? buildConversationTree(threadTweets) : null,
+      treeTweets.length > 1 ? buildConversationTree(treeTweets) : null,
+    threadTweets: pageTweets,
+    totalCount: Math.max(count(response.query?.total), pageTweets.length),
+    nextCursor: response.query?.nextCursor || null,
   }
 }

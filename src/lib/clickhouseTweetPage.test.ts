@@ -124,6 +124,13 @@ describe('fetchClickHouseTweetPageData', () => {
         tweet: root,
         conversationTweets: [root, reply],
       },
+      query: {
+        total: 18,
+        nextCursor: {
+          createdAt: reply.createdAt,
+          tweetId: reply.tweetId,
+        },
+      },
     })
 
     const page = await fetchClickHouseTweetThreadPageData(root.tweetId, fetcher)
@@ -150,6 +157,13 @@ describe('fetchClickHouseTweetPageData', () => {
       tweet_id: reply.tweetId,
       reply_to_tweet_id: root.tweetId,
       username: 'exgenesis',
+    })
+    expect(page).toMatchObject({
+      totalCount: 18,
+      nextCursor: {
+        createdAt: reply.createdAt,
+        tweetId: reply.tweetId,
+      },
     })
   })
 })

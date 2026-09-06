@@ -122,6 +122,12 @@ describe('getTweetPageData', () => {
     fetchClickHouseTweetThreadPageDataMock.mockResolvedValue({
       tweet,
       threadTree: threadTree as never,
+      threadTweets: Object.values(threadTree.tweets) as never,
+      totalCount: 18,
+      nextCursor: {
+        createdAt: '2026-08-07T12:05:00.000Z',
+        tweetId: '2085473085399150818',
+      },
     })
     fetchClickHouseQuotePostsMock.mockResolvedValue({
       totalCount: 7,
@@ -138,6 +144,13 @@ describe('getTweetPageData', () => {
     await expect(getTweetPageData(tweet.tweet_id)).resolves.toMatchObject({
       tweet,
       threadTree,
+      threadPage: {
+        totalCount: 18,
+        nextCursor: {
+          createdAt: '2026-08-07T12:05:00.000Z',
+          tweetId: '2085473085399150818',
+        },
+      },
       quotingTweetCount: 7,
       quotingTweets: [
         expect.objectContaining({
@@ -175,6 +188,9 @@ describe('getTweetPageData', () => {
     fetchClickHouseTweetThreadPageDataMock.mockResolvedValue({
       tweet,
       threadTree: null,
+      threadTweets: [tweet as never],
+      totalCount: 1,
+      nextCursor: null,
     })
     fetchClickHouseQuotePostsMock.mockRejectedValue(new Error('gateway down'))
     const consoleError = jest
@@ -184,6 +200,7 @@ describe('getTweetPageData', () => {
     await expect(getTweetPageData(tweet.tweet_id)).resolves.toEqual({
       tweet,
       threadTree: null,
+      threadPage: null,
       quotingTweets: [],
       quotingTweetCount: 0,
     })

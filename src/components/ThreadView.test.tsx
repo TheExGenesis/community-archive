@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ThreadView from './ThreadView'
 import type { ConversationTree, ThreadTweet } from '@/lib/threadUtils'
 
@@ -76,5 +76,60 @@ describe('ThreadView', () => {
 
     expect(screen.getByText('tweet 1')).toBeVisible()
     expect(screen.getByText('tweet 2 (permalink)')).toBeVisible()
+  })
+
+  test('appends the next chronological page without duplicating tweets', async () => {
+    const originalIntersectionObserver = global.IntersectionObserver
+    const originalFetch = global.fetch
+    Object.defineProperty(global, 'IntersectionObserver', {
+      configurable: true,
+      value: class {
+        observe() {}
+        disconnect() {}
+      },
+    })
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        tweets: [tweet('2', '1')],
+        totalCount: 2,
+        nextCursor: null,
+      }),
+    }) as jest.Mock
+
+    const tree: ConversationTree = {
+      root: '1',
+      roots: ['1'],
+      tweets: { '1': tweet('1', null) },
+      children: { '1': [] },
+      parents: {},
+      paths: { '1': ['1'] },
+    }
+    render(
+      <ThreadView
+        tree={tree}
+        highlightTweetId="1"
+        totalCount={2}
+        nextCursor={{
+          createdAt: '2026-08-10T12:01:00.000Z',
+          tweetId: '1',
+        }}
+      />,
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Load more of this thread' }),
+    )
+    await waitFor(() => expect(screen.getByText('tweet 2')).toBeVisible())
+    expect(screen.getAllByText('tweet 1 (permalink)')).toHaveLength(1)
+    expect(
+      screen.queryByText('Load more of this thread'),
+    ).not.toBeInTheDocument()
+
+    global.fetch = originalFetch
+    Object.defineProperty(global, 'IntersectionObserver', {
+      configurable: true,
+      value: originalIntersectionObserver,
+    })
   })
 })

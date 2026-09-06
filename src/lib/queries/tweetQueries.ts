@@ -109,26 +109,38 @@ function transformRawTweetsToTimelineTweets(
   })
 }
 
+export interface TweetFetchOptions {
+  signal?: AbortSignal
+  /** Publish the canonical page before optional quote bodies finish loading. */
+  onBaseTweets?: (tweets: TimelineTweet[]) => void
+}
+
 async function finalizeTweets(
   supabase: SupabaseClient,
   tweets: TimelineTweet[],
   criteria: FilterCriteria,
+  options: TweetFetchOptions = {},
 ): Promise<TimelineTweet[]> {
   const filteredTweets = criteria.excludeRetweets
     ? tweets.filter((tweet) => !isRetweetText(tweet.full_text))
     : tweets
 
-  return criteria.includeQuoteTweets
-    ? enrichSearchTweets(supabase, filteredTweets)
-    : filteredTweets
+  options.signal?.throwIfAborted()
+  if (!criteria.includeQuoteTweets || filteredTweets.length === 0)
+    return filteredTweets
+  options.onBaseTweets?.(filteredTweets)
+  return enrichSearchTweets(supabase, filteredTweets, options.signal)
 }
 
 async function searchClickHousePage(
   criteria: FilterCriteria,
   page: number,
   pageSize: number,
+  signal?: AbortSignal,
 ): Promise<TimelineTweet[]> {
-  return searchTweetsWithClickHouse(criteria, page, pageSize)
+  return signal
+    ? searchTweetsWithClickHouse(criteria, page, pageSize, undefined, signal)
+    : searchTweetsWithClickHouse(criteria, page, pageSize)
 }
 
 /**
@@ -152,6 +164,7 @@ async function searchExactPhrase(
   criteria: FilterCriteria,
   pageSize: number,
   offset: number,
+  signal?: AbortSignal,
 ): Promise<TimelineTweet[]> {
   const data = await rpcSearchExactPhrase(
     supabase,
@@ -164,6 +177,7 @@ async function searchExactPhrase(
     },
     pageSize,
     offset,
+    signal,
   )
 
   return data ? transformRawTweetsToTimelineTweets(data, true) : []
@@ -174,7 +188,9 @@ export async function fetchTweets(
   criteria: FilterCriteria,
   page: number,
   pageSize: number = DEFAULT_PAGE_SIZE,
+  options: TweetFetchOptions = {},
 ): Promise<{ tweets: TimelineTweet[]; totalCount: number | null; error: any }> {
+  options.signal?.throwIfAborted()
   // Use RPC if a text search query is provided OR if any filters supported by the RPC are used.
   if (
     criteria.searchQuery || // Main keyword search
@@ -209,28 +225,24 @@ export async function fetchTweets(
       }
 
       if (rawText && clickHouseSearchEnabled) {
-        try {
-          const clickHouseTweets = await searchClickHousePage(
-            criteria,
-            page,
-            pageSize,
-          )
-          const finalizedTweets = await finalizeTweets(
-            supabase,
-            clickHouseTweets,
-            criteria,
-          )
-          return {
-            tweets: finalizedTweets,
-            totalCount: finalizedTweets.length === 0 ? 0 : null,
-            error: null,
-          }
-        } catch (error) {
-          console.warn(
-            'ClickHouse tweet search failed; falling back to Supabase:',
-            error,
-          )
-          if (criteria.sort && criteria.sort !== 'newest') throw error
+        // Do not start a second corpus scan against PostgreSQL when the
+        // analytical service fails or the reader has cancelled this search.
+        const clickHouseTweets = await searchClickHousePage(
+          criteria,
+          page,
+          pageSize,
+          options.signal,
+        )
+        const finalizedTweets = await finalizeTweets(
+          supabase,
+          clickHouseTweets,
+          criteria,
+          options,
+        )
+        return {
+          tweets: finalizedTweets,
+          totalCount: finalizedTweets.length === 0 ? 0 : null,
+          error: null,
         }
       }
 
@@ -245,9 +257,15 @@ export async function fetchTweets(
           criteria,
           pageSize,
           offset,
+          options.signal,
         )
         return {
-          tweets: await finalizeTweets(supabase, phraseResults, criteria),
+          tweets: await finalizeTweets(
+            supabase,
+            phraseResults,
+            criteria,
+            options,
+          ),
           totalCount: null,
           error: null,
         }
@@ -263,6 +281,7 @@ export async function fetchTweets(
         searchParams,
         pageSize,
         offset,
+        options.signal,
       )
 
       if (!rpcData || rpcData.length === 0) {
@@ -277,12 +296,14 @@ export async function fetchTweets(
           supabase,
           transformRawTweetsToTimelineTweets(rpcData, true),
           criteria,
+          options,
         ),
         totalCount: null,
         error: null,
       }
     } catch (error: any) {
-      console.error('Error fetching tweets via RPC:', error)
+      if (options.signal?.aborted) throw error
+      console.error('Error fetching search results:', error)
       if (error.message && error.message.includes('statement timeout')) {
         return {
           tweets: [],
@@ -367,7 +388,9 @@ export async function fetchTweets(
     query = query.order('created_at', { ascending: false })
     query = query.range((page - 1) * pageSize, page * pageSize - 1)
 
+    if (options.signal) query = query.abortSignal(options.signal)
     const { data: rawData, error, count } = await query
+    options.signal?.throwIfAborted()
 
     if (error) {
       console.error('Error fetching tweets directly:', error) // Clarified error source
@@ -389,7 +412,12 @@ export async function fetchTweets(
 
     const transformedTweets = transformRawTweetsToTimelineTweets(rawData, false)
     return {
-      tweets: await finalizeTweets(supabase, transformedTweets, criteria),
+      tweets: await finalizeTweets(
+        supabase,
+        transformedTweets,
+        criteria,
+        options,
+      ),
       totalCount: count,
       error: null,
     }

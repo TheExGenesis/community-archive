@@ -31,7 +31,7 @@ const avatarResponse = (
   )
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: { account_id: string } },
 ) {
   if (!ACCOUNT_ID_PATTERN.test(params.account_id)) {
@@ -49,7 +49,8 @@ export async function GET(
   const storedAvatarUrl = page.tweets
     .map((tweet) => getHighResolutionAvatarUrl(tweet.avatar_media_url))
     .find(Boolean)
-  if (storedAvatarUrl) return avatarResponse(storedAvatarUrl, 200)
+  const refresh = new URL(request.url).searchParams.get('refresh') === '1'
+  if (storedAvatarUrl && !refresh) return avatarResponse(storedAvatarUrl, 200)
 
   const tweets = await fetchSyndicatedTweets(
     page.tweets.map((tweet) => tweet.tweet_id),

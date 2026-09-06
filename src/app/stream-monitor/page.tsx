@@ -1,8 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import Link from 'next/link'
+import React, { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createBrowserClient } from '@/utils/supabase'
 import {
   ChartContainer,
@@ -21,9 +20,10 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import getLatestTweets from '@/lib/queries/getLatestTweets'
 import UnifiedTweetList from '@/components/UnifiedTweetList'
+import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 
 interface TweetMedia {
   media_url: string
@@ -52,13 +52,53 @@ interface Tweet {
   urls: TweetUrl[]
 }
 
+type ViewMode = '24h' | '7d' | '1y'
+
+function getStatsRange(viewMode: ViewMode, timeOffset: number) {
+  const now = new Date()
+  if (viewMode === '24h') {
+    const periods = 24
+    return {
+      startDate: new Date(
+        now.getTime() - (periods + timeOffset * periods) * 60 * 60 * 1000,
+      ),
+      endDate: new Date(now.getTime() - timeOffset * periods * 60 * 60 * 1000),
+      granularity: 'hour',
+    }
+  }
+  if (viewMode === '7d') {
+    const periods = 7
+    return {
+      startDate: new Date(
+        now.getTime() - (periods + timeOffset * periods) * 24 * 60 * 60 * 1000,
+      ),
+      endDate: new Date(
+        now.getTime() - timeOffset * periods * 24 * 60 * 60 * 1000,
+      ),
+      granularity: 'day',
+    }
+  }
+
+  const periods = 52
+  return {
+    startDate: new Date(
+      now.getTime() -
+        (periods + timeOffset * periods) * 7 * 24 * 60 * 60 * 1000,
+    ),
+    endDate: new Date(
+      now.getTime() - timeOffset * periods * 7 * 24 * 60 * 60 * 1000,
+    ),
+    granularity: 'week',
+  }
+}
+
 const StreamMonitor = () => {
-  const [viewMode, setViewMode] = useState<'24h' | '7d' | '1y'>('7d')
+  const queryClient = useQueryClient()
+  const [viewMode, setViewMode] = useState<ViewMode>('7d')
   const [timeOffset, setTimeOffset] = useState(0)
   const [showStreamedOnly, setShowStreamedOnly] = useState(true)
   const [loadedTweets, setLoadedTweets] = useState<Tweet[]>([])
   const [tweetOffset, setTweetOffset] = useState(0)
-  const [showBanner, setShowBanner] = useState(true)
   const tweetsPerPage = 20
 
   const supabase = createBrowserClient()
@@ -71,40 +111,10 @@ const StreamMonitor = () => {
   } = useQuery({
     queryKey: ['scrapingStats', viewMode, timeOffset, showStreamedOnly],
     queryFn: async () => {
-      const now = new Date()
-      let startDate, endDate, granularity, periods
-
-      if (viewMode === '24h') {
-        periods = 24
-        startDate = new Date(
-          now.getTime() - (periods + timeOffset * periods) * 60 * 60 * 1000,
-        )
-        endDate = new Date(
-          now.getTime() - timeOffset * periods * 60 * 60 * 1000,
-        )
-        granularity = 'hour'
-      } else if (viewMode === '7d') {
-        periods = 7
-        startDate = new Date(
-          now.getTime() -
-            (periods + timeOffset * periods) * 24 * 60 * 60 * 1000,
-        )
-        endDate = new Date(
-          now.getTime() - timeOffset * periods * 24 * 60 * 60 * 1000,
-        )
-        granularity = 'day'
-      } else {
-        // 1y
-        periods = 52 // 52 weeks
-        startDate = new Date(
-          now.getTime() -
-            (periods + timeOffset * periods) * 7 * 24 * 60 * 60 * 1000,
-        )
-        endDate = new Date(
-          now.getTime() - timeOffset * periods * 7 * 24 * 60 * 60 * 1000,
-        )
-        granularity = 'week'
-      }
+      const { startDate, endDate, granularity } = getStatsRange(
+        viewMode,
+        timeOffset,
+      )
 
       // Use the new API with custom date ranges
       const params = new URLSearchParams({
@@ -125,19 +135,51 @@ const StreamMonitor = () => {
     staleTime: 60000, // 1 minute stale time
   })
 
+  const {
+    data: contributorCount,
+    isLoading: contributorCountLoading,
+    isError: contributorCountError,
+  } = useQuery({
+    queryKey: ['streamContributorCount', viewMode, timeOffset],
+    queryFn: async () => {
+      const { startDate, endDate } = getStatsRange(viewMode, timeOffset)
+      const params = new URLSearchParams({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+      })
+      const response = await fetch(`/api/scraper-count?${params}`)
+      const body = (await response.json().catch(() => null)) as {
+        count?: unknown
+      } | null
+      const count = Number(body?.count)
+      if (!response.ok || !Number.isSafeInteger(count) || count < 0) {
+        throw new Error('Failed to fetch streaming contributor count')
+      }
+      return count
+    },
+    refetchInterval: viewMode === '24h' && timeOffset === 0 ? 300000 : 0,
+    staleTime: 60000,
+  })
+
   // Extract chart data and summary from scraping stats
   const chartData = scrapingStats?.data
   const chartLoading = statsLoading
   const chartError = statsError
   const sourceMetric = showStreamedOnly
-    ? scrapingStats?.summary?.sourceMessages || 0
-    : scrapingStats?.summary?.sourceCount || 0
-  const sourceMetricLoading = statsLoading
+    ? scrapingStats?.summary?.sourceMessages
+    : scrapingStats?.summary?.sourceCount
+  const formatMetric = (value: number | undefined) =>
+    statsLoading
+      ? '...'
+      : statsError || value == null
+        ? 'Unavailable'
+        : value.toLocaleString()
 
   // Query for latest tweets with pagination
   const {
     data: tweetsData,
     isLoading: tweetsLoading,
+    isFetching: tweetsFetching,
     error: tweetsError,
     refetch: refetchTweets,
   } = useQuery({
@@ -163,8 +205,14 @@ const StreamMonitor = () => {
         // Fresh load or refresh - replace all tweets
         setLoadedTweets(tweetsData)
       } else {
-        // Load more - append to existing tweets
-        setLoadedTweets((prev) => [...prev, ...tweetsData])
+        // Pages can overlap as new tweets arrive or the current page refetches.
+        setLoadedTweets((prev) =>
+          Array.from(
+            new Map(
+              [...prev, ...tweetsData].map((tweet) => [tweet.tweet_id, tweet]),
+            ).values(),
+          ),
+        )
       }
     }
   }, [tweetsData, tweetOffset])
@@ -174,7 +222,7 @@ const StreamMonitor = () => {
       label: showStreamedOnly
         ? 'Unique Tweets Streamed'
         : 'Unique Tweets Observed',
-      color: 'hsl(var(--chart-1))',
+      color: 'hsl(var(--chart-accent))',
     },
   }
 
@@ -228,49 +276,32 @@ const StreamMonitor = () => {
     }
   }
 
-  const getTotalTweets = () => {
-    return scrapingStats?.summary?.totalTweets || 0
-  }
-
-  const getAverageTweetsPerPeriod = () => {
-    return scrapingStats?.summary?.avgTweetsPerPeriod || 0
-  }
+  const averageUnit =
+    viewMode === '24h' ? 'hour' : viewMode === '7d' ? 'day' : 'week'
 
   const loadMoreTweets = () => {
     setTweetOffset((prev) => prev + tweetsPerPage)
   }
 
   const refreshLatestTweets = async () => {
-    setTweetOffset(0)
-    await refetchTweets()
-  }
-
-  // LocalStorage key for banner dismissal
-  const BANNER_DISMISSED_KEY = 'stream-monitor-banner-dismissed'
-  const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000
-
-  useEffect(() => {
-    const twoWeeksMs = TWO_WEEKS_MS
-    const dismissedAt = localStorage.getItem(BANNER_DISMISSED_KEY)
-    if (dismissedAt) {
-      const dismissedTime = parseInt(dismissedAt, 10)
-      if (Date.now() - dismissedTime < twoWeeksMs) {
-        setShowBanner(false)
-      } else {
-        localStorage.removeItem(BANNER_DISMISSED_KEY)
-      }
+    if (tweetOffset === 0) {
+      await refetchTweets()
+    } else {
+      // Mark the first page stale before switching back to it. Refetching here
+      // would use the old offset and request another later page instead.
+      await queryClient.invalidateQueries({
+        queryKey: ['streamMonitorTweets', 0],
+        exact: true,
+        refetchType: 'none',
+      })
+      setTweetOffset(0)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleDismissBanner = () => {
-    localStorage.setItem(BANNER_DISMISSED_KEY, Date.now().toString())
-    setShowBanner(false)
   }
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-8">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h1 className="mb-2 text-3xl font-bold text-foreground">
               Stream Monitor
@@ -293,42 +324,9 @@ const StreamMonitor = () => {
         </div>
       </div>
 
-      {/* Compact call-to-action banner */}
-      {showBanner && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted p-4">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <span className="flex-shrink-0 text-xl">📡</span>
-              <p className="truncate text-sm text-brand">
-                Help grow the archive! Opt in and install the extension to
-                stream tweets.
-              </p>
-            </div>
-            <div className="flex flex-shrink-0 items-center gap-2">
-              <Link href="/">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-brand text-brand hover:bg-brand/10 dark:border-border dark:text-brand dark:hover:bg-brand/90"
-                >
-                  Get Started
-                </Button>
-              </Link>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-brand hover:text-brand"
-                onClick={handleDismissBanner}
-              >
-                <X className="h-4 w-4" />
-                <span className="sr-only">Dismiss</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ExtensionInstallPrompt surface="stream-monitor" className="mb-6" />
 
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
@@ -344,21 +342,41 @@ const StreamMonitor = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-brand">
-              {getTotalTweets().toLocaleString()}
+              {formatMetric(scrapingStats?.summary?.totalTweets)}
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Average per period</CardTitle>
+            <CardTitle className="text-base">
+              Average per {averageUnit}
+            </CardTitle>
             <CardDescription>
               {showStreamedOnly ? 'Mean streaming rate' : 'Mean tweet rate'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {getAverageTweetsPerPeriod().toLocaleString()}
+              {formatMetric(scrapingStats?.summary?.avgTweetsPerPeriod)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Streaming contributors</CardTitle>
+            <CardDescription>
+              Distinct extension users in time range
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              {contributorCountLoading
+                ? '...'
+                : contributorCountError
+                  ? 'Unavailable'
+                  : contributorCount?.toLocaleString()}
             </div>
           </CardContent>
         </Card>
@@ -376,7 +394,7 @@ const StreamMonitor = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {sourceMetricLoading ? '...' : sourceMetric}
+              {formatMetric(sourceMetric)}
             </div>
           </CardContent>
         </Card>
@@ -384,7 +402,7 @@ const StreamMonitor = () => {
 
       <Card className="mb-8">
         <CardHeader>
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <CardTitle>
                 {showStreamedOnly
@@ -394,13 +412,19 @@ const StreamMonitor = () => {
               <CardDescription>{getTimeRangeLabel()}</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handlePrevious}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrevious}
+                aria-label="Previous time period"
+              >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleNext}
+                aria-label="Next time period"
                 disabled={timeOffset === 0}
               >
                 <ChevronRight className="h-4 w-4" />
@@ -410,7 +434,7 @@ const StreamMonitor = () => {
           <Tabs
             value={viewMode}
             onValueChange={(v) => {
-              setViewMode(v as any)
+              setViewMode(v as ViewMode)
               setTimeOffset(0)
             }}
           >
@@ -467,9 +491,11 @@ const StreamMonitor = () => {
               onClick={refreshLatestTweets}
               variant="outline"
               size="sm"
-              disabled={tweetsLoading}
+              disabled={tweetsFetching}
             >
-              {tweetsLoading ? 'Refreshing...' : 'Refresh'}
+              {tweetsFetching && tweetOffset === 0
+                ? 'Refreshing...'
+                : 'Refresh'}
             </Button>
           </CardTitle>
           <CardDescription>
@@ -478,32 +504,46 @@ const StreamMonitor = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {tweetsLoading ? (
+          {tweetsLoading && loadedTweets.length === 0 ? (
             <div className="flex items-center justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-brand"></div>
             </div>
-          ) : tweetsError ? (
-            <div className="flex items-center justify-center py-8 text-red-600 dark:text-red-400">
-              Error loading tweets
-            </div>
           ) : (
             <>
-              <UnifiedTweetList
-                tweets={loadedTweets}
-                isLoading={false}
-                emptyMessage="No tweets available"
-                showCsvExport={true}
-                csvFilename="stream_monitor_tweets.csv"
-              />
+              {(!tweetsError || loadedTweets.length > 0) && (
+                <UnifiedTweetList
+                  tweets={loadedTweets}
+                  isLoading={false}
+                  emptyMessage="No tweets available"
+                  showCsvExport={true}
+                  csvFilename="stream_monitor_tweets.csv"
+                />
+              )}
 
-              {loadedTweets.length > 0 && (
+              {tweetsError && (
+                <p
+                  role="alert"
+                  className="pt-4 text-center text-red-600 dark:text-red-400"
+                >
+                  Could not load tweets. Please try again.
+                </p>
+              )}
+              {(tweetsError ||
+                tweetsLoading ||
+                tweetsData?.length === tweetsPerPage) && (
                 <div className="flex justify-center pt-4">
                   <Button
-                    onClick={loadMoreTweets}
+                    onClick={
+                      tweetsError ? () => void refetchTweets() : loadMoreTweets
+                    }
                     variant="outline"
-                    disabled={tweetsLoading}
+                    disabled={tweetsFetching}
                   >
-                    {tweetsLoading ? 'Loading...' : 'Load More'}
+                    {tweetsFetching
+                      ? 'Loading...'
+                      : tweetsError
+                        ? 'Retry loading tweets'
+                        : 'Load More'}
                   </Button>
                 </div>
               )}

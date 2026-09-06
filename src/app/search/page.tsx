@@ -1,7 +1,7 @@
 'use client'
 
 import AdvancedSearchForm from '@/components/AdvancedSearchForm'
-import TweetList from '@/components/TweetList'
+import dynamic from 'next/dynamic'
 import {
   FilterCriteria,
   type TweetSearchSort,
@@ -11,6 +11,12 @@ import { Search, SlidersHorizontal } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import { capturePostHogEvent } from '@/lib/posthog'
+import UserMatchResults from '@/components/UserMatchResults'
+
+const TweetList = dynamic(() => import('@/components/TweetList'), {
+  loading: () => <p role="status">Loading results…</p>,
+})
 
 const starterSearches = [
   { label: 'Open source', query: 'open source' },
@@ -57,6 +63,16 @@ function SearchPageContent() {
   }
 
   const handleSortChange = (sort: TweetSearchSort) => {
+    capturePostHogEvent('search_interface_action', {
+      action: 'result_sort_changed',
+      has_query: Boolean(cleanRawText),
+      active_filter_count: [
+        filterCriteria.fromUsername,
+        filterCriteria.replyToUsername,
+        filterCriteria.startDate,
+        filterCriteria.endDate,
+      ].filter(Boolean).length,
+    })
     const next = new URLSearchParams(normalizedSearchParams)
     if (sort === 'newest') next.delete('sort')
     else next.set('sort', sort)
@@ -104,21 +120,24 @@ function SearchPageContent() {
 
         <div className={hasSearch ? 'mt-5' : 'mt-10'}>
           {hasSearch ? (
-            <TweetList
-              key={tweetListKey}
-              filterCriteria={filterCriteria}
-              resultsHeading="Search results"
-              resultsDescription={searchDescription}
-              collapseLongTweets
-              compact
-              permalinkOrigin="search"
-              permalinkReturnTo={`/search?${tweetListKey}`}
-              onSearchSortChange={
-                canSortSearchResults ? handleSortChange : undefined
-              }
-            />
+            <>
+              <UserMatchResults query={cleanRawText} />
+              <TweetList
+                key={tweetListKey}
+                filterCriteria={filterCriteria}
+                resultsHeading="Search results"
+                resultsDescription={searchDescription}
+                collapseLongTweets
+                compact
+                permalinkOrigin="search"
+                permalinkReturnTo={`/search?${tweetListKey}`}
+                onSearchSortChange={
+                  canSortSearchResults ? handleSortChange : undefined
+                }
+              />
+            </>
           ) : (
-            <div className="rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center sm:px-10">
+            <div className="rounded-lg border border-dashed border-border bg-card px-6 py-10 text-center sm:px-10">
               <SlidersHorizontal className="mx-auto h-8 w-8 text-muted-foreground" />
               <h2 className="mt-4 text-2xl font-semibold text-foreground">
                 Start with a topic or phrase
@@ -132,6 +151,13 @@ function SearchPageContent() {
                   <Link
                     key={item.query}
                     href={`/search?q=${encodeURIComponent(item.query)}`}
+                    onClick={() =>
+                      capturePostHogEvent('search_interface_action', {
+                        action: 'starter_search_selected',
+                        has_query: false,
+                        active_filter_count: 0,
+                      })
+                    }
                     className="rounded-full border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
                   >
                     {item.label}

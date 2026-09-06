@@ -6,7 +6,6 @@ import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { createBrowserClient } from '@/utils/supabase'
 import { Upload, ExternalLink } from 'lucide-react'
 import { devLog } from '@/lib/devLog'
-import { handleFileUpload } from '@/lib/upload-archive/handleFileUpload'
 import { FileUploadDialog } from './file-upload-dialog'
 import { Archive } from '@/lib/types'
 import { calculateArchiveStats } from '@/lib/upload-archive/calculateArchiveStats'
@@ -102,6 +101,9 @@ export default function UploadArchiveSection() {
     setIsUploadProcessing(true)
 
     try {
+      const { handleFileUpload } = await import(
+        '@/lib/upload-archive/handleFileUpload'
+      )
       const uploadedArchive = await handleFileUpload(
         event,
         setIsUploadProcessing,
@@ -162,9 +164,9 @@ export default function UploadArchiveSection() {
         {steps.map((step) => (
           <div
             key={step.number}
-            className="rounded-xl border border-border bg-card p-6 text-center"
+            className="rounded-lg border border-border bg-card p-6 text-center"
           >
-            <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-muted text-lg font-bold text-brand">
+            <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-muted text-lg font-bold text-foreground">
               {step.number}
             </div>
             <h3 className="mb-2 font-semibold text-foreground">{step.title}</h3>
@@ -177,7 +179,7 @@ export default function UploadArchiveSection() {
                 href={step.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center text-sm text-brand hover:underline"
+                className="inline-flex items-center text-sm text-brand"
               >
                 {step.linkText}
                 <ExternalLink className="ml-1 h-3 w-3" />
@@ -189,7 +191,7 @@ export default function UploadArchiveSection() {
                 <Button
                   onClick={handleUploadClick}
                   disabled={isUploadProcessing}
-                  className="bg-green-600 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
+                  className="bg-brand text-brand-foreground hover:bg-brand/90"
                 >
                   <Upload className="mr-2 h-4 w-4" />
                   {isUploadProcessing ? 'Processing...' : 'Upload .zip'}
@@ -215,7 +217,7 @@ export default function UploadArchiveSection() {
           href="https://github.com/TheExGenesis/community-archive/blob/main/docs/archive_data.md"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-brand hover:underline"
+          className="text-brand"
         >
           what data we use
         </a>{' '}

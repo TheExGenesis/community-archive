@@ -34,7 +34,6 @@ tests/
 │       ├── generate-mock-archives.ts # Mock archive generators
 │       ├── test-db-utils.ts         # Database utilities
 │       ├── test-connection.js       # Connection validation
-│       ├── validate-test-structure.js # Structure validation
 │       ├── TESTING.md               # This file
 │       ├── README.md                # Fixtures documentation
 │       └── generated/               # Generated mock archives
@@ -62,18 +61,13 @@ Remote test URLs are accepted only when both URLs identify the same Supabase
 project. The known production project is always refused. Do not reuse the app's
 normal Supabase variables for these destructive integration tests.
 
-2. Generate mock archives:
-```bash
-pnpm dev:generate-mock-archives
-```
+2. The tests build their fixtures in memory; generating JSON files is not a
+prerequisite. For optional manual benchmark artifacts, see [README.md](README.md).
 
-3. Validate setup:
+3. Validate database connectivity:
 ```bash
 # Test database connectivity
 node tests/db-insertion/fixtures/test-connection.js
-
-# Validate test structure
-node tests/db-insertion/fixtures/validate-test-structure.js
 ```
 
 ### Running Tests
@@ -296,9 +290,6 @@ echo $TESTS_POSTGRES_CONNECTION_STRING
 ```bash
 # Regenerate all mock data
 npm run dev:generate-mock-archives
-
-# Validate test structure
-node tests/db-insertion/fixtures/validate-test-structure.js
 ```
 
 ### Debug Mode

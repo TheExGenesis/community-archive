@@ -42,8 +42,37 @@ export interface DigestPromptCorpusRow {
   tweet: PortalTweet
 }
 
+export interface DigestContinuityContext {
+  digestDate: string
+  executiveSummary: string[]
+  storyTitles: string[]
+  keywords: string[]
+}
+
 export function selectDailyDigestBangers(tweets: PortalTweet[]): PortalTweet[] {
   return tweets.filter((tweet) => (tweet.quoteCount ?? 0) >= 2).slice(0, 50)
+}
+
+export function fillDailyDigestCandidates(
+  bangers: PortalTweet[],
+  interactionRanked: PortalTweet[],
+  minimum = 10,
+): Array<{ tweet: PortalTweet; source: 'banger' | 'ca_interactions' }> {
+  const selected: Array<{
+    tweet: PortalTweet
+    source: 'banger' | 'ca_interactions'
+  }> = selectDailyDigestBangers(bangers).map((tweet) => ({
+    tweet,
+    source: 'banger',
+  }))
+  const seen = new Set(selected.map(({ tweet }) => tweet.id))
+  for (const tweet of interactionRanked) {
+    if (selected.length >= minimum) break
+    if (seen.has(tweet.id)) continue
+    seen.add(tweet.id)
+    selected.push({ tweet, source: 'ca_interactions' })
+  }
+  return selected
 }
 
 const cleanText = (value: unknown, max: number): string | null => {
@@ -280,6 +309,7 @@ export function renderDigestPrompt(
     windowStart: string
     windowEnd: string
     candidates: EnrichedDigestCandidate[]
+    priorDigests?: DigestContinuityContext[]
   },
 ): string {
   const corpus = buildDigestPromptCorpus(input.candidates)
@@ -297,7 +327,15 @@ export function renderDigestPrompt(
         ...(candidate
           ? {
               source_rank: candidate.sourceRank,
+              selection_source: candidate.source ?? 'banger',
+              authored_by_community_member:
+                candidate.communityAuthored === true,
               archived_ca_quote_count: candidate.tweet.quoteCount ?? 0,
+              archived_ca_reply_count: candidate.tweet.replyCount ?? 0,
+              archived_ca_interaction_count:
+                candidate.tweet.interactionCount ??
+                candidate.tweet.quoteCount ??
+                0,
             }
           : {}),
         tweet: promptTweet(row.tweet),
@@ -306,11 +344,22 @@ export function renderDigestPrompt(
     null,
     2,
   )
-  return template
+  const rendered = template
     .replaceAll('{{digest_date}}', input.digestDate)
     .replaceAll('{{window_start}}', input.windowStart)
     .replaceAll('{{window_end}}', input.windowEnd)
     .replaceAll('{{candidate_json}}', candidateJson)
+
+  if (!input.priorDigests?.length) return rendered
+
+  const continuityContext = input.priorDigests.map((digest) => ({
+    digest_date: digest.digestDate,
+    executive_summary: digest.executiveSummary,
+    story_titles: digest.storyTitles,
+    keywords: digest.keywords,
+  }))
+
+  return `${rendered}\n\nPAST PUBLISHED DIGESTS (CONTINUITY CONTEXT)\n${JSON.stringify(continuityContext, null, 2)}\n\nUse this history only to preserve continuity, identify genuinely continuing threads, and avoid repetitive framing. Every factual claim and every selected tweet in today's digest must still be grounded in TODAY'S CURRENT CANDIDATE CORPUS above.`
 }
 
 export function renderDigestRevisionPrompt(input: {
@@ -353,13 +402,21 @@ export function assembleDigestEditionContent(input: {
       candidate,
     ]),
   )
+  const markCommunityAuthorship = (row: DigestPromptCorpusRow): PortalTweet => {
+    const isCommunityAuthored =
+      row.kind === 'banger' &&
+      enrichedByBanger.get(row.tweetId)?.candidate.communityAuthored === true
+    return isCommunityAuthored
+      ? { ...row.tweet, communityAuthored: true }
+      : row.tweet
+  }
   const slugCounts = new Map<string, number>()
 
   const stories: DigestStory[] = parsed.stories.map((story) => {
     const indexedTweets = story.tweetIndices.map((index) => corpus[index])
     const storyBangers = indexedTweets
       .filter(({ kind }) => kind === 'banger')
-      .map(({ tweet }) => tweet)
+      .map(markCommunityAuthorship)
     const storyCommentary = indexedTweets
       .filter(({ kind }) => kind !== 'banger')
       .map(({ tweet }) => tweet)
@@ -405,8 +462,9 @@ export function assembleDigestEditionContent(input: {
     }
   })
 
-  const topBanger = corpus[parsed.representativeTweetIndex]?.tweet
-  if (!topBanger) throw new Error('Digest has no representative tweet')
+  const topBangerRow = corpus[parsed.representativeTweetIndex]
+  if (!topBangerRow) throw new Error('Digest has no representative tweet')
+  const topBanger = markCommunityAuthorship(topBangerRow)
 
   return {
     digestDate: input.digestDate,

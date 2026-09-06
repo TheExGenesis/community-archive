@@ -56,4 +56,22 @@ describe('API middleware rate limits', () => {
     })
     expect(response.headers.get('Retry-After')).toBe('60')
   })
+
+  it('rate limits community submissions in their own tighter bucket', async () => {
+    const ip = '203.0.113.12'
+
+    for (let index = 0; index < 5; index += 1) {
+      await expect(
+        request('/api/community/submissions', ip, 'POST'),
+      ).resolves.toMatchObject({ status: 200 })
+    }
+
+    await expect(
+      request('/api/community/submissions', ip, 'POST'),
+    ).resolves.toMatchObject({ status: 429 })
+
+    await expect(request('/api/search', ip)).resolves.toMatchObject({
+      status: 200,
+    })
+  })
 })

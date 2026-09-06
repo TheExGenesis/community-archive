@@ -1,15 +1,21 @@
 import { createClient } from '@supabase/supabase-js'
 import * as dotenv from 'dotenv'
 import path from 'path'
-import { getArchiveTweetMedia } from '../src/lib/archiveMedia'
+import { createRequire } from 'node:module'
+const { getArchiveTweetMedia }: typeof import('../src/lib/archiveMedia') =
+  createRequire(import.meta.url)('../src/lib/archiveMedia.ts')
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
 
 const args = process.argv.slice(2)
-const apply = args.includes('--apply')
+if (args.includes('--apply')) {
+  throw new Error(
+    'Historical writes are disabled: media repair must use the current canonical ingestion and consent gates.',
+  )
+}
 const limitArg = args.find((arg) => arg.startsWith('--limit='))
 const usernameArg = args.find((arg) => arg.startsWith('--username='))
-const limit = limitArg ? Number(limitArg.slice('--limit='.length)) : undefined
+const limit = limitArg ? Number(limitArg.slice('--limit='.length)) : 10
 const requestedUsername = usernameArg?.slice('--username='.length).toLowerCase()
 
 if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
@@ -69,15 +75,17 @@ function expectedMediaRows(archive: any, archiveUploadId: number): RepairRow[] {
       const mediaUrl = media.media_url_https || media.media_url
       if (!mediaId || !mediaUrl) return []
 
-      return [{
-        tweet_id: tweetId,
-        media_id: String(mediaId),
-        media_url: mediaUrl,
-        media_type: media.type || 'photo',
-        width: media.sizes?.large?.w || 0,
-        height: media.sizes?.large?.h || 0,
-        archive_upload_id: archiveUploadId,
-      }]
+      return [
+        {
+          tweet_id: tweetId,
+          media_id: String(mediaId),
+          media_url: mediaUrl,
+          media_type: media.type || 'photo',
+          width: media.sizes?.large?.w || 0,
+          height: media.sizes?.large?.h || 0,
+          archive_upload_id: archiveUploadId,
+        },
+      ]
     })
   })
 }
@@ -91,7 +99,10 @@ async function missingRows(expected: RepairRow[]): Promise<RepairRow[]> {
     const { data, error } = await supabase
       .from('tweet_media')
       .select('media_id')
-      .in('media_id', batch.map((row) => row.media_id))
+      .in(
+        'media_id',
+        batch.map((row) => row.media_id),
+      )
     if (error) throw error
     for (const row of data ?? []) existing.add(String(row.media_id))
   }
@@ -104,9 +115,7 @@ async function main() {
   let candidateTweets = 0
   let candidateMedia = 0
 
-  console.log(
-    `${apply ? 'APPLY' : 'DRY RUN'}: checking ${uploads.length} completed archive(s)`,
-  )
+  console.log(`DRY RUN: checking ${uploads.length} completed archive(s)`)
 
   for (const upload of uploads) {
     const username = upload.username.toLowerCase()
@@ -131,21 +140,18 @@ async function main() {
     const tweetCount = new Set(missing.map((row) => row.tweet_id)).size
     candidateTweets += tweetCount
     candidateMedia += missing.length
-    console.log(`${username}: ${missing.length} missing media row(s) on ${tweetCount} tweet(s)`)
-
-    if (apply) {
-      const { error: upsertError } = await supabase
-        .from('tweet_media')
-        .upsert(missing, { onConflict: 'media_id' })
-      if (upsertError) throw upsertError
-    }
+    console.log(
+      `${username}: ${missing.length} missing media row(s) on ${tweetCount} tweet(s)`,
+    )
   }
 
   console.log(
-    `${apply ? 'Repaired' : 'Found'} ${candidateMedia} media row(s) on ${candidateTweets} tweet(s)`,
+    `Found ${candidateMedia} media row(s) on ${candidateTweets} tweet(s)`,
   )
-  if (!apply && candidateMedia) {
-    console.log('Re-run with --apply after reviewing this audit to insert only missing rows.')
+  if (candidateMedia) {
+    console.log(
+      'Historical repair requires a separately reviewed canonical ingestion replay with current consent checks.',
+    )
   }
 }
 

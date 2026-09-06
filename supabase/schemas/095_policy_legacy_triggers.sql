@@ -1,0 +1,3 @@
+-- Durable JSON producers must consume the same policy-safe input used by the
+-- PostgreSQL and ClickHouse sinks. Database-wide JSON scans are intentionally
+-- not attached to insert/update operations.

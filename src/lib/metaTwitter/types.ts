@@ -66,7 +66,14 @@ export interface ProfileHeaderData {
   is_opted_in: boolean
   bio: string | null
   website: string | null
+  profile_links?: ResolvedProfileLink[]
   location: string | null
   avatar_media_url: string | null
   header_media_url: string | null
+}
+
+export interface ResolvedProfileLink {
+  original_url: string
+  expanded_url: string
+  display_url: string
 }

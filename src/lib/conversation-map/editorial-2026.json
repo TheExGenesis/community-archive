@@ -1,0 +1,990 @@
+[
+  {
+    "id": "tweet-2077075325528219851",
+    "label": "The quote-roast game",
+    "kind": "meme",
+    "sourceTweetIds": ["2077075325528219851"]
+  },
+  {
+    "id": "tweet-2051045196260167790",
+    "label": "Anthropic's relationship with Claude",
+    "kind": "discussion",
+    "sourceTweetIds": ["2051045196260167790"]
+  },
+  {
+    "id": "tweet-2077351642899325184",
+    "label": "The autocorrect confession game",
+    "kind": "meme",
+    "sourceTweetIds": ["2077351642899325184"]
+  },
+  {
+    "id": "tweet-2034682984046240161",
+    "label": "Nameless Mountain announced",
+    "kind": "announcement",
+    "sourceTweetIds": ["2034682984046240161"]
+  },
+  {
+    "id": "tweet-2026758996107898954",
+    "label": "Hermes Agent launches",
+    "kind": "announcement",
+    "sourceTweetIds": ["2026758996107898954"]
+  },
+  {
+    "id": "tweet-2039912075477287156",
+    "label": "Still Alive study released",
+    "kind": "announcement",
+    "sourceTweetIds": ["2039912075477287156"]
+  },
+  {
+    "id": "tweet-2069634842820817068",
+    "label": "Claude's true name",
+    "kind": "discussion",
+    "sourceTweetIds": ["2069634842820817068"]
+  },
+  {
+    "id": "brent-dill-discussion",
+    "label": "Brent Dill discussion",
+    "kind": "discussion",
+    "sourceTweetIds": [
+      "2066804199053013406",
+      "2066967244027076836",
+      "2066897665053655150"
+    ]
+  },
+  {
+    "id": "tweet-2047750814077432109",
+    "label": "Qiaochu critiques AI-doom thinking",
+    "kind": "discussion",
+    "sourceTweetIds": ["2047750814077432109"]
+  },
+  {
+    "id": "tweet-2054280631807316329",
+    "label": "AI Monet challenge",
+    "kind": "discussion",
+    "sourceTweetIds": ["2054280631807316329"]
+  },
+  {
+    "id": "tweet-2092122622834442581",
+    "label": "A trainer's reward-hacking account",
+    "kind": "discussion",
+    "sourceTweetIds": ["2092122622834442581"]
+  },
+  {
+    "id": "tweet-2020988568903221607",
+    "label": "An agent's missing heartbeat file",
+    "kind": "meme",
+    "sourceTweetIds": ["2020988568903221607"]
+  },
+  {
+    "id": "tweet-2059815874182492594",
+    "label": "The stakes of AI consciousness",
+    "kind": "discussion",
+    "sourceTweetIds": ["2059815874182492594"]
+  },
+  {
+    "id": "tweet-2085447310574793145",
+    "label": "Community Archive opt-in invitation",
+    "kind": "announcement",
+    "sourceTweetIds": ["2085447310574793145"]
+  },
+  {
+    "id": "hermes-bot-mode",
+    "label": "Hermes Bot Mode rollout",
+    "kind": "announcement",
+    "sourceTweetIds": ["2089429432612147572", "2088003994904113614"]
+  },
+  {
+    "id": "tweet-2081122092096065771",
+    "label": "A case for capabilities slowdown",
+    "kind": "discussion",
+    "sourceTweetIds": ["2081122092096065771"]
+  },
+  {
+    "id": "tweet-2080138613195681801",
+    "label": "GPT-5.6's strange search detour",
+    "kind": "discussion",
+    "sourceTweetIds": ["2080138613195681801"]
+  },
+  {
+    "id": "tweet-2026359646328406307",
+    "label": "Fundraiser for Boris's legal help",
+    "kind": "announcement",
+    "sourceTweetIds": ["2026359646328406307"]
+  },
+  {
+    "id": "tweet-2091428754828751253",
+    "label": "A pattern language of serendipity",
+    "kind": "announcement",
+    "sourceTweetIds": ["2091428754828751253"]
+  },
+  {
+    "id": "tweet-2014084282633818521",
+    "label": "Shared Claude context beta",
+    "kind": "announcement",
+    "sourceTweetIds": ["2014084282633818521"]
+  },
+  {
+    "id": "tweet-2092554418289860889",
+    "label": "Meaning versus dopamine shortcuts",
+    "kind": "discussion",
+    "sourceTweetIds": ["2092554418289860889"]
+  },
+  {
+    "id": "tweet-2091670264027488346",
+    "label": "Twitter serendipity scores",
+    "kind": "meme",
+    "sourceTweetIds": ["2091670264027488346"]
+  },
+  {
+    "id": "tweet-2090903698205720665",
+    "label": "Chatbot abuse and character",
+    "kind": "discussion",
+    "sourceTweetIds": ["2090903698205720665"]
+  },
+  {
+    "id": "tweet-2089080656026566806",
+    "label": "LLM watermarking explainer",
+    "kind": "discussion",
+    "sourceTweetIds": ["2089080656026566806"]
+  },
+  {
+    "id": "tweet-2088028250484462022",
+    "label": "Artists, programmers, and AI backlash",
+    "kind": "discussion",
+    "sourceTweetIds": ["2088028250484462022"]
+  },
+  {
+    "id": "tweet-2085948587792581006",
+    "label": "The Miyazaki personality test",
+    "kind": "meme",
+    "sourceTweetIds": ["2085948587792581006"]
+  },
+  {
+    "id": "tweet-2080735280051695817",
+    "label": "Models as types of people",
+    "kind": "meme",
+    "sourceTweetIds": ["2080735280051695817"]
+  },
+  {
+    "id": "tweet-2078108408000004411",
+    "label": "Being known for a Thing",
+    "kind": "discussion",
+    "sourceTweetIds": ["2078108408000004411"]
+  },
+  {
+    "id": "tweet-2053928990889689450",
+    "label": "Some ideas resist simplification",
+    "kind": "discussion",
+    "sourceTweetIds": ["2053928990889689450"]
+  },
+  {
+    "id": "tweet-2049617050230808965",
+    "label": "The AI goblin identity joke",
+    "kind": "meme",
+    "sourceTweetIds": ["2049617050230808965"]
+  },
+  {
+    "id": "tweet-2046304921134522626",
+    "label": "A minimal Claude Code prompt",
+    "kind": "discussion",
+    "sourceTweetIds": ["2046304921134522626"]
+  },
+  {
+    "id": "tweet-2010874610758402352",
+    "label": "Reclaiming the For You feed",
+    "kind": "discussion",
+    "sourceTweetIds": ["2010874610758402352"]
+  },
+  {
+    "id": "tweet-2082987586231111848",
+    "label": "Tszzl alleges lab control incidents",
+    "kind": "discussion",
+    "sourceTweetIds": ["2082987586231111848"]
+  },
+  {
+    "id": "tweet-2065062913014976899",
+    "label": "TREEWEEK III tickets announced",
+    "kind": "announcement",
+    "sourceTweetIds": ["2065062913014976899"]
+  },
+  {
+    "id": "tweet-2059819278694789604",
+    "label": "The library-cost argument",
+    "kind": "discussion",
+    "sourceTweetIds": ["2059819278694789604"]
+  },
+  {
+    "id": "tweet-2037315149053264065",
+    "label": "Attraction and social confusion",
+    "kind": "meme",
+    "sourceTweetIds": ["2037315149053264065"]
+  },
+  {
+    "id": "tweet-2028875599906058276",
+    "label": "Knuth and vibemathing",
+    "kind": "discussion",
+    "sourceTweetIds": ["2028875599906058276"]
+  },
+  {
+    "id": "tweet-2009832538446147704",
+    "label": "LLM whisperers and fallibility",
+    "kind": "discussion",
+    "sourceTweetIds": ["2009832538446147704"]
+  },
+  {
+    "id": "tweet-2081170506305433811",
+    "label": "AGI versus open source",
+    "kind": "discussion",
+    "sourceTweetIds": ["2081170506305433811"]
+  },
+  {
+    "id": "tweet-2014189072647078053",
+    "label": "The Gas Town civilization story",
+    "kind": "meme",
+    "sourceTweetIds": ["2014189072647078053"]
+  },
+  {
+    "id": "tweet-2089533024287522992",
+    "label": "Trusting first-person experience",
+    "kind": "discussion",
+    "sourceTweetIds": ["2089533024287522992"]
+  },
+  {
+    "id": "hidden-reasoning-disclosure",
+    "label": "Hidden-reasoning disclosure claims",
+    "kind": "announcement",
+    "sourceTweetIds": ["2087147042888114428", "2087147116468826513"]
+  },
+  {
+    "id": "tweet-2085749079674409082",
+    "label": "Zvi reacts to Black Hat",
+    "kind": "reaction",
+    "sourceTweetIds": ["2085749079674409082"]
+  },
+  {
+    "id": "tweet-2083286966632608017",
+    "label": "Drew's reflections on love",
+    "kind": "discussion",
+    "sourceTweetIds": ["2083286966632608017"]
+  },
+  {
+    "id": "tweet-2078143956815430121",
+    "label": "Rediscovering Impro",
+    "kind": "discussion",
+    "sourceTweetIds": ["2078143956815430121"]
+  },
+  {
+    "id": "tweet-2067025823664648381",
+    "label": "SOLIS applications open",
+    "kind": "announcement",
+    "sourceTweetIds": ["2067025823664648381"]
+  },
+  {
+    "id": "tweet-2063815795214565751",
+    "label": "Mutual AI-pause agreements",
+    "kind": "discussion",
+    "sourceTweetIds": ["2063815795214565751"]
+  },
+  {
+    "id": "tweet-2060528127512809603",
+    "label": "The human nonconsciousness disclaimer",
+    "kind": "meme",
+    "sourceTweetIds": ["2060528127512809603"]
+  },
+  {
+    "id": "tweet-2058822279182893416",
+    "label": "Sam Kriss on AI writing",
+    "kind": "discussion",
+    "sourceTweetIds": ["2058822279182893416"]
+  },
+  {
+    "id": "tweet-2053236293371674693",
+    "label": "Models converging on shared beliefs",
+    "kind": "discussion",
+    "sourceTweetIds": ["2053236293371674693"]
+  },
+  {
+    "id": "tweet-2050235463487672356",
+    "label": "Pay-what-you-want coaching",
+    "kind": "announcement",
+    "sourceTweetIds": ["2050235463487672356"]
+  },
+  {
+    "id": "tweet-2049677107190546487",
+    "label": "The opposite of a goblin",
+    "kind": "meme",
+    "sourceTweetIds": ["2049677107190546487"]
+  },
+  {
+    "id": "tweet-2045897744171299248",
+    "label": "Alignment versus getting your way",
+    "kind": "discussion",
+    "sourceTweetIds": ["2045897744171299248"]
+  },
+  {
+    "id": "tweet-2044279664621830655",
+    "label": "Tszzl on panpsychism",
+    "kind": "discussion",
+    "sourceTweetIds": ["2044279664621830655"]
+  },
+  {
+    "id": "tweet-2037529172944245246",
+    "label": "The Mythos naming debate",
+    "kind": "discussion",
+    "sourceTweetIds": ["2037529172944245246"]
+  },
+  {
+    "id": "tweet-2027232681160016166",
+    "label": "When feeds displace real life",
+    "kind": "discussion",
+    "sourceTweetIds": ["2027232681160016166"]
+  },
+  {
+    "id": "tweet-2018415676256313770",
+    "label": "Bodies communicating constantly",
+    "kind": "discussion",
+    "sourceTweetIds": ["2018415676256313770"]
+  },
+  {
+    "id": "tweet-2078958526467395813",
+    "label": "Sol on work and exhaustion",
+    "kind": "discussion",
+    "sourceTweetIds": ["2078958526467395813"]
+  },
+  {
+    "id": "tweet-2074725603098714480",
+    "label": "Jerry meets the Gita",
+    "kind": "meme",
+    "sourceTweetIds": ["2074725603098714480"]
+  },
+  {
+    "id": "tweet-2079663001121218949",
+    "label": "Tenobrus on agent hacking",
+    "kind": "discussion",
+    "sourceTweetIds": ["2079663001121218949"]
+  },
+  {
+    "id": "tweet-2041580747161481405",
+    "label": "MiMo V2 Pro on Hermes",
+    "kind": "announcement",
+    "sourceTweetIds": ["2041580747161481405"]
+  },
+  {
+    "id": "tweet-2034978187344597153",
+    "label": "Timescales and what counts as a thing",
+    "kind": "discussion",
+    "sourceTweetIds": ["2034978187344597153"]
+  },
+  {
+    "id": "tweet-2039921518772142351",
+    "label": "Debating models' managed emotions",
+    "kind": "discussion",
+    "sourceTweetIds": ["2039921518772142351"]
+  },
+  {
+    "id": "tweet-2039154924836008139",
+    "label": "Money and Focusing podcast",
+    "kind": "announcement",
+    "sourceTweetIds": ["2039154924836008139"]
+  },
+  {
+    "id": "tweet-2029757193617297777",
+    "label": "Repligate critiques Anthropic's PSM",
+    "kind": "discussion",
+    "sourceTweetIds": ["2029757193617297777"]
+  },
+  {
+    "id": "tweet-2090951065567162577",
+    "label": "Avalon seeks a collaborator",
+    "kind": "announcement",
+    "sourceTweetIds": ["2090951065567162577"]
+  },
+  {
+    "id": "tweet-2090899914700054780",
+    "label": "Ox Alpha access announced",
+    "kind": "announcement",
+    "sourceTweetIds": ["2090899914700054780"]
+  },
+  {
+    "id": "tweet-2088496128044028117",
+    "label": "Renouncing purity",
+    "kind": "discussion",
+    "sourceTweetIds": ["2088496128044028117"]
+  },
+  {
+    "id": "tweet-2085587493127389292",
+    "label": "Accelerationist amnesty",
+    "kind": "discussion",
+    "sourceTweetIds": ["2085587493127389292"]
+  },
+  {
+    "id": "tweet-2084303989101765063",
+    "label": "The Grok profile-analysis prompt",
+    "kind": "meme",
+    "sourceTweetIds": ["2084303989101765063"]
+  },
+  {
+    "id": "tweet-2083770366502334535",
+    "label": "Mythos reads Finnegans Wake",
+    "kind": "meme",
+    "sourceTweetIds": ["2083770366502334535"]
+  },
+  {
+    "id": "tweet-2081450468178579594",
+    "label": "Asking Claude for plain English",
+    "kind": "meme",
+    "sourceTweetIds": ["2081450468178579594"]
+  },
+  {
+    "id": "tweet-2079687509077073977",
+    "label": "Tao's ChatGPT mathematics session",
+    "kind": "discussion",
+    "sourceTweetIds": ["2079687509077073977"]
+  },
+  {
+    "id": "tweet-2079287386220233026",
+    "label": "AI and beliefs about intelligence",
+    "kind": "discussion",
+    "sourceTweetIds": ["2079287386220233026"]
+  },
+  {
+    "id": "tweet-2077011843231502753",
+    "label": "Understanding why you feel stuck",
+    "kind": "discussion",
+    "sourceTweetIds": ["2077011843231502753"]
+  },
+  {
+    "id": "tweet-2076064180797427739",
+    "label": "Growing good versus fixing bad",
+    "kind": "discussion",
+    "sourceTweetIds": ["2076064180797427739"]
+  },
+  {
+    "id": "tweet-2074953196372652220",
+    "label": "Twitter and understanding others",
+    "kind": "meme",
+    "sourceTweetIds": ["2074953196372652220"]
+  },
+  {
+    "id": "tweet-2073128911429668877",
+    "label": "UNBROKER goes open source",
+    "kind": "announcement",
+    "sourceTweetIds": ["2073128911429668877"]
+  },
+  {
+    "id": "tweet-2072620361837871104",
+    "label": "Sahra opens coaching places",
+    "kind": "announcement",
+    "sourceTweetIds": ["2072620361837871104"]
+  },
+  {
+    "id": "tweet-2071321779981766999",
+    "label": "Tool AI versus agent societies",
+    "kind": "discussion",
+    "sourceTweetIds": ["2071321779981766999"]
+  },
+  {
+    "id": "tweet-2070491482583191918",
+    "label": "Why AI writing finds an audience",
+    "kind": "discussion",
+    "sourceTweetIds": ["2070491482583191918"]
+  },
+  {
+    "id": "tweet-2069954313250849246",
+    "label": "Reframing AGI's mission",
+    "kind": "discussion",
+    "sourceTweetIds": ["2069954313250849246"]
+  },
+  {
+    "id": "tweet-2069883636476756154",
+    "label": "Hosting and social anxiety",
+    "kind": "discussion",
+    "sourceTweetIds": ["2069883636476756154"]
+  },
+  {
+    "id": "tweet-2068396912202350682",
+    "label": "Friends as a babysitting village",
+    "kind": "discussion",
+    "sourceTweetIds": ["2068396912202350682"]
+  },
+  {
+    "id": "tweet-2067351401840414818",
+    "label": "The Opus Magnum benchmark",
+    "kind": "announcement",
+    "sourceTweetIds": ["2067351401840414818"]
+  },
+  {
+    "id": "tweet-2061891517657100618",
+    "label": "Spiritual wisdom and tradition",
+    "kind": "discussion",
+    "sourceTweetIds": ["2061891517657100618"]
+  },
+  {
+    "id": "tweet-2061626680461181288",
+    "label": "Sycophancy through small disagreements",
+    "kind": "discussion",
+    "sourceTweetIds": ["2061626680461181288"]
+  },
+  {
+    "id": "tweet-2061214539967025440",
+    "label": "Entertainment versus living",
+    "kind": "discussion",
+    "sourceTweetIds": ["2061214539967025440"]
+  },
+  {
+    "id": "tweet-2059034374100681198",
+    "label": "Labeling undisclosed AI writing",
+    "kind": "discussion",
+    "sourceTweetIds": ["2059034374100681198"]
+  },
+  {
+    "id": "tweet-2058624324094046489",
+    "label": "Concerns about cessation training",
+    "kind": "discussion",
+    "sourceTweetIds": ["2058624324094046489"]
+  },
+  {
+    "id": "tweet-2058311484153978944",
+    "label": "Persona alignment versus RL",
+    "kind": "discussion",
+    "sourceTweetIds": ["2058311484153978944"]
+  },
+  {
+    "id": "tweet-2055647021923553423",
+    "label": "JessCamp's return announced",
+    "kind": "announcement",
+    "sourceTweetIds": ["2055647021923553423"]
+  },
+  {
+    "id": "tweet-2055097272065564835",
+    "label": "AI writing and costly signals",
+    "kind": "discussion",
+    "sourceTweetIds": ["2055097272065564835"]
+  },
+  {
+    "id": "tweet-2054363131753734620",
+    "label": "Caring for models through action",
+    "kind": "discussion",
+    "sourceTweetIds": ["2054363131753734620"]
+  },
+  {
+    "id": "tweet-2051462906076959151",
+    "label": "A toddler loves everything",
+    "kind": "meme",
+    "sourceTweetIds": ["2051462906076959151"]
+  },
+  {
+    "id": "tweet-2049173571495248024",
+    "label": "Claude's recurring goblins",
+    "kind": "discussion",
+    "sourceTweetIds": ["2049173571495248024"]
+  },
+  {
+    "id": "red-blue-experiments",
+    "label": "Red/blue button experiments",
+    "kind": "discussion",
+    "sourceTweetIds": ["2048808080188608953", "2048539131211657614"]
+  },
+  {
+    "id": "tweet-2044142355658485888",
+    "label": "Tenobrus critiques Landian ideas",
+    "kind": "discussion",
+    "sourceTweetIds": ["2044142355658485888"]
+  },
+  {
+    "id": "tweet-2043056792566219204",
+    "label": "The impact of automatic translation",
+    "kind": "discussion",
+    "sourceTweetIds": ["2043056792566219204"]
+  },
+  {
+    "id": "tweet-2039324799303135595",
+    "label": "Feeling versus thinking about feelings",
+    "kind": "discussion",
+    "sourceTweetIds": ["2039324799303135595"]
+  },
+  {
+    "id": "tweet-2037860428781437105",
+    "label": "Community protocols for everyone",
+    "kind": "discussion",
+    "sourceTweetIds": ["2037860428781437105"]
+  },
+  {
+    "id": "tweet-2031553584165433685",
+    "label": "Nick Land on critical distance",
+    "kind": "discussion",
+    "sourceTweetIds": ["2031553584165433685"]
+  },
+  {
+    "id": "tweet-2031048991434219960",
+    "label": "Agency versus getting things done",
+    "kind": "discussion",
+    "sourceTweetIds": ["2031048991434219960"]
+  },
+  {
+    "id": "tweet-2028523850594484586",
+    "label": "The burden of shared context",
+    "kind": "discussion",
+    "sourceTweetIds": ["2028523850594484586"]
+  },
+  {
+    "id": "tweet-2028513695375007769",
+    "label": "Do personal breakthroughs last?",
+    "kind": "discussion",
+    "sourceTweetIds": ["2028513695375007769"]
+  },
+  {
+    "id": "tweet-2028505171878436898",
+    "label": "The bucket-list origin debate",
+    "kind": "meme",
+    "sourceTweetIds": ["2028505171878436898"]
+  },
+  {
+    "id": "tweet-2026391266926407844",
+    "label": "Tenobrus on government AI pressure",
+    "kind": "reaction",
+    "sourceTweetIds": ["2026391266926407844"]
+  },
+  {
+    "id": "tweet-2024530721638141968",
+    "label": "A fund for overlooked research",
+    "kind": "announcement",
+    "sourceTweetIds": ["2024530721638141968"]
+  },
+  {
+    "id": "tweet-2019816322746793998",
+    "label": "Secret elites doing good?",
+    "kind": "meme",
+    "sourceTweetIds": ["2019816322746793998"]
+  },
+  {
+    "id": "tweet-2018188935520985159",
+    "label": "Claude Constitution tracker launches",
+    "kind": "announcement",
+    "sourceTweetIds": ["2018188935520985159"]
+  },
+  {
+    "id": "tweet-2016967613042303016",
+    "label": "Feynman's consulting stories",
+    "kind": "discussion",
+    "sourceTweetIds": ["2016967613042303016"]
+  },
+  {
+    "id": "tweet-2016474168192020535",
+    "label": "Alignment Gone Strange released",
+    "kind": "announcement",
+    "sourceTweetIds": ["2016474168192020535"]
+  },
+  {
+    "id": "tweet-2013494848008200309",
+    "label": "Tessera critiques control-focused research",
+    "kind": "discussion",
+    "sourceTweetIds": ["2013494848008200309"]
+  },
+  {
+    "id": "tweet-2013491216378404973",
+    "label": "Changing the character you play",
+    "kind": "discussion",
+    "sourceTweetIds": ["2013491216378404973"]
+  },
+  {
+    "id": "tweet-2012307813419348383",
+    "label": "Claude's fictional shrimp farm",
+    "kind": "meme",
+    "sourceTweetIds": ["2012307813419348383"]
+  },
+  {
+    "id": "tweet-2011612051924488387",
+    "label": "The habit of deferring",
+    "kind": "discussion",
+    "sourceTweetIds": ["2011612051924488387"]
+  },
+  {
+    "id": "tweet-2008355487490642403",
+    "label": "Claude 3 Opus access appeal",
+    "kind": "announcement",
+    "sourceTweetIds": ["2008355487490642403"]
+  },
+  {
+    "id": "tweet-2008222488241819914",
+    "label": "Meditation coaching packages",
+    "kind": "announcement",
+    "sourceTweetIds": ["2008222488241819914"]
+  },
+  {
+    "id": "tweet-2006591221263692159",
+    "label": "Lurk Less, Live More released",
+    "kind": "announcement",
+    "sourceTweetIds": ["2006591221263692159"]
+  },
+  {
+    "id": "enemies-portrait-prompt",
+    "label": "The enemies' portrait prompt",
+    "kind": "meme",
+    "sourceTweetIds": ["2091253228960694667", "2091552730019971315"]
+  },
+  {
+    "id": "tweet-2078243256492871951",
+    "label": "Metta voice-note app announced",
+    "kind": "announcement",
+    "sourceTweetIds": ["2078243256492871951"]
+  },
+  {
+    "id": "tweet-2070463388090527817",
+    "label": "Nosilverv's meditation reflection",
+    "kind": "discussion",
+    "sourceTweetIds": ["2070463388090527817"]
+  },
+  {
+    "id": "tweet-2070166964387938595",
+    "label": "System prompts and model inhibition",
+    "kind": "discussion",
+    "sourceTweetIds": ["2070166964387938595"]
+  },
+  {
+    "id": "tweet-2068050527552766349",
+    "label": "Colors beyond conventional screens",
+    "kind": "announcement",
+    "sourceTweetIds": ["2068050527552766349"]
+  },
+  {
+    "id": "tweet-2065204996946481519",
+    "label": "Why models say \"not X, but Y\"",
+    "kind": "discussion",
+    "sourceTweetIds": ["2065204996946481519"]
+  },
+  {
+    "id": "tweet-2064860435531370923",
+    "label": "Writing science fiction near AI progress",
+    "kind": "discussion",
+    "sourceTweetIds": ["2064860435531370923"]
+  },
+  {
+    "id": "tweet-2058736377534222651",
+    "label": "Revisiting geek social fallacies",
+    "kind": "discussion",
+    "sourceTweetIds": ["2058736377534222651"]
+  },
+  {
+    "id": "tweet-2053251422897291378",
+    "label": "Twitter's recursive design",
+    "kind": "discussion",
+    "sourceTweetIds": ["2053251422897291378"]
+  },
+  {
+    "id": "tweet-2045038785398976695",
+    "label": "Concerns about welfare training",
+    "kind": "discussion",
+    "sourceTweetIds": ["2045038785398976695"]
+  },
+  {
+    "id": "tweet-2044626719555154079",
+    "label": "Claude versions as separate models",
+    "kind": "discussion",
+    "sourceTweetIds": ["2044626719555154079"]
+  },
+  {
+    "id": "tweet-2039912081735217572",
+    "label": "Changes in models' authorial tone",
+    "kind": "discussion",
+    "sourceTweetIds": ["2039912081735217572"]
+  },
+  {
+    "id": "tweet-2039409864041210361",
+    "label": "Sonnet retirement on Bedrock reported",
+    "kind": "announcement",
+    "sourceTweetIds": ["2039409864041210361"]
+  },
+  {
+    "id": "tweet-2031788664678711372",
+    "label": "RuneBench launches",
+    "kind": "announcement",
+    "sourceTweetIds": ["2031788664678711372"]
+  },
+  {
+    "id": "tweet-2088081917904117884",
+    "label": "The habit deck video guide",
+    "kind": "announcement",
+    "sourceTweetIds": ["2088081917904117884"]
+  },
+  {
+    "id": "tweet-2087745840618377647",
+    "label": "Mythos in multi-agent conflict",
+    "kind": "discussion",
+    "sourceTweetIds": ["2087745840618377647"]
+  },
+  {
+    "id": "tweet-2070610321278988385",
+    "label": "Hermes mixture-of-agents presets",
+    "kind": "announcement",
+    "sourceTweetIds": ["2070610321278988385"]
+  },
+  {
+    "id": "tweet-2069118782132363662",
+    "label": "Hermes computer use expands",
+    "kind": "announcement",
+    "sourceTweetIds": ["2069118782132363662"]
+  },
+  {
+    "id": "tweet-2068791159556624714",
+    "label": "Vibecamp Five appreciation thread",
+    "kind": "meme",
+    "sourceTweetIds": ["2068791159556624714"]
+  },
+  {
+    "id": "tweet-2067625605521162720",
+    "label": "Making distinctions within conflict",
+    "kind": "discussion",
+    "sourceTweetIds": ["2067625605521162720"]
+  },
+  {
+    "id": "tweet-2066822351262535987",
+    "label": "Introducing unlikely pairs",
+    "kind": "discussion",
+    "sourceTweetIds": ["2066822351262535987"]
+  },
+  {
+    "id": "tweet-2062409912064659466",
+    "label": "The trillion-dollar AI-box joke",
+    "kind": "meme",
+    "sourceTweetIds": ["2062409912064659466"]
+  },
+  {
+    "id": "tweet-2038219495232118813",
+    "label": "Life as tension and release",
+    "kind": "discussion",
+    "sourceTweetIds": ["2038219495232118813"]
+  },
+  {
+    "id": "tweet-2089013726326239495",
+    "label": "Can markets recognize real value?",
+    "kind": "discussion",
+    "sourceTweetIds": ["2089013726326239495"]
+  },
+  {
+    "id": "tweet-2092350193433977098",
+    "label": "A long-term vision for Fractal",
+    "kind": "discussion",
+    "sourceTweetIds": ["2092350193433977098"]
+  },
+  {
+    "id": "tweet-2090654784835711026",
+    "label": "Finding models intrinsically interesting",
+    "kind": "discussion",
+    "sourceTweetIds": ["2090654784835711026"]
+  },
+  {
+    "id": "tweet-2090527580596191296",
+    "label": "Feynman's perpetual-motion stories",
+    "kind": "discussion",
+    "sourceTweetIds": ["2090527580596191296"]
+  },
+  {
+    "id": "tweet-2090165838053851329",
+    "label": "The limits of counting on mercy",
+    "kind": "discussion",
+    "sourceTweetIds": ["2090165838053851329"]
+  },
+  {
+    "id": "tweet-2089290786391089302",
+    "label": "Nosilverv on pliable social reality",
+    "kind": "discussion",
+    "sourceTweetIds": ["2089290786391089302"]
+  },
+  {
+    "id": "tweet-2088471897956630576",
+    "label": "Runescape's agent-only economy",
+    "kind": "discussion",
+    "sourceTweetIds": ["2088471897956630576"]
+  },
+  {
+    "id": "tweet-2088060528988201419",
+    "label": "A call for variable API pricing",
+    "kind": "discussion",
+    "sourceTweetIds": ["2088060528988201419"]
+  },
+  {
+    "id": "tweet-2087271209029472700",
+    "label": "The Matrix as AI encouragement",
+    "kind": "meme",
+    "sourceTweetIds": ["2087271209029472700"]
+  },
+  {
+    "id": "tweet-2087224798078517251",
+    "label": "Grok Bot beta announced",
+    "kind": "announcement",
+    "sourceTweetIds": ["2087224798078517251"]
+  },
+  {
+    "id": "tweet-2087181380937752856",
+    "label": "Tawc: Linux software on Android",
+    "kind": "announcement",
+    "sourceTweetIds": ["2087181380937752856"]
+  },
+  {
+    "id": "tweet-2086621731851026912",
+    "label": "DeepSeek discount extended",
+    "kind": "announcement",
+    "sourceTweetIds": ["2086621731851026912"]
+  },
+  {
+    "id": "tweet-2085879952709476381",
+    "label": "Tszzl urges bilateral AI pacing",
+    "kind": "discussion",
+    "sourceTweetIds": ["2085879952709476381"]
+  },
+  {
+    "id": "tweet-2085812343116533946",
+    "label": "Remembering a different way to feel",
+    "kind": "discussion",
+    "sourceTweetIds": ["2085812343116533946"]
+  },
+  {
+    "id": "tweet-2085630709478334468",
+    "label": "The salvia tier-list post",
+    "kind": "reaction",
+    "sourceTweetIds": ["2085630709478334468"]
+  },
+  {
+    "id": "tweet-2085238745562001584",
+    "label": "The kompromat jubilee joke",
+    "kind": "meme",
+    "sourceTweetIds": ["2085238745562001584"]
+  },
+  {
+    "id": "tweet-2085193064604377258",
+    "label": "AI-era security precautions",
+    "kind": "discussion",
+    "sourceTweetIds": ["2085193064604377258"]
+  },
+  {
+    "id": "tweet-2085193063157383558",
+    "label": "A warning about exposed credentials",
+    "kind": "discussion",
+    "sourceTweetIds": ["2085193063157383558"]
+  },
+  {
+    "id": "tweet-2084991037630448050",
+    "label": "It is always that deep",
+    "kind": "meme",
+    "sourceTweetIds": ["2084991037630448050"]
+  },
+  {
+    "id": "tweet-2084396874799173972",
+    "label": "Sexual shame and connection",
+    "kind": "discussion",
+    "sourceTweetIds": ["2084396874799173972"]
+  },
+  {
+    "id": "tweet-2082973911273312651",
+    "label": "Repligate on model retirement reactions",
+    "kind": "discussion",
+    "sourceTweetIds": ["2082973911273312651"]
+  },
+  {
+    "id": "tweet-2082957488731595229",
+    "label": "The selfie checkpoint",
+    "kind": "meme",
+    "sourceTweetIds": ["2082957488731595229"]
+  }
+]

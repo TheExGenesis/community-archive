@@ -1,7 +1,8 @@
 import ClassicHomepage from '@/components/home/ClassicHomepage'
+import HomepagePeople from '@/components/home/HomepagePeople'
 import { hasPendingOptInAction } from '@/lib/homepageAccess'
 import { getIsMember } from '@/lib/portal/auth'
-import { getPortalData } from '@/lib/portal/data'
+import { startHomepageData } from '@/lib/portal/data'
 
 // The first request after a daily analytics-cache rollover builds the bounded
 // ClickHouse snapshot; subsequent homepage requests reuse the shared Data Cache.
@@ -20,12 +21,18 @@ interface HomepageProps {
 }
 
 export default async function Homepage({ searchParams }: HomepageProps = {}) {
-  const [isMember, data] = await Promise.all([getIsMember(), getPortalData()])
+  // Start the heavier portal request immediately, but do not hold the hero or
+  // curated people behind it. ClassicHomepage streams the data-dependent
+  // regions through their own Suspense boundaries.
+  const data = startHomepageData()
+  const isMember = await getIsMember()
+
   return (
     <ClassicHomepage
       data={data}
       isMember={isMember}
       showCta={!isMember || hasPendingOptInAction(searchParams?.action)}
+      homepagePeople={<HomepagePeople />}
     />
   )
 }

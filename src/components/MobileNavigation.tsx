@@ -12,8 +12,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-import { isNavItemActive, NavItem } from '@/lib/navigation'
+import {
+  isNavItemActive,
+  navAnalyticsDestination,
+  NavItem,
+} from '@/lib/navigation'
 import { cn } from '@/utils/tailwind'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 export default function MobileNavigation({ items }: { items: NavItem[] }) {
   const pathname = usePathname()
@@ -41,12 +46,16 @@ export default function MobileNavigation({ items }: { items: NavItem[] }) {
             <DropdownMenuItem key={item.href} asChild>
               <Link
                 href={item.href}
+                onClick={() =>
+                  capturePostHogEvent('navigation_item_clicked', {
+                    destination: navAnalyticsDestination(item.href),
+                    surface: 'mobile',
+                    already_active: isActive,
+                  })
+                }
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'cursor-pointer py-2.5',
-                  item.tone === 'muted'
-                    ? 'bg-muted/70 text-muted-foreground focus:bg-muted focus:text-foreground'
-                    : '',
                   isActive ? 'bg-muted font-medium' : '',
                 )}
               >

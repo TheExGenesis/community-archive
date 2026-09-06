@@ -64,11 +64,9 @@ export type AdminActionResult =
       ok: true
       optInRecord: OptInRecord
       blockedFromScraping: boolean
-      // True iff the action also wiped archive data (opt-out and delete).
-      // For "Opt out and delete data" this is now FALSE at the moment of
-      // the response: the actual delete + export runs asynchronously on
-      // the worker (see docs/admin-delete-worker.md). Row's account data
-      // stays populated until the worker completes the deletion.
+      // True when the database has synchronously applied policy tombstones.
+      // Raw Storage cleanup is asynchronous, but the bucket is private and
+      // policy-gated before this result is returned.
       archiveDeleted: boolean
       // Populated by manualOptIn (and only manualOptIn) so the client can
       // materialize a fully-rendered row when the affected account wasn't
@@ -336,16 +334,14 @@ export async function adminOptOutAccount(
   formData: FormData,
 ): Promise<AdminActionResult> {
   try {
-    // requireAdmin both gates access and gives us the requester's auth.users.id,
-    // which we record on the delete-with-export job for audit.
-    const { user: requester } = await requireAdmin()
+    // Gate this service-role write behind the existing administrator check.
+    await requireAdmin()
     const admin = await getAdminClient()
     const id = String(formData.get('id') ?? '')
     const username = normalizeUsername(String(formData.get('username') ?? ''))
     const twitterUserId = String(formData.get('twitter_user_id') ?? '')
     const reason =
       String(formData.get('reason') ?? '').trim() || 'Admin manual opt-out'
-    const deleteData = String(formData.get('delete_data') ?? '') === 'true'
 
     if (!username) return { ok: false, error: 'Missing username' }
 
@@ -380,58 +376,34 @@ export async function adminOptOutAccount(
       return { ok: false, error: writeResponse.error.message }
     }
 
-    let message: string | undefined
-    let archiveDeleted = false
-    if (deleteData) {
-      if (!twitterUserId) {
-        return {
-          ok: false,
-          error: 'Missing Twitter account id for delete',
-        }
-      }
-      // Enqueue the delete-with-export job for the Hetzner worker
-      // (services/admin-delete-worker) and return immediately. The opt-in
-      // row above is already marked explicit_optout=true and the scrape
-      // block is already in place, so the user is functionally cut off
-      // even before the worker runs.
-      //
-      // The RPC (public.admin_enqueue_delete_with_export) writes into
-      // private.admin_jobs, which isn't exposed via PostgREST — that's
-      // why we go through a SECURITY DEFINER bridge rather than .from().
-      const enqueueResponse = await admin.rpc(
-        'admin_enqueue_delete_with_export' as never,
+    const { data: resolvedPolicyAccountId, error: resolveError } =
+      await admin.rpc(
+        'policy_blocked_account_id' as never,
         {
-          p_account_id: twitterUserId,
           p_username: username,
-          p_reason: reason,
-          p_requested_by_user_id: requester.id,
         } as never,
       )
-      if (enqueueResponse.error) {
-        return {
-          ok: false,
-          error: `Opt-out + scrape-block applied, but enqueue failed: ${enqueueResponse.error.message}`,
-        }
-      }
+    if (resolveError) throw resolveError
+    const stableAccountId =
+      twitterUserId ||
+      (typeof resolvedPolicyAccountId === 'string'
+        ? resolvedPolicyAccountId
+        : '')
 
-      // archiveDeleted stays false — the delete happens asynchronously
-      // on the worker. The admin row will show populated counts until
-      // the worker completes and the next page refresh re-queries.
-      const jobKey = enqueueResponse.data as string
-      message =
-        `@${username}: queued for export + delete (job ${jobKey.slice(0, 8)}). ` +
-        `The Hetzner worker (admin-delete-worker) typically picks the job up within ~10s ` +
-        `and finishes within ~1 minute per 10k tweets. Refresh the page in a minute to ` +
-        `see the row's archive counts drop to zero.`
-    }
+    // The database trigger synchronously tombstones PostgreSQL and deduplicates
+    // a raw-Storage cleanup job for every policy block. There is no optional
+    // content-retention mode for an explicitly opted-out account.
+    const message = stableAccountId
+      ? `@${username}: policy tombstones applied; private raw archive cleanup queued.`
+      : `@${username}: opt-out saved; no Twitter account id was available to tombstone.`
 
     revalidatePath('/admin')
     return {
       ok: true,
       optInRecord: writeResponse.data as OptInRecord,
       // Opt out always adds to the scrape blocklist when we have an account id.
-      blockedFromScraping: !!twitterUserId,
-      archiveDeleted,
+      blockedFromScraping: !!stableAccountId,
+      archiveDeleted: true,
       message,
     }
   } catch (e) {

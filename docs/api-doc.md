@@ -1,10 +1,11 @@
 # API guide
 
-There are three ways to access Community Archive data:
+There are three currently supported ways to access Community Archive data:
 
-1. Download the bulk Parquet export for corpus-wide analysis.
+1. Download the consent-safe bulk Parquet package.
 2. Query filtered records through the read-only Supabase REST API.
-3. Download one user's processed archive JSON from public object storage.
+3. Authenticated owners may download their own processed archive through the
+   policy-aware web endpoint.
 
 The website version of this guide is at
 [`community-archive.org/docs`](https://www.community-archive.org/docs). Agents
@@ -13,22 +14,16 @@ should start at
 
 ## Bulk Parquet export
 
-Use the [GitHub data release](https://github.com/TheExGenesis/community-archive/releases/tag/data_export)
-as the canonical page for current export notes and its download link.
+The current consent-safe package contains enriched `tweets.parquet`, separate
+`profiles.parquet`, and `manifest.json`. Start from the
+[`latest.json` pointer](https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/community-archive-public-export/latest.json)
+or the repository's [latest GitHub Release](https://github.com/TheExGenesis/community-archive/releases/latest).
 
-Current file:
-[`enriched_tweets.parquet`](https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet)
-
-The dump is the right choice for full-corpus analysis. For example, DuckDB can
-query the remote Parquet file directly:
-
-```sql
-SELECT tweet_id, username, created_at, full_text
-FROM read_parquet('https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet')
-WHERE lower(username) = 'defenderofbasic'
-ORDER BY created_at DESC
-LIMIT 100;
-```
+Follow `manifest_url` instead of bookmarking a versioned object. Each nightly
+publication re-checks current PostgreSQL membership and opt-outs, publishes the
+new package atomically, and removes the superseded package. Historical releases
+remain as a publication log, but their versioned file links expire after the
+next successful dump.
 
 ## REST API
 
@@ -132,19 +127,20 @@ for a complete example. Run it from the repository root with:
 pnpm script scripts/get_all_tweets_paginated.mts
 ```
 
-Use the Parquet dump instead when you need most or all of the corpus.
+For full-corpus access, prefer the bulk Parquet package instead of paginating
+the REST API.
 
 ## Raw user archives
 
-Given a lowercase username, use:
+While signed in as the matching archive owner, use:
 
 ```text
-https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/<username>/archive.json
+https://www.community-archive.org/api/archive/<username>
 ```
 
 Example:
 
-<https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/defenderofbasic/archive.json>
+<https://www.community-archive.org/api/archive/defenderofbasic>
 
 The object contains archive-shaped sections such as `account`, `profile`,
 `tweets`, `follower`, `following`, and optionally `like`. See

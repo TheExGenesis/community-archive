@@ -2,20 +2,15 @@ import CommunityStats from '@/components/CommunityStats'
 import TopMentionedUsers from '@/components/TopMentionedMissingUsers'
 import { getArchiveMostMentionedAccounts } from '@/lib/queries/getMostMentionedAccounts'
 import { getStats } from '@/lib/stats'
-import { createServerClient } from '@/utils/supabase'
-import { cookies } from 'next/headers'
 
 // export const revalidate = 0; // TODO: Decide on revalidation strategy
 
 export default async function MissionControlPage() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
-  const stats = await getStats(supabase).catch((error) => {
+  const stats = await getStats().catch((error) => {
     console.error('Failed to fetch stats for mission control:', error)
     return {
       userCount: null,
       tweetCount: null,
-      userMentionsCount: null, // Ensure all potential fields from getStats are handled
     }
   })
 

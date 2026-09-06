@@ -1,4 +1,5 @@
 import 'server-only'
+import { measureServerRead } from '@/lib/performance/server'
 import { unstable_cache } from 'next/cache'
 import {
   clickHouseAnalyticsGatewayBaseUrl,
@@ -10,6 +11,7 @@ import {
   fetchPortalLiveAnalytics,
   fetchPortalRecentBangers,
   fetchPortalTrends,
+  fetchPortalWeeklyTrends,
 } from './analytics'
 import { getResearchPosts, selectFeaturedResearchPosts } from './research'
 import { selectHomepageStream } from './stream'
@@ -47,25 +49,26 @@ interface PortalCorpusRange {
   currentYear: number
 }
 
-interface PortalCorpusStats {
+interface PortalGlobalStats {
   totalTweets: number
+  memberCount: number
   generatedAt: string
 }
 
-interface ClickHouseCorpusCountResponse {
+interface ClickHouseSummaryResponse {
   data: {
     totalTweets: unknown
+    memberAccounts: unknown
     sourceUpdatedAt: unknown
     collectedAt: unknown
-    source: 'clickhouse.tweet_content_versions'
-    countMode: 'unique_tweets_observed'
+    membershipSnapshotAt: unknown
+    source: string
+    countMode: string
   }
 }
 
 const PORTAL_READ_TIMEOUT_MS = 10_000
 export const PORTAL_BANGERS_PAGE_SIZE = 30
-const PORTAL_BANGERS_PERIOD_SCAN_PAGE_SIZE = 100
-const PORTAL_BANGERS_PERIOD_SCAN_PAGE_LIMIT = 25
 
 function required(value: string | undefined, name: string): string {
   if (!value) throw new Error(`${name} is not configured`)
@@ -131,7 +134,7 @@ export function portalDataSourceKey(
     throw new Error('ClickHouse analytics URL is invalid')
   }
   const environment = env.VERCEL_ENV || env.NODE_ENV || 'unknown'
-  return `portal-v5:${environment}:${analyticsSource}:${portalRead.sourceId}`
+  return `portal-v6:${environment}:${analyticsSource}:${portalRead.sourceId}`
 }
 
 interface PortalRestOptions {
@@ -247,68 +250,27 @@ function portalClickHouseCount(value: unknown, label: string): number {
   return portalSnapshotCount(Number(value), label)
 }
 
-async function fetchSupabasePortalCorpusStats(): Promise<PortalCorpusStats> {
-  const rows = await portalRestRows<{
-    total_tweets: number | null
-    last_updated: string
-  }>(
-    'global_activity_summary',
-    new URLSearchParams({ select: 'total_tweets,last_updated' }),
+/** Shared ClickHouse-backed counts used by every public count display. */
+export async function fetchPortalGlobalStats(): Promise<PortalGlobalStats> {
+  const response = await fetchAnalyticsGatewayJson<ClickHouseSummaryResponse>(
+    ['summary'],
+    new URLSearchParams(),
+    { timeoutMs: PORTAL_READ_TIMEOUT_MS },
   )
-  if (rows.length !== 1) {
-    throw new Error('Portal corpus summary returned an invalid response')
-  }
   return {
-    totalTweets: portalSnapshotCount(
-      rows[0].total_tweets,
-      'corpus tweet count',
+    totalTweets: portalClickHouseCount(
+      response.data.totalTweets,
+      'ClickHouse corpus tweet count',
     ),
-    generatedAt: portalSnapshotTimestamp(
-      rows[0].last_updated,
-      'corpus summary timestamp',
+    memberCount: portalClickHouseCount(
+      response.data.memberAccounts,
+      'ClickHouse member count',
+    ),
+    generatedAt: portalClickHouseTimestamp(
+      String(response.data.collectedAt),
+      'ClickHouse corpus count timestamp',
     ),
   }
-}
-
-/**
- * ClickHouse owns the live analytical corpus count. Supabase's daily summary
- * remains a last-known-good fallback during gateway or projection failures.
- */
-export async function fetchPortalCorpusStats(): Promise<PortalCorpusStats> {
-  try {
-    const response =
-      await fetchAnalyticsGatewayJson<ClickHouseCorpusCountResponse>(
-        ['corpus-count'],
-        new URLSearchParams(),
-        { timeoutMs: PORTAL_READ_TIMEOUT_MS },
-      )
-    return {
-      totalTweets: portalClickHouseCount(
-        response.data.totalTweets,
-        'ClickHouse corpus tweet count',
-      ),
-      generatedAt: portalClickHouseTimestamp(
-        String(response.data.collectedAt),
-        'ClickHouse corpus count timestamp',
-      ),
-    }
-  } catch (error) {
-    console.error(
-      'Portal ClickHouse corpus count failed; falling back to Supabase:',
-      error,
-    )
-    return fetchSupabasePortalCorpusStats()
-  }
-}
-
-/** Archive uploaders plus opted-in members, deduplicated by production. */
-export async function fetchPortalMemberCount(): Promise<number> {
-  const membersResponse = await portalRestRequest(
-    'user_directory',
-    new URLSearchParams({ select: 'directory_id' }),
-    { method: 'HEAD', prefer: 'count=exact' },
-  )
-  return exactCount(membersResponse, 'member')
 }
 
 function isoDaysAgo(days: number): string {
@@ -524,17 +486,20 @@ export async function enrichPortalTweets(
 ): Promise<PortalTweet[]> {
   const tweetIdFilter = portalIdFilter(tweets.map(({ id }) => id))
   if (!tweetIdFilter) return tweets
+  const needsOwnMedia = tweets.some((tweet) => tweet.media === undefined)
 
   const [mediaRows, quoteRelations] = await Promise.all([
-    optionalPortalRestRows<PortalMediaRow>(
-      'tweet_media',
-      new URLSearchParams({
-        select: 'tweet_id,media_url,media_type,width,height',
-        tweet_id: tweetIdFilter,
-        order: 'media_id.asc',
-      }),
-      'media',
-    ),
+    needsOwnMedia
+      ? optionalPortalRestRows<PortalMediaRow>(
+          'tweet_media',
+          new URLSearchParams({
+            select: 'tweet_id,media_url,media_type,width,height',
+            tweet_id: tweetIdFilter,
+            order: 'media_id.asc',
+          }),
+          'media',
+        )
+      : Promise.resolve([]),
     optionalPortalRestRows<PortalQuoteRelationRow>(
       'quote_tweets',
       new URLSearchParams({
@@ -763,6 +728,15 @@ async function fetchPortalJoinedThisWeek(): Promise<number> {
 
 // Arguments participate in the cache key, keeping staging/prod sources and
 // deployment environments isolated even when the Data Cache survives deploys.
+const getCachedExplorerTrends = unstable_cache(
+  async (_sourceKey: string) =>
+    fetchPortalTrends(new Date(), undefined, true, false),
+  ['portal-explorer-trends-v1'],
+  // Preserve the historical seed's daily refresh; query pruning must not
+  // increase how often corpus-wide analytical queries run.
+  { revalidate: 86_400 },
+)
+
 const getCachedTrendsSnapshot = unstable_cache(
   async (_sourceKey: string) => fetchPortalTrends(),
   ['portal-trends-snapshot-v1'],
@@ -773,19 +747,14 @@ const getCachedCorpusRange = unstable_cache(
   ['portal-corpus-range-v1'],
   { revalidate: 86_400 },
 )
-const getCachedCorpusStats = unstable_cache(
-  async (_sourceKey: string) => fetchPortalCorpusStats(),
-  ['portal-corpus-stats-v1'],
-  { revalidate: 300 },
+const getCachedGlobalStats = unstable_cache(
+  async (_sourceKey: string) => fetchPortalGlobalStats(),
+  ['portal-global-stats-v1'],
+  { revalidate: 60 },
 )
 const getCachedLiveAnalytics = unstable_cache(
   async (_sourceKey: string) => fetchPortalLiveAnalytics(),
   ['portal-live-analytics-v1'],
-  { revalidate: 300 },
-)
-const getCachedMemberCount = unstable_cache(
-  async (_sourceKey: string) => fetchPortalMemberCount(),
-  ['portal-member-count-v1'],
   { revalidate: 300 },
 )
 const getCachedJoinedThisWeek = unstable_cache(
@@ -798,18 +767,31 @@ const getCachedHomepageStreamCandidates = unstable_cache(
   ['portal-home-stream-candidates-v1'],
   { revalidate: 60 },
 )
-const getCachedHistoricalBangers = unstable_cache(
-  async (_sourceKey: string, day: string) => {
-    const ranked = await fetchPortalHistoricalBangers(100)
-    return enrichPortalTweets(
-      selectDailyBangers(ranked, new Date(`${day}T12:00:00.000Z`)),
-    )
-  },
-  ['portal-bangers-v6'],
+const getCachedHistoricalCandidates = unstable_cache(
+  async (_sourceKey: string) => fetchPortalHistoricalBangers(100),
+  ['portal-historical-candidates-v1'],
+  { revalidate: 86_400 },
+)
+const getCachedHistoricalSelection = unstable_cache(
+  async (_sourceKey: string, selected: PortalTweet[]) =>
+    enrichPortalTweets(selected),
+  ['portal-historical-selection-v1'],
+  { revalidate: 86_400 },
+)
+async function getCachedHistoricalBangers(sourceKey: string, day: string) {
+  const candidates = await getCachedHistoricalCandidates(sourceKey)
+  return getCachedHistoricalSelection(
+    sourceKey,
+    selectDailyBangers(candidates, new Date(`${day}T12:00:00.000Z`)),
+  )
+}
+const getCachedWeeklyTrends = unstable_cache(
+  async (_sourceKey: string) => fetchPortalWeeklyTrends(),
+  ['portal-weekly-trends-v1'],
   { revalidate: 86_400 },
 )
 const getCachedRecentBangers = unstable_cache(
-  async (_sourceKey: string, _day: string) =>
+  async (_sourceKey: string) =>
     enrichPortalTweets(
       selectDailyRecentBangers(await fetchPortalRecentBangers(50, 24)),
     ),
@@ -817,10 +799,10 @@ const getCachedRecentBangers = unstable_cache(
   { revalidate: 1_800 },
 )
 
-function portalBangersPeriodStart(
+function portalBangersPeriodRange(
   period: PortalBangersPeriod,
   now = new Date(),
-): string {
+): { createdAfter: string; createdBefore: string } {
   const start = new Date(now)
   if (period === 'today') {
     start.setUTCDate(start.getUTCDate() - 1)
@@ -829,96 +811,37 @@ function portalBangersPeriodStart(
   } else {
     start.setUTCMonth(start.getUTCMonth() - 3)
   }
-  return start.toISOString()
+  return {
+    createdAfter: start.toISOString(),
+    createdBefore: now.toISOString(),
+  }
 }
 
-function portalBangersSnapshotStart(
-  period: PortalBangersPeriod,
-  now = new Date(),
-): string {
-  const start = new Date(portalBangersPeriodStart(period, now))
-  if (period === 'today' || period === 'week') start.setUTCMinutes(0, 0, 0)
-  if (period === 'three-months') start.setUTCHours(0, 0, 0, 0)
-  return start.toISOString()
-}
-
-async function fetchPortalBangersPeriodSnapshot(
-  _sourceKey: string,
-  periodStart: string,
-  scope: PortalBangersScope,
-  query: string,
-): Promise<{ tweets: PortalTweet[]; candidateRankingTruncated: boolean }> {
-  const tweets: PortalTweet[] = []
-  let offset = 0
-  let candidateRankingTruncated = false
-
-  for (
-    let pageIndex = 0;
-    pageIndex < PORTAL_BANGERS_PERIOD_SCAN_PAGE_LIMIT;
-    pageIndex += 1
-  ) {
+const getCachedPortalBangersPeriodPage = unstable_cache(
+  async (
+    _sourceKey: string,
+    period: PortalBangersPeriod,
+    limit: number,
+    offset: number,
+    sort: PortalBangersSort,
+    scope: PortalBangersScope,
+    query: string,
+  ): Promise<PortalBangersPage> => {
+    const range = portalBangersPeriodRange(period)
     const page = await fetchPortalBangersPage({
-      limit: PORTAL_BANGERS_PERIOD_SCAN_PAGE_SIZE,
+      limit,
       offset,
-      sort: 'recent',
+      sort,
       scope,
       query,
+      ...range,
     })
-    candidateRankingTruncated ||= page.pagination.candidateRankingTruncated
-
-    const firstOlderIndex = page.tweets.findIndex(
-      (tweet) => tweet.createdAt < periodStart,
-    )
-    tweets.push(
-      ...(firstOlderIndex === -1
-        ? page.tweets
-        : page.tweets.slice(0, firstOlderIndex)),
-    )
-
-    if (firstOlderIndex !== -1 || page.pagination.nextOffset === null) {
-      return {
-        tweets: dedupePortalTweets(tweets),
-        candidateRankingTruncated,
-      }
+    return {
+      ...page,
+      tweets: await enrichPortalTweets(page.tweets),
     }
-    if (page.tweets.length === 0) break
-    offset = page.pagination.nextOffset
-  }
-
-  return {
-    tweets: dedupePortalTweets(tweets),
-    candidateRankingTruncated: true,
-  }
-}
-
-function dedupePortalTweets(tweets: PortalTweet[]): PortalTweet[] {
-  return Array.from(new Map(tweets.map((tweet) => [tweet.id, tweet])).values())
-}
-
-function sortPortalBangers(
-  tweets: PortalTweet[],
-  sort: PortalBangersSort,
-): PortalTweet[] {
-  return [...tweets].sort((left, right) => {
-    if (sort === 'recent') {
-      return (
-        Date.parse(right.createdAt) - Date.parse(left.createdAt) ||
-        (right.quoteCount ?? 0) - (left.quoteCount ?? 0) ||
-        right.id.localeCompare(left.id)
-      )
-    }
-    return (
-      (right.quoteCount ?? 0) - (left.quoteCount ?? 0) ||
-      right.likes - left.likes ||
-      Date.parse(right.createdAt) - Date.parse(left.createdAt) ||
-      right.id.localeCompare(left.id)
-    )
-  })
-}
-
-const getCachedPortalBangersPeriodSnapshot = unstable_cache(
-  fetchPortalBangersPeriodSnapshot,
-  ['portal-bangers-period-snapshot-v1'],
+  },
+  ['portal-bangers-period-page-v1'],
   { revalidate: 300 },
 )
 
@@ -952,7 +875,10 @@ export async function loadPortalComponentData<T>(
   fallback: T,
 ): Promise<{ data: T; failed: boolean }> {
   try {
-    return { data: await loader(), failed: false }
+    return {
+      data: await measureServerRead(`homepage.${section}`, loader),
+      failed: false,
+    }
   } catch (error) {
     console.error(
       JSON.stringify({
@@ -989,43 +915,15 @@ export async function getPortalBangersPage(
     const sort = options.sort ?? 'quotes'
     const scope = options.scope ?? 'all'
     const query = options.query?.trim().slice(0, 120) ?? ''
-    const now = new Date()
-    const periodStart = portalBangersPeriodStart(options.period, now)
-    const snapshotStart = portalBangersSnapshotStart(options.period, now)
-    const snapshot = await getCachedPortalBangersPeriodSnapshot(
+    return getCachedPortalBangersPeriodPage(
       portalDataSourceKey(),
-      snapshotStart,
+      options.period,
+      limit,
+      offset,
+      sort,
       scope,
       query,
     )
-    const ranked = sortPortalBangers(
-      snapshot.tweets.filter((tweet) => tweet.createdAt >= periodStart),
-      sort,
-    )
-    const pageTweets = ranked.slice(offset, offset + limit)
-    const nextOffset = offset + pageTweets.length
-    const yearCounts = new Map<number, number>()
-    for (const tweet of ranked) {
-      const year = new Date(tweet.createdAt).getUTCFullYear()
-      if (Number.isFinite(year)) {
-        yearCounts.set(year, (yearCounts.get(year) ?? 0) + 1)
-      }
-    }
-    return {
-      tweets: await enrichPortalTweets(pageTweets),
-      pagination: {
-        limit,
-        offset,
-        nextOffset: nextOffset < ranked.length ? nextOffset : null,
-        totalAvailable: ranked.length,
-        snapshotSize: ranked.length,
-        yearCounts: Array.from(yearCounts, ([year, count]) => ({
-          year,
-          count,
-        })).sort((left, right) => right.year - left.year),
-        candidateRankingTruncated: snapshot.candidateRankingTruncated,
-      },
-    }
   }
 
   const page = await fetchPortalBangersPage(options)
@@ -1066,7 +964,7 @@ export async function getInitialPortalBangersPage(
 
 /** Cached corpus-wide seed series for the authenticated trends explorer. */
 export async function getPortalTrendSnapshot(): Promise<PortalTrends> {
-  return getCachedTrendsSnapshot(portalDataSourceKey())
+  return getCachedExplorerTrends(portalDataSourceKey())
 }
 
 export async function getPortalData(
@@ -1077,9 +975,8 @@ export async function getPortalData(
   const [
     trends,
     corpusRange,
-    corpusStats,
+    globalStats,
     liveAnalytics,
-    memberCount,
     joinedThisWeek,
     initialStream,
     research,
@@ -1107,9 +1004,13 @@ export async function getPortalData(
           failed: false,
         }),
     loadPortalComponentData(
-      'corpus-stats',
-      () => getCachedCorpusStats(sourceKey),
-      { totalTweets: 0, generatedAt: new Date().toISOString() },
+      'global-stats',
+      () => getCachedGlobalStats(sourceKey),
+      {
+        totalTweets: 0,
+        memberCount: 0,
+        generatedAt: new Date().toISOString(),
+      },
     ),
     view === 'home'
       ? loadPortalComponentData(
@@ -1124,13 +1025,6 @@ export async function getPortalData(
           data: { streamedLast24Hours: 0, latestObservedAt: null },
           failed: false,
         }),
-    view === 'home'
-      ? loadPortalComponentData(
-          'member-count',
-          () => getCachedMemberCount(sourceKey),
-          0,
-        )
-      : Promise.resolve({ data: 0, failed: false }),
     view === 'home'
       ? loadPortalComponentData(
           'joined-this-week',
@@ -1156,7 +1050,7 @@ export async function getPortalData(
     view === 'home'
       ? loadPortalComponentData(
           'recent-bangers',
-          () => getCachedRecentBangers(sourceKey, today),
+          () => getCachedRecentBangers(sourceKey),
           [],
         )
       : Promise.resolve({ data: [], failed: false }),
@@ -1169,20 +1063,20 @@ export async function getPortalData(
       : Promise.resolve({ data: [], failed: false }),
   ])
   const stats: PortalStats = {
-    totalTweets: corpusStats.data.totalTweets,
-    accountCount: memberCount.data,
+    totalTweets: globalStats.data.totalTweets,
+    accountCount: globalStats.data.memberCount,
     streamedLast24Hours: liveAnalytics.data.streamedLast24Hours,
     joinedThisWeek: joinedThisWeek.data,
     firstYear: corpusRange.data.firstYear,
     currentYear: corpusRange.data.currentYear,
-    generatedAt: corpusStats.data.generatedAt,
+    generatedAt: globalStats.data.generatedAt,
   }
   const selectedStream =
     view === 'home'
       ? selectHomepageStream(
           [...initialStream.data, ...recentBangers.data],
           30,
-          new Date(corpusStats.data.generatedAt),
+          new Date(globalStats.data.generatedAt),
         )
       : initialStream.data
   return {
@@ -1193,8 +1087,8 @@ export async function getPortalData(
     recentBangers: recentBangers.data,
     historicalBangers: historicalBangers.data,
     failures: {
-      liveAnalytics: corpusStats.failed || liveAnalytics.failed,
-      memberCount: memberCount.failed,
+      liveAnalytics: globalStats.failed || liveAnalytics.failed,
+      memberCount: globalStats.failed,
       joinedThisWeek: joinedThisWeek.failed,
       corpusRange: corpusRange.failed,
       trends: trends.failed,
@@ -1203,5 +1097,110 @@ export async function getPortalData(
       recentBangers: recentBangers.failed,
       historicalBangers: historicalBangers.failed,
     },
+  }
+}
+
+/**
+ * Start independent section promises. Never return Promise.all here: the hero,
+ * stream, digest and cards have separate Suspense boundaries and failure states.
+ */
+export function startHomepageData() {
+  const sourceKey = portalDataSourceKey()
+  const today = new Date().toISOString().slice(0, 10)
+  const globalStats = loadPortalComponentData(
+    'global-stats',
+    () => getCachedGlobalStats(sourceKey),
+    {
+      totalTweets: 0,
+      memberCount: 0,
+      generatedAt: new Date().toISOString(),
+    },
+  )
+  const liveAnalytics = loadPortalComponentData(
+    'live-analytics',
+    () => getCachedLiveAnalytics(sourceKey),
+    { streamedLast24Hours: 0, latestObservedAt: null },
+  )
+  const joinedThisWeek = loadPortalComponentData(
+    'joined-this-week',
+    () => getCachedJoinedThisWeek(sourceKey),
+    0,
+  )
+  const corpusRange = loadPortalComponentData(
+    'corpus-range',
+    () => getCachedCorpusRange(sourceKey),
+    { firstYear: 0, currentYear: 0 },
+  )
+  const overview = Promise.all([
+    globalStats,
+    liveAnalytics,
+    joinedThisWeek,
+    corpusRange,
+  ]).then(([global, live, joined, range]) => ({
+    stats: {
+      totalTweets: global.data.totalTweets,
+      accountCount: global.data.memberCount,
+      generatedAt: global.data.generatedAt,
+      streamedLast24Hours: live.data.streamedLast24Hours,
+      joinedThisWeek: joined.data,
+      ...range.data,
+    },
+    failures: {
+      liveAnalytics: global.failed || live.failed,
+      memberCount: global.failed,
+      joinedThisWeek: joined.failed,
+      corpusRange: range.failed,
+    },
+  }))
+  return {
+    globalStats,
+    overview,
+    stream: loadPortalComponentData(
+      'initial-stream',
+      async () =>
+        selectHomepageStream(
+          await getCachedHomepageStreamCandidates(sourceKey),
+          30,
+        ),
+      [],
+    ),
+    recentBangers: loadPortalComponentData(
+      'recent-bangers',
+      () => getCachedRecentBangers(sourceKey),
+      [],
+    ),
+    historicalBangers: loadPortalComponentData(
+      'historical-bangers',
+      () => getCachedHistoricalBangers(sourceKey, today),
+      [],
+    ),
+    trends: loadPortalComponentData(
+      'weekly-trends',
+      () => getCachedWeeklyTrends(sourceKey),
+      [],
+    ),
+    research: loadPortalComponentData(
+      'research',
+      async () => selectFeaturedResearchPosts(await getResearchPosts(24)),
+      [],
+    ),
+  }
+}
+
+export type HomepageData = ReturnType<typeof startHomepageData>
+
+/** Public feed and optional total have independent failure/streaming boundaries. */
+export function startStreamData() {
+  return {
+    tweets: loadPortalComponentData(
+      'initial-stream',
+      () => getPortalStreamPage(30),
+      [],
+    ),
+    stats: loadPortalComponentData(
+      'global-stats',
+      () => getCachedGlobalStats(portalDataSourceKey()),
+      { totalTweets: 0, memberCount: 0, generatedAt: new Date().toISOString() },
+    ),
   }
 }

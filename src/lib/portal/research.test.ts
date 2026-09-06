@@ -1,6 +1,6 @@
 jest.mock('server-only', () => ({}), { virtual: true })
 
-import { selectFeaturedResearchPosts } from './research'
+import { getResearchPosts, selectFeaturedResearchPosts } from './research'
 import type { ResearchPost } from './types'
 
 function post(title: string): ResearchPost {
@@ -16,6 +16,7 @@ function post(title: string): ResearchPost {
 
 test('selects the four featured research posts in editorial order', () => {
   const selected = selectFeaturedResearchPosts([
+    post('The Switchboard Operator Benchmark'),
     post('epistemic garden recap | lab notes #1'),
     post(
       'discovering the postrat canon in the community archive | lab notes #4',
@@ -23,12 +24,49 @@ test('selects the four featured research posts in editorial order', () => {
     post('opportunity mining | lab notes #6'),
     post('a theory of tpot (postrat twitter)'),
     post('Agentic Taste Modeling | lab notes #8'),
+    post('Towards a Pattern Language of Serendipity Online'),
   ])
 
   expect(selected.map(({ title }) => title)).toEqual([
+    'The Switchboard Operator Benchmark',
+    'Towards a Pattern Language of Serendipity Online',
     'Agentic Taste Modeling | lab notes #8',
     'a theory of tpot (postrat twitter)',
-    'opportunity mining | lab notes #6',
-    'discovering the postrat canon in the community archive | lab notes #4',
   ])
+})
+
+test('shows the featured research posts and hides the phoenix post', async () => {
+  const item = (title: string, url: string) => `
+    <item>
+      <title><![CDATA[${title}]]></title>
+      <link>${url}</link>
+      <pubDate>Sun, 23 Aug 2026 12:00:00 GMT</pubDate>
+      <description><![CDATA[Excerpt]]></description>
+    </item>`
+  const xml = `<rss><channel>
+    ${item(
+      'The Switchboard Operator Benchmark',
+      'https://xiqo.substack.com/p/the-switchboard-operator-benchmark',
+    )}
+    ${item(
+      'Towards a Pattern Language of Serendipity Online',
+      'https://xiqo.substack.com/p/why-do-i-care-about-twitter-so-much',
+    )}
+    ${item(
+      'New on the Community Archive: User Pages, Bangers, Daily Digest',
+      'https://xiqo.substack.com/p/the-community-archive-rises-from',
+    )}
+  </channel></rss>`
+  const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+    ok: true,
+    text: jest.fn().mockResolvedValue(xml),
+  } as unknown as Response)
+
+  const posts = await getResearchPosts(24)
+
+  expect(posts.map(({ url }) => url)).toEqual([
+    'https://xiqo.substack.com/p/the-switchboard-operator-benchmark',
+    'https://xiqo.substack.com/p/why-do-i-care-about-twitter-so-much',
+  ])
+  fetchSpy.mockRestore()
 })

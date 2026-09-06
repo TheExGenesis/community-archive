@@ -106,7 +106,7 @@ export default function UnifiedTweetList({
 
   if (!tweets.length) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
+      <div className="rounded-lg border border-dashed border-border bg-card px-6 py-12 text-center">
         <SearchX className="mx-auto h-8 w-8 text-muted-foreground" />
         <div className="mt-4 text-base font-medium text-foreground">
           {emptyMessage}
@@ -199,7 +199,7 @@ export default function UnifiedTweetList({
                   {onSearchSortChange ? (
                     <button
                       type="button"
-                      className="rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="rounded-sm underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       onClick={() =>
                         onSearchSortChange(
                           searchSort === 'newest' ? 'oldest' : 'newest',
@@ -235,7 +235,7 @@ export default function UnifiedTweetList({
                             ? 'Sort by likes, currently descending'
                             : 'Sort by likes'
                         }
-                        className={`rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        className={`rounded-sm underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                           searchSort === 'likes' ? 'text-foreground' : ''
                         }`}
                         onClick={() => onSearchSortChange('likes')}
@@ -249,7 +249,7 @@ export default function UnifiedTweetList({
                             ? 'Sort by reposts, currently descending'
                             : 'Sort by reposts'
                         }
-                        className={`rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        className={`rounded-sm underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                           searchSort === 'reposts' ? 'text-foreground' : ''
                         }`}
                         onClick={() => onSearchSortChange('reposts')}
@@ -290,7 +290,7 @@ export default function UnifiedTweetList({
           {tweets.map((tweet) => (
             <div
               key={tweet.tweet_id}
-              className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-foreground/20 sm:p-5"
+              className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/20 sm:p-5"
             >
               <TweetComponent
                 tweet={tweet}

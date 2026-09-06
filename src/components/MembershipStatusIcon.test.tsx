@@ -11,7 +11,7 @@ test.each([
 
   const icon = screen.getByRole('img', { name: status.label })
   expect(icon).toHaveClass(
-    status.hasArchive ? 'text-[#25AADF]/70' : 'text-brand/60',
+    status.hasArchive ? 'text-muted-foreground/60' : 'text-brand/60',
   )
 
   await user.hover(icon)

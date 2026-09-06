@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import UserSearchInput from '@/components/UserSearchInput'
-import { buildSearchHref } from '@/lib/searchParams'
+import { buildSearchHref, parseSearchExpression } from '@/lib/searchParams'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 export default function HeaderSearch() {
   const router = useRouter()
@@ -13,6 +14,12 @@ export default function HeaderSearch() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const { options } = parseSearchExpression(query)
+    capturePostHogEvent('archive_search_submitted', {
+      has_query: Boolean(query.trim()),
+      active_filter_count: Object.keys(options).length,
+      surface: 'header',
+    })
     router.push(searchHref)
   }
 

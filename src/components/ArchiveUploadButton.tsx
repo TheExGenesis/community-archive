@@ -54,7 +54,7 @@ export function ArchiveUploadButton({
           href="https://x.com/settings/download_your_data"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-muted-foreground hover:underline"
+          className="text-xs text-muted-foreground"
         >
           Request your archive from X
         </a>

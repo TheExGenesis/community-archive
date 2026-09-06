@@ -1,10 +1,16 @@
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
 import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
+import { DigestJingleButton } from '@/components/digest/DigestJingleButton'
+import { DigestComments } from '@/components/digest/DigestComments'
+import { DigestLikeButton } from '@/components/digest/DigestLikeButton'
 import { DigestMarkdown } from '@/components/digest/DigestMarkdown'
+import { DigestSubscribeButton } from '@/components/digest/DigestSubscribeButton'
 import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
 import { buildSearchHref } from '@/lib/searchParams'
 import { MUTED, SERIF } from '@/components/portal/styles'
+import PostHogLink from '@/components/PostHogLink'
 
 const longDate = (date: string) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -22,10 +28,22 @@ export function DigestEditionView({
   edition,
   archive,
   isAdmin = false,
+  likeCount = 0,
+  likedByViewer = false,
+  isSignedIn = false,
+  commentCount = 0,
+  slots = {},
 }: {
   edition: DigestEdition
   archive: DigestCalendarDay[]
   isAdmin?: boolean
+  likeCount?: number
+  likedByViewer?: boolean
+  isSignedIn?: boolean
+  commentCount?: number
+  slots?: Partial<
+    Record<'likes' | 'admin' | 'calendar' | 'recent' | 'comments', ReactNode>
+  >
 }) {
   const content = edition.content
   const returnTo = `/digest/${edition.digestDate}`
@@ -47,16 +65,30 @@ export function DigestEditionView({
 
         <header>
           <div className="flex flex-wrap items-baseline justify-between gap-3 border-t border-zinc-800 pt-2.5 dark:border-zinc-200">
-            <div className={sectionLabel}>The Daily Digest</div>
+            <div className="flex items-center gap-2">
+              <DigestJingleButton />
+              <div className={sectionLabel}>What Happened Yesterday</div>
+            </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
-              {isAdmin ? (
-                <Link
-                  href="/admin/digest"
-                  className="rounded-full bg-zinc-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-brand transition-colors hover:bg-blue-100 hover:text-blue-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:bg-zinc-800 dark:hover:bg-blue-950 dark:hover:text-blue-100"
-                >
-                  Editorial lab →
-                </Link>
-              ) : null}
+              {slots.likes ??
+                (edition.isPreview ? null : (
+                  <DigestLikeButton
+                    editionId={edition.id}
+                    initialCount={likeCount}
+                    initialLiked={likedByViewer}
+                    isSignedIn={isSignedIn}
+                  />
+                ))}
+              <DigestSubscribeButton />
+              {slots.admin ??
+                (isAdmin ? (
+                  <Link
+                    href="/admin/digest"
+                    className="rounded-full bg-zinc-100 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-brand transition-colors hover:bg-blue-100 hover:text-blue-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:bg-zinc-800 dark:hover:bg-blue-950 dark:hover:text-blue-100"
+                  >
+                    Editorial lab →
+                  </Link>
+                ) : null)}
               <div
                 className={`text-[11.5px] uppercase tracking-[0.18em] ${MUTED}`}
               >
@@ -129,8 +161,13 @@ export function DigestEditionView({
                       className="mt-4 text-[34px] font-semibold leading-[1.14] tracking-[-0.005em] [text-wrap:pretty] sm:text-[42px]"
                       style={SERIF}
                     >
-                      <Link
+                      <PostHogLink
                         href={storyHref}
+                        eventName="digest_action"
+                        eventProperties={{
+                          action: 'story_opened',
+                          surface: 'edition_title',
+                        }}
                         className="rounded-sm hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       >
                         {story.titleIsQuote === false ? null : '“'}
@@ -138,7 +175,7 @@ export function DigestEditionView({
                           {story.title}
                         </DigestMarkdown>
                         {story.titleIsQuote === false ? null : '”'}
-                      </Link>
+                      </PostHogLink>
                     </h2>
                     <p
                       className={`mt-3 max-w-[60ch] text-base leading-[1.65] [text-wrap:pretty] sm:text-[17.5px] ${MUTED}`}
@@ -160,12 +197,17 @@ export function DigestEditionView({
                       ))}
                     </div>
 
-                    <Link
+                    <PostHogLink
                       href={storyHref}
-                      className="mt-5 inline-flex rounded-sm text-sm font-semibold text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      eventName="digest_action"
+                      eventProperties={{
+                        action: 'story_opened',
+                        surface: 'edition_cta',
+                      }}
+                      className="mt-5 inline-flex rounded-sm text-sm font-semibold text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     >
                       Read the full story and surrounding conversation →
-                    </Link>
+                    </PostHogLink>
 
                     <div className="my-12 flex items-center gap-4 text-zinc-400 dark:text-zinc-600">
                       <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
@@ -181,11 +223,13 @@ export function DigestEditionView({
           </div>
 
           <aside className="mt-2 border-zinc-200 pt-10 dark:border-zinc-800 lg:sticky lg:top-24 lg:mt-0 lg:border-l lg:py-0 lg:pl-10">
-            <DigestDaySelector
-              currentDate={edition.digestDate}
-              availableDays={archive}
-              variant="editorial"
-            />
+            {slots.calendar ?? (
+              <DigestDaySelector
+                currentDate={edition.digestDate}
+                availableDays={archive}
+                variant="editorial"
+              />
+            )}
 
             <section className="mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800">
               <h2 className="text-[19px] font-semibold" style={SERIF}>
@@ -193,14 +237,19 @@ export function DigestEditionView({
               </h2>
               <div className="mt-4 flex flex-wrap gap-2">
                 {content.keywords.map((keyword) => (
-                  <Link
+                  <PostHogLink
                     key={keyword}
                     href={buildSearchHref(keyword)}
+                    eventName="digest_action"
+                    eventProperties={{
+                      action: 'keyword_search_opened',
+                      surface: 'keyword',
+                    }}
                     aria-label={`Search Community Archive for ${keyword}`}
                     className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs transition-colors hover:bg-blue-100 hover:text-blue-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:bg-zinc-800 dark:hover:bg-blue-950 dark:hover:text-blue-100"
                   >
                     {keyword}
-                  </Link>
+                  </PostHogLink>
                 ))}
               </div>
             </section>
@@ -214,44 +263,82 @@ export function DigestEditionView({
                   : `Clustered from ${content.source.selectedCount} selected bangers in a frozen 24-hour snapshot.`}{' '}
                 Keywords are required to occur in the included posts.
               </p>
-              <Link
+              <PostHogLink
                 href="/bangers?period=today"
-                className="mt-4 inline-flex font-semibold text-brand hover:underline"
+                eventName="digest_action"
+                eventProperties={{
+                  action: 'bangers_opened',
+                  surface: 'sidebar',
+                }}
+                className="mt-4 inline-flex font-semibold text-brand"
               >
                 Explore today&apos;s bangers →
-              </Link>
+              </PostHogLink>
             </section>
 
-            {archive.length > 1 ? (
-              <section className="mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800">
-                <h2 className="text-[19px] font-semibold" style={SERIF}>
-                  Recent editions
-                </h2>
-                <div className="mt-4 space-y-2">
-                  {archive
-                    .filter((item) => item.digestDate !== edition.digestDate)
-                    .slice(0, 6)
-                    .map((item) => (
-                      <Link
-                        key={item.digestDate}
-                        href={`/digest/${item.digestDate}`}
-                        className="block text-sm text-muted-foreground hover:text-brand hover:underline"
-                      >
-                        {longDate(item.digestDate)}
-                      </Link>
-                    ))}
-                </div>
-              </section>
-            ) : null}
+            {slots.recent ?? (
+              <DigestRecentEditions
+                archive={archive}
+                currentDate={edition.digestDate}
+              />
+            )}
           </aside>
         </div>
 
         <footer className={`mt-4 border-t pt-5 text-xs leading-5 ${MUTED}`}>
           {edition.isPreview
             ? 'Prototype assembled from a frozen research snapshot. Tweet text and engagement were hydrated for this preview; editorial summaries come from the cluster memo.'
-            : 'Curated automatically from the previous 24 hours of archive bangers and reviewed through the Daily Digest lab before publication.'}
+            : 'Curated automatically from the previous 24 hours of archive bangers and reviewed in the editorial lab before publication.'}
         </footer>
+
+        {slots.comments ??
+          (edition.isPreview ? null : (
+            <DigestComments
+              editionId={edition.id}
+              initialCount={commentCount}
+              isSignedIn={isSignedIn}
+            />
+          ))}
       </article>
     </main>
+  )
+}
+
+export function DigestRecentEditions({
+  archive,
+  currentDate,
+}: {
+  archive: DigestCalendarDay[]
+  currentDate: string
+}) {
+  return (
+    <>
+      {archive.length > 1 ? (
+        <section className="mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800">
+          <h2 className="text-[19px] font-semibold" style={SERIF}>
+            Recent editions
+          </h2>
+          <div className="mt-4 space-y-2">
+            {archive
+              .filter((item) => item.digestDate !== currentDate)
+              .slice(0, 6)
+              .map((item) => (
+                <PostHogLink
+                  key={item.digestDate}
+                  href={`/digest/${item.digestDate}`}
+                  eventName="digest_action"
+                  eventProperties={{
+                    action: 'recent_edition_opened',
+                    surface: 'recent_editions',
+                  }}
+                  className="block text-sm text-muted-foreground hover:text-brand"
+                >
+                  {longDate(item.digestDate)}
+                </PostHogLink>
+              ))}
+          </div>
+        </section>
+      ) : null}
+    </>
   )
 }

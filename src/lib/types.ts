@@ -178,6 +178,11 @@ export type SortKey =
   | 'num_followers'
   | 'joined_at'
 
+export type UserDirectoryPage = {
+  users: DirectoryUser[]
+  hasMore: boolean
+}
+
 export type FormattedUser = {
   account_id: string | null
   username: string

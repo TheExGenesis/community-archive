@@ -131,7 +131,7 @@ function EditionList({
           <div className="mt-3 flex flex-wrap gap-2">
             {edition.status === 'published' ? (
               <Link
-                className="text-sm font-semibold text-brand hover:underline"
+                className="text-sm font-semibold text-brand"
                 href={`/digest/${edition.digestDate}`}
               >
                 Open public page →
@@ -207,8 +207,9 @@ export default async function DigestLabPage({
             <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
               Pull a frozen 24-hour banger set, choose what belongs, compare
               immutable prompt versions, inspect the exact request and run
-              trace, then stage a public edition. Nothing publishes
-              automatically.
+              trace, then stage a public edition. The nightly workflow uses the
+              newest prompt and publishes automatically; manual runs remain
+              editable here.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -259,7 +260,7 @@ export default async function DigestLabPage({
         ) : null}
 
         {activeDraft && state.activeRun ? (
-          <section className="mb-6 flex flex-col gap-4 rounded-xl border-2 border-emerald-500 bg-emerald-50 p-5 shadow-sm dark:bg-emerald-950/25 sm:flex-row sm:items-center sm:justify-between">
+          <section className="mb-6 flex flex-col gap-4 rounded-lg border-2 border-emerald-500 bg-emerald-50 p-5 shadow-sm dark:bg-emerald-950/25 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-800 dark:text-emerald-200">
                 Draft v{activeDraft.version} ready
@@ -269,7 +270,7 @@ export default async function DigestLabPage({
               </h2>
               <p className="mt-1 text-sm text-emerald-900/75 dark:text-emerald-100/75">
                 Publishing makes this exact draft the public edition. It never
-                happens automatically.
+                changes the immutable source run.
               </p>
             </div>
             <form action={publishDigestEditionAction}>
@@ -310,6 +311,15 @@ export default async function DigestLabPage({
                       </option>
                     ))}
                   </select>
+                  <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      name="target_ca_users_only"
+                      value="true"
+                      className="mt-0.5 h-4 w-4 rounded border-zinc-300"
+                    />
+                    Restrict this manual run to Community Archive authors
+                  </label>
                   <SubmitButton pendingLabel="Pulling candidates…">
                     Pull last 24 hours
                   </SubmitButton>
@@ -338,6 +348,7 @@ export default async function DigestLabPage({
                       action: createAndGenerateDigestDateAction,
                       dates: pastDates,
                       promptVersionId: prompt.id,
+                      targetCommunityUsersOnly: false,
                       runningRuns: runningRuns.map((run) => ({
                         date: run.digestDate,
                         id: run.id,
@@ -452,8 +463,9 @@ export default async function DigestLabPage({
                         Candidate selection
                       </h2>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Up to 50 posts with a Community Archive banger score of
-                        at least two, ranked strongest first.
+                        Qualifying bangers first, supplemented to a pool of 10
+                        by same-day posts with the most non-self replies and
+                        quotes from Community Archive members.
                       </p>
                     </div>
                     <span className="text-xs text-muted-foreground">
@@ -497,9 +509,16 @@ export default async function DigestLabPage({
                               <span className="text-muted-foreground">
                                 @{candidate.tweet.username}
                               </span>
+                              {candidate.communityAuthored ? (
+                                <Badge variant="secondary">
+                                  Community author
+                                </Badge>
+                              ) : null}
                               <span className="ml-auto tabular-nums text-muted-foreground">
-                                ✦ {candidate.tweet.quoteCount ?? 0} · ♥{' '}
-                                {candidate.tweet.likes.toLocaleString()}
+                                {candidate.source === 'ca_interactions'
+                                  ? `↪ ${candidate.tweet.interactionCount ?? 0} CA interactions (${candidate.tweet.replyCount ?? 0} replies · ${candidate.tweet.quoteCount ?? 0} quotes) · `
+                                  : `banger ${candidate.tweet.quoteCount ?? 0} quotes · `}
+                                ♥ {candidate.tweet.likes.toLocaleString()}
                               </span>
                             </span>
                             <span className="mt-2 block whitespace-pre-wrap text-sm leading-6">
@@ -510,8 +529,8 @@ export default async function DigestLabPage({
                       ))}
                       {state.activeRun.candidates.length === 0 ? (
                         <p className="p-5 text-sm text-muted-foreground">
-                          No recent bangers met the current quote-based
-                          threshold.
+                          No qualifying bangers or same-day CA-interaction
+                          candidates were found.
                         </p>
                       ) : null}
                     </div>

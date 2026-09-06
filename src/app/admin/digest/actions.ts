@@ -4,20 +4,21 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { start } from 'workflow/api'
 import { requireAdmin } from '@/app/admin/data'
-import { fetchPortalRecentBangers } from '@/lib/portal/analytics'
 import {
   getDigestDateWindow,
   isRecentPastDigestDate,
   listPastDigestDates,
 } from '@/lib/digest/dateWindow'
+import {
+  loadDigestCandidates,
+  MINIMUM_DIGEST_CANDIDATE_POOL,
+} from '@/lib/digest/candidates'
 import { createDigestAdminClient } from '@/lib/digest/database'
-import { selectDailyDigestBangers } from '@/lib/digest/generation'
 import { captureDigestPostHogEvent } from '@/lib/digest/posthogServer'
 import { mapDigestEdition, mapDigestRun, toJson } from '@/lib/digest/data'
 import {
   DIGEST_STORY_CATEGORIES,
   parseDigestEditionContent,
-  type DigestCandidate,
   type DigestEditionContent,
   type DigestRunEvent,
 } from '@/lib/digest/types'
@@ -31,6 +32,8 @@ const REASONING_EFFORTS = new Set(['none', 'low', 'medium', 'high'])
 
 const formString = (formData: FormData, key: string) =>
   String(formData.get(key) ?? '').trim()
+const formBoolean = (formData: FormData, key: string) =>
+  ['true', 'on', '1'].includes(formString(formData, key).toLowerCase())
 
 const event = (
   stage: DigestRunEvent['stage'],
@@ -285,6 +288,7 @@ export async function createDigestPromptVersionAction(formData: FormData) {
 export async function createDigestRunAction(formData: FormData) {
   const { user } = await requireAdmin()
   const promptVersionId = formString(formData, 'prompt_version_id')
+  const targetCommunityUsersOnly = formBoolean(formData, 'target_ca_users_only')
   if (!UUID_PATTERN.test(promptVersionId)) {
     redirectToLab({ error: 'Choose a prompt version.' })
   }
@@ -304,22 +308,28 @@ export async function createDigestRunAction(formData: FormData) {
   try {
     const windowEnd = new Date()
     const windowStart = new Date(windowEnd.getTime() - 24 * 60 * 60 * 1_000)
-    const tweets = await fetchPortalRecentBangers(50, 24)
-    const candidates: DigestCandidate[] = selectDailyDigestBangers(tweets).map(
-      (tweet, index) => ({
-        tweet,
-        sourceRank: index + 1,
-        selected: true,
-      }),
+    const snapshot = await loadDigestCandidates(
+      windowEnd.toISOString(),
+      targetCommunityUsersOnly,
     )
+    const candidates = snapshot.candidates
+    const authorPopulation = targetCommunityUsersOnly
+      ? 'current Community Archive members'
+      : 'all authors'
     const initialEvent = event(
       'candidates',
       'completed',
-      'Saved up to 50 rolling 24-hour posts with a Community Archive banger score of at least two.',
+      `Saved rolling 24-hour candidates by ${authorPopulation}: qualifying bangers first, then CA interaction-ranked posts up to a minimum pool of ${MINIMUM_DIGEST_CANDIDATE_POOL}.`,
       {
         candidate_count: candidates.length,
         default_selected_count: candidates.length,
+        qualifying_banger_count: snapshot.bangerCount,
+        community_authored_count: snapshot.communityAuthoredCount,
+        interaction_fallback_count: snapshot.fallbackCount,
         minimum_ca_quote_count: 2,
+        target_author_population: targetCommunityUsersOnly
+          ? 'community_members'
+          : 'all_authors',
       },
     )
     const { data: run, error } = await admin
@@ -362,6 +372,7 @@ export async function createAndGenerateDigestDateAction(formData: FormData) {
   const { user } = await requireAdmin()
   const promptVersionId = formString(formData, 'prompt_version_id')
   const digestDate = formString(formData, 'digest_date')
+  const targetCommunityUsersOnly = formBoolean(formData, 'target_ca_users_only')
   if (!UUID_PATTERN.test(promptVersionId)) {
     redirectToLab({ error: 'Choose a prompt version.' })
   }
@@ -399,27 +410,28 @@ export async function createAndGenerateDigestDateAction(formData: FormData) {
   let candidateCount = 0
   try {
     const window = getDigestDateWindow(digestDate)
-    const tweets = await fetchPortalRecentBangers(
-      50,
-      24,
-      undefined,
+    const snapshot = await loadDigestCandidates(
       window.windowEnd,
+      targetCommunityUsersOnly,
     )
-    const candidates: DigestCandidate[] = selectDailyDigestBangers(tweets).map(
-      (tweet, index) => ({
-        tweet,
-        sourceRank: index + 1,
-        selected: true,
-      }),
-    )
+    const candidates = snapshot.candidates
+    const authorPopulation = targetCommunityUsersOnly
+      ? 'current Community Archive members'
+      : 'all authors'
     const initialEvent = event(
       'candidates',
       'completed',
-      `Saved up to 50 bangers authored during the ${digestDate} Community Archive day (06:00 UTC to 05:59 UTC).`,
+      `Saved ${digestDate} Community Archive day candidates by ${authorPopulation}: qualifying bangers first, then CA interaction-ranked posts up to a minimum pool of ${MINIMUM_DIGEST_CANDIDATE_POOL}.`,
       {
         candidate_count: candidates.length,
         default_selected_count: candidates.length,
+        qualifying_banger_count: snapshot.bangerCount,
+        community_authored_count: snapshot.communityAuthoredCount,
+        interaction_fallback_count: snapshot.fallbackCount,
         minimum_ca_quote_count: 2,
+        target_author_population: targetCommunityUsersOnly
+          ? 'community_members'
+          : 'all_authors',
         historical_window: true,
       },
     )

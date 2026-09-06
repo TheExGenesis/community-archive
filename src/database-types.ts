@@ -36,18 +36,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      commit_temp_data: {
-        Args: {
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      create_temp_tables: {
-        Args: {
-          p_suffix: string
-        }
-        Returns: undefined
-      }
       delete_all_archives: {
         Args: {
           p_account_id: string
@@ -58,12 +46,6 @@ export type Database = {
         Args: {
           function_name: string
           function_args: string[]
-        }
-        Returns: undefined
-      }
-      drop_temp_tables: {
-        Args: {
-          p_suffix: string
         }
         Returns: undefined
       }
@@ -85,73 +67,6 @@ export type Database = {
           follower_count: number
         }[]
       }
-      insert_temp_account: {
-        Args: {
-          p_account: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_archive_upload: {
-        Args: {
-          p_account_id: string
-          p_archive_at: string
-          p_suffix: string
-        }
-        Returns: number
-      }
-      insert_temp_followers: {
-        Args: {
-          p_followers: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_following: {
-        Args: {
-          p_following: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_likes: {
-        Args: {
-          p_likes: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_profiles: {
-        Args: {
-          p_profile: Json
-          p_account_id: string
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_tweets: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      process_and_insert_tweet_entities: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      process_archive: {
-        Args: {
-          archive_data: Json
-        }
-        Returns: undefined
-      }
     }
     Enums: {
       [_ in never]: never
@@ -168,6 +83,7 @@ export type Database = {
           account_id: string
           created_at: string
           created_via: string
+          is_tombstone: boolean
           num_followers: number | null
           num_following: number | null
           num_likes: number | null
@@ -180,6 +96,7 @@ export type Database = {
           account_id: string
           created_at: string
           created_via: string
+          is_tombstone?: boolean
           num_followers?: number | null
           num_following?: number | null
           num_likes?: number | null
@@ -192,6 +109,7 @@ export type Database = {
           account_id?: string
           created_at?: string
           created_via?: string
+          is_tombstone?: boolean
           num_followers?: number | null
           num_following?: number | null
           num_likes?: number | null
@@ -324,6 +242,145 @@ export type Database = {
           },
         ]
       }
+      community_project_comments: {
+        Row: {
+          content: string
+          created_at: string
+          deleted_at: string | null
+          display_name: string | null
+          id: string
+          project_id: string
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          id?: string
+          project_id: string
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          id?: string
+          project_id?: string
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_project_comments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "community_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_project_likes: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_project_likes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "community_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_projects: {
+        Row: {
+          archive_use: string
+          category: string
+          cover_mime_type: string | null
+          cover_storage_path: string | null
+          creator_handle: string | null
+          creator_name: string
+          description: string
+          featured: boolean
+          id: string
+          name: string
+          project_url: string
+          published_at: string | null
+          published_by: string | null
+          slug: string
+          source_post_url: string
+          status: string
+          submitted_at: string
+          submitted_by: string | null
+          submitter_username: string
+          tags: string[]
+        }
+        Insert: {
+          archive_use: string
+          category: string
+          cover_mime_type?: string | null
+          cover_storage_path?: string | null
+          creator_handle?: string | null
+          creator_name: string
+          description: string
+          featured?: boolean
+          id?: string
+          name: string
+          project_url: string
+          published_at?: string | null
+          published_by?: string | null
+          slug: string
+          source_post_url: string
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          submitter_username: string
+          tags?: string[]
+        }
+        Update: {
+          archive_use?: string
+          category?: string
+          cover_mime_type?: string | null
+          cover_storage_path?: string | null
+          creator_handle?: string | null
+          creator_name?: string
+          description?: string
+          featured?: boolean
+          id?: string
+          name?: string
+          project_url?: string
+          published_at?: string | null
+          published_by?: string | null
+          slug?: string
+          source_post_url?: string
+          status?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          submitter_username?: string
+          tags?: string[]
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           conversation_id: string | null
@@ -358,6 +415,79 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "tweets_w_conversation_id"
             referencedColumns: ["tweet_id"]
+          },
+        ]
+      }
+      digest_edition_comments: {
+        Row: {
+          content: string
+          created_at: string
+          deleted_at: string | null
+          display_name: string | null
+          edition_id: string
+          id: string
+          updated_at: string
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          edition_id: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          edition_id?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_edition_comments_edition_id_fkey"
+            columns: ["edition_id"]
+            isOneToOne: false
+            referencedRelation: "digest_editions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      digest_edition_likes: {
+        Row: {
+          created_at: string
+          edition_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          edition_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          edition_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_edition_likes_edition_id_fkey"
+            columns: ["edition_id"]
+            isOneToOne: false
+            referencedRelation: "digest_editions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -410,6 +540,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      digest_email_sends: {
+        Row: {
+          edition_id: string
+          message_id: string | null
+          sent_at: string
+          subscription_id: string
+        }
+        Insert: {
+          edition_id: string
+          message_id?: string | null
+          sent_at?: string
+          subscription_id: string
+        }
+        Update: {
+          edition_id?: string
+          message_id?: string | null
+          sent_at?: string
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_email_sends_edition_id_fkey"
+            columns: ["edition_id"]
+            isOneToOne: false
+            referencedRelation: "digest_editions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "digest_email_sends_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "digest_email_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      digest_email_subscriptions: {
+        Row: {
+          account_id: string | null
+          confirmed_at: string | null
+          created_at: string
+          email: string
+          id: string
+          token: string
+          unsubscribed_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          token?: string
+          unsubscribed_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          token?: string
+          unsubscribed_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       digest_prompt_versions: {
         Row: {
@@ -657,18 +856,24 @@ export type Database = {
       }
       liked_tweets: {
         Row: {
+          author_account_id: string | null
           fts: unknown | null
           full_text: string
+          is_tombstone: boolean
           tweet_id: string
         }
         Insert: {
+          author_account_id?: string | null
           fts?: unknown | null
           full_text: string
+          is_tombstone?: boolean
           tweet_id: string
         }
         Update: {
+          author_account_id?: string | null
           fts?: unknown | null
           full_text?: string
+          is_tombstone?: boolean
           tweet_id?: string
         }
         Relationships: []
@@ -735,18 +940,21 @@ export type Database = {
       }
       mentioned_users: {
         Row: {
+          is_tombstone: boolean
           name: string
           screen_name: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          is_tombstone?: boolean
           name: string
           screen_name: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          is_tombstone?: boolean
           name?: string
           screen_name?: string
           updated_at?: string
@@ -1127,6 +1335,7 @@ export type Database = {
           favorite_count: number
           fts: unknown | null
           full_text: string
+          is_tombstone: boolean
           reply_to_tweet_id: string | null
           reply_to_user_id: string | null
           reply_to_username: string | null
@@ -1141,6 +1350,7 @@ export type Database = {
           favorite_count: number
           fts?: unknown | null
           full_text: string
+          is_tombstone?: boolean
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
@@ -1155,6 +1365,7 @@ export type Database = {
           favorite_count?: number
           fts?: unknown | null
           full_text?: string
+          is_tombstone?: boolean
           reply_to_tweet_id?: string | null
           reply_to_user_id?: string | null
           reply_to_username?: string | null
@@ -1610,11 +1821,28 @@ export type Database = {
         }
         Returns: undefined
       }
-      commit_temp_data: {
+      archive_upload_is_allowed: {
         Args: {
-          p_suffix: string
+          p_account_id: string
+          p_username: string
         }
-        Returns: undefined
+        Returns: boolean
+      }
+      assert_archive_upload_allowed: {
+        Args: {
+          p_account_id: string
+          p_username: string
+        }
+        Returns: boolean
+      }
+      community_archive_monitoring_digest: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          publication_age_seconds: number
+          expected_date_published: number
+          automated_run_failed: number
+          healthy: number
+        }[]
       }
       compute_hourly_scraping_stats: {
         Args: {
@@ -1628,18 +1856,25 @@ export type Database = {
           unique_scrapers: number
         }[]
       }
-      create_temp_tables: {
-        Args: {
-          p_suffix: string
-        }
-        Returns: undefined
-      }
       delete_non_allowlist_streamed_tweet_batch: {
         Args: {
           p_limit?: number
         }
         Returns: {
           requested_tweets: number
+          deleted_tweets: number
+          deleted_conversations: number
+          deleted_tweet_media: number
+          deleted_user_mentions: number
+          deleted_tweet_urls: number
+          deleted_private_tweet_user: number
+        }[]
+      }
+      delete_own_tweets: {
+        Args: {
+          p_tweet_ids: string[]
+        }
+        Returns: {
           deleted_tweets: number
           deleted_conversations: number
           deleted_tweet_media: number
@@ -1681,11 +1916,13 @@ export type Database = {
         }
         Returns: undefined
       }
-      drop_temp_tables: {
+      enqueue_policy_archive_cleanup: {
         Args: {
-          p_suffix: string
+          p_account_id: string
+          p_username: string
+          p_reason?: string
         }
-        Returns: undefined
+        Returns: string
       }
       get_account_most_liked_tweets_archive_users: {
         Args: {
@@ -2138,76 +2375,30 @@ export type Database = {
         }
         Returns: unknown
       }
-      insert_temp_account: {
-        Args: {
-          p_account: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      insert_temp_archive_upload: {
+      lock_policy_account: {
         Args: {
           p_account_id: string
-          p_archive_at: string
-          p_keep_private: boolean
-          p_upload_likes: boolean
-          p_start_date: string
-          p_end_date: string
-          p_suffix: string
-        }
-        Returns: number
-      }
-      insert_temp_followers: {
-        Args: {
-          p_followers: Json
-          p_account_id: string
-          p_suffix: string
         }
         Returns: undefined
       }
-      insert_temp_following: {
+      policy_account_is_blocked: {
         Args: {
-          p_following: Json
-          p_account_id: string
-          p_suffix: string
+          p_account_id?: string
+          p_username?: string
         }
-        Returns: undefined
+        Returns: boolean
       }
-      insert_temp_likes: {
+      policy_blocked_account_id: {
         Args: {
-          p_likes: Json
-          p_account_id: string
-          p_suffix: string
+          p_username: string
         }
-        Returns: undefined
+        Returns: string
       }
-      insert_temp_profiles: {
+      policy_json_contains_blocked_author: {
         Args: {
-          p_profile: Json
-          p_account_id: string
-          p_suffix: string
+          p_payload: Json
         }
-        Returns: undefined
-      }
-      insert_temp_tweets: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      process_and_insert_tweet_entities: {
-        Args: {
-          p_tweets: Json
-          p_suffix: string
-        }
-        Returns: undefined
-      }
-      process_archive: {
-        Args: {
-          archive_data: Json
-        }
-        Returns: undefined
+        Returns: boolean
       }
       publish_digest_edition: {
         Args: {
@@ -2300,6 +2491,18 @@ export type Database = {
           media: Json
         }[]
       }
+      search_user_suggestions: {
+        Args: {
+          search_text: string
+          result_limit?: number
+        }
+        Returns: {
+          account_id: string
+          username: string
+          account_display_name: string
+          num_followers: number
+        }[]
+      }
       set_limit: {
         Args: {
           "": number
@@ -2315,6 +2518,12 @@ export type Database = {
           "": string
         }
         Returns: string[]
+      }
+      tombstone_policy_account: {
+        Args: {
+          p_account_id: string
+        }
+        Returns: undefined
       }
       update_foreign_keys: {
         Args: {

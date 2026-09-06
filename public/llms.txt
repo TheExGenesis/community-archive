@@ -16,26 +16,16 @@ Source repository: https://github.com/TheExGenesis/community-archive
 
 ## Choose the right data access method
 
-1. Bulk or corpus-wide analysis: use the Parquet dump. Do not page through millions of API rows.
-2. Filtered or application queries: use the Supabase REST API.
-3. One user's original processed archive: fetch that user's public `archive.json`.
+1. Filtered or application queries: use the Supabase REST API.
+2. Bulk analysis: the historical Parquet artifact is unavailable while its exporter is rebuilt to enforce current consent.
+3. One user's original processed archive: authenticated owners may use the policy-aware web endpoint for their own archive.
 
 ## Bulk dump
 
-Canonical release page: https://github.com/TheExGenesis/community-archive/releases/tag/data_export
-Current Parquet file: https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet
-
-The GitHub release page is the canonical location for current export notes and the download link. The export contains enriched tweet records, including tweet and account IDs, username, display name, timestamp, text, engagement counts, reply fields, quoted tweet ID, conversation ID, avatar URL, and archive upload ID.
-
-DuckDB example:
-
-```sql
-SELECT tweet_id, username, created_at, full_text
-FROM read_parquet('https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/enriched_tweets/enriched_tweets.parquet')
-WHERE lower(username) = 'defenderofbasic'
-ORDER BY created_at DESC
-LIMIT 100;
-```
+The historical `enriched_tweets.parquet` object and release verifier are
+disabled because that exporter did not apply current PostgreSQL consent to
+every nested author immediately before publication. Use filtered REST queries
+until a policy-aware replacement is available.
 
 ## API
 
@@ -76,11 +66,13 @@ Important API rules:
 - Use PostgREST filters such as `username=eq.name`, `created_at=gte.2025-01-01`, and `order=created_at.desc`.
 - Select only needed columns.
 - Responses are capped at 1,000 rows. Paginate with `limit` and `offset` or HTTP Range headers, using a stable order.
-- Use the Parquet dump instead of the API for full-corpus analysis.
+- Full-corpus bulk access is paused until the Parquet exporter is policy-aware.
 
 ## Individual raw archives
 
-URL template: https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/<lowercase-username>/archive.json
+Raw archives are private and policy-checked at download time. Use the web
+endpoint `/api/archive/<username>` while authenticated as that archive owner;
+blocked owners receive no download URL.
 
 Raw archive structure: https://raw.githubusercontent.com/TheExGenesis/community-archive/main/docs/archive_data.md
 

@@ -34,7 +34,7 @@ jest.mock('@/components/digest/DigestMarkdown', () => ({
 }))
 
 describe('DigestEditionView', () => {
-  test('keeps the future weekly newsletter call to action hidden', () => {
+  test('offers the inline email subscribe control', () => {
     render(
       <DigestEditionView
         edition={AUGUST_11_MOCK_DIGEST}
@@ -43,7 +43,12 @@ describe('DigestEditionView', () => {
     )
 
     expect(
-      screen.queryByRole('link', { name: 'Get the weekly email' }),
+      screen.getByRole('button', { name: 'Subscribe' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', {
+        name: 'Subscribe to Community Archive on Substack',
+      }),
     ).not.toBeInTheDocument()
   })
 

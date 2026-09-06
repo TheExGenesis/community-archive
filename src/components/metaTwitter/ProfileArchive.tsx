@@ -1,5 +1,7 @@
 'use client'
 
+import { useReportSectionReady } from '@/components/PagePerformance'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArchiveNav, archiveChapterHref, type NavChapter } from './ArchiveNav'
 import { Workspace } from './Workspace'
@@ -9,6 +11,11 @@ import {
   type ProfileBangerSort,
   type ProfileBangersPageState,
 } from '@/lib/metaTwitter/profilePagination'
+import { chapterSectionTweets } from '@/lib/metaTwitter/chapterSections'
+import type {
+  ChapterSection,
+  SectionsByYear,
+} from '@/lib/metaTwitter/chapterSections'
 import type {
   ArchiveMediaItem,
   ArchivePerson,
@@ -41,6 +48,14 @@ interface FeedState {
   available: boolean
 }
 
+interface DismissedItem {
+  itemId: string
+  section: ProfileCurationSection
+}
+
+const EMPTY_SECTIONS: ChapterSection[] = []
+const EMPTY_SECTIONS_BY_YEAR: SectionsByYear = {}
+
 const scopeKey = (year: number | null) => year?.toString() ?? 'overall'
 const feedKey = (year: number | null, sort: ProfileBangerSort) =>
   `${scopeKey(year)}:${sort}`
@@ -64,6 +79,9 @@ const yearFromLocation = (chapters: NavChapter[]): number | null => {
   return chapters.some((chapter) => chapter.year === year) ? year : null
 }
 
+const sectionFromLocation = () =>
+  new URL(window.location.href).searchParams.get('section')
+
 export function ProfileArchive({
   accountId,
   avatarUrl,
@@ -71,8 +89,10 @@ export function ProfileArchive({
   chapters,
   displayName,
   initialYear,
+  initialSectionSlug = null,
   initialPage,
   initialSidebar,
+  sectionsByYear = EMPTY_SECTIONS_BY_YEAR,
 }: {
   accountId: string
   avatarUrl: string | null
@@ -80,13 +100,24 @@ export function ProfileArchive({
   chapters: NavChapter[]
   displayName: string
   initialYear: number | null
+  initialSectionSlug?: string | null
   initialPage: ProfileBangersPageState
   initialSidebar?: SidebarData
+  /** Curated or generated sections per chapter year, catch-alls included. */
+  sectionsByYear?: SectionsByYear
+  /** Shown under the chapter list, e.g. why there are no sections. */
 }) {
   const initialFeedKey = feedKey(initialYear, 'quotes')
   const initialScopeKey = scopeKey(initialYear)
   const hasInitialSidebar = initialSidebar?.available !== false
   const [activeYear, setActiveYear] = useState<number | null>(initialYear)
+  const [activeSectionSlug, setActiveSectionSlug] = useState<string | null>(
+    (initialYear !== null &&
+      sectionsByYear[initialYear]?.find(
+        (section) => section.slug === initialSectionSlug,
+      )?.slug) ||
+      null,
+  )
   const [sort, setSort] = useState<ProfileBangerSort>('quotes')
   const [feeds, setFeeds] = useState<Record<string, FeedState>>({
     [initialFeedKey]: initialPage,
@@ -124,6 +155,7 @@ export function ProfileArchive({
   )
   const { editing, editSaving, setEditing, setEditSaving } = useProfileEditing()
   const [editError, setEditError] = useState<string | null>(null)
+  const [dismissedItem, setDismissedItem] = useState<DismissedItem | null>(null)
   const feedsRef = useRef(feeds)
   const mediaRef = useRef(mediaByScope)
   const peopleRef = useRef(peopleByScope)
@@ -132,6 +164,12 @@ export function ProfileArchive({
   const peopleRequests = useRef(new Map<string, Promise<void>>())
   const automaticallyFilledFeeds = useRef(new Set<string>())
   const loadMoreRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!dismissedItem) return
+    const timeout = window.setTimeout(() => setDismissedItem(null), 10_000)
+    return () => window.clearTimeout(timeout)
+  }, [dismissedItem])
 
   const updateFeeds = useCallback(
     (
@@ -338,6 +376,7 @@ export function ProfileArchive({
   const activeNextOffset = activeFeed?.nextOffset
   const activeFeedLoading = Boolean(loadingFeeds[activeKey])
   const activeFeedFailed = Boolean(failedFeeds[activeKey])
+  useReportSectionReady('profile_feed', activeFeedLoaded && !activeFeedFailed)
   const activeScopeKey = scopeKey(activeYear)
   const activeMedia = mediaByScope[activeScopeKey]
   const activePeople = peopleByScope[activeScopeKey]
@@ -346,15 +385,54 @@ export function ProfileArchive({
   const activeMediaFailed = Boolean(failedMedia[activeScopeKey])
   const activePeopleFailed = Boolean(failedPeople[activeScopeKey])
   const hasMore = activeFeedLoaded && activeNextOffset !== null
+  const activeSections =
+    activeYear === null
+      ? EMPTY_SECTIONS
+      : (sectionsByYear[activeYear] ?? EMPTY_SECTIONS)
+  const activeSection =
+    activeSections.find((section) => section.slug === activeSectionSlug) ?? null
+  const sectionTweets = activeSection
+    ? chapterSectionTweets(
+        activeSections,
+        activeSection,
+        activeFeed?.tweets ?? [],
+      )
+    : (activeFeed?.tweets ?? [])
+
+  // A section filters the chapter in the client, so the rest of the chapter's
+  // pages have to arrive before an empty section means anything.
+  useEffect(() => {
+    if (!activeSection || !hasMore || activeFeedLoading || activeFeedFailed) {
+      return
+    }
+    void loadNextPage(activeYear, sort)
+  }, [
+    activeFeedFailed,
+    activeFeedLoading,
+    activeNextOffset,
+    activeSection,
+    activeYear,
+    hasMore,
+    loadNextPage,
+    sort,
+  ])
 
   useEffect(() => {
     const onPopState = () => {
+      const year = yearFromLocation(chapters)
       setSort('quotes')
-      setActiveYear(yearFromLocation(chapters))
+      setActiveYear(year)
+      const slug = sectionFromLocation()
+      setActiveSectionSlug(
+        (year !== null &&
+          sectionsByYear[year]?.find((section) => section.slug === slug)
+            ?.slug) ||
+          null,
+      )
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [chapters])
+  }, [chapters, sectionsByYear])
 
   useEffect(() => {
     const current = feedsRef.current[activeKey]
@@ -387,26 +465,27 @@ export function ProfileArchive({
     void loadPeople(activeYear)
   }, [activeYear, loadPeople])
 
-  useEffect(() => {
-    const initialFill = loadNextPage(initialYear, 'quotes')
-    void initialFill.finally(() => {
-      const scopes = [null, ...chapters.map((chapter) => chapter.year)].filter(
-        (year) => year !== initialYear,
+  // Only speculative chapter reads are gated; choosing a chapter always loads it.
+  const preloadingChapter = useRef(false)
+  const prefetchChapter = useCallback(
+    (year: number | null) => {
+      if (
+        preloadingChapter.current ||
+        feedsRef.current[feedKey(year, 'quotes')]
       )
-      void Promise.allSettled(
-        scopes.map((year) => {
-          const key = feedKey(year, 'quotes')
-          const alreadyLoading = Array.from(feedRequests.current.keys()).some(
-            (requestKey) => requestKey.startsWith(`${key}:`),
-          )
-          if (feedsRef.current[key] || alreadyLoading) {
-            return Promise.resolve()
-          }
-          return loadFeedPage(year, 'quotes', 0, PROFILE_BANGERS_PRELOAD_LIMIT)
-        }),
-      )
-    })
-  }, [chapters, initialYear, loadFeedPage, loadNextPage])
+        return
+      preloadingChapter.current = true
+      void loadFeedPage(
+        year,
+        'quotes',
+        0,
+        PROFILE_BANGERS_PRELOAD_LIMIT,
+      ).finally(() => {
+        preloadingChapter.current = false
+      })
+    },
+    [loadFeedPage],
+  )
 
   useEffect(() => {
     const target = loadMoreRef.current
@@ -432,11 +511,29 @@ export function ProfileArchive({
 
   const selectChapter = useCallback(
     (year: number | null) => {
-      if (year === activeYear) return
+      if (year === activeYear && activeSectionSlug === null) return
       setEditing(false)
       setSort('quotes')
       setActiveYear(year)
+      setActiveSectionSlug(null)
       window.history.pushState(null, '', archiveChapterHref(basePath, year))
+    },
+    [activeSectionSlug, activeYear, basePath, setEditing],
+  )
+
+  const selectSection = useCallback(
+    (year: number, slug: string | null) => {
+      if (year !== activeYear) {
+        setEditing(false)
+        setSort('quotes')
+        setActiveYear(year)
+      }
+      setActiveSectionSlug(slug)
+      window.history.pushState(
+        null,
+        '',
+        archiveChapterHref(basePath, year, slug),
+      )
     },
     [activeYear, basePath, setEditing],
   )
@@ -445,6 +542,7 @@ export function ProfileArchive({
     if (!editing || activeYear === null) return
     setSort('quotes')
     setActiveYear(null)
+    setActiveSectionSlug(null)
     window.history.pushState(null, '', archiveChapterHref(basePath, null))
   }, [activeYear, basePath, editing])
 
@@ -489,6 +587,8 @@ export function ProfileArchive({
       })
       if (!result) return
 
+      setDismissedItem({ section, itemId })
+
       if (section === 'bangers') {
         const prefix = `${activeScopeKey}:`
         updateFeeds((current) =>
@@ -521,6 +621,52 @@ export function ProfileArchive({
     },
     [accountId, activeScopeKey, runEditMutation, updateFeeds, updatePeople],
   )
+
+  const undoDismissItem = useCallback(async () => {
+    if (!dismissedItem) return
+    setDismissedItem(null)
+    const result = await runEditMutation({
+      action: 'restore-item',
+      accountId,
+      section: dismissedItem.section,
+      itemId: dismissedItem.itemId,
+    })
+    if (!result) {
+      setDismissedItem(dismissedItem)
+      return
+    }
+
+    if (dismissedItem.section === 'bangers') {
+      const prefix = `${activeScopeKey}:`
+      const nextFeeds = Object.fromEntries(
+        Object.entries(feedsRef.current).filter(
+          ([key]) => !key.startsWith(prefix),
+        ),
+      )
+      feedsRef.current = nextFeeds
+      setFeeds(nextFeeds)
+      automaticallyFilledFeeds.current.delete(activeKey)
+      await loadFeedPage(activeYear, sort, 0, PROFILE_BANGERS_PRELOAD_LIMIT)
+      return
+    }
+
+    const nextPeople = { ...peopleRef.current }
+    delete nextPeople[activeScopeKey]
+    peopleRef.current = nextPeople
+    setPeopleByScope(nextPeople)
+    peopleRequests.current.delete(activeScopeKey)
+    await loadPeople(activeYear)
+  }, [
+    accountId,
+    activeKey,
+    activeScopeKey,
+    activeYear,
+    dismissedItem,
+    loadFeedPage,
+    loadPeople,
+    runEditMutation,
+    sort,
+  ])
 
   const toggleFeature = useCallback(
     async (section: ProfileCurationSection, itemId: string) => {
@@ -711,11 +857,41 @@ export function ProfileArchive({
     ],
   )
 
-  const contextTitle = activeYear
-    ? `Best of ${activeYear}`
-    : `Best of ${displayName}`
+  const addTweet = useCallback(
+    async (itemId: string) => {
+      const result = await runEditMutation({
+        action: 'add',
+        accountId,
+        section: 'bangers',
+        itemId,
+      })
+      if (!result) return false
 
-  const returnTo = archiveChapterHref(basePath, activeYear)
+      const nextFeeds = Object.fromEntries(
+        Object.entries(feedsRef.current).filter(
+          ([key]) => !key.startsWith('overall:'),
+        ),
+      )
+      feedsRef.current = nextFeeds
+      setFeeds(nextFeeds)
+      automaticallyFilledFeeds.current.delete(activeKey)
+      await loadFeedPage(null, sort, 0, PROFILE_BANGERS_PRELOAD_LIMIT)
+      return true
+    },
+    [accountId, activeKey, loadFeedPage, runEditMutation, sort],
+  )
+
+  const contextTitle = activeSection
+    ? activeSection.title
+    : activeYear
+      ? `Best of ${activeYear}`
+      : `Best of ${displayName}`
+
+  const returnTo = archiveChapterHref(
+    basePath,
+    activeYear,
+    activeSection?.slug ?? null,
+  )
 
   return (
     <div className="grid grid-cols-1 items-start border-t border-border lg:grid-cols-[250px_1fr]">
@@ -723,13 +899,17 @@ export function ProfileArchive({
         basePath={basePath}
         chapters={chapters}
         activeYear={activeYear}
+        sectionsByYear={sectionsByYear}
+        activeSectionSlug={activeSection?.slug ?? null}
         onSelect={selectChapter}
+        onIntent={prefetchChapter}
+        onSelectSection={selectSection}
       />
       <Workspace
         key={`${activeKey}:${activeFeed ? 'ready' : 'loading'}`}
         avatarUrl={avatarUrl}
         contextTitle={contextTitle}
-        tweets={activeFeed?.tweets ?? []}
+        tweets={sectionTweets}
         bangersAvailable={activeFeed?.available !== false}
         bangersLoading={activeFeedLoading || (!activeFeed && !activeFeedFailed)}
         media={activeMedia?.media ?? []}
@@ -759,6 +939,8 @@ export function ProfileArchive({
         editing={editing && activeYear === null}
         editSaving={editSaving}
         editError={editError}
+        undoDismissAvailable={dismissedItem !== null}
+        onUndoDismiss={() => void undoDismissItem()}
         onDismiss={(section, itemId) => void dismissItem(section, itemId)}
         onToggleFeature={(section, itemId) =>
           void toggleFeature(section, itemId)
@@ -767,6 +949,7 @@ export function ProfileArchive({
           void moveItem(section, itemId, direction)
         }
         onRestore={(section) => void restoreSection(section)}
+        onAddTweet={addTweet}
       />
     </div>
   )

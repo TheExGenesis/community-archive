@@ -36,7 +36,7 @@ export function TweetText({
               href={part}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[hsl(var(--brand))] hover:underline"
+              className="text-[hsl(var(--brand))]"
             >
               {part.replace(/^https?:\/\//, '')}
             </a>
@@ -49,7 +49,7 @@ export function TweetText({
               href={`https://x.com/${part.slice(1)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[hsl(var(--brand))] hover:underline"
+              className="text-[hsl(var(--brand))]"
             >
               {part}
             </a>

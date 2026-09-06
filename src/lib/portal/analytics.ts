@@ -62,6 +62,12 @@ interface ClickHouseSearchTweet {
   username: string | null
   accountDisplayName: string | null
   avatarMediaUrl: string | null
+  media?: Array<{
+    mediaUrl: string
+    mediaType: string
+    width: number | null
+    height: number | null
+  }>
 }
 
 interface ClickHouseSearchResponse {
@@ -93,6 +99,15 @@ interface ClickHouseRecentBanger {
 
 interface ClickHouseRecentBangersResponse {
   data: ClickHouseRecentBanger[]
+}
+
+interface ClickHouseDailyInteraction extends ClickHouseRecentBanger {
+  interactionCount: string | number
+  replyCount: string | number
+}
+
+interface ClickHouseDailyInteractionsResponse {
+  data: ClickHouseDailyInteraction[]
 }
 
 interface ClickHouseTopQuote {
@@ -321,17 +336,31 @@ export async function fetchPortalTrendSeries(
 
 interface PortalTrendEvidenceOptions {
   limit?: number
+  offset?: number
   since?: string
+  sort?: 'newest' | 'oldest'
   until?: string
 }
 
-/** Latest posts counted by at least one included trend in an optional period. */
+export interface PortalTrendEvidencePage {
+  tweets: PortalTweet[]
+  nextOffset: number | null
+}
+
+/** Chronological page of posts counted by an included trend in a period. */
 export async function fetchPortalTrendEvidence(
   includeTerms: string[],
-  { limit = 30, since, until }: PortalTrendEvidenceOptions = {},
+  {
+    limit = 30,
+    offset = 0,
+    since,
+    sort = 'newest',
+    until,
+  }: PortalTrendEvidenceOptions = {},
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
-): Promise<PortalTweet[]> {
+): Promise<PortalTrendEvidencePage> {
   const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
+  const safeOffset = Math.max(0, Math.min(5_000, Math.trunc(offset)))
   const candidateLimit = Math.min(50, Math.max(safeLimit * 2, 30))
   const responses = await runBatched(
     includeTerms.map(
@@ -343,6 +372,8 @@ export async function fetchPortalTrendEvidence(
               q: term,
               mode: 'all',
               limit: String(candidateLimit),
+              offset: String(safeOffset),
+              sort,
             })
             if (since) params.set('since', since)
             if (until) params.set('until', until)
@@ -357,10 +388,19 @@ export async function fetchPortalTrendEvidence(
   )
 
   const unique = new Map<string, PortalTweet>()
+  let hasMore = false
   for (const response of responses) {
     if (!Array.isArray(response.data?.tweets)) {
       throw new Error('ClickHouse search returned an invalid response')
     }
+    if (
+      response.data.nextOffset !== null &&
+      (!Number.isSafeInteger(response.data.nextOffset) ||
+        response.data.nextOffset <= safeOffset)
+    ) {
+      throw new Error('ClickHouse search returned an invalid next offset')
+    }
+    hasMore ||= response.data.nextOffset !== null
     for (const row of response.data.tweets) {
       if (
         !/^\d{1,32}$/.test(row.tweetId) ||
@@ -371,6 +411,22 @@ export async function fetchPortalTrendEvidence(
       }
       const username = row.username || 'unknown'
       const createdAt = safeTimestamp(row.createdAt, 'trend tweet timestamp')
+      const media = row.media?.flatMap((item) =>
+        typeof item.mediaUrl === 'string' && typeof item.mediaType === 'string'
+          ? [
+              {
+                url: item.mediaUrl,
+                type: item.mediaType,
+                ...(typeof item.width === 'number'
+                  ? { width: item.width }
+                  : {}),
+                ...(typeof item.height === 'number'
+                  ? { height: item.height }
+                  : {}),
+              },
+            ]
+          : [],
+      )
       unique.set(row.tweetId, {
         id: row.tweetId,
         accountId: row.accountId,
@@ -382,17 +438,29 @@ export async function fetchPortalTrendEvidence(
         createdAt,
         likes: safeCount(row.favoriteCount, 'trend tweet favorite count'),
         rts: safeCount(row.retweetCount, 'trend tweet repost count'),
+        ...(media ? { media } : {}),
       })
     }
   }
 
-  return Array.from(unique.values())
+  const direction = sort === 'oldest' ? 1 : -1
+  const tweets = Array.from(unique.values())
     .sort(
       (left, right) =>
-        new Date(right.createdAt).getTime() -
-          new Date(left.createdAt).getTime() || right.id.localeCompare(left.id),
+        direction *
+        (new Date(left.createdAt).getTime() -
+          new Date(right.createdAt).getTime() ||
+          left.id.localeCompare(right.id)),
     )
     .slice(0, safeLimit)
+  return {
+    tweets,
+    nextOffset:
+      (hasMore || unique.size > safeLimit) &&
+      safeOffset + tweets.length <= 5_000
+        ? safeOffset + tweets.length
+        : null,
+  }
 }
 
 export async function fetchPortalLiveAnalytics(
@@ -431,12 +499,13 @@ export async function fetchPortalLiveAnalytics(
   }
 }
 
-/** Recent original posts from current archive uploaders and opted-in members. */
+/** Recent posts ranked by quotes from current archive uploaders and opted-in members. */
 export async function fetchPortalRecentBangers(
   limit = 50,
   hours = 48,
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
   end?: string,
+  targetCommunityUsersOnly = false,
 ): Promise<PortalTweet[]> {
   const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
   const safeHours = Math.max(1, Math.min(168, Math.trunc(hours)))
@@ -446,6 +515,7 @@ export async function fetchPortalRecentBangers(
       limit: String(safeLimit),
       hours: String(safeHours),
       ...(end ? { end: safeTimestamp(end, 'window end') } : {}),
+      ...(targetCommunityUsersOnly ? { target_ca_users_only: 'true' } : {}),
     }),
     { timeoutMs: 30_000, revalidate: 1_800 },
   )
@@ -491,6 +561,80 @@ export async function fetchPortalRecentBangers(
       likes: safeCount(row.favoriteCount, 'banger favorite count'),
       rts: safeCount(row.retweetCount, 'banger repost count'),
       quoteCount: safeCount(row.quoteCount, 'banger quote count'),
+      ...(media.length ? { media } : {}),
+    }
+  })
+}
+
+/** Same-window posts ranked by non-self replies and quotes from CA members. */
+export async function fetchPortalDailyInteractions(
+  limit = 50,
+  hours = 24,
+  fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+  end?: string,
+  targetCommunityUsersOnly = false,
+): Promise<PortalTweet[]> {
+  const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)))
+  const safeHours = Math.max(1, Math.min(168, Math.trunc(hours)))
+  const response = await fetcher<ClickHouseDailyInteractionsResponse>(
+    ['daily-interactions'],
+    new URLSearchParams({
+      limit: String(safeLimit),
+      hours: String(safeHours),
+      ...(end ? { end: safeTimestamp(end, 'window end') } : {}),
+      ...(targetCommunityUsersOnly ? { target_ca_users_only: 'true' } : {}),
+    }),
+    { timeoutMs: 30_000, revalidate: 300 },
+  )
+  if (!Array.isArray(response.data)) {
+    throw new Error(
+      'ClickHouse daily-interactions returned an invalid response',
+    )
+  }
+
+  return response.data.map((row) => {
+    if (
+      !/^\d{1,32}$/.test(row.tweetId) ||
+      !/^\d{1,32}$/.test(row.accountId) ||
+      typeof row.fullText !== 'string'
+    ) {
+      throw new Error('ClickHouse daily-interactions returned an invalid tweet')
+    }
+    const username = row.username || 'unknown'
+    const media = (row.media ?? []).flatMap((item) =>
+      typeof item.mediaUrl === 'string' && typeof item.mediaType === 'string'
+        ? [
+            {
+              url: item.mediaUrl,
+              type: item.mediaType,
+              ...(typeof item.width === 'number' ? { width: item.width } : {}),
+              ...(typeof item.height === 'number'
+                ? { height: item.height }
+                : {}),
+            },
+          ]
+        : [],
+    )
+    return {
+      id: row.tweetId,
+      accountId: row.accountId,
+      username,
+      name: row.accountDisplayName || username,
+      avatar: row.avatarMediaUrl || null,
+      text: row.fullText,
+      observedAt: safeTimestamp(
+        row.latestObservedAt,
+        'interaction observation timestamp',
+      ),
+      createdAt: safeTimestamp(row.createdAt, 'interaction authored timestamp'),
+      likes: safeCount(row.favoriteCount, 'interaction favorite count'),
+      rts: safeCount(row.retweetCount, 'interaction repost count'),
+      quoteCount: safeCount(row.quoteCount, 'interaction quote count'),
+      replyCount: safeCount(row.replyCount, 'interaction reply count'),
+      interactionCount: safeCount(
+        row.interactionCount,
+        'interaction total count',
+      ),
       ...(media.length ? { media } : {}),
     }
   })
@@ -577,6 +721,8 @@ export async function fetchPortalBangersPage(
     sort = 'quotes',
     scope = 'all',
     year,
+    createdAfter,
+    createdBefore,
     query = '',
   }: {
     limit?: number
@@ -584,6 +730,8 @@ export async function fetchPortalBangersPage(
     sort?: PortalBangersSort
     scope?: PortalBangersScope
     year?: number
+    createdAfter?: string
+    createdBefore?: string
     query?: string
   } = {},
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
@@ -597,6 +745,8 @@ export async function fetchPortalBangersPage(
     quote_ca_users_only: 'true',
   })
   if (year !== undefined) params.set('year', String(year))
+  if (createdAfter) params.set('created_after', createdAfter)
+  if (createdBefore) params.set('created_before', createdBefore)
   const safeQuery = query.trim().slice(0, 120)
   if (safeQuery) params.set('q', safeQuery)
 
@@ -632,6 +782,8 @@ export async function fetchPortalHistoricalBangers(
 export async function fetchPortalTrends(
   now = new Date(),
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+  includeHistory = true,
+  includeWeekly = true,
 ): Promise<PortalTrends> {
   const currentYear = now.getUTCFullYear()
   const years = Array.from(
@@ -639,7 +791,7 @@ export async function fetchPortalTrends(
     (_, index) => FIRST_TREND_YEAR + index,
   )
   // word-trend accepts date inputs (the same YYYY-MM-DD values used by the
-  // ClickHouse lab UI), rather than full ISO timestamps.
+  // ClickHouse analytics gateway), rather than full ISO timestamps.
   const yearlyFrom = `${FIRST_TREND_YEAR}-01-01`
   const yearlyTo = `${currentYear + 1}-01-01`
   const today = startOfUtcDay(now)
@@ -647,13 +799,15 @@ export async function fetchPortalTrends(
   const from7 = daysBefore(today, 6)
   const weeklyTo = daysBefore(today, -1)
 
+  const chartTerms = includeHistory ? CHART_TERMS : []
+  const weeklyTerms = includeWeekly ? WATCHLIST : []
   const jobs: Array<() => Promise<ClickHouseTrendResponse>> = [
-    ...CHART_TERMS.map(
+    ...chartTerms.map(
       ({ term }) =>
         () =>
           fetchTrend(term, 'year', yearlyFrom, yearlyTo, fetcher),
     ),
-    ...WATCHLIST.map(
+    ...weeklyTerms.map(
       (term) => () =>
         fetchTrend(
           term,
@@ -665,10 +819,10 @@ export async function fetchPortalTrends(
     ),
   ]
   const responses = await runBatched(jobs)
-  const yearlyResponses = responses.slice(0, CHART_TERMS.length)
-  const weeklyResponses = responses.slice(CHART_TERMS.length)
+  const yearlyResponses = responses.slice(0, chartTerms.length)
+  const weeklyResponses = responses.slice(chartTerms.length)
 
-  const series: TermSeries[] = CHART_TERMS.map(({ term, color }, index) => {
+  const series: TermSeries[] = chartTerms.map(({ term, color }, index) => {
     const rows = new Map<number, ClickHouseTrendRow>()
     for (const row of yearlyResponses[index].data) {
       const bucket = new Date(normalizeClickHouseTimestamp(row.bucket))
@@ -691,7 +845,7 @@ export async function fetchPortalTrends(
     }
   })
 
-  const weekly: TermWeek[] = WATCHLIST.map((term, index) => {
+  const weekly: TermWeek[] = weeklyTerms.map((term, index) => {
     let last7 = 0
     let prev7 = 0
     for (const row of weeklyResponses[index].data) {
@@ -713,9 +867,15 @@ export async function fetchPortalTrends(
   })
 
   return {
-    years,
+    years: includeHistory ? years : [],
     series,
     weekly,
     computedAt: now.toISOString(),
   }
+}
+
+/** The homepage displays only weekly bars, including for signed-in visitors. */
+export async function fetchPortalWeeklyTrends() {
+  return (await fetchPortalTrends(new Date(), fetchAnalyticsGatewayJson, false))
+    .weekly
 }

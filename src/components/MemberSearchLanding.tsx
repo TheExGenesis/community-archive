@@ -70,7 +70,7 @@ export default function MemberSearchLanding({
 
         <form
           onSubmit={handleSubmit}
-          className="mt-10 flex w-full max-w-3xl flex-col gap-3 rounded-xl border border-border bg-card p-2 shadow-lg sm:flex-row"
+          className="mt-10 flex w-full max-w-3xl flex-col gap-3 rounded-lg border border-border bg-card p-2 shadow-lg sm:flex-row"
         >
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -88,7 +88,7 @@ export default function MemberSearchLanding({
             type="submit"
             size="lg"
             disabled={!query.trim()}
-            className="h-14 bg-green-600 px-7 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
+            className="h-14 bg-brand px-7 text-brand-foreground hover:bg-brand/90"
           >
             Search
             <ArrowRight className="ml-2 h-4 w-4" />
@@ -112,7 +112,7 @@ export default function MemberSearchLanding({
         <div className="mt-14 grid w-full max-w-3xl gap-3 text-left sm:grid-cols-3">
           <Link
             href="/search"
-            className="group rounded-xl border border-border bg-card p-5 transition-colors hover:bg-accent"
+            className="group rounded-lg border border-border bg-card p-5 transition-colors hover:bg-accent"
           >
             <SlidersHorizontal className="h-5 w-5 text-brand" />
             <h2 className="mt-4 text-base font-semibold text-foreground">
@@ -124,11 +124,11 @@ export default function MemberSearchLanding({
           </Link>
           <Link
             href="/user-dir"
-            className="group rounded-xl border border-border bg-card p-5 transition-colors hover:bg-accent"
+            className="group rounded-lg border border-border bg-card p-5 transition-colors hover:bg-accent"
           >
             <Users className="h-5 w-5 text-brand" />
             <h2 className="mt-4 text-base font-semibold text-foreground">
-              Library
+              Users
             </h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
               Browse the archive by contributor.
@@ -136,7 +136,7 @@ export default function MemberSearchLanding({
           </Link>
           <Link
             href="/#products"
-            className="group rounded-xl border border-border bg-card p-5 transition-colors hover:bg-accent"
+            className="group rounded-lg border border-border bg-card p-5 transition-colors hover:bg-accent"
           >
             <Boxes className="h-5 w-5 text-brand" />
             <h2 className="mt-4 text-base font-semibold text-foreground">

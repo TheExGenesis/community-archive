@@ -1,7 +1,6 @@
-const resolveAccountIdMock = jest.fn()
+const resolvePublicProfileIdentityMock = jest.fn()
 const getCachedProfileHeaderMock = jest.fn()
 const getClickHouseUserProfileMock = jest.fn()
-const getProfileBangersMock = jest.fn()
 
 jest.mock('react', () => ({
   ...jest.requireActual('react'),
@@ -9,7 +8,8 @@ jest.mock('react', () => ({
 }))
 
 jest.mock('@/lib/metaTwitter/data', () => ({
-  resolveAccountId: (...args: unknown[]) => resolveAccountIdMock(...args),
+  resolvePublicProfileIdentity: (...args: unknown[]) =>
+    resolvePublicProfileIdentityMock(...args),
   getCachedProfileHeader: (...args: unknown[]) =>
     getCachedProfileHeaderMock(...args),
 }))
@@ -19,11 +19,7 @@ jest.mock('@/lib/clickhouseUserProfile', () => ({
     getClickHouseUserProfileMock(...args),
 }))
 
-jest.mock('@/lib/metaTwitter/bangers', () => ({
-  getProfileBangers: (...args: unknown[]) => getProfileBangersMock(...args),
-}))
-
-import { getProfilePreviewStats, resolveProfile } from './profile'
+import { resolveProfile, resolveProfileCore } from './profile'
 
 const archivedProfile = {
   account_id: '42',
@@ -39,8 +35,9 @@ const archivedProfile = {
   bio: 'Archived profile',
   website: null,
   location: null,
-  avatar_media_url: null,
-  header_media_url: null,
+  avatar_media_url:
+    'https://pbs.twimg.com/profile_images/7/archived_normal.jpg',
+  header_media_url: 'https://pbs.twimg.com/profile_banners/7/7',
 }
 
 beforeEach(() => {
@@ -48,7 +45,10 @@ beforeEach(() => {
 })
 
 test('prefers the authoritative archived profile', async () => {
-  resolveAccountIdMock.mockResolvedValue('42')
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: '42',
+    username: 'alice',
+  })
   getCachedProfileHeaderMock.mockResolvedValue(archivedProfile)
 
   await expect(resolveProfile('alice')).resolves.toEqual({
@@ -59,7 +59,10 @@ test('prefers the authoritative archived profile', async () => {
 })
 
 test('maps the analytical fallback to the shared profile shape', async () => {
-  resolveAccountIdMock.mockResolvedValue(null)
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: null,
+    username: 'bob',
+  })
   getClickHouseUserProfileMock.mockResolvedValue({
     user: {
       ...archivedProfile,
@@ -86,38 +89,106 @@ test('maps the analytical fallback to the shared profile shape', async () => {
   })
 })
 
-test('returns null when neither profile source can resolve the user', async () => {
-  resolveAccountIdMock.mockResolvedValue(null)
-  getClickHouseUserProfileMock.mockResolvedValue(null)
+test('does not load profile sources when the public policy identity is hidden', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue(null)
 
   await expect(resolveProfile('missing')).resolves.toBeNull()
+  expect(getCachedProfileHeaderMock).not.toHaveBeenCalled()
+  expect(getClickHouseUserProfileMock).not.toHaveBeenCalled()
 })
 
-test('summarizes the profile collection for the preview card', async () => {
-  getProfileBangersMock.mockResolvedValue({
-    available: true,
-    total: 3,
-    yearCounts: [
-      { year: 2024, count: 2 },
-      { year: 2023, count: 1 },
-    ],
-    tweets: [{ quote_count: 5 }, { quote_count: 8 }, { quote_count: 2 }],
+test('backfills a missing archive avatar from the analytical profile', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: '42',
+    username: 'alice',
+  })
+  getCachedProfileHeaderMock.mockResolvedValue({
+    ...archivedProfile,
+    avatar_media_url: null,
+    header_media_url: '',
+  })
+  getClickHouseUserProfileMock.mockResolvedValue({
+    user: {
+      ...archivedProfile,
+      avatar_media_url: 'https://pbs.twimg.com/profile_images/1/a_normal.jpg',
+      header_media_url: 'https://pbs.twimg.com/profile_banners/1/2',
+    },
+    topTweets: [],
   })
 
-  await expect(getProfilePreviewStats('42')).resolves.toEqual({
-    archivedQuotes: 15,
-    bangers: 3,
-    yearsArchived: 2,
+  await expect(resolveProfile('alice')).resolves.toMatchObject({
+    profile: {
+      avatar_media_url: 'https://pbs.twimg.com/profile_images/1/a_normal.jpg',
+      header_media_url: 'https://pbs.twimg.com/profile_banners/1/2',
+    },
   })
 })
 
-test('omits preview stats when the analytical collection is unavailable', async () => {
-  getProfileBangersMock.mockResolvedValue({
-    available: false,
-    total: 0,
-    yearCounts: [],
-    tweets: [],
+test('keeps the archived media and skips the analytical lookup when both are present', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: '42',
+    username: 'alice',
+  })
+  getCachedProfileHeaderMock.mockResolvedValue({
+    ...archivedProfile,
+    avatar_media_url: 'https://pbs.twimg.com/profile_images/9/archived.jpg',
+    header_media_url: 'https://pbs.twimg.com/profile_banners/9/9',
   })
 
-  await expect(getProfilePreviewStats('42')).resolves.toBeNull()
+  await expect(resolveProfile('alice')).resolves.toMatchObject({
+    profile: {
+      avatar_media_url: 'https://pbs.twimg.com/profile_images/9/archived.jpg',
+    },
+  })
+  expect(getClickHouseUserProfileMock).not.toHaveBeenCalled()
+})
+
+test('leaves media null when neither source has it', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: '42',
+    username: 'alice',
+  })
+  getCachedProfileHeaderMock.mockResolvedValue({
+    ...archivedProfile,
+    avatar_media_url: '   ',
+    header_media_url: null,
+  })
+  getClickHouseUserProfileMock.mockResolvedValue(null)
+
+  await expect(resolveProfile('alice')).resolves.toMatchObject({
+    profile: { avatar_media_url: null, header_media_url: null },
+  })
+})
+
+test('uses the policy-approved account ID for the analytical lookup', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: '42',
+    username: 'alice',
+  })
+  getCachedProfileHeaderMock.mockResolvedValue({
+    ...archivedProfile,
+    avatar_media_url: null,
+  })
+  getClickHouseUserProfileMock.mockResolvedValue(null)
+
+  await resolveProfile('archive%3Aalice')
+  expect(getClickHouseUserProfileMock).toHaveBeenCalledWith('42', {
+    tweetLimit: 1,
+  })
+})
+
+test('renders the core profile while optional media never settles', async () => {
+  resolvePublicProfileIdentityMock.mockResolvedValue({
+    accountId: '42',
+    username: 'alice',
+  })
+  getCachedProfileHeaderMock.mockResolvedValue({
+    ...archivedProfile,
+    header_media_url: null,
+  })
+  getClickHouseUserProfileMock.mockReturnValue(new Promise(() => undefined))
+  await expect(resolveProfileCore('alice')).resolves.toMatchObject({
+    profile: { account_display_name: 'Alice', header_media_url: null },
+  })
+  expect(getClickHouseUserProfileMock).not.toHaveBeenCalled()
 })

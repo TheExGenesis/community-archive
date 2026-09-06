@@ -12,7 +12,7 @@ import { AdminTable } from './AdminTable'
 import { RecentPrivacyActivity } from './RecentPrivacyActivity'
 import { loadRecentPrivacyActivity } from './activity'
 import {
-  ADMIN_USERNAME,
+  ADMIN_USERNAMES,
   getDisplayUsername,
   loadInitialAccounts,
   normalizeUsername,
@@ -21,11 +21,8 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-// "Opt out and delete data" runs a synchronous export + delete that can
-// exceed Vercel's default 60s function ceiling for large accounts. Bumping
-// to 300s (Pro tier max for `nodejs` runtime — 800s is gated behind a paid
-// add-on, and 5 minutes is plenty for the parallelized export path).
-// Has no effect on smaller actions; they return in milliseconds.
+// Kept for compatibility with older inline admin cleanup paths. Current
+// export + tombstone work runs asynchronously on the Hetzner worker.
 export const maxDuration = 300
 
 async function RecentPrivacyActivitySection() {
@@ -105,9 +102,11 @@ export default async function AdminPage({
                 Community Archive admin dashboard
               </h1>
               <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-                Visible only to @{ADMIN_USERNAME}, with staging-only dev access
-                when enabled. Reads and mutations use the server-side Supabase
-                service role after the identity gate passes.
+                Visible only to{' '}
+                {ADMIN_USERNAMES.map((name) => `@${name}`).join(' and ')}, with
+                staging-only dev access when enabled. Reads and mutations use
+                the server-side Supabase service role after the identity gate
+                passes.
               </p>
             </div>
             <Badge variant="secondary">@{twitterUsername}</Badge>

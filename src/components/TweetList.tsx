@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import UnifiedTweetList from '@/components/UnifiedTweetList'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -15,9 +15,10 @@ import {
 } from '@/lib/queries/tweetQueries'
 import {
   canPreviewTweetSearch,
-  searchTweetPreviewWithClickHouse,
+  searchTweetPreviewsWithClickHouse,
 } from '@/lib/clickhouseSearch'
 import { AlertCircle, Loader2 } from 'lucide-react'
+import { capturePostHogEvent } from '@/lib/posthog'
 import type { TweetOrigin } from '@/lib/navigation'
 
 interface TweetListProps {
@@ -53,7 +54,18 @@ export default function TweetList({
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isCompletingPreview, setIsCompletingPreview] = useState(false)
+  const [isLoadingQuotes, setIsLoadingQuotes] = useState(false)
+  const activeRequest = useRef<{
+    controller: AbortController
+    previewController: AbortController
+  } | null>(null)
+  const criteriaKey = JSON.stringify(filterCriteria)
+  const stableCriteria = useMemo<FilterCriteria>(
+    () => JSON.parse(criteriaKey),
+    [criteriaKey],
+  )
   const [error, setError] = useState<string | null>(null)
+  const [failedPage, setFailedPage] = useState(1)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState<number | null>(null)
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
@@ -66,11 +78,35 @@ export default function TweetList({
   const loadTweets = useCallback(
     async (pageToLoad: number, criteria: FilterCriteria) => {
       if (!supabase) return
+      activeRequest.current?.controller.abort()
+      activeRequest.current?.previewController.abort()
+      const request = {
+        controller: new AbortController(),
+        previewController: new AbortController(),
+      }
+      activeRequest.current = request
+      const signal = request.controller.signal
+      const isCurrent = () =>
+        activeRequest.current === request && !signal.aborted
+      const startedAt = performance.now()
+      const reportReceived = (phase: 'preview' | 'canonical', count: number) =>
+        capturePostHogEvent('search_results_received', {
+          phase,
+          result_count: count,
+          elapsed_ms: Math.round(performance.now() - startedAt),
+          page: pageToLoad,
+        })
+      let canonicalReady = false
+      let definitiveEmpty = false
 
       if (pageToLoad === 1) {
         setIsLoading(true)
         setIsCompletingPreview(false)
+        setIsLoadingQuotes(false)
         setTweets([])
+        setTotalCount(null)
+        setLastFetchCount(0)
+        setCurrentPage(1)
       } else {
         setIsLoadingMore(true)
       }
@@ -78,47 +114,106 @@ export default function TweetList({
 
       try {
         if (pageToLoad === 1 && canPreviewTweetSearch(criteria)) {
-          try {
-            const preview = await searchTweetPreviewWithClickHouse(criteria)
-            if (preview) {
-              setTweets([preview])
-              setIsLoading(false)
-              setIsCompletingPreview(true)
-            }
-          } catch (previewError) {
-            console.warn(
-              'Could not load the progressive tweet preview:',
-              previewError,
-            )
-          }
+          const preview = searchTweetPreviewsWithClickHouse(
+            criteria,
+            undefined,
+            request.previewController.signal,
+          )
+            .then((result) => {
+              if (
+                !isCurrent() ||
+                canonicalReady ||
+                request.previewController.signal.aborted
+              )
+                return
+              if (result.definitiveEmpty) {
+                definitiveEmpty = true
+                setTweets([])
+                setIsLoading(false)
+                setIsCompletingPreview(false)
+                setLastFetchCount(0)
+                setTotalCount(0)
+                request.controller.abort()
+              } else if (result.tweets.length > 0) {
+                reportReceived('preview', result.tweets.length)
+                setTweets(result.tweets)
+                setIsLoading(false)
+                setIsCompletingPreview(true)
+              }
+            })
+            .catch((error) => {
+              if (isCurrent() && !request.previewController.signal.aborted) {
+                console.warn(
+                  'Could not load the progressive tweet preview:',
+                  error,
+                )
+              }
+            })
+          // Let fast/definitively empty previews avoid another query, but never
+          // let a slow preview hold the canonical page behind it indefinitely.
+          let release!: () => void
+          let timer: ReturnType<typeof setTimeout> | undefined
+          const headStart = new Promise<void>((resolve) => {
+            release = resolve
+            timer = setTimeout(resolve, 250)
+            signal.addEventListener('abort', release, { once: true })
+          })
+          await Promise.race([preview, headStart])
+          clearTimeout(timer)
+          signal.removeEventListener('abort', release)
+          if (!isCurrent() || definitiveEmpty) return
         }
 
-        const {
-          tweets: fetchedTweets,
-          error: fetchError,
-          totalCount: fetchedTotalCount,
-        } = await fetchTweets(supabase, criteria, pageToLoad, itemsPerPage)
-
-        if (fetchError) {
-          throw fetchError
-        }
-
-        setTweets((prevTweets) =>
-          pageToLoad === 1 ? fetchedTweets : [...prevTweets, ...fetchedTweets],
+        const result = await fetchTweets(
+          supabase,
+          criteria,
+          pageToLoad,
+          itemsPerPage,
+          {
+            signal,
+            onBaseTweets:
+              pageToLoad === 1
+                ? (baseTweets) => {
+                    if (!isCurrent()) return
+                    reportReceived('canonical', baseTweets.length)
+                    canonicalReady = true
+                    request.previewController.abort()
+                    setTweets(baseTweets)
+                    setIsLoading(false)
+                    setIsCompletingPreview(false)
+                    setIsLoadingQuotes(true)
+                  }
+                : undefined,
+          },
         )
-        setLastFetchCount(fetchedTweets.length)
-        if (fetchedTotalCount !== null) {
-          setTotalCount(fetchedTotalCount)
-        }
+        if (!isCurrent()) return
+        if (result.error) throw result.error
+        if (!canonicalReady) reportReceived('canonical', result.tweets.length)
+        canonicalReady = true
+        setTweets((previous) =>
+          pageToLoad === 1 ? result.tweets : [...previous, ...result.tweets],
+        )
+        setLastFetchCount(result.tweets.length)
+        if (result.totalCount !== null) setTotalCount(result.totalCount)
         setCurrentPage(pageToLoad)
-      } catch (e: any) {
-        console.error('Failed to load tweets for list:', e)
-        setError(e.message || 'Failed to load tweets.')
+      } catch (error) {
+        if (!isCurrent()) return
+        setFailedPage(pageToLoad)
+        console.error('Failed to load tweets for list:', error)
+        setError(
+          error &&
+            typeof error === 'object' &&
+            'message' in error &&
+            typeof error.message === 'string'
+            ? error.message
+            : 'Failed to load tweets.',
+        )
       } finally {
-        if (pageToLoad === 1) {
+        request.previewController.abort()
+        if (isCurrent()) {
           setIsLoading(false)
           setIsCompletingPreview(false)
-        } else {
+          setIsLoadingQuotes(false)
           setIsLoadingMore(false)
         }
       }
@@ -127,17 +222,21 @@ export default function TweetList({
   )
 
   useEffect(() => {
-    if (supabase) {
-      setCurrentPage(1)
-      setTotalCount(null)
-      setLastFetchCount(0)
-      loadTweets(1, filterCriteria)
+    if (supabase) void loadTweets(1, stableCriteria)
+    return () => {
+      activeRequest.current?.controller.abort()
+      activeRequest.current?.previewController.abort()
     }
-  }, [supabase, filterCriteria, loadTweets])
+  }, [supabase, stableCriteria, loadTweets])
 
   const handleLoadMore = () => {
-    if (!isLoadingMore && hasMoreTweets) {
-      loadTweets(currentPage + 1, filterCriteria)
+    if (
+      !isLoadingMore &&
+      !isCompletingPreview &&
+      !isLoadingQuotes &&
+      hasMoreTweets
+    ) {
+      void loadTweets(currentPage + 1, stableCriteria)
     }
   }
 
@@ -159,7 +258,7 @@ export default function TweetList({
         {[0, 1, 2].map((item) => (
           <div
             key={item}
-            className="rounded-xl border border-border bg-card p-5"
+            className="rounded-lg border border-border bg-card p-5"
           >
             <div className="flex gap-3">
               <Skeleton className="h-11 w-11 rounded-full" />
@@ -181,6 +280,14 @@ export default function TweetList({
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>Search could not be completed</AlertTitle>
         <AlertDescription>{error}</AlertDescription>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-3"
+          onClick={() => void loadTweets(failedPage, stableCriteria)}
+        >
+          Retry search
+        </Button>
       </Alert>
     )
   }
@@ -222,7 +329,9 @@ export default function TweetList({
         isLoading={isLoading}
         emptyMessage="No tweets to display for the current filters."
         className="space-y-4"
-        showCsvExport={showCsvExportButton && !isCompletingPreview}
+        showCsvExport={
+          showCsvExportButton && !isCompletingPreview && !isLoadingQuotes
+        }
         csvFilename={csvExportFilename}
         headerTitle={
           resultsHeading
@@ -240,14 +349,16 @@ export default function TweetList({
         onSearchSortChange={onSearchSortChange}
       />
 
-      {isCompletingPreview && (
+      {(isCompletingPreview || isLoadingQuotes) && (
         <div
           className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
           role="status"
           aria-live="polite"
         >
           <Loader2 className="h-4 w-4 animate-spin" />
-          Loading the remaining results…
+          {isLoadingQuotes
+            ? 'Loading quoted tweets…'
+            : 'Loading the remaining results…'}
         </div>
       )}
 
@@ -255,13 +366,21 @@ export default function TweetList({
         <Alert variant="destructive">
           <AlertTitle>More results could not be loaded</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => void loadTweets(failedPage, stableCriteria)}
+          >
+            Retry search
+          </Button>
         </Alert>
       )}
       {hasMoreTweets && (
         <div className="mt-8 flex justify-center">
           <Button
             onClick={handleLoadMore}
-            disabled={isLoadingMore}
+            disabled={isLoadingMore || isCompletingPreview || isLoadingQuotes}
             variant="outline"
             className="min-w-36"
           >

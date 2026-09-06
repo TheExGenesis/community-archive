@@ -4,21 +4,22 @@ This guide walks you through deploying the process_archive service to a server f
 
 ## Multi-image repair
 
-The processor reads `extended_entities.media` first so multi-image archive
-tweets retain all attachments. Before deploying a processor release that
-includes this fix, audit affected archives without writing:
+The PostgreSQL processor and ClickHouse/canonical archive adapter share the
+same extraction rule: prefer `extended_entities.media` so all attachments survive.
+The helper lives beside the worker so the flattened Docker layout can import it.
+
+The historical audit is read-only and defaults to ten completed uploads:
 
 ```bash
 pnpm tsx scripts/repair_archive_media.mts --limit=10
 pnpm tsx scripts/repair_archive_media.mts --username=example
 ```
 
-Review the candidate counts, deploy the processor, then run the same bounded
-command with `--apply`. The repair only inserts media IDs that are absent; it
-does not update or delete existing rows. Re-run the dry audit afterward and
-require zero remaining candidates. Omitting `--limit` and `--username` scans
-every completed archive and should only be done during a monitored maintenance
-window.
+`--apply` is disabled. This older audit reads the current archive object by
+username, so it is only a candidate finder, not proof of historical version
+completeness. Historical repair must use stable owner identity, current consent,
+and the canonical ingestion contract for both sinks; do not restore media with
+an isolated PostgreSQL upsert. Review a bounded replay separately.
 
 ## Prerequisites
 
@@ -118,6 +119,15 @@ NEXT_PUBLIC_SUPABASE_URL=https://[YOUR_PROJECT_REF].supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_SERVICE_ROLE=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
+# Independent new-archive ClickHouse sink. Keep false until the PostgreSQL
+# delivery-state migration and ClickHouse tombstone columns are verified.
+ARCHIVE_CLICKHOUSE_SINK_ENABLED=false
+ARCHIVE_CLICKHOUSE_RETRY_BATCH=5
+CLICKHOUSE_URL=http://clickhouse-host:8123
+CLICKHOUSE_DATABASE=community_archive
+CLICKHOUSE_USER=archive_ingestor
+CLICKHOUSE_PASSWORD=replace-with-runtime-secret
+
 # Performance Configuration (OPTIONAL)
 LOG_LEVEL=info
 PG_BATCH_SIZE=1000
@@ -129,6 +139,10 @@ NODE_ENV=production
 # Docker-specific Configuration (OPTIONAL)
 ARCHIVE_DATA_PATH=./data
 ```
+
+The production ClickHouse HTTP listener remains on host loopback. The checked-in
+Compose service and direct Docker fallback therefore use host networking; do
+not replace this with a public bind or published ClickHouse port.
 
 ### Secure Your Environment File
 
@@ -172,6 +186,47 @@ npm run docker:build
 tail -f logs/execution.log
 tail -f logs/process_archive.log
 ```
+
+### Verify the explicit opt-out gate
+
+Before promoting a new worker image, exercise the privacy gate with a staging
+account whose `public.optin.explicit_optout` value is true. Move one of that
+account's uploads to `ready_for_commit`, run the worker once, and verify:
+
+- the upload moves to `completed` after the transaction commits;
+- the account row and every authored tweet ID from the archive exist only as
+  content-free policy tombstones;
+- no profile, media, URL, mention, like, follower, following, quote, or retweet
+payload authored by the blocked owner was written.
+
+The ClickHouse path is an independent sink from the same uploaded archive; it
+must never reconstruct content by reading PostgreSQL tweet/profile rows. Before
+setting `ARCHIVE_CLICKHOUSE_SINK_ENABLED=true`, verify the ClickHouse writer can
+insert into the nine canonical archive tables and that `is_tombstone UInt8`
+exists on `account_observations`, `tweet_content_versions`, and
+`tweet_analytics_versions`. A ClickHouse outage must not roll back a successful
+PostgreSQL archive insertion: the content-free
+`private.archive_clickhouse_delivery` row remains pending and a later cron run
+reloads the original private archive. If that archive has been removed after an
+opt-out, the stored account/tweet IDs are sufficient to deliver tombstones but
+never to reconstruct allowed content.
+
+This rollout applies only to uploads processed after the delivery-state
+migration. Do not seed the delivery table from completed uploads; historical
+tombstoning and replay require separate approval.
+
+Repeat with an account present only in `tes.blocked_scraping_users`. Also verify
+an allowed outer tweet keeps its quote/retweet relationship to a blocked target
+tombstone, while a blocked outer tweet does not remove an independently allowed
+embedded tweet already in the database. Keep the previous worker image only as
+an incident artifact; after this privacy gate is active, rollback means pausing
+ingestion rather than restarting a policy-unaware writer.
+
+Then clear only the test account's explicit opt-out and opt it in. Confirm its
+`explicit_optout` block-source row disappears while an independent `admin`
+block-source row, when present, remains. Re-run the archive and verify the
+existing policy tombstones are hydrated in place (`is_tombstone = false`) with
+their text and child rows restored from the authorized upload.
 
 **Expected output in `logs/execution.log`:**
 ```
@@ -439,7 +494,7 @@ find "$BACKUP_DIR" -name "logs-*.tar.gz" -mtime +30 -delete
    # Make sure you're building from the correct context
    cd services/process_archive
    ./docker-build.sh
-   
+
    # Or manually:
    cd ../../
    docker build -f services/process_archive/Dockerfile -t process-archive .

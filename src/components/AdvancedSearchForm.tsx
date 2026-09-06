@@ -92,10 +92,20 @@ export default function AdvancedSearchForm() {
     { key: 'until' as const, label: 'Until', value: until },
   ].filter((filter) => filter.value)
 
+  const toggleAdvancedOptions = () => {
+    const nextOpen = !showAdvancedOptions
+    capturePostHogEvent('search_interface_action', {
+      action: nextOpen ? 'advanced_options_opened' : 'advanced_options_closed',
+      has_query: Boolean(query.trim()),
+      active_filter_count: activeFilters.length,
+    })
+    setShowAdvancedOptions(nextOpen)
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4"
+      className="rounded-lg border border-border bg-card p-3 shadow-sm sm:p-4"
     >
       <Label htmlFor="main-search" className="sr-only">
         Search the archive
@@ -114,7 +124,7 @@ export default function AdvancedSearchForm() {
         </div>
         <Button
           type="submit"
-          className="h-10 bg-green-600 px-6 text-white hover:bg-green-700 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300"
+          className="h-10 bg-brand px-6 text-brand-foreground hover:bg-brand/90"
         >
           <Search className="mr-2 h-4 w-4" />
           Search
@@ -126,7 +136,7 @@ export default function AdvancedSearchForm() {
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+          onClick={toggleAdvancedOptions}
           className="-ml-2 h-8 text-muted-foreground hover:text-foreground"
           aria-expanded={showAdvancedOptions}
         >

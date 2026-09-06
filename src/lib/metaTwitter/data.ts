@@ -4,6 +4,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { unstable_cache } from 'next/cache'
 import { Database } from '@/database-types'
 import { devLog } from '@/lib/devLog'
+import { isTwitterUsername } from '@/lib/apiInputValidation'
 import type {
   ArchiveMediaItem,
   ArchivePerson,
@@ -14,7 +15,9 @@ export type { ArchiveMediaItem, ArchivePerson, ProfileHeaderData }
 
 const DAY = 86_400
 
-const getMetaClient = (): SupabaseClient<Database> => {
+const getMetaClient = (
+  options: { noStore?: boolean } = {},
+): SupabaseClient<Database> => {
   const isDevelopment = process.env.NODE_ENV === 'development'
   const useRemoteDevDb = process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true'
   const url =
@@ -27,6 +30,14 @@ const getMetaClient = (): SupabaseClient<Database> => {
       : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   return createClient<Database>(url, anonKey, {
     auth: { persistSession: false },
+    ...(options.noStore
+      ? {
+          global: {
+            fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+              fetch(input, { ...init, cache: 'no-store' }),
+          },
+        }
+      : {}),
   })
 }
 
@@ -63,11 +74,13 @@ async function fetchProfileHeader(
   if (profileError) throw profileError
   if (membershipError) throw membershipError
   if (!account) return null
+  const bio = profile?.bio ?? null
+  const website = profile?.website ?? null
   return {
     ...account,
     account_display_name: account.account_display_name ?? account.username,
-    bio: profile?.bio ?? null,
-    website: profile?.website ?? null,
+    bio,
+    website,
     location: profile?.location ?? null,
     avatar_media_url: profile?.avatar_media_url ?? null,
     header_media_url: profile?.header_media_url ?? null,
@@ -214,33 +227,55 @@ async function fetchMediaCount(scope: SidebarScope): Promise<number> {
 
 export const getCachedProfileHeader = unstable_cache(
   fetchProfileHeader,
-  ['meta-twitter-profile-header-v3'],
+  ['meta-twitter-profile-header-v4'],
   { revalidate: 3600 },
 )
 
-export const resolveAccountId = unstable_cache(
-  async (param: string): Promise<string | null> => {
-    let decoded: string
-    try {
-      decoded = decodeURIComponent(param)
-    } catch {
-      return null
-    }
-    decoded = decoded.replace(/^(archive|optin):/, '')
-    if (/^\d+$/.test(decoded)) return decoded
-    const supabase = getMetaClient()
-    const { data, error } = await supabase
-      .from('all_account')
-      .select('account_id')
-      .ilike('username', decoded)
-      .limit(1)
-      .maybeSingle()
-    if (error) throw error
-    return data?.account_id ?? null
-  },
-  ['meta-twitter-resolve-account-v1'],
-  { revalidate: DAY },
-)
+export interface PublicProfileIdentity {
+  accountId: string | null
+  username: string
+}
+
+/**
+ * Resolve only identities that are currently eligible for public serving.
+ * This policy lookup is deliberately uncached so an explicit opt-out hides a
+ * profile on the next request instead of waiting for an application cache.
+ */
+export const resolvePublicProfileIdentity = async (
+  param: string,
+): Promise<PublicProfileIdentity | null> => {
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(param)
+  } catch {
+    return null
+  }
+
+  const isDirectoryIdentifier = /^(archive|optin):/.test(decoded)
+  const isAccountIdentifier = /^\d{1,20}$/.test(decoded)
+  if (
+    !isDirectoryIdentifier &&
+    !isAccountIdentifier &&
+    !isTwitterUsername(decoded)
+  ) {
+    return null
+  }
+
+  const supabase = getMetaClient({ noStore: true })
+  const baseQuery = supabase
+    .from('user_directory')
+    .select('account_id, username')
+
+  const { data, error } = isDirectoryIdentifier
+    ? await baseQuery.eq('directory_id', decoded).limit(1).maybeSingle()
+    : isAccountIdentifier
+      ? await baseQuery.eq('account_id', decoded).limit(1).maybeSingle()
+      : await baseQuery.ilike('username', decoded).limit(1).maybeSingle()
+
+  if (error) throw error
+  if (!data?.username) return null
+  return { accountId: data.account_id ?? null, username: data.username }
+}
 
 export const getCachedArchivedAt = unstable_cache(
   async (accountId: string): Promise<string | null> => {

@@ -40,6 +40,12 @@ export interface PortalTweet {
   quotedTweet?: PortalQuotedTweet
   /** Distinct non-self quote tweets from archive uploaders and opt-ins. */
   quoteCount?: number
+  /** Distinct non-self replies from archive uploaders and opt-ins. */
+  replyCount?: number
+  /** Distinct non-self replies plus quote posts from archive members. */
+  interactionCount?: number
+  /** Frozen digest-time membership marker shown on community-authored bangers. */
+  communityAuthored?: boolean
 }
 
 export type PortalBangersScope = 'all' | 'members'

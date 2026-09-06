@@ -95,7 +95,7 @@ export default function DataPolicyPage() {
         API docs & instructions for downloading the data{' '}
         <a
           href="https://github.com/TheExGenesis/community-archive/tree/main/docs#docs"
-          className="text-brand hover:underline"
+          className="text-brand"
         >
           are in the GitHub repo.
         </a>
@@ -276,21 +276,21 @@ export default function DataPolicyPage() {
           href="https://x.com/exgenesis"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-brand hover:underline"
+          className="text-brand"
         >
           @exgenesis
         </a>
         . Or find us on{' '}
         <a
           href="https://discord.gg/RArTGrUawX"
-          className="text-brand hover:underline"
+          className="text-brand"
         >
           Discord
         </a>{' '}
         or{' '}
         <a
           href="https://github.com/TheExGenesis/community-archive"
-          className="text-brand hover:underline"
+          className="text-brand"
         >
           GitHub
         </a>
@@ -310,7 +310,7 @@ export default function DataPolicyPage() {
             href="https://github.com/TheExGenesis/community-archive/blob/main/docs/archive_data.md"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-brand hover:underline"
+            className="font-medium text-brand"
           >
             Twitter Archive Data Details
           </a>

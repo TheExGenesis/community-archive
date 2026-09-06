@@ -24,6 +24,9 @@ export interface DigestCandidate {
   tweet: PortalTweet
   sourceRank: number
   selected: boolean
+  source?: 'banger' | 'ca_interactions'
+  /** Frozen membership marker supplied to editors and the generation prompt. */
+  communityAuthored?: boolean
 }
 
 export interface DigestRunEvent {
@@ -136,12 +139,22 @@ export interface DigestCalendarDay {
   isPreview?: boolean
 }
 
+export interface DigestPreviewStory {
+  slug: string
+  /** Editorial label shown above the story title on the homepage hero. */
+  tag: string
+  title: string
+  blurb: string
+}
+
 export interface DigestPreview {
   href: string
   digestDate: string
-  executiveSummary: string
+  /** Lead executive-summary line, used as the homepage hero headline. */
+  headline: string
   storyCount: number
-  storyTitles: string[]
+  /** The first few stories, rendered as cards under the hero headline. */
+  stories: DigestPreviewStory[]
   isPreview?: boolean
 }
 

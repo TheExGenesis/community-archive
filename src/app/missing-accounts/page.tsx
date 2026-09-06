@@ -78,7 +78,7 @@ function AccountIdentity({ account }: { account: MissingAccount }) {
         )}
       </span>
       <span className="min-w-0">
-        <span className="flex items-center gap-1 font-semibold text-foreground group-hover:underline">
+        <span className="flex items-center gap-1 font-semibold text-foreground ">
           <span className="truncate">{displayName}</span>
           <ArrowUpRight
             aria-hidden="true"
@@ -301,7 +301,7 @@ export default async function MissingAccountsPage({
             </p>
             <Link
               href="/opt-in"
-              className="mt-3 inline-flex items-center gap-1 font-semibold text-brand hover:underline"
+              className="mt-3 inline-flex items-center gap-1 font-semibold text-brand"
             >
               Opt in to streaming
               <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
@@ -315,7 +315,7 @@ export default async function MissingAccountsPage({
             </p>
             <Link
               href="/#upload-archive"
-              className="mt-3 inline-flex items-center gap-1 font-semibold text-brand hover:underline"
+              className="mt-3 inline-flex items-center gap-1 font-semibold text-brand"
             >
               Upload an archive
               <ArrowUpRight aria-hidden="true" className="h-4 w-4" />

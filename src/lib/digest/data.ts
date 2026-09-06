@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 import type { Json } from '@/database-types'
 import {
@@ -21,6 +22,7 @@ import {
   type DigestRunStatus,
 } from './types'
 import { getPreviewDigestEdition } from './mock'
+import { getCurrentUser } from '@/lib/portal/auth'
 import { mergeDigestCalendarDays } from './archive'
 
 const RUN_STATUSES = new Set<DigestRunStatus>([
@@ -171,7 +173,7 @@ export async function loadDigestLabState(runId?: string) {
   }
 }
 
-export async function getPublishedDigest(
+async function readPublishedDigest(
   digestDate?: string,
 ): Promise<DigestEdition | null> {
   const preview = getPreviewDigestEdition(digestDate)
@@ -192,15 +194,92 @@ export async function getPublishedDigest(
   return data ? mapDigestEdition(data) : getPreviewDigestEdition(digestDate)
 }
 
+// Next supplies request-local cache in RSC; plain React 18 test runtimes do not.
+const requestCache = cache ?? ((loader: typeof readPublishedDigest) => loader)
+export const getPublishedDigest = requestCache(readPublishedDigest)
+
+export interface DigestLikeState {
+  count: number
+  likedByViewer: boolean
+}
+
+/**
+ * Public like count for an edition plus whether the current session already
+ * liked it. Preview fixtures are not real rows, so they report an empty state.
+ */
+export async function getDigestLikeState(
+  edition: DigestEdition | null,
+): Promise<DigestLikeState> {
+  const empty = { count: 0, likedByViewer: false }
+  if (!edition || edition.isPreview) return empty
+
+  const client = createDigestPublicClient(cookies())
+  const user = await getCurrentUser()
+
+  const [countResult, likedResult] = await Promise.all([
+    client
+      .from('digest_edition_likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('edition_id', edition.id),
+    user
+      ? client
+          .from('digest_edition_likes')
+          .select('id')
+          .eq('edition_id', edition.id)
+          .eq('user_id', user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ])
+
+  if (countResult.error) {
+    console.error('Digest like count read failed:', countResult.error.message)
+    return empty
+  }
+
+  return {
+    count: countResult.count ?? 0,
+    likedByViewer: Boolean(likedResult.data),
+  }
+}
+
+/**
+ * Server-rendered comment count for the initial paint. The list itself is
+ * fetched client-side so the page's 5 minute revalidate cannot stale it.
+ */
+export async function getDigestCommentCount(
+  edition: DigestEdition | null,
+): Promise<number> {
+  if (!edition || edition.isPreview) return 0
+
+  const client = createDigestPublicClient(cookies())
+  const { count, error } = await client
+    .from('digest_edition_comments')
+    .select('*', { count: 'exact', head: true })
+    .eq('edition_id', edition.id)
+    .is('deleted_at', null)
+
+  if (error) {
+    console.error('Digest comment count read failed:', error.message)
+    return 0
+  }
+  return count ?? 0
+}
+
 export async function getLatestDigestPreview(): Promise<DigestPreview | null> {
   const edition = await getPublishedDigest()
   if (!edition) return null
   return {
     href: `/digest/${edition.digestDate}`,
     digestDate: edition.digestDate,
-    executiveSummary: edition.content.executiveSummary.join(' '),
+    headline: edition.content.executiveSummary[0] ?? '',
     storyCount: edition.content.stories.length,
-    storyTitles: edition.content.stories.map((story) => story.title),
+    stories: edition.content.stories.slice(0, 3).map((story) => ({
+      slug: story.slug,
+      // Older saved editions predate categories; the keyword is the fallback label.
+      tag: story.category ?? story.keyword,
+      title: story.title,
+      blurb: story.subtitle,
+    })),
     isPreview: edition.isPreview,
   }
 }

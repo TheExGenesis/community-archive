@@ -39,9 +39,15 @@ pop3_port = 54326
 file_size_limit = "5000MiB"
 
 [storage.buckets.archives]
-public = true
+public = false
 file_size_limit = "5000MiB"
 # objects_path = "../data/local_seed/archives"
+
+# Historical Parquet exports are not consent-aware. Keep this bucket private
+# until the exporter applies the same PostgreSQL policy boundary.
+[storage.buckets.enriched_tweets]
+public = false
+file_size_limit = "5000MiB"
 
 # Created on hosted Supabase by migration
 # 20260521020000_admin_deleted_user_data_bucket.sql. Listed here so
@@ -119,6 +125,9 @@ schema_paths = [
   "./schemas/060_grants.sql",
   "./schemas/060_policies.sql",
   "./schemas/070_functions.sql",
+  "./schemas/075_policy_enforcement.sql",
   "./schemas/080_triggers.sql",
   "./schemas/prod.sql",
+  "./schemas/090_policy_grants.sql",
+  "./schemas/095_policy_legacy_triggers.sql",
 ]

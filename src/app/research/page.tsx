@@ -24,7 +24,7 @@ export default async function ResearchPage() {
             href={RESEARCH_SOURCE.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-brand hover:underline"
+            className="font-semibold text-brand"
           >
             {RESEARCH_SOURCE.name}
           </a>
@@ -38,7 +38,7 @@ export default async function ResearchPage() {
               href={RESEARCH_SOURCE.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-brand hover:underline"
+              className="font-semibold text-brand"
             >
               {RESEARCH_SOURCE.name}
             </a>

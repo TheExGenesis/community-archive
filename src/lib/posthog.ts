@@ -49,10 +49,11 @@ const isPortalSeriesCount: PropertyValidator = (value): value is number =>
   value >= 0 &&
   value <= 12
 
-const isSearchSurface = isOneOf(['advanced', 'homepage'])
+const isSearchSurface = isOneOf(['advanced', 'header', 'homepage'])
 const isDashboardDestination = isOneOf([
   'all_time_bangers',
   'best_strands',
+  'community_builds',
   'daily_digest',
   'data_export',
   'live_stream',
@@ -69,12 +70,14 @@ const isTweetCardAction = isOneOf([
   'expand',
   'open',
   'open_archived_quotes',
+  'open_external',
   'open_quoted_tweet',
 ])
 const isTweetOrigin = isOneOf([
   'bangers',
   'digest',
   'home',
+  'profile',
   'search',
   'stream',
   'trends',
@@ -101,6 +104,7 @@ const isTrendsExplorerAction = isOneOf([
   'chart_series_toggled',
   'evidence_filter_toggled',
   'evidence_refreshed',
+  'granularity_changed',
   'retry_defaults',
   'scale_changed',
   'term_removed',
@@ -109,6 +113,79 @@ const isTrendsExplorerAction = isOneOf([
   'year_filter_applied',
   'year_filter_cleared',
 ])
+const isProductPage = isOneOf([
+  'bangers',
+  'digest',
+  'digest_story',
+  'home',
+  'live_stream',
+  'research',
+  'search',
+  'settings',
+  'trends',
+  'user_directory',
+  'user_profile',
+])
+const isNavigationDestination = isOneOf([
+  'admin',
+  'bangers',
+  'digest',
+  'docs',
+  'home',
+  'live_stream',
+  'research',
+  'search',
+  'settings',
+  'sign_in',
+  'sign_out',
+  'social_graph',
+  'trends',
+  'upload_archive',
+  'user_directory',
+  'user_profile',
+])
+const isNavigationSurface = isOneOf([
+  'account_menu',
+  'brand',
+  'desktop',
+  'mobile',
+])
+const isHomepageAction = isOneOf(['get_extension', 'opt_in', 'upload_archive'])
+const isDigestAction = isOneOf([
+  'bangers_opened',
+  'edition_selected',
+  'keyword_search_opened',
+  'recent_edition_opened',
+  'story_opened',
+  'subscribed',
+])
+const isDigestSurface = isOneOf([
+  'calendar',
+  'edition_cta',
+  'edition_title',
+  'keyword',
+  'recent_editions',
+  'sidebar',
+  'subscribe',
+])
+const isUserDirectoryAction = isOneOf([
+  'profile_opened',
+  'searched',
+  'sort_changed',
+])
+const isDirectorySort = isOneOf([
+  'account_display_name',
+  'joined_at',
+  'num_followers',
+])
+const isSortOrder = isOneOf(['asc', 'desc'])
+const isSearchInterfaceAction = isOneOf([
+  'advanced_options_closed',
+  'advanced_options_opened',
+  'result_sort_changed',
+  'starter_search_selected',
+])
+const isSettingsTab = isOneOf(['archives', 'privacy', 'tweets'])
 
 const allowedEventProperties: Record<
   string,
@@ -132,6 +209,33 @@ const allowedEventProperties: Record<
     active_filter_count: isActiveFilterCount,
     surface: isSearchSurface,
   },
+  product_page_viewed: { page: isProductPage },
+  navigation_item_clicked: {
+    destination: isNavigationDestination,
+    surface: isNavigationSurface,
+    already_active: isBoolean,
+  },
+  homepage_action_clicked: {
+    action: isHomepageAction,
+    authenticated: isBoolean,
+  },
+  digest_action: {
+    action: isDigestAction,
+    surface: isDigestSurface,
+  },
+  user_directory_action: {
+    action: isUserDirectoryAction,
+    has_query: isBoolean,
+    sort_by: isDirectorySort,
+    sort_order: isSortOrder,
+    visible_result_count: isNonnegativeInteger,
+  },
+  search_interface_action: {
+    action: isSearchInterfaceAction,
+    has_query: isBoolean,
+    active_filter_count: isActiveFilterCount,
+  },
+  settings_tab_selected: { tab: isSettingsTab },
   dashboard_destination_opened: {
     destination: isDashboardDestination,
     surface: isDashboardLinkSurface,

@@ -1,6 +1,6 @@
 import {
   canPreviewTweetSearch,
-  searchTweetPreviewWithClickHouse,
+  searchTweetPreviewsWithClickHouse,
   searchTweetsWithClickHouse,
 } from './clickhouseSearch'
 
@@ -48,6 +48,7 @@ describe('searchTweetsWithClickHouse', () => {
         startDate: '2024-01-01',
         endDate: '2025-01-01',
         sort: 'likes',
+        excludeRetweets: true,
       },
       2,
       20,
@@ -55,7 +56,7 @@ describe('searchTweetsWithClickHouse', () => {
     )
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      '/api/tweet-search?q=Open+source&mode=phrase&limit=20&offset=20&from_user=alice&reply_to_user=bob&since=2024-01-01&until=2025-01-01&sort=likes',
+      '/api/tweet-search?q=Open+source&mode=phrase&limit=20&offset=20&from_user=alice&reply_to_user=bob&since=2024-01-01&until=2025-01-01&sort=likes&exclude_retweets=true',
       { cache: 'no-store' },
     )
     expect(tweets).toEqual([
@@ -96,35 +97,33 @@ describe('searchTweetsWithClickHouse', () => {
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
-  test('requests one newest non-retweet as a progressive preview', async () => {
+  test('requests five newest non-retweets as a progressive preview', async () => {
     const fetchImpl = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
       text: jest.fn().mockResolvedValue(
         JSON.stringify({
           data: {
-            tweets: [
-              {
-                tweetId: '123',
-                accountId: '42',
-                createdAt: '2026-08-13 00:00:00.000',
-                fullText: 'Open source matters',
-                replyToTweetId: null,
-                favoriteCount: '4',
-                retweetCount: '2',
-                username: 'alice',
-                accountDisplayName: 'Alice',
-                avatarMediaUrl: null,
-                media: [],
-              },
-            ],
+            tweets: ['123', '122', '121', '120', '119'].map((tweetId) => ({
+              tweetId,
+              accountId: '42',
+              createdAt: '2026-08-13 00:00:00.000',
+              fullText: 'Open source matters',
+              replyToTweetId: null,
+              favoriteCount: '4',
+              retweetCount: '2',
+              username: 'alice',
+              accountDisplayName: 'Alice',
+              avatarMediaUrl: null,
+              media: [],
+            })),
             nextOffset: null,
           },
         }),
       ),
     })
 
-    const tweet = await searchTweetPreviewWithClickHouse(
+    const tweets = await searchTweetPreviewsWithClickHouse(
       {
         rawSearchQuery: 'Open source',
         excludeRetweets: true,
@@ -133,10 +132,17 @@ describe('searchTweetsWithClickHouse', () => {
     )
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      '/api/tweet-search?q=Open+source&mode=phrase&limit=1&offset=0&preview=true&exclude_retweets=true',
+      '/api/tweet-search?q=Open+source&mode=phrase&limit=5&offset=0&preview=true&exclude_retweets=true',
       { cache: 'no-store' },
     )
-    expect(tweet?.tweet_id).toBe('123')
+    expect(tweets.definitiveEmpty).toBe(false)
+    expect(tweets.tweets.map((tweet) => tweet.tweet_id)).toEqual([
+      '123',
+      '122',
+      '121',
+      '120',
+      '119',
+    ])
   })
 
   test('only enables previews for ClickHouse newest text searches', () => {

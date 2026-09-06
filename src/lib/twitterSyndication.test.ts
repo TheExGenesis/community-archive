@@ -51,4 +51,34 @@ describe('Twitter syndication', () => {
       },
     })
   })
+
+  test('does not report the reply count as a repost count', async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          __typename: 'Tweet',
+          id_str: '1593478387703873536',
+          text: 'hello',
+          created_at: 'Thu Nov 17 20:12:00 +0000 2022',
+          favorite_count: 296,
+          // The syndication payload has no repost count; this is replies.
+          conversation_count: 57,
+          user: {
+            id_str: '826134955549790208',
+            screen_name: 'christineist',
+            name: 'christine',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ) as jest.MockedFunction<typeof fetch>
+
+    await expect(
+      fetchSyndicatedTweet('1593478387703873536'),
+    ).resolves.toMatchObject({
+      tweet_id: '1593478387703873536',
+      favorite_count: 296,
+      retweet_count: null,
+    })
+  })
 })

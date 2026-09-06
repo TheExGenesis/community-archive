@@ -45,6 +45,7 @@ else
     echo "Using direct docker run..."
     docker run --rm \
         --name process-archive-service \
+        --network host \
         --env-file=.env \
         -v "$(pwd)/logs:/app/logs" \
         -v "$(pwd)/data:/app/data" \

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
 import { DigestMarkdown } from '@/components/digest/DigestMarkdown'
 import { MUTED, SERIF } from '@/components/portal/styles'
+import type { DigestQuotePosts } from '@/lib/digest/quotePosts'
 import type { DigestEdition, DigestStory } from '@/lib/digest/types'
 
 const timeLabel = (value: string | null) =>
@@ -20,15 +21,26 @@ const sectionLabel =
 export function DigestStoryView({
   edition,
   story,
+  quotePosts = [],
 }: {
   edition: DigestEdition
   story: DigestStory
+  quotePosts?: DigestQuotePosts[]
 }) {
   const returnTo = `/digest/${edition.digestDate}/${story.slug}`
   const archivedQuotes = story.bangers.reduce(
     (total, tweet) => total + (tweet.quoteCount ?? 0),
     0,
   )
+  const selectedCommentaryIds = new Set(story.commentary.map(({ id }) => id))
+  const unselectedQuotePosts = quotePosts
+    .map((group) => ({
+      ...group,
+      tweets: group.tweets.filter(
+        (tweet) => !selectedCommentaryIds.has(tweet.id),
+      ),
+    }))
+    .filter(({ tweets }) => tweets.length > 0)
 
   return (
     <main className="min-h-screen bg-white dark:bg-[#111114]">
@@ -38,7 +50,7 @@ export function DigestStoryView({
             href={`/digest/${edition.digestDate}`}
             className="rounded-sm text-sm font-semibold text-muted-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
-            ← The Daily Digest
+            ← What Happened Yesterday
           </Link>
           <span className={`text-xs ${MUTED}`}>{edition.digestDate}</span>
         </div>
@@ -139,6 +151,48 @@ export function DigestStoryView({
                 </div>
               </section>
             ) : null}
+
+            {unselectedQuotePosts.length ? (
+              <section>
+                <div className="flex items-center gap-3.5">
+                  <h2 className={sectionLabel}>Archived quote posts</h2>
+                  <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
+                </div>
+                <p className={`mt-2 text-sm leading-6 ${MUTED}`}>
+                  Community Archive members who quoted the featured bangers.
+                </p>
+                <div className="mt-5 space-y-8">
+                  {unselectedQuotePosts.map((group) => {
+                    const banger = story.bangers.find(
+                      ({ id }) => id === group.bangerId,
+                    )
+                    if (!banger) return null
+                    return (
+                      <section key={group.bangerId}>
+                        <div className="mb-1 flex items-baseline gap-2 text-xs text-muted-foreground">
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                            Quotes of @{banger.username}
+                          </span>
+                          <span>· {group.totalCount} archived</span>
+                        </div>
+                        {group.tweets.map((tweet) => (
+                          <TweetCard
+                            key={tweet.id}
+                            tweet={tweet}
+                            variant="editorial"
+                            noClamp
+                            showDate
+                            quotedTweetDisplay="summary"
+                            origin="digest"
+                            returnTo={returnTo}
+                          />
+                        ))}
+                      </section>
+                    )
+                  })}
+                </div>
+              </section>
+            ) : null}
           </div>
 
           <aside className="mt-12 border-zinc-200 pt-8 dark:border-zinc-800 lg:sticky lg:top-24 lg:mt-0 lg:border-l lg:py-0 lg:pl-10">
@@ -172,7 +226,7 @@ export function DigestStoryView({
             <section className="mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800">
               <Link
                 href={`/tweets/${story.bangers[0].id}?from=digest&returnTo=${encodeURIComponent(returnTo)}`}
-                className="inline-flex text-sm font-semibold text-brand hover:underline"
+                className="inline-flex text-sm font-semibold text-brand"
               >
                 Open the lead banger and all archived replies →
               </Link>

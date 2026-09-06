@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { userProfileHref } from '@/lib/navigation'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 export default function MobileMenu() {
   const { userMetadata } = useAuthAndArchive()
@@ -29,6 +30,11 @@ export default function MobileMenu() {
     userMetadata?.user_name?.slice(0, 2).toUpperCase() ?? 'ME'
 
   const handleSignOut = async () => {
+    capturePostHogEvent('navigation_item_clicked', {
+      destination: 'sign_out',
+      surface: 'account_menu',
+      already_active: false,
+    })
     const supabase = createBrowserClient()
     const { error } = await supabase.auth.signOut()
 
@@ -67,13 +73,33 @@ export default function MobileMenu() {
         {userMetadata ? (
           <>
             <DropdownMenuItem asChild>
-              <Link href={profileHref} className="cursor-pointer gap-3 py-2.5">
+              <Link
+                href={profileHref}
+                onClick={() =>
+                  capturePostHogEvent('navigation_item_clicked', {
+                    destination: 'user_profile',
+                    surface: 'account_menu',
+                    already_active: false,
+                  })
+                }
+                className="cursor-pointer gap-3 py-2.5"
+              >
                 <UserRound className="h-4 w-4" />
                 Profile
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/settings" className="cursor-pointer gap-3 py-2.5">
+              <Link
+                href="/settings"
+                onClick={() =>
+                  capturePostHogEvent('navigation_item_clicked', {
+                    destination: 'settings',
+                    surface: 'account_menu',
+                    already_active: false,
+                  })
+                }
+                className="cursor-pointer gap-3 py-2.5"
+              >
                 <Settings className="h-4 w-4" />
                 Settings
               </Link>
@@ -88,7 +114,17 @@ export default function MobileMenu() {
           </>
         ) : (
           <DropdownMenuItem asChild>
-            <Link href="/login" className="cursor-pointer gap-3 py-2.5">
+            <Link
+              href="/login"
+              onClick={() =>
+                capturePostHogEvent('navigation_item_clicked', {
+                  destination: 'sign_in',
+                  surface: 'account_menu',
+                  already_active: false,
+                })
+              }
+              className="cursor-pointer gap-3 py-2.5"
+            >
               <LogIn className="h-4 w-4" />
               Sign in
             </Link>

@@ -6,7 +6,7 @@ import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import UserSearchInput from '@/components/UserSearchInput'
 import { capturePostHogEvent } from '@/lib/posthog'
-import { buildSearchParams } from '@/lib/searchParams'
+import { buildSearchParams, parseSearchExpression } from '@/lib/searchParams'
 
 const exampleSearches = ['open source', 'AI alignment', 'from:vitalikbuterin']
 
@@ -19,9 +19,10 @@ export default function HomepageSearch() {
     if (!trimmedQuery) return
 
     const params = buildSearchParams(trimmedQuery)
+    const { options } = parseSearchExpression(trimmedQuery)
     capturePostHogEvent('archive_search_submitted', {
       has_query: true,
-      active_filter_count: 0,
+      active_filter_count: Object.keys(options).length,
       surface: 'homepage',
     })
     router.push(`/search?${params.toString()}`)
@@ -36,20 +37,20 @@ export default function HomepageSearch() {
     <div className="mx-auto w-full max-w-3xl">
       <form
         onSubmit={handleSubmit}
-        className="relative rounded-2xl border border-border bg-card p-1.5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.10)] sm:p-2"
+        className="relative rounded-[50px] border border-border bg-card p-1.5 text-left shadow-[0_12px_30px_rgba(15,23,42,0.10)] sm:p-2"
       >
         <UserSearchInput
           value={query}
           onValueChange={setQuery}
           placeholder="Search tweets, people, ideas"
           aria-label="Search Community Archive"
-          className="h-14 border-0 bg-transparent pl-3 pr-16 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-[360px]:text-base sm:pl-4 sm:text-lg"
+          className="h-14 rounded-[50px] border-0 bg-transparent pl-3 pr-16 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 min-[360px]:text-base sm:pl-4 sm:text-lg"
           autoComplete="off"
         />
         <Button
           type="submit"
           size="icon"
-          className="absolute right-2.5 top-1/2 h-11 w-11 -translate-y-1/2 rounded-full bg-green-600 text-white shadow-sm hover:bg-green-700 focus-visible:ring-green-600 dark:bg-green-400 dark:text-green-950 dark:hover:bg-green-300 dark:focus-visible:ring-green-400 sm:right-3"
+          className="absolute right-2.5 top-1/2 h-11 w-11 -translate-y-1/2 rounded-full bg-brand text-brand-foreground shadow-sm hover:bg-brand/90 focus-visible:ring-brand sm:right-3"
           aria-label="Search archive"
         >
           <Search className="h-5 w-5" />
@@ -63,7 +64,7 @@ export default function HomepageSearch() {
             key={example}
             type="button"
             onClick={() => search(example)}
-            className="font-medium text-foreground underline-offset-4 transition-colors hover:text-brand hover:underline"
+            className="font-medium text-foreground underline-offset-4 transition-colors hover:text-brand"
           >
             {example}
           </button>

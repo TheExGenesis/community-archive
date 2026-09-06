@@ -33,31 +33,9 @@ if ! flock -n 200; then
     exit 1
 fi
 
-# Now we have exclusive access - check if there's existing lock content
-LOCK_CONTENT=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
-if [ -n "$LOCK_CONTENT" ]; then
-    LOCK_CONTAINER_ID=$(echo "$LOCK_CONTENT" | cut -d'|' -f1 2>/dev/null || echo "")
-    LOCK_TIMESTAMP=$(echo "$LOCK_CONTENT" | cut -d'|' -f2 2>/dev/null || echo "0")
-    
-    if [ -n "$LOCK_CONTAINER_ID" ] && [ "$LOCK_CONTAINER_ID" != "$CONTAINER_ID" ]; then
-        # Check if the lock is stale (older than 12 hours = 43200 seconds)
-        CURRENT_TIME=$(date +%s)
-        LOCK_AGE=$((CURRENT_TIME - LOCK_TIMESTAMP))
-        
-        if [ "$LOCK_AGE" -gt 43200 ]; then
-            echo "⚠️  Stale lock file found (${LOCK_AGE}s old), taking over..."
-        else
-            echo "❌ Another process-archive container is already running"
-            echo "   Container ID: $LOCK_CONTAINER_ID" 
-            echo "   Lock file: $LOCK_FILE"
-            echo "   Lock age: ${LOCK_AGE}s"
-            echo "   Container will exit to prevent concurrent execution"
-            exit 1
-        fi
-    elif [ "$LOCK_CONTAINER_ID" = "$CONTAINER_ID" ]; then
-        echo "⚠️  Found lock from same container (restart?), updating..."
-    fi
-fi
+# Acquiring flock proves that no live worker owns the lock. The file content is
+# diagnostic only and may outlive a container because exec replaces this shell;
+# never treat stale bytes as evidence of a running process.
 
 # Write our lock information
 echo "${CONTAINER_ID}|${TIMESTAMP}" > "$LOCK_FILE"

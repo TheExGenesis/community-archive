@@ -5,6 +5,7 @@ import {
   currentProjectContributors,
   pastProjectContributors,
 } from '@/lib/projectContributors'
+import { userProfileHref } from '@/lib/navigation'
 
 export default function AboutPage() {
   return (
@@ -36,10 +37,8 @@ export default function AboutPage() {
               className="rounded-lg bg-muted p-4 dark:bg-card"
             >
               <h3 className="mb-1 text-xl font-semibold">
-                <a
-                  href={`https://x.com/${contributor.username}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href={userProfileHref(contributor.username)}
                   className="transition-colors hover:text-brand"
                 >
                   {contributor.name}
@@ -49,7 +48,7 @@ export default function AboutPage() {
                       ({contributor.qualifier})
                     </span>
                   ) : null}
-                </a>
+                </Link>
               </h3>
               {contributor.role && (
                 <p className="text-muted-foreground">{contributor.role}</p>
@@ -72,14 +71,12 @@ export default function AboutPage() {
               className="rounded-lg bg-muted p-4 dark:bg-card"
             >
               <h3 className="text-lg font-semibold">
-                <a
-                  href={`https://x.com/${contributor.username}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href={userProfileHref(contributor.username)}
                   className="transition-colors hover:text-brand"
                 >
                   {contributor.name}
-                </a>
+                </Link>
               </h3>
             </div>
           ))}
@@ -145,7 +142,7 @@ export default function AboutPage() {
         <h2 className="mb-4 mt-8 text-2xl font-semibold">Learn More</h2>
         <ul className="space-y-2">
           <li>
-            <Link href="/data-policy" className="text-brand hover:underline">
+            <Link href="/data-policy" className="text-brand">
               Data Policy
             </Link>{' '}
             - How we handle your data
@@ -155,7 +152,7 @@ export default function AboutPage() {
               href="https://github.com/TheExGenesis/community-archive/tree/main/docs"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-brand hover:underline"
+              className="text-brand"
             >
               Documentation
             </a>{' '}

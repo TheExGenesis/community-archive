@@ -30,14 +30,30 @@ GRANT SELECT ON TABLE "public"."profile_settings" TO "readclient";
 GRANT SELECT ON TABLE "public"."profile_curation" TO "readclient";
 GRANT SELECT ON TABLE "public"."tweet_link_previews" TO "readclient";
 
--- Public profile projections are readable by everyone and owner-writable.
+-- This legacy materialized view embeds historical tweet text and has no RLS.
+-- The app uses live public.tweets rows instead.
+REVOKE ALL ON TABLE "public"."account_activity_summary" FROM PUBLIC, "anon", "authenticated", "readclient";
+
+-- These tables are populated only by trusted service-role routes and workers.
+-- Public/authenticated clients retain read access but no direct write grants.
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE
+  "public"."all_profile",
+  "public"."followers",
+  "public"."following",
+  "public"."likes",
+  "public"."tweets",
+  "public"."tweet_media",
+  "public"."tweet_urls",
+  "public"."user_mentions",
+  "public"."optin"
+FROM "anon", "authenticated";
+
+-- Public profile projections are readable by everyone and service-role writable.
 REVOKE ALL PRIVILEGES ON TABLE "public"."profile_settings" FROM "anon", "authenticated";
 REVOKE ALL PRIVILEGES ON TABLE "public"."profile_curation" FROM "anon", "authenticated";
 REVOKE ALL PRIVILEGES ON TABLE "public"."tweet_link_previews" FROM "anon", "authenticated";
 GRANT SELECT ON TABLE "public"."profile_settings" TO "anon", "authenticated";
-GRANT INSERT, UPDATE ON TABLE "public"."profile_settings" TO "authenticated";
 GRANT SELECT ON TABLE "public"."profile_curation" TO "anon", "authenticated";
-GRANT INSERT, UPDATE, DELETE ON TABLE "public"."profile_curation" TO "authenticated";
 
 -- Link metadata is populated only by trusted server enrichment code.
 GRANT SELECT ON TABLE "public"."tweet_link_previews" TO "anon", "authenticated";
@@ -86,3 +102,53 @@ GRANT ALL PRIVILEGES ON TABLE "public"."digest_editions" TO "service_role";
 GRANT USAGE, SELECT ON SEQUENCE "public"."digest_prompt_versions_version_seq" TO "service_role";
 GRANT USAGE, SELECT ON SEQUENCE "public"."digest_editions_issue_number_seq" TO "service_role";
 GRANT SELECT ON TABLE "public"."digest_editions" TO "anon", "authenticated";
+-- Email subscriptions hold addresses and capability tokens: service-role only.
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_email_subscriptions" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_email_sends" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_email_subscriptions" TO "service_role";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_email_sends" TO "service_role";
+
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_edition_likes" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_edition_likes" TO "service_role";
+GRANT SELECT ON TABLE "public"."digest_edition_likes" TO "anon", "authenticated";
+
+REVOKE ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" TO "service_role";
+GRANT SELECT ON TABLE "public"."digest_edition_comments" TO "anon", "authenticated";
+
+-- Community Gallery: public clients can read only rows allowed by RLS. All
+-- submissions and approvals are performed by authenticated server code after
+-- the appropriate identity gate.
+REVOKE ALL PRIVILEGES ON TABLE "public"."community_projects" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."community_projects" TO "service_role";
+GRANT SELECT ON TABLE "public"."community_projects" TO "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."community_project_likes" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."community_project_likes" TO "service_role";
+GRANT SELECT ON TABLE "public"."community_project_likes" TO "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE "public"."community_project_comments" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."community_project_comments" TO "service_role";
+GRANT SELECT ON TABLE "public"."community_project_comments" TO "anon", "authenticated";
+
+
+REVOKE ALL ON FUNCTION private.community_archive_monitoring_membership()
+  FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION private.community_archive_monitoring_activity_day(integer)
+  FROM PUBLIC, anon, authenticated, service_role;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_roles WHERE rolname = 'archive_metrics_exporter'
+  ) THEN
+    REVOKE SELECT ON public.optin, public.user_action_log
+      FROM archive_metrics_exporter;
+    GRANT USAGE ON SCHEMA private TO archive_metrics_exporter;
+    GRANT EXECUTE
+      ON FUNCTION private.community_archive_monitoring_membership()
+      TO archive_metrics_exporter;
+    GRANT EXECUTE
+      ON FUNCTION private.community_archive_monitoring_activity_day(integer)
+      TO archive_metrics_exporter;
+  END IF;
+END;
+$$;

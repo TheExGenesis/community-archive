@@ -1,6 +1,13 @@
 const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
   'corpus-count': new Set(),
   summary: new Set(),
+  'member-directory': new Set([
+    'limit',
+    'offset',
+    'sort_by',
+    'sort_order',
+    'search',
+  ]),
   'social-graph': new Set(),
   search: new Set([
     'q',
@@ -15,10 +22,24 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'preview',
     'exclude_retweets',
   ]),
-  'trend-evidence': new Set(['q', 'mode', 'since', 'until', 'limit']),
+  'trend-evidence': new Set([
+    'q',
+    'mode',
+    'since',
+    'until',
+    'sort',
+    'limit',
+    'offset',
+  ]),
   'word-trend': new Set(['q', 'bucket', 'match', 'from', 'to']),
   'stream-stats': new Set(['start', 'end', 'granularity', 'scope']),
-  'recent-bangers': new Set(['limit', 'hours', 'end']),
+  'recent-bangers': new Set(['limit', 'hours', 'end', 'target_ca_users_only']),
+  'daily-interactions': new Set([
+    'limit',
+    'hours',
+    'end',
+    'target_ca_users_only',
+  ]),
   'portal-stream': new Set([
     'limit',
     'before',
@@ -32,6 +53,8 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'offset',
     'sort',
     'year',
+    'created_after',
+    'created_before',
     'q',
     'target_account_id',
     'min_quote_count',
@@ -100,7 +123,7 @@ export function analyticsGatewayRequestUrl(
   } else if (
     cleanPath.length === 3 &&
     cleanPath[0] === 'user' &&
-    /^\d{1,20}$/.test(cleanPath[1]) &&
+    /^(?:\d{1,20}|[A-Za-z0-9_@]{1,80})$/.test(cleanPath[1]) &&
     cleanPath[2] === 'interactions'
   ) {
     allowedParams = new Set(['year', 'limit'])
@@ -108,6 +131,13 @@ export function analyticsGatewayRequestUrl(
     cleanPath.length === 2 &&
     cleanPath[0] === 'tweet' &&
     /^\d{1,20}$/.test(cleanPath[1])
+  ) {
+    allowedParams = new Set()
+  } else if (
+    cleanPath.length === 3 &&
+    cleanPath[0] === 'tweet' &&
+    /^\d{1,20}$/.test(cleanPath[1]) &&
+    cleanPath[2] === 'thread'
   ) {
     allowedParams = new Set()
   } else if (

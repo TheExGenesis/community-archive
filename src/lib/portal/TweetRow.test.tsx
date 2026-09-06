@@ -84,24 +84,14 @@ describe('portal TweetRow media', () => {
     mockCapturePostHogEvent.mockReset()
   })
 
-  test('uses a neutral card and explains its archived-quote evidence', async () => {
+  test('explains its archived-quote evidence and records opening it', async () => {
     const user = userEvent.setup()
-    const { container } = render(<TweetRow tweet={tweet} featuredRank={1} />)
-    const card = container.querySelector('article')
+    render(<TweetRow tweet={tweet} featuredRank={1} />)
 
     expect(screen.queryByLabelText('Rank 1')).not.toBeInTheDocument()
-    expect(card).toHaveClass('border-zinc-200/75')
-    expect(card).toHaveClass(
-      'duration-100',
-      'hover:-translate-y-0.5',
-      'hover:border-[#d4d4d7]/75',
-    )
-    expect(card?.className).not.toMatch(/amber|blue/)
     const archivedQuotes = screen.getByRole('link', {
       name: '12 archived quotes. Open tweet to see them.',
     })
-    expect(archivedQuotes).toHaveClass('text-zinc-500')
-    expect(archivedQuotes).not.toHaveClass('rounded-full', 'text-brand')
 
     await user.hover(archivedQuotes)
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
@@ -117,6 +107,12 @@ describe('portal TweetRow media', () => {
       has_quoted_tweet: true,
       is_featured: true,
     })
+  })
+
+  test('marks community-authored digest bangers', () => {
+    render(<TweetRow tweet={{ ...tweet, communityAuthored: true }} />)
+
+    expect(screen.getByText('Community author')).toBeVisible()
   })
 
   test('renders quotes and closes an enlarged image when the backdrop is clicked', async () => {

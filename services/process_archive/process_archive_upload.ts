@@ -10,7 +10,30 @@ import postgres from 'postgres'
 type Sql = postgres.Sql
 
 import { createClient } from '@supabase/supabase-js'
-import { getArchiveTweetMedia } from '../../src/lib/archiveMedia'
+import { getArchiveTweetMedia } from './archive_media'
+import {
+  ArchiveClickHouseError,
+  ArchiveClickHouseSink,
+  type ArchiveClickHouseDelivery,
+  type ArchivePolicyCandidate,
+  type ArchivePolicyDecisions,
+  attemptArchiveClickHouseDelivery,
+  buildArchiveClickHouseBatch,
+  buildArchiveTombstoneBatch,
+  collectArchivePolicyCandidates,
+  createArchiveClickHouseManifest,
+} from './archive_clickhouse'
+import {
+  CanonicalArchivePublisherError,
+  canonicalArchiveObservedAt,
+  canonicalArchivePolicyVersion,
+  canonicalArchivePublishingEnabled,
+  canonicalArchiveQueueFirstEnabled,
+  ensureCanonicalArchivePendingReport,
+  pendingCanonicalArchiveReportIds,
+  publishCanonicalArchiveBatch,
+  safeCanonicalArchiveErrorCode,
+} from './canonical_archive'
 
 // Configuration
 const CONFIG = {
@@ -21,7 +44,28 @@ const CONFIG = {
   POSTGRES_CONNECTION_STRING: process.env.POSTGRES_CONNECTION_STRING,
   MAX_MEMORY_MB: parseInt(process.env.MAX_MEMORY_MB || '1000', 10), // Memory limit
   PROCESS_RETWEETS: process.env.PROCESS_RETWEETS !== 'false', // Enable retweet processing by default
-  DEBUG_PG_QUERIES: process.env.DEBUG_PG_QUERIES === 'true' // only log if it has been explicitly enabled
+  DEBUG_PG_QUERIES: process.env.DEBUG_PG_QUERIES === 'true', // only log if it has been explicitly enabled
+  ARCHIVE_CLICKHOUSE_SINK_ENABLED:
+    process.env.ARCHIVE_CLICKHOUSE_SINK_ENABLED === 'true',
+  ARCHIVE_CLICKHOUSE_RETRY_BATCH: Math.max(
+    1,
+    Math.min(
+      50,
+      parseInt(process.env.ARCHIVE_CLICKHOUSE_RETRY_BATCH || '5', 10),
+    ),
+  ),
+  CLICKHOUSE_URL: process.env.CLICKHOUSE_URL,
+  CLICKHOUSE_DATABASE:
+    process.env.CLICKHOUSE_DATABASE || 'community_archive',
+  CLICKHOUSE_USER: process.env.CLICKHOUSE_USER,
+  CLICKHOUSE_PASSWORD: process.env.CLICKHOUSE_PASSWORD,
+  CANONICAL_ARCHIVE_RETRY_BATCH: Math.max(
+    1,
+    Math.min(
+      50,
+      parseInt(process.env.CANONICAL_ARCHIVE_RETRY_BATCH || '5', 10),
+    ),
+  ),
 } as const
 
 export async function createServerScriptClient() {
@@ -106,9 +150,9 @@ const logger = createLogger()
 // Table configurations
 const TABLE_CONFIGS: Record<string, TableConfig> = {
   all_account: {
-    columns: ['account_id', 'created_via', 'username', 'created_at', 'account_display_name', 'num_tweets', 'num_following', 'num_followers', 'num_likes'],
+    columns: ['account_id', 'created_via', 'username', 'created_at', 'account_display_name', 'num_tweets', 'num_following', 'num_followers', 'num_likes', 'is_tombstone'],
     conflict: 'account_id',
-    updates: ['username', 'account_display_name', 'num_tweets', 'num_following', 'num_followers', 'num_likes']
+    updates: ['created_via', 'username', 'created_at', 'account_display_name', 'num_tweets', 'num_following', 'num_followers', 'num_likes', 'is_tombstone']
   },
   all_profile: {
     columns: ['account_id', 'avatar_media_url', 'header_media_url', 'bio', 'location', 'website', 'archive_upload_id'],
@@ -116,13 +160,14 @@ const TABLE_CONFIGS: Record<string, TableConfig> = {
     updates: ['avatar_media_url', 'header_media_url', 'bio', 'location', 'website', 'archive_upload_id']
   },
   tweets: {
-    columns: ['tweet_id', 'account_id', 'created_at', 'full_text', 'favorite_count', 'retweet_count', 'reply_to_tweet_id', 'reply_to_user_id', 'reply_to_username', 'archive_upload_id'],
+    columns: ['tweet_id', 'account_id', 'created_at', 'full_text', 'favorite_count', 'retweet_count', 'reply_to_tweet_id', 'reply_to_user_id', 'reply_to_username', 'archive_upload_id', 'is_tombstone'],
     conflict: 'tweet_id',
-    updates: ['favorite_count', 'retweet_count', 'archive_upload_id']
+    updates: ['account_id', 'created_at', 'full_text', 'favorite_count', 'retweet_count', 'reply_to_tweet_id', 'reply_to_user_id', 'reply_to_username', 'archive_upload_id', 'is_tombstone']
   },
   mentioned_users: {
-    columns: ['user_id', 'name', 'screen_name'],
-    conflict: 'user_id'
+    columns: ['user_id', 'name', 'screen_name', 'is_tombstone'],
+    conflict: 'user_id',
+    updates: ['name', 'screen_name', 'is_tombstone']
   },
   user_mentions: {
     columns: ['tweet_id', 'mentioned_user_id'],
@@ -152,8 +197,9 @@ const TABLE_CONFIGS: Record<string, TableConfig> = {
     updates: ['archive_upload_id']
   },
   liked_tweets: {
-    columns: ['tweet_id', 'full_text'],
-    conflict: 'tweet_id'
+    columns: ['tweet_id', 'full_text', 'author_account_id', 'is_tombstone'],
+    conflict: 'tweet_id',
+    updates: ['full_text', 'author_account_id', 'is_tombstone']
   },
   following: {
     columns: ['account_id', 'following_account_id', 'archive_upload_id'],
@@ -301,12 +347,26 @@ export class ArchiveUploadProcessor {
   async processArchive(archive: any): Promise<void> {
 
     archive = patchArchive(archive);
+    const clickHouseManifest = createArchiveClickHouseManifest(
+      archive,
+      this.archiveUploadId,
+    )
 
 
     logger.info(`Processing large archive with optimized batch inserts (${getMemoryUsageMB()}MB memory used)`)
     
     // Process everything in a single transaction
     await this.sql.begin(async (trx: Sql) => {
+      const accountId = archive.account?.[0]?.account?.accountId
+      if (!accountId) throw new Error('Archive owner identity is missing')
+      await trx`SELECT public.lock_policy_account(${accountId})`
+      const ownerBlocked = await this.archiveOwnerIsBlocked(trx, archive)
+      if (ownerBlocked) {
+        await this.processBlockedArchive(trx, archive)
+        await this.enqueueClickHouseDelivery(trx, clickHouseManifest)
+        return
+      }
+
       // Process small data first (account, profile, etc.)
       await this.processUserData(trx, archive)
       
@@ -333,7 +393,115 @@ export class ArchiveUploadProcessor {
 
       // Process remaining data that depends on all tweets being processed
       await this.processRemainingData(trx, archive)
+      await this.enqueueClickHouseDelivery(trx, clickHouseManifest)
     })
+  }
+
+  private async enqueueClickHouseDelivery(
+    trx: Sql,
+    manifest: ReturnType<typeof createArchiveClickHouseManifest>,
+  ): Promise<void> {
+    await trx`
+      INSERT INTO private.archive_clickhouse_delivery (
+        archive_upload_id,
+        account_id,
+        tweet_ids,
+        delivery_state,
+        next_attempt_at,
+        updated_at
+      ) VALUES (
+        ${manifest.archiveUploadId},
+        ${manifest.accountId},
+        ${manifest.tweetIds}::text[],
+        'pending',
+        now(),
+        now()
+      )
+      ON CONFLICT (archive_upload_id) DO UPDATE SET
+        account_id = EXCLUDED.account_id,
+        tweet_ids = EXCLUDED.tweet_ids,
+        delivery_state = CASE
+          WHEN private.archive_clickhouse_delivery.delivery_state = 'delivered'
+            THEN 'delivered'
+          ELSE 'pending'
+        END,
+        next_attempt_at = CASE
+          WHEN private.archive_clickhouse_delivery.delivery_state = 'delivered'
+            THEN private.archive_clickhouse_delivery.next_attempt_at
+          ELSE now()
+        END,
+        updated_at = now()
+    `
+  }
+
+  private async archiveOwnerIsBlocked(
+    trx: Sql,
+    archive: any,
+  ): Promise<boolean> {
+    const account = archive.account?.[0]?.account
+    const accountId = account?.accountId
+    const username = account?.username
+
+    if (!accountId || !username) {
+      throw new Error('Archive owner identity is missing')
+    }
+
+    const [policy] = await trx`
+      SELECT public.policy_account_is_blocked(
+        ${accountId},
+        ${username}
+      ) AS blocked
+    `
+
+    return policy?.blocked === true
+  }
+
+  private async processBlockedArchive(trx: Sql, archive: any): Promise<void> {
+    const accountId = archive.account[0].account.accountId
+    await trx`
+      INSERT INTO public.all_account (
+        account_id, created_via, username, created_at, account_display_name,
+        num_tweets, num_following, num_followers, num_likes, is_tombstone
+      ) VALUES (
+        ${accountId}, 'policy_tombstone', '', '1970-01-01 00:00:00+00', '',
+        0, 0, 0, 0, true
+      )
+      ON CONFLICT (account_id) DO UPDATE SET
+        created_via = 'policy_tombstone',
+        username = '',
+        created_at = '1970-01-01 00:00:00+00',
+        account_display_name = '',
+        num_tweets = 0,
+        num_following = 0,
+        num_followers = 0,
+        num_likes = 0,
+        is_tombstone = true
+    `
+
+    for (const record of archive.tweets ?? []) {
+      const tweetId = record.tweet?.id_str ?? record.tweet?.id
+      if (!tweetId) continue
+      await trx`
+        INSERT INTO public.tweets (
+          tweet_id, account_id, created_at, full_text, favorite_count,
+          retweet_count, archive_upload_id, is_tombstone
+        ) VALUES (
+          ${tweetId}, ${accountId}, '1970-01-01 00:00:00+00', '', 0, 0,
+          NULL, true
+        )
+        ON CONFLICT (tweet_id) DO UPDATE SET
+          account_id = EXCLUDED.account_id,
+          created_at = EXCLUDED.created_at,
+          full_text = '',
+          favorite_count = 0,
+          retweet_count = 0,
+          reply_to_tweet_id = NULL,
+          reply_to_user_id = NULL,
+          reply_to_username = NULL,
+          archive_upload_id = NULL,
+          is_tombstone = true
+      `
+    }
   }
 
   private async processUserData(trx: Sql, archive: any): Promise<void> {
@@ -351,7 +519,8 @@ export class ArchiveUploadProcessor {
         num_tweets: archive.tweets?.length || 0,
         num_following: archive.following?.length || 0,
         num_followers: archive.follower?.length || 0,
-        num_likes: archive.like?.length || 0
+        num_likes: archive.like?.length || 0,
+        is_tombstone: false
       }]
 
       await bulkInsertWithCopy({
@@ -361,7 +530,7 @@ export class ArchiveUploadProcessor {
         conflictTarget: TABLE_CONFIGS.all_account.conflict,
         updateColumns: TABLE_CONFIGS.all_account.updates,
         data: account,
-        mapFn: (acc: any) => [acc.account_id, acc.created_via, acc.username, acc.created_at, acc.account_display_name, acc.num_tweets, acc.num_following, acc.num_followers, acc.num_likes]
+        mapFn: (acc: any) => [acc.account_id, acc.created_via, acc.username, acc.created_at, acc.account_display_name, acc.num_tweets, acc.num_following, acc.num_followers, acc.num_likes, acc.is_tombstone]
       })
     }
 
@@ -399,6 +568,7 @@ export class ArchiveUploadProcessor {
     const media: any[] = []
     const quotes: any[] = []
     const retweets: any[] = []
+    const nestedTargets = new Map<string, string | null>()
 
     // Process each tweet in the chunk
     for (const tweetData of tweetChunk) {
@@ -416,7 +586,8 @@ export class ArchiveUploadProcessor {
         reply_to_tweet_id: removeProblematicCharacters(tweet.in_reply_to_status_id_str),
         reply_to_user_id: removeProblematicCharacters(tweet.in_reply_to_user_id_str),
         reply_to_username: removeProblematicCharacters(tweet.in_reply_to_screen_name),
-        archive_upload_id: this.archiveUploadId
+        archive_upload_id: this.archiveUploadId,
+        is_tombstone: false
       })
 
       // Process mentions
@@ -427,7 +598,8 @@ export class ArchiveUploadProcessor {
           mentionedUsersMap.set(userId, {
             user_id: userId,
             name: removeProblematicCharacters(mention.name) || '',
-            screen_name: removeProblematicCharacters(mention.screen_name) || ''
+            screen_name: removeProblematicCharacters(mention.screen_name) || '',
+            is_tombstone: false,
           })
         }
         
@@ -443,15 +615,13 @@ export class ArchiveUploadProcessor {
           display_url: url.display_url || ''
         })
 
-        const isQuoteTweet = (url.expanded_url?.includes('twitter.com/') || 
-                            url.expanded_url?.includes('x.com/')) && 
-                           url.expanded_url?.includes('/status/')
-        
-        if (isQuoteTweet) {
-          const quotedTweetId = url.expanded_url?.split('/status/')[1]
-          if (quotedTweetId) {
-            quotes.push({ tweet_id: tweetId, quoted_tweet_id: quotedTweetId })
-          }
+        const quoteMatch = url.expanded_url?.match(
+          /(?:twitter\.com|x\.com)\/([A-Za-z0-9_]{1,15})\/status\/(\d+)/i,
+        )
+        if (quoteMatch) {
+          const [, quotedUsername, quotedTweetId] = quoteMatch
+          quotes.push({ tweet_id: tweetId, quoted_tweet_id: quotedTweetId })
+          nestedTargets.set(quotedTweetId, quotedUsername)
         }
       }
 
@@ -471,15 +641,27 @@ export class ArchiveUploadProcessor {
       // Process retweets
       const retweetMatch = tweet.full_text?.match(/^RT @\w+: /)
       if (retweetMatch) {
-        retweets.push({ tweet_id: tweetId, retweeted_tweet_id: null })
+        const retweetedTweetId =
+          tweet.retweeted_status_id_str ??
+          tweet.retweeted_status_id ??
+          tweet.retweeted_status?.id_str ??
+          null
+        const retweetedUsername =
+          tweet.full_text?.match(/^RT @([A-Za-z0-9_]{1,15}): /)?.[1] ?? null
+        retweets.push({ tweet_id: tweetId, retweeted_tweet_id: retweetedTweetId })
+        if (retweetedTweetId) {
+          nestedTargets.set(String(retweetedTweetId), retweetedUsername)
+        }
       }
     }
 
+    await this.ensureNestedTweetTombstones(trx, nestedTargets)
+
     // Insert tweets first
     await this.insertIfNotEmpty(trx, 'tweets', tweets, (t: any) => 
-      [t.tweet_id, t.account_id, t.created_at, t.full_text, t.favorite_count, t.retweet_count, t.reply_to_tweet_id, t.reply_to_user_id, t.reply_to_username, t.archive_upload_id])
+      [t.tweet_id, t.account_id, t.created_at, t.full_text, t.favorite_count, t.retweet_count, t.reply_to_tweet_id, t.reply_to_user_id, t.reply_to_username, t.archive_upload_id, t.is_tombstone])
 
-    await this.insertIfNotEmpty(trx, 'mentioned_users', Array.from(mentionedUsersMap.values()), (m: any) => [m.user_id, m.name, m.screen_name]);
+    await this.insertIfNotEmpty(trx, 'mentioned_users', Array.from(mentionedUsersMap.values()), (m: any) => [m.user_id, m.name, m.screen_name, m.is_tombstone]);
     
 
     // Insert chunk data in parallel using COPY
@@ -513,6 +695,49 @@ export class ArchiveUploadProcessor {
     retweets.length = 0
   }
 
+  private async ensureNestedTweetTombstones(
+    trx: Sql,
+    targets: Map<string, string | null>,
+  ): Promise<void> {
+    for (const [tweetId, username] of targets) {
+      const [existing] = await trx`
+        SELECT 1 AS present
+        FROM public.tweets
+        WHERE tweet_id = ${tweetId}
+        LIMIT 1
+      `
+      if (existing) continue
+
+      const [identity] = username
+        ? await trx`
+            SELECT public.policy_blocked_account_id(${username}) AS account_id
+          `
+        : [{ account_id: null }]
+      const accountId = identity?.account_id ?? `policy_unknown:${tweetId}`
+
+      await trx`
+        INSERT INTO public.all_account (
+          account_id, created_via, username, created_at, account_display_name,
+          num_tweets, num_following, num_followers, num_likes, is_tombstone
+        ) VALUES (
+          ${accountId}, 'policy_tombstone', '', '1970-01-01 00:00:00+00', '',
+          0, 0, 0, 0, true
+        )
+        ON CONFLICT (account_id) DO NOTHING
+      `
+      await trx`
+        INSERT INTO public.tweets (
+          tweet_id, account_id, created_at, full_text, favorite_count,
+          retweet_count, archive_upload_id, is_tombstone
+        ) VALUES (
+          ${tweetId}, ${accountId}, '1970-01-01 00:00:00+00', '', 0, 0,
+          NULL, true
+        )
+        ON CONFLICT (tweet_id) DO NOTHING
+      `
+    }
+  }
+
   private async processRemainingData(trx: Sql, archive: any): Promise<void> {
     const accountObj = archive.account?.[0]?.account
     if (!accountObj) return
@@ -524,9 +749,11 @@ export class ArchiveUploadProcessor {
         table: 'liked_tweets',
         data: (archive.like || []).map((like: any) => ({
           tweet_id: like.like.tweetId,
-          full_text: like.like.fullText || ''
+          full_text: '',
+          author_account_id: null,
+          is_tombstone: true,
         })),
-        mapFn: (lt: any) => [lt.tweet_id, lt.full_text]
+        mapFn: (lt: any) => [lt.tweet_id, lt.full_text, lt.author_account_id, lt.is_tombstone]
       },
       {
         table: 'likes',
@@ -702,10 +929,8 @@ function patchArchive(archive: any): any {
 }
 
 // Main processing function
-async function processSingleArchive(sql: Sql, username: string, archiveUploadId: number): Promise<void> {
-  logger.debug(`Loading archive for optimized processing (current memory: ${getMemoryUsageMB()}MB)`)
-  
-  const archive = await loadArchiveData(username)
+async function processSingleArchive(sql: Sql, archive: any, archiveUploadId: number): Promise<any> {
+  logger.debug(`Preparing archive for optimized processing (current memory: ${getMemoryUsageMB()}MB)`)
   
   // Determine processing strategy based on size
   const tweetsCount = archive.tweets?.length || 0
@@ -718,6 +943,341 @@ async function processSingleArchive(sql: Sql, username: string, archiveUploadId:
   await processor.processArchive(archive)
   
   logger.info(`Optimized processing completed (memory usage: ${getMemoryUsageMB()}MB)`)
+  return archive
+}
+
+function createArchiveClickHouseSink(): ArchiveClickHouseSink {
+  if (
+    !CONFIG.CLICKHOUSE_URL ||
+    !CONFIG.CLICKHOUSE_USER ||
+    !CONFIG.CLICKHOUSE_PASSWORD
+  ) {
+    throw new ArchiveClickHouseError('clickhouse_configuration_missing')
+  }
+  return new ArchiveClickHouseSink(
+    CONFIG.CLICKHOUSE_URL,
+    CONFIG.CLICKHOUSE_DATABASE,
+    CONFIG.CLICKHOUSE_USER,
+    CONFIG.CLICKHOUSE_PASSWORD,
+  )
+}
+
+async function resolveArchivePolicyDecisions(
+  trx: Sql,
+  candidates: ArchivePolicyCandidate[],
+): Promise<ArchivePolicyDecisions> {
+  if (candidates.length === 0) return new Map()
+  const rows = await trx`
+    WITH candidate AS (
+      SELECT
+        item->>'key' AS key,
+        NULLIF(item->>'accountId', '') AS account_id,
+        NULLIF(item->>'username', '') AS username,
+        NULLIF(item->>'tweetId', '') AS tweet_id
+      FROM jsonb_array_elements(${trx.json(candidates as never)}::jsonb) AS item
+    ), resolved AS (
+      SELECT
+        candidate.key,
+        candidate.username,
+        COALESCE(
+          candidate.account_id,
+          CASE
+            WHEN target.account_id ~ '^(0|[1-9][0-9]*)$'
+              THEN target.account_id
+            ELSE NULL
+          END,
+          public.policy_blocked_account_id(candidate.username)
+        ) AS account_id
+      FROM candidate
+      LEFT JOIN public.tweets AS target
+        ON target.tweet_id = candidate.tweet_id
+    )
+    SELECT
+      key,
+      CASE
+        WHEN account_id ~ '^(0|[1-9][0-9]*)$' THEN account_id
+        ELSE NULL
+      END AS account_id,
+      public.policy_account_is_blocked(account_id, username) AS blocked
+    FROM resolved
+  `
+  return new Map(
+    rows.map((row) => [
+      row.key,
+      {
+        accountId: row.account_id ?? null,
+        blocked: row.blocked === true,
+      },
+    ]),
+  )
+}
+
+async function buildPolicySafeCanonicalArchiveBatch(
+  sql: Sql,
+  delivery: ArchiveClickHouseDelivery,
+  archive?: any,
+  sourceObservedAt?: unknown,
+) {
+  const manifest = {
+    archiveUploadId: String(delivery.archive_upload_id),
+    accountId: String(delivery.account_id),
+    tweetIds: (delivery.tweet_ids ?? []).map(String),
+  }
+  return sql.begin(async (transaction) => {
+    const trx = transaction as unknown as Sql
+    await trx`SELECT public.lock_policy_account(${manifest.accountId})`
+    let observedAt: string
+    if (sourceObservedAt !== undefined) {
+      observedAt = canonicalArchiveObservedAt(sourceObservedAt)
+    } else {
+      const [source] = await trx`
+        SELECT created_at
+        FROM private.archive_clickhouse_delivery
+        WHERE archive_upload_id = ${manifest.archiveUploadId}
+          AND account_id = ${manifest.accountId}
+      `
+      observedAt = canonicalArchiveObservedAt(source?.created_at)
+    }
+    const [policy] = await trx`
+      SELECT public.policy_account_is_blocked(
+        ${manifest.accountId},
+        ${delivery.username ?? null}
+      ) AS blocked
+    `
+    const ownerBlocked = policy?.blocked === true
+    let decisions: ArchivePolicyDecisions = new Map()
+    let batch
+    if (ownerBlocked) {
+      batch = buildArchiveTombstoneBatch(manifest, observedAt)
+    } else {
+      const source =
+        archive ??
+        (delivery.username
+          ? patchArchive(await loadArchiveData(delivery.username))
+          : null)
+      if (!source) {
+        throw new ArchiveClickHouseError('archive_source_unavailable')
+      }
+      const sourceManifest = createArchiveClickHouseManifest(
+        source,
+        manifest.archiveUploadId,
+      )
+      if (
+        sourceManifest.accountId !== manifest.accountId ||
+        sourceManifest.tweetIds.join(',') !== manifest.tweetIds.join(',')
+      ) {
+        throw new ArchiveClickHouseError('archive_manifest_mismatch')
+      }
+      decisions = await resolveArchivePolicyDecisions(
+        trx,
+        collectArchivePolicyCandidates(source),
+      )
+      batch = buildArchiveClickHouseBatch(source, manifest, decisions, observedAt)
+    }
+    return {
+      batch,
+      manifest,
+      policyVersion: canonicalArchivePolicyVersion(
+        manifest,
+        ownerBlocked,
+        decisions,
+      ),
+    }
+  })
+}
+
+async function publishCanonicalArchiveQueueFirst(
+  sql: Sql,
+  delivery: ArchiveClickHouseDelivery,
+  archive: any,
+  sourceObservedAt: unknown,
+): Promise<void> {
+  ensureCanonicalArchivePendingReport(
+    String(delivery.archive_upload_id),
+    logsDir,
+  )
+  const prepared = await buildPolicySafeCanonicalArchiveBatch(
+    sql,
+    delivery,
+    archive,
+    sourceObservedAt,
+  )
+  const report = await publishCanonicalArchiveBatch({
+    ...prepared,
+    reportDir: logsDir,
+  })
+  if (report.status !== 'complete') {
+    throw new CanonicalArchivePublisherError('canonical_queue_first_incomplete')
+  }
+  logger.info(
+    `Canonical archive queue-first complete (archive_upload_id=${delivery.archive_upload_id})`,
+  )
+}
+
+async function attemptCanonicalArchiveShadow(
+  sql: Sql,
+  delivery: ArchiveClickHouseDelivery,
+  archive?: any,
+): Promise<void> {
+  if (!canonicalArchivePublishingEnabled()) return
+  try {
+    ensureCanonicalArchivePendingReport(
+      String(delivery.archive_upload_id),
+      logsDir,
+    )
+    const prepared = await buildPolicySafeCanonicalArchiveBatch(
+      sql,
+      delivery,
+      archive,
+    )
+    const report = await publishCanonicalArchiveBatch({
+      ...prepared,
+      reportDir: logsDir,
+    })
+    logger.info(
+      `Canonical archive shadow ${report.status} (archive_upload_id=${delivery.archive_upload_id})`,
+    )
+  } catch (error) {
+    logger.warn(
+      `Canonical archive shadow remains pending (archive_upload_id=${delivery.archive_upload_id}, code=${safeCanonicalArchiveErrorCode(error)})`,
+    )
+  }
+}
+
+async function retryPendingCanonicalArchiveShadows(sql: Sql): Promise<void> {
+  if (!canonicalArchivePublishingEnabled()) return
+  const archiveUploadIds = pendingCanonicalArchiveReportIds(logsDir).slice(
+    0,
+    CONFIG.CANONICAL_ARCHIVE_RETRY_BATCH,
+  )
+  for (const archiveUploadId of archiveUploadIds) {
+    try {
+      const rows = await sql`
+        SELECT
+          upload.id AS archive_upload_id,
+          upload.account_id,
+          upload.username,
+          delivery.tweet_ids
+        FROM public.archive_upload AS upload
+        JOIN private.archive_clickhouse_delivery AS delivery
+          ON delivery.archive_upload_id = upload.id
+        WHERE upload.id = ${archiveUploadId}
+          AND upload.upload_phase = 'completed'
+        LIMIT 1
+      `
+      if (rows.length !== 1) {
+        logger.warn(
+          `Canonical archive retry skipped missing completed upload (archive_upload_id=${archiveUploadId})`,
+        )
+        continue
+      }
+      await attemptCanonicalArchiveShadow(
+        sql,
+        rows[0] as ArchiveClickHouseDelivery,
+      )
+    } catch {
+      logger.warn(
+        `Canonical archive retry failed without affecting archive processing (archive_upload_id=${archiveUploadId})`,
+      )
+    }
+  }
+}
+
+async function attemptClickHouseDelivery(
+  sql: Sql,
+  sink: ArchiveClickHouseSink,
+  delivery: ArchiveClickHouseDelivery,
+  archive?: any,
+): Promise<void> {
+  const result = await attemptArchiveClickHouseDelivery({
+    delivery,
+    archive,
+    loadArchive: async (username) => patchArchive(await loadArchiveData(username)),
+    sink,
+    withOwnerPolicyLock: async (accountId, operation) => {
+      await sql.begin(async (trx: Sql) => {
+        await trx`SELECT public.lock_policy_account(${accountId})`
+        const [policy] = await trx`
+          SELECT public.policy_account_is_blocked(
+            ${accountId},
+            ${delivery.username ?? null}
+          ) AS blocked
+        `
+        await operation({
+          ownerBlocked: policy?.blocked === true,
+          resolvePolicies: (candidates) =>
+            resolveArchivePolicyDecisions(trx, candidates),
+          markDelivered: async () => {
+            const updated = await trx`
+              UPDATE private.archive_clickhouse_delivery
+              SET
+                delivery_state = 'delivered',
+                attempt_count = attempt_count + 1,
+                last_error_code = NULL,
+                delivered_at = now(),
+                updated_at = now()
+              WHERE archive_upload_id = ${delivery.archive_upload_id}
+                AND account_id = ${delivery.account_id}
+              RETURNING archive_upload_id
+            `
+            if (updated.length !== 1) {
+              throw new ArchiveClickHouseError('delivery_state_missing')
+            }
+          },
+        })
+      })
+    },
+    markPending: async (errorCode) => {
+      await sql`
+        UPDATE private.archive_clickhouse_delivery
+        SET
+          delivery_state = 'pending',
+          attempt_count = attempt_count + 1,
+          last_error_code = ${errorCode},
+          next_attempt_at = now() + interval '5 minutes',
+          updated_at = now()
+        WHERE archive_upload_id = ${delivery.archive_upload_id}
+          AND account_id = ${delivery.account_id}
+      `
+    },
+  })
+
+  if (result.status === 'delivered') {
+    logger.info(
+      `ClickHouse delivery completed (archive_upload_id=${delivery.archive_upload_id})`,
+    )
+  } else {
+    logger.warn(
+      `ClickHouse delivery remains pending (archive_upload_id=${delivery.archive_upload_id}, code=${result.errorCode})`,
+    )
+  }
+}
+
+async function retryPendingClickHouseDeliveries(
+  sql: Sql,
+  sink: ArchiveClickHouseSink,
+): Promise<void> {
+  const pending = await sql`
+    SELECT
+      delivery.archive_upload_id,
+      delivery.account_id,
+      delivery.tweet_ids,
+      upload.username
+    FROM private.archive_clickhouse_delivery AS delivery
+    LEFT JOIN public.archive_upload AS upload
+      ON upload.id = delivery.archive_upload_id
+    WHERE delivery.delivery_state = 'pending'
+      AND delivery.next_attempt_at <= now()
+    ORDER BY delivery.next_attempt_at, delivery.archive_upload_id
+    LIMIT ${CONFIG.ARCHIVE_CLICKHOUSE_RETRY_BATCH}
+  `
+  for (const delivery of pending) {
+    await attemptClickHouseDelivery(
+      sql,
+      sink,
+      delivery as ArchiveClickHouseDelivery,
+    )
+  }
 }
 
 // Main function
@@ -752,6 +1312,26 @@ async function main() {
   try {
     logger.debug(`Starting optimized batch processing with ${getMemoryUsageMB()}MB memory usage`)
 
+    let clickHouseSink: ArchiveClickHouseSink | null = null
+    if (CONFIG.ARCHIVE_CLICKHOUSE_SINK_ENABLED) {
+      try {
+        clickHouseSink = createArchiveClickHouseSink()
+        await clickHouseSink.healthCheck()
+        await retryPendingClickHouseDeliveries(sql, clickHouseSink)
+      } catch (error) {
+        const code =
+          error instanceof ArchiveClickHouseError
+            ? error.code
+            : 'clickhouse_readiness_failed'
+        logger.warn(
+          `ClickHouse unavailable; PostgreSQL ingestion will continue and deliveries will remain pending (code=${code})`,
+        )
+        clickHouseSink = null
+      }
+    }
+
+    await retryPendingCanonicalArchiveShadows(sql)
+
     logger.info('Fetching archive_upload records ready for processing...')
 
     const ready = await sql`
@@ -772,9 +1352,10 @@ async function main() {
     let archives_processed = 0
 
     for (const row of ready) {
-      const { id: archiveUploadId, account_id, username } = row
+      const { id: archiveUploadId, account_id, username, archive_at } = row
       logger.info(`Processing account ${account_id} with optimized batches (archive_upload_id=${archiveUploadId})`)
 
+      let queueFirstPending = false
       try {
         // Mark as committing
         const updateResult = await sql`
@@ -789,8 +1370,31 @@ async function main() {
           continue
         }
 
-        // Process archive with optimized batch inserts
-        await processSingleArchive(sql, username, archiveUploadId)
+        const archive = await loadArchiveData(username)
+        const archiveManifest = createArchiveClickHouseManifest(
+          archive,
+          archiveUploadId,
+        )
+        const delivery = {
+          archive_upload_id: archiveUploadId,
+          account_id,
+          tweet_ids: archiveManifest.tweetIds,
+          username,
+        }
+
+        if (canonicalArchiveQueueFirstEnabled()) {
+          queueFirstPending = true
+          await publishCanonicalArchiveQueueFirst(
+            sql,
+            delivery,
+            archive,
+            archive_at,
+          )
+          queueFirstPending = false
+        }
+
+        // Process archive with optimized compatibility inserts.
+        await processSingleArchive(sql, archive, archiveUploadId)
 
         // Mark as completed
         const completeResult = await sql`
@@ -807,6 +1411,19 @@ async function main() {
 
         logger.info(`✅ Successfully completed account ${account_id} with optimized batches (archive_upload_id=${archiveUploadId})`)
 
+        if (clickHouseSink) {
+          await attemptClickHouseDelivery(
+            sql,
+            clickHouseSink,
+            delivery,
+            archive,
+          )
+        }
+
+        if (!canonicalArchiveQueueFirstEnabled()) {
+          await attemptCanonicalArchiveShadow(sql, delivery, archive)
+        }
+
         // Force GC between accounts
         if (global.gc) {
           global.gc()
@@ -819,7 +1436,7 @@ async function main() {
         try {
           await sql`
             UPDATE public.archive_upload
-            SET upload_phase = 'failed'
+            SET upload_phase = ${queueFirstPending ? 'ready_for_commit' : 'failed'}
             WHERE id = ${archiveUploadId}
           `
         } catch (statusError) {

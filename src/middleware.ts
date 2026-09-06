@@ -88,6 +88,8 @@ const IN_MEMORY_MAX_API_SG = 5
 // cannot consume the request that completes OAuth or persists consent.
 const IN_MEMORY_MAX_OPT_IN_DEFAULT = 10
 const IN_MEMORY_MAX_OPT_IN_SG = 5
+const IN_MEMORY_MAX_COMMUNITY_SUBMISSIONS_DEFAULT = 5
+const IN_MEMORY_MAX_COMMUNITY_SUBMISSIONS_SG = 3
 const IN_MEMORY_MAX_AUTH_CALLBACK_DEFAULT = 30
 const IN_MEMORY_MAX_AUTH_CALLBACK_SG = 10
 const CLEANUP_INTERVAL_MS = 5 * 60_000
@@ -134,6 +136,15 @@ function getApiRateLimitPolicy(
       maxRequests: isSG
         ? IN_MEMORY_MAX_OPT_IN_SG
         : IN_MEMORY_MAX_OPT_IN_DEFAULT,
+    }
+  }
+
+  if (pathname === '/api/community/submissions' && method === 'POST') {
+    return {
+      bucket: 'api:community-submissions',
+      maxRequests: isSG
+        ? IN_MEMORY_MAX_COMMUNITY_SUBMISSIONS_SG
+        : IN_MEMORY_MAX_COMMUNITY_SUBMISSIONS_DEFAULT,
     }
   }
 
@@ -302,8 +313,21 @@ export async function middleware(request: NextRequest) {
   const isServerAction =
     request.method === 'POST' && request.headers.has('next-action')
 
+  // Machine-to-machine routes that carry their own credentials: cron routes
+  // require the CRON_SECRET bearer token (Vercel's cron caller sends a short
+  // non-browser UA), and one-click unsubscribe POSTs come from mailbox
+  // provider servers holding a per-subscription token.
+  const machineAuthRoute =
+    pathname.startsWith('/api/cron/') ||
+    pathname === '/api/digest/email/unsubscribe'
+
   // ── Stage 1: Bot User-Agent Detection (all routes) ──────────────────────
-  if (!previewBot && !publicDocumentationRoute && !monitoringHealthRoute) {
+  if (
+    !previewBot &&
+    !publicDocumentationRoute &&
+    !monitoringHealthRoute &&
+    !machineAuthRoute
+  ) {
     // Block empty or missing UA
     if (!ua || ua.trim().length === 0) {
       return blocked(403, 'Forbidden')
@@ -526,12 +550,13 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - images/ (static assets in /public/images, e.g. featured-app thumbnails)
+     * - audio/ (static assets in /public/audio, e.g. the digest jingle)
      * - icon.png / apple-icon.png (Next.js app-icon convention)
      * - favicon.ico (favicon file)
      * - robots.txt (crawler rules)
      * - sitemap.xml (sitemap)
      * - .well-known/workflow/ (authenticated Workflow queue delivery)
      */
-    '/((?!_next/static|_next/image|images/|icon\\.png|apple-icon\\.png|favicon\\.ico|robots\\.txt|sitemap\\.xml|\\.well-known/workflow/).*)',
+    '/((?!_next/static|_next/image|images/|audio/|icon\\.png|apple-icon\\.png|favicon\\.ico|robots\\.txt|sitemap\\.xml|\\.well-known/workflow/).*)',
   ],
 }

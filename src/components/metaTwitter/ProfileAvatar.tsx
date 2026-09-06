@@ -68,6 +68,14 @@ export function ProfileAvatar({
     )
   }
 
+  return <ProfileAvatarPlaceholder displayName={displayName} />
+}
+
+export function ProfileAvatarPlaceholder({
+  displayName,
+}: {
+  displayName: string
+}) {
   return (
     <div className="relative z-10 -mt-[66px] grid h-[132px] w-[132px] place-items-center rounded-full border-4 border-card bg-muted text-4xl font-bold">
       {displayName.charAt(0).toUpperCase()}

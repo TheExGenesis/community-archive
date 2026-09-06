@@ -1,5 +1,6 @@
 import {
   fetchPortalBangersPage,
+  fetchPortalDailyInteractions,
   fetchPortalTrendEvidence,
   fetchPortalTrendSeries,
   fetchPortalLiveAnalytics,
@@ -223,7 +224,7 @@ describe('ClickHouse-backed portal analytics', () => {
     expect(maxActive).toBe(2)
   })
 
-  test('merges included evidence and forwards a selected date range', async () => {
+  test('merges included evidence and forwards range, page, and order', async () => {
     const tweet = (tweetId: string, fullText: string, createdAt: string) => ({
       tweetId,
       accountId: '42',
@@ -234,6 +235,17 @@ describe('ClickHouse-backed portal analytics', () => {
       username: 'alice',
       accountDisplayName: 'Alice',
       avatarMediaUrl: null,
+      media:
+        tweetId === '102'
+          ? [
+              {
+                mediaUrl: 'https://pbs.twimg.com/media/evidence.jpg',
+                mediaType: 'photo',
+                width: 1200,
+                height: 800,
+              },
+            ]
+          : [],
     })
     const fetcherMock = jest.fn(
       async (_path: string[], params: URLSearchParams) => ({
@@ -264,21 +276,39 @@ describe('ClickHouse-backed portal analytics', () => {
 
     const result = await fetchPortalTrendEvidence(
       ['alpha', 'beta'],
-      { limit: 30, since: '2024-01-01', until: '2026-01-01' },
+      {
+        limit: 30,
+        offset: 60,
+        since: '2024-01-01',
+        sort: 'oldest',
+        until: '2026-01-01',
+      },
       fetcher,
     )
 
     expect(fetcher).toHaveBeenCalledTimes(2)
     expect(fetcherMock.mock.calls[0]?.[0]).toEqual(['trend-evidence'])
-    expect(result.map(({ id }) => id)).toEqual(['102', '101', '100'])
+    expect(result.tweets.map(({ id }) => id)).toEqual(['100', '101', '102'])
+    expect(result.nextOffset).toBeNull()
     expect(fetcherMock.mock.calls[0]?.[1]?.toString()).toContain(
       'since=2024-01-01&until=2026-01-01',
     )
-    expect(result[0]).toMatchObject({
+    expect(fetcherMock.mock.calls[0]?.[1]?.toString()).toContain(
+      'offset=60&sort=oldest',
+    )
+    expect(result.tweets[2]).toMatchObject({
       username: 'alice',
       createdAt: '2026-08-07T12:00:00.000Z',
       likes: 3,
       rts: 1,
+      media: [
+        {
+          url: 'https://pbs.twimg.com/media/evidence.jpg',
+          type: 'photo',
+          width: 1200,
+          height: 800,
+        },
+      ],
     })
   })
 
@@ -341,6 +371,7 @@ describe('ClickHouse-backed portal analytics', () => {
       24,
       fetcher,
       '2026-08-12T07:00:00.000Z',
+      true,
     )
     expect(fetcher).toHaveBeenLastCalledWith(
       ['recent-bangers'],
@@ -348,8 +379,58 @@ describe('ClickHouse-backed portal analytics', () => {
         limit: '50',
         hours: '24',
         end: '2026-08-12T07:00:00.000Z',
+        target_ca_users_only: 'true',
       }),
       { timeoutMs: 30_000, revalidate: 1_800 },
+    )
+  })
+
+  test('maps same-day CA interaction rankings with the exact window and author scope', async () => {
+    const fetcher = jest.fn(async () => ({
+      data: [
+        {
+          tweetId: '2085365448686866863',
+          accountId: '14816854',
+          createdAt: '2026-08-17 14:00:41.000',
+          fullText: 'A same-day discussed post',
+          favoriteCount: '12',
+          retweetCount: '3',
+          latestObservedAt: '2026-08-17 14:00:41.000',
+          interactionCount: '8',
+          replyCount: '7',
+          quoteCount: '1',
+          username: 'katiebakes',
+          accountDisplayName: 'Katie',
+          avatarMediaUrl: null,
+        },
+      ],
+    })) as unknown as AnalyticsFetcher
+
+    await expect(
+      fetchPortalDailyInteractions(
+        50,
+        24,
+        fetcher,
+        '2026-08-18T06:00:00.000Z',
+        true,
+      ),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: '2085365448686866863',
+        interactionCount: 8,
+        replyCount: 7,
+        quoteCount: 1,
+      }),
+    ])
+    expect(fetcher).toHaveBeenCalledWith(
+      ['daily-interactions'],
+      new URLSearchParams({
+        limit: '50',
+        hours: '24',
+        end: '2026-08-18T06:00:00.000Z',
+        target_ca_users_only: 'true',
+      }),
+      { timeoutMs: 30_000, revalidate: 300 },
     )
   })
 
@@ -425,6 +506,8 @@ describe('ClickHouse-backed portal analytics', () => {
           sort: 'recent',
           scope: 'members',
           year: 2024,
+          createdAfter: '2024-01-01T00:00:00.000Z',
+          createdBefore: '2024-12-31T23:59:59.999Z',
           query: '  historical  ',
         },
         fetcher,
@@ -451,9 +534,41 @@ describe('ClickHouse-backed portal analytics', () => {
         target_ca_users_only: 'true',
         quote_ca_users_only: 'true',
         year: '2024',
+        created_after: '2024-01-01T00:00:00.000Z',
+        created_before: '2024-12-31T23:59:59.999Z',
         q: 'historical',
       }),
       { timeoutMs: 30_000 },
     )
   })
+})
+
+test('homepage weekly snapshot makes no historical corpus requests', async () => {
+  const fetcher = jest.fn(async () => ({ data: [] }))
+  const result = await fetchPortalTrends(
+    new Date('2026-09-06T00:00:00Z'),
+    fetcher as unknown as AnalyticsFetcher,
+    false,
+  )
+  expect(result.series).toEqual([])
+  expect(result.weekly).toHaveLength(12)
+  expect(fetcher).toHaveBeenCalledTimes(12)
+  for (const call of (fetcher as jest.Mock).mock.calls) {
+    expect(call[1].get('bucket')).toBe('day')
+  }
+})
+
+test('explorer snapshot requests historical charts without twelve unused weekly queries', async () => {
+  const fetcher = jest.fn(async () => ({ data: [] }))
+  const result = await fetchPortalTrends(
+    new Date('2026-09-06T00:00:00Z'),
+    fetcher as unknown as AnalyticsFetcher,
+    true,
+    false,
+  )
+  expect(result.series.length).toBeGreaterThan(0)
+  expect(result.weekly).toEqual([])
+  expect(fetcher).toHaveBeenCalledTimes(result.series.length)
+  for (const call of (fetcher as jest.Mock).mock.calls)
+    expect(call[1].get('bucket')).toBe('year')
 })

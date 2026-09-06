@@ -107,35 +107,57 @@ $$;
 ALTER FUNCTION "public"."update_optin_updated_at"() OWNER TO "postgres";
 
 
--- Explicit opt-outs are a hard scrape deny. Resolve username-only legacy rows
--- when possible, and never remove a block automatically because the same table
--- also contains administrator-managed blocks.
+-- Explicit opt-outs are a hard scrape deny. Consent-derived and administrator
+-- blocks have separate source rows so a later opt-in removes only the former.
 CREATE OR REPLACE FUNCTION "public"."propagate_explicit_optout_scrape_block"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 DECLARE
-    v_account_id text;
+    v_new_account_id text;
+    v_old_account_id text;
 BEGIN
-    IF NEW.explicit_optout IS NOT TRUE THEN
-        RETURN NEW;
-    END IF;
+    v_new_account_id := NULLIF(BTRIM(NEW.twitter_user_id), '');
 
-    v_account_id := NULLIF(BTRIM(NEW.twitter_user_id), '');
-
-    IF v_account_id IS NULL AND NULLIF(BTRIM(NEW.username), '') IS NOT NULL THEN
+    IF v_new_account_id IS NULL AND NULLIF(BTRIM(NEW.username), '') IS NOT NULL THEN
         SELECT a.account_id
-        INTO v_account_id
+        INTO v_new_account_id
         FROM public.all_account AS a
         WHERE LOWER(a.username) = LOWER(BTRIM(NEW.username))
         ORDER BY a.updated_at DESC NULLS LAST
         LIMIT 1;
     END IF;
 
-    IF v_account_id IS NOT NULL THEN
-        INSERT INTO tes.blocked_scraping_users (account_id)
-        VALUES (v_account_id)
-        ON CONFLICT (account_id) DO NOTHING;
+    IF TG_OP = 'UPDATE' THEN
+        v_old_account_id := NULLIF(BTRIM(OLD.twitter_user_id), '');
+        IF v_old_account_id IS NULL AND NULLIF(BTRIM(OLD.username), '') IS NOT NULL THEN
+            SELECT a.account_id
+            INTO v_old_account_id
+            FROM public.all_account AS a
+            WHERE LOWER(a.username) = LOWER(BTRIM(OLD.username))
+            ORDER BY a.updated_at DESC NULLS LAST
+            LIMIT 1;
+        END IF;
+
+        IF v_old_account_id IS NOT NULL
+           AND (
+               NEW.explicit_optout IS NOT TRUE
+               OR v_old_account_id IS DISTINCT FROM v_new_account_id
+           ) THEN
+            DELETE FROM tes.blocked_scraping_users
+            WHERE account_id = v_old_account_id
+              AND block_source = 'explicit_optout';
+        END IF;
+    END IF;
+
+    IF NEW.explicit_optout IS TRUE AND v_new_account_id IS NOT NULL THEN
+        INSERT INTO tes.blocked_scraping_users (account_id, block_source)
+        VALUES (v_new_account_id, 'explicit_optout')
+        ON CONFLICT (account_id, block_source) DO NOTHING;
+    ELSIF v_new_account_id IS NOT NULL THEN
+        DELETE FROM tes.blocked_scraping_users
+        WHERE account_id = v_new_account_id
+          AND block_source = 'explicit_optout';
     END IF;
 
     RETURN NEW;
@@ -1262,6 +1284,70 @@ $$;
 ALTER FUNCTION "public"."delete_tweets"("p_tweet_ids" "text"[]) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) RETURNS TABLE("deleted_tweets" integer, "deleted_conversations" integer, "deleted_tweet_media" integer, "deleted_user_mentions" integer, "deleted_tweet_urls" integer, "deleted_private_tweet_user" integer)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "statement_timeout" TO '30s'
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_provider_id text;
+  v_tweet_ids text[];
+BEGIN
+  v_provider_id := nullif(auth.jwt()->'app_metadata'->>'provider_id', '');
+
+  IF auth.uid() IS NULL OR v_provider_id IS NULL THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '42501',
+      MESSAGE = 'A linked Twitter account is required';
+  END IF;
+
+  SELECT array_agg(tweet_id ORDER BY tweet_id)
+  INTO v_tweet_ids
+  FROM (
+    SELECT DISTINCT btrim(candidate) AS tweet_id
+    FROM unnest(p_tweet_ids) AS requested(candidate)
+    WHERE candidate IS NOT NULL AND btrim(candidate) <> ''
+  ) normalized;
+
+  IF coalesce(cardinality(v_tweet_ids), 0) = 0 THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '22023',
+      MESSAGE = 'At least one tweet ID is required';
+  END IF;
+
+  IF cardinality(v_tweet_ids) > 100 THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '22023',
+      MESSAGE = 'At most 100 tweets can be deleted at once';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM unnest(v_tweet_ids) AS requested(tweet_id)
+    LEFT JOIN public.tweets AS owned
+      ON owned.tweet_id = requested.tweet_id
+     AND owned.account_id = v_provider_id
+    WHERE owned.tweet_id IS NULL
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '42501',
+      MESSAGE = 'One or more tweets cannot be deleted';
+  END IF;
+
+  RETURN QUERY
+  SELECT * FROM public.delete_tweets(v_tweet_ids);
+END;
+$$;
+
+ALTER FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) FROM "anon";
+GRANT EXECUTE ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) TO "service_role";
+
+COMMENT ON FUNCTION "public"."delete_own_tweets"("p_tweet_ids" "text"[]) IS 'Deletes up to 100 tweets only when every ID belongs to the authenticated Twitter account in app_metadata.provider_id.';
+
+
 CREATE OR REPLACE FUNCTION "public"."delete_user_archive"("p_account_id" "text") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "statement_timeout" TO '20min'
@@ -1345,6 +1431,119 @@ $_$;
 
 ALTER FUNCTION "public"."delete_user_archive"("p_account_id" "text") OWNER TO "postgres";
 
+
+CREATE OR REPLACE FUNCTION public.tombstone_policy_account(p_account_id text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET statement_timeout TO '20min'
+SET search_path = ''
+AS $$
+DECLARE
+  v_provider_id text;
+  v_archive_upload_ids bigint[];
+  v_tweet_ids text[];
+BEGIN
+  IF p_account_id IS NULL OR BTRIM(p_account_id) = '' THEN
+    RAISE EXCEPTION 'p_account_id is required';
+  END IF;
+
+  SELECT auth.jwt()->'app_metadata'->>'provider_id'
+  INTO v_provider_id;
+
+  IF current_role NOT IN ('postgres', 'service_role')
+     AND (v_provider_id IS NULL OR v_provider_id <> p_account_id) THEN
+    RAISE EXCEPTION
+      'Unauthorized: provider_id % does not match account_id %',
+      v_provider_id,
+      p_account_id;
+  END IF;
+
+  SELECT COALESCE(array_agg(id), ARRAY[]::bigint[])
+  INTO v_archive_upload_ids
+  FROM public.archive_upload
+  WHERE account_id = p_account_id;
+
+  SELECT COALESCE(array_agg(tweet_id), ARRAY[]::text[])
+  INTO v_tweet_ids
+  FROM public.tweets
+  WHERE account_id = p_account_id;
+
+  DELETE FROM public.conversations
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.tweet_media
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.user_mentions
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.tweet_urls
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.quote_tweets
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM public.retweets
+  WHERE tweet_id = ANY(v_tweet_ids);
+  DELETE FROM private.tweet_user
+  WHERE tweet_id = ANY(v_tweet_ids);
+
+  DELETE FROM public.likes
+  WHERE account_id = p_account_id
+     OR archive_upload_id = ANY(v_archive_upload_ids);
+  DELETE FROM public.followers
+  WHERE account_id = p_account_id
+     OR archive_upload_id = ANY(v_archive_upload_ids);
+  DELETE FROM public.following
+  WHERE account_id = p_account_id
+     OR archive_upload_id = ANY(v_archive_upload_ids);
+  DELETE FROM public.all_profile
+  WHERE account_id = p_account_id;
+
+  UPDATE public.tweet_media
+  SET archive_upload_id = NULL
+  WHERE archive_upload_id = ANY(v_archive_upload_ids);
+  UPDATE public.all_profile
+  SET archive_upload_id = NULL
+  WHERE archive_upload_id = ANY(v_archive_upload_ids);
+  UPDATE public.tweets
+  SET archive_upload_id = NULL
+  WHERE archive_upload_id = ANY(v_archive_upload_ids);
+
+  DELETE FROM public.archive_upload
+  WHERE id = ANY(v_archive_upload_ids);
+  DELETE FROM ca_autorefresh.account_refresh_log
+  WHERE account_id = p_account_id;
+
+  UPDATE public.tweets
+  SET
+    created_at = '1970-01-01 00:00:00+00',
+    full_text = '',
+    favorite_count = 0,
+    retweet_count = 0,
+    reply_to_tweet_id = NULL,
+    reply_to_user_id = NULL,
+    reply_to_username = NULL,
+    archive_upload_id = NULL,
+    is_tombstone = true
+  WHERE account_id = p_account_id;
+
+  UPDATE public.all_account
+  SET
+    created_via = 'policy_tombstone',
+    username = '',
+    created_at = '1970-01-01 00:00:00+00',
+    account_display_name = '',
+    num_tweets = 0,
+    num_following = 0,
+    num_followers = 0,
+    num_likes = 0,
+    is_tombstone = true
+  WHERE account_id = p_account_id;
+END;
+$$;
+
+ALTER FUNCTION public.tombstone_policy_account(text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.tombstone_policy_account(text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.tombstone_policy_account(text)
+  TO service_role;
 
 CREATE OR REPLACE FUNCTION "public"."delete_single_archive"("p_account_id" "text", "p_archive_upload_id" bigint) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -2465,7 +2664,7 @@ ALTER FUNCTION "public"."search_tweets"("search_query" "text", "limit_count" int
 
 
 CREATE OR REPLACE FUNCTION "public"."search_tweets"("search_query" "text", "from_user" "text" DEFAULT NULL::"text", "to_user" "text" DEFAULT NULL::"text", "since_date" "date" DEFAULT NULL::"date", "until_date" "date" DEFAULT NULL::"date", "limit_" integer DEFAULT 50, "offset_" integer DEFAULT 0) RETURNS TABLE("tweet_id" "text", "account_id" "text", "created_at" timestamp with time zone, "full_text" "text", "retweet_count" integer, "favorite_count" integer, "reply_to_tweet_id" "text", "avatar_media_url" "text", "archive_upload_id" bigint, "username" "text", "account_display_name" "text", "media" "jsonb")
-    LANGUAGE "plpgsql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY INVOKER
     SET "statement_timeout" TO '5min'
     SET "search_path" TO ''
     AS $$
@@ -2564,7 +2763,7 @@ ALTER FUNCTION "public"."search_tweets"("search_query" "text", "from_user" "text
 -- find exact substrings in full_text for phrases like "you can just do things".
 -- The pg_trgm GIN index on full_text makes the ILIKE fast.
 CREATE OR REPLACE FUNCTION "public"."search_tweets_exact_phrase"("exact_phrase" "text", "from_user" "text" DEFAULT NULL::"text", "to_user" "text" DEFAULT NULL::"text", "since_date" "date" DEFAULT NULL::"date", "until_date" "date" DEFAULT NULL::"date", "limit_" integer DEFAULT 50, "offset_" integer DEFAULT 0) RETURNS TABLE("tweet_id" "text", "account_id" "text", "created_at" timestamp with time zone, "full_text" "text", "retweet_count" integer, "favorite_count" integer, "reply_to_tweet_id" "text", "avatar_media_url" "text", "archive_upload_id" bigint, "username" "text", "account_display_name" "text", "media" "jsonb")
-    LANGUAGE "plpgsql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY INVOKER
     SET "statement_timeout" TO '5min'
     SET "search_path" TO ''
     AS $$
@@ -2958,7 +3157,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
   SELECT COALESCE(
-    array_agg(b.account_id),
+    array_agg(DISTINCT b.account_id),
     ARRAY[]::text[]
   )
   FROM tes.blocked_scraping_users b
@@ -2981,11 +3180,13 @@ BEGIN
   END IF;
 
   IF p_blocked THEN
-    INSERT INTO tes.blocked_scraping_users (account_id)
-    VALUES (p_account_id)
-    ON CONFLICT (account_id) DO NOTHING;
+    INSERT INTO tes.blocked_scraping_users (account_id, block_source)
+    VALUES (p_account_id, 'admin')
+    ON CONFLICT (account_id, block_source) DO NOTHING;
   ELSE
-    DELETE FROM tes.blocked_scraping_users WHERE account_id = p_account_id;
+    DELETE FROM tes.blocked_scraping_users
+    WHERE account_id = p_account_id
+      AND block_source = 'admin';
   END IF;
 END;
 $$;
@@ -3120,3 +3321,218 @@ REVOKE EXECUTE ON FUNCTION "public"."publish_digest_edition"(uuid)
   FROM PUBLIC, "anon", "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."publish_digest_edition"(uuid)
   TO "service_role";
+
+CREATE OR REPLACE FUNCTION "public"."community_archive_monitoring_digest"()
+RETURNS TABLE (
+  "publication_age_seconds" double precision,
+  "expected_date_published" double precision,
+  "automated_run_failed" double precision,
+  "healthy" double precision
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  WITH expected AS (
+    SELECT
+      ((CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '30 hours')::date
+        AS digest_date,
+      (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') AS checked_at
+  ), latest_published AS (
+    SELECT edition.digest_date, edition.published_at
+    FROM public.digest_editions AS edition
+    WHERE edition.status = 'published'
+    ORDER BY edition.digest_date DESC, edition.version DESC
+    LIMIT 1
+  ), state AS (
+    SELECT
+      expected.digest_date AS expected_date,
+      expected.checked_at,
+      latest_published.digest_date AS published_date,
+      latest_published.published_at,
+      EXISTS (
+        SELECT 1
+        FROM public.digest_runs AS run
+        WHERE run.digest_date = expected.digest_date
+          AND run.status = 'failed'
+          AND run.created_by IS NULL
+          AND run.parent_run_id IS NULL
+          AND run.workflow_run_id IS NOT NULL
+      ) AS run_failed
+    FROM expected
+    LEFT JOIN latest_published ON TRUE
+  )
+  SELECT
+    COALESCE(
+      EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - state.published_at)),
+      1000000000000
+    )::double precision AS publication_age_seconds,
+    COALESCE(state.published_date = state.expected_date, FALSE)::integer::double precision
+      AS expected_date_published,
+    state.run_failed::integer::double precision AS automated_run_failed,
+    (
+      CASE
+        WHEN state.published_date = state.expected_date THEN 1
+        WHEN state.run_failed THEN 0
+        WHEN state.checked_at < state.expected_date::timestamp + INTERVAL '32 hours'
+          THEN 1
+        ELSE 0
+      END
+    )::double precision AS healthy
+  FROM state;
+$$;
+ALTER FUNCTION "public"."community_archive_monitoring_digest"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."community_archive_monitoring_digest"()
+  FROM PUBLIC, "anon", "authenticated", "service_role";
+GRANT EXECUTE ON FUNCTION "public"."community_archive_monitoring_digest"()
+  TO "readclient";
+
+CREATE OR REPLACE FUNCTION "public"."search_user_suggestions"(
+  "search_text" text,
+  "result_limit" integer DEFAULT 30
+)
+RETURNS TABLE (
+  "account_id" text,
+  "username" text,
+  "account_display_name" text,
+  "num_followers" integer
+)
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+  WITH input AS (
+    SELECT lower(trim(leading '@' FROM trim(search_text))) AS term
+  )
+  SELECT
+    account.account_id,
+    account.username,
+    account.account_display_name,
+    account.num_followers
+  FROM public.all_account AS account
+  CROSS JOIN input
+  WHERE length(input.term) BETWEEN 2 AND 50
+    AND account.is_tombstone IS NOT TRUE
+    AND (
+      (length(input.term) = 2 AND lower(account.username) = input.term)
+      OR (
+        length(input.term) >= 3
+        AND (
+          account.username ILIKE '%' || input.term || '%'
+          OR account.account_display_name ILIKE '%' || input.term || '%'
+          OR account.username OPERATOR(public.%) input.term
+          OR account.account_display_name OPERATOR(public.%) input.term
+        )
+      )
+    )
+  ORDER BY
+    CASE
+      WHEN lower(account.username) = input.term THEN 0
+      WHEN lower(account.username) LIKE input.term || '%' THEN 1
+      WHEN lower(account.account_display_name) = input.term THEN 2
+      WHEN lower(account.account_display_name) LIKE input.term || '%' THEN 3
+      WHEN lower(account.username) LIKE '%' || input.term || '%' THEN 4
+      WHEN lower(account.account_display_name) LIKE '%' || input.term || '%' THEN 5
+      ELSE 6
+    END,
+    greatest(
+      public.similarity(lower(account.username), input.term),
+      public.similarity(lower(account.account_display_name), input.term)
+    ) DESC,
+    account.num_followers DESC NULLS LAST,
+    lower(account.username),
+    account.account_id
+  LIMIT least(greatest(coalesce(result_limit, 30), 1), 60);
+$$;
+ALTER FUNCTION "public"."search_user_suggestions"(text, integer)
+  OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."search_user_suggestions"(text, integer)
+  FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."search_user_suggestions"(text, integer)
+  TO "anon", "authenticated", "readclient", "service_role";
+
+-- Private, aggregate-only monitoring bridges for the least-privilege
+-- archive_metrics_exporter role. The functions intentionally expose no user,
+-- account, archive, or free-form metadata labels.
+
+CREATE OR REPLACE FUNCTION private.community_archive_monitoring_membership()
+RETURNS TABLE (currently_opted_in double precision)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF session_user <> 'archive_metrics_exporter' THEN
+    RAISE EXCEPTION 'monitoring function is restricted'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN QUERY
+  SELECT COUNT(*)::double precision
+  FROM public.user_directory;
+END;
+$$;
+ALTER FUNCTION private.community_archive_monitoring_membership() OWNER TO postgres;
+
+CREATE OR REPLACE FUNCTION private.community_archive_monitoring_activity_day(
+  p_days integer DEFAULT 90
+)
+RETURNS TABLE (
+  activity_day text,
+  activity text,
+  events double precision
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_days integer := LEAST(GREATEST(COALESCE(p_days, 90), 1), 180);
+BEGIN
+  IF session_user <> 'archive_metrics_exporter' THEN
+    RAISE EXCEPTION 'monitoring function is restricted'
+      USING ERRCODE = '42501';
+  END IF;
+
+  RETURN QUERY
+  WITH days AS (
+    SELECT generate_series(
+      date_trunc('day', CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+        - ((v_days - 1) * INTERVAL '1 day'),
+      date_trunc('day', CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+      INTERVAL '1 day'
+    ) AS day_start
+  ), daily AS (
+    SELECT
+      date_trunc('day', created_at AT TIME ZONE 'UTC') AS day_start,
+      COUNT(*) FILTER (
+        WHERE action_type = 'opt_in'
+      )::double precision AS opt_ins,
+      COUNT(*) FILTER (
+        WHERE action_type LIKE 'opt_out%'
+      )::double precision AS opt_outs
+    FROM public.user_action_log
+    WHERE created_at >= date_trunc('day', CURRENT_TIMESTAMP)
+      - ((v_days - 1) * INTERVAL '1 day')
+    GROUP BY 1
+  )
+  SELECT
+    to_char(days.day_start, 'YYYY-MM-DD') AS activity_day,
+    daily_activity.activity,
+    daily_activity.events
+  FROM days
+  LEFT JOIN daily USING (day_start)
+  CROSS JOIN LATERAL (
+    VALUES
+      ('opt_in'::text, COALESCE(daily.opt_ins, 0)),
+      ('opt_out'::text, COALESCE(daily.opt_outs, 0))
+  ) AS daily_activity(activity, events)
+  ORDER BY days.day_start, daily_activity.activity;
+END;
+$$;
+ALTER FUNCTION private.community_archive_monitoring_activity_day(integer)
+  OWNER TO postgres;

@@ -28,6 +28,128 @@ CREATE TABLE IF NOT EXISTS "private"."user_intercepted_stats" (
 );
 ALTER TABLE "private"."user_intercepted_stats" OWNER TO "postgres";
 
+-- Content-free manifest for policy-safe Firehose Parquet/DLQ objects. Objects
+-- are deleted wholesale when any indexed author becomes policy-blocked.
+CREATE TABLE IF NOT EXISTS "private"."policy_storage_objects" (
+    "storage_class" "text" NOT NULL,
+    "object_path" "text" NOT NULL,
+    "account_ids" "text"[] NOT NULL,
+    "username_hashes" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "policy_storage_objects_pkey" PRIMARY KEY ("storage_class", "object_path"),
+    CONSTRAINT "policy_storage_objects_storage_class_check" CHECK (("storage_class" = ANY (ARRAY['private'::"text", 'public'::"text"]))),
+    CONSTRAINT "policy_storage_objects_path_check" CHECK (("object_path" ~ '^policy_safe_v1/'::"text")),
+    CONSTRAINT "policy_storage_objects_account_ids_check" CHECK ((cardinality("account_ids") > 0)),
+    CONSTRAINT "policy_storage_objects_account_ids_nonnull_check" CHECK ((array_position("account_ids", NULL::"text") IS NULL)),
+    CONSTRAINT "policy_storage_objects_username_hashes_nonnull_check" CHECK ((array_position("username_hashes", NULL::"text") IS NULL)),
+    CONSTRAINT "policy_storage_objects_username_hashes_format_check" CHECK (((cardinality("username_hashes") = 0) OR (array_to_string("username_hashes", ','::"text") ~ '^([0-9a-f]{64})(,[0-9a-f]{64})*$'::"text")))
+);
+ALTER TABLE "private"."policy_storage_objects" OWNER TO "postgres";
+REVOKE ALL ON TABLE "private"."policy_storage_objects" FROM PUBLIC, "anon", "authenticated", "readclient";
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "private"."policy_storage_objects" TO "service_role";
+
+-- Durable keyset checkpoint for the bounded legacy liked-tweet policy sweep.
+-- The operator is PostgreSQL-only; no API role can read or change its cursor.
+CREATE TABLE IF NOT EXISTS "private"."policy_backfill_progress" (
+    "job_name" "text" PRIMARY KEY,
+    "last_tweet_id" "text",
+    "rows_processed" bigint DEFAULT 0 NOT NULL,
+    "authors_backfilled" bigint DEFAULT 0 NOT NULL,
+    "tombstones_written" bigint DEFAULT 0 NOT NULL,
+    "completed_at" timestamp with time zone,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "policy_backfill_progress_job_check" CHECK (("job_name" = 'legacy_liked_tweets_v1'::"text")),
+    CONSTRAINT "policy_backfill_progress_counts_check" CHECK ((("rows_processed" >= 0) AND ("authors_backfilled" >= 0) AND ("tombstones_written" >= 0)))
+);
+ALTER TABLE "private"."policy_backfill_progress" OWNER TO "postgres";
+REVOKE ALL ON TABLE "private"."policy_backfill_progress" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
+
+-- Durable phase checkpoints for the direct historical policy reconciliation.
+CREATE TABLE IF NOT EXISTS "private"."policy_historical_reconcile_progress" (
+    "job_name" "text" NOT NULL,
+    "phase" "text" NOT NULL,
+    "policy_version" "text" DEFAULT 'universal_policy_tombstones_v1'::"text" NOT NULL,
+    "policy_fingerprint" "text" NOT NULL,
+    "rows_affected" bigint DEFAULT 0 NOT NULL,
+    "completed_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "policy_historical_reconcile_progress_pkey" PRIMARY KEY ("job_name", "phase"),
+    CONSTRAINT "policy_historical_reconcile_version_check" CHECK (("policy_version" = 'universal_policy_tombstones_v1'::"text")),
+    CONSTRAINT "policy_historical_reconcile_fingerprint_check" CHECK (("policy_fingerprint" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "policy_historical_reconcile_rows_check" CHECK (("rows_affected" >= 0))
+);
+ALTER TABLE "private"."policy_historical_reconcile_progress" OWNER TO "postgres";
+REVOKE ALL ON TABLE "private"."policy_historical_reconcile_progress" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
+
+-- Content-free stable-ID retry control for the direct archive-to-ClickHouse
+-- sink. It intentionally has no foreign key to archive_upload because an
+-- opt-out deletes upload metadata while its tombstone delivery must survive.
+CREATE TABLE IF NOT EXISTS "private"."archive_clickhouse_delivery" (
+    "archive_upload_id" bigint PRIMARY KEY,
+    "account_id" "text" NOT NULL,
+    "tweet_ids" "text"[] DEFAULT '{}'::"text"[] NOT NULL,
+    "delivery_state" "text" DEFAULT 'pending'::"text" NOT NULL,
+    "attempt_count" integer DEFAULT 0 NOT NULL,
+    "last_error_code" "text",
+    "next_attempt_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "delivered_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "archive_clickhouse_delivery_account_id_check" CHECK (("account_id" ~ '^(0|[1-9][0-9]*)$'::"text")),
+    CONSTRAINT "archive_clickhouse_delivery_tweet_ids_nonnull_check" CHECK ((array_position("tweet_ids", NULL::"text") IS NULL)),
+    CONSTRAINT "archive_clickhouse_delivery_tweet_ids_format_check" CHECK (((cardinality("tweet_ids") = 0) OR (array_to_string("tweet_ids", ','::"text") ~ '^((0|[1-9][0-9]*),)*(0|[1-9][0-9]*)$'::"text"))),
+    CONSTRAINT "archive_clickhouse_delivery_state_check" CHECK (("delivery_state" = ANY (ARRAY['pending'::"text", 'delivered'::"text"]))),
+    CONSTRAINT "archive_clickhouse_delivery_attempt_count_check" CHECK (("attempt_count" >= 0)),
+    CONSTRAINT "archive_clickhouse_delivery_error_code_check" CHECK ((("last_error_code" IS NULL) OR ("last_error_code" ~ '^[a-z0-9_]{1,80}$'::"text")))
+);
+ALTER TABLE "private"."archive_clickhouse_delivery" OWNER TO "postgres";
+ALTER TABLE "private"."archive_clickhouse_delivery" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "private"."archive_clickhouse_delivery" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
+COMMENT ON TABLE "private"."archive_clickhouse_delivery" IS 'Content-free stable-ID retry control for independent new archive ClickHouse delivery; never a source for content reconstruction or historical backfill.';
+
+-- Content-free commit receipts and entity ordering guards for the independent
+-- canonical PostgreSQL queue consumer. These tables are intentionally private
+-- and unavailable to every Data API role, including service_role.
+CREATE TABLE IF NOT EXISTS "private"."canonical_ingest_receipts" (
+    "event_id" "text" PRIMARY KEY,
+    "stream_id" "text" UNIQUE NOT NULL,
+    "source" "text" NOT NULL,
+    "source_batch_id_hash" "text" NOT NULL,
+    "payload_hash" "text" NOT NULL,
+    "projected_payload_hash" "text" NOT NULL,
+    "mutation_count" integer NOT NULL,
+    "committed_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "canonical_ingest_receipts_event_id_check" CHECK (("event_id" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "canonical_ingest_receipts_stream_id_check" CHECK (("stream_id" ~ '^[0-9]+-[0-9]+$'::"text")),
+    CONSTRAINT "canonical_ingest_receipts_source_check" CHECK (("source" = ANY (ARRAY['extension'::"text", 'autorefresh'::"text", 'archive_upload'::"text", 'manual'::"text", 'backfill'::"text", 'admin_delete'::"text", 'user_delete'::"text"]))),
+    CONSTRAINT "canonical_ingest_receipts_source_batch_hash_check" CHECK (("source_batch_id_hash" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "canonical_ingest_receipts_payload_hash_check" CHECK (("payload_hash" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "canonical_ingest_receipts_projected_hash_check" CHECK (("projected_payload_hash" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "canonical_ingest_receipts_mutation_count_check" CHECK ((("mutation_count" > 0) AND ("mutation_count" <= 500)))
+);
+ALTER TABLE "private"."canonical_ingest_receipts" OWNER TO "postgres";
+ALTER TABLE "private"."canonical_ingest_receipts" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "private"."canonical_ingest_receipts" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
+COMMENT ON TABLE "private"."canonical_ingest_receipts" IS 'Content-free commit receipts for the canonical PostgreSQL queue consumer.';
+
+CREATE TABLE IF NOT EXISTS "private"."canonical_ingest_entity_versions" (
+    "entity_type" "text" NOT NULL,
+    "entity_key_hash" "text" NOT NULL,
+    "version" numeric(40, 0) NOT NULL,
+    "event_id" "text" NOT NULL,
+    "operation_rank" smallint DEFAULT 1 NOT NULL,
+    "applied_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "canonical_ingest_entity_versions_pkey" PRIMARY KEY ("entity_type", "entity_key_hash"),
+    CONSTRAINT "canonical_ingest_entity_versions_type_check" CHECK (("entity_type" = ANY (ARRAY['account'::"text", 'tweet_content'::"text", 'tweet_engagement'::"text", 'media'::"text", 'url'::"text", 'mention'::"text", 'relationship'::"text", 'archive_upload'::"text"]))),
+    CONSTRAINT "canonical_ingest_entity_versions_key_hash_check" CHECK (("entity_key_hash" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "canonical_ingest_entity_versions_version_check" CHECK (("version" >= (0)::numeric)),
+    CONSTRAINT "canonical_ingest_entity_versions_event_id_check" CHECK (("event_id" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "canonical_ingest_entity_versions_operation_rank_check" CHECK (("operation_rank" = ANY (ARRAY[(1)::smallint, (2)::smallint])))
+);
+ALTER TABLE "private"."canonical_ingest_entity_versions" OWNER TO "postgres";
+ALTER TABLE "private"."canonical_ingest_entity_versions" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "private"."canonical_ingest_entity_versions" FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
+COMMENT ON TABLE "private"."canonical_ingest_entity_versions" IS 'Content-free latest-version guards for idempotent canonical PostgreSQL projection.';
+
 -- public.all_account
 CREATE TABLE IF NOT EXISTS "public"."all_account" (
     "account_id" "text" NOT NULL,
@@ -39,6 +161,7 @@ CREATE TABLE IF NOT EXISTS "public"."all_account" (
     "num_following" integer DEFAULT 0,
     "num_followers" integer DEFAULT 0,
     "num_likes" integer DEFAULT 0,
+    "is_tombstone" boolean DEFAULT false NOT NULL,
     "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 )
 WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.05');
@@ -74,6 +197,7 @@ CREATE TABLE IF NOT EXISTS "public"."mentioned_users" (
     "user_id" "text" NOT NULL,
     "name" "text" NOT NULL,
     "screen_name" "text" NOT NULL,
+    "is_tombstone" boolean DEFAULT false NOT NULL,
     "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 )
 WITH ("autovacuum_vacuum_scale_factor"='0.05', "autovacuum_analyze_scale_factor"='0.05');
@@ -91,6 +215,7 @@ CREATE TABLE IF NOT EXISTS "public"."tweets" (
     "reply_to_user_id" "text",
     "reply_to_username" "text",
     "archive_upload_id" bigint,
+    "is_tombstone" boolean DEFAULT false NOT NULL,
     "fts" "tsvector" GENERATED ALWAYS AS ("to_tsvector"('"english"'::"regconfig", "full_text")) STORED,
     "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 )
@@ -166,6 +291,8 @@ ALTER TABLE "public"."following" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."liked_tweets" (
     "tweet_id" "text" NOT NULL,
     "full_text" "text" NOT NULL,
+    "author_account_id" "text",
+    "is_tombstone" boolean DEFAULT false NOT NULL,
     "fts" "tsvector" GENERATED ALWAYS AS ("to_tsvector"('"english"'::"regconfig", "full_text")) STORED
 );
 ALTER TABLE "public"."liked_tweets" OWNER TO "postgres";
@@ -209,6 +336,8 @@ ALTER TABLE "public"."optin" OWNER TO "postgres";
 -- tes.blocked_scraping_users
 CREATE TABLE IF NOT EXISTS "tes"."blocked_scraping_users" (
     "account_id" "text" NOT NULL,
+    "block_source" "text" DEFAULT 'admin'::"text" NOT NULL,
+    "username" "text",
     "updated_at" timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 ALTER TABLE "tes"."blocked_scraping_users" OWNER TO "postgres";
@@ -328,6 +457,141 @@ CREATE TABLE IF NOT EXISTS "public"."digest_editions" (
     CONSTRAINT "digest_editions_publication_time_check" CHECK ((status = 'published' AND published_at IS NOT NULL) OR status <> 'published')
 );
 ALTER TABLE "public"."digest_editions" OWNER TO "postgres";
+
+-- Daily Digest email subscriptions. Single opt-in: a row exists only after
+-- someone submits their address, confirmed_at is stamped at that moment,
+-- sends go only to rows with confirmed_at set, and unsubscribed_at
+-- permanently wins over both. Service-role only; tokens are the sole
+-- credential in unsubscribe links, so rows must never be readable by anon or
+-- authenticated clients.
+CREATE TABLE IF NOT EXISTS "public"."digest_email_subscriptions" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "email" text NOT NULL,
+    -- Trusted Twitter provider id captured when the subscriber was signed in,
+    -- so settings can show and manage the subscription. Nullable: guests
+    -- subscribe with just an email.
+    "account_id" text,
+    "token" uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+    "confirmed_at" timestamptz,
+    "unsubscribed_at" timestamptz,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "updated_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "digest_email_subscriptions_email_length" CHECK (char_length(email) BETWEEN 3 AND 320),
+    CONSTRAINT "digest_email_subscriptions_email_format" CHECK (email ~ '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$')
+);
+ALTER TABLE "public"."digest_email_subscriptions" OWNER TO "postgres";
+
+-- One row per (edition, subscription) delivery so a re-run of the send cron
+-- can never email the same edition to the same address twice.
+CREATE TABLE IF NOT EXISTS "public"."digest_email_sends" (
+    "edition_id" uuid NOT NULL REFERENCES "public"."digest_editions"("id") ON DELETE CASCADE,
+    "subscription_id" uuid NOT NULL REFERENCES "public"."digest_email_subscriptions"("id") ON DELETE CASCADE,
+    "message_id" text,
+    "sent_at" timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY ("edition_id", "subscription_id")
+);
+ALTER TABLE "public"."digest_email_sends" OWNER TO "postgres";
+
+-- Reader appreciation for a published edition. One like per user per edition;
+-- writes go through the API's service-role client after session verification.
+CREATE TABLE IF NOT EXISTS "public"."digest_edition_likes" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "edition_id" uuid NOT NULL REFERENCES "public"."digest_editions"("id") ON DELETE CASCADE,
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "digest_edition_likes_edition_user_key" UNIQUE ("edition_id", "user_id")
+);
+ALTER TABLE "public"."digest_edition_likes" OWNER TO "postgres";
+
+-- Reader comments on a published edition. The display identity is captured at
+-- write time so rendering never joins auth.users; writes go through the API's
+-- service-role client after session verification. Deletes are soft so a thread
+-- keeps its shape.
+CREATE TABLE IF NOT EXISTS "public"."digest_edition_comments" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "edition_id" uuid NOT NULL REFERENCES "public"."digest_editions"("id") ON DELETE CASCADE,
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "content" text NOT NULL,
+    "username" text,
+    "display_name" text,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "updated_at" timestamptz NOT NULL DEFAULT now(),
+    "deleted_at" timestamptz,
+    CONSTRAINT "digest_edition_comments_content_length_check"
+      CHECK (char_length("content") BETWEEN 1 AND 2000)
+);
+ALTER TABLE "public"."digest_edition_comments" OWNER TO "postgres";
+
+-- Moderated Community Gallery submissions. Signed-in users submit through the
+-- server; only published rows are exposed to public clients. Covers remain in
+-- a private Storage bucket and are served through a status-gated route.
+CREATE TABLE IF NOT EXISTS "public"."community_projects" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "slug" text NOT NULL UNIQUE,
+    "name" text NOT NULL,
+    "project_url" text NOT NULL,
+    "creator_name" text NOT NULL,
+    "creator_handle" text,
+    "category" text NOT NULL,
+    "description" text NOT NULL,
+    "archive_use" text NOT NULL,
+    "source_post_url" text NOT NULL,
+    "tags" text[] NOT NULL DEFAULT ARRAY[]::text[],
+    "cover_storage_path" text,
+    "cover_mime_type" text,
+    "submitted_by" uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+    "submitter_username" text NOT NULL,
+    "status" text NOT NULL DEFAULT 'pending',
+    "featured" boolean NOT NULL DEFAULT false,
+    "submitted_at" timestamptz NOT NULL DEFAULT now(),
+    "published_by" uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+    "published_at" timestamptz,
+    CONSTRAINT "community_projects_name_length" CHECK (char_length(name) BETWEEN 1 AND 120),
+    CONSTRAINT "community_projects_creator_name_length" CHECK (char_length(creator_name) BETWEEN 1 AND 120),
+    CONSTRAINT "community_projects_creator_handle_length" CHECK (creator_handle IS NULL OR char_length(creator_handle) BETWEEN 1 AND 80),
+    CONSTRAINT "community_projects_description_length" CHECK (char_length(description) BETWEEN 1 AND 360),
+    CONSTRAINT "community_projects_archive_use_length" CHECK (char_length(archive_use) BETWEEN 1 AND 500),
+    CONSTRAINT "community_projects_category_check" CHECK (category IN ('Tools', 'Experiments', 'Research', 'Games')),
+    CONSTRAINT "community_projects_status_check" CHECK (status IN ('pending', 'published')),
+    CONSTRAINT "community_projects_tags_count" CHECK (cardinality(tags) <= 8),
+    CONSTRAINT "community_projects_cover_pair" CHECK ((cover_storage_path IS NULL) = (cover_mime_type IS NULL)),
+    CONSTRAINT "community_projects_cover_mime" CHECK (cover_mime_type IS NULL OR cover_mime_type IN ('image/png', 'image/jpeg', 'image/webp')),
+    CONSTRAINT "community_projects_publication_state" CHECK (
+      (status = 'published' AND published_at IS NOT NULL)
+      OR (status = 'pending' AND published_at IS NULL AND published_by IS NULL)
+    )
+);
+ALTER TABLE "public"."community_projects" OWNER TO "postgres";
+
+-- Community Gallery likes. One row per (project, signed-in user); writes are
+-- performed by server code after the session identity gate, and counts are
+-- readable for any published project.
+CREATE TABLE IF NOT EXISTS "public"."community_project_likes" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "project_id" uuid NOT NULL REFERENCES public.community_projects(id) ON DELETE CASCADE,
+    "user_id" uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "community_project_likes_project_user_key" UNIQUE ("project_id", "user_id")
+);
+ALTER TABLE "public"."community_project_likes" OWNER TO "postgres";
+
+-- Community Gallery comments. Soft-deleted so a reader can retract a comment
+-- without breaking the thread. The commenter's Twitter username and display
+-- name are persisted at write time from the trusted session identity, so the
+-- public list never needs to join auth.users.
+CREATE TABLE IF NOT EXISTS "public"."community_project_comments" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "project_id" uuid NOT NULL REFERENCES public.community_projects(id) ON DELETE CASCADE,
+    "user_id" uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    "content" text NOT NULL,
+    "username" text,
+    "display_name" text,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "deleted_at" timestamptz,
+    CONSTRAINT "community_project_comments_content_length"
+      CHECK (char_length("content") >= 1 AND char_length("content") <= 2000)
+);
+ALTER TABLE "public"."community_project_comments" OWNER TO "postgres";
 
 -- Public profile preferences. PostgreSQL remains authoritative for this
 -- owner-controlled policy state; analytical stores only consume the result.

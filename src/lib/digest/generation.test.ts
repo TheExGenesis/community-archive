@@ -2,6 +2,7 @@ import type { PortalTweet } from '@/lib/portal/types'
 import {
   assembleDigestEditionContent,
   buildDigestPromptCorpus,
+  fillDailyDigestCandidates,
   renderDigestPrompt,
   selectDailyDigestBangers,
   type EnrichedDigestCandidate,
@@ -28,6 +29,7 @@ const candidates: EnrichedDigestCandidate[] = [
       tweet: tweet('1', 'taste benchmarks are becoming public rituals', 9),
       sourceRank: 1,
       selected: true,
+      communityAuthored: true,
     },
     commentary: [tweet('11', 'taste is not the same thing as prediction')],
     totalReplyCount: 12,
@@ -116,6 +118,26 @@ describe('daily digest generation contract', () => {
     expect(selected.at(-1)?.quoteCount).toBe(2)
   })
 
+  test('fills a sparse banger set with unique CA interaction-ranked posts', () => {
+    const selected = fillDailyDigestCandidates(
+      [tweet('1', 'strong', 4), tweet('2', 'weak', 1)],
+      [
+        tweet('1', 'duplicate', 4),
+        tweet('3', 'discussed', 1),
+        tweet('4', 'also discussed', 0),
+      ],
+      3,
+    )
+
+    expect(
+      selected.map(({ tweet: item, source }) => [item.id, source]),
+    ).toEqual([
+      ['1', 'banger'],
+      ['3', 'ca_interactions'],
+      ['4', 'ca_interactions'],
+    ])
+  })
+
   test('renders a reproducible prompt from the frozen candidate snapshot', () => {
     const prompt = renderDigestPrompt(
       '{{digest_date}}|{{window_start}}|{{window_end}}|{{candidate_json}}',
@@ -131,8 +153,32 @@ describe('daily digest generation contract', () => {
     expect(prompt).toContain('taste benchmarks are becoming public rituals')
     expect(prompt).toContain('"index": 0')
     expect(prompt).toContain('"archived_ca_quote_count": 9')
+    expect(prompt).toContain('"selection_source": "banger"')
+    expect(prompt).toContain('"authored_by_community_member": true')
     expect(prompt).toContain('"kind": "quote"')
     expect(prompt).toContain('"tweet_id": "1"')
+  })
+
+  test('adds bounded published history for continuity without changing the current corpus', () => {
+    const prompt = renderDigestPrompt('{{candidate_json}}', {
+      digestDate: '2026-08-12',
+      windowStart: '2026-08-11T12:00:00.000Z',
+      windowEnd: '2026-08-12T12:00:00.000Z',
+      candidates,
+      priorDigests: [
+        {
+          digestDate: '2026-08-11',
+          executiveSummary: ['The community compared model taste.'],
+          storyTitles: ['Taste benchmarks became public rituals'],
+          keywords: ['taste'],
+        },
+      ],
+    })
+
+    expect(prompt).toContain('PAST PUBLISHED DIGESTS')
+    expect(prompt).toContain('"digest_date": "2026-08-11"')
+    expect(prompt).toContain("TODAY'S CURRENT CANDIDATE CORPUS")
+    expect(prompt.match(/"tweet_id": "1"/g)).toHaveLength(1)
   })
 
   test('indexes all bangers before reply and quote context', () => {
@@ -169,6 +215,7 @@ describe('daily digest generation contract', () => {
     })
 
     expect(edition.topBanger.id).toBe('1')
+    expect(edition.topBanger.communityAuthored).toBe(true)
     expect(edition.executiveSummary).toHaveLength(3)
     expect(edition.stories).toHaveLength(3)
     expect(edition.stories[0]).toMatchObject({
@@ -178,6 +225,8 @@ describe('daily digest generation contract', () => {
       replyCount: 12,
     })
     expect(edition.stories[0].commentary[0].id).toBe('11')
+    expect(edition.stories[0].bangers[0].communityAuthored).toBe(true)
+    expect(edition.stories[1].bangers[0].communityAuthored).toBeUndefined()
     expect(edition.stories[0].editorialNote).toContain('settled verdict')
     expect(edition.source).toEqual({
       candidateCount: 12,

@@ -19,7 +19,7 @@ export function MembershipStatusIcon({
   const Icon = hasArchive ? Archive : Radio
   if (!label) return null
   const colorClassName = hasArchive
-    ? 'text-[#25AADF]/70 hover:bg-[#25AADF]/5 hover:text-[#25AADF] focus-visible:ring-[#25AADF]'
+    ? 'text-muted-foreground/60 hover:bg-muted-foreground/5 hover:text-muted-foreground focus-visible:ring-muted-foreground'
     : 'text-brand/60 hover:bg-brand/5 hover:text-brand focus-visible:ring-brand'
 
   return (

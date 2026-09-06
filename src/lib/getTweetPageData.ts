@@ -11,7 +11,7 @@ import {
   type SyndicatedTweet,
 } from './twitterSyndication'
 import { isClickHouseReadsEnabled } from './clickhouseGateway'
-import { fetchClickHouseTweetPageData } from './clickhouseTweetPage'
+import { fetchClickHouseTweetThreadPageData } from './clickhouseTweetPage'
 import {
   fetchClickHouseQuotePosts,
   type ClickHouseQuotePostsData,
@@ -213,8 +213,8 @@ async function fetchClickHousePage(
   if (!isClickHouseReadsEnabled()) return null
 
   try {
-    const [tweet, quotePosts] = await Promise.all([
-      fetchClickHouseTweetPageData(tweetId),
+    const [page, quotePosts] = await Promise.all([
+      fetchClickHouseTweetThreadPageData(tweetId),
       fetchClickHouseQuotePosts(tweetId).catch((error) => {
         console.error('ClickHouse quote posts failed:', {
           tweetId,
@@ -223,15 +223,14 @@ async function fetchClickHousePage(
         return { tweets: [], totalCount: 0 } satisfies ClickHouseQuotePostsData
       }),
     ])
-    if (!tweet) return null
+    if (!page) return null
     return {
-      tweet,
-      threadTree: null,
+      ...page,
       quotingTweets: quotePosts.tweets,
       quotingTweetCount: quotePosts.totalCount,
     }
   } catch (error) {
-    console.error('ClickHouse tweet detail failed; falling back to Supabase:', {
+    console.error('ClickHouse tweet thread failed; falling back to Supabase:', {
       tweetId,
       error: error instanceof Error ? error.message : String(error),
     })

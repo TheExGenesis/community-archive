@@ -1,10 +1,8 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
 import ClassicHomepage from './ClassicHomepage'
-import type { PortalData } from '@/lib/portal/types'
-import { getTopFollowedAccounts } from '@/lib/clickhouseAnalytics'
+import type { HomepageData } from '@/lib/portal/data'
 import { createServerClient } from '@/utils/supabase'
-import { getLatestDigestPreview } from '@/lib/digest/data'
 
 jest.mock('next/headers', () => ({ cookies: jest.fn(() => ({})) }))
 jest.mock('next/dynamic', () => {
@@ -24,75 +22,71 @@ jest.mock('@/components/HomepageSearch', () => ({
   __esModule: true,
   default: () => <div data-testid="homepage-search" />,
 }))
-jest.mock('@/components/AvatarList', () => ({
-  __esModule: true,
-  default: () => <div data-testid="social-proof" />,
-}))
 jest.mock('@/components/home/Testimonials', () => ({
   __esModule: true,
   default: () => <div data-testid="testimonials" />,
 }))
-jest.mock('@/components/portal/Portal', () => ({
+jest.mock('@/components/home/HomepageDataSections', () => ({
+  HomepageStats: () => <>14.0M public tweets from 700 community members.</>,
+  HomepagePortal: () => <div data-testid="shared-dashboard" />,
+  HomepagePortalFallback: () => <div data-testid="dashboard-fallback" />,
+}))
+jest.mock('@/components/ExtensionInstallPrompt', () => ({
   __esModule: true,
-  default: () => <div data-testid="shared-dashboard" />,
-}))
-jest.mock('@/lib/clickhouseAnalytics', () => ({
-  getTopFollowedAccounts: jest.fn(),
-}))
-jest.mock('@/lib/digest/data', () => ({
-  getLatestDigestPreview: jest.fn(),
+  default: () => null,
 }))
 jest.mock('@/utils/supabase', () => ({ createServerClient: jest.fn() }))
 
-const data = {
-  stats: {
-    totalTweets: 14_000_000,
-    accountCount: 700,
-    streamedLast24Hours: 0,
-    joinedThisWeek: 0,
-    firstYear: 2006,
-    currentYear: 2026,
-    generatedAt: '2026-08-12T00:00:00.000Z',
-  },
-  trends: { years: [], series: [], weekly: [], computedAt: '' },
-  initialStream: [],
-  research: [],
-  recentBangers: [],
-  historicalBangers: [],
-  failures: {
-    liveAnalytics: false,
-    memberCount: false,
-    joinedThisWeek: false,
-    corpusRange: false,
-    trends: false,
-    initialStream: false,
-    research: false,
-    recentBangers: false,
-    historicalBangers: false,
-  },
-} satisfies PortalData
+const pending = new Promise<never>(() => undefined)
+const data: HomepageData = {
+  globalStats: pending,
+  overview: pending,
+  stream: pending,
+  recentBangers: pending,
+  historicalBangers: pending,
+  trends: pending,
+  research: pending,
+}
+jest.mock('./HomepageUpload', () => ({
+  __esModule: true,
+  default: () => <div data-testid="archive-upload" />,
+}))
 
 describe('ClassicHomepage audience actions', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    ;(getTopFollowedAccounts as jest.Mock).mockResolvedValue([])
-    ;(getLatestDigestPreview as jest.Mock).mockResolvedValue(null)
     ;(createServerClient as jest.Mock).mockReturnValue({})
   })
 
   it('keeps search above the shared dashboard for signed-in members', async () => {
-    render(await ClassicHomepage({ data, isMember: true, showCta: false }))
+    render(
+      await ClassicHomepage({
+        data,
+        homepagePeople: <div data-testid="homepage-people" />,
+        isMember: true,
+        showCta: false,
+      }),
+    )
 
     expect(screen.getByTestId('homepage-search')).toBeInTheDocument()
     expect(screen.queryByTestId('hero-cta')).not.toBeInTheDocument()
+    expect(screen.getByTestId('homepage-people')).toBeInTheDocument()
     expect(screen.getByTestId('shared-dashboard')).toBeInTheDocument()
   })
 
   it('keeps the CTA above the same dashboard for guests', async () => {
-    render(await ClassicHomepage({ data, isMember: false, showCta: true }))
+    render(
+      await ClassicHomepage({
+        data,
+        homepagePeople: <div data-testid="homepage-people" />,
+        isMember: false,
+        showCta: true,
+      }),
+    )
 
     expect(screen.getByTestId('hero-cta')).toBeInTheDocument()
     expect(screen.queryByTestId('homepage-search')).not.toBeInTheDocument()
+    expect(screen.getByTestId('homepage-people')).toBeInTheDocument()
     expect(screen.getByTestId('shared-dashboard')).toBeInTheDocument()
   })
 })

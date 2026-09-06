@@ -257,6 +257,81 @@ describe('OpenAI digest adapter', () => {
     })
   })
 
+  test('uses JSON object mode for GLM because its schema mode is unreliable', async () => {
+    process.env.OPENROUTER_API_KEY = 'openrouter-test-key'
+    const fetcher = jest.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'gen_glm',
+          model: 'z-ai/glm-5.3',
+          choices: [
+            {
+              message: {
+                content:
+                  '{"executive_summary":[],"representative_tweet_index":0,"stories":[],"keywords":[]}',
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    ) as jest.MockedFunction<typeof fetch>
+
+    await generateDigestWithModel(
+      {
+        runId: 'run-glm',
+        model: 'z-ai/glm-5.3',
+        systemPrompt: 'Return JSON.',
+        userPrompt: 'Indexed corpus',
+      },
+      fetcher,
+    )
+
+    const request = JSON.parse(String(fetcher.mock.calls[0][1]?.body))
+    expect(request.response_format).toEqual({ type: 'json_object' })
+  })
+
+  test('reports OpenRouter token exhaustion without storing response content in the error', async () => {
+    process.env.OPENROUTER_API_KEY = 'openrouter-test-key'
+    const fetcher = jest.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'gen_exhausted',
+          model: 'deepseek/deepseek-v4-flash-0731',
+          choices: [
+            {
+              finish_reason: 'length',
+              message: { content: null, reasoning: 'private reasoning' },
+            },
+          ],
+          usage: {
+            prompt_tokens: 14_279,
+            completion_tokens: 6_000,
+            completion_tokens_details: { reasoning_tokens: 5_068 },
+          },
+        }),
+        { status: 200 },
+      ),
+    ) as jest.MockedFunction<typeof fetch>
+
+    const result = await generateDigestWithModel(
+      {
+        runId: 'run-exhausted',
+        model: 'deepseek/deepseek-v4-flash-0731',
+        systemPrompt: 'Return the digest schema.',
+        userPrompt: 'Indexed corpus',
+        reasoningEffort: 'high',
+        maxOutputTokens: 6_000,
+      },
+      fetcher,
+    )
+
+    expect(result.outputError).toBe(
+      'OpenRouter response did not include output text (finish_reason=length, completion_tokens=6000, reasoning_tokens=5068)',
+    )
+    expect(result.outputError).not.toContain('private reasoning')
+  })
+
   test('reports model timeouts with a durable, readable error', async () => {
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key'
     const timeoutError = new Error('The operation was aborted due to timeout')

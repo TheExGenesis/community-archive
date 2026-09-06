@@ -8,6 +8,7 @@ jest.mock('./analytics', () => ({
   fetchPortalLiveAnalytics: jest.fn(),
   fetchPortalRecentBangers: jest.fn(),
   fetchPortalTrends: jest.fn(),
+  fetchPortalWeeklyTrends: jest.fn(),
 }))
 jest.mock('./research', () => ({
   getResearchPosts: jest.fn(),
@@ -15,13 +16,14 @@ jest.mock('./research', () => ({
 }))
 
 import {
-  fetchPortalCorpusStats,
-  fetchPortalMemberCount,
+  fetchPortalGlobalStats,
   getInitialPortalBangersPage,
   getPortalBangersPage,
   getPortalData,
+  startHomepageData,
   getPortalStreamPage,
   getPortalStreamUpdates,
+  enrichPortalTweets,
   loadOptionalPortalData,
   loadPortalComponentData,
   portalDataSourceKey,
@@ -35,6 +37,7 @@ import {
   fetchPortalLiveAnalytics,
   fetchPortalRecentBangers,
   fetchPortalTrends,
+  fetchPortalWeeklyTrends,
 } from './analytics'
 import { getResearchPosts } from './research'
 import type { PortalTweet } from './types'
@@ -96,7 +99,7 @@ describe('portal read source', () => {
     })
 
     expect(key).toBe(
-      'portal-v5:preview:analytics.example:prod-project.supabase.co',
+      'portal-v6:preview:analytics.example:prod-project.supabase.co',
     )
   })
 })
@@ -173,15 +176,18 @@ describe('portal page resilience', () => {
 
     jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
       const url = new URL(String(input))
-      if (url.pathname.endsWith('/corpus-count')) {
+      if (url.pathname.endsWith('/summary')) {
         return new Response(
           JSON.stringify({
             data: {
               totalTweets: '15334092',
+              memberAccounts: '42',
               sourceUpdatedAt: '2026-08-13 18:34:09.903',
               collectedAt: '2026-08-13 18:34:20.907',
-              source: 'clickhouse.tweet_content_versions',
-              countMode: 'unique_tweets_observed',
+              membershipSnapshotAt: '2026-08-13 18:34:00.000',
+              source:
+                'clickhouse.community_membership_current+corpus_count_current',
+              countMode: 'live_membership+cached_unique_tweets_exact',
             },
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
@@ -195,20 +201,6 @@ describe('portal page resilience', () => {
           status: 200,
           headers: { 'content-range': '0-0/42' },
         })
-      }
-      if (url.pathname.endsWith('/global_activity_summary')) {
-        return new Response(
-          JSON.stringify([
-            {
-              total_tweets: 15_100_732,
-              last_updated: '2026-08-07T20:00:00.000Z',
-            },
-          ]),
-          {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          },
-        )
       }
       if (url.pathname.endsWith('/tweets')) {
         const createdAt = url.searchParams.get('order')?.endsWith('.asc')
@@ -234,6 +226,24 @@ describe('portal page resilience', () => {
     restore('PORTAL_READ_SUPABASE_ANON_KEY', previousEnv.portalKey)
     restore('CLICKHOUSE_ANALYTICS_API_URL', previousEnv.analyticsUrl)
     restore('CLICKHOUSE_ANALYTICS_API_TOKEN', previousEnv.analyticsToken)
+  })
+
+  test('lets stats and stream settle while trends, research and Bangers remain pending', async () => {
+    const pending = new Promise<never>(() => undefined)
+    ;(fetchPortalWeeklyTrends as jest.Mock).mockReturnValue(pending)
+    fetchPortalRecentBangersMock.mockReturnValue(pending)
+    fetchPortalHistoricalBangersMock.mockReturnValue(pending)
+    getResearchPostsMock.mockReturnValue(pending)
+    const sections = startHomepageData()
+    await expect(sections.globalStats).resolves.toMatchObject({
+      data: { memberCount: 42 },
+      failed: false,
+    })
+    await expect(sections.stream).resolves.toEqual({ data: [], failed: true })
+    await expect(sections.overview).resolves.toMatchObject({
+      stats: { accountCount: 42 },
+    })
+    expect(fetchPortalTrendsMock).not.toHaveBeenCalled()
   })
 
   test('keeps the page available when the initial stream request fails', async () => {
@@ -286,7 +296,7 @@ describe('portal page resilience', () => {
     })
   })
 
-  test('preserves the Supabase corpus total when live analytics fails', async () => {
+  test('preserves the shared ClickHouse counts when live analytics fails', async () => {
     fetchPortalLiveAnalyticsMock.mockRejectedValueOnce(
       new Error('live analytics unavailable'),
     )
@@ -322,28 +332,121 @@ describe('portal reads', () => {
     process.env.CLICKHOUSE_ANALYTICS_API_TOKEN = 'test-token'
   })
 
-  test('reads the homepage corpus total from ClickHouse', async () => {
+  test('preserves hydrated own media while still checking quote relations', async () => {
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async (input) => {
+        const url = new URL(String(input))
+        if (url.pathname.endsWith('/quote_tweets')) {
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        throw new Error(`Unexpected test request: ${url}`)
+      })
+    const tweet: PortalTweet = {
+      id: '42',
+      accountId: '7',
+      username: 'alice',
+      name: 'Alice',
+      avatar: null,
+      text: 'Hydrated evidence',
+      observedAt: '2026-08-07T20:00:00.000Z',
+      createdAt: '2026-08-07T19:00:00.000Z',
+      likes: 3,
+      rts: 2,
+      media: [
+        {
+          url: 'https://pbs.twimg.com/media/evidence.jpg',
+          type: 'photo',
+          width: 1200,
+          height: 800,
+        },
+      ],
+    }
+
+    await expect(enrichPortalTweets([tweet])).resolves.toEqual([tweet])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/quote_tweets?')
+  })
+
+  test('falls back to own-media enrichment for partially hydrated rows', async () => {
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async (input) => {
+        const url = new URL(String(input))
+        const rows = url.pathname.endsWith('/tweet_media')
+          ? [
+              {
+                tweet_id: '42',
+                media_url: 'https://pbs.twimg.com/media/fallback.jpg',
+                media_type: 'photo',
+                width: 1200,
+                height: 800,
+              },
+            ]
+          : []
+        return new Response(JSON.stringify(rows), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      })
+    const tweet: PortalTweet = {
+      id: '42',
+      accountId: '7',
+      username: 'alice',
+      name: 'Alice',
+      avatar: null,
+      text: 'Partial gateway evidence',
+      observedAt: '2026-08-07T20:00:00.000Z',
+      createdAt: '2026-08-07T19:00:00.000Z',
+      likes: 3,
+      rts: 2,
+    }
+
+    await expect(enrichPortalTweets([tweet])).resolves.toEqual([
+      {
+        ...tweet,
+        media: [
+          {
+            url: 'https://pbs.twimg.com/media/fallback.jpg',
+            type: 'photo',
+            width: 1200,
+            height: 800,
+          },
+        ],
+      },
+    ])
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  test('reads the homepage counts from the shared ClickHouse summary', async () => {
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
       new Response(
         JSON.stringify({
           data: {
             totalTweets: '15334092',
+            memberAccounts: '658',
             sourceUpdatedAt: '2026-08-13 18:34:09.903',
             collectedAt: '2026-08-13 18:34:20.907',
-            source: 'clickhouse.tweet_content_versions',
-            countMode: 'unique_tweets_observed',
+            membershipSnapshotAt: '2026-08-13 18:34:00.000',
+            source:
+              'clickhouse.community_membership_current+corpus_count_current',
+            countMode: 'live_membership+cached_unique_tweets_exact',
           },
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
       ),
     )
 
-    await expect(fetchPortalCorpusStats()).resolves.toEqual({
+    await expect(fetchPortalGlobalStats()).resolves.toEqual({
       totalTweets: 15_334_092,
+      memberCount: 658,
       generatedAt: '2026-08-13T18:34:20.907Z',
     })
     expect(fetchMock).toHaveBeenCalledWith(
-      new URL('https://analytics.community-archive.org/analytics/corpus-count'),
+      new URL('https://analytics.community-archive.org/analytics/summary'),
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: 'Bearer test-token',
@@ -352,43 +455,17 @@ describe('portal reads', () => {
     )
   })
 
-  test('falls back to the Supabase summary when ClickHouse fails', async () => {
-    const consoleError = jest.spyOn(console, 'error').mockImplementation()
+  test('does not fall back to Supabase when the shared summary fails', async () => {
     const fetchMock = jest
       .spyOn(global, 'fetch')
       .mockResolvedValueOnce(
         new Response('gateway unavailable', { status: 503 }),
       )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify([
-            {
-              total_tweets: 15_100_732,
-              last_updated: '2026-08-12T05:15:00.098756+00:00',
-            },
-          ]),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
-      )
 
-    await expect(fetchPortalCorpusStats()).resolves.toEqual({
-      totalTweets: 15_100_732,
-      generatedAt: '2026-08-12T05:15:00.098Z',
-    })
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      'https://prod-project.supabase.co/rest/v1/global_activity_summary?select=total_tweets%2Clast_updated',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          apikey: 'prod-public-anon',
-          'Accept-Profile': 'public',
-        }),
-      }),
+    await expect(fetchPortalGlobalStats()).rejects.toThrow(
+      'ClickHouse analytics request failed (503)',
     )
-    expect(consoleError).toHaveBeenCalledWith(
-      'Portal ClickHouse corpus count failed; falling back to Supabase:',
-      expect.any(Error),
-    )
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   afterEach(() => {
@@ -526,16 +603,16 @@ describe('portal reads', () => {
     fetchPortalBangersPageMock.mockResolvedValueOnce({
       tweets: [
         {
-          id: 'today-low',
-          username: 'alice',
-          name: 'Alice',
+          id: 'boundary',
+          username: 'carol',
+          name: 'Carol',
           avatar: null,
-          text: 'Today with fewer quotes',
-          observedAt: '2026-08-10T13:00:00.000Z',
-          createdAt: '2026-08-10T13:00:00.000Z',
-          likes: 4,
+          text: 'Exactly 24 hours ago',
+          observedAt: '2026-08-09T14:00:00.000Z',
+          createdAt: '2026-08-09T14:00:00.000Z',
+          likes: 20,
           rts: 0,
-          quoteCount: 2,
+          quoteCount: 20,
         },
         {
           id: 'today-high',
@@ -550,37 +627,25 @@ describe('portal reads', () => {
           quoteCount: 9,
         },
         {
-          id: 'boundary',
-          username: 'carol',
-          name: 'Carol',
+          id: 'today-low',
+          username: 'alice',
+          name: 'Alice',
           avatar: null,
-          text: 'Exactly 24 hours ago',
-          observedAt: '2026-08-09T14:00:00.000Z',
-          createdAt: '2026-08-09T14:00:00.000Z',
-          likes: 20,
+          text: 'Today with fewer quotes',
+          observedAt: '2026-08-10T13:00:00.000Z',
+          createdAt: '2026-08-10T13:00:00.000Z',
+          likes: 4,
           rts: 0,
-          quoteCount: 20,
-        },
-        {
-          id: 'outside-window',
-          username: 'dave',
-          name: 'Dave',
-          avatar: null,
-          text: 'One second outside the window',
-          observedAt: '2026-08-09T13:59:59.000Z',
-          createdAt: '2026-08-09T13:59:59.000Z',
-          likes: 40,
-          rts: 0,
-          quoteCount: 40,
+          quoteCount: 2,
         },
       ],
       pagination: {
-        limit: 100,
+        limit: 30,
         offset: 0,
-        nextOffset: 100,
-        totalAvailable: 1_000,
-        snapshotSize: 1_000,
-        yearCounts: [{ year: 2026, count: 1_000 }],
+        nextOffset: null,
+        totalAvailable: 3,
+        snapshotSize: 3,
+        yearCounts: [{ year: 2026, count: 3 }],
         candidateRankingTruncated: false,
       },
     })
@@ -598,11 +663,13 @@ describe('portal reads', () => {
         },
       })
       expect(fetchPortalBangersPageMock).toHaveBeenCalledWith({
-        limit: 100,
+        limit: 30,
         offset: 0,
-        sort: 'recent',
+        sort: 'quotes',
         scope: 'all',
         query: '',
+        createdAfter: '2026-08-09T14:00:00.000Z',
+        createdBefore: '2026-08-10T14:00:00.000Z',
       })
     } finally {
       jest.useRealTimers()
@@ -626,26 +693,14 @@ describe('portal reads', () => {
           rts: 0,
           quoteCount: 2,
         },
-        {
-          id: 'outside-window',
-          username: 'bob',
-          name: 'Bob',
-          avatar: null,
-          text: 'One second outside the week',
-          observedAt: '2026-08-05T13:59:59.000Z',
-          createdAt: '2026-08-05T13:59:59.000Z',
-          likes: 8,
-          rts: 0,
-          quoteCount: 9,
-        },
       ],
       pagination: {
-        limit: 100,
+        limit: 30,
         offset: 0,
         nextOffset: null,
-        totalAvailable: 1_000,
-        snapshotSize: 1_000,
-        yearCounts: [{ year: 2026, count: 1_000 }],
+        totalAvailable: 1,
+        snapshotSize: 1,
+        yearCounts: [{ year: 2026, count: 1 }],
         candidateRankingTruncated: false,
       },
     })
@@ -656,6 +711,15 @@ describe('portal reads', () => {
       ).resolves.toMatchObject({
         tweets: [{ id: 'boundary' }],
         pagination: { totalAvailable: 1 },
+      })
+      expect(fetchPortalBangersPageMock).toHaveBeenCalledWith({
+        limit: 30,
+        offset: 0,
+        sort: 'quotes',
+        scope: 'all',
+        query: '',
+        createdAfter: '2026-08-05T14:00:00.000Z',
+        createdBefore: '2026-08-12T14:00:00.000Z',
       })
     } finally {
       jest.useRealTimers()
@@ -679,26 +743,14 @@ describe('portal reads', () => {
           rts: 0,
           quoteCount: 2,
         },
-        {
-          id: 'outside-quarter',
-          username: 'bob',
-          name: 'Bob',
-          avatar: null,
-          text: 'Outside the quarter',
-          observedAt: '2026-05-10T13:59:59.000Z',
-          createdAt: '2026-05-10T13:59:59.000Z',
-          likes: 8,
-          rts: 0,
-          quoteCount: 9,
-        },
       ],
       pagination: {
-        limit: 100,
+        limit: 30,
         offset: 0,
         nextOffset: null,
-        totalAvailable: 2,
-        snapshotSize: 2,
-        yearCounts: [{ year: 2026, count: 2 }],
+        totalAvailable: 1,
+        snapshotSize: 1,
+        yearCounts: [{ year: 2026, count: 1 }],
         candidateRankingTruncated: false,
       },
     })
@@ -709,6 +761,15 @@ describe('portal reads', () => {
       ).resolves.toMatchObject({
         tweets: [{ id: 'inside-quarter' }],
         pagination: { totalAvailable: 1 },
+      })
+      expect(fetchPortalBangersPageMock).toHaveBeenCalledWith({
+        limit: 30,
+        offset: 0,
+        sort: 'quotes',
+        scope: 'all',
+        query: '',
+        createdAfter: '2026-05-10T14:00:00.000Z',
+        createdBefore: '2026-08-10T14:00:00.000Z',
       })
     } finally {
       jest.useRealTimers()
@@ -751,24 +812,6 @@ describe('portal reads', () => {
     expect(query.get('limit')).toBe('31')
     expect(query.get('before')).toBe('2026-08-07T19:00:00.000Z')
     expect(query.get('before_id')).toBe('42')
-  })
-
-  test('uses the production uploader and opt-in membership count', async () => {
-    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      headers: new Headers({ 'content-range': '0-0/633' }),
-    } as Response)
-
-    await expect(fetchPortalMemberCount()).resolves.toBe(633)
-
-    const memberQuery = new URL(String(fetchMock.mock.calls[0][0])).searchParams
-    expect(memberQuery.get('select')).toBe('directory_id')
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({
-      method: 'HEAD',
-      headers: { Prefer: 'count=exact' },
-    })
-    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
 

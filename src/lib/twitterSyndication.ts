@@ -9,9 +9,8 @@
  * - Never persist hydrated tweet content to our DB. The link-preview subsystem may
  *   separately cache the bounded title, teaser, and cover image that X publishes for
  *   an Article linked by an archived tweet.
- * - Never use hydrated tweet content in search results or global feeds.
- * - Profile pages may use the text-only repair path for archived profile cards;
- *   that path only replaces flattened DB text when syndication supplies line breaks.
+ * - Never include hydrated tweet content in search results, profile listings, or any
+ *   other query path. Avatar recovery is render-only and is never persisted.
  * - Caller decides whether to render with a "(from Twitter)" marker.
  *
  * The endpoint requires a `token` query param derived from the tweet id. This is
@@ -45,6 +44,8 @@ export interface SyndicatedTweet {
   account_display_name: string
   created_at: string
   full_text: string
+  // Always null: the syndication endpoint does not report reposts. Kept so the
+  // shape stays ThreadTweet-compatible.
   retweet_count: number | null
   favorite_count: number
   avatar_media_url?: string
@@ -141,10 +142,10 @@ export async function fetchSyndicatedTweet(
     account_display_name: data.user?.name ?? '',
     created_at: data.created_at ?? '',
     full_text: data.text ?? '',
-    retweet_count:
-      typeof data.conversation_count === 'number'
-        ? data.conversation_count
-        : null,
+    // The syndication payload carries no repost count. `conversation_count` is
+    // the reply count, so reading it here rendered replies under the repost
+    // icon. Leave the metric unknown rather than surfacing a wrong number.
+    retweet_count: null,
     favorite_count:
       typeof data.favorite_count === 'number' ? data.favorite_count : 0,
     avatar_media_url: data.user?.profile_image_url_https,

@@ -84,7 +84,7 @@ test('shows the opted-in icon without treating the user as a contributor', () =>
   ).not.toBeInTheDocument()
 })
 
-test('shows the archive icon without treating the user as a contributor', () => {
+test('shows the archive icon without exposing another owner raw download', () => {
   render(
     <ProfileHeader
       profile={profile({ has_archive: true, is_opted_in: false })}
@@ -95,17 +95,14 @@ test('shows the archive icon without treating the user as a contributor', () => 
   expect(screen.getByRole('img', { name: 'Archive uploaded' })).toBeVisible()
   expect(screen.queryByText('Archive contributor')).not.toBeInTheDocument()
   expect(
-    screen.getByRole('link', { name: 'Download archive' }),
-  ).toHaveAttribute(
-    'href',
-    'https://archive.supabase.co/storage/v1/object/public/archives/alice/archive.json',
-  )
+    screen.queryByRole('link', { name: 'Download archive' }),
+  ).not.toBeInTheDocument()
   expect(
     screen.queryByRole('note', { name: 'Limited profile' }),
   ).not.toBeInTheDocument()
 })
 
-test('gives rostered contributors a distinct blue award badge', () => {
+test('gives rostered contributors a distinct gold award badge', () => {
   render(
     <ProfileHeader
       profile={{
@@ -117,9 +114,9 @@ test('gives rostered contributors a distinct blue award badge', () => {
   )
 
   expect(screen.getByText('Archive contributor')).toHaveClass(
-    'border-brand/40',
-    'bg-brand/10',
-    'text-brand',
+    'border-yellow-500/40',
+    'bg-yellow-500/10',
+    'text-yellow-600',
   )
   expect(screen.getByRole('img', { name: 'Archive uploaded' })).toBeVisible()
   expect(screen.getByText('Archive contributor').parentElement).toHaveClass(
@@ -141,6 +138,9 @@ test('puts the owner edit control immediately before the subtle X link', async (
 
   const editButton = screen.getByRole('button', { name: 'Edit profile' })
   const xLink = screen.getByRole('link', { name: 'View on X' })
+  expect(
+    screen.getByRole('link', { name: 'Download archive' }),
+  ).toHaveAttribute('href', '/api/archive/alice')
   expect(editButton.nextElementSibling).toBe(xLink)
   expect(xLink).toHaveClass('bg-transparent', 'text-muted-foreground')
 
@@ -150,11 +150,14 @@ test('puts the owner edit control immediately before the subtle X link', async (
 
 test('honors an owner setting that hides the archive download', () => {
   render(
-    <ProfileHeader
-      profile={profile({ has_archive: true, is_opted_in: false })}
-      archivedAt="2025-01-02T00:00:00.000Z"
-      downloadArchiveVisible={false}
-    />,
+    <ProfileEditingProvider>
+      <ProfileHeader
+        profile={profile({ has_archive: true, is_opted_in: false })}
+        archivedAt="2025-01-02T00:00:00.000Z"
+        downloadArchiveVisible={false}
+        isOwner
+      />
+    </ProfileEditingProvider>,
   )
 
   expect(
@@ -173,5 +176,52 @@ test('requests a high-resolution avatar for the profile header', () => {
   expect(screen.getByAltText("Alice's avatar")).toHaveAttribute(
     'src',
     'https://pbs.twimg.com/profile_images/42/avatar_400x400.jpg',
+  )
+})
+
+test('shows resolved, clickable profile bio and website links', () => {
+  render(
+    <ProfileHeader
+      profile={{
+        ...profile({ has_archive: true, is_opted_in: false }),
+        bio: 'Building https://t.co/bio',
+        website: 'https://t.co/site',
+        profile_links: [
+          {
+            original_url: 'https://t.co/bio',
+            expanded_url: 'https://www.community-archive.org/',
+            display_url: 'community-archive.org',
+          },
+          {
+            original_url: 'https://t.co/site',
+            expanded_url: 'https://xiqo.substack.com/',
+            display_url: 'xiqo.substack.com',
+          },
+        ],
+      }}
+      archivedAt={null}
+    />,
+  )
+
+  expect(
+    screen.getByRole('link', { name: 'community-archive.org' }),
+  ).toHaveAttribute('href', 'https://www.community-archive.org/')
+  expect(
+    screen.getByRole('link', { name: 'xiqo.substack.com' }),
+  ).toHaveAttribute('href', 'https://xiqo.substack.com/')
+  expect(screen.queryByText('https://t.co/bio')).not.toBeInTheDocument()
+  expect(screen.queryByText('https://t.co/site')).not.toBeInTheDocument()
+})
+
+test('links to all available tweets from this user sorted newest first', () => {
+  render(
+    <ProfileHeader
+      profile={profile({ has_archive: false, is_opted_in: true })}
+      archivedAt={null}
+    />,
+  )
+  expect(screen.getByRole('link', { name: 'Latest tweets →' })).toHaveAttribute(
+    'href',
+    '/search?fromUser=alice&sort=newest',
   )
 })

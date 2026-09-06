@@ -25,6 +25,7 @@ CREATE INDEX "idx_likes_liked_tweet_id" ON "public"."likes" USING "btree" ("like
 
 -- public.mentioned_users
 CREATE INDEX "idx_mentioned_users_user_id" ON "public"."mentioned_users" USING "btree" ("user_id");
+CREATE INDEX "mentioned_users_screen_name_lower_idx" ON "public"."mentioned_users" USING "btree" ("lower"("screen_name")) WHERE ("screen_name" <> ''::"text");
 
 -- public.tweet_media
 CREATE INDEX "idx_tweet_media_archive_upload_id" ON "public"."tweet_media" USING "btree" ("archive_upload_id");
@@ -33,6 +34,12 @@ CREATE INDEX "idx_tweet_media_tweet_id" ON "public"."tweet_media" USING "btree" 
 -- public.optin
 CREATE INDEX "idx_optin_opted_in" ON "public"."optin" USING "btree" ("opted_in") WHERE ("opted_in" = true);
 CREATE INDEX "idx_optin_explicit_optout" ON "public"."optin" USING "btree" ("explicit_optout") WHERE ("explicit_optout" = true);
+CREATE INDEX "optin_explicit_optout_twitter_user_id_idx" ON "public"."optin" USING "btree" ("twitter_user_id") WHERE (("explicit_optout" IS TRUE) AND ("twitter_user_id" IS NOT NULL));
+CREATE INDEX "optin_explicit_optout_username_lower_idx" ON "public"."optin" USING "btree" (lower("username")) WHERE ("explicit_optout" IS TRUE);
+
+CREATE INDEX "blocked_scraping_users_username_idx" ON "tes"."blocked_scraping_users" USING "btree" (lower("username")) WHERE ("username" IS NOT NULL);
+
+CREATE INDEX "liked_tweets_author_account_id_idx" ON "public"."liked_tweets" USING "btree" ("author_account_id") WHERE ("author_account_id" IS NOT NULL);
 CREATE INDEX "idx_optin_user_id" ON "public"."optin" USING "btree" ("user_id");
 CREATE INDEX "idx_optin_username" ON "public"."optin" USING "btree" ("username");
 
@@ -56,6 +63,8 @@ CREATE INDEX "idx_tweets_favorite_count" ON "public"."tweets" USING "btree" ("fa
 CREATE INDEX "idx_tweets_null_archive_upload_id" ON "public"."tweets" USING "btree" ("updated_at" DESC) WHERE ("archive_upload_id" IS NULL);
 CREATE INDEX "idx_tweets_reply_to_tweet_id" ON "public"."tweets" USING "btree" ("reply_to_tweet_id");
 CREATE INDEX "idx_tweets_reply_to_user_id" ON "public"."tweets" USING "btree" ("reply_to_user_id");
+CREATE INDEX "tweets_reply_to_username_lower_idx" ON "public"."tweets" USING "btree" ("lower"("reply_to_username")) WHERE ("reply_to_username" IS NOT NULL);
+CREATE INDEX "tweets_retweeted_username_lower_idx" ON "public"."tweets" USING "btree" (lower(substring("full_text" FROM '^RT @([A-Za-z0-9_]{1,15}):'::"text"))) WHERE ("full_text" ~ '^RT @[A-Za-z0-9_]{1,15}:'::"text");
 CREATE INDEX "idx_tweets_streaming" ON "public"."tweets" USING "btree" ("created_at") WHERE ("archive_upload_id" IS NULL);
 CREATE INDEX "idx_tweets_updated_at" ON "public"."tweets" USING "btree" ("updated_at" DESC);
 CREATE INDEX "idx_tweets_updated_at_tweet_id" ON "public"."tweets" USING "btree" ("updated_at", "tweet_id");
@@ -96,6 +105,8 @@ CREATE INDEX IF NOT EXISTS "idx_all_account_lower_username"
 -- both exact and wildcard ILIKE lookups.
 CREATE INDEX IF NOT EXISTS "idx_all_account_username_trgm"
   ON "public"."all_account" USING "gin" ("username" "public"."gin_trgm_ops");
+CREATE INDEX IF NOT EXISTS "idx_all_account_display_name_trgm"
+  ON "public"."all_account" USING "gin" ("account_display_name" "public"."gin_trgm_ops");
 
 -- private.tweet_user: every get_streaming_stats_* function filters on created_at.
 CREATE INDEX IF NOT EXISTS "idx_tweet_user_created_at"
@@ -106,6 +117,20 @@ CREATE INDEX IF NOT EXISTS "digest_runs_date_created_idx"
 CREATE INDEX IF NOT EXISTS "digest_runs_prompt_version_idx"
   ON "public"."digest_runs" ("prompt_version_id");
 
+-- One subscription per address, case-insensitively.
+CREATE UNIQUE INDEX IF NOT EXISTS "digest_email_subscriptions_email_key"
+  ON "public"."digest_email_subscriptions" (lower("email"));
+
+CREATE INDEX IF NOT EXISTS "digest_email_subscriptions_account_idx"
+  ON "public"."digest_email_subscriptions" ("account_id")
+  WHERE "account_id" IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS "digest_runs_one_nightly_run_per_date_idx"
+  ON "public"."digest_runs" ("digest_date")
+  WHERE "created_by" IS NULL
+    AND "parent_run_id" IS NULL
+    AND "workflow_run_id" IS NOT NULL;
+
 CREATE UNIQUE INDEX IF NOT EXISTS "digest_editions_one_published_per_date_idx"
   ON "public"."digest_editions" ("digest_date")
   WHERE "status" = 'published';
@@ -113,3 +138,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS "digest_editions_one_published_per_date_idx"
 CREATE INDEX IF NOT EXISTS "digest_editions_public_archive_idx"
   ON "public"."digest_editions" ("digest_date" DESC, "published_at" DESC)
   WHERE "status" = 'published';
+
+CREATE INDEX IF NOT EXISTS "digest_edition_likes_edition_idx"
+  ON "public"."digest_edition_likes" ("edition_id");
+
+CREATE INDEX IF NOT EXISTS "digest_edition_comments_edition_created_idx"
+  ON "public"."digest_edition_comments" ("edition_id", "created_at");
+CREATE INDEX IF NOT EXISTS "policy_storage_objects_account_ids_idx"
+ON "private"."policy_storage_objects" USING "gin" ("account_ids");
+
+CREATE INDEX IF NOT EXISTS "policy_storage_objects_username_hashes_idx"
+ON "private"."policy_storage_objects" USING "gin" ("username_hashes");
+
+CREATE INDEX IF NOT EXISTS "archive_clickhouse_delivery_pending_idx"
+ON "private"."archive_clickhouse_delivery" ("next_attempt_at", "archive_upload_id")
+WHERE ("delivery_state" = 'pending'::"text");
+CREATE INDEX IF NOT EXISTS "community_projects_status_submitted_at_idx"
+  ON "public"."community_projects" ("status", "submitted_at" DESC);
+CREATE INDEX IF NOT EXISTS "community_project_likes_project_id_idx"
+  ON "public"."community_project_likes" ("project_id");
+CREATE INDEX IF NOT EXISTS "community_project_comments_project_id_created_at_idx"
+  ON "public"."community_project_comments" ("project_id", "created_at");

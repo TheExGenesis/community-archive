@@ -1,5 +1,10 @@
-import { DirectoryUser, FormattedUser, SortKey } from '@/lib/types'
-import { SupabaseClient } from '@supabase/supabase-js'
+import {
+  DirectoryUser,
+  FormattedUser,
+  SortKey,
+  UserDirectoryPage,
+} from '@/lib/types'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { devLog } from '@/lib/devLog'
 import { rankUserSuggestions } from '@/lib/searchSuggestions'
 import type { UserSuggestion } from '@/lib/searchSuggestions'
@@ -25,9 +30,9 @@ export const getDirectoryProfileHref = (user: DirectoryUser) =>
   userProfileHref(user.username, user.account_id || user.directory_id)
 
 export const fetchUsers = async (
-  supabase: SupabaseClient,
   options?: FetchUsersOptions,
-): Promise<DirectoryUser[]> => {
+  fetchImpl: typeof fetch = fetch,
+): Promise<UserDirectoryPage> => {
   const {
     limit,
     offset = 0,
@@ -36,95 +41,185 @@ export const fetchUsers = async (
     search,
   } = options || {}
 
-  let query = supabase
-    .schema('public')
-    .from('user_directory')
-    .select(
-      `
-      account_id,
-      username,
-      account_display_name,
-      avatar_media_url,
-      num_followers,
-      archive_uploaded_at,
-      directory_id,
-      has_archive,
-      is_opted_in,
-      opted_in_at,
-      joined_at
-    `,
-    )
-
-  if (search) {
-    query = query.or(buildDirectorySearchFilter(search))
-  }
-
-  query = query.order(sortBy, {
-    ascending: sortOrder === 'asc',
-    nullsFirst: false,
+  const searchParams = new URLSearchParams({
+    limit: String(limit || 15),
+    offset: String(offset),
+    sort_by: sortBy,
+    sort_order: sortOrder,
   })
-  query = query.order('directory_id', { ascending: true })
+  if (search) searchParams.set('search', search)
 
-  if (limit) {
-    query = query.range(offset, offset + limit - 1)
+  const response = await fetchImpl(`/api/user-directory?${searchParams}`, {
+    cache: 'no-store',
+  })
+  if (!response.ok) {
+    throw new Error(`User directory request failed (${response.status})`)
   }
-
-  const { data, error } = await query
-
-  if (error) throw error
-
-  return (data as DirectoryUser[]) || []
+  const page = (await response.json()) as UserDirectoryPage
+  if (!Array.isArray(page?.users) || typeof page.hasMore !== 'boolean') {
+    throw new Error('User directory returned an invalid response')
+  }
+  return page
 }
 
-export const fetchUsersCount = async (
-  supabase: SupabaseClient,
-  search?: string,
-): Promise<number> => {
-  let query = supabase
-    .schema('public')
-    .from('user_directory')
-    .select('account_id', { count: 'exact', head: true })
-
-  if (search) {
-    query = query.or(buildDirectorySearchFilter(search))
-  }
-
-  const { count, error } = await query
-
-  if (error) throw error
-  return count || 0
-}
-
-export const fetchUserSuggestions = async (
-  supabase: SupabaseClient,
-  fragment: string,
-  limit = 6,
-): Promise<UserSuggestion[]> => {
+const normalizeSuggestionFragment = (fragment: string) => {
   const normalizedFragment = fragment
     .trim()
     .replace(/^@/, '')
     .toLocaleLowerCase()
-  if (!/^[a-z0-9_]{2,15}$/.test(normalizedFragment)) return []
 
-  const escapedFragment = normalizedFragment.replace(/[\\%_]/g, '\\$&')
+  return /^[a-z0-9_]{2,15}$/.test(normalizedFragment)
+    ? normalizedFragment
+    : null
+}
+
+export const fetchMemberSuggestions = async (
+  fragment: string,
+  limit = 6,
+  fetchImpl: typeof fetch = fetch,
+): Promise<UserSuggestion[]> => {
+  const normalizedFragment = normalizeSuggestionFragment(fragment)
+  if (!normalizedFragment) return []
+
+  const page = await fetchUsers(
+    {
+      limit: Math.max(limit * 5, 30),
+      sortBy: 'username',
+      sortOrder: 'asc',
+      search: normalizedFragment,
+    },
+    fetchImpl,
+  )
+
+  return rankUserSuggestions(
+    page.users
+      .filter((user) => {
+        const username = user.username.toLocaleLowerCase()
+        const displayName = user.account_display_name.toLocaleLowerCase()
+        return (
+          username.includes(normalizedFragment) ||
+          displayName.includes(normalizedFragment)
+        )
+      })
+      .map(
+        ({
+          account_id,
+          directory_id,
+          username,
+          account_display_name,
+          avatar_media_url,
+          num_followers,
+        }) => ({
+          account_id,
+          directory_id,
+          username,
+          account_display_name,
+          avatar_media_url,
+          num_followers,
+        }),
+      ),
+    normalizedFragment,
+    limit,
+  )
+}
+
+export const fetchMemberDirectorySuggestions = async (
+  supabase: SupabaseClient,
+  fragment: string,
+  limit = 6,
+): Promise<UserSuggestion[]> => {
+  const normalizedFragment = normalizeSuggestionFragment(fragment)
+  if (!normalizedFragment) return []
+
   const { data, error } = await supabase
     .schema('public')
     .from('user_directory')
     .select(
-      'directory_id, username, account_display_name, avatar_media_url, num_followers',
+      'account_id, directory_id, username, account_display_name, avatar_media_url, num_followers',
     )
-    .ilike('username', `%${escapedFragment}%`)
-    .order('num_followers', { ascending: false, nullsFirst: false })
+    .or(buildDirectorySearchFilter(normalizedFragment))
+    .order('username', { ascending: true })
     .limit(Math.max(limit * 5, 30))
 
   if (error) throw error
 
   return rankUserSuggestions(
-    (data as UserSuggestion[]) || [],
+    (data || []).map(
+      ({
+        account_id,
+        directory_id,
+        username,
+        account_display_name,
+        avatar_media_url,
+        num_followers,
+      }) => ({
+        account_id,
+        directory_id,
+        username,
+        account_display_name,
+        avatar_media_url,
+        num_followers,
+      }),
+    ),
     normalizedFragment,
     limit,
   )
 }
+
+export const fetchAccountSuggestions = async (
+  supabase: SupabaseClient,
+  fragment: string,
+  limit = 6,
+): Promise<UserSuggestion[]> => {
+  const normalizedFragment = normalizeSuggestionFragment(fragment)
+  if (!normalizedFragment) return []
+
+  const { data, error } = await supabase
+    .schema('public')
+    .rpc('search_user_suggestions', {
+      search_text: normalizedFragment,
+      result_limit: Math.max(limit * 5, 30),
+    })
+
+  if (error) {
+    // Keep previews usable until the matching migration reaches their DB.
+    const escapedFragment = normalizedFragment.replace(/[\\%_]/g, '\\$&')
+    const fallback = await supabase
+      .schema('public')
+      .from('all_account')
+      .select('account_id, username, account_display_name, num_followers')
+      .ilike('username', `${escapedFragment}%`)
+      .order('username', { ascending: true })
+      .limit(Math.max(limit * 5, 30))
+
+    if (fallback.error) throw error
+    return rankUserSuggestions(
+      (fallback.data || []).map(mapAccountSuggestion),
+      normalizedFragment,
+      limit,
+    )
+  }
+
+  return rankUserSuggestions(
+    (data || []).map(mapAccountSuggestion),
+    normalizedFragment,
+    limit,
+  )
+}
+
+const mapAccountSuggestion = (user: {
+  account_id: string
+  username: string
+  account_display_name: string
+  num_followers: number | null
+}): UserSuggestion => ({
+  account_id: user.account_id,
+  directory_id: `account:${user.account_id}`,
+  username: user.username,
+  account_display_name: user.account_display_name,
+  avatar_media_url: null,
+  num_followers: user.num_followers,
+})
 
 export const getUserData = async (
   supabase: SupabaseClient,

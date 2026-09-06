@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { FileDown } from 'lucide-react'
 
 export function DownloadArchiveButton({ username }: { username: string }) {
-  const archiveUrl = `https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/archives/${username.toLowerCase()}/archive.json`
+  const archiveUrl = `/api/archive/${encodeURIComponent(username.toLowerCase())}`
 
   const handleDownload = async () => {
     try {

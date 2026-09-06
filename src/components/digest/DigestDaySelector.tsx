@@ -5,6 +5,7 @@ import { useState } from 'react'
 import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
 import { CARD, MUTED } from '@/components/portal/styles'
 import { DigestGenerationDayButton } from './DigestGenerationDayButton'
+import { capturePostHogEvent } from '@/lib/posthog'
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
@@ -30,6 +31,7 @@ export function DigestDaySelector({
     action: string | ((formData: FormData) => Promise<void>)
     dates: string[]
     promptVersionId: string
+    targetCommunityUsersOnly?: boolean
     runningRuns?: Array<{ date: string; id: string }>
   }
 }) {
@@ -49,6 +51,9 @@ export function DigestDaySelector({
   ).sort()
   const initialMonth = currentDate.slice(0, 7)
   const [visibleMonth, setVisibleMonth] = useState(initialMonth)
+  const [targetCommunityUsersOnly, setTargetCommunityUsersOnly] = useState(
+    generation?.targetCommunityUsersOnly ?? true,
+  )
   const [year, month] = visibleMonth.split('-').map(Number)
   const firstMonth = availableMonths[0] ?? initialMonth
   const lastMonth = availableMonths.at(-1) ?? initialMonth
@@ -166,6 +171,11 @@ export function DigestDaySelector({
                   value={generation.promptVersionId}
                 />
                 <input type="hidden" name="digest_date" value={date} />
+                <input
+                  type="hidden"
+                  name="target_ca_users_only"
+                  value={String(targetCommunityUsersOnly)}
+                />
                 <DigestGenerationDayButton date={date} day={day} />
               </form>
             )
@@ -186,6 +196,12 @@ export function DigestDaySelector({
             <Link
               key={date}
               href={`/digest/${date}`}
+              onClick={() =>
+                capturePostHogEvent('digest_action', {
+                  action: 'edition_selected',
+                  surface: 'calendar',
+                })
+              }
               aria-label={`${date}${availableDay.isPreview ? ', preview edition' : ''}`}
               aria-current={isCurrent ? 'date' : undefined}
               className={`relative flex aspect-square items-center justify-center rounded-[6px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand ${
@@ -215,6 +231,19 @@ export function DigestDaySelector({
           )
         })}
       </div>
+      {generation ? (
+        <label className={`mt-4 flex items-start gap-2 text-xs ${MUTED}`}>
+          <input
+            type="checkbox"
+            checked={targetCommunityUsersOnly}
+            onChange={(event) =>
+              setTargetCommunityUsersOnly(event.currentTarget.checked)
+            }
+            className="mt-0.5 h-4 w-4 rounded border-zinc-300"
+          />
+          Only include posts authored by Community Archive members
+        </label>
+      ) : null}
       <p
         className={`${editorial ? 'mt-4 text-xs leading-[1.6]' : 'mt-3 text-[11px] leading-4'} ${MUTED}`}
       >

@@ -1,10 +1,12 @@
 import React from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import ProfileContent from './ProfileContent'
 
 const mockFetch = jest.fn()
 const originalFetch = global.fetch
 const mockLogInsert = jest.fn().mockResolvedValue({ error: null })
+const mockRpc = jest.fn()
 const mockUpdateDownloadArchiveVisibility = jest.fn()
 
 jest.mock('next/navigation', () => ({
@@ -20,6 +22,7 @@ jest.mock('@/hooks/useAuthAndArchive', () => ({
 jest.mock('@/utils/supabase', () => ({
   createBrowserClient: () => ({
     from: () => ({ insert: mockLogInsert }),
+    rpc: mockRpc,
     storage: { from: jest.fn() },
   }),
 }))
@@ -137,5 +140,45 @@ describe('ProfileContent opt-in preference', () => {
     expect(
       screen.getByText('Download Archive is hidden from your public profile'),
     ).toBeVisible()
+  })
+
+  it('lets the owner permanently delete one of their tweets', async () => {
+    const interaction = userEvent.setup()
+    jest.spyOn(window, 'confirm').mockReturnValue(true)
+    mockRpc.mockResolvedValue({
+      data: [{ deleted_tweets: 1 }],
+      error: null,
+    })
+
+    render(
+      <ProfileContent
+        user={user}
+        accountId="twitter-123"
+        initialOptInData={null}
+        archives={[]}
+        initialTweets={[
+          {
+            tweet_id: '1234567890',
+            created_at: '2026-08-15T00:00:00.000Z',
+            full_text: 'A tweet I can remove',
+            favorite_count: 3,
+            retweet_count: 1,
+          },
+        ]}
+      />,
+    )
+
+    await interaction.click(screen.getByRole('tab', { name: 'My Tweets' }))
+    await interaction.click(
+      screen.getByRole('button', { name: 'Delete tweet 1234567890' }),
+    )
+
+    await waitFor(() =>
+      expect(mockRpc).toHaveBeenCalledWith('delete_own_tweets', {
+        p_tweet_ids: ['1234567890'],
+      }),
+    )
+    expect(await screen.findByText('Tweet deleted permanently')).toBeVisible()
+    expect(screen.queryByText('A tweet I can remove')).not.toBeInTheDocument()
   })
 })

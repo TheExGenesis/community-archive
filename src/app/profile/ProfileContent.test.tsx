@@ -3,6 +3,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ProfileContent from './ProfileContent'
 
+const mockGetOwnLatestTweets = jest.fn()
+jest.mock('@/app/settings/tweet-actions', () => ({
+  getOwnLatestTweets: (...args: unknown[]) => mockGetOwnLatestTweets(...args),
+}))
+
 const mockFetch = jest.fn()
 const originalFetch = global.fetch
 const mockLogInsert = jest.fn().mockResolvedValue({ error: null })
@@ -181,4 +186,34 @@ describe('ProfileContent opt-in preference', () => {
     expect(await screen.findByText('Tweet deleted permanently')).toBeVisible()
     expect(screen.queryByText('A tweet I can remove')).not.toBeInTheDocument()
   })
+})
+
+test('loads tweets only when the tab is opened, with retry instead of an empty result on failure', async () => {
+  mockGetOwnLatestTweets
+    .mockRejectedValueOnce(new Error('temporary'))
+    .mockResolvedValueOnce([
+      {
+        tweet_id: '10',
+        created_at: '2026-09-06T00:00:00Z',
+        full_text: 'My lazy-loaded tweet',
+        favorite_count: 0,
+        retweet_count: 0,
+      },
+    ])
+  render(<ProfileContent user={user} initialOptInData={null} archives={[]} />)
+  expect(mockGetOwnLatestTweets).not.toHaveBeenCalled()
+  await userEvent.click(screen.getByRole('tab', { name: 'My Tweets' }))
+  expect(
+    await screen.findByRole('button', { name: 'Retry loading tweets' }),
+  ).toBeVisible()
+  expect(
+    screen.queryByText('No archived tweets found.'),
+  ).not.toBeInTheDocument()
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Retry loading tweets' }),
+  )
+  expect(await screen.findByText('My lazy-loaded tweet')).toBeVisible()
+  await userEvent.click(screen.getByRole('tab', { name: 'Privacy Settings' }))
+  await userEvent.click(screen.getByRole('tab', { name: 'My Tweets' }))
+  expect(mockGetOwnLatestTweets).toHaveBeenCalledTimes(2)
 })

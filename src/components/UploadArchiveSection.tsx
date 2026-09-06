@@ -6,7 +6,6 @@ import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { createBrowserClient } from '@/utils/supabase'
 import { Upload, ExternalLink } from 'lucide-react'
 import { devLog } from '@/lib/devLog'
-import { handleFileUpload } from '@/lib/upload-archive/handleFileUpload'
 import { FileUploadDialog } from './file-upload-dialog'
 import { Archive } from '@/lib/types'
 import { calculateArchiveStats } from '@/lib/upload-archive/calculateArchiveStats'
@@ -102,6 +101,9 @@ export default function UploadArchiveSection() {
     setIsUploadProcessing(true)
 
     try {
+      const { handleFileUpload } = await import(
+        '@/lib/upload-archive/handleFileUpload'
+      )
       const uploadedArchive = await handleFileUpload(
         event,
         setIsUploadProcessing,

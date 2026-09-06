@@ -80,12 +80,13 @@ function profileTweet(value: unknown): ClickHouseProfileTweet | null {
 
 export async function getClickHouseUserProfile(
   identifier: string,
+  { tweetLimit = 20 }: { tweetLimit?: number } = {},
 ): Promise<ClickHouseUserProfile | null> {
   try {
     const response = await fetchAnalyticsGatewayJson<ClickHouseUserResponse>(
       ['user', identifier],
       new URLSearchParams({
-        limit: '20',
+        limit: String(Math.min(20, Math.max(1, Math.trunc(tweetLimit) || 1))),
         include_interactions: 'false',
       }),
       { revalidate: 300, timeoutMs: 8_000 },

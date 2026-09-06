@@ -5,7 +5,6 @@ import { unstable_cache } from 'next/cache'
 import { Database } from '@/database-types'
 import { devLog } from '@/lib/devLog'
 import { isTwitterUsername } from '@/lib/apiInputValidation'
-import { resolveProfileLinks } from '@/lib/profileLinks'
 import type {
   ArchiveMediaItem,
   ArchivePerson,
@@ -77,13 +76,11 @@ async function fetchProfileHeader(
   if (!account) return null
   const bio = profile?.bio ?? null
   const website = profile?.website ?? null
-  const profileLinks = await resolveProfileLinks([bio, website])
   return {
     ...account,
     account_display_name: account.account_display_name ?? account.username,
     bio,
     website,
-    profile_links: profileLinks,
     location: profile?.location ?? null,
     avatar_media_url: profile?.avatar_media_url ?? null,
     header_media_url: profile?.header_media_url ?? null,
@@ -230,7 +227,7 @@ async function fetchMediaCount(scope: SidebarScope): Promise<number> {
 
 export const getCachedProfileHeader = unstable_cache(
   fetchProfileHeader,
-  ['meta-twitter-profile-header-v3'],
+  ['meta-twitter-profile-header-v4'],
   { revalidate: 3600 },
 )
 

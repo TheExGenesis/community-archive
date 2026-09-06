@@ -8,6 +8,7 @@ jest.mock('./analytics', () => ({
   fetchPortalLiveAnalytics: jest.fn(),
   fetchPortalRecentBangers: jest.fn(),
   fetchPortalTrends: jest.fn(),
+  fetchPortalWeeklyTrends: jest.fn(),
 }))
 jest.mock('./research', () => ({
   getResearchPosts: jest.fn(),
@@ -19,6 +20,7 @@ import {
   getInitialPortalBangersPage,
   getPortalBangersPage,
   getPortalData,
+  startHomepageData,
   getPortalStreamPage,
   getPortalStreamUpdates,
   enrichPortalTweets,
@@ -35,6 +37,7 @@ import {
   fetchPortalLiveAnalytics,
   fetchPortalRecentBangers,
   fetchPortalTrends,
+  fetchPortalWeeklyTrends,
 } from './analytics'
 import { getResearchPosts } from './research'
 import type { PortalTweet } from './types'
@@ -223,6 +226,24 @@ describe('portal page resilience', () => {
     restore('PORTAL_READ_SUPABASE_ANON_KEY', previousEnv.portalKey)
     restore('CLICKHOUSE_ANALYTICS_API_URL', previousEnv.analyticsUrl)
     restore('CLICKHOUSE_ANALYTICS_API_TOKEN', previousEnv.analyticsToken)
+  })
+
+  test('lets stats and stream settle while trends, research and Bangers remain pending', async () => {
+    const pending = new Promise<never>(() => undefined)
+    ;(fetchPortalWeeklyTrends as jest.Mock).mockReturnValue(pending)
+    fetchPortalRecentBangersMock.mockReturnValue(pending)
+    fetchPortalHistoricalBangersMock.mockReturnValue(pending)
+    getResearchPostsMock.mockReturnValue(pending)
+    const sections = startHomepageData()
+    await expect(sections.globalStats).resolves.toMatchObject({
+      data: { memberCount: 42 },
+      failed: false,
+    })
+    await expect(sections.stream).resolves.toEqual({ data: [], failed: true })
+    await expect(sections.overview).resolves.toMatchObject({
+      stats: { accountCount: 42 },
+    })
+    expect(fetchPortalTrendsMock).not.toHaveBeenCalled()
   })
 
   test('keeps the page available when the initial stream request fails', async () => {

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { AvatarType } from '@/lib/types'
 import { formatNumber } from '@/lib/formatNumber'
-import Link from 'next/link'
+import Link from '@/components/IntentLink'
 import { userProfileHref } from '@/lib/navigation'
 
 type AvatarListProps = {

@@ -14,6 +14,7 @@ import MobileMenu from '@/components/MobileMenu'
 import Footer from '@/components/Footer'
 import HashScrollHandler from '@/components/HashScrollHandler'
 import PostHogPageView from '@/components/PostHogPageView'
+import PagePerformance from '@/components/PagePerformance'
 import PostHogLink from '@/components/PostHogLink'
 import {
   AdminNavigationLink,
@@ -66,6 +67,7 @@ export default function RootLayout({
         <NextTopLoader showSpinner={false} height={3} color="#2acf80" />
         <PostHogProvider>
           <PostHogPageView />
+          <PagePerformance />
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"

@@ -542,3 +542,18 @@ describe('ClickHouse-backed portal analytics', () => {
     )
   })
 })
+
+test('homepage weekly snapshot makes no historical corpus requests', async () => {
+  const fetcher = jest.fn(async () => ({ data: [] }))
+  const result = await fetchPortalTrends(
+    new Date('2026-09-06T00:00:00Z'),
+    fetcher as unknown as AnalyticsFetcher,
+    false,
+  )
+  expect(result.series).toEqual([])
+  expect(result.weekly).toHaveLength(12)
+  expect(fetcher).toHaveBeenCalledTimes(12)
+  for (const call of (fetcher as jest.Mock).mock.calls) {
+    expect(call[1].get('bucket')).toBe('day')
+  }
+})

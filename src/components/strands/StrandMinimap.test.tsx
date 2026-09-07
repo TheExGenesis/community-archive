@@ -1,19 +1,28 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import StrandMinimap from './StrandMinimap'
 import { StrandFocusProvider, StrandCardFocus } from './StrandFocus'
-jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }))
-test('card hover and keyboard focus highlight its dot and preview original text; manual labels retain their ring', () => {
-  const strands = [
-    {
-      id: '1',
-      title: 'Generated title',
-      username: 'alice',
-      text: 'The original seed tweet &amp; its text',
-      mapLabel: 'Handwritten label',
-      position: { x: 0, y: 0, cluster: 0, color: 'red' },
-    },
-  ]
-  const { container } = render(
+const mockPush = jest.fn()
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }))
+const strands = [
+  {
+    id: '1',
+    title: 'Generated title',
+    username: 'alice',
+    text: 'The original seed tweet &amp; its text',
+    mapLabel: 'Handwritten label',
+    position: { x: 0, y: 0, cluster: 0, color: 'red' },
+  },
+  {
+    id: '2',
+    title: 'Another strand',
+    username: 'bob',
+    text: 'Another seed',
+    mapLabel: 'Other label',
+    position: { x: 10, y: 10, cluster: 1, color: 'blue' },
+  },
+]
+function setup() {
+  return render(
     <StrandFocusProvider>
       <StrandCardFocus id="1">
         <a href="/strands/1">Strand card</a>
@@ -21,18 +30,62 @@ test('card hover and keyboard focus highlight its dot and preview original text;
       <StrandMinimap strands={strands} />
     </StrandFocusProvider>,
   )
+}
+beforeEach(() => mockPush.mockClear())
+test('card hover grays out other nodes and labels, retaining the original ring and decoded seed text', () => {
+  const { container } = setup()
   const circle = container.querySelector('[data-strand-id="1"]')!
+  const other = container.querySelector('[data-strand-id="2"]')!
+  const label = container.querySelector('[data-label-strand-id="2"]')!
   expect(circle).toHaveAttribute('stroke-width', '2')
   fireEvent.mouseEnter(screen.getByRole('article'))
   expect(circle).toHaveAttribute('data-highlighted', 'true')
-  expect(screen.getByText('The original seed tweet & its text')).toBeInTheDocument()
+  expect(circle).toHaveAttribute('fill', 'red')
+  expect(other).toHaveAttribute('fill', 'hsl(var(--muted-foreground))')
+  expect(label).toHaveAttribute('data-muted', 'true')
+  expect(
+    screen.getByText('The original seed tweet & its text'),
+  ).toBeInTheDocument()
   fireEvent.mouseLeave(screen.getByRole('article'))
   expect(circle).not.toHaveAttribute('data-highlighted')
+  expect(other).toHaveAttribute('fill', 'blue')
+  expect(label).not.toHaveAttribute('data-muted')
+})
+test('cluster buttons highlight in place; card focus overrides and then restores the chosen cluster', () => {
+  const { container } = setup()
+  const first = container.querySelector('[data-strand-id="1"]')!
+  const second = container.querySelector('[data-strand-id="2"]')!
+  const cluster = screen.getByRole('button', {
+    name: 'Cluster 2: Community and twitter tools',
+  })
+  fireEvent.click(cluster)
+  expect(cluster).toHaveAttribute('aria-pressed', 'true')
+  expect(mockPush).not.toHaveBeenCalled()
+  expect(screen.getByRole('link', { name: 'Strand card' })).toBeInTheDocument()
+  expect(container.querySelectorAll('[data-strand-id]')).toHaveLength(2)
+  expect(first).toHaveAttribute('data-muted', 'true')
+  expect(second).not.toHaveAttribute('data-muted')
+  fireEvent.focus(screen.getByRole('link', { name: 'Strand card' }))
+  expect(first).not.toHaveAttribute('data-muted')
+  expect(second).toHaveAttribute('data-muted', 'true')
+  fireEvent.blur(screen.getByRole('link', { name: 'Strand card' }))
+  expect(first).toHaveAttribute('data-muted', 'true')
+  expect(second).not.toHaveAttribute('data-muted')
+  fireEvent.click(screen.getByRole('button', { name: 'All' }))
+  expect(first).not.toHaveAttribute('data-muted')
+  expect(second).not.toHaveAttribute('data-muted')
+})
+test('keyboard focus on a dot also isolates it', () => {
+  const { container } = setup()
   fireEvent.focus(
     screen.getByRole('link', { name: 'Explore Handwritten label' }),
   )
-  expect(circle).toHaveAttribute('data-highlighted', 'true')
-  expect(
-    screen.getByRole('link', { name: 'Cluster 1: Conversation & connection' }),
-  ).toHaveAttribute('href', '/strands?cluster=0')
+  expect(container.querySelector('[data-strand-id="1"]')).toHaveAttribute(
+    'data-highlighted',
+    'true',
+  )
+  expect(container.querySelector('[data-strand-id="2"]')).toHaveAttribute(
+    'data-muted',
+    'true',
+  )
 })

@@ -124,8 +124,9 @@ seed IDs and 2D display coordinates, imported from the original
 `bangers/public/strand_semantic_map.json`). Deterministic farthest-first k-means
 forms ten spatial clusters. Each cluster shares the hue of its centroid's angle
 around the collection centroid. Clustering happens before request filtering;
-only policy-eligible strands reach the minimap. Search, cluster selection and
-pagination preserve stable colors. The map supports zoom and source navigation.
+only policy-eligible strands reach the minimap. Search and pagination preserve
+stable colors. Cluster buttons highlight in place without navigation or filtering
+the cards; All clears the highlight. The map supports zoom and source navigation.
 
 List cards pair the seed tweet with the first summary paragraph. Detail pages
 place the seed above a chronological key-post map, with dated avatar labels,
@@ -148,9 +149,11 @@ for this presentation change.
 The minimap also retains all 22 nonempty handwritten labels from the original
 `strand_semantic_map.json`; those dots keep a dark ring, including when a label
 is hidden to avoid overlap. Zoom reveals more labels. Hover/focus previews the
-original seed text, and hovering or focusing a list card highlights its dot.
-The ten natural-language cluster names in `strand-cluster-names.ts` are editorial
-drafts derived from the existing cluster contents, without changing membership.
+original seed text, and hovering or focusing a list card highlights its dot while
+graying out every other dot and label. Leaving the card restores the cluster
+highlight.
+The ten natural-language cluster names in `strand-cluster-names.ts` use the
+owner-selected wording, without changing membership.
 
 `strand-display.json` stores those labels and the original monthly histogram
 counts from `bangers/public/strand_histograms.json` (January 2015–December 2025).

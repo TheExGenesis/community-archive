@@ -1,5 +1,4 @@
 'use client'
-import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Strand } from '@/lib/community-apps/types'
@@ -14,18 +13,23 @@ export type MapStrand = Pick<
 export default function StrandMinimap({
   strands,
   activeId,
-  cluster,
-  query = '',
+  initialCluster,
 }: {
   strands: MapStrand[]
   activeId?: string
-  cluster?: number
-  query?: string
+  initialCluster?: number
 }) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
   const focus = useStrandFocus()
-  const selectedId = hovered ?? focus?.id ?? activeId
+  const [highlightedCluster, setHighlightedCluster] = useState(initialCluster)
+  const interactionId = hovered ?? focus?.id
+  const selectedId = interactionId ?? activeId
+  const isMuted = (strand: MapStrand) =>
+    interactionId
+      ? strand.id !== interactionId
+      : highlightedCluster !== undefined &&
+        strand.position?.cluster !== highlightedCluster
   const router = useRouter()
   const points = strands.filter((s) => s.position)
   const xs = points.map((s) => s.position!.x),
@@ -46,8 +50,6 @@ export default function StrandMinimap({
   const groups = Array.from(
     new Set(points.map((s) => s.position!.cluster)),
   ).sort((a, b) => a - b)
-  const clusterHref = (value?: number) =>
-    `/strands?${new URLSearchParams({ ...(query ? { q: query } : {}), ...(value !== undefined ? { cluster: String(value) } : {}) })}`
   const nearest = (event: React.MouseEvent<SVGSVGElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect()
     const x = ((event.clientX - bounds.left) / bounds.width) * 600,
@@ -148,7 +150,8 @@ export default function StrandMinimap({
           {points.map((s) => {
             const p = s.position!,
               { x, y } = coords(s),
-              active = s.id === selectedId
+              active = s.id === selectedId,
+              muted = isMuted(s)
             return (
               <a
                 key={s.id}
@@ -161,17 +164,18 @@ export default function StrandMinimap({
                 <circle
                   data-strand-id={s.id}
                   data-highlighted={active || undefined}
+                  data-muted={muted || undefined}
                   cx={x}
                   cy={y}
                   r={active ? 10 : s.mapLabel ? 7 : 5}
-                  fill={p.color}
-                  opacity={
-                    cluster !== undefined && cluster !== p.cluster ? 0.18 : 1
-                  }
+                  fill={muted ? 'hsl(var(--muted-foreground))' : p.color}
+                  opacity={muted ? 0.25 : 1}
                   stroke={
-                    active || s.mapLabel
-                      ? 'currentColor'
-                      : 'hsl(var(--background))'
+                    muted
+                      ? 'hsl(var(--muted-foreground))'
+                      : active || s.mapLabel
+                        ? 'currentColor'
+                        : 'hsl(var(--background))'
                   }
                   strokeWidth={active ? 3 : s.mapLabel ? 2 : 0.7}
                 />
@@ -180,7 +184,12 @@ export default function StrandMinimap({
           })}
           <g pointerEvents="none" aria-hidden="true">
             {labels.map(({ s, short, box }) => (
-              <g key={s.id}>
+              <g
+                key={s.id}
+                data-label-strand-id={s.id}
+                data-muted={isMuted(s) || undefined}
+                opacity={isMuted(s) ? 0.35 : 1}
+              >
                 <rect
                   x={box.x}
                   y={box.y}
@@ -194,7 +203,9 @@ export default function StrandMinimap({
                   x={box.x + 4}
                   y={box.y + box.h * 0.73}
                   fontSize={18 / zoom}
-                  fill="currentColor"
+                  fill={
+                    isMuted(s) ? 'hsl(var(--muted-foreground))' : 'currentColor'
+                  }
                 >
                   {short}
                 </text>
@@ -225,21 +236,27 @@ export default function StrandMinimap({
           </p>
         )}
       </div>
-      <nav aria-label="Filter by cluster" className="mt-3 flex flex-wrap gap-2">
-        <Link
-          href={clusterHref()}
-          aria-current={cluster === undefined ? 'page' : undefined}
-          className="border border-border px-2 py-1 text-xs aria-[current=page]:border-foreground"
+      <div
+        role="group"
+        aria-label="Highlight a cluster"
+        className="mt-3 flex flex-wrap gap-2"
+      >
+        <button
+          type="button"
+          onClick={() => setHighlightedCluster(undefined)}
+          aria-pressed={highlightedCluster === undefined}
+          className="border border-border px-2 py-1 text-xs aria-pressed:border-foreground"
         >
           All
-        </Link>
+        </button>
         {groups.map((group) => (
-          <Link
+          <button
+            type="button"
             key={group}
-            href={clusterHref(group)}
+            onClick={() => setHighlightedCluster(group)}
             aria-label={`Cluster ${group + 1}: ${STRAND_CLUSTER_NAMES[group]}`}
-            aria-current={cluster === group ? 'page' : undefined}
-            className="flex items-center gap-1.5 border border-border px-2 py-1 text-xs aria-[current=page]:border-foreground"
+            aria-pressed={highlightedCluster === group}
+            className="flex items-center gap-1.5 border border-border px-2 py-1 text-xs aria-pressed:border-foreground"
           >
             <span
               className="h-2 w-2 shrink-0 rounded-full"
@@ -249,9 +266,9 @@ export default function StrandMinimap({
               }}
             />
             {STRAND_CLUSTER_NAMES[group]}
-          </Link>
+          </button>
         ))}
-      </nav>
+      </div>
     </aside>
   )
 }

@@ -40,7 +40,6 @@ export default async function StrandsPage({
     ? group
     : undefined
   const filtered = strands
-    .filter((s) => cluster === undefined || s.position?.cluster === cluster)
     .filter((strand) =>
       `${strand.title} ${strand.summary} ${strand.username}`
         .toLowerCase()
@@ -55,7 +54,7 @@ export default async function StrandsPage({
   const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const tweets = await getStrandTweets(visible.map((s) => s.id))
   const href = (next: number) =>
-    `/strands?${new URLSearchParams({ ...(query ? { q: query } : {}), ...(cluster !== undefined ? { cluster: String(cluster) } : {}), page: String(next) })}`
+    `/strands?${new URLSearchParams({ ...(query ? { q: query } : {}), page: String(next) })}`
   return (
     <main className="mx-auto min-h-screen max-w-[1500px] px-5 py-10 sm:px-7">
       <Link href="/community" className="text-sm font-semibold text-brand">
@@ -76,9 +75,6 @@ export default async function StrandsPage({
         <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
           <div className="min-w-0">
             <form action="/strands" className="mb-6 flex max-w-xl gap-3">
-              {cluster !== undefined && (
-                <input type="hidden" name="cluster" value={cluster} />
-              )}
               <label className="min-w-0 flex-1">
                 <span className="sr-only">Search strands</span>
                 <input
@@ -220,8 +216,7 @@ export default async function StrandsPage({
                 mapLabel,
               }),
             )}
-            cluster={cluster}
-            query={query}
+            initialCluster={cluster}
           />
         </div>
       </StrandFocusProvider>

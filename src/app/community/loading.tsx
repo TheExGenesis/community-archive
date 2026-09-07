@@ -1,4 +1,4 @@
 import { PortalPageLoading } from '@/components/portal/PortalPageLoading'
 export default function Loading() {
-  return <PortalPageLoading label="Loading Gallery" />
+  return <PortalPageLoading label="Loading Apps" />
 }

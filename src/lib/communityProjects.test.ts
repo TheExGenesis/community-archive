@@ -5,7 +5,7 @@ import {
 
 describe('community project catalog', () => {
   it('contains only verified entries with source posts and no prototype filler', () => {
-    expect(COMMUNITY_PROJECTS).toHaveLength(11)
+    expect(COMMUNITY_PROJECTS).toHaveLength(13)
     expect(COMMUNITY_PROJECTS).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'Ratio Radar' }),
@@ -20,6 +20,8 @@ describe('community project catalog', () => {
         expect(project.image).toBe(
           '/images/community/conversation-map-cover.png',
         )
+      } else if (['birdseye', 'strands'].includes(project.slug)) {
+        expect(project.projectUrl).toBe('/' + project.slug)
       } else expect(project.sourceTweetId).toMatch(/^\d+$/)
       expect(project.projectUrl ?? '').not.toContain('example.com')
       expect(project.image ?? '').not.toContain('pbs.twimg.com')
@@ -50,7 +52,7 @@ describe('community project catalog', () => {
       'All',
       'Newest',
     )
-    expect(newest[0].name).toBe('Conversation Map')
+    expect(newest[0].name).toBe('Birdseye')
 
     const alphabetical = filterCommunityProjects(
       COMMUNITY_PROJECTS,
@@ -107,6 +109,7 @@ describe('community project catalog', () => {
     )
 
     expect(tools.map((project) => project.name)).toEqual([
+      'Birdseye',
       'Bangers.page',
       'Tweet Harvest',
       'Semantic Search',

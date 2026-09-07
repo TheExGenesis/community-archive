@@ -90,7 +90,7 @@ test('renders the balanced homepage composition and editorial labels', async () 
     screen.getByRole('link', { name: /All-time bangers/i }),
   ).toHaveAttribute('href', '/bangers?period=all')
   expect(
-    screen.getByRole('link', { name: /Bulk export paused/i }),
+    screen.getByRole('link', { name: /Download the bulk export/i }),
   ).toHaveAttribute('href', '/docs#bulk-dump')
   expect(
     screen.getByRole('link', { name: /Community Builds/i }),

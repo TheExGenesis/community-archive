@@ -725,8 +725,8 @@ export function HomePortalLayout({
             <UtilityLink
               href={ARCHIVE_EXPORT_URL}
               destination="data_export"
-              title="Bulk export paused"
-              note="Why the historical Parquet file is private"
+              title="Download the bulk export"
+              note="Tweets, profiles, and snapshot details"
               action="Details"
               icon={<FaDatabase className="h-[17px] w-[17px]" />}
             />

@@ -117,11 +117,11 @@ export default function DocsPage() {
             <article className="rounded-lg border border-border bg-card p-6">
               <Database className="h-6 w-6 text-brand" aria-hidden="true" />
               <h3 className="mt-4 text-lg font-semibold text-foreground">
-                Bulk export paused
+                Bulk Parquet export
               </h3>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                The historical Parquet pipeline is private while it is rebuilt
-                to enforce current consent for every nested author.
+                Download tweets, profiles, and a manifest for bulk analysis.
+                Check the manifest for the snapshot date.
               </p>
             </article>
 
@@ -161,13 +161,30 @@ export default function DocsPage() {
         <section className="space-y-6" id="bulk-dump">
           <div className="max-w-3xl">
             <h2 className="text-3xl font-bold text-foreground">
-              Bulk export paused
+              Bulk Parquet export
             </h2>
             <p className="mt-2 leading-7 text-muted-foreground">
-              The former <code>enriched_tweets.parquet</code> artifact was not
-              able to apply current consent to every nested author immediately
-              before publication. It is no longer public. Use filtered API
-              requests until a policy-aware replacement is available.
+              Download the current consent-filtered package for bulk analysis:
+              <code> tweets.parquet</code>, <code>profiles.parquet</code>, and
+              <code> manifest.json</code>. Follow the latest pointer each time;
+              older package links can expire. Publication is scheduled nightly,
+              but a failed run does not create a fresh snapshot. Check the
+              manifest’s creation time, source watermarks, row counts, and
+              checksums.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-4">
+              <ResourceLink href="https://github.com/TheExGenesis/community-archive/releases/latest">
+                Download links and snapshot details
+              </ResourceLink>
+              <ResourceLink href="https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/community-archive-public-export/latest.json">
+                Latest package pointer (JSON)
+              </ResourceLink>
+            </div>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">
+              Follow <code>manifest_url</code> in the pointer, then download the
+              files from <code>publication.urls</code>. Join tweets to profiles
+              on <code>account_id</code>; preserve all IDs as strings. Use this
+              package instead of paginating the API to reconstruct the corpus.
             </p>
           </div>
         </section>

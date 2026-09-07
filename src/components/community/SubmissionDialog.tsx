@@ -73,7 +73,7 @@ export default function SubmissionDialog({
       <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
         {complete ? (
           <div className="py-4 text-center" aria-live="polite">
-            <div className="bg-brand/15 mx-auto flex h-12 w-12 items-center justify-center rounded-full text-brand">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand/15 text-brand">
               <CheckCircle2 className="h-6 w-6" />
             </div>
             <DialogHeader className="mt-5 text-center">
@@ -81,7 +81,7 @@ export default function SubmissionDialog({
                 Your project is in the approval queue
               </DialogTitle>
               <DialogDescription className="mx-auto max-w-md leading-6">
-                An admin will review it before it appears in the Gallery.
+                An admin will review it before it appears in Apps.
               </DialogDescription>
             </DialogHeader>
             <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
@@ -90,7 +90,7 @@ export default function SubmissionDialog({
                 onClick={() => handleOpenChange(false)}
                 className="bg-brand text-brand-foreground hover:bg-brand/90"
               >
-                Back to gallery
+                Back to Apps
               </Button>
               <Button
                 type="button"
@@ -234,7 +234,7 @@ export default function SubmissionDialog({
               </div>
 
               <p className="rounded-lg border border-border bg-muted/60 p-3 text-xs leading-5 text-muted-foreground">
-                Submissions will be reviewed before appearing in the gallery.
+                Submissions will be reviewed before appearing in Apps.
               </p>
 
               {error ? (

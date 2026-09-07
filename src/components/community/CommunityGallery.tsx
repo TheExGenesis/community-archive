@@ -231,7 +231,7 @@ function ProjectComments({
           {comments.map((comment) => (
             <li
               key={comment.id}
-              className="bg-muted/45 rounded-xl border border-border px-[18px] py-3"
+              className="rounded-xl border border-border bg-muted/45 px-[18px] py-3"
             >
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-sm font-bold">
@@ -510,7 +510,7 @@ function ProjectDialog({
                   </span>
                 ))}
               </div>
-              <div className="bg-muted/45 rounded-xl border border-border px-[18px] py-4">
+              <div className="rounded-xl border border-border bg-muted/45 px-[18px] py-4">
                 <h3 className="text-[10.5px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">
                   How it uses the archive
                 </h3>
@@ -717,7 +717,8 @@ export default function CommunityGallery({
               <span className="text-brand-icon">visualizations,</span> and more
             </h1>
             <p className="mx-auto mt-3 max-w-[560px] text-[17px] leading-[1.55] text-muted-foreground">
-              Explore tools built on top of the community archive
+              Community apps, experiments, and research built with Community
+              Archive data.
             </p>
             <label className="relative mx-auto mt-7 block max-w-[520px]">
               <span className="sr-only">Search community projects</span>

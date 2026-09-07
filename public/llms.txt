@@ -17,15 +17,20 @@ Source repository: https://github.com/TheExGenesis/community-archive
 ## Choose the right data access method
 
 1. Filtered or application queries: use the Supabase REST API.
-2. Bulk analysis: the historical Parquet artifact is unavailable while its exporter is rebuilt to enforce current consent.
+2. Bulk analysis: download the current consent-filtered Parquet package using the latest pointer below.
 3. One user's original processed archive: authenticated owners may use the policy-aware web endpoint for their own archive.
 
 ## Bulk dump
 
-The historical `enriched_tweets.parquet` object and release verifier are
-disabled because that exporter did not apply current PostgreSQL consent to
-every nested author immediately before publication. Use filtered REST queries
-until a policy-aware replacement is available.
+Start at https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/community-archive-public-export/latest.json
+or https://github.com/TheExGenesis/community-archive/releases/latest.
+Follow manifest_url, then publication.urls for tweets.parquet and profiles.parquet.
+Join on account_id and preserve all IDs as strings. The manifest includes row
+counts, sizes, SHA-256 checksums, creation time, and source/consent watermarks.
+Publication is scheduled nightly, but failed runs do not advance the snapshot.
+Check the actual timestamp; do not assume the latest package is from today.
+Older package URLs expire after replacement or consent withdrawal. Re-resolve
+the pointer each time. Do not use the retired enriched_tweets.parquet artifact.
 
 ## API
 
@@ -66,7 +71,7 @@ Important API rules:
 - Use PostgREST filters such as `username=eq.name`, `created_at=gte.2025-01-01`, and `order=created_at.desc`.
 - Select only needed columns.
 - Responses are capped at 1,000 rows. Paginate with `limit` and `offset` or HTTP Range headers, using a stable order.
-- Full-corpus bulk access is paused until the Parquet exporter is policy-aware.
+- For corpus-wide analysis, use the bulk package rather than paginating the REST API.
 
 ## Individual raw archives
 

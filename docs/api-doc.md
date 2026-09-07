@@ -19,11 +19,17 @@ The current consent-safe package contains enriched `tweets.parquet`, separate
 [`latest.json` pointer](https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/community-archive-public-export/latest.json)
 or the repository's [latest GitHub Release](https://github.com/TheExGenesis/community-archive/releases/latest).
 
-Follow `manifest_url` instead of bookmarking a versioned object. Each nightly
+Follow `manifest_url` instead of bookmarking a versioned object. Each successful
 publication re-checks current PostgreSQL membership and opt-outs, publishes the
 new package atomically, and removes the superseded package. Historical releases
 remain as a publication log, but their versioned file links expire after the
 next successful dump.
+
+Publication is scheduled nightly, but failed runs leave the previous snapshot
+in place. Check `created_at` and source watermarks in the manifest before use;
+the release date alone is not a freshness guarantee. Follow `publication.urls`
+for the download URLs, and verify sizes and SHA-256 checksums against `files`.
+Join tweets to profiles on `account_id`; keep all IDs as strings.
 
 ## REST API
 

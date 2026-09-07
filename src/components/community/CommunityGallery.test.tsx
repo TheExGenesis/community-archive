@@ -50,7 +50,7 @@ describe('CommunityGallery', () => {
         name: 'Discover community-made tools, bots, visualizations, and more',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText('11 projects')).toBeInTheDocument()
+    expect(screen.getByText('13 projects')).toBeInTheDocument()
 
     await user.type(
       screen.getByRole('searchbox', { name: 'Search community projects' }),
@@ -158,7 +158,7 @@ describe('CommunityGallery', () => {
     ])
 
     await user.click(screen.getByRole('button', { name: 'Tools' }))
-    expect(screen.getByText('6 projects')).toBeInTheDocument()
+    expect(screen.getByText('7 projects')).toBeInTheDocument()
   })
 
   it('submits a project to the approval queue', async () => {

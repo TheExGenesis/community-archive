@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Suspense, type ReactNode } from 'react'
 import { cookies } from 'next/headers'
 import HomepageSearch from '@/components/HomepageSearch'
+import FeaturedCommunityApps from './FeaturedCommunityApps'
 import Testimonials from '@/components/home/Testimonials'
 import type { HomepageData } from '@/lib/portal/data'
 import HomepageUpload from './HomepageUpload'
@@ -136,6 +137,7 @@ export default async function ClassicHomepage({
         </div>
       </section>
 
+      <FeaturedCommunityApps />
       <Testimonials />
     </main>
   )

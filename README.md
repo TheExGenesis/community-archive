@@ -8,6 +8,13 @@ _from Xiq's [Towards data sovereignty, and a backup of the twitter canon](https:
 
 The goals of this project are (1) create a public domain dataset so that we can analyze & build apps on top of our own data, commercial or otherwise (2) develop an open workflow for archival that people can self host or create private archives for their communities if they wish.
 
+## Bulk data
+
+For bulk analysis, use the [current Parquet export](https://github.com/TheExGenesis/community-archive/releases/latest)
+with tweets, profiles, and a manifest. Check the manifest timestamp for freshness
+and resolve the latest pointer each time; older download links expire. See the
+[data access guide](docs/api-doc.md) for downloads and targeted API queries.
+
 ## How to use the API (from your own app)
 
 See [API docs](docs/api-doc.md) for how to access the archive's supabase DB.

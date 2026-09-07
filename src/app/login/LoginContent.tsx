@@ -1,13 +1,19 @@
 'use client'
 
 import SignIn from '@/components/SignIn'
+import { isProductionSupabaseUrl } from '@/lib/isProductionSupabaseUrl'
 
 interface LoginContentProps {
   redirectUrl?: string
 }
 
 export default function LoginContent({ redirectUrl }: LoginContentProps) {
-  const isDev = process.env.NODE_ENV === 'development'
+  const isDev =
+    process.env.NODE_ENV === 'development' &&
+    !(
+      process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true' &&
+      isProductionSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL)
+    )
 
   return (
     <main className="min-h-screen bg-card dark:bg-background">
@@ -27,7 +33,7 @@ export default function LoginContent({ redirectUrl }: LoginContentProps) {
           </div>
 
           <div className="space-y-6">
-            <SignIn />
+            <SignIn alwaysVisible />
 
             {isDev && (
               <div className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">

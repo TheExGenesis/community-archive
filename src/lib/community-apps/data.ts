@@ -96,19 +96,6 @@ export function hasBlockedParticipant(
 ) {
   return participants.some((username) => blocked.has(username.toLowerCase()))
 }
-export async function getBirdseyeCatalog() {
-  const manifest = await getAppDataManifest()
-  const policy = await getAppPolicy(
-    manifest.birdseye.map((entry) => entry.username),
-  )
-  return {
-    manifest,
-    policy,
-    accounts: manifest.birdseye.filter((entry) =>
-      policy.members.has(entry.username),
-    ),
-  }
-}
 export async function getBirdseyeAnalysis(
   username: string,
   manifest: AppDataManifest,

@@ -25,6 +25,37 @@ These are saved AI analyses, not a live view of a person's opinions. Their
 participant lists come from the original analysis metadata and supporting tweet
 index; they are not a newly reconstructed conversation corpus.
 
+## Birdseye privacy and presentation
+
+Birdseye is owner-only by default; the public account catalog has been removed.
+The page and `/api/birdseye/sources` verify the current Supabase Auth user,
+trusted Twitter identity, account ID against `user_directory`, and current
+membership/opt-out policy before loading analysis content. Source requests
+select only IDs from the authorized topic, six at a time, and use the same
+full-fidelity tweet loader and opt-out filtering as Strands.
+
+Owners can explicitly enable one share link for all their topics, replace it,
+or revoke it. The server stores only a SHA-256 token hash and bound Twitter
+identity in the owner's admin-controlled `app_metadata.birdseye_share`.
+No database migration or public Storage policy is needed. Share requests read
+fresh Auth metadata, so rotation and revocation invalidate previously issued
+cookies on the next request. Revocation cannot recall already downloaded copies.
+
+`/api/birdseye/share/<auth-user-id>.<256-bit-secret>` validates the link and
+redirects immediately to the clean Birdseye URL with an HttpOnly, SameSite=Lax
+cookie (one day; HTTPS cookies are Secure). The link remains usable until
+revoked or replaced. It is a bearer credential: do not log it or paste it into
+analytics. The redirect renders no page scripts; private responses use
+`no-store`, `no-referrer`, and `noindex`. The analysis/share UI is blocked from
+PostHog autocapture and session replay via `ph-no-capture`.
+
+Each topic row has a sparkline with a shared year range and individually scaled
+counts of cited posts. The topic page shows compact insight cards, icon source
+links, and lazy source tweet cards, with a Load more/retry fallback. The profile
+handle is the primary heading. Local development against production Supabase
+uses real Twitter OAuth; mock login remains disabled for that project. Its OAuth
+redirect allowlist still needs to permit the local callback for local sign-in.
+
 ## Display package
 
 - `birdseye/<username>.json`: existing topic names, summaries, ontology items,
@@ -80,8 +111,10 @@ python -m unittest discover -s scripts/community-apps -p 'test_*.py'
 pnpm exec jest --selectProjects server --runInBand --runTestsByPath src/lib/community-apps/data.test.ts
 ```
 
-Verify an account/topic change and source link in Birdseye, and search plus a
-Strands detail page in a local browser. Verify anonymous direct Storage access
+Verify owner access, denied anonymous access, topic navigation, and lazy sources
+in Birdseye. Test share/replace/revoke with a mock account in local or staging
+Supabase, never by changing a production account for verification. Check search
+and a Strands detail page in a local browser. Verify anonymous direct Storage access
 is denied after a private import. Do not regenerate analyses during verification.
 
 ### Strands presentation

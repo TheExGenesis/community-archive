@@ -1,6 +1,7 @@
 'use client'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { devLog } from '@/lib/devLog'
+import { isProductionSupabaseUrl } from '@/lib/isProductionSupabaseUrl'
 import { createBrowserClient } from '@/utils/supabase'
 import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
@@ -16,7 +17,11 @@ const STAGING_USERS = [
   { username: 'xiq_dev', providerId: 'mock_xiq', displayName: 'XIQ Dev' },
 ] as const
 
-export default function SignIn() {
+export default function SignIn({
+  alwaysVisible = false,
+}: {
+  alwaysVisible?: boolean
+}) {
   const searchParams = useSearchParams()
   const requestedRedirect = searchParams.get('redirect')
   const redirectTo =
@@ -24,10 +29,17 @@ export default function SignIn() {
       ? requestedRedirect
       : null
   const { userMetadata } = useAuthAndArchive()
+  const activeSupabaseUrl =
+    process.env.NODE_ENV === 'development' &&
+    process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB !== 'true'
+      ? process.env.NEXT_PUBLIC_LOCAL_SUPABASE_URL
+      : process.env.NEXT_PUBLIC_SUPABASE_URL
   const isDevLoginEnabled =
-    process.env.NODE_ENV === 'development' ||
-    process.env.NEXT_PUBLIC_ENABLE_STAGING_DEV_LOGIN === 'true'
+    (process.env.NODE_ENV === 'development' ||
+      process.env.NEXT_PUBLIC_ENABLE_STAGING_DEV_LOGIN === 'true') &&
+    !isProductionSupabaseUrl(activeSupabaseUrl)
   const isStagingLogin =
+    isDevLoginEnabled &&
     process.env.NODE_ENV !== 'development' &&
     process.env.NEXT_PUBLIC_ENABLE_STAGING_DEV_LOGIN === 'true'
 
@@ -115,7 +127,7 @@ export default function SignIn() {
 
   return userMetadata ? null : (
     <div
-      className={`${isStagingLogin ? 'hidden lg:inline-flex' : 'hidden sm:inline-flex'} items-center gap-2`}
+      className={`${alwaysVisible ? 'inline-flex' : isStagingLogin ? 'hidden lg:inline-flex' : 'hidden sm:inline-flex'} items-center gap-2`}
     >
       {isStagingLogin && (
         <select

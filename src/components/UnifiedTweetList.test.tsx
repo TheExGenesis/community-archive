@@ -162,3 +162,17 @@ test('renders a nested search result through the normalized tweet boundary', () 
     screen.getAllByRole('link', { name: "View @archive_user's profile" })[0],
   ).toHaveAttribute('href', '/user/archive_user')
 })
+
+test.each([true, false])(
+  'preserves search highlighting after normalization (compact=%s)',
+  (compact) => {
+    const { container } = render(
+      <UnifiedTweetList
+        tweets={[tweet]}
+        highlightQuery="compact"
+        compact={compact}
+      />,
+    )
+    expect(container.querySelector('mark')).toHaveTextContent('compact')
+  },
+)

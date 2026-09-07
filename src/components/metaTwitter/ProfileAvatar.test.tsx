@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ProfileAvatar } from './ProfileAvatar'
 
 jest.mock('next/image', () => ({
@@ -48,4 +48,50 @@ test('recovers a missing avatar after rendering the initial fallback', async () 
     ),
   )
   expect(global.fetch).toHaveBeenCalledWith('/api/profile/42/avatar')
+})
+
+test('requests a fresh source after a stored avatar fails instead of retrying the same cached URL', async () => {
+  const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+    ok: true,
+    json: async () => ({ avatar_media_url: 'https://pbs.twimg.com/new.jpg' }),
+  } as Response)
+  render(
+    <ProfileAvatar
+      accountId="42"
+      avatarUrl="https://pbs.twimg.com/old.jpg"
+      displayName="Alice"
+    />,
+  )
+  fireEvent.error(screen.getByAltText("Alice's avatar"))
+  await waitFor(() =>
+    expect(screen.getByAltText("Alice's avatar")).toHaveAttribute(
+      'src',
+      'https://pbs.twimg.com/new.jpg',
+    ),
+  )
+  expect(fetchMock).toHaveBeenCalledWith('/api/profile/42/avatar?refresh=1')
+  fireEvent.error(screen.getByAltText("Alice's avatar"))
+  expect(screen.getByText('A')).toBeVisible()
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+})
+
+test('resets avatar state when navigating between profiles', () => {
+  const { rerender } = render(
+    <ProfileAvatar
+      accountId="42"
+      avatarUrl="https://pbs.twimg.com/alice.jpg"
+      displayName="Alice"
+    />,
+  )
+  rerender(
+    <ProfileAvatar
+      accountId="43"
+      avatarUrl="https://pbs.twimg.com/bob.jpg"
+      displayName="Bob"
+    />,
+  )
+  expect(screen.getByAltText("Bob's avatar")).toHaveAttribute(
+    'src',
+    'https://pbs.twimg.com/bob.jpg',
+  )
 })

@@ -399,7 +399,7 @@ export default function SocialGraphExplorer({
   const workerRef = useRef<Worker | null>(null)
   const workerRequestRef = useRef(0)
   const workerSignatureRef = useRef('')
-  const completedPresetRecalculationRef = useRef(0)
+  const hasStartedAdaptiveGraph = useRef(false)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hoverCandidateRef = useRef<string | null>(null)
   const layoutReferenceRef = useRef(
@@ -848,6 +848,10 @@ export default function SocialGraphExplorer({
   }, [labelPercentage])
 
   useEffect(() => {
+    setAdaptiveError(null)
+    setIsAdapting(!isPending && filtered.nodes.length >= 2)
+    if (isPending || filtered.nodes.length < 2) return
+
     const worker = new Worker(
       new URL('../../workers/socialGraph.worker.ts', import.meta.url),
     )
@@ -855,7 +859,12 @@ export default function SocialGraphExplorer({
     worker.addEventListener(
       'message',
       (event: MessageEvent<SocialGraphWorkerResponse>) => {
-        if (event.data.id !== workerRequestRef.current) return
+        if (
+          workerRef.current !== worker ||
+          event.data.id !== workerRequestRef.current ||
+          workerSignatureRef.current !== adaptiveInputRef.current.signature
+        )
+          return
         setIsAdapting(false)
         if (event.data.error || !event.data.result) {
           setAdaptiveError(event.data.error || 'Adaptive graph failed')
@@ -875,29 +884,21 @@ export default function SocialGraphExplorer({
       },
     )
     worker.addEventListener('error', () => {
+      if (workerRef.current !== worker) return
       setIsAdapting(false)
       setAdaptiveError('Adaptive graph worker failed')
     })
-    requestAdaptiveGraph(worker)
+    // Cancel obsolete CPU work immediately, then wait for slider changes to settle.
+    const delay = hasStartedAdaptiveGraph.current ? 350 : 0
+    hasStartedAdaptiveGraph.current = true
+    const timer = window.setTimeout(() => requestAdaptiveGraph(worker), delay)
     return () => {
+      window.clearTimeout(timer)
       worker.terminate()
       if (workerRef.current === worker) workerRef.current = null
     }
-  }, [requestAdaptiveGraph])
-
-  useEffect(() => {
-    if (
-      presetRecalculationRequest === 0 ||
-      completedPresetRecalculationRef.current === presetRecalculationRequest ||
-      isPending ||
-      !workerRef.current ||
-      filtered.nodes.length < 2
-    ) {
-      return
-    }
-    completedPresetRecalculationRef.current = presetRecalculationRequest
-    requestAdaptiveGraph()
   }, [
+    adaptiveRunSignature,
     filtered.nodes.length,
     isPending,
     presetRecalculationRequest,
@@ -1175,7 +1176,7 @@ export default function SocialGraphExplorer({
                   ? `Find @${currentMemberNode.username}`
                   : 'Your signed-in X account is not in this snapshot'
               }
-              className="disabled:opacity-45 flex h-9 items-center justify-center gap-1.5 rounded-[3px] border border-zinc-200 px-2 text-[12px] font-medium hover:bg-zinc-50 disabled:cursor-not-allowed dark:border-[#35353a] dark:hover:bg-[#242428]"
+              className="flex h-9 items-center justify-center gap-1.5 rounded-[3px] border border-zinc-200 px-2 text-[12px] font-medium hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-[#35353a] dark:hover:bg-[#242428]"
             >
               <LocateFixed className="h-3.5 w-3.5 text-brand" />
               Find yourself
@@ -1184,7 +1185,7 @@ export default function SocialGraphExplorer({
               type="button"
               onClick={exploreLargestGroup}
               disabled={!displayCommunities.length}
-              className="disabled:opacity-45 flex h-9 items-center justify-center gap-1.5 rounded-[3px] border border-zinc-200 px-2 text-[12px] font-medium hover:bg-zinc-50 dark:border-[#35353a] dark:hover:bg-[#242428]"
+              className="flex h-9 items-center justify-center gap-1.5 rounded-[3px] border border-zinc-200 px-2 text-[12px] font-medium hover:bg-zinc-50 disabled:opacity-45 dark:border-[#35353a] dark:hover:bg-[#242428]"
             >
               <Network className="h-3.5 w-3.5 text-brand" />
               Explore groups
@@ -1344,8 +1345,8 @@ export default function SocialGraphExplorer({
               <div>
                 <h2 className="text-[12px] font-semibold">Groups and layout</h2>
                 <p className={`mt-1 text-[12px] leading-relaxed ${MUTED}`}>
-                  Recalculate the algorithmic groups using only the people and
-                  ties in this view.
+                  Groups update automatically using only the people and ties in
+                  this view.
                 </p>
               </div>
               <button
@@ -1367,7 +1368,7 @@ export default function SocialGraphExplorer({
                 <p className={`text-[12px] leading-relaxed ${MUTED}`}>
                   {adaptiveIsCurrent
                     ? `${adaptiveResult.communityCount} groups in the current view.`
-                    : 'Filters changed; recalculate to update the groups.'}
+                    : 'Groups update automatically when filters settle.'}
                 </p>
               ) : null}
               {adaptiveError ? (

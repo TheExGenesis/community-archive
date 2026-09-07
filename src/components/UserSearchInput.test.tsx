@@ -98,7 +98,7 @@ describe('UserSearchInput', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   })
 
-  it('inserts a from: filter when the filter row is selected', async () => {
+  it('searches the selected author when the filter row is selected', async () => {
     setDefaultSuggestions()
     const input = renderSearch()
     await userEvent.type(input, 'exg')
@@ -110,7 +110,7 @@ describe('UserSearchInput', () => {
     await userEvent.click(filterOption)
 
     expect(input).toHaveValue('from:exgenesis')
-    expect(mockPush).not.toHaveBeenCalled()
+    expect(mockPush).toHaveBeenCalledWith('/search?fromUser=exgenesis')
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   })
 
@@ -131,6 +131,7 @@ describe('UserSearchInput', () => {
     await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}')
 
     expect(input).toHaveValue('from:exgenesis')
+    expect(mockPush).toHaveBeenLastCalledWith('/search?fromUser=exgenesis')
   })
 
   it('debounces typing before starting the member lookup', async () => {

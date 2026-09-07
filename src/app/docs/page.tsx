@@ -172,6 +172,25 @@ export default function DocsPage() {
           </div>
         </section>
 
+        <section className="space-y-6" id="examples">
+          <h2 className="text-3xl font-bold text-foreground">
+            What can I build or discover?
+          </h2>
+          <ul className="grid gap-3 text-muted-foreground sm:grid-cols-2">
+            <li>Find a remembered quote, reply, link, or old discussion.</li>
+            <li>
+              Revisit your own themes, collaborators, and changing interests.
+            </li>
+            <li>Follow emerging ideas with Trends, Bangers, and the Digest.</li>
+            <li>Trace people, projects, events, and intellectual lineages.</li>
+            <li>Build a personal canon, visualization, or research dataset.</li>
+            <li>Analyze public interaction networks and communities.</li>
+          </ul>
+          <ResourceLink href="https://github.com/TheExGenesis/community-archive/blob/main/docs/use-cases.md">
+            More examples and starting points
+          </ResourceLink>
+        </section>
+
         <section className="space-y-8" id="api">
           <div className="max-w-3xl">
             <h2 className="text-3xl font-bold text-foreground">

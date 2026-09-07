@@ -78,6 +78,8 @@ export interface PortalStats {
 }
 
 export interface TermWeek {
+  sinceDate?: string
+  untilDate?: string
   term: string
   last7: number
   prev7: number

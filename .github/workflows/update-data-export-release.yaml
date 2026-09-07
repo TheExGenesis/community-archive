@@ -2,7 +2,7 @@ name: Publish consent-safe bulk export release
 
 on:
   schedule:
-    - cron: "30 8 * * *"
+    - cron: '30 8 * * *'
   workflow_dispatch:
 
 permissions:
@@ -20,6 +20,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+
+      - name: Verify freshness validation
+        run: node --test scripts/validate-public-export-freshness.test.mjs
 
       - name: Build verified release notes
         id: export

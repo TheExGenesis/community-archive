@@ -900,9 +900,17 @@ export function HomeTrendsPanel({
         {!failed &&
           weeklyBars.map((b) => (
             <div key={b.term} className="flex items-center gap-2 py-[6px]">
-              <span className="w-[82px] truncate text-[12px] font-semibold">
+              <Link
+                href={`/search?${new URLSearchParams({
+                  q: b.term,
+                  ...(b.sinceDate ? { sinceDate: b.sinceDate } : {}),
+                  ...(b.untilDate ? { untilDate: b.untilDate } : {}),
+                }).toString()}`}
+                title={`Search tweets mentioning ${b.term}`}
+                className="w-[82px] truncate text-[12px] font-semibold text-brand underline-offset-2 hover:underline"
+              >
                 {b.term}
-              </span>
+              </Link>
               <span className="w-[46px] text-right text-[11px] tabular-nums text-muted-foreground">
                 {b.last7.toLocaleString('en-US')}
               </span>

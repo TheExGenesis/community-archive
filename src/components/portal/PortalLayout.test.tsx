@@ -88,7 +88,7 @@ test('renders the balanced homepage composition and editorial labels', async () 
   )
   expect(
     screen.getByRole('link', { name: /All-time bangers/i }),
-  ).toHaveAttribute('href', '/bangers?period=week')
+  ).toHaveAttribute('href', '/bangers?period=all')
   expect(
     screen.getByRole('link', { name: /Daily data export/i }),
   ).toHaveAttribute(

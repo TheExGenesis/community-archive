@@ -38,7 +38,7 @@ export default function UserSearchInput({
   onBlur,
   onClick,
   onFocus,
-  onKeyDown,
+  onKeyDownCapture,
   onKeyUp,
   type = 'search',
   ...inputProps
@@ -228,9 +228,30 @@ export default function UserSearchInput({
             )
           }
         }}
-        onKeyDown={(event) => {
-          onKeyDown?.(event)
-          if (event.defaultPrevented || !isOpen) return
+        // Handle combobox keys before native bubble listeners can cancel Enter
+        // (observed in Brave), preventing React from silently skipping submit.
+        onKeyDownCapture={(event) => {
+          onKeyDownCapture?.(event)
+          if (event.defaultPrevented) return
+          // Committing an IME composition must not submit or choose a suggestion.
+          if (
+            event.nativeEvent.isComposing ||
+            event.nativeEvent.keyCode === 229
+          )
+            return
+
+          if (event.key === 'Enter' && (!isOpen || activeIndex < 0)) {
+            const form = event.currentTarget.form
+            if (form) {
+              // Submit explicitly: implicit submission from a search combobox
+              // is not reliable across browsers.
+              event.preventDefault()
+              closeSuggestions()
+              form.requestSubmit()
+            }
+            return
+          }
+          if (!isOpen) return
 
           if (event.key === 'ArrowDown') {
             event.preventDefault()

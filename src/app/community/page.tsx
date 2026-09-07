@@ -11,11 +11,11 @@ import {
 import { getCurrentUser } from '@/lib/portal/auth'
 
 export const metadata: Metadata = {
-  title: 'Community Gallery · Community Archive',
+  title: 'Community Apps · Community Archive',
   description:
     'Independent tools, experiments, research, and games built with Community Archive data.',
   openGraph: {
-    title: 'Community Gallery · Community Archive',
+    title: 'Community Apps · Community Archive',
     description:
       'Independent tools, experiments, research, and games built with Community Archive data.',
     images: [
@@ -23,13 +23,13 @@ export const metadata: Metadata = {
         url: '/images/community/og.png',
         width: 1200,
         height: 630,
-        alt: 'Community Gallery — independent projects built with the archive',
+        alt: 'Community Apps — independent projects built with the archive',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Community Gallery · Community Archive',
+    title: 'Community Apps · Community Archive',
     description:
       'Independent tools, experiments, research, and games built with Community Archive data.',
     images: ['/images/community/og.png'],

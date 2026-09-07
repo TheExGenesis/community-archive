@@ -33,7 +33,7 @@ describe('member navigation', () => {
       { href: '/bangers?period=all', label: 'Bangers' },
       { href: '/digest', label: 'Digest' },
       { href: '/user-dir', label: 'Users' },
-      { href: '/community', label: 'Gallery' },
+      { href: '/community', label: 'Apps' },
       { href: '/trends', label: 'Trends' },
       { href: '/stream', label: 'Live stream' },
       { href: '/social-graph', label: 'Graph' },
@@ -46,7 +46,7 @@ describe('member navigation', () => {
         { href: '/bangers?period=all', label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
         { href: '/search', label: 'Search' },
-        { href: '/community', label: 'Gallery' },
+        { href: '/community', label: 'Apps' },
         { href: '/social-graph', label: 'Graph' },
       ]),
     )
@@ -74,7 +74,7 @@ describe('member navigation', () => {
     })
     expect(getPrimaryNav(false)).toContainEqual({
       href: '/community',
-      label: 'Gallery',
+      label: 'Apps',
     })
     expect(getPrimaryNav(true)).toContainEqual({
       href: '/trends',

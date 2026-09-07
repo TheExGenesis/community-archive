@@ -6,6 +6,7 @@ import { unstable_cache } from 'next/cache'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import type { AppDataManifest, BirdseyeAnalysis, Strand } from './types'
 import positions from './strand-positions.json'
+import display from './strand-display.json'
 import { clusterPositions } from './strand-layout'
 
 const strandPositions = new Map(
@@ -135,6 +136,17 @@ async function loadStrands() {
       )
       .map((strand) => ({
         ...strand,
+        mapLabel: (display.labels as Record<string, string>)[strand.id],
+        activity: (display.strands as Record<string, { counts: number[] }>)[
+          strand.id
+        ]
+          ? {
+              months: display.months,
+              counts: (display.strands as Record<string, { counts: number[] }>)[
+                strand.id
+              ].counts,
+            }
+          : undefined,
         position: strandPositions.get(strand.id),
       })),
   }

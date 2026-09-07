@@ -4,6 +4,12 @@ import { getStrands } from '@/lib/community-apps/data'
 import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
 import StrandMinimap from '@/components/strands/StrandMinimap'
 import TweetCard from '@/components/TweetCard'
+import {
+  StrandFocusProvider,
+  StrandCardFocus,
+} from '@/components/strands/StrandFocus'
+import { StrandActivity } from '@/components/strands/StrandActivity'
+import { STRAND_CLUSTER_NAMES } from '@/lib/community-apps/strand-cluster-names'
 import { AnalysisText } from '@/components/community-apps/AnalysisText'
 
 export const dynamic = 'force-dynamic'
@@ -51,7 +57,7 @@ export default async function StrandsPage({
   const href = (next: number) =>
     `/strands?${new URLSearchParams({ ...(query ? { q: query } : {}), ...(cluster !== undefined ? { cluster: String(cluster) } : {}), page: String(next) })}`
   return (
-    <main className="mx-auto min-h-screen max-w-7xl px-5 py-10 sm:px-7">
+    <main className="mx-auto min-h-screen max-w-[1500px] px-5 py-10 sm:px-7">
       <Link href="/community" className="text-sm font-semibold text-brand">
         ← Community Apps
       </Link>
@@ -66,148 +72,159 @@ export default async function StrandsPage({
           Collection snapshot: {generatedAt.slice(0, 10)}.
         </p>
       </header>
-      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="min-w-0">
-          <form action="/strands" className="mb-6 flex max-w-xl gap-3">
-            {cluster !== undefined && (
-              <input type="hidden" name="cluster" value={cluster} />
-            )}
-            <label className="min-w-0 flex-1">
-              <span className="sr-only">Search strands</span>
-              <input
-                type="search"
-                name="q"
-                defaultValue={query}
-                maxLength={120}
-                placeholder="Search ideas, topics, or people"
-                className="h-11 w-full rounded-lg border border-border bg-background px-4"
-              />
-            </label>
-            <button className="rounded-lg bg-brand px-5 font-semibold text-brand-foreground">
-              Search
-            </button>
-          </form>
-          <p className="mb-5 text-sm text-muted-foreground">
-            {filtered.length} strands · ordered by the original analysis’s
-            rating
-          </p>
-          <section aria-label="Strands" className="space-y-7">
-            {visible.map((strand) => (
-              <article
-                key={strand.id}
-                className="overflow-hidden border-2 border-foreground/80 bg-card shadow-[3px_3px_0_0_hsl(var(--foreground)/0.15)]"
-              >
-                <div className="grid sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-                  <div className="min-w-0 border-b border-border p-4 sm:border-b-0 sm:border-r">
-                    <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                      The seed post
-                    </p>
-                    {tweets.get(strand.id) ? (
-                      <TweetCard
-                        tweet={tweets.get(strand.id)!}
-                        showDate
-                        noClamp
-                        clickable={false}
-                      />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        Seed post unavailable.{' '}
-                        <Link
-                          className="text-brand"
-                          href={`/tweets/${strand.id}`}
-                        >
-                          Open source ↗
-                        </Link>
+      <StrandFocusProvider>
+        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
+          <div className="min-w-0">
+            <form action="/strands" className="mb-6 flex max-w-xl gap-3">
+              {cluster !== undefined && (
+                <input type="hidden" name="cluster" value={cluster} />
+              )}
+              <label className="min-w-0 flex-1">
+                <span className="sr-only">Search strands</span>
+                <input
+                  type="search"
+                  name="q"
+                  defaultValue={query}
+                  maxLength={120}
+                  placeholder="Search ideas, topics, or people"
+                  className="h-11 w-full rounded-lg border border-border bg-background px-4"
+                />
+              </label>
+              <button className="rounded-lg bg-brand px-5 font-semibold text-brand-foreground">
+                Search
+              </button>
+            </form>
+            <p className="mb-5 text-sm text-muted-foreground">
+              {filtered.length} strands · ordered by the original analysis’s
+              rating
+            </p>
+            <section aria-label="Strands" className="space-y-7">
+              {visible.map((strand) => (
+                <StrandCardFocus
+                  id={strand.id}
+                  key={strand.id}
+                  className="overflow-hidden border-2 border-foreground/80 bg-card shadow-[3px_3px_0_0_hsl(var(--foreground)/0.15)]"
+                >
+                  <div className="grid sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+                    <div className="min-w-0 border-b border-border p-4 sm:border-b-0 sm:border-r">
+                      <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        The seed post
                       </p>
-                    )}
-                  </div>
-                  <div className="min-w-0 p-5">
-                    <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
-                      {strand.position && (
-                        <span className="flex items-center gap-1.5">
-                          <span
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ background: strand.position.color }}
-                          />
-                          Cluster {strand.position.cluster + 1}
-                        </span>
+                      {tweets.get(strand.id) ? (
+                        <TweetCard
+                          tweet={tweets.get(strand.id)!}
+                          showDate
+                          noClamp
+                          clickable={false}
+                        />
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          Seed post unavailable.{' '}
+                          <Link
+                            className="text-brand"
+                            href={`/tweets/${strand.id}`}
+                          >
+                            Open source ↗
+                          </Link>
+                        </p>
                       )}
-                      <span>· {strand.essentialTweets.length} key posts</span>
                     </div>
-                    <h2 className="text-xl font-bold leading-tight">
+                    <div className="min-w-0 p-5">
+                      <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+                        {strand.position && (
+                          <span className="flex items-center gap-1.5">
+                            <span
+                              className="h-2.5 w-2.5 rounded-full"
+                              style={{ background: strand.position.color }}
+                            />
+                            {STRAND_CLUSTER_NAMES[strand.position.cluster]}
+                          </span>
+                        )}
+                        <span>· {strand.essentialTweets.length} key posts</span>
+                      </div>
+                      <h2 className="text-xl font-bold leading-tight">
+                        <Link
+                          href={`/strands/${strand.id}`}
+                          className="hover:text-brand"
+                        >
+                          {strand.title}
+                        </Link>
+                      </h2>
+                      <div className="mt-3 text-sm leading-6">
+                        <AnalysisText>
+                          {strand.summary.split(/\n\n/)[0]}
+                        </AnalysisText>
+                      </div>
+                      <StrandActivity
+                        activity={strand.activity}
+                        color={strand.position?.color}
+                      />
                       <Link
                         href={`/strands/${strand.id}`}
-                        className="hover:text-brand"
+                        className="mt-4 inline-block text-sm font-semibold text-brand"
                       >
-                        {strand.title}
+                        Explore the strand →
                       </Link>
-                    </h2>
-                    <div className="mt-3 text-sm leading-6">
-                      <AnalysisText>
-                        {strand.summary.split(/\n\n/)[0]}
-                      </AnalysisText>
                     </div>
-                    <Link
-                      href={`/strands/${strand.id}`}
-                      className="mt-4 inline-block text-sm font-semibold text-brand"
-                    >
-                      Explore the strand →
-                    </Link>
                   </div>
-                </div>
-              </article>
-            ))}
-          </section>
-          {!filtered.length && (
-            <p className="py-12">
-              No strands match this search.{' '}
-              <Link className="text-brand" href="/strands">
-                Browse all strands
-              </Link>
-            </p>
-          )}
-          {pages > 1 && (
-            <nav
-              aria-label="Strands pagination"
-              className="mt-10 flex items-center justify-between border-t border-border pt-5"
-            >
-              {page > 1 ? (
-                <Link
-                  href={href(page - 1)}
-                  className="font-semibold text-brand"
-                >
-                  ← Previous
+                </StrandCardFocus>
+              ))}
+            </section>
+            {!filtered.length && (
+              <p className="py-12">
+                No strands match this search.{' '}
+                <Link className="text-brand" href="/strands">
+                  Browse all strands
                 </Link>
-              ) : (
-                <span />
-              )}
-              <span className="text-sm text-muted-foreground">
-                Page {page} of {pages}
-              </span>
-              {page < pages ? (
-                <Link
-                  href={href(page + 1)}
-                  className="font-semibold text-brand"
-                >
-                  Next →
-                </Link>
-              ) : (
-                <span />
-              )}
-            </nav>
-          )}
+              </p>
+            )}
+            {pages > 1 && (
+              <nav
+                aria-label="Strands pagination"
+                className="mt-10 flex items-center justify-between border-t border-border pt-5"
+              >
+                {page > 1 ? (
+                  <Link
+                    href={href(page - 1)}
+                    className="font-semibold text-brand"
+                  >
+                    ← Previous
+                  </Link>
+                ) : (
+                  <span />
+                )}
+                <span className="text-sm text-muted-foreground">
+                  Page {page} of {pages}
+                </span>
+                {page < pages ? (
+                  <Link
+                    href={href(page + 1)}
+                    className="font-semibold text-brand"
+                  >
+                    Next →
+                  </Link>
+                ) : (
+                  <span />
+                )}
+              </nav>
+            )}
+          </div>
+          <StrandMinimap
+            strands={strands.map(
+              ({ id, title, username, position, text, mapLabel }) => ({
+                id,
+                title,
+                username,
+                position,
+                text,
+                mapLabel,
+              }),
+            )}
+            cluster={cluster}
+            query={query}
+          />
         </div>
-        <StrandMinimap
-          strands={strands.map(({ id, title, username, position }) => ({
-            id,
-            title,
-            username,
-            position,
-          }))}
-          cluster={cluster}
-          query={query}
-        />
-      </div>
+      </StrandFocusProvider>
     </main>
   )
 }

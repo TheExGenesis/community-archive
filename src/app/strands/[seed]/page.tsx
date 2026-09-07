@@ -52,11 +52,11 @@ export default async function StrandPage({
     tweet: tweets.get(p.id),
   }))
   return (
-    <main className="mx-auto max-w-7xl px-5 py-10 sm:px-7">
+    <main className="mx-auto max-w-[1500px] px-5 py-10 sm:px-7">
       <Link href="/strands" className="text-sm font-semibold text-brand">
         ← All strands
       </Link>
-      <div className="mt-6 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="mt-6 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
         <article className="min-w-0">
           <h1 className="text-4xl font-bold leading-tight">{strand.title}</h1>
           <p className="mb-7 mt-3 text-sm text-muted-foreground">
@@ -96,12 +96,16 @@ export default async function StrandPage({
           </section>
         </article>
         <StrandMinimap
-          strands={strands.map(({ id, title, username, position }) => ({
-            id,
-            title,
-            username,
-            position,
-          }))}
+          strands={strands.map(
+            ({ id, title, username, position, text, mapLabel }) => ({
+              id,
+              title,
+              username,
+              position,
+              text,
+              mapLabel,
+            }),
+          )}
           activeId={strand.id}
         />
       </div>

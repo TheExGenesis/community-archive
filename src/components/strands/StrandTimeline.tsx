@@ -4,7 +4,11 @@ import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
 import { TweetAvatar } from '@/components/portal/TweetRow'
 import type { PortalTweet } from '@/lib/portal/types'
-import { timelinePositions } from '@/lib/community-apps/strand-layout'
+import {
+  timelinePositions,
+  postTimestamp,
+} from '@/lib/community-apps/strand-layout'
+import { StrandThreadContext } from './StrandThreadContext'
 
 export interface StrandPost {
   id: string
@@ -22,7 +26,12 @@ function Post({ post, seedId }: { post: StrandPost; seedId: string }) {
   return (
     <div className="min-w-0">
       <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-        <span>{post.id === seedId ? 'Seed post' : 'Key post'}</span>
+        <span>
+          {postTimestamp(post.id, post.tweet?.createdAt) !== null
+            ? date(postTimestamp(post.id, post.tweet?.createdAt)!)
+            : 'Date unavailable'}
+          {post.id === seedId ? ' · Seed post' : ''}
+        </span>
       </div>
       {post.tweet ? (
         <TweetCard tweet={post.tweet} noClamp showDate clickable={false} />
@@ -42,6 +51,7 @@ function Post({ post, seedId }: { post: StrandPost; seedId: string }) {
       <p className="mt-4 text-sm leading-6 text-muted-foreground">
         {post.annotation}
       </p>
+      <StrandThreadContext key={post.id} seedId={seedId} tweetId={post.id} />
     </div>
   )
 }
@@ -281,7 +291,7 @@ export default function StrandTimeline({
                   Next post →
                 </button>
               </div>
-              <Post post={current} seedId={seedId} />
+              <Post key={current.id} post={current} seedId={seedId} />
             </div>
           )}
         </>

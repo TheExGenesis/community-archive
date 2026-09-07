@@ -43,6 +43,9 @@ test('map keyboard selection and chronological list retain all source posts', ()
   })
   expect(screen.getByText('Post 2')).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'timeline' }))
+  expect(screen.getByText('Jan 1, 2020 · Seed post')).toBeInTheDocument()
+  expect(screen.getByText('Jan 1, 2023')).toBeInTheDocument()
+  expect(screen.queryByText('Key post')).not.toBeInTheDocument()
   expect(screen.getAllByRole('article').map((el) => el.textContent)).toEqual([
     'Post 1',
     'Post 2',

@@ -144,3 +144,28 @@ media/quote enrichment. Apply current username and account-ID opt-outs to both
 returned authors and quoted authors after enrichment. Missing posts show a
 source link, not a fabricated tweet. No snapshot or database writes are needed
 for this presentation change.
+
+The minimap also retains all 22 nonempty handwritten labels from the original
+`strand_semantic_map.json`; those dots keep a dark ring, including when a label
+is hidden to avoid overlap. Zoom reveals more labels. Hover/focus previews the
+original seed text, and hovering or focusing a list card highlights its dot.
+The ten natural-language cluster names in `strand-cluster-names.ts` are editorial
+drafts derived from the existing cluster contents, without changing membership.
+
+`strand-display.json` stores those labels and the original monthly histogram
+counts from `bangers/public/strand_histograms.json` (January 2015–December 2025).
+Only policy-eligible strands receive display metadata. Cards plot the saved
+monthly counts with per-month hover text; these are historical aggregates, not
+fresh activity counts or just the selected key tweets.
+
+Key posts offer an on-demand thread preview at
+`/api/strands/<seed>/context?tweet_id=<key-post>`. The endpoint first verifies
+that the seed is still eligible and the selected ID belongs to that strand.
+It uses the existing ClickHouse thread read, or the existing permalink RPC
+when ClickHouse reads are disabled; it does not recover missing tweets or write
+data. Current opt-outs break traversal before selecting at most five ancestors
+and five chronological descendants. Nearby continuations take precedence over
+much later direct replies. The bounded selection is hydrated with the same
+full-fidelity tweet cards and final opt-out checks as other Strands posts.
+Unavailable context has a retry state and a full-conversation link. Timeline
+labels show the post date, with a seed marker where applicable.

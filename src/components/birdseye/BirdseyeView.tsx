@@ -11,11 +11,15 @@ export function BirdseyeView({
   selectedId,
   isOwner,
   sharingEnabled,
+  profiles = [],
+  isAdmin = false,
 }: {
   analysis: BirdseyeAnalysis
   selectedId?: string
   isOwner: boolean
   sharingEnabled: boolean
+  profiles?: string[]
+  isAdmin?: boolean
 }) {
   const selected =
     analysis.clusters.find((cluster) => cluster.id === selectedId) ??
@@ -67,10 +71,39 @@ export function BirdseyeView({
           <ShareBirdseye initiallyEnabled={sharingEnabled} />
         ) : (
           <span className="rounded-full bg-muted px-3 py-1.5 text-xs text-muted-foreground">
-            Shared with you
+            {isAdmin ? 'Admin view · private analysis' : 'Shared with you'}
           </span>
         )}
       </header>
+      {profiles.length > 0 && (
+        <form
+          action="/birdseye"
+          className="mb-8 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-muted/30 p-4"
+        >
+          <label className="min-w-0 flex-1 text-sm font-semibold">
+            Admin · Birdseye profile
+            <select
+              name="username"
+              defaultValue={analysis.username}
+              className="mt-2 block h-10 w-full rounded-lg border border-border bg-background px-3"
+              aria-label="Birdseye profile"
+            >
+              {profiles.map((username) => (
+                <option key={username} value={username}>
+                  @{username}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="h-10 rounded-lg bg-brand px-4 text-sm font-semibold text-brand-foreground">
+            View profile
+          </button>
+          <p className="w-full text-xs text-muted-foreground">
+            {profiles.length} available profiles. Admin access does not make
+            these analyses public.
+          </p>
+        </form>
+      )}
       <div className="grid items-start gap-8 lg:grid-cols-[330px_minmax(0,1fr)] lg:gap-12">
         <nav
           aria-label="Archive topics"

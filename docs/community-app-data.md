@@ -27,7 +27,10 @@ index; they are not a newly reconstructed conversation corpus.
 
 ## Birdseye privacy and presentation
 
-Birdseye is owner-only by default; the public account catalog has been removed.
+Birdseye is private by default; the public account catalog has been removed.
+Verified administrators can use the profile picker to inspect all currently
+eligible analyses. This grants read access, not permission to share on behalf
+of another owner. Membership and opt-outs still apply to administrator reads.
 The page and `/api/birdseye/sources` verify the current Supabase Auth user,
 trusted Twitter identity, account ID against `user_directory`, and current
 membership/opt-out policy before loading analysis content. Source requests
@@ -52,9 +55,19 @@ PostHog autocapture and session replay via `ph-no-capture`.
 Each topic row has a sparkline with a shared year range and individually scaled
 counts of cited posts. The topic page shows compact insight cards, icon source
 links, and lazy source tweet cards, with a Load more/retry fallback. The profile
-handle is the primary heading. Local development against production Supabase
-uses real Twitter OAuth; mock login remains disabled for that project. Its OAuth
-redirect allowlist still needs to permit the local callback for local sign-in.
+handle is the primary heading. The standard `dev` and `dev-remote-db` scripts bind to `127.0.0.1` and enable
+`LOCAL_ADMIN_PREVIEW=true`. On a loopback host in `NODE_ENV=development`, with
+no Vercel deployment marker, this starts a local admin read preview automatically.
+The header's Local admin menu signs out (persistent across reloads) and can
+restart the preview. It does not create a Supabase user, fabricate an OAuth
+identity, grant production admin write permissions, or change sharing settings.
+Other development launchers must both bind to loopback and explicitly set the
+flag. Production/preview deployments and non-loopback hosts cannot use it.
+
+Set `COMMUNITY_APP_DATA_DIR` to an existing normalized display package to avoid
+Storage downloads while testing locally. Live membership/opt-out checks and
+source tweet reads still use the configured serving backends. Real Twitter OAuth
+remains available; mock login stays disabled against production Supabase.
 
 ## Display package
 

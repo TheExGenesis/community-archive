@@ -1,4 +1,5 @@
 'use client'
+import { useNavigationAudience } from '@/components/NavigationAudience'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
 import { devLog } from '@/lib/devLog'
 import { isProductionSupabaseUrl } from '@/lib/isProductionSupabaseUrl'
@@ -22,6 +23,7 @@ export default function SignIn({
 }: {
   alwaysVisible?: boolean
 }) {
+  const { localPreview } = useNavigationAudience()
   const searchParams = useSearchParams()
   const requestedRedirect = searchParams.get('redirect')
   const redirectTo =
@@ -125,7 +127,7 @@ export default function SignIn({
     }
   }
 
-  return userMetadata ? null : (
+  return userMetadata || localPreview === 'admin' ? null : (
     <div
       className={`${alwaysVisible ? 'inline-flex' : isStagingLogin ? 'hidden lg:inline-flex' : 'hidden sm:inline-flex'} items-center gap-2`}
     >

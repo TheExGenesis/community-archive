@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { loadAccessibleBirdseye } from '@/lib/community-apps/birdseye-access'
+import {
+  getBirdseyeProfiles,
+  loadAccessibleBirdseye,
+} from '@/lib/community-apps/birdseye-access'
 import { BirdseyeView } from '@/components/birdseye/BirdseyeView'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -19,7 +22,8 @@ export default async function BirdseyePage({
     typeof searchParams.username === 'string'
       ? searchParams.username
       : undefined
-  const access = await loadAccessibleBirdseye(username)
+  const profiles = await getBirdseyeProfiles()
+  const access = await loadAccessibleBirdseye(username || profiles[0])
   if (!access)
     return (
       <main className="mx-auto min-h-[70vh] max-w-xl px-6 py-16">
@@ -53,6 +57,7 @@ export default async function BirdseyePage({
   return (
     <BirdseyeView
       {...access}
+      profiles={profiles}
       selectedId={
         typeof searchParams.cluster_id === 'string'
           ? searchParams.cluster_id

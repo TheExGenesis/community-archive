@@ -4,7 +4,7 @@
 
 - [Agent entry point](https://www.community-archive.org/llms.txt) machine-readable index of the docs and API usage.
 - [Website docs](https://www.community-archive.org/docs) quickstart for agents, developers, and researchers.
-- [API docs](./api-doc.md) how owners download their private raw JSON or query the public database API.
+- [API docs](./api-doc.md) download the daily Parquet export, query the public API, or access your own private raw archive.
 - [Declarative schemas](./supabase-declarative-schemas.md) how to evolve the database using ordered schema files and migrations.
 - [Daily Digest](./daily-digest.md) explains the editorial lab, reproducible generation runs, publication boundary, and rollout gates.
 - [Website architecture](./website-architecture.md) feature ownership, tweet contracts, and client state boundaries.

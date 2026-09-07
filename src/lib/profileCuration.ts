@@ -3,7 +3,7 @@ import 'server-only'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { devLog } from '@/lib/devLog'
 import { fetchClickHouseTweetPageData } from '@/lib/clickhouseTweetPage'
-import type { TweetData } from '@/components/TweetComponent'
+import type { TweetData } from '@/lib/tweets/types'
 import {
   applyProfileCuration,
   type ProfileCurationRow,

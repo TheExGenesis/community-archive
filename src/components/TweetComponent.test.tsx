@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom'
 import { render, screen } from '@testing-library/react'
-import TweetComponent, { type TweetData } from './TweetComponent'
+import TweetComponent from './TweetComponent'
+import type { TweetData } from '@/lib/tweets/types'
 
 jest.mock('@/components/TweetAvatarImage', () => ({
   __esModule: true,
@@ -64,4 +65,13 @@ describe('TweetComponent', () => {
 
     expect(screen.getByText('[Quoted tweet unavailable]')).toBeVisible()
   })
+})
+
+test('keeps an unknown-author label for a normalized tweet with empty identity', () => {
+  render(
+    <TweetComponent
+      tweet={{ ...tweet, username: '', account_display_name: '' }}
+    />,
+  )
+  expect(screen.getAllByText('Unknown').length).toBeGreaterThan(0)
 })

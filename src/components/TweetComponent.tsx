@@ -23,77 +23,7 @@ import { decodeTweetText } from '@/lib/tweetText'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
 import ImageLightbox from '@/components/ImageLightbox'
 
-export interface TweetMedia {
-  media_url: string
-  media_type: string
-  width?: number
-  height?: number
-}
-
-export interface TweetUrl {
-  expanded_url: string | null
-  display_url: string
-}
-
-export interface TweetData {
-  tweet_id: string
-  account_id: string
-  created_at: string
-  full_text: string
-  retweet_count: number | null
-  favorite_count: number
-  reply_to_tweet_id: string | null
-  quote_tweet_id: string | null
-  retweeted_tweet_id: string | null
-  avatar_media_url: string | null
-  username: string
-  account_display_name: string
-  media: TweetMedia[]
-  urls: TweetUrl[]
-  reply_to_username?: string
-  // For quote tweets
-  quoted_tweet?: {
-    tweet_id: string
-    account_id: string
-    created_at: string
-    full_text: string
-    retweet_count: number | null
-    favorite_count: number
-    avatar_media_url?: string
-    username: string
-    account_display_name: string
-    media?: TweetMedia[]
-    // True when the quoted tweet is missing from our archive AND wasn't recoverable
-    // via Twitter syndication; renderer shows a tombstone.
-    is_deleted?: boolean
-    // True when the quoted tweet was hydrated at render time from Twitter's public
-    // syndication endpoint (not from our DB); renderer marks it as not archived.
-    from_external?: boolean
-  }
-  // Support both interface styles for compatibility
-  account?: {
-    profile?: {
-      avatar_media_url?: string
-    }
-    username?: string
-    account_display_name?: string
-  }
-  // For RT tweets with mentioned user data
-  mentioned_users?: {
-    mentioned_user: {
-      user_id: string
-      name: string
-      screen_name: string
-      account?: {
-        username: string
-        account_display_name: string
-        profile?: {
-          avatar_media_url: string
-        }
-      }
-    }
-  }[]
-}
+import type { TweetData } from '@/lib/tweets/types'
 
 interface TweetComponentProps {
   tweet: TweetData
@@ -123,15 +53,9 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
   highlightQuery,
 }) => {
   const [isTextExpanded, setIsTextExpanded] = React.useState(false)
-  // Support both interface formats for backwards compatibility
-  const originalUsername =
-    tweet.username || tweet.account?.username || 'Unknown'
-  const originalDisplayName =
-    tweet.account_display_name ||
-    tweet.account?.account_display_name ||
-    'Unknown'
-  const originalProfilePicUrl =
-    tweet.avatar_media_url || tweet.account?.profile?.avatar_media_url
+  const originalUsername = tweet.username || 'Unknown'
+  const originalDisplayName = tweet.account_display_name || 'Unknown'
+  const originalProfilePicUrl = tweet.avatar_media_url || undefined
   const replyToUsername = tweet.reply_to_username
 
   const isRetweet = !!tweet.retweeted_tweet_id
@@ -225,12 +149,11 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
   }
 
   const renderMedia = () => {
-    // Support both tweet.media and (tweet as any).media for different query formats
-    const mediaArray = tweet.media || (tweet as any).media || []
+    const mediaArray = tweet.media
     if (!mediaArray || mediaArray.length === 0) return null
 
     const renderableMedia = mediaArray.filter(
-      (mediaItem: any) =>
+      (mediaItem) =>
         mediaItem.media_type === 'photo' ||
         mediaItem.media_type.startsWith('image/') ||
         mediaItem.media_type === 'video',
@@ -240,7 +163,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
     if (compact) {
       return (
         <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-          {renderableMedia.slice(0, 4).map((mediaItem: any, index: number) => (
+          {renderableMedia.slice(0, 4).map((mediaItem, index) => (
             <ImageLightbox
               key={index}
               src={mediaItem.media_url}
@@ -265,7 +188,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       <div
         className={`my-3 grid gap-2 ${renderableMedia.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
       >
-        {renderableMedia.map((mediaItem: any, index: number) => (
+        {renderableMedia.map((mediaItem, index) => (
           <ImageLightbox
             key={index}
             src={mediaItem.media_url}
@@ -380,13 +303,13 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
               >
                 {quotedTweet.media
                   .filter(
-                    (m: any) =>
+                    (m) =>
                       m.media_type === 'photo' ||
                       m.media_type.startsWith('image/') ||
                       m.media_type === 'video',
                   )
                   .slice(0, compact ? 3 : undefined)
-                  .map((mediaItem: any, index: number) => (
+                  .map((mediaItem, index) => (
                     <ImageLightbox
                       key={index}
                       src={mediaItem.media_url}

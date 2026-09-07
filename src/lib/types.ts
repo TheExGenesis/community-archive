@@ -1,3 +1,4 @@
+import type { TweetData, TweetMedia } from '@/lib/tweets/types'
 import { Database } from '@/database-types'
 import { SupabaseClient } from '@supabase/supabase-js'
 
@@ -29,7 +30,7 @@ export interface Tweet {
   retweet_count: number | null
   created_at: string
   favorited: boolean
-  full_text: string,
+  full_text: string
   truncated?: boolean
 }
 
@@ -206,67 +207,50 @@ export type FormattedUser = {
 
 // Interfaces for fetching and displaying tweets via Supabase queries
 export interface RawSupabaseProfile {
-  avatar_media_url: string | null;
-  archive_upload_id?: number | null;
+  avatar_media_url: string | null
+  archive_upload_id?: number | null
 }
 
 export interface RawSupabaseAccount {
-  username: string;
-  account_display_name: string;
-  profile: RawSupabaseProfile | RawSupabaseProfile[] | null;
+  username: string
+  account_display_name: string
+  profile: RawSupabaseProfile | RawSupabaseProfile[] | null
 }
 
 export interface RawSupabaseTweet {
-  tweet_id: string;
-  created_at: string;
-  full_text: string;
-  favorite_count: number;
-  retweet_count: number | null;
-  reply_to_tweet_id: string | null;
-  account: RawSupabaseAccount; 
+  tweet_id: string
+  created_at: string
+  full_text: string
+  favorite_count: number
+  retweet_count: number | null
+  reply_to_tweet_id: string | null
+  account: RawSupabaseAccount
   media?: Array<{
-    media_url: string;
-    media_type: string;
-    width?: number;
-    height?: number;
-  }>;
+    media_url: string
+    media_type: string
+    width?: number
+    height?: number
+  }>
 }
 
 export interface TimelineTweet {
-  tweet_id: string;
-  account_id?: string;
-  created_at: string;
-  full_text: string;
-  favorite_count: number;
-  retweet_count: number | null;
-  reply_to_tweet_id: string | null;
-  account: { 
-    username: string;
-    account_display_name: string;
-    profile?: { 
-      avatar_media_url?: string;
-    };
-  };
-  media?: Array<TweetMediaItem>;
-  quote_tweet_id?: string | null;
-  quoted_tweet?: {
-    tweet_id: string;
-    account_id: string;
-    created_at: string;
-    full_text: string;
-    retweet_count: number | null;
-    favorite_count: number;
-    avatar_media_url?: string;
-    username: string;
-    account_display_name: string;
-    media?: Array<TweetMediaItem>;
-    is_deleted?: boolean;
-  };
+  tweet_id: string
+  account_id?: string
+  created_at: string
+  full_text: string
+  favorite_count: number
+  retweet_count: number | null
+  reply_to_tweet_id: string | null
+  account: {
+    username: string
+    account_display_name: string
+    profile?: {
+      avatar_media_url?: string
+    }
+  }
+  media?: Array<TweetMediaItem>
+  quote_tweet_id?: string | null
+  quoted_tweet?: TweetData['quoted_tweet']
 }
 
-export interface TweetMediaItem {
-  media_url: string;
-  media_type: string;
-  width?: number;
-  height?: number;
-}
+export type TweetMediaItem = TweetMedia

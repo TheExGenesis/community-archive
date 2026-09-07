@@ -3,7 +3,7 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import QuotingTweetsSidebar from './QuotingTweetsSidebar'
-import type { TweetData } from './TweetComponent'
+import type { TweetData } from '@/lib/tweets/types'
 
 jest.mock('@/components/TweetAvatarImage', () => ({
   __esModule: true,

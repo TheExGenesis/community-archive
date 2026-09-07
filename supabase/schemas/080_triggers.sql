@@ -49,3 +49,7 @@ CREATE OR REPLACE TRIGGER "apply_policy_block_tombstone" AFTER INSERT OR UPDATE 
 CREATE OR REPLACE TRIGGER trg_log_archive_upload_event
   AFTER INSERT OR UPDATE OF upload_phase ON public.archive_upload
   FOR EACH ROW EXECUTE FUNCTION public.log_archive_upload_event();
+
+CREATE TRIGGER preserve_archive_storage_reference
+BEFORE UPDATE ON public.archive_upload FOR EACH ROW
+EXECUTE FUNCTION private.preserve_archive_storage_reference();

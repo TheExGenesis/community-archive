@@ -18,6 +18,7 @@ const mockedUsername = jest.mocked(getSessionTwitterUsername)
 function client(options: {
   user?: Record<string, unknown> | null
   policyError?: { message: string } | null
+  upload?: { storage_path: string; storage_sha256: string }
 }) {
   const createSignedUrl = jest.fn().mockResolvedValue({
     data: { signedUrl: 'https://storage.example/signed' },
@@ -27,7 +28,14 @@ function client(options: {
     data: options.policyError ? null : true,
     error: options.policyError ?? null,
   })
+  const query: Record<string, jest.Mock> = {}
+  for (const method of ['select', 'eq', 'order', 'limit'])
+    query[method] = jest.fn(() => query)
+  query.maybeSingle = jest
+    .fn()
+    .mockResolvedValue({ data: options.upload ?? null, error: null })
   const value = {
+    from: jest.fn(() => query),
     auth: {
       getUser: jest.fn().mockResolvedValue({
         data: { user: options.user ?? null },
@@ -99,5 +107,20 @@ describe('private archive download route', () => {
       'allowed_owner/archive.json',
       60,
     )
+  })
+
+  it('downloads the latest pinned object instead of the legacy username object', async () => {
+    mockedUsername.mockReturnValue('allowed_owner')
+    const storage_path =
+      'allowed_owner/12345678-1234-1234-1234-123456789abc/archive.json'
+    const { createSignedUrl } = client({
+      user: { app_metadata: { provider_id: 'allowed-id' } },
+      upload: { storage_path, storage_sha256: 'a'.repeat(64) },
+    })
+    const response = await GET({} as NextRequest, {
+      params: { username: 'allowed_owner' },
+    })
+    expect(response.status).toBe(307)
+    expect(createSignedUrl).toHaveBeenCalledWith(storage_path, 60)
   })
 })

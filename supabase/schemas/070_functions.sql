@@ -3536,3 +3536,19 @@ END;
 $$;
 ALTER FUNCTION private.community_archive_monitoring_activity_day(integer)
   OWNER TO postgres;
+
+-- An accepted upload cannot be repointed to different bytes. Deletion remains
+-- available through the established policy workflow.
+CREATE OR REPLACE FUNCTION private.preserve_archive_storage_reference()
+RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
+BEGIN
+  IF OLD.storage_path IS NOT NULL AND (
+    NEW.storage_path IS DISTINCT FROM OLD.storage_path OR
+    NEW.storage_sha256 IS DISTINCT FROM OLD.storage_sha256 OR
+    NEW.account_id IS DISTINCT FROM OLD.account_id
+  ) THEN
+    RAISE EXCEPTION 'Archive input reference is immutable' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;

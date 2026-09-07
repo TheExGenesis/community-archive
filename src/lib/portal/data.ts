@@ -785,11 +785,6 @@ async function getCachedHistoricalBangers(sourceKey: string, day: string) {
     selectDailyBangers(candidates, new Date(`${day}T12:00:00.000Z`)),
   )
 }
-const getCachedWeeklyTrends = unstable_cache(
-  async (_sourceKey: string) => fetchPortalWeeklyTrends(),
-  ['portal-weekly-trends-v1'],
-  { revalidate: 86_400 },
-)
 const getCachedRecentBangers = unstable_cache(
   async (_sourceKey: string) =>
     enrichPortalTweets(
@@ -1176,7 +1171,9 @@ export function startHomepageData() {
     ),
     trends: loadPortalComponentData(
       'weekly-trends',
-      () => getCachedWeeklyTrends(sourceKey),
+      // The gateway caches by UTC day and membership. Read it directly so a
+      // failed freshness check cannot serve an older Next Data Cache entry.
+      () => fetchPortalWeeklyTrends(),
       [],
     ),
     research: loadPortalComponentData(

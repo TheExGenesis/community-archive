@@ -32,6 +32,7 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'offset',
   ]),
   'word-trend': new Set(['q', 'bucket', 'match', 'from', 'to']),
+  'weekly-keywords': new Set(),
   'stream-stats': new Set(['start', 'end', 'granularity', 'scope']),
   'recent-bangers': new Set(['limit', 'hours', 'end', 'target_ca_users_only']),
   'daily-interactions': new Set([
@@ -182,6 +183,15 @@ interface AnalyticsGatewayJsonOptions {
   token?: string
 }
 
+export class AnalyticsGatewayError extends Error {
+  constructor(
+    public readonly status: number,
+    detail: string,
+  ) {
+    super(`ClickHouse analytics request failed (${status}): ${detail}`)
+  }
+}
+
 export async function fetchAnalyticsGatewayJson<T>(
   path: string[],
   searchParams = new URLSearchParams(),
@@ -211,9 +221,7 @@ export async function fetchAnalyticsGatewayJson<T>(
   const response = await fetchImpl(target, init)
   const body = await response.text()
   if (!response.ok) {
-    throw new Error(
-      `ClickHouse analytics request failed (${response.status}): ${body.slice(0, 300)}`,
-    )
+    throw new AnalyticsGatewayError(response.status, body.slice(0, 300))
   }
 
   try {

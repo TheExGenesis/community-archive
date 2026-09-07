@@ -1,6 +1,7 @@
 'use client'
 
 import { usePortalStream } from './usePortalStream'
+import { WeeklyKeywordRows } from './WeeklyKeywordRows'
 import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
@@ -57,12 +58,6 @@ const compact = (n: number) =>
 
 const signInHref = (returnTo: string) =>
   `/login?redirect=${encodeURIComponent(returnTo)}`
-
-const fmtDelta = (term: TermWeek) => {
-  if (term.status === 'new') return 'new'
-  if (term.status === 'inactive' || term.deltaPct === null) return '—'
-  return `${term.deltaPct >= 0 ? '+' : '−'}${Math.abs(term.deltaPct)}%`
-}
 
 function PanelHeader({
   title,
@@ -865,86 +860,21 @@ export function HomeTrendsPanel({
   failed: boolean
   isMember: boolean
 }) {
-  // ---- derived trend views ----------------------------------------------
-  const weeklyRanked = useMemo(
-    () =>
-      weekly.filter((term) => term.last7 > 0).sort((a, b) => b.last7 - a.last7),
-    [weekly],
-  )
-  const weeklyBars = weeklyRanked.slice(0, 6)
-  const maxWeekly = Math.max(...weeklyBars.map((w) => w.last7), 1)
-
   return (
     <div className={`${CARD} flex flex-col`}>
       <PanelHeader
-        title="Trending terms · 7 days"
+        title={
+          weekly.some((row) => !row.lane)
+            ? 'Tracked terms · 7 days'
+            : 'Trending terms · 7 days'
+        }
         action={{
           label: isMember ? 'Trends explorer' : 'Sign in for Trends',
           href: isMember ? '/trends' : signInHref('/trends'),
           analyticsDestination: 'trends',
         }}
       />
-      <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
-        {failed ? (
-          <PanelUnavailable message="Trending terms are temporarily unavailable." />
-        ) : weeklyBars.length > 0 ? (
-          <div
-            className={`flex items-center gap-2 pb-1 text-[9px] font-medium uppercase tracking-wide ${MUTED}`}
-          >
-            <span className="w-[82px]" />
-            <span className="w-[46px] text-right">Tweets</span>
-            <span className="flex-1">Volume</span>
-            <span className="w-[46px] text-right">Change</span>
-          </div>
-        ) : null}
-        {!failed &&
-          weeklyBars.map((b) => (
-            <div key={b.term} className="flex items-center gap-2 py-[6px]">
-              <Link
-                href={`/search?${new URLSearchParams({
-                  q: b.term,
-                  ...(b.sinceDate ? { sinceDate: b.sinceDate } : {}),
-                  ...(b.untilDate ? { untilDate: b.untilDate } : {}),
-                }).toString()}`}
-                title={`Search tweets mentioning ${b.term}`}
-                className="w-[82px] truncate text-[12px] font-semibold text-brand underline-offset-2 hover:underline"
-              >
-                {b.term}
-              </Link>
-              <span className="w-[46px] text-right text-[11px] tabular-nums text-muted-foreground">
-                {b.last7.toLocaleString('en-US')}
-              </span>
-              <div
-                className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]"
-                role="img"
-                aria-label={`${b.term}: ${b.last7.toLocaleString('en-US')} tweets in the last seven days`}
-                title={`${b.last7.toLocaleString('en-US')} tweets in the last 7 days; bar is relative to ${weeklyBars[0].term}`}
-              >
-                <div
-                  className="h-full rounded bg-chart-accent"
-                  style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
-                />
-              </div>
-              <span
-                title={`${b.last7.toLocaleString('en-US')} tweets vs ${b.prev7.toLocaleString('en-US')} in the previous 7 days`}
-                className={`w-[46px] text-right text-[11px] font-bold tabular-nums ${
-                  b.status === 'inactive'
-                    ? MUTED
-                    : (b.deltaPct ?? 0) >= 0
-                      ? 'text-[#16a34a] dark:text-[#2acf80]'
-                      : 'text-[#dc2626] dark:text-[#f87171]'
-                }`}
-              >
-                {fmtDelta(b)}
-              </span>
-            </div>
-          ))}
-        {!failed && weeklyBars.length === 0 && (
-          <div className={`py-8 text-center text-[13px] ${MUTED}`}>
-            No watchlist activity in the last seven days.
-          </div>
-        )}
-      </div>
+      <WeeklyKeywordRows weekly={weekly} failed={failed} />
     </div>
   )
 }

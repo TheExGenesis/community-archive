@@ -1,4 +1,4 @@
-import { BANGERS_ALL_TIME_HREF } from './portal/bangers'
+import { BANGERS_WEEK_HREF } from './portal/bangers'
 import { isTwitterUsername } from './apiInputValidation'
 
 export interface NavItem {
@@ -159,7 +159,7 @@ export const getPrimaryNav = (
 ): NavItem[] =>
   isMember || _isAdmin
     ? [
-        { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
+        { href: BANGERS_WEEK_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
         { href: '/user-dir', label: 'Users' },
         { href: '/community', label: 'Apps' },
@@ -169,7 +169,7 @@ export const getPrimaryNav = (
         { href: '/research', label: 'Research' },
       ]
     : [
-        { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
+        { href: BANGERS_WEEK_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
         { href: '/user-dir', label: 'Users' },
         { href: '/community', label: 'Apps' },

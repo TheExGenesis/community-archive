@@ -90,8 +90,11 @@ test('renders the balanced homepage composition and editorial labels', async () 
     screen.getByRole('link', { name: /All-time bangers/i }),
   ).toHaveAttribute('href', '/bangers?period=all')
   expect(
-    screen.getByRole('link', { name: /Download the bulk export/i }),
-  ).toHaveAttribute('href', '/docs#bulk-dump')
+    screen.getByRole('link', { name: /Daily data export/i }),
+  ).toHaveAttribute(
+    'href',
+    'https://github.com/TheExGenesis/community-archive/releases/latest',
+  )
   expect(
     screen.getByRole('link', { name: /Community Builds/i }),
   ).toHaveAttribute('href', '/tweets/1835411943735140798')

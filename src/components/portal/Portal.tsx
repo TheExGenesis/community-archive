@@ -23,7 +23,8 @@ import { CHROME_EXTENSION_URL } from '@/lib/browserExtension'
 export type PortalView = 'home' | 'stream'
 
 const HOME_LIVE_STREAM_LIMIT = 12
-const ARCHIVE_EXPORT_URL = '/docs#bulk-dump'
+const ARCHIVE_EXPORT_URL =
+  'https://github.com/TheExGenesis/community-archive/releases/latest'
 const COMMUNITY_BUILDS_URL = '/tweets/1835411943735140798'
 
 type DashboardDestination =
@@ -725,9 +726,9 @@ export function HomePortalLayout({
             <UtilityLink
               href={ARCHIVE_EXPORT_URL}
               destination="data_export"
-              title="Download the bulk export"
-              note="Tweets, profiles, and snapshot details"
-              action="Details"
+              title="Daily data export"
+              note="Tweets and profiles in Parquet"
+              action="Download"
               icon={<FaDatabase className="h-[17px] w-[17px]" />}
             />
             <UtilityLink

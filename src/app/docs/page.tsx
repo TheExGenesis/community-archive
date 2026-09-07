@@ -3,6 +3,10 @@ import Link from 'next/link'
 import { ArrowUpRight, Bot, Braces, Database } from 'lucide-react'
 
 const API_URL = 'https://fabxmporizzqflnftavs.supabase.co'
+const EXPORT_RELEASE_URL =
+  'https://github.com/TheExGenesis/community-archive/releases/latest'
+const EXPORT_POINTER_URL =
+  'https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/community-archive-public-export/latest.json'
 const ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8'
 export const metadata: Metadata = {
@@ -83,8 +87,8 @@ export default function DocsPage() {
               Build with the archive
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-              Query policy-filtered public records through the API or give an
-              agent one canonical starting point.
+              Download the daily data export, query public records through the
+              API, or give an agent one canonical starting point.
             </p>
             <div className="rounded-lg border border-brand/30 bg-brand/5 p-5">
               <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -120,9 +124,15 @@ export default function DocsPage() {
                 Bulk Parquet export
               </h3>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Download tweets, profiles, and a manifest for bulk analysis.
-                Check the manifest for the snapshot date.
+                Download tweets and profiles for bulk analysis. Each daily
+                export checks current membership and opt-outs before
+                publication.
               </p>
+              <div className="mt-4">
+                <ResourceLink href={EXPORT_RELEASE_URL}>
+                  Download the latest export
+                </ResourceLink>
+              </div>
             </article>
 
             <article className="rounded-lg border border-border bg-card p-6">
@@ -164,28 +174,27 @@ export default function DocsPage() {
               Bulk Parquet export
             </h2>
             <p className="mt-2 leading-7 text-muted-foreground">
-              Download the current consent-filtered package for bulk analysis:
-              <code> tweets.parquet</code>, <code>profiles.parquet</code>, and
-              <code> manifest.json</code>. Follow the latest pointer each time;
-              older package links can expire. Publication is scheduled nightly,
-              but a failed run does not create a fresh snapshot. Check the
-              manifest’s creation time, source watermarks, row counts, and
-              checksums.
+              The daily package contains enriched <code>tweets.parquet</code>,
+              separate <code>profiles.parquet</code>, and a{' '}
+              <code>manifest.json</code> with row counts, schemas, and
+              checksums. It includes eligible members and applies current
+              consent to referenced authors too.
+            </p>
+            <p className="mt-3 leading-7 text-muted-foreground">
+              Use the latest release link below to find the most recent
+              successful export. GitHub lists the download links; the files stay
+              in consent-managed storage. Superseded packages are removed, so
+              bookmark the latest release rather than an individual Parquet URL.
+              Downloads may be temporarily withdrawn when consent changes.
             </p>
             <div className="mt-4 flex flex-wrap gap-4">
-              <ResourceLink href="https://github.com/TheExGenesis/community-archive/releases/latest">
-                Download links and snapshot details
+              <ResourceLink href={EXPORT_RELEASE_URL}>
+                Download the latest export
               </ResourceLink>
-              <ResourceLink href="https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/community-archive-public-export/latest.json">
-                Latest package pointer (JSON)
+              <ResourceLink href={EXPORT_POINTER_URL}>
+                Latest JSON pointer for scripts
               </ResourceLink>
             </div>
-            <p className="mt-4 text-sm leading-6 text-muted-foreground">
-              Follow <code>manifest_url</code> in the pointer, then download the
-              files from <code>publication.urls</code>. Join tweets to profiles
-              on <code>account_id</code>; preserve all IDs as strings. Use this
-              package instead of paginating the API to reconstruct the corpus.
-            </p>
           </div>
         </section>
 

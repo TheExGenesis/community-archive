@@ -82,7 +82,9 @@ function ResolvedAvatar({
             // Radix decodes off-DOM; failed images never mount an img/onError.
             if (status === 'error') {
               setUrl(null)
-              recover(true)
+              // Featured/OAuth URLs can lag behind the current profile photo.
+              // Try that stored photo before a fresh external lookup.
+              recover(attempted.current.has(false))
             }
           }}
         />

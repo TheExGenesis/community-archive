@@ -36,7 +36,7 @@ it('recovers a missing homepage avatar through the bounded profile route', async
   expect(global.fetch).toHaveBeenCalledWith('/api/profile/42/avatar')
 })
 
-it('refreshes a failed preloaded image and stops after a failed recovery image', async () => {
+it('uses the current stored profile photo when a homepage snapshot image fails', async () => {
   jest.spyOn(global, 'fetch').mockResolvedValueOnce({
     ok: true,
     json: async () => ({ avatar_media_url: recovered }),
@@ -46,19 +46,49 @@ it('refreshes a failed preloaded image and stops after a failed recovery image',
       initialAvatars={[
         {
           ...archive,
-          avatar_media_url: 'https://pbs.twimg.com/broken_normal.jpg',
+          avatar_media_url: 'https://pbs.twimg.com/old_normal.jpg',
         },
       ]}
-      compact
     />,
   )
-  expect(screen.queryByAltText("alice's avatar")).not.toBeInTheDocument()
   fireEvent.error(pendingImages[0])
   await waitFor(() => expect(pendingImages).toHaveLength(2))
-  expect(global.fetch).toHaveBeenCalledWith('/api/profile/42/avatar?refresh=1')
-  fireEvent.error(pendingImages[1])
-  expect(screen.getByText('A')).toBeInTheDocument()
+  fireEvent.load(pendingImages[1])
+  expect(screen.getByAltText("alice's avatar")).toHaveAttribute(
+    'src',
+    recovered,
+  )
   expect(global.fetch).toHaveBeenCalledTimes(1)
+  expect(global.fetch).toHaveBeenCalledWith('/api/profile/42/avatar')
+})
+
+it('tries a fresh lookup only if the stored photo also fails, then stops', async () => {
+  const broken = 'https://pbs.twimg.com/broken_normal.jpg'
+  jest
+    .spyOn(global, 'fetch')
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ avatar_media_url: broken }),
+    } as Response)
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ avatar_media_url: recovered }),
+    } as Response)
+  render(
+    <AvatarList initialAvatars={[{ ...archive, avatar_media_url: broken }]} />,
+  )
+  fireEvent.error(pendingImages[0])
+  await waitFor(() => expect(pendingImages).toHaveLength(2))
+  fireEvent.error(pendingImages[1])
+  await waitFor(() => expect(pendingImages).toHaveLength(3))
+  expect(global.fetch).toHaveBeenNthCalledWith(1, '/api/profile/42/avatar')
+  expect(global.fetch).toHaveBeenNthCalledWith(
+    2,
+    '/api/profile/42/avatar?refresh=1',
+  )
+  fireEvent.error(pendingImages[2])
+  expect(screen.getByText('A')).toBeInTheDocument()
+  expect(global.fetch).toHaveBeenCalledTimes(2)
 })
 
 it('does not apply an old recovery response after the avatar input changes', async () => {

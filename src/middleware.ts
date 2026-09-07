@@ -130,6 +130,15 @@ function getApiRateLimitPolicy(
   method: string,
   isSG: boolean,
 ) {
+  // Directory lookups, avatars, stream polling, and link previews can exhaust
+  // the shared API bucket before a visitor submits their first search.
+  if (pathname === '/api/tweet-search' && method === 'GET') {
+    return {
+      bucket: 'api:tweet-search',
+      maxRequests: isSG ? IN_MEMORY_MAX_API_SG : IN_MEMORY_MAX_API_DEFAULT,
+    }
+  }
+
   if (pathname === '/api/opt-in' && method === 'POST') {
     return {
       bucket: 'api:opt-in',

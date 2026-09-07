@@ -5,6 +5,21 @@ soon as its own data is ready. Profiles require current public eligibility and
 identity before rendering; optional enrichment streams afterward. Background
 work follows user intent or viewport proximity.
 
+## Vercel compute
+
+`vercel.json` enables Fluid Compute so external-service waits incur provisioned
+memory charges without active CPU charges. It keeps a 15-second default for
+`src/app/**`; route-level `maxDuration` exports retain their explicit limits.
+This prevents enabling Fluid from silently increasing ordinary requests to its
+300-second default. The digest email cron schedule is unchanged.
+
+The setting takes effect on deployment. Before production rollout, verify the
+generated function configuration and exercise a public profile and signed-in
+session on a preview. Compare active CPU plus provisioned memory cost against
+legacy duration cost; legacy GB-hours alone are no longer comparable. Fluid
+does not fix slow queries or make waiting free. Roll back with the previous
+deployment, or revert this configuration and redeploy.
+
 ## Loading boundaries
 
 - `startHomepageData()` returns an object of independent promises, not one

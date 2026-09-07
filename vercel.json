@@ -1,4 +1,11 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "fluid": true,
+  "functions": {
+    "src/app/**/*": {
+      "maxDuration": 15
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/digest-email",

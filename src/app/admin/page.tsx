@@ -10,6 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Suspense } from 'react'
 import { AdminTable } from './AdminTable'
 import { RecentPrivacyActivity } from './RecentPrivacyActivity'
+import { RecentArchiveUploads } from './RecentArchiveUploads'
+import { loadRecentArchiveUploads } from './recentUploads'
 import { loadRecentPrivacyActivity } from './activity'
 import {
   ADMIN_USERNAMES,
@@ -28,6 +30,10 @@ export const maxDuration = 300
 async function RecentPrivacyActivitySection() {
   const activity = await loadRecentPrivacyActivity()
   return <RecentPrivacyActivity activity={activity} />
+}
+
+async function RecentUploadsSection() {
+  return <RecentArchiveUploads {...await loadRecentArchiveUploads()} />
 }
 
 function SectionSkeleton({ label }: { label: string }) {
@@ -112,6 +118,12 @@ export default async function AdminPage({
             <Badge variant="secondary">@{twitterUsername}</Badge>
           </div>
         </section>
+
+        <Suspense
+          fallback={<SectionSkeleton label="Loading recent archive uploads" />}
+        >
+          <RecentUploadsSection />
+        </Suspense>
 
         <Suspense
           fallback={<SectionSkeleton label="Loading recent privacy activity" />}

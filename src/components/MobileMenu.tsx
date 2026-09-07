@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import RecoverableAvatar from '@/components/RecoverableAvatar'
 import { userProfileHref } from '@/lib/navigation'
 import { capturePostHogEvent } from '@/lib/posthog'
 
@@ -26,8 +26,6 @@ export default function MobileMenu() {
     userMetadata?.picture ??
     userMetadata?.profile_image_url_https ??
     userMetadata?.profile_image_url
-  const avatarFallback =
-    userMetadata?.user_name?.slice(0, 2).toUpperCase() ?? 'ME'
 
   const handleSignOut = async () => {
     capturePostHogEvent('navigation_item_clicked', {
@@ -53,12 +51,15 @@ export default function MobileMenu() {
           className="overflow-hidden rounded-full"
         >
           {userMetadata ? (
-            <Avatar className="h-9 w-9">
-              <AvatarImage src={avatarUrl} alt="" className="object-cover" />
-              <AvatarFallback className="text-xs font-semibold">
-                {avatarFallback}
-              </AvatarFallback>
-            </Avatar>
+            <RecoverableAvatar
+              accountId={String(userMetadata.provider_id ?? '')}
+              avatarUrl={avatarUrl}
+              displayName={userMetadata.user_name || 'ME'}
+              className="h-9 w-9"
+              imageClassName="object-cover"
+              fallbackClassName="text-xs font-semibold"
+              fallbackLength={2}
+            />
           ) : (
             <UserRound className="h-5 w-5" />
           )}

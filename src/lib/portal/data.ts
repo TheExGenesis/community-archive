@@ -297,15 +297,13 @@ function validatedPageCursor(
   return { createdAt: createdAt.toISOString(), id: cursor.id }
 }
 
-interface ClickHousePortalStreamTweet {
+interface ClickHousePortalTweet {
   tweetId: string
   accountId: string
   createdAt: string
-  latestObservedAt: string
   fullText: string
   favoriteCount: string | number
   retweetCount: string | number
-  followerCount: string | number
   username: string | null
   accountDisplayName: string | null
   avatarMediaUrl: string | null
@@ -315,6 +313,13 @@ interface ClickHousePortalStreamTweet {
     width: number | null
     height: number | null
   }>
+}
+
+interface ClickHousePortalStreamTweet extends ClickHousePortalTweet {
+  latestObservedAt: string
+  followerCount: string | number
+  quoteTweetId?: string | null
+  quotedTweet?: ClickHousePortalTweet | null
 }
 
 interface ClickHousePortalStreamResponse {
@@ -343,9 +348,9 @@ function clickHousePortalTimestamp(value: string, field: string): string {
   return timestamp.toISOString()
 }
 
-function mapClickHousePortalStreamTweet(
-  row: ClickHousePortalStreamTweet,
-): PortalTweet {
+function mapClickHousePortalTweet(
+  row: ClickHousePortalTweet,
+): PortalQuotedTweet {
   if (
     !/^\d{1,32}$/.test(row.tweetId) ||
     !/^\d{1,32}$/.test(row.accountId) ||
@@ -361,14 +366,9 @@ function mapClickHousePortalStreamTweet(
     name: row.accountDisplayName || username,
     avatar: row.avatarMediaUrl || null,
     text: row.fullText,
-    observedAt: clickHousePortalTimestamp(
-      row.latestObservedAt,
-      'observation timestamp',
-    ),
     createdAt: clickHousePortalTimestamp(row.createdAt, 'authored timestamp'),
     likes: clickHousePortalCount(row.favoriteCount, 'favorite count'),
     rts: clickHousePortalCount(row.retweetCount, 'repost count'),
-    followers: clickHousePortalCount(row.followerCount, 'follower count'),
     media: (row.media || []).flatMap((item): PortalMedia[] => {
       if (!item.mediaUrl || !item.mediaType) return []
       return [
@@ -380,6 +380,37 @@ function mapClickHousePortalStreamTweet(
         },
       ]
     }),
+  }
+}
+
+function mapClickHousePortalStreamTweet(
+  row: ClickHousePortalStreamTweet,
+): PortalTweet {
+  const tweet = mapClickHousePortalTweet(row)
+  const quotedTweet = row.quotedTweet
+    ? mapClickHousePortalTweet(row.quotedTweet)
+    : row.quoteTweetId && /^\d{1,32}$/.test(row.quoteTweetId)
+      ? {
+          id: row.quoteTweetId,
+          username: '',
+          name: '',
+          avatar: null,
+          text: '',
+          createdAt: tweet.createdAt,
+          likes: 0,
+          rts: 0,
+          media: [],
+          isDeleted: true,
+        }
+      : undefined
+  return {
+    ...tweet,
+    observedAt: clickHousePortalTimestamp(
+      row.latestObservedAt,
+      'observation timestamp',
+    ),
+    followers: clickHousePortalCount(row.followerCount, 'follower count'),
+    ...(quotedTweet ? { quotedTweet } : {}),
   }
 }
 

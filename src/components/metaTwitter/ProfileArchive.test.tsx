@@ -964,3 +964,42 @@ test('shows no sections when none are provided', () => {
   // Sectionless chapters stay directly clickable.
   expect(screen.getAllByRole('link', { name: '2025 4' })).not.toHaveLength(0)
 })
+
+test('refills the visible people list from the reserve after a dismissal', async () => {
+  const user = userEvent.setup()
+  renderProfileArchive(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      displayName="Alice"
+      initialYear={null}
+      initialPage={{
+        tweets: [],
+        yearCounts: [],
+        total: 0,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={{
+        media: [],
+        mediaCount: 0,
+        people: Array.from({ length: 10 }, (_, i) => ({
+          user_id: String(100 + i),
+          screen_name: `person${i}`,
+          name: `Person ${i}`,
+          interactions: 20 - i,
+        })),
+      }}
+    />,
+    { withEditButton: true },
+  )
+  await user.click(screen.getByRole('button', { name: 'Edit profile' }))
+  expect(screen.getByText('Person 0')).toBeVisible()
+  expect(screen.queryByText('Person 8')).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Dismiss @person0' }))
+  await waitFor(() => expect(screen.getByText('Person 8')).toBeVisible())
+  expect(screen.queryByText('Person 0')).not.toBeInTheDocument()
+  expect(screen.queryByText('Person 9')).not.toBeInTheDocument()
+})

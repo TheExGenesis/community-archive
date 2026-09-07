@@ -27,6 +27,7 @@ export interface Strand {
   createdAt: string
   participants: string[]
   essentialTweets: { id: string; annotation: string }[]
+  position?: { x: number; y: number; cluster: number; color: string }
 }
 export interface AppDataManifest {
   version: 1

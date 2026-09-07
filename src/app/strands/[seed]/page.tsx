@@ -2,6 +2,10 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getStrands } from '@/lib/community-apps/data'
+import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
+import StrandMinimap from '@/components/strands/StrandMinimap'
+import StrandTimeline from '@/components/strands/StrandTimeline'
+import TweetCard from '@/components/TweetCard'
 import { AnalysisText } from '@/components/community-apps/AnalysisText'
 
 export const dynamic = 'force-dynamic'
@@ -33,46 +37,74 @@ export default async function StrandPage({
   params: { seed: string }
 }) {
   const strand = await findStrand(params.seed)
+  const [{ strands }, tweets] = await Promise.all([
+    getStrands(),
+    getStrandTweets([strand.id, ...strand.essentialTweets.map((p) => p.id)]),
+  ])
+  const refs = new Map(strand.essentialTweets.map((p) => [p.id, p]))
+  if (!refs.has(strand.id))
+    refs.set(strand.id, {
+      id: strand.id,
+      annotation: 'The seed post around which this strand was assembled.',
+    })
+  const posts = Array.from(refs.values()).map((p) => ({
+    ...p,
+    tweet: tweets.get(p.id),
+  }))
   return (
-    <main className="mx-auto max-w-3xl px-5 py-10 sm:px-7">
+    <main className="mx-auto max-w-7xl px-5 py-10 sm:px-7">
       <Link href="/strands" className="text-sm font-semibold text-brand">
         ← All strands
       </Link>
-      <article className="mt-6">
-        <h1 className="text-4xl font-bold leading-tight">{strand.title}</h1>
-        <p className="mb-7 mt-3 text-sm text-muted-foreground">
-          An AI-written reading of the conversation. Check the source posts for
-          context.
-        </p>
-        <blockquote className="mb-8 border-l-2 border-brand pl-5">
-          <p className="whitespace-pre-wrap leading-7">{strand.text}</p>
-          <Link
-            href={`/tweets/${strand.id}`}
-            className="mt-3 inline-block text-sm font-semibold text-brand"
-          >
-            Starting post by @{strand.username} ↗
-          </Link>
-        </blockquote>
-        <AnalysisText>{strand.summary}</AnalysisText>
-        <section className="mt-10 border-t border-border pt-7">
-          <h2 className="mb-5 text-2xl font-bold">Key posts in this strand</h2>
-          <ol className="space-y-5">
-            {strand.essentialTweets.map((tweet, index) => (
-              <li key={tweet.id}>
-                <Link
-                  href={`/tweets/${tweet.id}`}
-                  className="font-semibold text-brand"
-                >
-                  {index + 1}. Read source post ↗
+      <div className="mt-6 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <article className="min-w-0">
+          <h1 className="text-4xl font-bold leading-tight">{strand.title}</h1>
+          <p className="mb-7 mt-3 text-sm text-muted-foreground">
+            An AI-written reading of the conversation. Check the source posts
+            for context.
+          </p>
+          <div className="mb-8 border-2 border-foreground/80 bg-card p-5 shadow-[3px_3px_0_0_hsl(var(--foreground)/0.15)]">
+            <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              The seed post · where this strand begins
+            </p>
+            {tweets.get(strand.id) ? (
+              <TweetCard
+                tweet={tweets.get(strand.id)!}
+                noClamp
+                showDate
+                clickable={false}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Seed post unavailable.{' '}
+                <Link href={`/tweets/${strand.id}`} className="text-brand">
+                  Open source ↗
                 </Link>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  {tweet.annotation}
-                </p>
-              </li>
-            ))}
-          </ol>
-        </section>
-      </article>
+              </p>
+            )}
+          </div>
+          <StrandTimeline
+            posts={posts}
+            seedId={strand.id}
+            color={strand.position?.color}
+          />
+          <section className="mt-12 border-t border-border pt-7">
+            <h2 className="mb-5 text-2xl font-bold">
+              The story of this strand
+            </h2>
+            <AnalysisText>{strand.summary}</AnalysisText>
+          </section>
+        </article>
+        <StrandMinimap
+          strands={strands.map(({ id, title, username, position }) => ({
+            id,
+            title,
+            username,
+            position,
+          }))}
+          activeId={strand.id}
+        />
+      </div>
     </main>
   )
 }

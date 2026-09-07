@@ -83,3 +83,31 @@ pnpm exec jest --selectProjects server --runInBand --runTestsByPath src/lib/comm
 Verify an account/topic change and source link in Birdseye, and search plus a
 Strands detail page in a local browser. Verify anonymous direct Storage access
 is denied after a private import. Do not regenerate analyses during verification.
+
+### Strands presentation
+
+Strands uses the original semantic projection (`strand-positions.json`, only
+seed IDs and 2D display coordinates, imported from the original
+`bangers/public/strand_semantic_map.json`). Deterministic farthest-first k-means
+forms ten spatial clusters. Each cluster shares the hue of its centroid's angle
+around the collection centroid. Clustering happens before request filtering;
+only policy-eligible strands reach the minimap. Search, cluster selection and
+pagination preserve stable colors. The map supports zoom and source navigation.
+
+List cards pair the seed tweet with the first summary paragraph. Detail pages
+place the seed above a chronological key-post map, with dated avatar labels,
+keyboard/click selection, zoom, and a full timeline toggle. Marker lanes separate
+same-day labels; vertical position does not claim influence or quote volume.
+The story follows the map. Dates use the source timestamp, or the exact tweet
+snowflake when a source is unavailable.
+
+Visible seed and key posts use the shared `TweetCard`, preserving complete text,
+media and quoted tweets. Reads are limited to 24 seeds per list page or one
+strand's key IDs (currently at most 10). When ClickHouse reads are enabled, use
+its existing tweet detail endpoint with four requests at a time; an absent
+record stays unavailable, while other failures propagate without switching
+sources. Other environments use bounded Supabase ID lookups and existing portal
+media/quote enrichment. Apply current username and account-ID opt-outs to both
+returned authors and quoted authors after enrichment. Missing posts show a
+source link, not a fabricated tweet. No snapshot or database writes are needed
+for this presentation change.

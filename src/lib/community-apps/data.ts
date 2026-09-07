@@ -5,6 +5,12 @@ import path from 'node:path'
 import { unstable_cache } from 'next/cache'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import type { AppDataManifest, BirdseyeAnalysis, Strand } from './types'
+import positions from './strand-positions.json'
+import { clusterPositions } from './strand-layout'
+
+const strandPositions = new Map(
+  clusterPositions(positions).map((p) => [p.id, p]),
+)
 
 const BUCKET = 'community-app-data'
 // Only normalized display data lives here. Never expose private Storage URLs,
@@ -82,7 +88,7 @@ export async function getAppPolicy(usernames: string[]) {
         members.add(row.username.toLowerCase())
     }
   }
-  return { blocked, members }
+  return { blocked, blockedIds, members }
 }
 export function hasBlockedParticipant(
   participants: string[],
@@ -134,11 +140,16 @@ async function loadStrands() {
   const policy = await getAppPolicy(strands.map((strand) => strand.username))
   return {
     generatedAt: manifest.strandsGeneratedAt,
-    strands: strands.filter(
-      (strand) =>
-        policy.members.has(strand.username.toLowerCase()) &&
-        !hasBlockedParticipant(strand.participants, policy.blocked),
-    ),
+    strands: strands
+      .filter(
+        (strand) =>
+          policy.members.has(strand.username.toLowerCase()) &&
+          !hasBlockedParticipant(strand.participants, policy.blocked),
+      )
+      .map((strand) => ({
+        ...strand,
+        position: strandPositions.get(strand.id),
+      })),
   }
 }
 

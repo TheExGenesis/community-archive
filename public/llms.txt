@@ -17,15 +17,22 @@ Source repository: https://github.com/TheExGenesis/community-archive
 ## Choose the right data access method
 
 1. Filtered or application queries: use the Supabase REST API.
-2. Bulk analysis: the historical Parquet artifact is unavailable while its exporter is rebuilt to enforce current consent.
+2. Bulk analysis: download the daily consent-safe Parquet package from the [latest release](https://github.com/TheExGenesis/community-archive/releases/latest).
 3. One user's original processed archive: authenticated owners may use the policy-aware web endpoint for their own archive.
 
 ## Bulk dump
 
-The historical `enriched_tweets.parquet` object and release verifier are
-disabled because that exporter did not apply current PostgreSQL consent to
-every nested author immediately before publication. Use filtered REST queries
-until a policy-aware replacement is available.
+The daily package contains enriched `tweets.parquet`, separate `profiles.parquet`,
+and `manifest.json` with row counts, schemas, and checksums. It includes eligible
+members and checks current PostgreSQL membership and opt-outs before publication,
+including consent for referenced authors.
+
+Start from the [latest GitHub release](https://github.com/TheExGenesis/community-archive/releases/latest).
+Scripts can read the stable [latest.json pointer](https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/community-archive-public-export/latest.json)
+and follow its `manifest_url` to the current package. GitHub lists download links;
+the Parquet files remain in consent-managed storage. Superseded packages are
+removed, so do not bookmark versioned file URLs. Downloads may be temporarily
+withdrawn when consent changes.
 
 ## API
 
@@ -66,7 +73,7 @@ Important API rules:
 - Use PostgREST filters such as `username=eq.name`, `created_at=gte.2025-01-01`, and `order=created_at.desc`.
 - Select only needed columns.
 - Responses are capped at 1,000 rows. Paginate with `limit` and `offset` or HTTP Range headers, using a stable order.
-- Full-corpus bulk access is paused until the Parquet exporter is policy-aware.
+- Bulk exports include eligible members, not every account observed in the archive.
 
 ## Individual raw archives
 

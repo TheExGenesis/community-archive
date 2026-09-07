@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Strand } from '@/lib/community-apps/types'
+import { decodeTweetText } from '@/lib/tweetText'
 import { STRAND_CLUSTER_NAMES } from '@/lib/community-apps/strand-cluster-names'
 import { useStrandFocus } from './StrandFocus'
 
@@ -214,7 +215,7 @@ export default function StrandMinimap({
               {STRAND_CLUSTER_NAMES[selected.position!.cluster]}
             </p>
             <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap">
-              {selected.text}
+              {decodeTweetText(selected.text)}
             </p>
           </>
         ) : (

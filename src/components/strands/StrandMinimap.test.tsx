@@ -8,7 +8,7 @@ test('card hover and keyboard focus highlight its dot and preview original text;
       id: '1',
       title: 'Generated title',
       username: 'alice',
-      text: 'The original seed tweet',
+      text: 'The original seed tweet &amp; its text',
       mapLabel: 'Handwritten label',
       position: { x: 0, y: 0, cluster: 0, color: 'red' },
     },
@@ -25,7 +25,7 @@ test('card hover and keyboard focus highlight its dot and preview original text;
   expect(circle).toHaveAttribute('stroke-width', '2')
   fireEvent.mouseEnter(screen.getByRole('article'))
   expect(circle).toHaveAttribute('data-highlighted', 'true')
-  expect(screen.getByText('The original seed tweet')).toBeInTheDocument()
+  expect(screen.getByText('The original seed tweet & its text')).toBeInTheDocument()
   fireEvent.mouseLeave(screen.getByRole('article'))
   expect(circle).not.toHaveAttribute('data-highlighted')
   fireEvent.focus(

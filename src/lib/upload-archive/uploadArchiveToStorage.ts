@@ -3,13 +3,14 @@ import { Archive } from '../types'
 import { devLog } from '../devLog'
 import { refreshSession } from '../refreshSession'
 import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
+import type { ArchiveStorageReference } from './archiveStorageReference'
 
 async function uploadPolicyCheckedObject(
   supabase: SupabaseClient,
   archive: Archive,
   accountId: string,
   username: string,
-): Promise<string> {
+): Promise<ArchiveStorageReference> {
   const { error: policyError } = await supabase.rpc(
     'assert_archive_upload_allowed',
     { p_account_id: accountId, p_username: username },
@@ -21,22 +22,29 @@ async function uploadPolicyCheckedObject(
   const serializedArchive = JSON.stringify(archive)
   const archiveSize = serializedArchive.length / (1024 * 1024)
   console.log(`Size of archive: ${archiveSize.toFixed(2)} MB`)
-  const objectPath = `${username.toLowerCase()}/archive.json`
+  const objectPath = `${username.toLowerCase()}/${crypto.randomUUID()}/archive.json`
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(serializedArchive),
+  )
+  const storageSha256 = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
   const { error: uploadError } = await supabase.storage
     .from('archives')
-    .upload(objectPath, serializedArchive, { upsert: true })
-  if (uploadError && uploadError.message !== 'The resource already exists') {
+    .upload(objectPath, serializedArchive, { upsert: false })
+  if (uploadError) {
     throw new Error(
       `Error uploading archive to storage: ${uploadError.message}`,
     )
   }
-  return objectPath
+  return { storage_path: objectPath, storage_sha256: storageSha256 }
 }
 
 export const uploadArchiveToStorage = async (
   supabase: SupabaseClient,
   archive: Archive,
-): Promise<string> => {
+): Promise<ArchiveStorageReference> => {
   const isDevelopment = process.env.NODE_ENV === 'development'
   const useRemoteDevDb = process.env.NEXT_PUBLIC_USE_REMOTE_DEV_DB === 'true'
 
@@ -92,7 +100,7 @@ export const uploadArchiveToStorage = async (
 export const uploadArchiveToStorageAsService = async (
   supabase: SupabaseClient,
   archive: Archive,
-): Promise<string> => {
+): Promise<ArchiveStorageReference> => {
   const account = archive.account?.[0]?.account
   const accountId = account?.accountId
   const username = account?.username

@@ -4,6 +4,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 import path from 'path'
 import { removeProblematicCharacters } from '@/lib/removeProblematicChars'
+import type { ArchiveStorageReference } from '@/lib/upload-archive/archiveStorageReference'
 
 // Load environment variables from .env file in the scratchpad directory
 if (process.env.NODE_ENV !== 'production') {
@@ -72,6 +73,7 @@ const insertAccountAndUploadRow = async (
   accountId: string,
   archiveData: Archive,
   latestTweetDate: string,
+  storageReference?: ArchiveStorageReference,
 ): Promise<number> => {
   // Compute counts
   const num_tweets = archiveData.tweets.length
@@ -106,13 +108,15 @@ const insertAccountAndUploadRow = async (
   }
 
   const {data: lastUploadedArchive, error: lastUploadedArchiveError} = await supabase.from('archive_upload').
-  select('id,archive_at').eq('account_id', accountId).in('upload_phase', ['uploading', 'ready_for_commit'])
+  select('id,archive_at,storage_path').eq('account_id', accountId).in('upload_phase', ['uploading', 'ready_for_commit'])
   .order('created_at', { ascending: false }).limit(1).maybeSingle()
 
-  const username = archiveData.account[0].account.username;
+  // The immutable path uses the verified current identity; an archive may
+  // still contain the owner's previous Twitter username.
+  const username = storageReference?.storage_path.split('/')[0] ?? archiveData.account[0].account.username;
 
   let supabaseUpsertQuery;
-  if (lastUploadedArchive) {
+  if (lastUploadedArchive && !lastUploadedArchive.storage_path && !storageReference) {
      supabaseUpsertQuery = supabase
       .from('archive_upload')
       .update({ 
@@ -140,7 +144,8 @@ const insertAccountAndUploadRow = async (
           upload_likes: uploadOptions.uploadLikes,
           start_date: uploadOptions.startDate,
           end_date: uploadOptions.endDate,
-          upload_phase: 'uploading'
+          upload_phase: 'uploading',
+          ...storageReference,
         })
         .select('id')
         .single()
@@ -167,6 +172,7 @@ export const insertArchiveForProcessing = async (
     phase: string
     percent: number | null
   }) => void,
+  storageReference?: ArchiveStorageReference,
 ): Promise<void> => {
   const startTime = performance.now()
   console.log('Starting Twitter Archive processing...')
@@ -192,6 +198,7 @@ export const insertArchiveForProcessing = async (
     accountId,
     archiveData,
     latestTweetDate,
+    storageReference,
   )
 
   try{

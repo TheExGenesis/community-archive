@@ -1,6 +1,8 @@
 import * as dotenv from 'dotenv'
 import fs from 'fs'
 import path from 'path'
+import { archiveStoragePath } from './archive_storage_reference'
+import { parseArchiveInput } from './archive_storage_input'
 import winston from 'winston'
 import type { Logform } from 'winston'
 dotenv.config({ path: '.env' })
@@ -854,10 +856,11 @@ function assertValidUsername(username: string): void {
   }
 }
 
-async function loadArchiveData(username: string): Promise<any> {
+async function loadArchiveData(username: string, reference?: Partial<ArchiveClickHouseDelivery>): Promise<any> {
   assertValidUsername(username)
+  const objectPath = archiveStoragePath(username, reference)
   if (CONFIG.DEV_ARCHIVE_PATH) {
-    const archivePath = path.join(CONFIG.DEV_ARCHIVE_PATH, `${username}/archive.json`)
+    const archivePath = path.join(CONFIG.DEV_ARCHIVE_PATH, objectPath)
     logger.debug(`Reading archive from filesystem: ${archivePath}`)
 
     // For very large files, consider streaming JSON parsing
@@ -867,14 +870,14 @@ async function loadArchiveData(username: string): Promise<any> {
     logger.info(`Archive file size: ${fileSizeMB.toFixed(1)}MB`)
 
     const archiveData = fs.readFileSync(archivePath, 'utf8')
-    return JSON.parse(archiveData)
+    return parseArchiveInput(archiveData, reference)
   }
 
-  logger.debug(`Downloading archive ${username}/archive.json from Supabase`)
+  logger.debug(`Downloading pinned archive for ${username} from Supabase`)
   const supabase = await createServerScriptClient()
   const { data, error } = await supabase.storage
     .from('archives')
-    .download(`${username.toLowerCase()}/archive.json`)
+    .download(objectPath)
   
   if (error) {
     throw new Error(`Failed to download archive for ${username}: ${error.message}`)
@@ -883,7 +886,7 @@ async function loadArchiveData(username: string): Promise<any> {
   const text = await data.text()
   logger.info(`Downloaded archive of ${username} with size: ${(text.length / (1024 * 1024)).toFixed(1)}MB`)
   
-  return JSON.parse(text)
+  return parseArchiveInput(text, reference)
 }
 
 
@@ -1053,7 +1056,7 @@ async function buildPolicySafeCanonicalArchiveBatch(
       const source =
         archive ??
         (delivery.username
-          ? patchArchive(await loadArchiveData(delivery.username))
+          ? patchArchive(await loadArchiveData(delivery.username, delivery))
           : null)
       if (!source) {
         throw new ArchiveClickHouseError('archive_source_unavailable')
@@ -1157,6 +1160,8 @@ async function retryPendingCanonicalArchiveShadows(sql: Sql): Promise<void> {
           upload.id AS archive_upload_id,
           upload.account_id,
           upload.username,
+          upload.storage_path,
+          upload.storage_sha256,
           delivery.tweet_ids
         FROM public.archive_upload AS upload
         JOIN private.archive_clickhouse_delivery AS delivery
@@ -1192,7 +1197,7 @@ async function attemptClickHouseDelivery(
   const result = await attemptArchiveClickHouseDelivery({
     delivery,
     archive,
-    loadArchive: async (username) => patchArchive(await loadArchiveData(username)),
+    loadArchive: async (username) => patchArchive(await loadArchiveData(username, delivery)),
     sink,
     withOwnerPolicyLock: async (accountId, operation) => {
       await sql.begin(async (trx: Sql) => {
@@ -1262,7 +1267,9 @@ async function retryPendingClickHouseDeliveries(
       delivery.archive_upload_id,
       delivery.account_id,
       delivery.tweet_ids,
-      upload.username
+      upload.username,
+      upload.storage_path,
+      upload.storage_sha256
     FROM private.archive_clickhouse_delivery AS delivery
     LEFT JOIN public.archive_upload AS upload
       ON upload.id = delivery.archive_upload_id
@@ -1335,7 +1342,7 @@ async function main() {
     logger.info('Fetching archive_upload records ready for processing...')
 
     const ready = await sql`
-      SELECT au.id, au.account_id, au.username, au.archive_at
+      SELECT au.id, au.account_id, au.username, au.archive_at, au.storage_path, au.storage_sha256
       FROM public.archive_upload au
       WHERE upload_phase IN ('ready_for_commit')
       ORDER BY archive_at ASC
@@ -1370,7 +1377,7 @@ async function main() {
           continue
         }
 
-        const archive = await loadArchiveData(username)
+        const archive = await loadArchiveData(username, row)
         const archiveManifest = createArchiveClickHouseManifest(
           archive,
           archiveUploadId,
@@ -1380,6 +1387,8 @@ async function main() {
           account_id,
           tweet_ids: archiveManifest.tweetIds,
           username,
+          storage_path: row.storage_path,
+          storage_sha256: row.storage_sha256,
         }
 
         if (canonicalArchiveQueueFirstEnabled()) {

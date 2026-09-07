@@ -192,6 +192,8 @@ export type Database = {
           start_date: string | null
           upload_likes: boolean | null
           upload_phase: Database["public"]["Enums"]["upload_phase_enum"] | null
+          storage_path: string | null
+          storage_sha256: string | null
           username: string | null
         }
         Insert: {
@@ -204,6 +206,8 @@ export type Database = {
           start_date?: string | null
           upload_likes?: boolean | null
           upload_phase?: Database["public"]["Enums"]["upload_phase_enum"] | null
+          storage_path?: string | null
+          storage_sha256?: string | null
           username?: string | null
         }
         Update: {
@@ -216,6 +220,8 @@ export type Database = {
           start_date?: string | null
           upload_likes?: boolean | null
           upload_phase?: Database["public"]["Enums"]["upload_phase_enum"] | null
+          storage_path?: string | null
+          storage_sha256?: string | null
           username?: string | null
         }
         Relationships: [

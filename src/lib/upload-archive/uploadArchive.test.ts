@@ -16,7 +16,10 @@ const mockedUpload = jest.mocked(uploadArchiveToStorage)
 
 describe('uploadArchive policy race cleanup', () => {
   it('removes the raw object when policy changes before the PostgreSQL sink', async () => {
-    mockedUpload.mockResolvedValue('allowed_owner/archive.json')
+    mockedUpload.mockResolvedValue({
+      storage_path: 'allowed_owner/archive.json',
+      storage_sha256: 'a'.repeat(64),
+    })
     mockedInsert.mockRejectedValue(new Error('archive owner is blocked'))
     const remove = jest.fn().mockResolvedValue({ data: null, error: null })
     const from = jest.fn().mockReturnValue({ remove })

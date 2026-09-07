@@ -36,6 +36,31 @@ This document explains how to run the `@process_archive/` service using Docker f
 
 ## Configuration
 
+### Immutable archive inputs
+
+New uploads store `public.archive_upload.storage_path` and `storage_sha256`.
+The object lives at `<verified-username>/<upload-uuid>/archive.json`, is created
+without upsert, and cannot be overwritten through the authenticated Storage
+UPDATE policy. The upload row cannot later be repointed to different bytes or
+an unrelated account. Every upload gets a new row rather than reusing another
+pending upload's identity.
+
+The worker loads this exact object for initial processing, canonical retries,
+and direct ClickHouse retries, verifies SHA-256 before parsing/normalization,
+and checks the archive owner against the upload row. A missing object or a
+checksum mismatch fails closed; it never falls back to another upload.
+Existing rows with both reference fields null retain the legacy
+`<username>/archive.json` behavior. This change does not repair historical
+mutable inputs. The existing admin deletion worker already recursively removes
+the owner's archive folder, including immutable upload objects.
+
+Deploy migration `20260907031822_pin_immutable_archive_inputs` first, then this
+worker, then the upload/download frontend. Validate an isolated staged upload
+and retry before production promotion. Keep a worker that understands pinned
+references running if the frontend is rolled back; an older worker cannot
+correctly process new pinned uploads. Do not drop the reference columns or
+rewrite them to legacy paths during rollback.
+
 ### Required Environment Variables
 
 Copy `env.example` to `.env` and configure these **required** variables:

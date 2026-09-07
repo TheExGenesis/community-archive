@@ -178,7 +178,16 @@ CREATE TABLE IF NOT EXISTS "public"."archive_upload" (
     "start_date" "date",
     "end_date" "date",
     "upload_phase" "public"."upload_phase_enum" DEFAULT 'uploading'::"public"."upload_phase_enum",
-    "username" "text"
+    "username" "text",
+    "storage_path" "text",
+    "storage_sha256" "text",
+    CONSTRAINT archive_upload_storage_reference CHECK (
+      (storage_path IS NULL AND storage_sha256 IS NULL) OR
+      (storage_path IS NOT NULL AND storage_sha256 IS NOT NULL AND username IS NOT NULL
+       AND storage_sha256 ~ '^[a-f0-9]{64}$'
+       AND storage_path ~ '^[a-z0-9_]{1,15}/[a-f0-9-]{36}/archive[.]json$'
+       AND split_part(storage_path, '/', 1) = lower(username))
+    )
 );
 ALTER TABLE "public"."archive_upload" OWNER TO "postgres";
 

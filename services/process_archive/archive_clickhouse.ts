@@ -20,6 +20,8 @@ export interface ArchiveClickHouseDelivery {
   account_id: string
   tweet_ids: string[]
   username?: string | null
+  storage_path?: string | null
+  storage_sha256?: string | null
 }
 
 export interface ArchivePolicyCandidate {

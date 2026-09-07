@@ -130,3 +130,17 @@ test('omits the year for the all-time sidebar and rejects scope drift', async ()
     fetchClickHouseProfileSidebar('42', 2025, wrongYearFetcher),
   ).rejects.toThrow('mismatched profile sidebar scope')
 })
+
+test('loads a bounded reserve of people for the editable all-time profile', async () => {
+  const payload = response(null)
+  payload.query.peopleLimit = 25
+  const fetcher = jest.fn(
+    async () => payload,
+  ) as unknown as AnalyticsGatewayFetcher
+  await fetchClickHouseProfileInteractions('42', undefined, fetcher)
+  expect(fetcher).toHaveBeenCalledWith(
+    ['user', '42', 'interactions'],
+    new URLSearchParams({ limit: '25' }),
+    { timeoutMs: 30_000 },
+  )
+})

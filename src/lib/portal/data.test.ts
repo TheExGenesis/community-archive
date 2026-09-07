@@ -570,6 +570,74 @@ describe('portal reads', () => {
     expect(tweetsInit?.signal).toBeInstanceOf(AbortSignal)
   })
 
+  test.each([true, false])(
+    'preserves stream quote targets (available=%s)',
+    async (available) => {
+      const quote = {
+        tweetId: '99',
+        accountId: '8',
+        createdAt: '2026-08-07 18:00:00.000',
+        fullText: 'The quoted context',
+        favoriteCount: '9',
+        retweetCount: '1',
+        username: 'quoted_author',
+        accountDisplayName: 'Quoted Author',
+        avatarMediaUrl: null,
+        media: [
+          {
+            mediaUrl: 'https://pbs.twimg.com/media/quote.jpg',
+            mediaType: 'photo',
+            width: 800,
+            height: 600,
+          },
+        ],
+      }
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              data: {
+                tweets: [
+                  {
+                    ...quote,
+                    tweetId: '100',
+                    latestObservedAt: '2026-08-07 20:00:00.000',
+                    followerCount: '5',
+                    quoteTweetId: '99',
+                    quotedTweet: available ? quote : null,
+                  },
+                ],
+                updateCursor: null,
+              },
+            }),
+        } as Response)
+      const [tweet] = await getPortalStreamUpdates(1)
+      expect(tweet.quotedTweet).toMatchObject(
+        available
+          ? {
+              id: '99',
+              accountId: '8',
+              username: 'quoted_author',
+              text: 'The quoted context',
+              createdAt: '2026-08-07T18:00:00.000Z',
+              likes: 9,
+              media: [
+                {
+                  url: 'https://pbs.twimg.com/media/quote.jpg',
+                  type: 'photo',
+                  width: 800,
+                  height: 600,
+                },
+              ],
+            }
+          : { id: '99', text: '', isDeleted: true },
+      )
+    },
+  )
+
   test('loads the initial bangers explorer in a 30-row page', async () => {
     fetchPortalBangersPageMock.mockResolvedValueOnce({
       tweets: [],

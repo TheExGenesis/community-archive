@@ -309,7 +309,7 @@ export function ProfileArchive({
         bangersLoading={activeFeedLoading || (!activeFeed && !activeFeedFailed)}
         media={activeMedia?.media ?? []}
         mediaCount={activeMedia?.mediaCount ?? 0}
-        people={activePeople?.people ?? []}
+        people={(activePeople?.people ?? []).slice(0, 8)}
         peopleTitle={activeYear ? `People in ${activeYear}` : 'Top people'}
         mediaLoading={
           activeMediaLoading || (!activeMedia && !activeMediaFailed)

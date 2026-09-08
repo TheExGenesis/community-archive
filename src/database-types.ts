@@ -1755,6 +1755,26 @@ export type Database = {
       }
     }
     Functions: {
+      get_bulletin_opportunities: {
+        Args: { max_results?: number }
+        Returns: {
+          account_id: string
+          evidence: string
+          expires_at: string
+          full_text: string
+          kind: string
+          model: string
+          place: string
+          posted_at: string
+          respond: string
+          side: string
+          standing: boolean
+          summary: string
+          topics: string[]
+          tweet_id: string
+          username: string
+        }[]
+      }
       admin_activity_page: {
         Args: {
           p_before_at?: string

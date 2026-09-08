@@ -162,3 +162,17 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp
   REVOKE EXECUTE ON FUNCTIONS
   FROM PUBLIC, anon, authenticated, readclient, service_role;
+
+-- Private Bulletin opportunities
+ALTER TABLE bulletin.decisions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bulletin.opportunities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bulletin.calls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bulletin.worker_state ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON SCHEMA bulletin FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON ALL TABLES IN SCHEMA bulletin FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA bulletin FROM PUBLIC,anon,authenticated;
+GRANT USAGE ON SCHEMA bulletin TO service_role;
+GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA bulletin TO service_role;
+GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA bulletin TO service_role;
+REVOKE ALL ON FUNCTION public.get_bulletin_opportunities(integer) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_bulletin_opportunities(integer) TO service_role;

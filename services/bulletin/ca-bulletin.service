@@ -1,0 +1,20 @@
+[Unit]
+Description=Community Archive private Bulletin opportunities
+After=network-online.target
+Wants=network-online.target
+OnFailure=ca-bulletin-failure.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/community-archive-bulletin/current
+Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
+LoadCredentialEncrypted=openrouter_api_key:/etc/credstore.encrypted/ca-bulletin-openrouter
+ExecStart=/usr/bin/python3 /opt/community-archive-bulletin/current/run_service.py
+TimeoutStartSec=20min
+MemoryMax=512M
+CPUQuota=100%
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Deliberately no timer: the successful autorefresh wrapper starts this unit.

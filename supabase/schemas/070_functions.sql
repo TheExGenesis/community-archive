@@ -3645,3 +3645,25 @@ $$;
 ALTER FUNCTION public.admin_activity_page(timestamptz, text, text, text, integer) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.admin_activity_page(timestamptz, text, text, text, integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_activity_page(timestamptz, text, text, text, integer) TO service_role;
+
+-- Private Bulletin opportunities
+-- Backend-only read path: always recheck current policy, source content and expiry.
+CREATE FUNCTION public.get_bulletin_opportunities(max_results integer DEFAULT 50)
+RETURNS TABLE(tweet_id text,account_id text,username text,posted_at timestamptz,
+  full_text text,side text,kind text,summary text,evidence text,topics text[],
+  respond text,standing boolean,expires_at date,place text,model text)
+LANGUAGE sql STABLE SECURITY INVOKER SET search_path=''
+AS $$
+ SELECT t.tweet_id,t.account_id,a.username,t.created_at,t.full_text,
+   o.side,o.kind,o.summary,o.evidence,o.topics,o.respond,o.standing,o.expires_at,o.place,o.model
+ FROM bulletin.opportunities o JOIN public.tweets t USING (tweet_id)
+ JOIN bulletin.allowed_accounts a ON a.account_id=t.account_id
+ WHERE NOT t.is_tombstone AND t.reply_to_tweet_id IS NULL
+   AND t.full_text NOT LIKE 'RT @%'
+   AND NOT EXISTS (SELECT 1 FROM public.retweets r WHERE r.tweet_id=t.tweet_id)
+   AND o.content_hash=encode(sha256(convert_to(t.full_text,'UTF8')),'hex')
+   AND (o.expires_at IS NULL OR o.expires_at >= (now() AT TIME ZONE 'UTC')::date)
+   AND (o.standing OR o.expires_at IS NOT NULL OR t.created_at >= now()-interval '30 days')
+ ORDER BY t.created_at DESC,t.tweet_id DESC
+ LIMIT greatest(0,least(coalesce(max_results,50),200))
+$$;

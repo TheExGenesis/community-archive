@@ -35,11 +35,15 @@ compact insight panels, and the remaining sources. Month counts work with hover,
 keyboard focus, and tap. Insight descriptions and source links open on demand.
 
 Sample ranking and reply grouping query only the topic's exact reference IDs.
+Standalone cards are limited to the profile owner's posts and cited reply groups
+containing an owner post. Quote links do not connect reply groups: a quoted thread
+appears only inside the quoting tweet unless the owner also participates in its
+reply conversation. This filter runs before sample ranking and source pagination.
 Full-fidelity TweetCard payloads use the configured archive reader and fresh opt-out
 checks; they never switch analytical record sources on failure. Related cited posts
 share thread blocks across six-post pages. No uncited parents or other conversation
-content is fetched. Samples are excluded from the remaining feed. Missing metadata
-leaves a source separate; lookup failures are retryable errors.
+content is fetched. Samples are excluded from the remaining feed. A source without enough metadata to establish owner participation is omitted;
+lookup failures are retryable errors.
 
 Counts describe saved references, including conversation context, rather than all
 activity in an archive. Display changes do not refresh analyses.

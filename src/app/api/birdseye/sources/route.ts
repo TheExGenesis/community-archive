@@ -21,16 +21,16 @@ export async function GET(request: NextRequest) {
   const cluster = access?.analysis.clusters.find(
     (c) => c.id === params.get('cluster_id'),
   )
-  if (!cluster)
+  if (!access || !cluster)
     return NextResponse.json(
       { error: 'Birdseye unavailable' },
       { status: 404, headers: PRIVATE_HEADERS },
     )
   const excluded = new Set((params.get('exclude') ?? '').split(',').slice(0, 3))
   try {
-    const index = (await getBirdseyeSourceIndex(cluster.tweetIds)).filter(
-      ({ id }) => !excluded.has(id),
-    )
+    const index = (
+      await getBirdseyeSourceIndex(cluster.tweetIds, access.analysis.username)
+    ).filter(({ id }) => !excluded.has(id))
     const page = index.slice(offset, offset + 6)
     const tweets = await getSourceTweets(page.map(({ id }) => id))
     return NextResponse.json(

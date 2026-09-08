@@ -97,8 +97,9 @@ export function SourcePosts({
         </span>
       </div>
       <p className="text-xs text-muted-foreground">
-        Related replies stay together as posts load. Only cited posts are shown;
-        some may no longer be available.
+        Posts by @{username} and cited replies in their conversations. Quoted
+        posts appear inside the quoting tweet. Some sources may no longer be
+        available.
       </p>
       {Array.from(threads.entries()).map(([threadId, posts]) => (
         <div

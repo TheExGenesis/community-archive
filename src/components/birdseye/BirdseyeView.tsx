@@ -10,6 +10,7 @@ import {
   birdseyeGroups,
   monthlyActivity,
 } from '@/lib/community-apps/birdseye-layout'
+import { getBirdseyeSourceIndex } from '@/lib/community-apps/birdseye-source-index'
 import { getBirdseyeSamples } from '@/lib/community-apps/birdseye-samples'
 import { TopicSparkline } from './TopicSparkline'
 import { MonthlyTimeline } from './MonthlyTimeline'
@@ -27,8 +28,14 @@ async function TopicContent({
 }) {
   let samples: Awaited<ReturnType<typeof getBirdseyeSamples>> = []
   let sampleError = false
+  let sourceTotal = new Set(cluster.tweetIds).size
   try {
-    samples = await getBirdseyeSamples(cluster.tweetIds, username)
+    const index = await getBirdseyeSourceIndex(cluster.tweetIds, username)
+    sourceTotal = index.length
+    samples = await getBirdseyeSamples(
+      index.map(({ id }) => id),
+      username,
+    )
   } catch {
     sampleError = true
   }
@@ -53,7 +60,7 @@ async function TopicContent({
         key={`${username}:${cluster.id}`}
         username={username}
         clusterId={cluster.id}
-        total={Array.from(new Set(cluster.tweetIds)).length - samples.length}
+        total={sourceTotal - samples.length}
         excludeIds={samples.map((tweet) => tweet.id)}
       />
     </>

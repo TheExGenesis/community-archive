@@ -310,3 +310,35 @@ test('source grouping failures remain private and retryable', async () => {
   expect(response.headers.get('cache-control')).toContain('no-store')
   expect(getSourceTweets).not.toHaveBeenCalled()
 })
+
+test('paginates the owner-filtered index before fetching cards and preserves embedded quotes', async () => {
+  session = owner
+  jest.mocked(getBirdseyeSourceIndex).mockResolvedValue([
+    { id: '10', threadId: '10' },
+    { id: '11', threadId: '10' },
+  ])
+  const quotedTweet = { id: '1', username: 'qc', text: 'Quoted thread' }
+  jest.mocked(getSourceTweets).mockResolvedValue(
+    new Map([
+      ['10', { id: '10', username: 'alice', quotedTweet }],
+      ['11', { id: '11', username: 'friend' }],
+    ] as never),
+  )
+  const response = await sources(
+    new NextRequest(
+      'https://ca.test/api/birdseye/sources?username=alice&cluster_id=topic',
+    ),
+  )
+  expect(getBirdseyeSourceIndex).toHaveBeenCalledWith(
+    Array.from({ length: 14 }, (_, i) => String(i + 1)),
+    'alice',
+  )
+  expect(getSourceTweets).toHaveBeenCalledWith(['10', '11'])
+  expect(await response.json()).toMatchObject({
+    tweets: [
+      { id: '10', threadId: '10', quotedTweet },
+      { id: '11', threadId: '10' },
+    ],
+    nextOffset: null,
+  })
+})

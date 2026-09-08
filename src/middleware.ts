@@ -520,6 +520,15 @@ export async function middleware(request: NextRequest) {
 
   // ── Stage 6: Security Headers (all responses) ──────────────────────────
   addSecurityHeaders(response)
+  if (
+    pathname === '/birdseye' ||
+    pathname.startsWith('/birdseye/') ||
+    pathname.startsWith('/api/birdseye/')
+  ) {
+    response.headers.set('Cache-Control', 'private, no-store')
+    response.headers.set('Referrer-Policy', 'no-referrer')
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+  }
 
   // Set rate limit cookie on final response
   const newRlData = (request as any).__newRlData as RateLimitData | undefined

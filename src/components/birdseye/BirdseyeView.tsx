@@ -1,229 +1,269 @@
 import Link from 'next/link'
-import { Link2 } from 'lucide-react'
-import type { BirdseyeAnalysis } from '@/lib/community-apps/types'
+import { Suspense } from 'react'
 import { AnalysisText } from '@/components/community-apps/AnalysisText'
+import type {
+  BirdseyeAnalysis,
+  BirdseyeCluster,
+} from '@/lib/community-apps/types'
+import {
+  birdseyeGroups,
+  monthlyActivity,
+} from '@/lib/community-apps/birdseye-layout'
+import { getBirdseyeSamples } from '@/lib/community-apps/birdseye-samples'
 import { TopicSparkline } from './TopicSparkline'
+import { MonthlyTimeline } from './MonthlyTimeline'
+import { SampleTweets } from './SampleTweets'
+import { InsightCards } from './InsightCards'
 import { SourcePosts } from './SourcePosts'
 import { ShareBirdseye } from './ShareBirdseye'
+
+async function TopicContent({
+  cluster,
+  username,
+}: {
+  cluster: BirdseyeCluster
+  username: string
+}) {
+  let samples: Awaited<ReturnType<typeof getBirdseyeSamples>> = []
+  let sampleError = false
+  try {
+    samples = await getBirdseyeSamples(cluster.tweetIds, username)
+  } catch {
+    sampleError = true
+  }
+  return (
+    <>
+      <SampleTweets tweets={samples} username={username} />
+      {sampleError && (
+        <p className="text-xs text-muted-foreground">
+          Sample selection is temporarily unavailable. Source posts below can
+          still be loaded.
+        </p>
+      )}
+      <MonthlyTimeline cluster={cluster} />
+      <details className="rounded-xl bg-muted/30 p-4">
+        <summary className="cursor-pointer font-sans text-sm font-semibold">
+          About this topic · saved AI summary
+        </summary>
+        <div className="mt-3">
+          <AnalysisText>{cluster.summary}</AnalysisText>
+        </div>
+      </details>
+      <Suspense
+        fallback={
+          <p className="text-sm text-muted-foreground">Loading insights…</p>
+        }
+      >
+        <InsightCards cluster={cluster} />
+      </Suspense>
+      <SourcePosts
+        key={`${username}:${cluster.id}`}
+        username={username}
+        clusterId={cluster.id}
+        total={Array.from(new Set(cluster.tweetIds)).length - samples.length}
+        excludeIds={samples.map((tweet) => tweet.id)}
+      />
+    </>
+  )
+}
 
 export function BirdseyeView({
   analysis,
   selectedId,
   isOwner,
   sharingEnabled,
-  profiles = [],
   isAdmin = false,
 }: {
   analysis: BirdseyeAnalysis
   selectedId?: string
   isOwner: boolean
   sharingEnabled: boolean
-  profiles?: string[]
   isAdmin?: boolean
 }) {
-  const selected =
-    analysis.clusters.find((cluster) => cluster.id === selectedId) ??
-    analysis.clusters[0]
-  const dates = analysis.clusters.flatMap((cluster) =>
-    cluster.years.map((p) => p.year),
+  const selected = analysis.clusters.find(
+    (cluster) => cluster.id === selectedId,
   )
-  const start = dates.length ? Math.min(...dates) : 0
-  const end = dates.length ? Math.max(...dates) : 0
-  const groupedIds = new Set(
-    analysis.groups.flatMap((group) => group.clusterIds),
+  const groups = birdseyeGroups(analysis)
+  const ids = Array.from(
+    new Set(analysis.clusters.flatMap((cluster) => cluster.tweetIds)),
   )
-  const groups = [
-    ...analysis.groups,
-    {
-      name: 'More topics',
-      clusterIds: analysis.clusters
-        .filter((c) => !groupedIds.has(c.id))
-        .map((c) => c.id),
-    },
-  ]
-  const clusters = new Map(
-    analysis.clusters.map((cluster) => [cluster.id, cluster]),
-  )
+  const months = monthlyActivity(ids)
+  const start = months.length ? Number(months[0].month.slice(0, 4)) : 0
+  const end = months.length
+    ? Number(months[months.length - 1].month.slice(0, 4))
+    : 0
+  const overviewHref = `/birdseye?username=${analysis.username}`
+  const topicHref = (cluster: BirdseyeCluster) =>
+    `${overviewHref}&cluster_id=${encodeURIComponent(cluster.id)}`
   return (
-    <main className="ph-no-capture ph-mask mx-auto min-h-screen max-w-[1440px] px-5 py-8 sm:px-8">
-      <Link
-        href="/community"
-        className="text-xs font-semibold text-muted-foreground hover:text-brand"
-      >
-        ← Community Apps
-      </Link>
-      <header className="mb-9 mt-6 flex flex-wrap items-start justify-between gap-5 border-b border-border pb-7">
+    <main className="ph-no-capture ph-mask mx-auto min-h-screen max-w-[1440px] px-5 py-5 sm:px-8">
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <Link
+          href="/community"
+          className="font-semibold text-muted-foreground hover:text-brand"
+        >
+          ← Community Apps
+        </Link>
+        {isAdmin && (
+          <Link href="/birdseye/profiles" className="font-semibold text-brand">
+            Change profile →
+          </Link>
+        )}
+      </div>
+      <header className="mb-6 mt-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-brand">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-brand">
             Birdseye · Experimental
           </p>
-          <h1 className="break-all text-4xl font-bold tracking-tight sm:text-5xl">
-            <Link href={`/user/${analysis.username}`}>
-              @{analysis.username}
-            </Link>
+          <h1 className="break-all font-sans text-2xl font-bold tracking-tight sm:text-3xl">
+            <Link href={overviewHref}>@{analysis.username}</Link>
           </h1>
-          <p className="mt-3 text-sm text-muted-foreground">
-            An archive in {analysis.clusters.length} topics. Ideas, interests,
-            and connections over time.
-          </p>
         </div>
         {isOwner ? (
           <ShareBirdseye initiallyEnabled={sharingEnabled} />
         ) : (
-          <span className="rounded-full bg-muted px-3 py-1.5 text-xs text-muted-foreground">
-            {isAdmin ? 'Admin view · private analysis' : 'Shared with you'}
+          <span className="rounded-full bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground">
+            {isAdmin ? 'Admin view' : 'Shared with you'}
           </span>
         )}
       </header>
-      {profiles.length > 0 && (
-        <form
-          action="/birdseye"
-          className="mb-8 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-muted/30 p-4"
-        >
-          <label className="min-w-0 flex-1 text-sm font-semibold">
-            Admin · Birdseye profile
-            <select
-              name="username"
-              defaultValue={analysis.username}
-              className="mt-2 block h-10 w-full rounded-lg border border-border bg-background px-3"
-              aria-label="Birdseye profile"
-            >
-              {profiles.map((username) => (
-                <option key={username} value={username}>
-                  @{username}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className="h-10 rounded-lg bg-brand px-4 text-sm font-semibold text-brand-foreground">
-            View profile
-          </button>
-          <p className="w-full text-xs text-muted-foreground">
-            {profiles.length} available profiles. Admin access does not make
-            these analyses public.
-          </p>
-        </form>
-      )}
-      <div className="grid items-start gap-8 lg:grid-cols-[330px_minmax(0,1fr)] lg:gap-12">
+      <div className="grid items-start gap-6 lg:grid-cols-[290px_minmax(0,1fr)] lg:gap-10">
         <nav
           aria-label="Archive topics"
-          className="max-h-56 space-y-6 overflow-y-auto pr-2 lg:sticky lg:top-20 lg:max-h-[calc(100vh-7rem)]"
+          className="birdseye-scroll max-h-28 space-y-5 overflow-y-auto pr-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-7rem)]"
         >
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>{analysis.clusters.length} TOPICS</span>
-            <span>
-              Cited posts · {start}–{end}
+          <Link
+            href={overviewHref}
+            aria-current={!selected ? 'page' : undefined}
+            className={`block rounded-lg px-2 py-2 font-sans text-base font-bold ${!selected ? 'bg-brand/10 text-brand' : 'hover:bg-muted/50'}`}
+          >
+            Overview{' '}
+            <span className="float-right text-xs font-normal">
+              {analysis.clusters.length} topics
             </span>
-          </div>
-          {groups.map((group) => {
-            const members = group.clusterIds.flatMap((id) =>
-              clusters.has(id) ? [clusters.get(id)!] : [],
-            )
-            return members.length ? (
-              <section key={group.name}>
-                <h2 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          </Link>
+          {groups.map((group) => (
+            <section key={group.id}>
+              <h2 className="mb-2 px-2 font-sans text-lg font-bold leading-snug">
+                <Link
+                  href={`${overviewHref}#${group.id}`}
+                  className="hover:text-brand"
+                >
                   {group.name}
-                </h2>
-                <ul className="space-y-1">
-                  {members.map((cluster) => (
-                    <li key={cluster.id}>
-                      <Link
-                        prefetch={false}
-                        href={`/birdseye?username=${analysis.username}&cluster_id=${encodeURIComponent(cluster.id)}`}
-                        aria-current={
-                          selected?.id === cluster.id ? 'page' : undefined
-                        }
-                        className={`flex items-center justify-between gap-3 rounded-xl border p-3 text-sm transition-colors ${selected?.id === cluster.id ? 'border-brand/20 bg-brand/10 font-semibold text-foreground' : 'border-transparent text-muted-foreground hover:bg-muted'}`}
-                      >
-                        <span className="min-w-0">{cluster.name}</span>
-                        <TopicSparkline
-                          years={cluster.years}
-                          start={start}
-                          end={end}
-                        />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null
-          })}
+                </Link>
+              </h2>
+              <ul className="space-y-0.5">
+                {group.topics.map((cluster) => (
+                  <li key={cluster.id}>
+                    <Link
+                      prefetch={false}
+                      href={topicHref(cluster)}
+                      aria-current={
+                        selected?.id === cluster.id ? 'page' : undefined
+                      }
+                      className={`flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-[13px] ${selected?.id === cluster.id ? 'bg-brand/10 font-semibold text-brand' : 'text-muted-foreground hover:bg-muted/40'}`}
+                    >
+                      <span className="min-w-0">{cluster.name}</span>
+                      <TopicSparkline
+                        years={cluster.years}
+                        start={start}
+                        end={end}
+                      />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
         </nav>
         {selected ? (
-          <article className="min-w-0 space-y-8">
-            <section>
-              <p className="mb-3 text-xs text-muted-foreground">
-                TOPIC / {Array.from(new Set(selected.tweetIds)).length} CITED
-                POSTS
-              </p>
-              <h2 className="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">
+          <article className="min-w-0 space-y-7">
+            <div>
+              <h2 className="font-sans text-2xl font-bold leading-tight sm:text-3xl">
                 {selected.name}
               </h2>
-              <AnalysisText>{selected.summary}</AnalysisText>
-            </section>
-            <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs leading-5 text-muted-foreground">
-              AI-generated from a saved archive snapshot. Interpretations may be
-              mistaken. Charts count cited posts, not every tweet.
-            </p>
-            <div className="grid items-start gap-4 xl:grid-cols-2">
-              {selected.sections
-                .filter((section) => section.items.length)
-                .map((section) => (
-                  <section
-                    key={section.name}
-                    className="rounded-2xl border border-border bg-card p-4"
-                  >
-                    <h3 className="mb-3 flex items-center justify-between gap-2 text-sm font-bold">
-                      {section.name}
-                      <span className="font-normal text-muted-foreground">
-                        {section.items.length}
-                      </span>
-                    </h3>
-                    <div className="divide-y divide-border/60">
-                      {section.items.map((item, index) => (
-                        <div
-                          key={`${item.label}:${index}`}
-                          className="py-3 first:pt-0 last:pb-0"
-                        >
-                          <h4 className="text-sm font-semibold">
-                            {item.label}
-                          </h4>
-                          {item.description && (
-                            <p className="mt-1 text-[13px] leading-5 text-muted-foreground">
-                              {item.description}
-                            </p>
-                          )}
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {Array.from(new Set(item.tweetIds)).map(
-                              (id, sourceIndex) => (
-                                <Link
-                                  prefetch={false}
-                                  key={id}
-                                  href={`/tweets/${id}`}
-                                  aria-label={`Source ${sourceIndex + 1} for ${item.label}`}
-                                  title={`View source post ${sourceIndex + 1}`}
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-brand hover:bg-brand/10"
-                                >
-                                  <Link2 size={13} aria-hidden="true" />
-                                </Link>
-                              ),
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ))}
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                @{analysis.username}’s posts and the conversations around them.
+                Saved analysis; interpretations may be mistaken.
+              </p>
             </div>
-            <SourcePosts
-              key={`${analysis.username}:${selected.id}`}
-              username={analysis.username}
-              clusterId={selected.id}
-              total={Array.from(new Set(selected.tweetIds)).length}
-            />
+            <Suspense
+              key={selected.id}
+              fallback={
+                <section
+                  aria-label="Loading sample tweets"
+                  className="grid gap-3 xl:grid-cols-2"
+                >
+                  {[0, 1].map((i) => (
+                    <div
+                      key={i}
+                      className="h-52 animate-pulse rounded-xl bg-muted/40 p-5 text-sm text-muted-foreground"
+                    >
+                      Loading sample posts…
+                    </div>
+                  ))}
+                </section>
+              }
+            >
+              <TopicContent cluster={selected} username={analysis.username} />
+            </Suspense>
           </article>
         ) : (
-          <p>No topics are currently available for this archive.</p>
+          <article className="min-w-0 space-y-6">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-brand">
+                The big picture
+              </p>
+              <h2 className="font-sans text-3xl font-bold">
+                @{analysis.username}’s topics, at a glance
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+                {groups.length} big themes across {analysis.clusters.length}{' '}
+                topics and {ids.length.toLocaleString()} cited posts
+                {start ? `, ${start}–${end}` : ''}. Start with a theme or choose
+                a subtopic.
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Based on saved analyses, ordered by cited-post count. This is a
+                snapshot, not a live profile.
+              </p>
+            </div>
+            <div className="grid items-start gap-4 xl:grid-cols-2">
+              {groups.map((group) => (
+                <section
+                  id={group.id}
+                  key={group.id}
+                  className="scroll-mt-20 rounded-2xl border border-border bg-card/60 p-5"
+                >
+                  <div className="mb-4">
+                    <h3 className="font-sans text-xl font-bold leading-snug">
+                      {group.name}
+                    </h3>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {group.topics.length} subtopics ·{' '}
+                      {group.tweetIds.length.toLocaleString()} cited posts
+                    </p>
+                  </div>
+                  <ul className="space-y-1">
+                    {group.topics.map((cluster) => (
+                      <li key={cluster.id}>
+                        <Link
+                          prefetch={false}
+                          href={topicHref(cluster)}
+                          className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm hover:bg-brand/5"
+                        >
+                          <span>{cluster.name}</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {new Set(cluster.tweetIds).size} ↗
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          </article>
         )}
       </div>
     </main>

@@ -25,7 +25,10 @@ export async function GET(request: NextRequest) {
       { error: 'Birdseye unavailable' },
       { status: 404, headers: PRIVATE_HEADERS },
     )
-  const ids = Array.from(new Set(cluster.tweetIds))
+  const excluded = new Set((params.get('exclude') ?? '').split(',').slice(0, 2))
+  const ids = Array.from(new Set(cluster.tweetIds)).filter(
+    (id) => !excluded.has(id),
+  )
   const page = ids.slice(offset, offset + 6)
   const tweets = await getStrandTweets(page)
   return NextResponse.json(

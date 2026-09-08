@@ -19,7 +19,7 @@ test('loads on approach, retains earlier posts, retries a failed batch, and stop
     .mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        tweets: [{ id: '1', text: 'First source' }],
+        tweets: [{ id: '1', username: 'alice', text: 'First source' }],
         nextOffset: 6,
       }),
     } as Response)
@@ -27,7 +27,7 @@ test('loads on approach, retains earlier posts, retries a failed batch, and stop
     .mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        tweets: [{ id: '2', text: 'Last source' }],
+        tweets: [{ id: '2', username: 'bob', text: 'Last source' }],
         nextOffset: null,
       }),
     } as Response)
@@ -40,6 +40,8 @@ test('loads on approach, retains earlier posts, retries a failed batch, and stop
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
   expect(await screen.findByText('Last source')).toBeInTheDocument()
   expect(screen.getByText('First source')).toBeInTheDocument()
+  expect(screen.getByText('By @alice')).toBeInTheDocument()
+  expect(screen.getByText('Conversation context · @bob')).toBeInTheDocument()
   await waitFor(() =>
     expect(screen.queryByRole('button')).not.toBeInTheDocument(),
   )

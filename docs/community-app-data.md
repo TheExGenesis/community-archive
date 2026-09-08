@@ -52,10 +52,31 @@ analytics. The redirect renders no page scripts; private responses use
 `no-store`, `no-referrer`, and `noindex`. The analysis/share UI is blocked from
 PostHog autocapture and session replay via `ph-no-capture`.
 
-Each topic row has a sparkline with a shared year range and individually scaled
-counts of cited posts. The topic page shows compact insight cards, icon source
-links, and lazy source tweet cards, with a Load more/retry fallback. The profile
-handle is the primary heading. The standard `dev` and `dev-remote-db` scripts bind to `127.0.0.1` and enable
+Birdseye opens on a macro-topic overview, ordered by each group's unique cited
+post count. Subtopics are ranked by cited count too. Profile switching lives at
+`/birdseye/profiles`, behind the same admin gate; it is a compact header link on
+the profile itself. The large sidebar headings use sans-serif type, with subtle
+scrollbars revealed on hover or keyboard focus.
+
+Topic pages lead with two sample TweetCards. Exact-ID PostgreSQL metadata
+lookups rank only that topic's cited references by likes, prioritizing the
+profile owner's posts. The final payloads use the configured shared archive
+reader and fresh opt-out checks; conversation-context samples are labeled.
+Ranking metadata is cached for five minutes. There is no whole-archive scan,
+new analysis, or inference. A ranking failure displays an unavailable notice;
+it does not silently substitute arbitrary samples.
+
+Monthly bars derive UTC creation months from the saved tweet snowflakes,
+deduplicate references, fill interior empty months, and crop to the first/last
+cited month. Existing yearly summaries follow horizontally, cropped to the
+same year range. These counts include cited conversation context and do not
+claim full archive activity. Compact insight cards follow, starting with entities;
+known participant handles use available directory avatars, while unknown names
+remain text. The remaining six-at-a-time source feed excludes the samples and
+labels owner posts versus conversation context. Existing saved analysis content
+and relationships are unchanged.
+
+The standard `dev` and `dev-remote-db` scripts bind to `127.0.0.1` and enable
 `LOCAL_ADMIN_PREVIEW=true`. On a loopback host in `NODE_ENV=development`, with
 no Vercel deployment marker, this starts a local admin read preview automatically.
 The header's Local admin menu signs out (persistent across reloads) and can

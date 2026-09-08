@@ -244,13 +244,11 @@ test('real admins can list and read eligible profiles without becoming the owner
     isOwner: false,
   })
   expect(member).not.toHaveBeenCalled()
-  jest
-    .mocked(getAppPolicy)
-    .mockResolvedValue({
-      members: new Set(),
-      blocked: new Set(['alice']),
-      blockedIds: new Set(),
-    })
+  jest.mocked(getAppPolicy).mockResolvedValue({
+    members: new Set(),
+    blocked: new Set(['alice']),
+    blockedIds: new Set(),
+  })
   expect(await getBirdseyeProfiles()).toEqual([])
   expect(await loadAccessibleBirdseye('alice')).toBeNull()
 })
@@ -276,4 +274,16 @@ test('local admin can browse sources, logout removes access, and no Auth identit
   jest.mocked(getLocalAdminPreview).mockResolvedValue('signed-out')
   expect(await getBirdseyeProfiles()).toEqual([])
   expect(await loadAccessibleBirdseye('alice')).toBeNull()
+})
+
+test('remaining sources skip the two highlighted posts before applying pagination', async () => {
+  session = owner
+  const response = await sources(
+    new NextRequest(
+      'https://ca.test/api/birdseye/sources?username=alice&cluster_id=topic&exclude=1,5',
+    ),
+  )
+  expect(response.status).toBe(200)
+  expect(getStrandTweets).toHaveBeenCalledWith(['2', '3', '4', '6', '7', '8'])
+  expect(await response.json()).toMatchObject({ nextOffset: 6 })
 })

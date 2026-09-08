@@ -7,11 +7,14 @@ export function SourcePosts({
   username,
   clusterId,
   total,
+  excludeIds = [],
 }: {
   username: string
   clusterId: string
   total: number
+  excludeIds?: string[]
 }) {
+  const excluded = excludeIds.join(',')
   const [tweets, setTweets] = useState<PortalTweet[]>([])
   const [offset, setOffset] = useState<number | null>(total ? 0 : null)
   const [loading, setLoading] = useState(false)
@@ -32,6 +35,7 @@ export function SourcePosts({
         cluster_id: clusterId,
         offset: String(offset),
       })
+      if (excluded) query.set('exclude', excluded)
       const response = await fetch(`/api/birdseye/sources?${query}`, {
         signal: abort.signal,
         cache: 'no-store',
@@ -62,7 +66,7 @@ export function SourcePosts({
       inFlight.current = false
       if (!abort.signal.aborted) setLoading(false)
     }
-  }, [username, clusterId, offset])
+  }, [username, clusterId, offset, excluded])
   useEffect(() => () => controller.current?.abort(), [])
   useEffect(() => {
     if (!sentinel.current || error || offset === null) return
@@ -78,7 +82,9 @@ export function SourcePosts({
   return (
     <section aria-label="Source posts" className="space-y-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-xl font-bold">Source posts</h3>
+        <h3 className="font-sans text-xl font-bold">
+          {excluded ? 'More source posts' : 'Source posts'}
+        </h3>
         <span className="text-xs text-muted-foreground">
           {total} cited posts
         </span>
@@ -92,6 +98,11 @@ export function SourcePosts({
           key={tweet.id}
           className="overflow-hidden rounded-xl border border-border bg-card"
         >
+          <p className="px-4 pt-3 text-xs text-muted-foreground">
+            {tweet.username.toLowerCase() === username.toLowerCase()
+              ? `By @${username}`
+              : `Conversation context · @${tweet.username}`}
+          </p>
           <TweetCard tweet={tweet} noClamp showDate showExternalLink />
         </div>
       ))}

@@ -1,3 +1,4 @@
+import { HowItWorks } from '@/components/birdseye/HowItWorks'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
@@ -45,6 +46,9 @@ export default async function BirdseyePage({
         <p className="mt-3 text-sm text-muted-foreground">
           Analyses are currently available for a limited set of archives.
         </p>
+        <div className="mt-4">
+          <HowItWorks />
+        </div>
         <div className="mt-7 flex gap-4">
           <Link
             href="/login?redirect=%2Fbirdseye"

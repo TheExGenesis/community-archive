@@ -123,17 +123,19 @@ function TweetImages({
   media,
   compact,
   compactGrid = false,
+  constrainMedia = false,
   label,
 }: {
   media: PortalMedia[] | undefined
   compact: boolean
   compactGrid?: boolean
+  constrainMedia?: boolean
   label: string
 }) {
   const images = imageMedia(media)
   if (images.length === 0) return null
 
-  if (compact && !compactGrid) {
+  if (compact && !compactGrid && !constrainMedia) {
     return (
       <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
         {images.slice(0, 4).map((item, index) => (
@@ -156,7 +158,7 @@ function TweetImages({
     <div
       role={compactGrid ? 'group' : undefined}
       aria-label={compactGrid ? 'Quoted tweet media' : undefined}
-      className={`mt-2 grid gap-1.5 ${images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
+      className={`mt-2 grid gap-1.5 ${images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} ${constrainMedia ? 'h-[25svh] max-h-[240px] auto-rows-fr' : ''}`}
     >
       {images.slice(0, 4).map((item, index) => (
         <ImageLightbox
@@ -170,8 +172,8 @@ function TweetImages({
               ? '(max-width: 640px) 50vw, 320px'
               : '(max-width: 640px) 100vw, 640px'
           }
-          className={`${compactGrid ? (images.length > 1 ? 'aspect-square' : 'aspect-video') : 'max-h-72'} rounded-[4px] border border-zinc-200 bg-zinc-100 dark:border-[#303036] dark:bg-[#202023]`}
-          imageClassName={`${compactGrid ? 'h-full' : 'h-full max-h-72'} w-full object-cover transition-transform hover:scale-[1.01]`}
+          className={`${constrainMedia ? 'h-full min-h-0' : compactGrid ? (images.length > 1 ? 'aspect-square' : 'aspect-video') : 'max-h-72'} rounded-[4px] border border-zinc-200 bg-zinc-100 dark:border-[#303036] dark:bg-[#202023]`}
+          imageClassName={`${constrainMedia ? 'h-full max-h-full object-contain' : compactGrid ? 'h-full object-cover' : 'h-full max-h-72 object-cover'} w-full transition-transform hover:scale-[1.01]`}
         />
       ))}
     </div>
@@ -183,6 +185,7 @@ function QuotedTweet({
   compact,
   summary,
   noClamp,
+  constrainMedia,
   showDate,
   origin,
   returnTo,
@@ -192,6 +195,7 @@ function QuotedTweet({
   compact: boolean
   summary: boolean
   noClamp: boolean
+  constrainMedia: boolean
   showDate: boolean
   origin?: TweetOrigin
   returnTo?: string
@@ -256,6 +260,7 @@ function QuotedTweet({
             media={tweet.media}
             compact={compact}
             compactGrid
+            constrainMedia={constrainMedia}
             label="Quoted tweet image"
           />
           {/https?:\/\//.test(tweet.text) && (
@@ -290,6 +295,8 @@ export interface TweetCardProps {
   compact?: boolean
   collapsible?: boolean
   noClamp?: boolean
+  /** Keep media within a quarter viewport; lightbox still shows full size. */
+  constrainMedia?: boolean
   featuredRank?: number
   showDate?: boolean
   showArchivedBadge?: boolean
@@ -340,6 +347,7 @@ export function TweetRow({
   compact = false,
   collapsible = false,
   noClamp = false,
+  constrainMedia = false,
   featuredRank,
   showDate = false,
   showArchivedBadge = false,
@@ -492,7 +500,12 @@ export function TweetRow({
           {isExpanded ? 'Show less' : 'Read more'}
         </button>
       )}
-      <TweetImages media={tweet.media} compact={compact} label="Tweet image" />
+      <TweetImages
+        media={tweet.media}
+        compact={compact}
+        constrainMedia={constrainMedia}
+        label="Tweet image"
+      />
       {/https?:\/\//.test(tweet.text) && (
         <TweetLinkPreviews tweetId={tweet.id} compact={compact} />
       )}
@@ -502,6 +515,7 @@ export function TweetRow({
           compact={compact}
           summary={quotedTweetDisplay === 'summary'}
           noClamp={noClamp}
+          constrainMedia={constrainMedia}
           showDate={showDate}
           origin={origin}
           returnTo={returnTo}

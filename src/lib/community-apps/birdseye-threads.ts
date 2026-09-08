@@ -40,3 +40,23 @@ export function groupBirdseyeSources(
     return group.map((id) => ({ id, threadId: group[0] }))
   })
 }
+
+/** Quote references are deliberately not edges: only reply participation counts. */
+export function selectBirdseyeSources(
+  ids: string[],
+  rows: (Parameters<typeof groupBirdseyeSources>[1][number] & {
+    username: string | null
+  })[],
+  username: string,
+) {
+  const index = groupBirdseyeSources(ids, rows)
+  const ownIds = new Set(
+    rows
+      .filter((row) => row.username?.toLowerCase() === username.toLowerCase())
+      .map((row) => row.tweet_id),
+  )
+  const ownThreads = new Set(
+    index.filter(({ id }) => ownIds.has(id)).map(({ threadId }) => threadId),
+  )
+  return index.filter(({ threadId }) => ownThreads.has(threadId))
+}

@@ -106,3 +106,123 @@ test('tolerates malformed model output', () => {
     ),
   ).toEqual([])
 })
+
+test('only the fallback path accepts two-post sections', async () => {
+  const { generateYearSections } = await import('./sectionGeneration')
+  const small = YEAR.filter((tweet) =>
+    ['1', '2', '4', '5'].includes(tweet.tweet_id),
+  ).map((tweet) => ({ ...tweet, favorite_count: 10 }))
+  const raw = [
+    { title: 'full of sinkholes', tweet_ids: ['1', '2'] },
+    { title: 'soup thoughts', tweet_ids: ['4', '5'] },
+  ]
+  expect(parseYearSections(raw, small)).toEqual([])
+  const request = jest.fn().mockResolvedValue(raw)
+  const result = await generateYearSections(
+    2025,
+    [],
+    async () => small,
+    request,
+  )
+  expect(result.source).toBe('fallback')
+  expect(result.sections).toHaveLength(2)
+  expect(request.mock.calls[0][0]).toContain('at least 2 posts')
+})
+
+test('prefers successful bangers and never fetches fallback unnecessarily', async () => {
+  const { generateYearSections } = await import('./sectionGeneration')
+  const fallback = jest.fn()
+  const request = jest
+    .fn()
+    .mockRejectedValueOnce(new Error('provider down'))
+    .mockResolvedValue([
+      { title: 'full of sinkholes', tweet_ids: ['1', '2', '3'] },
+      { title: 'soup thoughts', tweet_ids: ['4', '5', '6'] },
+    ])
+  const result = await generateYearSections(2025, YEAR, fallback, request)
+  expect(result.source).toBe('bangers')
+  expect(result.failures).toBe(1)
+  expect(fallback).not.toHaveBeenCalled()
+})
+
+test('fallback tries three-post themes before permitting pairs and distinguishes provider errors', async () => {
+  const { generateYearSections } = await import('./sectionGeneration')
+  const candidates = YEAR.map((tweet) => ({ ...tweet, favorite_count: 10 }))
+  const request = jest.fn().mockResolvedValue([])
+  const result = await generateYearSections(
+    2025,
+    [],
+    async () => candidates,
+    request,
+  )
+  expect(result.source).toBe('no-defensible-split')
+  expect(
+    request.mock.calls
+      .slice(0, 3)
+      .every(([prompt]) => prompt.includes('at least 3 posts')),
+  ).toBe(true)
+  expect(
+    request.mock.calls
+      .slice(3)
+      .every(([prompt]) => prompt.includes('at least 2 posts')),
+  ).toBe(true)
+  expect(
+    (
+      await generateYearSections(
+        2025,
+        [],
+        async () => candidates,
+        async () => {
+          throw new Error('down')
+        },
+      )
+    ).source,
+  ).toBe('provider-failure')
+})
+
+test('top-liked pool excludes replies, retweets, links and other years, sorts and caps deterministically', async () => {
+  const { topLikedTweets } = await import('./sectionGeneration')
+  const candidates = Array.from({ length: 60 }, (_, i) => ({
+    ...tweet(String(i), 2025, `original post ${i}`),
+    favorite_count: i,
+  }))
+  const result = topLikedTweets(
+    [
+      ...candidates,
+      {
+        ...tweet('reply', 2025, 'a reply'),
+        favorite_count: 999,
+        reply_to_tweet_id: '1',
+      },
+      { ...tweet('rt', 2025, 'RT @someone: popular'), favorite_count: 999 },
+      { ...tweet('link', 2025, 'https://t.co/link'), favorite_count: 999 },
+      { ...tweet('old', 2024, 'old post'), favorite_count: 999 },
+      candidates[59],
+    ],
+    2025,
+  )
+  expect(result).toHaveLength(50)
+  expect(result[0].tweet_id).toBe('59')
+  expect(result[49].tweet_id).toBe('10')
+})
+
+test('rejects overfragmented model output instead of publishing more than five sections', () => {
+  const tweets = Array.from({ length: 18 }, (_, i) =>
+    tweet(String(i), 2025, `theme ${Math.floor(i / 3)}`),
+  )
+  const raw = Array.from({ length: 6 }, (_, i) => ({
+    title: `theme ${i}`,
+    tweet_ids: [0, 1, 2].map((j) => String(i * 3 + j)),
+  }))
+  expect(parseYearSections(raw, tweets)).toEqual([])
+})
+
+test('bare media labels are not evidence of a theme', async () => {
+  const { topLikedTweets } = await import('./sectionGeneration')
+  expect(
+    topLikedTweets(
+      [{ ...tweet('1', 2025, 'Photo: https://t.co/a'), favorite_count: 999 }],
+      2025,
+    ),
+  ).toEqual([])
+})

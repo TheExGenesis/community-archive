@@ -5652,5 +5652,6 @@
     }
   ],
   "baseline": "4c3551c436579610e2001d503032c1af7328ab2b",
-  "note": "Counts consolidated across the initial run, corrected UTC extraction, and review of two overfragmented new years. Published successful years remained frozen."
+  "note": "Counts consolidated across the initial run, corrected UTC extraction, and review of two overfragmented new years. Published successful years remained frozen.",
+  "review": "Reviewed representative outputs; regenerated two overfragmented new years; manually removed a bare-photo grouping, a mismatched tweet, and a vague Amazing grouping. No published successful year changed."
 }

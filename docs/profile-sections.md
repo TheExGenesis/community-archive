@@ -95,3 +95,45 @@ Rendering tests cover zero-banger navigation, hydration, pagination,
 deduplication, author/year checks and visible gateway failures. Inspect sample
 groups against their source text before committing a backfill, and compare all
 previous successful years structurally to confirm they remain frozen.
+
+## Backfill result — 2026-09-08
+
+Relative to PR #878 at `4c3551c436579610e2001d503032c1af7328ab2b`:
+
+| Measure                                         | Count |
+| ----------------------------------------------- | ----: |
+| Already-sectioned accounts audited              |    52 |
+| Active years audited                            |   569 |
+| Previously filled years, preserved unchanged    |   207 |
+| Previously recorded empty years, now all filled |    21 |
+| Previously missing years discovered             |   341 |
+| Additional years filled using bangers           |    12 |
+| Additional years filled using top-liked posts   |   293 |
+| Filled years after backfill                     |   512 |
+| Remaining: fewer than four usable posts         |    47 |
+| Remaining: no defensible split                  |    10 |
+| Unresolved provider/data failures               |     0 |
+
+The three accounts with only empty generated entries were outside the requested
+already-sectioned scope. Their four empty entries remain untouched.
+
+The input was export `2026-09-08T07-00-55Z`, verified against its SHA-256 manifest.
+The complete per-year results are in [profile-sections-audit.json](profile-sections-audit.json).
+Counts consolidate the UTC-corrected run and review corrections; source fields
+in individual records describe the accepted generation path.
+
+Representative inspection included Prigoose 2025 (four groups: living near
+friends, parenting, Twitter Speedrun, and FractalU), tasshinfogleman 2022
+(recovered through bangers), TylerAlterman 2025 (also recovered through bangers),
+and older fallback years with sparse or media-heavy posts. Review rejected two
+overfragmented results, removed an uninformative bare-photo group, and replaced
+a vague “Amazing” grouping with specific supported groups. These edits affected
+only new, unpublished years.
+
+Verification on the branch after integrating current main: focused profile
+suite (38 tests), extraction fixture, type-check, lint, and production build.
+All 207 previously successful generated year records were structurally unchanged.
+All 3,874 new representative assignments were checked against the export for
+account and UTC year; fallback IDs and title grounding were also checked against
+their candidate pool. Existing curated definitions were moved without changing
+their contents. Lint retains an unrelated existing `<img>` warning.

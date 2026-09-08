@@ -685,6 +685,7 @@ export function selectDailyRecentBangers(
   tweets: PortalTweet[],
   now = new Date(),
   poolSize = 10,
+  randomize = true,
 ): PortalTweet[] {
   const windowEnd = now.getTime()
   const windowStart = windowEnd - 24 * 60 * 60 * 1_000
@@ -693,6 +694,7 @@ export function selectDailyRecentBangers(
       const createdAt = new Date(tweet.createdAt)
       const createdAtTime = createdAt.getTime()
       return (
+        (tweet.quoteCount ?? 0) >= 2 &&
         !Number.isNaN(createdAtTime) &&
         createdAtTime >= windowStart &&
         createdAtTime <= windowEnd
@@ -708,11 +710,30 @@ export function selectDailyRecentBangers(
     })
     .slice(0, Math.max(1, poolSize))
 
-  if (candidates.length < 2) return candidates
+  if (candidates.length < 2 || !randomize) return candidates
   const day = now.toISOString().slice(0, 10)
   const selectedIndex = stableHash(day) % candidates.length
   const selected = candidates[selectedIndex]
   return [selected, ...candidates.filter((_, index) => index !== selectedIndex)]
+}
+
+/** Keep the current window when it qualifies; otherwise use the previous day's best. */
+export async function loadRecentBangerSelection(
+  now = new Date(),
+): Promise<PortalTweet[]> {
+  const current = selectDailyRecentBangers(
+    await fetchPortalRecentBangers(50, 24),
+    now,
+  )
+  if (current.length) return current
+  const previousEnd = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  const previous = await fetchPortalRecentBangers(
+    50,
+    24,
+    undefined,
+    previousEnd.toISOString(),
+  )
+  return selectDailyRecentBangers(previous, previousEnd, 1, false)
 }
 
 async function fetchCorpusRange(): Promise<PortalCorpusRange> {
@@ -823,10 +844,8 @@ const getCachedWeeklyTrends = unstable_cache(
 )
 const getCachedRecentBangers = unstable_cache(
   async (_sourceKey: string) =>
-    enrichPortalTweets(
-      selectDailyRecentBangers(await fetchPortalRecentBangers(50, 24)),
-    ),
-  ['portal-recent-bangers-v5'],
+    enrichPortalTweets(await loadRecentBangerSelection()),
+  ['portal-recent-bangers-v6'],
   { revalidate: 1_800 },
 )
 

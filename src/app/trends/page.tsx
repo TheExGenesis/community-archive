@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import PortalComponentErrorBoundary from '@/components/portal/PortalComponentErrorBoundary'
 import TrendsExplorer from '@/components/portal/TrendsExplorer'
 import { getIsMember } from '@/lib/portal/auth'
+import { loginHref } from '@/lib/authRedirect'
 import {
   getPortalTrendSnapshot,
   loadPortalComponentData,
@@ -30,7 +31,10 @@ export default async function TrendsPage({
 }: {
   searchParams?: Record<string, string | string[] | undefined>
 }) {
-  if (!(await getIsMember())) redirect('/login?redirect=/trends')
+  const initialSearch = serializedSearchParams(searchParams)
+  if (!(await getIsMember())) {
+    redirect(loginHref(`/trends${initialSearch ? `?${initialSearch}` : ''}`))
+  }
   const initial = await loadPortalComponentData(
     'trends-explorer',
     getPortalTrendSnapshot,
@@ -42,7 +46,7 @@ export default async function TrendsPage({
       <TrendsExplorer
         initialTrends={initial.data}
         initialLoadFailed={initial.failed}
-        initialSearch={serializedSearchParams(searchParams)}
+        initialSearch={initialSearch}
       />
     </PortalComponentErrorBoundary>
   )

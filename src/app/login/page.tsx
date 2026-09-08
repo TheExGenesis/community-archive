@@ -3,6 +3,7 @@ import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import { Suspense } from 'react'
 import LoginContent from './LoginContent'
+import { safeAuthRedirect } from '@/lib/authRedirect'
 
 export default async function LoginPage({
   searchParams,
@@ -16,21 +17,12 @@ export default async function LoginPage({
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (user) {
-    const requestedRedirect = searchParams.redirect
-    const safeRedirect =
-      requestedRedirect?.startsWith('/') && !requestedRedirect.startsWith('//')
-        ? requestedRedirect
-        : null
-
-    if (safeRedirect) redirect(safeRedirect)
-
-    redirect('/')
-  }
+  const returnTo = safeAuthRedirect(searchParams.redirect)
+  if (user) redirect(returnTo)
 
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <LoginContent redirectUrl={searchParams.redirect} />
+      <LoginContent redirectUrl={returnTo} />
     </Suspense>
   )
 }

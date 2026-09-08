@@ -709,8 +709,10 @@ export function HomePortalLayout({
 >) {
   return (
     <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
+      <div id="daily-digest" className="scroll-mt-20">
+        {digest}
+      </div>
       {overview}
-      {digest}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
         <div className="flex h-full min-h-0 flex-col gap-4 lg:overflow-hidden">

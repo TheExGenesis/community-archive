@@ -4,6 +4,7 @@ import { devLog } from '@/lib/devLog'
 import { createBrowserClient } from '@/utils/supabase'
 import { useSearchParams } from 'next/navigation'
 import { useState } from 'react'
+import { safeAuthRedirect } from '@/lib/authRedirect'
 
 // Seeded mock users available for staging dev-login bypass.
 // Keep in sync with supabase/seed.sql.
@@ -16,13 +17,9 @@ const STAGING_USERS = [
   { username: 'xiq_dev', providerId: 'mock_xiq', displayName: 'XIQ Dev' },
 ] as const
 
-export default function SignIn() {
+export default function SignIn({ fullPage = false }: { fullPage?: boolean }) {
   const searchParams = useSearchParams()
-  const requestedRedirect = searchParams.get('redirect')
-  const redirectTo =
-    requestedRedirect?.startsWith('/') && !requestedRedirect.startsWith('//')
-      ? requestedRedirect
-      : null
+  const redirectTo = safeAuthRedirect(searchParams.get('redirect'))
   const { userMetadata } = useAuthAndArchive()
   const isDevLoginEnabled =
     process.env.NODE_ENV === 'development' ||
@@ -115,7 +112,7 @@ export default function SignIn() {
 
   return userMetadata ? null : (
     <div
-      className={`${isStagingLogin ? 'hidden lg:inline-flex' : 'hidden sm:inline-flex'} items-center gap-2`}
+      className={`${fullPage ? 'inline-flex' : isStagingLogin ? 'hidden lg:inline-flex' : 'hidden sm:inline-flex'} items-center gap-2`}
     >
       {isStagingLogin && (
         <select

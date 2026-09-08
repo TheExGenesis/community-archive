@@ -26,3 +26,40 @@ test('search and pagination hydrate at most 24 policy-filtered seeds, with stabl
   expect((await getStrandPage('no match', 0)).items).toEqual([])
   expect((await getStrandPage('Vibetober', 0)).total).toBe(27)
 })
+
+test('ranks title and handwritten labels, seed text, usernames, then summary before rating', async () => {
+  const base = {
+    title: 'Other',
+    text: '',
+    username: 'writer',
+    participants: [],
+    summary: 'Other',
+    rating: 0,
+  }
+  ;(getStrands as jest.Mock).mockResolvedValue({
+    strands: [
+      { ...base, id: 'summary', summary: 'Portal story', rating: 100 },
+      { ...base, id: 'username', username: 'portal', rating: 90 },
+      {
+        ...base,
+        id: 'participant',
+        participants: ['PortalFriend'],
+        rating: 80,
+      },
+      { ...base, id: 'text', text: 'Building PORTAL together', rating: 70 },
+      { ...base, id: 'title', title: 'Portal', rating: 60 },
+      { ...base, id: 'label', mapLabel: 'Portal in Porto', rating: 50 },
+      { ...base, id: 'absent', rating: 200 },
+    ],
+  })
+  ;(getStrandTweets as jest.Mock).mockResolvedValue(new Map())
+  expect((await getStrandPage(' PORTAL ', 0)).items.map((s) => s.id)).toEqual([
+    'title',
+    'label',
+    'text',
+    'username',
+    'participant',
+    'summary',
+  ])
+  expect((await getStrandPage('', 0)).items[0].id).toBe('absent')
+})

@@ -8,6 +8,9 @@ jest.mock('@/components/TweetCard', () => ({
   ),
 }))
 jest.mock('@/components/portal/TweetRow', () => ({ TweetAvatar: () => null }))
+beforeEach(() => {
+  global.fetch = jest.fn(() => new Promise(() => {}))
+})
 const tweet = (id: string, createdAt: string): PortalTweet => ({
   id,
   createdAt,

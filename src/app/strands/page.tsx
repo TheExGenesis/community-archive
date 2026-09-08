@@ -33,7 +33,7 @@ export default async function StrandsPage({
     : undefined
   const initialPage = await getStrandPage(query, 0)
   return (
-    <main className="mx-auto min-h-screen max-w-[1500px] px-5 py-10 sm:px-7">
+    <main className="mx-auto min-h-screen w-full max-w-[1500px] px-5 py-10 sm:px-7">
       <Link href="/community" className="text-sm font-semibold text-brand">
         ← Community Apps
       </Link>

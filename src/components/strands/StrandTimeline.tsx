@@ -23,7 +23,15 @@ const date = (time: number) =>
     year: 'numeric',
     timeZone: 'UTC',
   })
-function Post({ post, seedId }: { post: StrandPost; seedId: string }) {
+function Post({
+  post,
+  seedId,
+  threadToggle = true,
+}: {
+  post: StrandPost
+  seedId: string
+  threadToggle?: boolean
+}) {
   return (
     <div className="min-w-0">
       <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
@@ -52,7 +60,9 @@ function Post({ post, seedId }: { post: StrandPost; seedId: string }) {
       <p className="mt-4 text-sm leading-6 text-muted-foreground">
         {post.annotation}
       </p>
-      <StrandThreadContext key={post.id} seedId={seedId} tweetId={post.id} />
+      {threadToggle && (
+        <StrandThreadContext key={post.id} seedId={seedId} tweetId={post.id} />
+      )}
     </div>
   )
 }
@@ -296,7 +306,13 @@ export default function StrandTimeline({
                   Next post →
                 </button>
               </div>
-              <Post key={current.id} post={current} seedId={seedId} />
+              <StrandThreadContext
+                key={current.id}
+                seedId={seedId}
+                tweetId={current.id}
+              >
+                <Post post={current} seedId={seedId} threadToggle={false} />
+              </StrandThreadContext>
             </div>
           )}
         </>

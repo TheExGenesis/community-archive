@@ -158,7 +158,7 @@ export default function StrandMinimap({
   return (
     <aside
       aria-label="Strands minimap"
-      className="order-first border border-border bg-card p-4 lg:sticky lg:top-20 lg:order-last lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto"
+      className="order-first border border-border bg-card p-4 [scrollbar-width:none] lg:sticky lg:top-20 lg:order-last lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto [&::-webkit-scrollbar]:hidden"
     >
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-bold">A map of ideas</h2>
@@ -185,7 +185,7 @@ export default function StrandMinimap({
         Nearby dots are related strands. Ringed dots have your original map
         labels. Zoom to see more labels.
       </p>
-      <div className="mt-3 max-h-[29rem] overflow-auto border border-border bg-background">
+      <div className="mt-3 max-h-[29rem] overflow-auto border border-border bg-background [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <svg
           viewBox="0 0 600 440"
           role="group"
@@ -313,7 +313,7 @@ export default function StrandMinimap({
                 </p>
               </div>
             </div>
-            <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap">
+            <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {decodeTweetText(selected.text)}
             </p>
             <a

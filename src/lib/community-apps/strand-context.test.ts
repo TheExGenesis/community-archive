@@ -4,13 +4,13 @@ const node = (id: string, parent: string | null) => ({
   reply_to_tweet_id: parent,
   created_at: id.padStart(4, '0'),
 })
-test('bounds ancestry and descendants to five, preserves edges, and handles cycles', () => {
-  const nodes = Array.from({ length: 20 }, (_, i) =>
+test('bounds ancestry and descendants to twenty, preserves edges, and handles cycles', () => {
+  const nodes = Array.from({ length: 60 }, (_, i) =>
     node(String(i), i ? String(i - 1) : null),
   )
-  expect(selectStrandContext(nodes, '8')).toEqual({
-    before: ['3', '4', '5', '6', '7'],
-    after: ['9', '10', '11', '12', '13'],
+  expect(selectStrandContext(nodes, '30')).toEqual({
+    before: Array.from({ length: 20 }, (_, i) => String(i + 10)),
+    after: Array.from({ length: 20 }, (_, i) => String(i + 31)),
   })
   expect(selectStrandContext([node('1', '2'), node('2', '1')], '1')).toEqual({
     before: ['2'],

@@ -12,7 +12,7 @@ export function selectStrandContext(
     after: string[] = [],
     seen = new Set([selectedId])
   let cursor = byId.get(selectedId)
-  while (cursor?.reply_to_tweet_id && before.length < 5) {
+  while (cursor?.reply_to_tweet_id && before.length < 20) {
     const parent = byId.get(cursor.reply_to_tweet_id)
     if (!parent || seen.has(parent.tweet_id)) break
     seen.add(parent.tweet_id)
@@ -32,7 +32,7 @@ export function selectStrandContext(
       ])
   }
   const queue = [...(children.get(selectedId) ?? [])]
-  while (queue.length && after.length < 5) {
+  while (queue.length && after.length < 20) {
     // Prioritize the nearby continuation over a years-later direct reply.
     queue.sort(
       (a, b) =>

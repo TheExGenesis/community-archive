@@ -782,6 +782,8 @@ export async function fetchPortalHistoricalBangers(
 export async function fetchPortalTrends(
   now = new Date(),
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+  includeHistory = true,
+  includeWeekly = true,
 ): Promise<PortalTrends> {
   const currentYear = now.getUTCFullYear()
   const years = Array.from(
@@ -797,13 +799,15 @@ export async function fetchPortalTrends(
   const from7 = daysBefore(today, 6)
   const weeklyTo = daysBefore(today, -1)
 
+  const chartTerms = includeHistory ? CHART_TERMS : []
+  const weeklyTerms = includeWeekly ? WATCHLIST : []
   const jobs: Array<() => Promise<ClickHouseTrendResponse>> = [
-    ...CHART_TERMS.map(
+    ...chartTerms.map(
       ({ term }) =>
         () =>
           fetchTrend(term, 'year', yearlyFrom, yearlyTo, fetcher),
     ),
-    ...WATCHLIST.map(
+    ...weeklyTerms.map(
       (term) => () =>
         fetchTrend(
           term,
@@ -815,10 +819,10 @@ export async function fetchPortalTrends(
     ),
   ]
   const responses = await runBatched(jobs)
-  const yearlyResponses = responses.slice(0, CHART_TERMS.length)
-  const weeklyResponses = responses.slice(CHART_TERMS.length)
+  const yearlyResponses = responses.slice(0, chartTerms.length)
+  const weeklyResponses = responses.slice(chartTerms.length)
 
-  const series: TermSeries[] = CHART_TERMS.map(({ term, color }, index) => {
+  const series: TermSeries[] = chartTerms.map(({ term, color }, index) => {
     const rows = new Map<number, ClickHouseTrendRow>()
     for (const row of yearlyResponses[index].data) {
       const bucket = new Date(normalizeClickHouseTimestamp(row.bucket))
@@ -841,7 +845,7 @@ export async function fetchPortalTrends(
     }
   })
 
-  const weekly: TermWeek[] = WATCHLIST.map((term, index) => {
+  const weekly: TermWeek[] = weeklyTerms.map((term, index) => {
     let last7 = 0
     let prev7 = 0
     for (const row of weeklyResponses[index].data) {
@@ -855,6 +859,8 @@ export async function fetchPortalTrends(
     }
     return {
       term,
+      sinceDate: utcDateParam(from7),
+      untilDate: utcDateParam(today),
       last7,
       prev7,
       deltaPct: prev7 > 0 ? Math.round(((last7 - prev7) / prev7) * 100) : null,
@@ -863,9 +869,15 @@ export async function fetchPortalTrends(
   })
 
   return {
-    years,
+    years: includeHistory ? years : [],
     series,
     weekly,
     computedAt: now.toISOString(),
   }
+}
+
+/** The homepage displays only weekly bars, including for signed-in visitors. */
+export async function fetchPortalWeeklyTrends() {
+  return (await fetchPortalTrends(new Date(), fetchAnalyticsGatewayJson, false))
+    .weekly
 }

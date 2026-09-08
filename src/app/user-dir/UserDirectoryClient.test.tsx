@@ -52,6 +52,19 @@ describe('UserDirectoryClient', () => {
     })
   })
 
+  test('keeps a non-BMP display-name initial intact for server hydration', () => {
+    render(
+      <UserDirectoryClient
+        totalCount={1}
+        initialUsers={[{ ...directoryUser(1), account_display_name: '𒐪' }]}
+        initialHasMore={false}
+      />,
+    )
+    // Both the name and avatar fallback must contain the complete code point.
+    // A lone UTF-16 surrogate becomes U+FFFD when the server sends UTF-8 HTML.
+    expect(screen.getAllByText('𒐪')).toHaveLength(2)
+  })
+
   test('records profile opens using aggregate directory context', async () => {
     const initialUsers = [directoryUser(1)]
     render(
@@ -180,5 +193,42 @@ describe('UserDirectoryClient', () => {
     expect(mockFetchUsers).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 15, offset: 0 }),
     )
+  })
+  test('retries a failed search from the first page without showing unrelated users', async () => {
+    const log = jest.spyOn(console, 'error').mockImplementation(() => {})
+    mockFetchUsers.mockRejectedValueOnce(new Error('offline'))
+    mockFetchUsers.mockResolvedValueOnce({
+      users: [directoryUser(2)],
+      hasMore: false,
+    })
+    render(
+      <UserDirectoryClient
+        totalCount={20}
+        initialUsers={[directoryUser(1)]}
+        initialHasMore
+      />,
+    )
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search users' }), {
+      target: { value: 'member_2' },
+    })
+    const retry = await screen.findByRole('button', {
+      name: 'Retry loading users',
+    })
+    expect(
+      screen.queryByRole('link', { name: /Member 1/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Load more users' }),
+    ).not.toBeInTheDocument()
+    fireEvent.click(retry)
+
+    expect(
+      await screen.findByRole('link', { name: /Member 2/ }),
+    ).toBeInTheDocument()
+    expect(mockFetchUsers).toHaveBeenLastCalledWith(
+      expect.objectContaining({ offset: 0, search: 'member_2' }),
+    )
+    log.mockRestore()
   })
 })

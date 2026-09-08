@@ -2,7 +2,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import Homepage, { dynamic as homepageRenderingMode } from '@/app/page'
 import { getIsMember } from '@/lib/portal/auth'
-import { getPortalData } from '@/lib/portal/data'
+import { startHomepageData } from '@/lib/portal/data'
 
 jest.mock('server-only', () => ({}), { virtual: true })
 jest.mock('@/components/home/ClassicHomepage', () => ({
@@ -23,23 +23,23 @@ jest.mock('@/components/home/ClassicHomepage', () => ({
   ),
 }))
 jest.mock('@/lib/portal/auth', () => ({ getIsMember: jest.fn() }))
-jest.mock('@/lib/portal/data', () => ({ getPortalData: jest.fn() }))
+jest.mock('@/lib/portal/data', () => ({ startHomepageData: jest.fn() }))
 jest.mock('@/components/home/HomepagePeople', () => ({
   __esModule: true,
   default: () => <div>homepage people</div>,
 }))
 
 const getIsMemberMock = getIsMember as jest.MockedFunction<typeof getIsMember>
-const getPortalDataMock = getPortalData as jest.MockedFunction<
-  typeof getPortalData
+const startHomepageDataMock = startHomepageData as jest.MockedFunction<
+  typeof startHomepageData
 >
 
 describe('Homepage OAuth actions', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     getIsMemberMock.mockResolvedValue(true)
-    getPortalDataMock.mockResolvedValue(
-      {} as Awaited<ReturnType<typeof getPortalData>>,
+    startHomepageDataMock.mockReturnValue(
+      {} as Awaited<ReturnType<typeof startHomepageData>>,
     )
   })
 
@@ -48,13 +48,15 @@ describe('Homepage OAuth actions', () => {
   })
 
   it('returns the homepage shell without waiting for portal analytics', async () => {
-    getPortalDataMock.mockReturnValue(new Promise(() => undefined))
+    startHomepageDataMock.mockReturnValue({
+      globalStats: new Promise(() => undefined),
+    } as ReturnType<typeof startHomepageData>)
 
     const page = await Homepage({ searchParams: {} })
     const markup = renderToStaticMarkup(page)
 
     expect(markup).toContain('homepage people')
-    expect(getPortalDataMock).toHaveBeenCalledTimes(1)
+    expect(startHomepageDataMock).toHaveBeenCalledTimes(1)
   })
 
   it('keeps an authenticated OAuth return on the opt-in completion surface', async () => {
@@ -64,7 +66,7 @@ describe('Homepage OAuth actions', () => {
     expect(markup).toContain('shared homepage · member true · CTA true')
     expect(markup).toContain('homepage people')
     expect(getIsMemberMock).toHaveBeenCalledTimes(1)
-    expect(getPortalDataMock).toHaveBeenCalledTimes(1)
+    expect(startHomepageDataMock).toHaveBeenCalledTimes(1)
   })
 
   it('renders the same dashboard without the CTA for signed-in visitors', async () => {
@@ -74,7 +76,7 @@ describe('Homepage OAuth actions', () => {
     expect(markup).toContain('shared homepage · member true · CTA false')
     expect(markup).toContain('homepage people')
     expect(getIsMemberMock).toHaveBeenCalledTimes(1)
-    expect(getPortalDataMock).toHaveBeenCalledTimes(1)
+    expect(startHomepageDataMock).toHaveBeenCalledTimes(1)
   })
 
   it('renders the shared dashboard with the CTA for logged-out visitors', async () => {

@@ -15,7 +15,7 @@ describe('DigestSubscribeButton', () => {
   it('expands into an email form and reports success', async () => {
     ;(global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ status: 'pending' }),
+      json: async () => ({ status: 'subscribed' }),
     })
     render(<DigestSubscribeButton />)
 
@@ -25,7 +25,7 @@ describe('DigestSubscribeButton', () => {
     fireEvent.submit(input.closest('form')!)
 
     await waitFor(() =>
-      expect(screen.getByText('Check your inbox ✓')).toBeInTheDocument(),
+      expect(screen.getByText('Subscribed ✓')).toBeInTheDocument(),
     )
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/digest/email/subscribe',
@@ -55,9 +55,9 @@ describe('DigestSubscribeButton', () => {
     ).toBeInTheDocument()
   })
 
-  it('surfaces the confirm-redirect message', () => {
-    searchParams.set('email', 'confirmed')
+  it('surfaces the unsubscribe-redirect message', () => {
+    searchParams.set('email', 'unsubscribed')
     render(<DigestSubscribeButton />)
-    expect(screen.getByText('Subscription confirmed ✓')).toBeInTheDocument()
+    expect(screen.getByText('Unsubscribed ✓')).toBeInTheDocument()
   })
 })

@@ -220,7 +220,9 @@ test('publisher resubmits thin batches for server dedupe on retry', async () => 
 
 test('publisher is inert without its explicit flag', async () => {
   const original = process.env.CANONICAL_ARCHIVE_SHADOW_PUBLISH_ENABLED
+  const originalQueueFirst = process.env.CANONICAL_ARCHIVE_QUEUE_FIRST_ENABLED
   delete process.env.CANONICAL_ARCHIVE_SHADOW_PUBLISH_ENABLED
+  delete process.env.CANONICAL_ARCHIVE_QUEUE_FIRST_ENABLED
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'canonical-archive-'))
   try {
     const result = await publishCanonicalArchiveBatch({
@@ -237,6 +239,51 @@ test('publisher is inert without its explicit flag', async () => {
     } else {
       process.env.CANONICAL_ARCHIVE_SHADOW_PUBLISH_ENABLED = original
     }
+    if (originalQueueFirst === undefined) {
+      delete process.env.CANONICAL_ARCHIVE_QUEUE_FIRST_ENABLED
+    } else {
+      process.env.CANONICAL_ARCHIVE_QUEUE_FIRST_ENABLED = originalQueueFirst
+    }
+    fs.rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('queue-first flag enables the canonical publisher without shadow mode', async () => {
+  const originalShadow = process.env.CANONICAL_ARCHIVE_SHADOW_PUBLISH_ENABLED
+  const originalQueueFirst = process.env.CANONICAL_ARCHIVE_QUEUE_FIRST_ENABLED
+  const originalUrl = process.env.CANONICAL_PUBLISH_URL
+  const originalKey = process.env.CANONICAL_PUBLISHER_API_KEY
+  delete process.env.CANONICAL_ARCHIVE_SHADOW_PUBLISH_ENABLED
+  process.env.CANONICAL_ARCHIVE_QUEUE_FIRST_ENABLED = 'true'
+  process.env.CANONICAL_PUBLISH_URL = 'http://127.0.0.1:3000/internal/canonical-ingest'
+  process.env.CANONICAL_PUBLISHER_API_KEY = 'publisher-secret'
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'canonical-archive-'))
+  try {
+    const result = await publishCanonicalArchiveBatch({
+      batch: fixtureBatch(),
+      manifest,
+      policyVersion: 'policy-1',
+      reportDir: directory,
+      fetchImpl: (async (_input, init) => {
+        const body = JSON.parse(String(init?.body))
+        return new Response(JSON.stringify({ accepted: body.batches.map(
+          (submission: { source_batch_id: string }) => ({
+            source_batch_id: submission.source_batch_id,
+            event_id: 'a'.repeat(64), message_id: '1-0', duplicate: false,
+          }),
+        ) }), { status: 202, headers: { 'content-type': 'application/json' } })
+      }) as typeof fetch,
+    })
+    assert.equal(result.status, 'complete')
+  } finally {
+    if (originalShadow === undefined) delete process.env.CANONICAL_ARCHIVE_SHADOW_PUBLISH_ENABLED
+    else process.env.CANONICAL_ARCHIVE_SHADOW_PUBLISH_ENABLED = originalShadow
+    if (originalQueueFirst === undefined) delete process.env.CANONICAL_ARCHIVE_QUEUE_FIRST_ENABLED
+    else process.env.CANONICAL_ARCHIVE_QUEUE_FIRST_ENABLED = originalQueueFirst
+    if (originalUrl === undefined) delete process.env.CANONICAL_PUBLISH_URL
+    else process.env.CANONICAL_PUBLISH_URL = originalUrl
+    if (originalKey === undefined) delete process.env.CANONICAL_PUBLISHER_API_KEY
+    else process.env.CANONICAL_PUBLISHER_API_KEY = originalKey
     fs.rmSync(directory, { recursive: true, force: true })
   }
 })

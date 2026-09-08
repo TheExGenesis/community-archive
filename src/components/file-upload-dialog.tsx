@@ -354,12 +354,23 @@ export function FileUploadDialog({
             <div className="space-y-2">
               <p className="text-sm text-green-600">We got your archive!</p>
               <p className="text-sm text-muted-foreground">
-                Your account should show up in the database in the next 20 mins
-                or so
+                Thank you for helping preserve the community. Your archive is
+                being processed; you can check its status in Settings.
               </p>
             </div>
+            <div className="flex flex-wrap gap-3 text-sm font-medium text-brand">
+              <Link href="/settings" onClick={onClose}>
+                Check upload status
+              </Link>
+              <Link href="/bangers?period=week" onClick={onClose}>
+                Explore recent Bangers
+              </Link>
+              <Link href="/docs#examples" onClick={onClose}>
+                What can I do with the archive?
+              </Link>
+            </div>
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="text-muted-foreground">Uploaded Tweets</div>
+              <div className="text-muted-foreground">Submitted Tweets</div>
               <div>{state.uploadedStats.uploadedTweets.toLocaleString()}</div>
               {state.uploadLikes && (
                 <>

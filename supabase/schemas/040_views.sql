@@ -71,7 +71,10 @@ ALTER TABLE "public"."tweets_w_conversation_id" OWNER TO "postgres";
 
 -- public.user_directory
 CREATE OR REPLACE VIEW "public"."user_directory" WITH (security_invoker = true) AS
-WITH archived_members AS (
+-- Inline this shared CTE so single-profile filters can reach the base tables
+-- before archive metadata and opt-in aggregates are computed for every member.
+-- This changes query planning only; membership and opt-out predicates stay live.
+WITH archived_members AS NOT MATERIALIZED (
   SELECT
     a.account_id,
     a.username,

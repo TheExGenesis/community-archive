@@ -6,21 +6,19 @@ This directory contains mock Twitter archive data generators for testing databas
 
 - `mock-data-builders.ts` - Helper functions to build various archive data structures
 - `generate-mock-archives.ts` - Main generator script (TypeScript version)
-- `generate-mock-archives.js` - Simplified generator script (JavaScript version for quick testing)
 - `generated/` - Output directory for generated mock archives
 
 ## Usage
 
 ### Generate Mock Archives
 
-Run the generator script to create both small and large mock archives:
+Tests call the TypeScript generators in memory; no generated files are needed
+to run them. For optional manual inspection or benchmarking, create both small
+and large mock archives (including 50,000 tweets):
 
 ```bash
-# Using npm script (JavaScript version - no dependencies needed)
+# Requires the project's dependencies to be installed.
 pnpm dev:generate-mock-archives
-
-# Using TypeScript version (requires tsx and node_modules installed)
-pnpm dev:generate-mock-archives-ts
 ```
 
 This will generate two files in `generated/`:

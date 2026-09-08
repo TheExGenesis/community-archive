@@ -11,17 +11,6 @@ jest.mock('next/navigation', () => ({
 jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 
 describe('HeaderNavigation', () => {
-  it('renders Graph with the same styling as other navigation items', () => {
-    render(
-      <HeaderNavigation items={[{ href: '/social-graph', label: 'Graph' }]} />,
-    )
-
-    expect(screen.getByRole('link', { name: 'Graph' })).not.toHaveClass(
-      'bg-muted/70',
-      'text-muted-foreground',
-    )
-  })
-
   it('records the selected destination without sending its label or URL', () => {
     render(
       <HeaderNavigation

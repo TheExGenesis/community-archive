@@ -84,24 +84,14 @@ describe('portal TweetRow media', () => {
     mockCapturePostHogEvent.mockReset()
   })
 
-  test('uses a neutral card and explains its archived-quote evidence', async () => {
+  test('explains its archived-quote evidence and records opening it', async () => {
     const user = userEvent.setup()
-    const { container } = render(<TweetRow tweet={tweet} featuredRank={1} />)
-    const card = container.querySelector('article')
+    render(<TweetRow tweet={tweet} featuredRank={1} />)
 
     expect(screen.queryByLabelText('Rank 1')).not.toBeInTheDocument()
-    expect(card).toHaveClass('border-zinc-200/75')
-    expect(card).toHaveClass(
-      'duration-100',
-      'hover:-translate-y-0.5',
-      'hover:border-[#d4d4d7]/75',
-    )
-    expect(card?.className).not.toMatch(/amber|blue/)
     const archivedQuotes = screen.getByRole('link', {
       name: '12 archived quotes. Open tweet to see them.',
     })
-    expect(archivedQuotes).toHaveClass('text-zinc-500')
-    expect(archivedQuotes).not.toHaveClass('rounded-full', 'text-brand')
 
     await user.hover(archivedQuotes)
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
@@ -196,4 +186,18 @@ describe('portal TweetRow media', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
   })
+})
+
+test('unclamped Birdseye cards retain full text, bounded quote media, and a full-size lightbox', async () => {
+  const text = 'A complete featured post. '.repeat(30)
+  render(<TweetRow tweet={{ ...tweet, text }} noClamp constrainMedia />)
+  expect(screen.getByText(text.trim())).not.toHaveClass('line-clamp-2')
+  expect(screen.queryByText('Read more')).not.toBeInTheDocument()
+  expect(screen.getByAltText('Quoted tweet image 1')).toHaveClass(
+    'object-contain',
+  )
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Enlarge quoted tweet image 1' }),
+  )
+  expect(await screen.findByRole('dialog')).toBeInTheDocument()
 })

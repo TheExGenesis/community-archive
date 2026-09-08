@@ -3,6 +3,10 @@ import Link from 'next/link'
 import { ArrowUpRight, Bot, Braces, Database } from 'lucide-react'
 
 const API_URL = 'https://fabxmporizzqflnftavs.supabase.co'
+const EXPORT_RELEASE_URL =
+  'https://github.com/TheExGenesis/community-archive/releases/latest'
+const EXPORT_POINTER_URL =
+  'https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/community-archive-public-export/latest.json'
 const ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhYnhtcG9yaXp6cWZsbmZ0YXZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyNDQ5MTIsImV4cCI6MjAzNzgyMDkxMn0.UIEJiUNkLsW28tBHmG-RQDW-I5JNlJLt62CSk9D_qG8'
 export const metadata: Metadata = {
@@ -83,8 +87,8 @@ export default function DocsPage() {
               Build with the archive
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-              Query policy-filtered public records through the API or give an
-              agent one canonical starting point.
+              Download the daily data export, query public records through the
+              API, or give an agent one canonical starting point.
             </p>
             <div className="rounded-lg border border-brand/30 bg-brand/5 p-5">
               <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -117,12 +121,18 @@ export default function DocsPage() {
             <article className="rounded-lg border border-border bg-card p-6">
               <Database className="h-6 w-6 text-brand" aria-hidden="true" />
               <h3 className="mt-4 text-lg font-semibold text-foreground">
-                Bulk export paused
+                Bulk Parquet export
               </h3>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                The historical Parquet pipeline is private while it is rebuilt
-                to enforce current consent for every nested author.
+                Download tweets and profiles for bulk analysis. Each daily
+                export checks current membership and opt-outs before
+                publication.
               </p>
+              <div className="mt-4">
+                <ResourceLink href={EXPORT_RELEASE_URL}>
+                  Download the latest export
+                </ResourceLink>
+              </div>
             </article>
 
             <article className="rounded-lg border border-border bg-card p-6">
@@ -152,7 +162,6 @@ export default function DocsPage() {
                 while current PostgreSQL policy permits it.
               </p>
               <p className="mt-4 break-all font-mono text-xs leading-5 text-muted-foreground">
-                {API_URL}
                 https://www.community-archive.org/api/archive/&lt;username&gt;
               </p>
             </article>
@@ -162,15 +171,50 @@ export default function DocsPage() {
         <section className="space-y-6" id="bulk-dump">
           <div className="max-w-3xl">
             <h2 className="text-3xl font-bold text-foreground">
-              Bulk export paused
+              Bulk Parquet export
             </h2>
             <p className="mt-2 leading-7 text-muted-foreground">
-              The former <code>enriched_tweets.parquet</code> artifact was not
-              able to apply current consent to every nested author immediately
-              before publication. It is no longer public. Use filtered API
-              requests until a policy-aware replacement is available.
+              The daily package contains enriched <code>tweets.parquet</code>,
+              separate <code>profiles.parquet</code>, and a{' '}
+              <code>manifest.json</code> with row counts, schemas, and
+              checksums. It includes eligible members and applies current
+              consent to referenced authors too.
             </p>
+            <p className="mt-3 leading-7 text-muted-foreground">
+              Use the latest release link below to find the most recent
+              successful export. GitHub lists the download links; the files stay
+              in consent-managed storage. Superseded packages are removed, so
+              bookmark the latest release rather than an individual Parquet URL.
+              Downloads may be temporarily withdrawn when consent changes.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-4">
+              <ResourceLink href={EXPORT_RELEASE_URL}>
+                Download the latest export
+              </ResourceLink>
+              <ResourceLink href={EXPORT_POINTER_URL}>
+                Latest JSON pointer for scripts
+              </ResourceLink>
+            </div>
           </div>
+        </section>
+
+        <section className="space-y-6" id="examples">
+          <h2 className="text-3xl font-bold text-foreground">
+            What can I build or discover?
+          </h2>
+          <ul className="grid gap-3 text-muted-foreground sm:grid-cols-2">
+            <li>Find a remembered quote, reply, link, or old discussion.</li>
+            <li>
+              Revisit your own themes, collaborators, and changing interests.
+            </li>
+            <li>Follow emerging ideas with Trends, Bangers, and the Digest.</li>
+            <li>Trace people, projects, events, and intellectual lineages.</li>
+            <li>Build a personal canon, visualization, or research dataset.</li>
+            <li>Analyze public interaction networks and communities.</li>
+          </ul>
+          <ResourceLink href="https://github.com/TheExGenesis/community-archive/blob/main/docs/use-cases.md">
+            More examples and starting points
+          </ResourceLink>
         </section>
 
         <section className="space-y-8" id="api">

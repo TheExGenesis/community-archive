@@ -212,3 +212,16 @@ test('shows resolved, clickable profile bio and website links', () => {
   expect(screen.queryByText('https://t.co/bio')).not.toBeInTheDocument()
   expect(screen.queryByText('https://t.co/site')).not.toBeInTheDocument()
 })
+
+test('links to all available tweets from this user sorted newest first', () => {
+  render(
+    <ProfileHeader
+      profile={profile({ has_archive: false, is_opted_in: true })}
+      archivedAt={null}
+    />,
+  )
+  expect(screen.getByRole('link', { name: 'Latest tweets →' })).toHaveAttribute(
+    'href',
+    '/search?fromUser=alice&sort=newest',
+  )
+})

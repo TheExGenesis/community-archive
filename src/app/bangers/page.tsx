@@ -1,3 +1,5 @@
+import { Suspense } from 'react'
+import { SectionReady } from '@/components/PagePerformance'
 import Link from 'next/link'
 import { BangersExplorer } from '@/components/portal/BangersExplorer'
 import { MUTED, SERIF } from '@/components/portal/styles'
@@ -16,7 +18,7 @@ function paramValue(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? '') : (value ?? '')
 }
 
-export default async function BangersPage({
+export default function BangersPage({
   searchParams,
 }: {
   searchParams: BangersSearchParams
@@ -38,14 +40,15 @@ export default async function BangersPage({
     periodValue === 'week' ||
     periodValue === 'three-months'
       ? periodValue
-      : undefined
-  const allTime =
-    periodValue === 'all' || (period === undefined && year === undefined)
+      : periodValue === 'all' || year !== undefined
+        ? undefined
+        : 'week'
+  const allTime = periodValue === 'all'
   const query = paramValue(searchParams.q).trim().slice(0, 120)
-  const initialPage = await getInitialPortalBangersPage({
+  const initialPage = getInitialPortalBangersPage({
     scope,
     sort,
-    ...(period ? { period } : { year }),
+    ...(period ? { period } : { year: allTime ? undefined : year }),
     query,
   })
 
@@ -66,18 +69,42 @@ export default async function BangersPage({
             Bangers
           </h1>
         </header>
-        <BangersExplorer
+        <Suspense
           key={`${scope}:${sort}:${period ?? year ?? 'all'}:${query}`}
-          initialPage={initialPage}
-          scope={scope}
-          sort={sort}
-          currentYear={currentYear}
-          year={period ? undefined : year}
-          period={period}
-          allTime={allTime}
-          initialQuery={query}
-        />
+          fallback={
+            <p role="status" className="min-h-96 py-8 text-muted-foreground">
+              Loading bangers…
+            </p>
+          }
+        >
+          <LoadedBangers
+            key={`${scope}:${sort}:${period ?? year ?? 'all'}:${query}`}
+            initialPage={initialPage}
+            scope={scope}
+            sort={sort}
+            currentYear={currentYear}
+            year={period || allTime ? undefined : year}
+            period={period}
+            allTime={allTime}
+            initialQuery={query}
+          />
+        </Suspense>
       </div>
     </main>
+  )
+}
+
+async function LoadedBangers({
+  initialPage,
+  ...props
+}: Omit<React.ComponentProps<typeof BangersExplorer>, 'initialPage'> & {
+  initialPage: ReturnType<typeof getInitialPortalBangersPage>
+}) {
+  const page = await initialPage
+  return (
+    <>
+      <SectionReady section="bangers_results" />
+      <BangersExplorer {...props} initialPage={page} />
+    </>
   )
 }

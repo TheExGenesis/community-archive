@@ -117,6 +117,8 @@ describe('ClickHouse-backed portal analytics', () => {
     ).toEqual([10, 0, 0, 0, 0, 0, 0, 40])
     expect(trends.weekly.find(({ term }) => term === 'tpot')).toEqual({
       term: 'tpot',
+      sinceDate: '2026-08-01',
+      untilDate: '2026-08-07',
       last7: 8,
       prev7: 4,
       deltaPct: 100,
@@ -541,4 +543,34 @@ describe('ClickHouse-backed portal analytics', () => {
       { timeoutMs: 30_000 },
     )
   })
+})
+
+test('homepage weekly snapshot makes no historical corpus requests', async () => {
+  const fetcher = jest.fn(async () => ({ data: [] }))
+  const result = await fetchPortalTrends(
+    new Date('2026-09-06T00:00:00Z'),
+    fetcher as unknown as AnalyticsFetcher,
+    false,
+  )
+  expect(result.series).toEqual([])
+  expect(result.weekly).toHaveLength(12)
+  expect(fetcher).toHaveBeenCalledTimes(12)
+  for (const call of (fetcher as jest.Mock).mock.calls) {
+    expect(call[1].get('bucket')).toBe('day')
+  }
+})
+
+test('explorer snapshot requests historical charts without twelve unused weekly queries', async () => {
+  const fetcher = jest.fn(async () => ({ data: [] }))
+  const result = await fetchPortalTrends(
+    new Date('2026-09-06T00:00:00Z'),
+    fetcher as unknown as AnalyticsFetcher,
+    true,
+    false,
+  )
+  expect(result.series.length).toBeGreaterThan(0)
+  expect(result.weekly).toEqual([])
+  expect(fetcher).toHaveBeenCalledTimes(result.series.length)
+  for (const call of (fetcher as jest.Mock).mock.calls)
+    expect(call[1].get('bucket')).toBe('year')
 })

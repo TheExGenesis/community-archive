@@ -1,30 +1,25 @@
 import StreamPage, { dynamic as streamRenderingMode } from '@/app/stream/page'
-import { getPortalData } from '@/lib/portal/data'
-import type { PortalData } from '@/lib/portal/types'
+import { startStreamData } from '@/lib/portal/data'
+import { getIsMember, getCurrentUser } from '@/lib/portal/auth'
 
-jest.mock('@/lib/portal/data', () => ({
-  getPortalData: jest.fn(),
+jest.mock('@/lib/portal/data', () => ({ startStreamData: jest.fn() }))
+jest.mock('@/lib/portal/auth', () => ({
+  getIsMember: jest.fn(),
+  getCurrentUser: jest.fn(),
 }))
-
-jest.mock('@/components/portal/Portal', () => ({
-  __esModule: true,
-  default: ({ view }: { view: string }) => <div>Portal view: {view}</div>,
-}))
-
-const getPortalDataMock = getPortalData as jest.MockedFunction<
-  typeof getPortalData
->
 
 test('renders at request time so portal fallback data is not frozen at build time', () => {
   expect(streamRenderingMode).toBe('force-dynamic')
 })
 
-test('renders the public stream without a membership check', async () => {
-  const data = {} as PortalData
-  getPortalDataMock.mockResolvedValue(data)
-
-  const page = await StreamPage()
-
-  expect(getPortalDataMock).toHaveBeenCalledWith('stream')
-  expect(page.props).toMatchObject({ data, view: 'stream' })
+test('renders the public stream without a membership check', () => {
+  const pending = new Promise<never>(() => {})
+  jest
+    .mocked(startStreamData)
+    .mockReturnValue({ tweets: pending, stats: pending })
+  const page = StreamPage()
+  expect(page.type).toBe('main')
+  expect(startStreamData).toHaveBeenCalledTimes(1)
+  expect(getIsMember).not.toHaveBeenCalled()
+  expect(getCurrentUser).not.toHaveBeenCalled()
 })

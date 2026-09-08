@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 
 import '@testing-library/jest-dom'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { SocialGraphSnapshot } from '@/lib/socialGraph'
 import SocialGraphExplorer from './SocialGraphExplorer'
 
@@ -184,8 +184,54 @@ describe('SocialGraphExplorer defaults', () => {
       fireEvent.click(screen.getByRole('button', { name: preset }))
 
       await waitFor(() => {
-        expect(workerInstances[0].postMessage).toHaveBeenCalledTimes(2)
+        expect(workerInstances[0].terminate).toHaveBeenCalledTimes(1)
+        expect(workerInstances.at(-1)?.postMessage).toHaveBeenCalledTimes(1)
       })
     },
   )
+
+  it('debounces rapid filter changes, ignores obsolete worker replies, and cancels on unmount', () => {
+    jest.useFakeTimers()
+    try {
+      const { unmount } = render(<SocialGraphExplorer snapshot={snapshot} />)
+      act(() => jest.advanceTimersByTime(0))
+      const original = workerInstances[0]
+      const oldRequest = original.postMessage.mock.calls[0][0]
+      fireEvent.keyDown(
+        screen.getByRole('slider', { name: 'Interaction start year' }),
+        { key: 'ArrowRight' },
+      )
+      const superseded = workerInstances.at(-1)!
+      fireEvent.keyDown(
+        screen.getByRole('slider', { name: 'Interaction start year' }),
+        { key: 'ArrowLeft' },
+      )
+      const latest = workerInstances.at(-1)!
+      expect(original.terminate).toHaveBeenCalledTimes(1)
+      expect(superseded.terminate).toHaveBeenCalledTimes(1)
+      act(() => jest.advanceTimersByTime(349))
+      expect(latest.postMessage).not.toHaveBeenCalled()
+      const oldMessage = original.addEventListener.mock.calls.find(
+        ([event]) => event === 'message',
+      )![1]
+      act(() =>
+        oldMessage({ data: { id: oldRequest.id, error: 'obsolete error' } }),
+      )
+      expect(screen.queryByText('obsolete error')).not.toBeInTheDocument()
+      act(() => jest.advanceTimersByTime(1))
+      expect(latest.postMessage).toHaveBeenCalledTimes(1)
+      expect(superseded.postMessage).not.toHaveBeenCalled()
+      fireEvent.keyDown(
+        screen.getByRole('slider', { name: 'Interaction start year' }),
+        { key: 'ArrowRight' },
+      )
+      const pending = workerInstances.at(-1)!
+      unmount()
+      act(() => jest.advanceTimersByTime(350))
+      expect(pending.terminate).toHaveBeenCalledTimes(1)
+      expect(pending.postMessage).not.toHaveBeenCalled()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
 })

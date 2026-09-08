@@ -4,7 +4,7 @@ set -euo pipefail
 latest_url="https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/community-archive-public-export/latest.json"
 output_dir="${1:-public-export-release}"
 
-for command in curl jq; do
+for command in curl jq node; do
   command -v "$command" >/dev/null || {
     echo "Required command not found: $command" >&2
     exit 1
@@ -14,6 +14,8 @@ done
 mkdir -p "$output_dir"
 curl --fail --silent --show-error --location --max-filesize 1048576 \
   "$latest_url" --output "$output_dir/latest.json"
+
+node "$(dirname "${BASH_SOURCE[0]}")/validate-public-export-freshness.mjs" "$output_dir/latest.json"
 
 export_id="$(jq -er '.export_id | select(type == "string" and length > 0)' "$output_dir/latest.json")"
 manifest_url="$(jq -er '.manifest_url | select(type == "string" and length > 0)' "$output_dir/latest.json")"

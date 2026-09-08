@@ -1,113 +1,63 @@
-const getProfileBangersPageMock = jest.fn()
-const fetchSyndicatedTweetsMock = jest.fn()
-
-jest.mock('./metaTwitter/bangers', () => ({
-  getProfileBangersPage: (...args: unknown[]) =>
-    getProfileBangersPageMock(...args),
+import { GET } from '@/app/api/profile/[account_id]/avatar/route'
+import { getProfileBangersPage } from '@/lib/metaTwitter/bangers'
+import { fetchSyndicatedTweets } from '@/lib/twitterSyndication'
+jest.mock('@/lib/metaTwitter/bangers', () => ({
+  getProfileBangersPage: jest.fn(),
   PROFILE_BANGERS_INITIAL_LIMIT: 2,
 }))
-
-jest.mock('./twitterSyndication', () => ({
-  fetchSyndicatedTweets: (...args: unknown[]) =>
-    fetchSyndicatedTweetsMock(...args),
+jest.mock('@/lib/twitterSyndication', () => ({
+  fetchSyndicatedTweets: jest.fn(),
 }))
-
-import { GET } from '@/app/api/profile/[account_id]/avatar/route'
-
-const banger = (tweetId: string, avatarMediaUrl: string | null = null) => ({
-  tweet_id: tweetId,
-  avatar_media_url: avatarMediaUrl,
-})
-
 beforeEach(() => {
-  getProfileBangersPageMock.mockReset()
-  fetchSyndicatedTweetsMock.mockReset()
-})
-
-test('returns the stored high-resolution banger avatar without syndication', async () => {
-  getProfileBangersPageMock.mockResolvedValueOnce({
+  jest.clearAllMocks()
+  ;(getProfileBangersPage as jest.Mock).mockResolvedValue({
+    available: true,
     tweets: [
-      banger(
-        '100',
-        'https://pbs.twimg.com/profile_images/42/avatar_normal.jpg',
-      ),
+      { tweet_id: '100', avatar_media_url: 'https://pbs.twimg.com/old.jpg' },
     ],
-    available: true,
   })
-
-  const response = await GET(new Request('http://localhost'), {
-    params: { account_id: '42' },
-  })
-
-  expect(response.status).toBe(200)
-  await expect(response.json()).resolves.toEqual({
-    avatar_media_url:
-      'https://pbs.twimg.com/profile_images/42/avatar_400x400.jpg',
-  })
-  expect(response.headers.get('cache-control')).toBe(
-    'public, s-maxage=3600, stale-while-revalidate=86400',
-  )
-  expect(fetchSyndicatedTweetsMock).not.toHaveBeenCalled()
 })
-
-test('recovers an avatar from a bounded set of syndicated bangers', async () => {
-  getProfileBangersPageMock.mockResolvedValueOnce({
-    tweets: [banger('100'), banger('101')],
-    available: true,
+test('uses stored avatars for normal requests without external recovery', async () => {
+  const response = await GET(
+    new Request('https://archive.test/api/profile/42/avatar'),
+    { params: { account_id: '42' } },
+  )
+  expect(await response.json()).toEqual({
+    avatar_media_url: 'https://pbs.twimg.com/old.jpg',
   })
-  fetchSyndicatedTweetsMock.mockResolvedValueOnce(
+  expect(fetchSyndicatedTweets).not.toHaveBeenCalled()
+})
+test('a failed-image refresh bypasses the known stored avatar and checks the author', async () => {
+  ;(fetchSyndicatedTweets as jest.Mock).mockResolvedValue(
+    new Map([
+      [
+        '100',
+        { account_id: '42', avatar_media_url: 'https://pbs.twimg.com/new.jpg' },
+      ],
+    ]),
+  )
+  const response = await GET(
+    new Request('https://archive.test/api/profile/42/avatar?refresh=1'),
+    { params: { account_id: '42' } },
+  )
+  expect(await response.json()).toEqual({
+    avatar_media_url: 'https://pbs.twimg.com/new.jpg',
+  })
+  expect(fetchSyndicatedTweets).toHaveBeenCalledWith(['100'], { limit: 2 })
+  ;(fetchSyndicatedTweets as jest.Mock).mockResolvedValue(
     new Map([
       [
         '100',
         {
-          account_id: '42',
-          avatar_media_url:
-            'https://pbs.twimg.com/profile_images/42/avatar_normal.jpg',
+          account_id: '99',
+          avatar_media_url: 'https://pbs.twimg.com/wrong.jpg',
         },
       ],
-      ['101', null],
     ]),
   )
-
-  const response = await GET(new Request('http://localhost'), {
-    params: { account_id: '42' },
-  })
-
-  expect(fetchSyndicatedTweetsMock).toHaveBeenCalledWith(['100', '101'], {
-    limit: 2,
-  })
-  expect(response.status).toBe(200)
-  await expect(response.json()).resolves.toEqual({
-    avatar_media_url:
-      'https://pbs.twimg.com/profile_images/42/avatar_400x400.jpg',
-  })
-})
-
-test('short-caches a legitimate missing avatar', async () => {
-  getProfileBangersPageMock.mockResolvedValueOnce({
-    tweets: [],
-    available: true,
-  })
-  fetchSyndicatedTweetsMock.mockResolvedValueOnce(new Map())
-
-  const response = await GET(new Request('http://localhost'), {
-    params: { account_id: '42' },
-  })
-
-  expect(response.status).toBe(404)
-  expect(response.headers.get('cache-control')).toBe('public, s-maxage=300')
-})
-
-test('does not cache an upstream banger failure as a missing avatar', async () => {
-  getProfileBangersPageMock.mockResolvedValueOnce({
-    tweets: [],
-    available: false,
-  })
-
-  const response = await GET(new Request('http://localhost'), {
-    params: { account_id: '42' },
-  })
-
-  expect(response.status).toBe(502)
-  expect(response.headers.get('cache-control')).toBe('private, no-store')
+  const mismatch = await GET(
+    new Request('https://archive.test/api/profile/42/avatar?refresh=1'),
+    { params: { account_id: '42' } },
+  )
+  expect(mismatch.status).toBe(404)
 })

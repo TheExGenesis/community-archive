@@ -1,4 +1,4 @@
-import type { TweetData } from '@/components/TweetComponent'
+import type { TweetData } from '@/lib/tweets/types'
 import { fetchClickHouseQuotePosts } from '@/lib/clickhouseQuotePosts'
 import {
   loadDigestCandidates,

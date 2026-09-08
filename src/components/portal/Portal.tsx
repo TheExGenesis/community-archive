@@ -1,7 +1,8 @@
 'use client'
 
+import { usePortalStream } from './usePortalStream'
 import type { ReactNode } from 'react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { FaDatabase, FaExternalLinkAlt, FaUsers } from 'react-icons/fa'
 import {
@@ -13,11 +14,6 @@ import {
 import { PORTAL_ARTICLES } from './articles'
 import { CARD, MUTED, FAINT, BODY, SERIF } from './styles'
 import TweetCard from '@/components/TweetCard'
-import { PORTAL_STREAM_POLL_INTERVAL_MS } from './live'
-import {
-  comparePortalTweetChronology,
-  selectHomepageStream,
-} from '@/lib/portal/stream'
 import { BANGERS_ALL_TIME_HREF, BANGERS_WEEK_HREF } from '@/lib/portal/bangers'
 import { capturePostHogEvent } from '@/lib/posthog'
 import type { DigestPreview } from '@/lib/digest/types'
@@ -27,7 +23,8 @@ import { CHROME_EXTENSION_URL } from '@/lib/browserExtension'
 export type PortalView = 'home' | 'stream'
 
 const HOME_LIVE_STREAM_LIMIT = 12
-const ARCHIVE_EXPORT_URL = '/docs#bulk-dump'
+const ARCHIVE_EXPORT_URL =
+  'https://github.com/TheExGenesis/community-archive/releases/latest'
 const COMMUNITY_BUILDS_URL = '/tweets/1835411943735140798'
 
 type DashboardDestination =
@@ -66,34 +63,6 @@ const fmtDelta = (term: TermWeek) => {
   if (term.status === 'new') return 'new'
   if (term.status === 'inactive' || term.deltaPct === null) return '—'
   return `${term.deltaPct >= 0 ? '+' : '−'}${Math.abs(term.deltaPct)}%`
-}
-
-function compareTweetIds(left: string, right: string): number {
-  return left.length - right.length || left.localeCompare(right)
-}
-
-function newestCursor(tweets: PortalTweet[]) {
-  return tweets.reduce<{ observedAt: string; id: string } | null>(
-    (latest, tweet) => {
-      if (!latest) return { observedAt: tweet.observedAt, id: tweet.id }
-      const timeDiff =
-        new Date(tweet.observedAt).getTime() -
-        new Date(latest.observedAt).getTime()
-      if (
-        timeDiff > 0 ||
-        (timeDiff === 0 && compareTweetIds(tweet.id, latest.id) > 0)
-      ) {
-        return { observedAt: tweet.observedAt, id: tweet.id }
-      }
-      return latest
-    },
-    null,
-  )
-}
-
-function oldestPageCursor(tweets: PortalTweet[]) {
-  const oldest = [...tweets].sort(comparePortalTweetChronology).at(-1)
-  return oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null
 }
 
 function PanelHeader({
@@ -261,7 +230,7 @@ function ArchiveMetric({
   )
 }
 
-function ArchiveOverview({
+export function ArchiveOverview({
   stats,
   generatedDate,
   failures,
@@ -346,7 +315,7 @@ function ArchiveOverview({
  * every morning, so it runs full width above the dashboard grid, marked by an
  * accent rule along its top edge rather than a filled surface.
  */
-function DigestHero({ preview }: { preview: DigestPreview | null }) {
+export function DigestHero({ preview }: { preview: DigestPreview | null }) {
   if (!preview) {
     return (
       <div
@@ -485,201 +454,8 @@ export default function Portal({
 }) {
   const { stats, trends } = data
 
-  // ---- live stream state -------------------------------------------------
-  const [visible, setVisible] = useState<PortalTweet[]>(data.initialStream)
-  const [streamUnavailable, setStreamUnavailable] = useState(
-    data.failures.initialStream,
-  )
-  const seenIds = useRef<Set<string>>(
-    new Set(data.initialStream.map((t) => t.id)),
-  )
-  const updateCursor = useRef(newestCursor(data.initialStream))
-  const pageCursor = useRef(oldestPageCursor(data.initialStream))
-  const loadingMoreRef = useRef(false)
-  const loadMoreTarget = useRef<HTMLDivElement>(null)
-  const [hasMore, setHasMore] = useState(
-    !data.failures.initialStream && data.initialStream.length >= 30,
-  )
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
-
-  const loadMore = useCallback(async () => {
-    if (
-      view !== 'stream' ||
-      !hasMore ||
-      loadingMoreRef.current ||
-      !pageCursor.current
-    ) {
-      return
-    }
-    loadingMoreRef.current = true
-    setIsLoadingMore(true)
-    try {
-      const params = new URLSearchParams({
-        before: pageCursor.current.createdAt,
-        beforeId: pageCursor.current.id,
-      })
-      const res = await fetch(`/api/portal/stream?${params.toString()}`)
-      if (!res.ok) return
-      const {
-        tweets,
-        nextCursor,
-        hasMore: nextHasMore,
-      } = (await res.json()) as {
-        tweets: PortalTweet[]
-        nextCursor: { createdAt: string; id: string } | null
-        hasMore: boolean
-      }
-      const older = tweets.filter((tweet) => !seenIds.current.has(tweet.id))
-      older.forEach((tweet) => seenIds.current.add(tweet.id))
-      if (older.length > 0) {
-        setVisible((current) =>
-          [...current, ...older].sort(comparePortalTweetChronology),
-        )
-      }
-      pageCursor.current = nextCursor
-      const canLoadMore = nextHasMore && nextCursor !== null
-      setHasMore(canLoadMore)
-      capturePostHogEvent('portal_stream_loaded_more', {
-        loaded_tweet_count: older.length,
-        has_more: canLoadMore,
-      })
-    } catch {
-      // Keep the sentinel active so scrolling can retry after a network hiccup.
-    } finally {
-      loadingMoreRef.current = false
-      setIsLoadingMore(false)
-    }
-  }, [hasMore, view])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    let polling = false
-    const applyHead = (tweets: PortalTweet[], nextHasMore: boolean) => {
-      const head = [...tweets].sort(comparePortalTweetChronology)
-      updateCursor.current = newestCursor(head)
-      pageCursor.current = oldestPageCursor(head)
-      if (view === 'stream') {
-        setHasMore(nextHasMore && pageCursor.current !== null)
-      }
-      setVisible((current) => {
-        const next =
-          view === 'home'
-            ? selectHomepageStream([...head, ...current], 30)
-            : head
-        seenIds.current = new Set(next.map((tweet) => tweet.id))
-        return next
-      })
-    }
-    const fetchHead = async () => {
-      const response = await fetch('/api/portal/stream', {
-        signal: controller.signal,
-        cache: 'no-store',
-      })
-      if (!response.ok) return false
-      const payload = (await response.json()) as {
-        tweets: PortalTweet[]
-        hasMore?: boolean
-      }
-      applyHead(payload.tweets, payload.hasMore ?? false)
-      return true
-    }
-    const poll = async () => {
-      if (polling) return
-      polling = true
-      try {
-        const params = new URLSearchParams()
-        const requestedHead = updateCursor.current === null
-        if (updateCursor.current) {
-          params.set('after', updateCursor.current.observedAt)
-          params.set('afterId', updateCursor.current.id)
-        }
-        const res = await fetch(`/api/portal/stream?${params.toString()}`, {
-          signal: controller.signal,
-          cache: 'no-store',
-        })
-        if (!res.ok) {
-          setStreamUnavailable(true)
-          return
-        }
-        setStreamUnavailable(false)
-        const {
-          tweets,
-          updateCursor: nextUpdateCursor,
-          hasMore: nextHasMore,
-          backlogTruncated,
-        } = (await res.json()) as {
-          tweets: PortalTweet[]
-          updateCursor?: { observedAt: string; id: string } | null
-          hasMore?: boolean
-          backlogTruncated?: boolean
-        }
-        if (requestedHead) {
-          applyHead(tweets, nextHasMore ?? false)
-          return
-        }
-        if (backlogTruncated) {
-          if (!(await fetchHead())) setStreamUnavailable(true)
-          return
-        }
-        const responseCursor = nextUpdateCursor ?? newestCursor(tweets)
-        if (responseCursor) updateCursor.current = responseCursor
-        const fresh = tweets
-          .filter((t) => !seenIds.current.has(t.id))
-          .sort(
-            (a, b) =>
-              new Date(a.observedAt).getTime() -
-                new Date(b.observedAt).getTime() || compareTweetIds(a.id, b.id),
-          )
-        if (fresh.length > 0) {
-          fresh.forEach((t) => seenIds.current.add(t.id))
-          setVisible((current) =>
-            view === 'home'
-              ? selectHomepageStream([...fresh, ...current], 30)
-              : [...fresh, ...current].sort(comparePortalTweetChronology),
-          )
-        }
-      } catch {
-        if (!controller.signal.aborted) setStreamUnavailable(true)
-        // network hiccup; try again next poll
-      } finally {
-        polling = false
-      }
-    }
-    void poll()
-    const interval = window.setInterval(
-      () => void poll(),
-      PORTAL_STREAM_POLL_INTERVAL_MS,
-    )
-    return () => {
-      controller.abort()
-      window.clearInterval(interval)
-    }
-  }, [view])
-
-  useEffect(() => {
-    if (view !== 'stream' || !hasMore) return
-    const target = loadMoreTarget.current
-    if (!target) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) void loadMore()
-      },
-      { rootMargin: '600px 0px' },
-    )
-    observer.observe(target)
-    return () => observer.disconnect()
-  }, [hasMore, loadMore, view])
-
-  // ---- derived trend views ----------------------------------------------
-  const weeklyRanked = useMemo(
-    () =>
-      trends.weekly
-        .filter((term) => term.last7 > 0)
-        .sort((a, b) => b.last7 - a.last7),
-    [trends.weekly],
-  )
-  const weeklyBars = weeklyRanked.slice(0, 6)
-  const maxWeekly = Math.max(...weeklyBars.map((w) => w.last7), 1)
+  const { visible, streamUnavailable, loadMoreTarget, isLoadingMore, hasMore } =
+    usePortalStream(data, view)
 
   const recentBanger = data.recentBangers[0] ?? null
   const historicalBanger = data.historicalBangers[0] ?? null
@@ -703,285 +479,48 @@ export default function Portal({
     <Root className="min-h-screen bg-zinc-100/80 dark:bg-transparent">
       {/* ------------------------------------------------ Home ---------- */}
       {view === 'home' && (
-        <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
-          <ArchiveOverview
-            stats={stats}
-            generatedDate={generatedDate}
-            failures={data.failures}
-          />
-
-          <DigestHero preview={digestPreview} />
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
-            <div className="flex h-full min-h-0 flex-col gap-4 lg:overflow-hidden">
-              <div
-                className={`${CARD} flex min-h-[420px] flex-col lg:h-[420px] lg:min-h-[420px] lg:flex-none lg:overflow-hidden lg:[contain:size]`}
-              >
-                <PanelHeader
-                  title="Live stream"
-                  live
-                  action={{
-                    label: 'Open firehose',
-                    href: '/stream',
-                    analyticsDestination: 'live_stream',
-                  }}
-                />
-                <div
-                  role="region"
-                  aria-label="Live tweet stream"
-                  tabIndex={0}
-                  className="flex max-h-[420px] flex-col overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60 lg:max-h-none lg:min-h-0 lg:flex-1 [&::-webkit-scrollbar]:hidden"
-                >
-                  {visible.slice(0, HOME_LIVE_STREAM_LIMIT).map((t, i) => (
-                    <TweetCard
-                      key={t.id}
-                      tweet={t}
-                      compact
-                      noClamp
-                      animate={i === 0}
-                      clickable
-                      origin="home"
-                      returnTo="/"
-                    />
-                  ))}
-                  {visible.length === 0 && streamUnavailable && (
-                    <PanelUnavailable message="Live stream is temporarily unavailable." />
-                  )}
-                  {visible.length === 0 && !streamUnavailable && (
-                    <div
-                      className={`px-4 py-8 text-center text-[13px] ${MUTED}`}
-                    >
-                      Waiting for the firehose…
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {(recentBanger ||
-                historicalBanger ||
-                data.failures.recentBangers ||
-                data.failures.historicalBangers) && (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {(recentBanger || data.failures.recentBangers) && (
-                    <div className={`${CARD} min-w-0 overflow-hidden`}>
-                      <PanelHeader
-                        title="Banger of the moment"
-                        action={{
-                          label: 'Recent bangers',
-                          href: BANGERS_WEEK_HREF,
-                          analyticsDestination: 'recent_bangers',
-                        }}
-                      />
-                      {recentBanger ? (
-                        <TweetCard
-                          tweet={recentBanger}
-                          collapsible
-                          clickable
-                          origin="home"
-                          returnTo="/"
-                        />
-                      ) : (
-                        <PanelUnavailable message="Recent bangers are temporarily unavailable." />
-                      )}
-                    </div>
-                  )}
-
-                  {(historicalBanger || data.failures.historicalBangers) && (
-                    <div className={`${CARD} min-w-0 overflow-hidden`}>
-                      <PanelHeader
-                        title="Historical Banger"
-                        action={{
-                          label: 'All-time bangers',
-                          href: BANGERS_ALL_TIME_HREF,
-                          analyticsDestination: 'all_time_bangers',
-                        }}
-                      />
-                      {historicalBanger ? (
-                        <TweetCard
-                          tweet={historicalBanger}
-                          collapsible
-                          showDate
-                          clickable
-                          origin="home"
-                          returnTo="/"
-                        />
-                      ) : (
-                        <PanelUnavailable message="Historical bangers are temporarily unavailable." />
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <div className={`${CARD} flex flex-col`}>
-                <PanelHeader
-                  title="Trending terms · 7 days"
-                  action={{
-                    label: isMember ? 'Trends explorer' : 'Sign in for Trends',
-                    href: isMember ? '/trends' : signInHref('/trends'),
-                    analyticsDestination: 'trends',
-                  }}
-                />
-                <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
-                  {data.failures.trends ? (
-                    <PanelUnavailable message="Trending terms are temporarily unavailable." />
-                  ) : weeklyBars.length > 0 ? (
-                    <div
-                      className={`flex items-center gap-2 pb-1 text-[9px] font-medium uppercase tracking-wide ${MUTED}`}
-                    >
-                      <span className="w-[82px]" />
-                      <span className="w-[46px] text-right">Tweets</span>
-                      <span className="flex-1">Volume</span>
-                      <span className="w-[46px] text-right">Change</span>
-                    </div>
-                  ) : null}
-                  {!data.failures.trends &&
-                    weeklyBars.map((b) => (
-                      <div
-                        key={b.term}
-                        className="flex items-center gap-2 py-[6px]"
-                      >
-                        <span className="w-[82px] truncate text-[12px] font-semibold">
-                          {b.term}
-                        </span>
-                        <span className="w-[46px] text-right text-[11px] tabular-nums text-muted-foreground">
-                          {b.last7.toLocaleString('en-US')}
-                        </span>
-                        <div
-                          className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]"
-                          role="img"
-                          aria-label={`${b.term}: ${b.last7.toLocaleString('en-US')} tweets in the last seven days`}
-                          title={`${b.last7.toLocaleString('en-US')} tweets in the last 7 days; bar is relative to ${weeklyBars[0].term}`}
-                        >
-                          <div
-                            className="h-full rounded bg-chart-accent"
-                            style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
-                          />
-                        </div>
-                        <span
-                          title={`${b.last7.toLocaleString('en-US')} tweets vs ${b.prev7.toLocaleString('en-US')} in the previous 7 days`}
-                          className={`w-[46px] text-right text-[11px] font-bold tabular-nums ${
-                            b.status === 'inactive'
-                              ? MUTED
-                              : (b.deltaPct ?? 0) >= 0
-                                ? 'text-[#16a34a] dark:text-[#2acf80]'
-                                : 'text-[#dc2626] dark:text-[#f87171]'
-                          }`}
-                        >
-                          {fmtDelta(b)}
-                        </span>
-                      </div>
-                    ))}
-                  {!data.failures.trends && weeklyBars.length === 0 && (
-                    <div className={`py-8 text-center text-[13px] ${MUTED}`}>
-                      No watchlist activity in the last seven days.
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className={CARD}>
-                <PanelHeader
-                  title="Featured research"
-                  action={{
-                    label: 'All research',
-                    href: '/research',
-                    analyticsDestination: 'research',
-                  }}
-                />
-                <div className="flex flex-col">
-                  {data.failures.research ? (
-                    <PanelUnavailable message="Featured research is temporarily unavailable." />
-                  ) : (
-                    data.research.slice(0, 4).map((post) => (
-                      <a
-                        key={post.url}
-                        href={post.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() =>
-                          captureDashboardDestination(
-                            'research_article',
-                            'list',
-                            true,
-                          )
-                        }
-                        className="group flex items-start gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div
-                            className="flex items-baseline gap-1.5 text-[15.5px] font-semibold leading-snug"
-                            style={SERIF}
-                          >
-                            {post.title}
-                            <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
-                          </div>
-                          {post.excerpt && (
-                            <div
-                              className={`mt-1 line-clamp-2 text-[12.5px] leading-normal ${MUTED}`}
-                            >
-                              {post.excerpt}
-                            </div>
-                          )}
-                          <div className={`mt-1 text-[12px] ${MUTED}`}>
-                            {RESEARCH_SOURCE.name}
-                            {post.date &&
-                              ` · ${new Date(post.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
-                          </div>
-                        </div>
-                        {post.image && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={post.image}
-                            alt=""
-                            loading="lazy"
-                            className="mt-0.5 h-14 w-20 flex-shrink-0 rounded-[4px] border border-zinc-200 object-cover dark:border-[#26262a]"
-                          />
-                        )}
-                      </a>
-                    ))
-                  )}
-                  {!data.failures.research && data.research.length === 0 && (
-                    <a
-                      href={RESEARCH_SOURCE.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() =>
-                        captureDashboardDestination(
-                          'research_article',
-                          'list',
-                          true,
-                        )
-                      }
-                      className={`px-4 py-6 text-center text-[13px] ${MUTED} hover:text-brand`}
-                    >
-                      Read the latest research at {RESEARCH_SOURCE.name} →
-                    </a>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-col gap-3">
-                <UtilityLink
-                  href={ARCHIVE_EXPORT_URL}
-                  destination="data_export"
-                  title="Bulk export paused"
-                  note="Why the historical Parquet file is private"
-                  action="Details"
-                  icon={<FaDatabase className="h-[17px] w-[17px]" />}
-                />
-                <UtilityLink
-                  href={COMMUNITY_BUILDS_URL}
-                  destination="community_builds"
-                  title="Community Builds"
-                  note="Projects made with Community Archive data"
-                  action="Explore"
-                  icon={<FaUsers className="h-[17px] w-[17px]" />}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+        <HomePortalLayout
+          overview={
+            <ArchiveOverview
+              stats={stats}
+              generatedDate={generatedDate}
+              failures={data.failures}
+            />
+          }
+          digest={<DigestHero preview={digestPreview} />}
+          stream={
+            <HomeStreamPanel
+              visible={visible}
+              streamUnavailable={streamUnavailable}
+            />
+          }
+          bangers={
+            <>
+              <HomeBangerPanel
+                tweet={recentBanger}
+                failed={data.failures.recentBangers}
+              />
+              <HomeBangerPanel
+                historical
+                tweet={historicalBanger}
+                failed={data.failures.historicalBangers}
+              />
+            </>
+          }
+          trends={
+            <HomeTrendsPanel
+              weekly={trends.weekly}
+              failed={data.failures.trends}
+              isMember={isMember}
+            />
+          }
+          research={
+            <HomeResearchPanel
+              research={data.research}
+              failed={data.failures.research}
+            />
+          }
+        />
       )}
 
       {/* ------------------------------------------------ Stream -------- */}
@@ -1152,6 +691,345 @@ export function PortalNotes({
             <div className={`text-[12px] ${FAINT}`}>{a.meta}</div>
           </button>
         ))}
+      </div>
+    </div>
+  )
+}
+
+export function HomePortalLayout({
+  overview,
+  digest,
+  stream,
+  bangers,
+  trends,
+  research,
+}: Record<
+  'overview' | 'digest' | 'stream' | 'bangers' | 'trends' | 'research',
+  ReactNode
+>) {
+  return (
+    <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
+      <div id="daily-digest" className="scroll-mt-20">
+        {digest}
+      </div>
+      {overview}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+        <div className="flex h-full min-h-0 flex-col gap-4 lg:overflow-hidden">
+          {stream}
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{bangers}</div>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {trends}
+          {research}
+          <div className="flex flex-col gap-3">
+            <UtilityLink
+              href={ARCHIVE_EXPORT_URL}
+              destination="data_export"
+              title="Daily data export"
+              note="Tweets and profiles in Parquet"
+              action="Download"
+              icon={<FaDatabase className="h-[17px] w-[17px]" />}
+            />
+            <UtilityLink
+              href={COMMUNITY_BUILDS_URL}
+              destination="community_builds"
+              title="Community Builds"
+              note="Projects made with Community Archive data"
+              action="Explore"
+              icon={<FaUsers className="h-[17px] w-[17px]" />}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function HomeStreamPanel({
+  visible,
+  streamUnavailable,
+}: {
+  visible: PortalTweet[]
+  streamUnavailable: boolean
+}) {
+  return (
+    <div
+      className={`${CARD} flex min-h-[420px] flex-col lg:h-[420px] lg:min-h-[420px] lg:flex-none lg:overflow-hidden lg:[contain:size]`}
+    >
+      <PanelHeader
+        title="Live stream"
+        live
+        action={{
+          label: 'Open firehose',
+          href: '/stream',
+          analyticsDestination: 'live_stream',
+        }}
+      />
+      <div
+        role="region"
+        aria-label="Live tweet stream"
+        tabIndex={0}
+        className="flex max-h-[420px] flex-col overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60 lg:max-h-none lg:min-h-0 lg:flex-1 [&::-webkit-scrollbar]:hidden"
+      >
+        {visible.slice(0, HOME_LIVE_STREAM_LIMIT).map((t, i) => (
+          <TweetCard
+            key={t.id}
+            tweet={t}
+            compact
+            noClamp
+            animate={i === 0}
+            clickable
+            origin="home"
+            returnTo="/"
+          />
+        ))}
+        {visible.length === 0 && streamUnavailable && (
+          <PanelUnavailable message="Live stream is temporarily unavailable." />
+        )}
+        {visible.length === 0 && !streamUnavailable && (
+          <div className={`px-4 py-8 text-center text-[13px] ${MUTED}`}>
+            Waiting for the firehose…
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function HomepageLiveStream({
+  tweets,
+  failed,
+}: {
+  tweets: PortalTweet[]
+  failed: boolean
+}) {
+  const { visible, streamUnavailable } = usePortalStream(
+    { initialStream: tweets, failures: { initialStream: failed } },
+    'home',
+  )
+  return (
+    <HomeStreamPanel visible={visible} streamUnavailable={streamUnavailable} />
+  )
+}
+
+export function HomeBangerPanel({
+  tweet,
+  failed,
+  historical = false,
+}: {
+  tweet: PortalTweet | null
+  failed: boolean
+  historical?: boolean
+}) {
+  if (!tweet && !failed) return null
+  return (
+    <div className={`${CARD} min-w-0 overflow-hidden`}>
+      <PanelHeader
+        title={historical ? 'Historical Banger' : 'Banger of the moment'}
+        action={{
+          label: historical ? 'All-time bangers' : 'Recent bangers',
+          href: historical ? BANGERS_ALL_TIME_HREF : BANGERS_WEEK_HREF,
+          analyticsDestination: historical
+            ? 'all_time_bangers'
+            : 'recent_bangers',
+        }}
+      />
+      {tweet ? (
+        <TweetCard
+          tweet={tweet}
+          collapsible
+          showDate={historical}
+          clickable
+          origin="home"
+          returnTo="/"
+        />
+      ) : (
+        <PanelUnavailable
+          message={
+            historical
+              ? 'Historical bangers are temporarily unavailable.'
+              : 'Recent bangers are temporarily unavailable.'
+          }
+        />
+      )}
+    </div>
+  )
+}
+
+export function HomeTrendsPanel({
+  weekly,
+  failed,
+  isMember,
+}: {
+  weekly: TermWeek[]
+  failed: boolean
+  isMember: boolean
+}) {
+  // ---- derived trend views ----------------------------------------------
+  const weeklyRanked = useMemo(
+    () =>
+      weekly.filter((term) => term.last7 > 0).sort((a, b) => b.last7 - a.last7),
+    [weekly],
+  )
+  const weeklyBars = weeklyRanked.slice(0, 6)
+  const maxWeekly = Math.max(...weeklyBars.map((w) => w.last7), 1)
+
+  return (
+    <div className={`${CARD} flex flex-col`}>
+      <PanelHeader
+        title="Trending terms · 7 days"
+        action={{
+          label: isMember ? 'Trends explorer' : 'Sign in for Trends',
+          href: isMember ? '/trends' : signInHref('/trends'),
+          analyticsDestination: 'trends',
+        }}
+      />
+      <div className="flex flex-1 flex-col justify-evenly px-4 pb-3 pt-2">
+        {failed ? (
+          <PanelUnavailable message="Trending terms are temporarily unavailable." />
+        ) : weeklyBars.length > 0 ? (
+          <div
+            className={`flex items-center gap-2 pb-1 text-[9px] font-medium uppercase tracking-wide ${MUTED}`}
+          >
+            <span className="w-[82px]" />
+            <span className="w-[46px] text-right">Tweets</span>
+            <span className="flex-1">Volume</span>
+            <span className="w-[46px] text-right">Change</span>
+          </div>
+        ) : null}
+        {!failed &&
+          weeklyBars.map((b) => (
+            <div key={b.term} className="flex items-center gap-2 py-[6px]">
+              <Link
+                href={`/search?${new URLSearchParams({
+                  q: b.term,
+                  ...(b.sinceDate ? { sinceDate: b.sinceDate } : {}),
+                  ...(b.untilDate ? { untilDate: b.untilDate } : {}),
+                }).toString()}`}
+                title={`Search tweets mentioning ${b.term}`}
+                className="w-[82px] truncate text-[12px] font-semibold text-brand underline-offset-2 hover:underline"
+              >
+                {b.term}
+              </Link>
+              <span className="w-[46px] text-right text-[11px] tabular-nums text-muted-foreground">
+                {b.last7.toLocaleString('en-US')}
+              </span>
+              <div
+                className="h-2 flex-1 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]"
+                role="img"
+                aria-label={`${b.term}: ${b.last7.toLocaleString('en-US')} tweets in the last seven days`}
+                title={`${b.last7.toLocaleString('en-US')} tweets in the last 7 days; bar is relative to ${weeklyBars[0].term}`}
+              >
+                <div
+                  className="h-full rounded bg-chart-accent"
+                  style={{ width: `${(b.last7 / maxWeekly) * 100}%` }}
+                />
+              </div>
+              <span
+                title={`${b.last7.toLocaleString('en-US')} tweets vs ${b.prev7.toLocaleString('en-US')} in the previous 7 days`}
+                className={`w-[46px] text-right text-[11px] font-bold tabular-nums ${
+                  b.status === 'inactive'
+                    ? MUTED
+                    : (b.deltaPct ?? 0) >= 0
+                      ? 'text-[#16a34a] dark:text-[#2acf80]'
+                      : 'text-[#dc2626] dark:text-[#f87171]'
+                }`}
+              >
+                {fmtDelta(b)}
+              </span>
+            </div>
+          ))}
+        {!failed && weeklyBars.length === 0 && (
+          <div className={`py-8 text-center text-[13px] ${MUTED}`}>
+            No watchlist activity in the last seven days.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function HomeResearchPanel({
+  research,
+  failed,
+}: {
+  research: PortalData['research']
+  failed: boolean
+}) {
+  return (
+    <div className={CARD}>
+      <PanelHeader
+        title="Featured research"
+        action={{
+          label: 'All research',
+          href: '/research',
+          analyticsDestination: 'research',
+        }}
+      />
+      <div className="flex flex-col">
+        {failed ? (
+          <PanelUnavailable message="Featured research is temporarily unavailable." />
+        ) : (
+          research.slice(0, 4).map((post) => (
+            <a
+              key={post.url}
+              href={post.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() =>
+                captureDashboardDestination('research_article', 'list', true)
+              }
+              className="group flex items-start gap-3 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-[#202023] dark:hover:bg-[#1f1f23]"
+            >
+              <div className="min-w-0 flex-1">
+                <div
+                  className="flex items-baseline gap-1.5 text-[15.5px] font-semibold leading-snug"
+                  style={SERIF}
+                >
+                  {post.title}
+                  <FaExternalLinkAlt className="h-2.5 w-2.5 flex-shrink-0 text-zinc-900 opacity-0 transition-opacity group-hover:opacity-70 dark:text-white" />
+                </div>
+                {post.excerpt && (
+                  <div
+                    className={`mt-1 line-clamp-2 text-[12.5px] leading-normal ${MUTED}`}
+                  >
+                    {post.excerpt}
+                  </div>
+                )}
+                <div className={`mt-1 text-[12px] ${MUTED}`}>
+                  {RESEARCH_SOURCE.name}
+                  {post.date &&
+                    ` · ${new Date(post.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}`}
+                </div>
+              </div>
+              {post.image && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={post.image}
+                  alt=""
+                  loading="lazy"
+                  className="mt-0.5 h-14 w-20 flex-shrink-0 rounded-[4px] border border-zinc-200 object-cover dark:border-[#26262a]"
+                />
+              )}
+            </a>
+          ))
+        )}
+        {!failed && research.length === 0 && (
+          <a
+            href={RESEARCH_SOURCE.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() =>
+              captureDashboardDestination('research_article', 'list', true)
+            }
+            className={`px-4 py-6 text-center text-[13px] ${MUTED} hover:text-brand`}
+          >
+            Read the latest research at {RESEARCH_SOURCE.name} →
+          </a>
+        )}
       </div>
     </div>
   )

@@ -1,6 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useReportSectionReady } from '@/components/PagePerformance'
+
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Search } from 'lucide-react'
 
@@ -17,31 +19,23 @@ import {
 } from '@/components/ui/table'
 import { MembershipStatusIcon } from '@/components/MembershipStatusIcon'
 import { formatNumber } from '@/lib/formatNumber'
+import { formatDirectoryDate as formatJoinedDate } from '@/lib/directoryDate'
 import { fetchUsers, getDirectoryProfileHref } from '@/lib/queries/fetchUsers'
 import { DirectoryUser, SortKey } from '@/lib/types'
 import { capturePostHogEvent } from '@/lib/posthog'
 
 export const USERS_PER_PAGE = 15
 
-const joinedDateFormatter = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-})
-
-function formatJoinedDate(date: string | null) {
-  if (!date) return '—'
-  return joinedDateFormatter.format(new Date(date))
-}
-
 interface UserDirectoryClientProps {
   totalCount: number | null
+  totalCountSlot?: ReactNode
   initialUsers: DirectoryUser[] | null
   initialHasMore: boolean
 }
 
 export default function UserDirectoryClient({
   totalCount,
+  totalCountSlot,
   initialUsers,
   initialHasMore,
 }: UserDirectoryClientProps) {
@@ -49,6 +43,8 @@ export default function UserDirectoryClient({
   const [loading, setLoading] = useState(initialUsers === null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
+  useReportSectionReady('directory_rows', !loading && !error)
   const [sortKey, setSortKey] = useState<SortKey>('num_followers')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [hasMore, setHasMore] = useState(initialHasMore)
@@ -106,6 +102,8 @@ export default function UserDirectoryClient({
         }
       } catch (err) {
         if (!isCurrentRequest) return
+        setUsers([])
+        setHasMore(false)
         setError('We could not load users. Please try again.')
         console.error('Error fetching users:', err)
       } finally {
@@ -117,7 +115,7 @@ export default function UserDirectoryClient({
     return () => {
       isCurrentRequest = false
     }
-  }, [debouncedSearch, sortKey, sortOrder])
+  }, [debouncedSearch, retryCount, sortKey, sortOrder])
 
   const loadMore = useCallback(async () => {
     if (loading || loadingMore || !hasMore || loadMoreInFlightRef.current) {
@@ -226,13 +224,19 @@ export default function UserDirectoryClient({
             Archive.
           </p>
           <p className="mt-2 text-sm font-medium text-muted-foreground">
-            {loading && users.length === 0
-              ? 'Loading users…'
-              : debouncedSearch
-                ? `${users.length}${hasMore ? '+' : ''} matching users`
-                : totalCount === null
-                  ? `${users.length}${hasMore ? '+' : ''} users`
-                  : `${users.length} of ${totalCount.toLocaleString()} users`}
+            {loading && users.length === 0 ? (
+              'Loading users…'
+            ) : debouncedSearch ? (
+              `${users.length}${hasMore ? '+' : ''} matching users`
+            ) : totalCountSlot ? (
+              <>
+                {users.length} of {totalCountSlot} users
+              </>
+            ) : totalCount === null ? (
+              `${users.length}${hasMore ? '+' : ''} users`
+            ) : (
+              `${users.length} of ${totalCount.toLocaleString()} users`
+            )}
           </p>
         </div>
 
@@ -335,7 +339,14 @@ export default function UserDirectoryClient({
                     colSpan={4}
                     className="h-40 text-center text-sm text-red-600 dark:text-red-400"
                   >
-                    {error}
+                    <p role="alert">{error}</p>
+                    <Button
+                      variant="outline"
+                      className="mt-3"
+                      onClick={() => setRetryCount((count) => count + 1)}
+                    >
+                      Retry loading users
+                    </Button>
                   </TableCell>
                 </TableRow>
               ) : users.length === 0 ? (
@@ -357,7 +368,9 @@ export default function UserDirectoryClient({
                           alt={`${user.account_display_name}'s avatar`}
                         />
                         <AvatarFallback>
-                          {user.account_display_name.charAt(0).toUpperCase()}
+                          {Array.from(
+                            user.account_display_name,
+                          )[0]?.toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
@@ -439,6 +452,8 @@ export default function UserDirectoryClient({
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Loading…
                 </>
+              ) : error ? (
+                'Retry loading more users'
               ) : (
                 'Load more users'
               )}

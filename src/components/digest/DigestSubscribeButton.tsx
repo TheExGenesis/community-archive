@@ -5,9 +5,8 @@ import { useSearchParams } from 'next/navigation'
 
 type Phase = 'idle' | 'open' | 'submitting' | 'done'
 
-// Confirm/unsubscribe redirects land on /digest?email=<status>.
+// Unsubscribe redirects land on /digest?email=<status>.
 const REDIRECT_MESSAGES: Record<string, string> = {
-  confirmed: 'Subscription confirmed ✓',
   unsubscribed: 'Unsubscribed ✓',
   invalid: 'That link is invalid or expired.',
   error: 'Something went wrong. Please try again.',
@@ -57,7 +56,7 @@ function SubscribeControl() {
   if (phase === 'done') {
     return (
       <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-400">
-        Check your inbox ✓
+        Subscribed ✓
       </span>
     )
   }
@@ -82,7 +81,7 @@ function SubscribeControl() {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="relative">
       <form
         className="flex items-center gap-1 rounded-full border border-zinc-300 bg-white py-0.5 pl-3 pr-0.5 focus-within:ring-2 focus-within:ring-brand dark:border-zinc-700 dark:bg-zinc-900"
         onSubmit={(event) => {
@@ -109,10 +108,10 @@ function SubscribeControl() {
           disabled={phase === 'submitting'}
           className={`${pillClasses} disabled:opacity-60`}
         >
-          {phase === 'submitting' ? 'Sending…' : 'Subscribe'}
+          {phase === 'submitting' ? 'Subscribing…' : 'Subscribe'}
         </button>
       </form>
-      <span className="pr-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+      <span className="absolute right-0 top-full mt-1 whitespace-nowrap pr-2 text-[11px] text-zinc-500 dark:text-zinc-400">
         {error ?? 'Daily digest in your inbox. Unsubscribe anytime.'}
       </span>
     </div>

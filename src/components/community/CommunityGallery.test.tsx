@@ -23,6 +23,9 @@ const PUBLISHED_PROJECT: CommunityProject = {
   commentCount: 1,
 }
 
+const DATABASE_COVER_URL =
+  '/api/community/projects/8c21b2b5-3530-4ec8-9729-07635b28b692/cover?v=cover.png'
+
 async function openPublishedProject(user: ReturnType<typeof userEvent.setup>) {
   await user.type(
     screen.getByRole('searchbox', { name: 'Search community projects' }),
@@ -47,7 +50,7 @@ describe('CommunityGallery', () => {
         name: 'Discover community-made tools, bots, visualizations, and more',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText('11 projects')).toBeInTheDocument()
+    expect(screen.getByText('13 projects')).toBeInTheDocument()
 
     await user.type(
       screen.getByRole('searchbox', { name: 'Search community projects' }),
@@ -87,6 +90,23 @@ describe('CommunityGallery', () => {
     expect(
       screen.queryByRole('link', { name: /View full page/i }),
     ).not.toBeInTheDocument()
+  })
+
+  it('loads database-backed covers directly instead of through the image optimizer', async () => {
+    render(
+      <CommunityGallery
+        publishedProjects={[
+          { ...PUBLISHED_PROJECT, image: DATABASE_COVER_URL },
+        ]}
+      />,
+    )
+
+    const covers = screen.getAllByRole('img', {
+      name: 'Preview of Archive Quilt',
+    })
+    expect(covers).toHaveLength(1)
+    expect(covers[0]).toHaveAttribute('src', DATABASE_COVER_URL)
+    expect(covers[0]).not.toHaveAttribute('srcset')
   })
 
   it('opens the Conversation Map internally without inventing a source post', async () => {
@@ -138,7 +158,7 @@ describe('CommunityGallery', () => {
     ])
 
     await user.click(screen.getByRole('button', { name: 'Tools' }))
-    expect(screen.getByText('6 projects')).toBeInTheDocument()
+    expect(screen.getByText('7 projects')).toBeInTheDocument()
   })
 
   it('submits a project to the approval queue', async () => {

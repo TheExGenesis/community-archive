@@ -33,6 +33,7 @@ export function ArchiveNav({
   activeSectionSlug = null,
   onSelect,
   onSelectSection,
+  onIntent,
 }: {
   basePath: string
   chapters: NavChapter[]
@@ -40,6 +41,7 @@ export function ArchiveNav({
   /** Curated sections per chapter year; every chapter lists its own. */
   sectionsByYear?: Record<number, ChapterSection[]>
   activeSectionSlug?: string | null
+  onIntent?: (year: number | null) => void
   onSelect?: (year: number | null) => void
   onSelectSection?: (year: number, slug: string | null) => void
   /** Rendered after the chapter list; wide layout only. */
@@ -80,6 +82,8 @@ export function ArchiveNav({
         href={archiveChapterHref(basePath, null)}
         prefetch={false}
         onClick={(event) => select(event, null)}
+        onMouseEnter={() => onIntent?.(null)}
+        onFocus={() => onIntent?.(null)}
         aria-current={isOverall ? 'page' : undefined}
         className={`whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-bold ${
           isOverall
@@ -101,6 +105,8 @@ export function ArchiveNav({
               href={archiveChapterHref(basePath, chapter.year)}
               prefetch={false}
               onClick={(event) => select(event, chapter.year)}
+              onMouseEnter={() => onIntent?.(chapter.year)}
+              onFocus={() => onIntent?.(chapter.year)}
               aria-current={active ? 'page' : undefined}
               className={`flex whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold ${
                 sections.length ? 'lg:hidden' : 'lg:mt-1 lg:justify-between'
@@ -141,6 +147,8 @@ export function ArchiveNav({
                       sectionActive ? null : section.slug,
                     )
                   }
+                  onMouseEnter={() => onIntent?.(chapter.year)}
+                  onFocus={() => onIntent?.(chapter.year)}
                   aria-current={sectionActive ? 'page' : undefined}
                   // Titles like "other" repeat across chapters.
                   aria-label={`${section.title}, ${chapter.year}`}

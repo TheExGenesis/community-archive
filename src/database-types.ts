@@ -190,6 +190,8 @@ export type Database = {
           id: number
           keep_private: boolean | null
           start_date: string | null
+          storage_path: string | null
+          storage_sha256: string | null
           upload_likes: boolean | null
           upload_phase: Database["public"]["Enums"]["upload_phase_enum"] | null
           username: string | null
@@ -202,6 +204,8 @@ export type Database = {
           id?: never
           keep_private?: boolean | null
           start_date?: string | null
+          storage_path?: string | null
+          storage_sha256?: string | null
           upload_likes?: boolean | null
           upload_phase?: Database["public"]["Enums"]["upload_phase_enum"] | null
           username?: string | null
@@ -214,6 +218,8 @@ export type Database = {
           id?: never
           keep_private?: boolean | null
           start_date?: string | null
+          storage_path?: string | null
+          storage_sha256?: string | null
           upload_likes?: boolean | null
           upload_phase?: Database["public"]["Enums"]["upload_phase_enum"] | null
           username?: string | null
@@ -415,6 +421,79 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "tweets_w_conversation_id"
             referencedColumns: ["tweet_id"]
+          },
+        ]
+      }
+      digest_edition_comments: {
+        Row: {
+          content: string
+          created_at: string
+          deleted_at: string | null
+          display_name: string | null
+          edition_id: string
+          id: string
+          updated_at: string
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          edition_id: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          edition_id?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_edition_comments_edition_id_fkey"
+            columns: ["edition_id"]
+            isOneToOne: false
+            referencedRelation: "digest_editions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      digest_edition_likes: {
+        Row: {
+          created_at: string
+          edition_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          edition_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          edition_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_edition_likes_edition_id_fkey"
+            columns: ["edition_id"]
+            isOneToOne: false
+            referencedRelation: "digest_editions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1676,6 +1755,27 @@ export type Database = {
       }
     }
     Functions: {
+      admin_activity_page: {
+        Args: {
+          p_before_at?: string
+          p_before_id?: string
+          p_kind?: string
+          p_search?: string
+          p_limit?: number
+        }
+        Returns: {
+          id: string
+          kind: string
+          occurred_at: string
+          account_id: string
+          username: string
+          status: string
+          detail: string
+          reason: string
+          error: string
+          date_basis: string
+        }[]
+      }
       admin_enqueue_delete_with_export: {
         Args: {
           p_account_id: string

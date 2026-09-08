@@ -1,8 +1,16 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
-import { ProfileHeader } from '@/components/metaTwitter/ProfileHeader'
+import {
+  ProfileHeader,
+  ProfileBio,
+  ProfileOwnerActions,
+} from '@/components/metaTwitter/ProfileHeader'
 import type { NavChapter } from '@/components/metaTwitter/ArchiveNav'
+import {
+  ProfileAvatar,
+  ProfileAvatarPlaceholder,
+} from '@/components/metaTwitter/ProfileAvatar'
 import { ProfileArchive } from '@/components/metaTwitter/ProfileArchive'
 import { ProfileArchiveSkeleton } from '@/components/metaTwitter/ProfilePageSkeleton'
 import { ProfileEditingProvider } from '@/components/metaTwitter/ProfileEditingContext'
@@ -17,7 +25,15 @@ import {
   resolveProfileChapterYear,
 } from '@/lib/metaTwitter/profilePagination'
 import { getCachedArchivedAt } from '@/lib/metaTwitter/data'
-import { resolveProfile } from '@/lib/metaTwitter/profile'
+import {
+  resolveProfileCore,
+  withBackfilledMedia,
+} from '@/lib/metaTwitter/profile'
+import { getCachedProfileLinks } from '@/lib/profileLinks'
+import { measureServerRead } from '@/lib/performance/server'
+import type { ProfileHeaderData } from '@/lib/metaTwitter/types'
+import Image from 'next/image'
+import { SectionReady } from '@/components/PagePerformance'
 import type { SectionsByYear } from '@/lib/metaTwitter/chapterSections'
 import { configuredSectionsByYear } from '@/lib/metaTwitter/sectionConfig'
 
@@ -29,7 +45,7 @@ interface PageProps {
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const resolved = await resolveProfile(params.account_id)
+  const resolved = await resolveProfileCore(params.account_id)
   if (!resolved) return { title: 'User not found' }
   const { accountId, profile } = resolved
   const title = `${profile.account_display_name} (@${profile.username}) — Community Archive`
@@ -124,15 +140,10 @@ async function ProfileArchivedAt({ accountId }: { accountId: string }) {
 }
 
 export default async function UserPage({ params, searchParams }: PageProps) {
-  const resolved = await resolveProfile(params.account_id)
+  const resolved = await resolveProfileCore(params.account_id)
   if (!resolved) notFound()
 
   const { accountId, profile } = resolved
-  const [settings, authenticatedAccountId] = await Promise.all([
-    getPublicProfileSettings(accountId),
-    getAuthenticatedAccountId(),
-  ])
-  const isOwner = authenticatedAccountId === accountId
   const requestedYear = searchParams.chapter
     ? Number.parseInt(searchParams.chapter, 10)
     : null
@@ -167,9 +178,9 @@ export default async function UserPage({ params, searchParams }: PageProps) {
     <div className="flex justify-center px-4 pb-8 pt-4 sm:px-6">
       <div className="h-fit w-full max-w-[1220px] overflow-hidden rounded-lg border border-border bg-card shadow-[0_2px_16px_rgba(0,0,0,0.06)]">
         <ProfileEditingProvider>
+          <SectionReady section="profile_header" />
           <ProfileHeader
             profile={profile}
-            downloadArchiveVisible={settings.downloadArchiveVisible}
             archivedAt={null}
             archivedAtSlot={
               profile.has_archive ? (
@@ -178,7 +189,34 @@ export default async function UserPage({ params, searchParams }: PageProps) {
                 </Suspense>
               ) : null
             }
-            isOwner={isOwner}
+            avatarSlot={
+              profile.avatar_media_url ? undefined : (
+                <Suspense
+                  fallback={
+                    <ProfileAvatarPlaceholder
+                      displayName={profile.account_display_name}
+                    />
+                  }
+                >
+                  <OptionalProfileAvatar profile={profile} />
+                </Suspense>
+              )
+            }
+            bannerSlot={
+              <Suspense fallback={null}>
+                <OptionalProfileBanner profile={profile} />
+              </Suspense>
+            }
+            bioSlot={
+              <Suspense fallback={<ProfileBio profile={profile} />}>
+                <OptionalProfileBio profile={profile} />
+              </Suspense>
+            }
+            ownerActionsSlot={
+              <Suspense fallback={null}>
+                <OwnerActions profile={profile} />
+              </Suspense>
+            }
           />
           <Suspense fallback={<ProfileArchiveSkeleton />}>
             <ProfileArchiveContent
@@ -193,5 +231,63 @@ export default async function UserPage({ params, searchParams }: PageProps) {
         </ProfileEditingProvider>
       </div>
     </div>
+  )
+}
+
+async function OptionalProfileAvatar({
+  profile,
+}: {
+  profile: ProfileHeaderData
+}) {
+  const enriched = await withBackfilledMedia(profile, profile.account_id)
+  return (
+    <ProfileAvatar
+      accountId={profile.account_id}
+      avatarUrl={enriched.avatar_media_url}
+      displayName={profile.account_display_name}
+    />
+  )
+}
+
+async function OptionalProfileBanner({
+  profile,
+}: {
+  profile: ProfileHeaderData
+}) {
+  if (profile.header_media_url) return null
+  const enriched = await withBackfilledMedia(profile, profile.account_id)
+  const url = enriched.header_media_url
+  return url ? (
+    <Image
+      src={`${url.replace(/\/$/, '')}/1500x500`}
+      alt=""
+      fill
+      sizes="(max-width: 1220px) 100vw, 1220px"
+      className="object-cover"
+    />
+  ) : null
+}
+
+async function OptionalProfileBio({ profile }: { profile: ProfileHeaderData }) {
+  const links = await measureServerRead('profile.optional-links', () =>
+    getCachedProfileLinks([profile.bio, profile.website]),
+  )
+  return <ProfileBio profile={{ ...profile, profile_links: links }} />
+}
+
+async function OwnerActions({ profile }: { profile: ProfileHeaderData }) {
+  const owner = await measureServerRead(
+    'profile.owner',
+    getAuthenticatedAccountId,
+  )
+  if (owner !== profile.account_id) return null
+  const settings = await measureServerRead('profile.settings', () =>
+    getPublicProfileSettings(profile.account_id),
+  )
+  return (
+    <ProfileOwnerActions
+      profile={profile}
+      downloadArchiveVisible={settings.downloadArchiveVisible}
+    />
   )
 }

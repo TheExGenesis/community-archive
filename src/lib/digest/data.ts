@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 import type { Json } from '@/database-types'
 import {
@@ -172,7 +173,7 @@ export async function loadDigestLabState(runId?: string) {
   }
 }
 
-export async function getPublishedDigest(
+async function readPublishedDigest(
   digestDate?: string,
 ): Promise<DigestEdition | null> {
   const preview = getPreviewDigestEdition(digestDate)
@@ -192,6 +193,10 @@ export async function getPublishedDigest(
   }
   return data ? mapDigestEdition(data) : getPreviewDigestEdition(digestDate)
 }
+
+// Next supplies request-local cache in RSC; plain React 18 test runtimes do not.
+const requestCache = cache ?? ((loader: typeof readPublishedDigest) => loader)
+export const getPublishedDigest = requestCache(readPublishedDigest)
 
 export interface DigestLikeState {
   count: number

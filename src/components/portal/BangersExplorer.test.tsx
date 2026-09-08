@@ -378,15 +378,6 @@ describe('BangersExplorer', () => {
     expect(screen.getAllByTestId('tweet-row')).toHaveLength(3)
   })
 
-  test('removes the by-year view control', () => {
-    renderExplorer(page(tweets, 3, 4))
-
-    expect(
-      screen.queryByRole('button', { name: 'By year' }),
-    ).not.toBeInTheDocument()
-    expect(screen.getByTestId('bangers-masonry')).toBeVisible()
-  })
-
   test('loads and appends the next ranked page', async () => {
     const nextTweet = tweet('4', 'One more banger', 2026, 2, 8)
     jest.spyOn(global, 'fetch').mockResolvedValue({

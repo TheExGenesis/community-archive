@@ -30,10 +30,10 @@ describe('member navigation', () => {
 
   it('uses the requested primary order without a redundant Home link', () => {
     expect(getPrimaryNav(true)).toEqual([
-      { href: '/bangers?period=all', label: 'Bangers' },
+      { href: '/bangers?period=week', label: 'Bangers' },
       { href: '/digest', label: 'Digest' },
       { href: '/user-dir', label: 'Users' },
-      { href: '/community', label: 'Gallery' },
+      { href: '/community', label: 'Apps' },
       { href: '/trends', label: 'Trends' },
       { href: '/stream', label: 'Live stream' },
       { href: '/social-graph', label: 'Graph' },
@@ -43,24 +43,24 @@ describe('member navigation', () => {
       expect.arrayContaining([
         { href: '/user-dir', label: 'Users' },
         { href: '/stream', label: 'Live stream' },
-        { href: '/bangers?period=all', label: 'Bangers' },
+        { href: '/bangers?period=week', label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
         { href: '/search', label: 'Search' },
-        { href: '/community', label: 'Gallery' },
+        { href: '/community', label: 'Apps' },
         { href: '/social-graph', label: 'Graph' },
       ]),
     )
-    expect(isNavItemActive('/bangers', '/bangers?period=all')).toBe(true)
+    expect(isNavItemActive('/bangers', '/bangers?period=week')).toBe(true)
     expect(isNavItemActive('/stream', '/stream')).toBe(true)
-    expect(isNavItemActive('/search', '/bangers?period=all')).toBe(false)
+    expect(isNavItemActive('/search', '/bangers?period=week')).toBe(false)
   })
 
-  it('keeps Bangers public while reserving Trends for signed-in members', () => {
+  it('shows Bangers and Trends navigation to every audience', () => {
     expect(getPrimaryNav(false)).toContainEqual({
-      href: '/bangers?period=all',
+      href: '/bangers?period=week',
       label: 'Bangers',
     })
-    expect(getPrimaryNav(false)).not.toContainEqual({
+    expect(getPrimaryNav(false)).toContainEqual({
       href: '/trends',
       label: 'Trends',
     })
@@ -74,7 +74,7 @@ describe('member navigation', () => {
     })
     expect(getPrimaryNav(false)).toContainEqual({
       href: '/community',
-      label: 'Gallery',
+      label: 'Apps',
     })
     expect(getPrimaryNav(true)).toContainEqual({
       href: '/trends',

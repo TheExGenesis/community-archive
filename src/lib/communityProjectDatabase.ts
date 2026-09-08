@@ -4,6 +4,7 @@ import type {
   CommunityProject,
   CommunityProjectCategory,
 } from '@/lib/communityProjects'
+import { getAdminClient } from '@/app/admin/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 
 export type CommunityProjectRow = {
@@ -56,7 +57,7 @@ export function mapCommunityProjectRow(
     sourceTweetId: sourceTweetId(row.source_post_url),
     sourceUrl: row.source_post_url,
     image: row.cover_storage_path
-      ? `/api/community/projects/${row.id}/cover`
+      ? `/api/community/projects/${row.id}/cover?v=${encodeURIComponent(row.cover_storage_path)}`
       : undefined,
     coverClass: 'from-[#8BD2EE] via-[#75C9EB] to-[#25AADF]',
     featured: row.featured,
@@ -172,12 +173,14 @@ export async function loadCommunityProjectLikesForUser(
 export async function loadPendingCommunityProjects(): Promise<
   CommunityProjectRow[]
 > {
-  const admin = createServerServiceRoleClient()
+  const admin = await getAdminClient()
   const { data, error } = await admin
     .from('community_projects')
     .select(PROJECT_SELECT)
     .eq('status', 'pending')
     .order('submitted_at', { ascending: true })
+    .order('id')
+    .limit(50)
 
   if (error) throw new Error('Unable to load pending Community submissions')
   return (data ?? []) as unknown as CommunityProjectRow[]

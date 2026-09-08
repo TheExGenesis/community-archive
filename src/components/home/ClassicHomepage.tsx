@@ -3,13 +3,14 @@ import Link from 'next/link'
 import { Suspense, type ReactNode } from 'react'
 import { cookies } from 'next/headers'
 import HomepageSearch from '@/components/HomepageSearch'
+import FeaturedCommunityApps from './FeaturedCommunityApps'
 import Testimonials from '@/components/home/Testimonials'
-import type { PortalData } from '@/lib/portal/types'
+import type { HomepageData } from '@/lib/portal/data'
+import HomepageUpload from './HomepageUpload'
 import { createServerClient } from '@/utils/supabase'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 import {
   HomepagePortal,
-  HomepagePortalFallback,
   HomepageStats,
 } from '@/components/home/HomepageDataSections'
 
@@ -27,18 +28,8 @@ const DynamicHeroCTAButtons = dynamic(
   },
 )
 
-const DynamicUploadArchiveSection = dynamic(
-  () => import('@/components/UploadArchiveSection'),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-48 w-full animate-pulse rounded-lg bg-muted dark:bg-card" />
-    ),
-  },
-)
-
 interface ClassicHomepageProps {
-  data: Promise<PortalData>
+  data: HomepageData
   homepagePeople: ReactNode
   isMember: boolean
   showCta: boolean
@@ -71,7 +62,7 @@ export default async function ClassicHomepage({
 
   return (
     <main>
-      <section className="overflow-hidden bg-card pb-16 pt-24 dark:bg-background md:pb-24 md:pt-36">
+      <section className="overflow-hidden bg-card pb-8 pt-16 dark:bg-background md:pb-10 md:pt-24">
         <div className="relative z-10 mx-auto w-full max-w-5xl space-y-12 px-4 text-center sm:px-6 md:space-y-16 lg:px-8">
           <div className="space-y-4">
             <h1 className="text-5xl font-bold tracking-tight text-foreground md:text-6xl">
@@ -86,7 +77,7 @@ export default async function ClassicHomepage({
                   </>
                 }
               >
-                <HomepageStats data={data} />
+                <HomepageStats data={data.globalStats} />
               </Suspense>
             </p>
           </div>
@@ -125,14 +116,18 @@ export default async function ClassicHomepage({
                 Vitalik Buterin
               </Link>
             </p>
+            <Link
+              href="#daily-digest"
+              className="mt-5 inline-flex items-center rounded-full border border-brand/30 bg-brand/10 px-4 py-2 text-sm font-medium text-brand-deep transition-colors hover:bg-brand/20"
+            >
+              Read the daily digest ↓
+            </Link>
           </div>
         </div>
       </section>
 
       <section className="bg-zinc-100/80 py-4 dark:bg-transparent sm:py-7">
-        <Suspense fallback={<HomepagePortalFallback />}>
-          <HomepagePortal data={data} isMember={isMember} />
-        </Suspense>
+        <HomepagePortal data={data} isMember={isMember} />
       </section>
 
       <section
@@ -140,7 +135,7 @@ export default async function ClassicHomepage({
         className="scroll-mt-16 overflow-hidden bg-muted py-12 dark:bg-card md:py-16 lg:py-20"
       >
         <div className="relative z-10 mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8">
-          <DynamicUploadArchiveSection />
+          <HomepageUpload />
           <ExtensionInstallPrompt
             surface="home"
             className="mx-auto mt-8 max-w-3xl"
@@ -148,6 +143,7 @@ export default async function ClassicHomepage({
         </div>
       </section>
 
+      <FeaturedCommunityApps />
       <Testimonials />
     </main>
   )

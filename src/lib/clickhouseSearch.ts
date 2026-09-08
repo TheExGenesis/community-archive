@@ -35,6 +35,7 @@ interface MappedClickHouseSearchResponse {
 
 interface ClickHouseSearchRequestOptions {
   preview?: boolean
+  signal?: AbortSignal
   excludeRetweets?: boolean
 }
 
@@ -98,6 +99,7 @@ async function requestClickHouseSearch(
 
   const response = await fetchImpl(`/api/tweet-search?${params.toString()}`, {
     cache: 'no-store',
+    ...(options.signal ? { signal: options.signal } : {}),
   })
   const body = await response.text()
   if (!response.ok) {
@@ -140,9 +142,11 @@ export async function searchTweetsWithClickHouse(
   page: number,
   pageSize: number,
   fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<TimelineTweet[]> {
   return requestClickHouseTweets(criteria, page, pageSize, fetchImpl, {
     excludeRetweets: criteria.excludeRetweets,
+    signal,
   })
 }
 
@@ -160,9 +164,11 @@ export function canPreviewTweetSearch(
 export async function searchTweetPreviewsWithClickHouse(
   criteria: FilterCriteria,
   fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<MappedClickHouseSearchResponse> {
   return requestClickHouseSearch(criteria, 1, 5, fetchImpl, {
     preview: true,
+    signal,
     excludeRetweets: criteria.excludeRetweets,
   })
 }

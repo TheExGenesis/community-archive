@@ -347,6 +347,13 @@ test('delivery manifest is content-free and historical uploads are not seeded', 
     ),
     'utf8',
   )
+  const queueFirst = processor.indexOf(
+    'await publishCanonicalArchiveQueueFirst(',
+  )
+  const compatibilityWrite = processor.indexOf(
+    'await processSingleArchive(',
+    queueFirst,
+  )
   const completion = processor.indexOf("SET upload_phase = 'completed'")
   const directSink = processor.indexOf(
     'await attemptClickHouseDelivery(',
@@ -357,8 +364,27 @@ test('delivery manifest is content-free and historical uploads are not seeded', 
     directSink,
   )
   assert.ok(
-    completion >= 0 && directSink > completion && canonicalShadow > directSink,
+    queueFirst >= 0 && compatibilityWrite > queueFirst &&
+      completion > compatibilityWrite && directSink > completion &&
+      canonicalShadow > directSink,
   )
   assert.match(processor, /jsonb_array_elements\(\$\{trx\.json\(candidates as never\)\}::jsonb\)/)
   assert.doesNotMatch(processor, /JSON\.stringify\(candidates\)/)
+})
+
+test('preserves all four extended attachments in the ClickHouse and canonical archive batch', () => {
+  const media = ['701', '702', '703', '704'].map((id_str) => ({
+    id_str, media_url_https: `https://example.com/${id_str}.jpg`, type: 'photo',
+    sizes: { large: { w: 1200, h: 800 } },
+  }))
+  const source = {
+    ...archive,
+    tweets: [{ tweet: {
+      ...archive.tweets[0].tweet,
+      entities: { urls: [], user_mentions: [], media: media.slice(0, 1) },
+      extended_entities: { media },
+    } }],
+  }
+  const batch = buildArchiveClickHouseBatch(source, createArchiveClickHouseManifest(source, '9'), new Map(), '2026-09-06T00:00:00Z')
+  assert.deepEqual(batch.tweet_media_versions.map((row) => row.media_id), ['701', '702', '703', '704'])
 })

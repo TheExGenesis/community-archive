@@ -1,6 +1,8 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo } from 'react'
+import { normalizeTweet } from '@/lib/tweets/normalize'
+import type { TweetInput } from '@/lib/tweets/types'
 import TweetComponent, { compactTweetGridClass } from './TweetComponent'
 import { Button } from '@/components/ui/button'
 import { Download, SearchX } from 'lucide-react'
@@ -8,7 +10,8 @@ import type { TweetOrigin } from '@/lib/navigation'
 import type { TweetSearchSort } from '@/lib/queries/tweetQueries'
 
 interface UnifiedTweetListProps {
-  tweets: any[]
+  highlightQuery?: string
+  tweets: readonly TweetInput[]
   isLoading?: boolean
   emptyMessage?: string
   className?: string
@@ -26,11 +29,12 @@ interface UnifiedTweetListProps {
 
 /**
  * Unified TweetList component that handles displaying tweets consistently across the app.
- * This component ensures all tweets are passed to TweetComponent in the correct raw format,
+ * This boundary normalizes source data before passing it to TweetComponent,
  * maintaining consistency for features like RT avatars, quote tweets, etc.
  */
 export default function UnifiedTweetList({
-  tweets,
+  tweets: inputTweets,
+  highlightQuery,
   isLoading = false,
   emptyMessage = 'No tweets found',
   className = 'space-y-4',
@@ -45,6 +49,7 @@ export default function UnifiedTweetList({
   searchSort,
   onSearchSortChange,
 }: UnifiedTweetListProps) {
+  const tweets = useMemo(() => inputTweets.map(normalizeTweet), [inputTweets])
   const handleExportCsv = () => {
     if (tweets.length === 0) {
       alert('No tweets to export.')
@@ -64,21 +69,14 @@ export default function UnifiedTweetList({
     const csvRows = [
       headers.join(','),
       ...tweets.map((tweet) => {
-        // Extract username and display name from either flattened or nested format
-        const username = tweet.username || tweet.account?.username || ''
-        const displayName =
-          tweet.account_display_name ||
-          tweet.account?.account_display_name ||
-          ''
-
         return [
           `"${tweet.tweet_id}"`,
           `"${tweet.created_at}"`,
           `"${tweet.full_text?.replace(/"/g, '""')?.replace(/\n/g, '\\n') || ''}"`,
           tweet.favorite_count || 0,
           tweet.retweet_count || 0,
-          `"${username}"`,
-          `"${displayName}"`,
+          `"${tweet.username}"`,
+          `"${tweet.account_display_name}"`,
           `"${tweet.reply_to_tweet_id || ''}"`,
         ].join(',')
       }),
@@ -271,9 +269,10 @@ export default function UnifiedTweetList({
                 <div
                   key={tweet.tweet_id}
                   role="row"
-                  className="hover:bg-muted/35 transition-colors"
+                  className="transition-colors hover:bg-muted/35"
                 >
                   <TweetComponent
+                    highlightQuery={highlightQuery}
                     tweet={tweet}
                     collapseLongText={collapseLongTweets}
                     compact
@@ -293,6 +292,7 @@ export default function UnifiedTweetList({
               className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/20 sm:p-5"
             >
               <TweetComponent
+                highlightQuery={highlightQuery}
                 tweet={tweet}
                 collapseLongText={collapseLongTweets}
                 permalinkOrigin={permalinkOrigin}

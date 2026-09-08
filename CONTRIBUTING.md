@@ -15,6 +15,9 @@ See [`docs/local-setup.md`](docs/local-setup.md) for the full local Supabase
 setup, and [`AGENTS.md`](AGENTS.md) for repository-specific safety and migration
 rules.
 
+For the website module map and feature boundaries, see
+[website architecture](docs/website-architecture.md).
+
 ## Before opening a PR
 
 ```bash

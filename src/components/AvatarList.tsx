@@ -1,75 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { useEffect, useState } from 'react'
+import RecoverableAvatar from '@/components/RecoverableAvatar'
 import { AvatarType } from '@/lib/types'
 import { formatNumber } from '@/lib/formatNumber'
-import Link from 'next/link'
+import Link from '@/components/IntentLink'
 import { userProfileHref } from '@/lib/navigation'
 
 type AvatarListProps = {
   initialAvatars: AvatarType[]
   title?: string
   compact?: boolean
-}
-
-function RecoverableArchiveAvatar({
-  avatar,
-  compact,
-}: {
-  avatar: AvatarType
-  compact: boolean
-}) {
-  const [avatarUrl, setAvatarUrl] = useState(
-    avatar.avatar_media_url || undefined,
-  )
-  const attemptedRecovery = useRef(false)
-
-  useEffect(() => {
-    attemptedRecovery.current = false
-    setAvatarUrl(avatar.avatar_media_url || undefined)
-  }, [avatar.account_id, avatar.avatar_media_url])
-
-  const recoverAvatar = useCallback(() => {
-    if (attemptedRecovery.current) return
-    attemptedRecovery.current = true
-    void fetch(`/api/profile/${encodeURIComponent(avatar.account_id)}/avatar`)
-      .then(async (response) => {
-        if (!response.ok) return null
-        const body = (await response.json()) as { avatar_media_url?: unknown }
-        return typeof body.avatar_media_url === 'string' &&
-          body.avatar_media_url
-          ? body.avatar_media_url
-          : null
-      })
-      .then((recoveredAvatarUrl) => {
-        if (recoveredAvatarUrl) setAvatarUrl(recoveredAvatarUrl)
-      })
-      .catch(() => undefined)
-  }, [avatar.account_id])
-
-  useEffect(() => {
-    if (!avatar.avatar_media_url) recoverAvatar()
-  }, [avatar.avatar_media_url, recoverAvatar])
-
-  return (
-    <Avatar className={compact ? 'h-10 w-10' : 'h-12 w-12'}>
-      {avatarUrl ? (
-        <AvatarImage
-          src={avatarUrl}
-          alt={`${avatar.username}'s avatar`}
-          // Radix only mounts the image once it has decoded, so the fade runs
-          // exactly when the photo replaces the letter fallback.
-          className="home-fade-in"
-          onError={() => {
-            setAvatarUrl(undefined)
-            recoverAvatar()
-          }}
-        />
-      ) : null}
-      <AvatarFallback>{avatar.username[0].toUpperCase()}</AvatarFallback>
-    </Avatar>
-  )
 }
 
 const AvatarList = ({
@@ -102,7 +43,14 @@ const AvatarList = ({
                 compact ? 'w-20' : 'w-24'
               }`}
             >
-              <RecoverableArchiveAvatar avatar={avatar} compact={compact} />
+              <RecoverableAvatar
+                accountId={avatar.account_id}
+                avatarUrl={avatar.avatar_media_url}
+                displayName={avatar.username}
+                alt={`${avatar.username}'s avatar`}
+                className={compact ? 'h-10 w-10' : 'h-12 w-12'}
+                imageClassName="home-fade-in"
+              />
               <span
                 className={`mt-1 w-full min-w-0 leading-tight [overflow-wrap:anywhere] ${
                   compact ? 'min-h-7 text-[11px]' : 'text-xs'

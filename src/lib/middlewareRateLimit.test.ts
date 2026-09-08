@@ -8,6 +8,7 @@ const request = (
   pathname: string,
   ip: string,
   method = 'GET',
+  country = 'US',
 ): Promise<Response> =>
   middleware(
     new NextRequest(`https://www.community-archive.org${pathname}`, {
@@ -15,11 +16,78 @@ const request = (
       headers: {
         'user-agent': browserUserAgent,
         'x-forwarded-for': ip,
+        'x-vercel-ip-country': country,
       },
     }),
   )
 
 describe('API middleware rate limits', () => {
+  it.each([
+    ['US', 20, '203.0.113.20'],
+    ['SG', 5, '203.0.113.21'],
+  ])(
+    'isolates search from background API traffic while retaining the %s quota',
+    async (country, quota, ip) => {
+      const backgroundPaths = [
+        '/api/user-directory',
+        '/api/profile/123/avatar',
+        '/api/portal/stream',
+        '/api/tweets/456/link-previews',
+      ]
+      for (let index = 0; index < quota; index += 1) {
+        await expect(
+          request(
+            backgroundPaths[index % backgroundPaths.length],
+            ip,
+            'GET',
+            country,
+          ),
+        ).resolves.toMatchObject({ status: 200 })
+      }
+      await expect(
+        request('/api/user-directory', ip, 'GET', country),
+      ).resolves.toMatchObject({ status: 429 })
+
+      for (let index = 0; index < quota; index += 1) {
+        await expect(
+          request(
+            `/api/tweet-search?q=website&offset=${index}`,
+            ip,
+            'GET',
+            country,
+          ),
+        ).resolves.toMatchObject({ status: 200 })
+      }
+      const response = await request(
+        '/api/tweet-search?q=personal',
+        ip,
+        'GET',
+        country,
+      )
+      expect(response.status).toBe(429)
+      expect(response.headers.get('Retry-After')).toBe('60')
+      await expect(response.json()).resolves.toEqual({
+        error: 'Too Many Requests',
+      })
+    },
+  )
+
+  it('does not let search consume the budget for other APIs or other visitors', async () => {
+    const ip = '203.0.113.22'
+    for (let index = 0; index < 20; index += 1) {
+      await request('/api/tweet-search?q=website', ip)
+    }
+    await expect(
+      request('/api/tweet-search?q=website', ip),
+    ).resolves.toMatchObject({ status: 429 })
+    await expect(request('/api/user-directory', ip)).resolves.toMatchObject({
+      status: 200,
+    })
+    await expect(
+      request('/api/tweet-search?q=website', '203.0.113.23'),
+    ).resolves.toMatchObject({ status: 200 })
+  })
+
   it('does not let unrelated API traffic block opt-in or OAuth completion', async () => {
     const ip = '203.0.113.10'
 

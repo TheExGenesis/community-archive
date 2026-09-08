@@ -1,15 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { checkIsAdmin } from '@/app/admin/data'
-import { DigestEditionView } from '@/components/digest/DigestEditionView'
-import {
-  getDigestCommentCount,
-  getDigestLikeState,
-  getPublishedDigest,
-  listPublishedDigestDays,
-} from '@/lib/digest/data'
+import { PublishedDigestView } from '@/components/digest/PublishedDigestView'
+import { getPublishedDigest } from '@/lib/digest/data'
 import { getDigestMetadata } from '@/lib/digest/metadata'
-import { getCurrentUser } from '@/lib/portal/auth'
 
 export const revalidate = 300
 
@@ -18,30 +12,12 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function DigestPage() {
-  const [edition, archive, isAdmin] = await Promise.all([
-    getPublishedDigest(),
-    listPublishedDigestDays(),
-    checkIsAdmin(),
-  ])
+  const edition = await getPublishedDigest()
   if (edition) {
-    const [likes, user, commentCount] = await Promise.all([
-      getDigestLikeState(edition),
-      getCurrentUser(),
-      getDigestCommentCount(edition),
-    ])
-    return (
-      <DigestEditionView
-        edition={edition}
-        archive={archive}
-        isAdmin={isAdmin}
-        likeCount={likes.count}
-        likedByViewer={likes.likedByViewer}
-        isSignedIn={Boolean(user)}
-        commentCount={commentCount}
-      />
-    )
+    return <PublishedDigestView edition={edition} />
   }
 
+  const isAdmin = await checkIsAdmin()
   return (
     <main className="min-h-[70vh] bg-zinc-100/70 px-4 py-16 dark:bg-background">
       <div className="mx-auto max-w-3xl rounded-lg border border-dashed bg-card p-10 text-center">

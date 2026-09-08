@@ -14,14 +14,14 @@
     "typescript"
   ],
   "scripts": {
-    "dev": "NODE_ENV=development NEXT_PUBLIC_USE_REMOTE_DEV_DB=false next dev",
+    "dev": "LOCAL_ADMIN_PREVIEW=true NODE_ENV=development NEXT_PUBLIC_USE_REMOTE_DEV_DB=false next dev --hostname 127.0.0.1",
     "dev-as-prod": "NODE_ENV=production next dev",
-    "dev-remote-db": "NEXT_PUBLIC_USE_REMOTE_DEV_DB=true next dev",
+    "dev-remote-db": "LOCAL_ADMIN_PREVIEW=true NEXT_PUBLIC_USE_REMOTE_DEV_DB=true next dev --hostname 127.0.0.1",
     "dev:importfiles": "tsx --env-file=.env scripts/import_from_files_to_db.ts",
     "dev:validateimport": "tsx --env-file=.env scripts/validate_db_import.ts",
     "dev:downloadarchive": "tsx --env-file=.env scripts/download_supabase_storage.mts",
     "dev:testconversationids": "tsx --env-file=.env scripts/testConversationIds.ts",
-    "dev:generate-mock-archives": "node tests/db-insertion/fixtures/generate-mock-archives.js",
+    "dev:generate-mock-archives": "tsx tests/db-insertion/fixtures/generate-mock-archives.ts",
     "build": "NODE_ENV=production next build",
     "start": "next start",
     "lint": "next lint",

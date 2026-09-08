@@ -1,3 +1,5 @@
+import { getArchiveTweetMedia } from './archive_media'
+
 const UINT64_PATTERN = /^(0|[1-9][0-9]*)$/
 const MAX_UINT64 = (1n << 64n) - 1n
 const TWITTER_USERNAME_PATTERN = /^[A-Za-z0-9_]{1,15}$/
@@ -18,6 +20,8 @@ export interface ArchiveClickHouseDelivery {
   account_id: string
   tweet_ids: string[]
   username?: string | null
+  storage_path?: string | null
+  storage_sha256?: string | null
 }
 
 export interface ArchivePolicyCandidate {
@@ -554,7 +558,7 @@ export function buildArchiveClickHouseBatch(
       })
     }
 
-    for (const media of tweet?.entities?.media ?? []) {
+    for (const media of getArchiveTweetMedia(tweet ?? {})) {
       const mediaId = asUInt64(media?.id_str ?? media?.id)
       const mediaUrl = cleanText(media?.media_url_https ?? media?.media_url)
       if (!mediaId || !mediaUrl) continue

@@ -16,18 +16,17 @@ export default function LoginContent({ redirectUrl }: LoginContentProps) {
           <div className="mb-8 text-center">
             <h1 className="mb-2 text-3xl font-bold text-foreground">Sign In</h1>
             <p className="text-muted-foreground">
-              Sign in to access your account and manage your tweet streaming
-              preferences
+              Sign in to continue exploring Community Archive.
             </p>
             {redirectUrl && (
               <p className="mt-2 text-sm text-brand">
-                You&apos;ll be redirected to: {decodeURIComponent(redirectUrl)}
+                You&apos;ll be redirected to: {redirectUrl}
               </p>
             )}
           </div>
 
           <div className="space-y-6">
-            <SignIn />
+            <SignIn fullPage />
 
             {isDev && (
               <div className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20">

@@ -42,6 +42,40 @@ export interface CommunityProject {
  */
 export const COMMUNITY_PROJECTS: CommunityProject[] = [
   {
+    slug: 'birdseye',
+    name: 'Birdseye',
+    creator: 'Community Archive',
+    summary: 'Explore the topics and recurring ideas in a personal archive.',
+    description:
+      'A topic-by-topic view of saved archive analyses, with themes, ideas, referenced posts over time, and links to the original conversations.',
+    archiveUse:
+      'Reuses existing Birdseye analyses of archived posts. Browse topic groups and follow the cited source tweets on Community Archive.',
+    category: 'Tools',
+    tags: ['Personal archive', 'Topics', 'AI analysis'],
+    projectUrl: '/birdseye',
+    image: '/images/community/birdseye-cover.png',
+    coverClass: 'from-[#d7e4ef] via-[#8bd2ee] to-[#1e9bcd]',
+    featured: true,
+    publishedAt: '2026-09-07',
+  },
+  {
+    slug: 'strands',
+    name: 'Strands',
+    creator: 'Community Archive',
+    summary: 'Follow ideas as they evolve across people and conversations.',
+    description:
+      'Read the original Best Strands collection: summaries of ideas that spread through the community, with key posts and links back to each conversation.',
+    archiveUse:
+      'Reuses the existing ranked strand analyses and their source references from the archive. Each strand has its own shareable page.',
+    category: 'Experiments',
+    tags: ['Ideas', 'Conversations', 'AI analysis'],
+    projectUrl: '/strands',
+    image: '/images/featured/strand-atlas.png',
+    coverClass: 'from-[#f3d36b] via-[#f0a660] to-[#1e9bcd]',
+    featured: true,
+    publishedAt: '2026-09-07',
+  },
+  {
     slug: 'conversation-map',
     name: 'Conversation Map',
     creator: 'Community Archive',
@@ -53,6 +87,7 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     category: 'Experiments',
     tags: ['Timeline', 'Conversations', 'Visualization'],
     projectUrl: '/conversation-map',
+    image: '/images/community/conversation-map-cover.png',
     coverClass: 'from-[#d7e4ef] via-[#8bd2ee] to-[#1e9bcd]',
     featured: true,
     publishedAt: '2026-08-30',

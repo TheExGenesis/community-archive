@@ -59,12 +59,20 @@ export function ProfileHeader({
   archivedAtSlot,
   downloadArchiveVisible = true,
   isOwner = false,
+  avatarSlot,
+  bannerSlot,
+  bioSlot,
+  ownerActionsSlot,
 }: {
   profile: ProfileHeaderData
   archivedAt: string | null
   archivedAtSlot?: ReactNode
   downloadArchiveVisible?: boolean
   isOwner?: boolean
+  avatarSlot?: ReactNode
+  bannerSlot?: ReactNode
+  bioSlot?: ReactNode
+  ownerActionsSlot?: ReactNode
 }) {
   const archiveUrl =
     profile.has_archive && isOwner
@@ -73,14 +81,11 @@ export function ProfileHeader({
   const headerUrl = profile.header_media_url
     ? `${profile.header_media_url.replace(/\/$/, '')}/1500x500`
     : null
-  const profileLinks = new Map(
-    (profile.profile_links ?? []).map((link) => [link.original_url, link]),
-  )
 
   return (
     <header>
       <div className="relative h-[210px] w-full bg-muted">
-        {headerUrl && (
+        {headerUrl ? (
           <Image
             src={headerUrl}
             alt=""
@@ -89,27 +94,35 @@ export function ProfileHeader({
             className="object-cover"
             sizes="(max-width: 1220px) 100vw, 1220px"
           />
+        ) : (
+          bannerSlot
         )}
       </div>
       <div className="px-4 pb-3 sm:px-6">
         <div className="flex items-start justify-between gap-3">
-          <ProfileAvatar
-            accountId={profile.account_id}
-            avatarUrl={profile.avatar_media_url}
-            displayName={profile.account_display_name}
-          />
+          {avatarSlot ?? (
+            <ProfileAvatar
+              accountId={profile.account_id}
+              avatarUrl={profile.avatar_media_url}
+              displayName={profile.account_display_name}
+            />
+          )}
           <div className="flex flex-wrap justify-end gap-2 pt-3.5">
-            {archiveUrl && downloadArchiveVisible && (
-              <a
-                href={archiveUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-full border border-border bg-transparent px-4 py-[7px] text-sm font-semibold text-foreground hover:bg-muted"
-              >
-                Download archive
-              </a>
+            {ownerActionsSlot ?? (
+              <>
+                {archiveUrl && downloadArchiveVisible && (
+                  <a
+                    href={archiveUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full border border-border bg-transparent px-4 py-[7px] text-sm font-semibold text-foreground hover:bg-muted"
+                  >
+                    Download archive
+                  </a>
+                )}
+                {isOwner ? <ProfileEditButton /> : null}
+              </>
             )}
-            {isOwner ? <ProfileEditButton /> : null}
             <a
               href={`https://x.com/${profile.username}`}
               target="_blank"
@@ -139,23 +152,7 @@ export function ProfileHeader({
 
         <div className="mt-2.5 grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-x-8">
           <div className="min-w-0">
-            <div
-              className={
-                profile.bio
-                  ? 'whitespace-pre-line text-sm leading-[1.4]'
-                  : 'hidden lg:block'
-              }
-            >
-              {profile.bio ? (
-                <ProfileText text={profile.bio} links={profileLinks} />
-              ) : null}
-            </div>
-
-            {profile.website ? (
-              <div className="mt-1 text-sm">
-                <ProfileText text={profile.website} links={profileLinks} />
-              </div>
-            ) : null}
+            {bioSlot ?? <ProfileBio profile={profile} />}
 
             {!profile.has_archive && !profile.is_opted_in ? (
               <div
@@ -203,9 +200,65 @@ export function ProfileHeader({
               <Stat value={profile.num_following} label="Following" />
               <Stat value={profile.num_likes} label="Likes" />
             </div>
+            <Link
+              href={`/search?${new URLSearchParams({ fromUser: profile.username, sort: 'newest' })}`}
+              className="self-start text-sm font-medium text-brand underline-offset-4 hover:underline lg:self-end"
+            >
+              Latest tweets →
+            </Link>
           </div>
         </div>
       </div>
     </header>
+  )
+}
+
+export function ProfileBio({ profile }: { profile: ProfileHeaderData }) {
+  const profileLinks = new Map(
+    (profile.profile_links ?? []).map((link) => [link.original_url, link]),
+  )
+  return (
+    <>
+      <div
+        className={
+          profile.bio
+            ? 'whitespace-pre-line text-sm leading-[1.4]'
+            : 'hidden lg:block'
+        }
+      >
+        {profile.bio ? (
+          <ProfileText text={profile.bio} links={profileLinks} />
+        ) : null}
+      </div>
+      {profile.website ? (
+        <div className="mt-1 text-sm">
+          <ProfileText text={profile.website} links={profileLinks} />
+        </div>
+      ) : null}
+    </>
+  )
+}
+
+export function ProfileOwnerActions({
+  profile,
+  downloadArchiveVisible,
+}: {
+  profile: ProfileHeaderData
+  downloadArchiveVisible: boolean
+}) {
+  return (
+    <>
+      {profile.has_archive && downloadArchiveVisible ? (
+        <a
+          href={`/api/archive/${encodeURIComponent(profile.username.toLowerCase())}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-full border border-border bg-transparent px-4 py-[7px] text-sm font-semibold text-foreground hover:bg-muted"
+        >
+          Download archive
+        </a>
+      ) : null}
+      <ProfileEditButton />
+    </>
   )
 }

@@ -10,8 +10,5 @@ export const digestEmailSiteUrl = () =>
       ? `https://${process.env.VERCEL_URL}`
       : `http://localhost:${process.env.PORT ?? 3000}`
 
-export const digestConfirmUrl = (token: string) =>
-  `${digestEmailSiteUrl()}/api/digest/email/confirm?token=${encodeURIComponent(token)}`
-
 export const digestUnsubscribeUrl = (token: string) =>
   `${digestEmailSiteUrl()}/api/digest/email/unsubscribe?token=${encodeURIComponent(token)}`

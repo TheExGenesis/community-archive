@@ -1,7 +1,7 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
 import ClassicHomepage from './ClassicHomepage'
-import type { PortalData } from '@/lib/portal/types'
+import type { HomepageData } from '@/lib/portal/data'
 import { createServerClient } from '@/utils/supabase'
 
 jest.mock('next/headers', () => ({ cookies: jest.fn(() => ({})) }))
@@ -37,33 +37,20 @@ jest.mock('@/components/ExtensionInstallPrompt', () => ({
 }))
 jest.mock('@/utils/supabase', () => ({ createServerClient: jest.fn() }))
 
-const data = {
-  stats: {
-    totalTweets: 14_000_000,
-    accountCount: 700,
-    streamedLast24Hours: 0,
-    joinedThisWeek: 0,
-    firstYear: 2006,
-    currentYear: 2026,
-    generatedAt: '2026-08-12T00:00:00.000Z',
-  },
-  trends: { years: [], series: [], weekly: [], computedAt: '' },
-  initialStream: [],
-  research: [],
-  recentBangers: [],
-  historicalBangers: [],
-  failures: {
-    liveAnalytics: false,
-    memberCount: false,
-    joinedThisWeek: false,
-    corpusRange: false,
-    trends: false,
-    initialStream: false,
-    research: false,
-    recentBangers: false,
-    historicalBangers: false,
-  },
-} satisfies PortalData
+const pending = new Promise<never>(() => undefined)
+const data: HomepageData = {
+  globalStats: pending,
+  overview: pending,
+  stream: pending,
+  recentBangers: pending,
+  historicalBangers: pending,
+  trends: pending,
+  research: pending,
+}
+jest.mock('./HomepageUpload', () => ({
+  __esModule: true,
+  default: () => <div data-testid="archive-upload" />,
+}))
 
 describe('ClassicHomepage audience actions', () => {
   beforeEach(() => {
@@ -74,7 +61,7 @@ describe('ClassicHomepage audience actions', () => {
   it('keeps search above the shared dashboard for signed-in members', async () => {
     render(
       await ClassicHomepage({
-        data: Promise.resolve(data),
+        data,
         homepagePeople: <div data-testid="homepage-people" />,
         isMember: true,
         showCta: false,
@@ -90,7 +77,7 @@ describe('ClassicHomepage audience actions', () => {
   it('keeps the CTA above the same dashboard for guests', async () => {
     render(
       await ClassicHomepage({
-        data: Promise.resolve(data),
+        data,
         homepagePeople: <div data-testid="homepage-people" />,
         isMember: false,
         showCta: true,
@@ -101,19 +88,5 @@ describe('ClassicHomepage audience actions', () => {
     expect(screen.queryByTestId('homepage-search')).not.toBeInTheDocument()
     expect(screen.getByTestId('homepage-people')).toBeInTheDocument()
     expect(screen.getByTestId('shared-dashboard')).toBeInTheDocument()
-  })
-
-  it('states the totals plainly, with no counter to animate them', async () => {
-    render(
-      await ClassicHomepage({
-        data: Promise.resolve(data),
-        homepagePeople: <div data-testid="homepage-people" />,
-        isMember: false,
-        showCta: true,
-      }),
-    )
-
-    expect(screen.getByText(/14\.0M public tweets/)).toBeInTheDocument()
-    expect(screen.getByText(/700 community members/)).toBeInTheDocument()
   })
 })

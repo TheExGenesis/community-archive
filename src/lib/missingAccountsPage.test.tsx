@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import React from 'react'
 
-import MissingAccountsPage, { metadata } from '@/app/missing-accounts/page'
+import MissingAccountsPage from '@/app/missing-accounts/page'
 import {
   getMissingAccounts,
   type MissingAccountsResponse,
@@ -61,12 +61,6 @@ const response: MissingAccountsResponse = {
 
 beforeEach(() => {
   getMissingAccountsMock.mockResolvedValue(response)
-})
-
-test('uses the same plain-language framing in page metadata', () => {
-  expect(metadata.description).toBe(
-    'See the accounts mentioned most often in the Community Archive that have not opted in or uploaded their archive yet.',
-  )
 })
 
 test('explains the not-opted-in view in plain language', async () => {

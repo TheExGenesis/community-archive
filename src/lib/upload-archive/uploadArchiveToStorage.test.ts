@@ -2,6 +2,7 @@ import type { SupabaseClient, User } from '@supabase/supabase-js'
 import type { Archive } from '../types'
 import { refreshSession } from '../refreshSession'
 import { uploadArchiveToStorage } from './uploadArchiveToStorage'
+import { createHash, webcrypto } from 'node:crypto'
 
 jest.mock('../refreshSession', () => ({
   refreshSession: jest.fn(),
@@ -58,6 +59,10 @@ const createSupabase = (
 describe('uploadArchiveToStorage', () => {
   beforeEach(() => {
     mockedRefreshSession.mockResolvedValue(undefined)
+    Object.defineProperty(globalThis, 'crypto', {
+      configurable: true,
+      value: webcrypto,
+    })
   })
 
   it('keys the object path from the verified Twitter identity', async () => {
@@ -67,7 +72,7 @@ describe('uploadArchiveToStorage', () => {
       error: null,
     })
 
-    await uploadArchiveToStorage(supabase, archive)
+    const reference = await uploadArchiveToStorage(supabase, archive)
 
     expect(getUser).toHaveBeenCalledTimes(1)
     expect(rpc).toHaveBeenCalledWith('assert_archive_upload_allowed', {
@@ -76,10 +81,16 @@ describe('uploadArchiveToStorage', () => {
     })
     expect(from).toHaveBeenCalledWith('archives')
     expect(upload).toHaveBeenCalledWith(
-      'verified_owner/archive.json',
+      expect.stringMatching(/^verified_owner\/[a-f0-9-]{36}\/archive\.json$/),
       JSON.stringify(archive),
-      { upsert: true },
+      { upsert: false },
     )
+    expect(reference.storage_path).toBe(upload.mock.calls[0][0])
+    expect(reference.storage_sha256).toBe(
+      createHash('sha256').update(JSON.stringify(archive)).digest('hex'),
+    )
+    const second = await uploadArchiveToStorage(supabase, archive)
+    expect(second.storage_path).not.toBe(reference.storage_path)
   })
 
   it('rejects a session without a trusted identity username', async () => {

@@ -1,7 +1,7 @@
 'use client'
 
 import AdvancedSearchForm from '@/components/AdvancedSearchForm'
-import TweetList from '@/components/TweetList'
+import dynamic from 'next/dynamic'
 import {
   FilterCriteria,
   type TweetSearchSort,
@@ -13,6 +13,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import { capturePostHogEvent } from '@/lib/posthog'
 import UserMatchResults from '@/components/UserMatchResults'
+
+const TweetList = dynamic(() => import('@/components/TweetList'), {
+  loading: () => <p role="status">Loading results…</p>,
+})
 
 const starterSearches = [
   { label: 'Open source', query: 'open source' },

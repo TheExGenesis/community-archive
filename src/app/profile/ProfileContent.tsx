@@ -1,5 +1,6 @@
 'use client'
 
+import { getOwnLatestTweets } from '@/app/settings/tweet-actions'
 import { useRef, useState } from 'react'
 import { User } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
@@ -55,7 +56,7 @@ export default function ProfileContent({
   initialDownloadArchiveVisible = true,
   initialOptInData,
   archives,
-  initialTweets = [],
+  initialTweets,
 }: ProfileContentProps) {
   const router = useRouter()
   const { userMetadata } = useAuthAndArchive()
@@ -74,7 +75,27 @@ export default function ProfileContent({
   const [success, setSuccess] = useState<string | null>(null)
   const [deletingArchive, setDeletingArchive] = useState<string | null>(null)
   const [deletingTweetId, setDeletingTweetId] = useState<string | null>(null)
-  const [ownTweets, setOwnTweets] = useState(initialTweets)
+  const [ownTweets, setOwnTweets] = useState(initialTweets ?? [])
+  const tweetsLoaded = useRef(initialTweets !== undefined)
+  const tweetsRequestInFlight = useRef(false)
+  const [tweetsLoading, setTweetsLoading] = useState(false)
+  const [tweetsError, setTweetsError] = useState<string | null>(null)
+
+  const loadOwnTweets = async () => {
+    if (tweetsLoaded.current || tweetsRequestInFlight.current) return
+    tweetsRequestInFlight.current = true
+    setTweetsLoading(true)
+    setTweetsError(null)
+    try {
+      setOwnTweets(await getOwnLatestTweets())
+      tweetsLoaded.current = true
+    } catch {
+      setTweetsError('Your tweets could not be loaded.')
+    } finally {
+      tweetsRequestInFlight.current = false
+      setTweetsLoading(false)
+    }
+  }
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false)
   const [showOptOutDialog, setShowOptOutDialog] = useState(false)
   const supabase = createBrowserClient()
@@ -435,9 +456,10 @@ export default function ProfileContent({
       <Tabs
         defaultValue="privacy"
         className="w-full"
-        onValueChange={(tab) =>
+        onValueChange={(tab) => {
           capturePostHogEvent('settings_tab_selected', { tab })
-        }
+          if (tab === 'tweets') void loadOwnTweets()
+        }}
       >
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="privacy">Privacy Settings</TabsTrigger>
@@ -448,9 +470,9 @@ export default function ProfileContent({
         <TabsContent value="privacy" className="space-y-4">
           <Card>
             <CardHeader className="space-y-1.5">
-              <CardTitle>Public Profile</CardTitle>
+              <CardTitle>Profile controls</CardTitle>
               <CardDescription>
-                Choose which owner actions appear to visitors
+                Choose which controls you see on your profile
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -460,8 +482,8 @@ export default function ProfileContent({
                     Show Download Archive
                   </Label>
                   <div className="text-sm text-muted-foreground">
-                    Visible by default. Turn this off to hide the button from
-                    your public profile.
+                    Only you can see and use this button. Turn it off to hide it
+                    when viewing your own profile.
                   </div>
                 </div>
                 <Switch
@@ -653,7 +675,24 @@ export default function ProfileContent({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {ownTweets.length === 0 ? (
+              {tweetsLoading ? (
+                <p
+                  role="status"
+                  className="py-8 text-center text-muted-foreground"
+                >
+                  Loading your tweets…
+                </p>
+              ) : tweetsError ? (
+                <div role="alert" className="space-y-3 py-4">
+                  <p>{tweetsError}</p>
+                  <Button
+                    variant="outline"
+                    onClick={() => void loadOwnTweets()}
+                  >
+                    Retry loading tweets
+                  </Button>
+                </div>
+              ) : ownTweets.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">
                   No archived tweets found.
                 </div>

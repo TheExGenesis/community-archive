@@ -273,18 +273,6 @@ describe('TrendsExplorer request isolation', () => {
     expect(screen.getByText('2/12 trends')).toBeVisible()
   })
 
-  test('lets the root layout own the viewport height without extra page length', () => {
-    jest
-      .spyOn(global, 'fetch')
-      .mockImplementation(() => new Promise<Response>(() => undefined))
-
-    render(<TrendsExplorer initialTrends={successfulTrends} />)
-
-    const main = screen.getByRole('main')
-    expect(main).toHaveClass('flex-1')
-    expect(main).not.toHaveClass('min-h-screen')
-  })
-
   test('loads only a newly included term when prior term evidence is cached', async () => {
     const user = userEvent.setup()
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({

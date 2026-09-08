@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { cache } from 'react'
+import { measureServerRead } from '@/lib/performance/server'
 import { getClickHouseUserProfile } from '@/lib/clickhouseUserProfile'
 import {
   getCachedProfileHeader,
@@ -26,7 +27,7 @@ const normalizeMediaUrl = (value: string | null | undefined): string | null => {
  * value they agree, so preferring the analytical copy wholesale would spend a
  * gateway request per render for no observable gain.
  */
-async function withBackfilledMedia(
+export const withBackfilledMedia = cache(async function withBackfilledMedia(
   profile: ProfileHeaderData,
   accountId: string,
 ): Promise<ProfileHeaderData> {
@@ -36,7 +37,9 @@ async function withBackfilledMedia(
     return { ...profile, avatar_media_url: avatar, header_media_url: header }
   }
 
-  const fallback = await getClickHouseUserProfile(accountId)
+  const fallback = await measureServerRead('profile.optional-media', () =>
+    getClickHouseUserProfile(accountId, { tweetLimit: 1 }),
+  )
   return {
     ...profile,
     avatar_media_url:
@@ -44,23 +47,31 @@ async function withBackfilledMedia(
     header_media_url:
       header ?? normalizeMediaUrl(fallback?.user.header_media_url),
   }
-}
+})
 
 /**
  * Resolves either a stable account ID or a username to the shared profile
  * payload used by the page, its metadata, and its social preview image.
  */
-export const resolveProfile = cache(
+export const resolveProfileCore = cache(
   async (param: string): Promise<ResolvedProfile | null> => {
-    const publicIdentity = await resolvePublicProfileIdentity(param)
+    const publicIdentity = await measureServerRead('profile.eligibility', () =>
+      resolvePublicProfileIdentity(param),
+    )
     if (!publicIdentity) return null
 
     if (publicIdentity.accountId) {
-      const profile = await getCachedProfileHeader(publicIdentity.accountId)
+      const profile = await measureServerRead('profile.header', () =>
+        getCachedProfileHeader(publicIdentity.accountId!),
+      )
       if (profile) {
         return {
           accountId: publicIdentity.accountId,
-          profile: await withBackfilledMedia(profile, publicIdentity.accountId),
+          profile: {
+            ...profile,
+            avatar_media_url: normalizeMediaUrl(profile.avatar_media_url),
+            header_media_url: normalizeMediaUrl(profile.header_media_url),
+          },
         }
       }
     }
@@ -90,6 +101,18 @@ export const resolveProfile = cache(
         avatar_media_url: normalizeMediaUrl(user.avatar_media_url),
         header_media_url: normalizeMediaUrl(user.header_media_url),
       },
+    }
+  },
+)
+
+/** Full media remains available for social cards; navigation uses the core. */
+export const resolveProfile = cache(
+  async (param: string): Promise<ResolvedProfile | null> => {
+    const resolved = await resolveProfileCore(param)
+    if (!resolved) return null
+    return {
+      ...resolved,
+      profile: await withBackfilledMedia(resolved.profile, resolved.accountId),
     }
   },
 )

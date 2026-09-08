@@ -216,15 +216,18 @@ export async function fetchClickHouseProfileInteractions(
   if (!ID_PATTERN.test(accountId)) {
     throw new Error('Profile interactions require a numeric account ID')
   }
+  // Keep a bounded reserve so hiding a top person can reveal the next one.
+  // The gateway supports at most 25 candidates; year views are not editable.
+  const candidateLimit = year === undefined ? 25 : PEOPLE_LIMIT
   const response = await fetcher<InteractionsResponse>(
     ['user', accountId, 'interactions'],
-    profileParams(year, PEOPLE_LIMIT),
+    profileParams(year, candidateLimit),
     { timeoutMs: 30_000 },
   )
   if (
     response.query?.accountId !== accountId ||
     response.query?.year !== (year ?? null) ||
-    Number(response.query?.peopleLimit) !== PEOPLE_LIMIT
+    Number(response.query?.peopleLimit) !== candidateLimit
   ) {
     throw new Error('ClickHouse returned mismatched profile interactions scope')
   }
@@ -301,7 +304,7 @@ const getCachedClickHouseProfileMedia = unstable_cache(
 
 const getCachedClickHouseProfileInteractions = unstable_cache(
   fetchClickHouseProfileInteractions,
-  ['meta-twitter-clickhouse-profile-interactions-v1'],
+  ['meta-twitter-clickhouse-profile-interactions-v2'],
   { revalidate: DAY },
 )
 

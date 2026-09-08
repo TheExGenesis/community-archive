@@ -42,6 +42,22 @@ export interface CommunityProject {
  */
 export const COMMUNITY_PROJECTS: CommunityProject[] = [
   {
+    slug: 'birdseye',
+    name: 'Birdseye',
+    creator: 'Community Archive',
+    summary: 'Explore the topics and recurring ideas in a personal archive.',
+    description:
+      'A topic-by-topic view of saved archive analyses, with themes, ideas, referenced posts over time, and links to the original conversations.',
+    archiveUse:
+      'Reuses existing Birdseye analyses of archived posts. Browse topic groups and follow the cited source tweets on Community Archive.',
+    category: 'Tools',
+    tags: ['Personal archive', 'Topics', 'AI analysis'],
+    projectUrl: '/birdseye',
+    coverClass: 'from-[#d7e4ef] via-[#8bd2ee] to-[#1e9bcd]',
+    featured: true,
+    publishedAt: '2026-09-07',
+  },
+  {
     slug: 'conversation-map',
     name: 'Conversation Map',
     creator: 'Community Archive',

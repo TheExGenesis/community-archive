@@ -1,6 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { loadAccessibleBirdseye } from '@/lib/community-apps/birdseye-access'
+import { notFound, redirect } from 'next/navigation'
+import {
+  getBirdseyeViewer,
+  loadAccessibleBirdseye,
+} from '@/lib/community-apps/birdseye-access'
 import { BirdseyeView } from '@/components/birdseye/BirdseyeView'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -19,7 +23,11 @@ export default async function BirdseyePage({
     typeof searchParams.username === 'string'
       ? searchParams.username
       : undefined
+  const viewer = await getBirdseyeViewer()
+  if (!username && viewer.isAdmin && !viewer.user)
+    redirect('/birdseye/profiles')
   const access = await loadAccessibleBirdseye(username)
+  if (!access && !username && viewer.isAdmin) redirect('/birdseye/profiles')
   if (!access)
     return (
       <main className="mx-auto min-h-[70vh] max-w-xl px-6 py-16">
@@ -50,6 +58,13 @@ export default async function BirdseyePage({
         </div>
       </main>
     )
+  if (
+    searchParams.cluster_id &&
+    !access.analysis.clusters.some(
+      (cluster) => cluster.id === searchParams.cluster_id,
+    )
+  )
+    notFound()
   return (
     <BirdseyeView
       {...access}

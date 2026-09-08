@@ -1,4 +1,6 @@
 import 'server-only'
+import { isAdminUser } from '@/app/admin/data'
+import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { User } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
@@ -35,6 +37,28 @@ export async function getBirdseyeOwner() {
     error,
   } = await createServerClient(await cookies()).auth.getUser()
   return error ? null : user
+}
+
+export async function getBirdseyeViewer() {
+  const localPreview = await getLocalAdminPreview()
+  // Local read preview never fabricates an Auth user or grants write access.
+  const user = localPreview === 'admin' ? null : await getBirdseyeOwner()
+  return {
+    user,
+    isAdmin: localPreview === 'admin' || (!!user && isAdminUser(user)),
+  }
+}
+
+export async function getBirdseyeProfiles() {
+  if (!(await getBirdseyeViewer()).isAdmin) return []
+  const manifest = await getAppDataManifest()
+  const policy = await getAppPolicy(
+    manifest.birdseye.map((entry) => entry.username),
+  )
+  return manifest.birdseye
+    .map((entry) => entry.username)
+    .filter((username) => policy.members.has(username))
+    .sort()
 }
 
 export function createBirdseyeShare(user: User) {
@@ -79,33 +103,39 @@ export async function resolveBirdseyeShare(token: string | undefined) {
 
 export async function loadAccessibleBirdseye(requestedUsername?: string) {
   noStore()
-  const user = await getBirdseyeOwner()
+  const { user, isAdmin } = await getBirdseyeViewer()
   const owner = birdseyeIdentity(user)
   const requested = requestedUsername?.toLowerCase()
   if (requested && !/^[a-z0-9_]{1,15}$/.test(requested)) return null
   const shared =
-    !owner || (requested && requested !== owner.username)
+    !isAdmin && (!owner || (requested && requested !== owner.username))
       ? await resolveBirdseyeShare((await cookies()).get(SHARE_COOKIE)?.value)
       : null
-  const username = requested || owner?.username || shared?.username
+  const username =
+    requested ||
+    owner?.username ||
+    shared?.username ||
+    (isAdmin ? (await getBirdseyeProfiles())[0] : undefined)
   const isOwner = !!owner && username === owner.username
   const identity = isOwner
     ? owner
     : shared?.username === username
       ? shared
       : null
-  if (!username || !identity) return null
+  if (!username || (!identity && !isAdmin)) return null
 
   const policy = await getAppPolicy([username])
   if (!policy.members.has(username)) return null
-  // A matching handle alone is insufficient if an account has been renamed.
-  const { data: member, error } = await createServerServiceRoleClient()
-    .from('user_directory')
-    .select('username')
-    .eq('account_id', identity.accountId)
-    .maybeSingle()
-  if (error) throw new Error('Birdseye ownership check unavailable')
-  if (member?.username?.toLowerCase() !== username) return null
+  if (!isAdmin) {
+    // A matching handle alone is insufficient if an account has been renamed.
+    const { data: member, error } = await createServerServiceRoleClient()
+      .from('user_directory')
+      .select('username')
+      .eq('account_id', identity!.accountId)
+      .maybeSingle()
+    if (error) throw new Error('Birdseye ownership check unavailable')
+    if (member?.username?.toLowerCase() !== username) return null
+  }
   const manifest = await getAppDataManifest()
   if (!manifest.birdseye.some((entry) => entry.username === username))
     return null
@@ -113,6 +143,7 @@ export async function loadAccessibleBirdseye(requestedUsername?: string) {
   return {
     analysis,
     isOwner,
+    isAdmin,
     sharingEnabled: isOwner && !!user?.app_metadata?.birdseye_share,
   }
 }

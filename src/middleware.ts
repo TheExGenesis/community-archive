@@ -130,6 +130,15 @@ function getApiRateLimitPolicy(
   method: string,
   isSG: boolean,
 ) {
+  // Directory lookups, avatars, stream polling, and link previews can exhaust
+  // the shared API bucket before a visitor submits their first search.
+  if (pathname === '/api/tweet-search' && method === 'GET') {
+    return {
+      bucket: 'api:tweet-search',
+      maxRequests: isSG ? IN_MEMORY_MAX_API_SG : IN_MEMORY_MAX_API_DEFAULT,
+    }
+  }
+
   if (pathname === '/api/opt-in' && method === 'POST') {
     return {
       bucket: 'api:opt-in',
@@ -511,7 +520,11 @@ export async function middleware(request: NextRequest) {
 
   // ── Stage 6: Security Headers (all responses) ──────────────────────────
   addSecurityHeaders(response)
-  if (pathname === '/birdseye' || pathname.startsWith('/api/birdseye/')) {
+  if (
+    pathname === '/birdseye' ||
+    pathname.startsWith('/birdseye/') ||
+    pathname.startsWith('/api/birdseye/')
+  ) {
     response.headers.set('Cache-Control', 'private, no-store')
     response.headers.set('Referrer-Policy', 'no-referrer')
     response.headers.set('X-Robots-Tag', 'noindex, nofollow')

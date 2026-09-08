@@ -22,6 +22,8 @@ describe('community project catalog', () => {
         )
       } else if (['birdseye', 'strands'].includes(project.slug)) {
         expect(project.projectUrl).toBe('/' + project.slug)
+        if (project.slug === 'birdseye')
+          expect(project.sourceTweetId).toBeUndefined()
       } else expect(project.sourceTweetId).toMatch(/^\d+$/)
       expect(project.projectUrl ?? '').not.toContain('example.com')
       expect(project.image ?? '').not.toContain('pbs.twimg.com')

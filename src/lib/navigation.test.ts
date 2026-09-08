@@ -55,12 +55,12 @@ describe('member navigation', () => {
     expect(isNavItemActive('/search', '/bangers?period=week')).toBe(false)
   })
 
-  it('keeps Bangers public while reserving Trends for signed-in members', () => {
+  it('shows Bangers and Trends navigation to every audience', () => {
     expect(getPrimaryNav(false)).toContainEqual({
       href: '/bangers?period=week',
       label: 'Bangers',
     })
-    expect(getPrimaryNav(false)).not.toContainEqual({
+    expect(getPrimaryNav(false)).toContainEqual({
       href: '/trends',
       label: 'Trends',
     })

@@ -30,6 +30,7 @@ import {
   resolvePortalReadConfig,
   selectDailyBangers,
   selectDailyRecentBangers,
+  loadRecentBangerSelection,
 } from './data'
 import {
   fetchPortalBangersPage,
@@ -592,28 +593,26 @@ describe('portal reads', () => {
           },
         ],
       }
-      jest
-        .spyOn(global, 'fetch')
-        .mockResolvedValueOnce({
-          ok: true,
-          status: 200,
-          text: async () =>
-            JSON.stringify({
-              data: {
-                tweets: [
-                  {
-                    ...quote,
-                    tweetId: '100',
-                    latestObservedAt: '2026-08-07 20:00:00.000',
-                    followerCount: '5',
-                    quoteTweetId: '99',
-                    quotedTweet: available ? quote : null,
-                  },
-                ],
-                updateCursor: null,
-              },
-            }),
-        } as Response)
+      jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify({
+            data: {
+              tweets: [
+                {
+                  ...quote,
+                  tweetId: '100',
+                  latestObservedAt: '2026-08-07 20:00:00.000',
+                  followerCount: '5',
+                  quoteTweetId: '99',
+                  quotedTweet: available ? quote : null,
+                },
+              ],
+              updateCursor: null,
+            },
+          }),
+      } as Response)
       const [tweet] = await getPortalStreamUpdates(1)
       expect(tweet.quotedTweet).toMatchObject(
         available
@@ -894,6 +893,7 @@ describe('daily banger selection', () => {
     observedAt: createdAt,
     likes,
     rts: 0,
+    quoteCount: 2,
     username: 'member',
     name: 'Member',
     avatar: null,
@@ -942,5 +942,51 @@ describe('daily banger selection', () => {
     )
     expect(selected.some(({ id }) => id === 'too-old')).toBe(false)
     expect(selected.some(({ id }) => id === 'future')).toBe(false)
+  })
+  test('excludes posts with fewer than two community quotes', () => {
+    const now = new Date('2026-08-14T12:00:00Z')
+    expect(
+      selectDailyRecentBangers(
+        [
+          { ...tweet('one', '2026-08-14T10:00:00Z', 10000), quoteCount: 1 },
+          {
+            ...tweet('unknown', '2026-08-14T10:00:00Z', 10000),
+            quoteCount: undefined,
+          },
+          tweet('two', '2026-08-14T10:00:00Z', 1),
+        ],
+        now,
+      ).map((row) => row.id),
+    ).toEqual(['two'])
+  })
+
+  test('uses the strongest qualifying previous-day post only when today has none', async () => {
+    const now = new Date('2026-08-14T12:00:00Z')
+    jest.mocked(fetchPortalRecentBangers).mockReset()
+    jest
+      .mocked(fetchPortalRecentBangers)
+      .mockResolvedValueOnce([
+        { ...tweet('weak', '2026-08-14T10:00:00Z', 1000), quoteCount: 1 },
+      ])
+      .mockResolvedValueOnce([
+        { ...tweet('best', '2026-08-13T10:00:00Z', 1), quoteCount: 5 },
+        { ...tweet('popular', '2026-08-13T10:00:00Z', 1000), quoteCount: 2 },
+      ])
+    expect((await loadRecentBangerSelection(now)).map((row) => row.id)).toEqual(
+      ['best'],
+    )
+    expect(fetchPortalRecentBangers).toHaveBeenNthCalledWith(
+      2,
+      50,
+      24,
+      undefined,
+      '2026-08-13T12:00:00.000Z',
+    )
+    jest
+      .mocked(fetchPortalRecentBangers)
+      .mockReset()
+      .mockResolvedValueOnce([tweet('today', '2026-08-14T10:00:00Z', 1)])
+    expect((await loadRecentBangerSelection(now))[0].id).toBe('today')
+    expect(fetchPortalRecentBangers).toHaveBeenCalledTimes(1)
   })
 })

@@ -10,6 +10,7 @@ import { getMobileNav, getPrimaryNav, getUtilityNav } from '@/lib/navigation'
 type NavigationAudience = {
   isMember: boolean
   isAdmin: boolean
+  localPreview?: 'admin' | 'signed-out' | null
 }
 
 const PUBLIC_AUDIENCE: NavigationAudience = {
@@ -43,6 +44,7 @@ export function NavigationAudienceProvider({
         setAudience({
           isMember: nextAudience.isMember === true,
           isAdmin: nextAudience.isAdmin === true,
+          localPreview: nextAudience.localPreview ?? null,
         })
       })
       .catch((error: unknown) => {
@@ -102,3 +104,5 @@ export function AdminNavigationLink() {
     </Link>
   )
 }
+
+export const useNavigationAudience = () => useContext(NavigationAudienceContext)

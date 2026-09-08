@@ -173,6 +173,7 @@ export const getPrimaryNav = (
         { href: '/digest', label: 'Digest' },
         { href: '/user-dir', label: 'Users' },
         { href: '/community', label: 'Apps' },
+        { href: '/trends', label: 'Trends' },
         { href: '/social-graph', label: 'Graph' },
         { href: '/docs', label: 'Docs' },
         { href: '/#upload-archive', label: 'Upload archive' },

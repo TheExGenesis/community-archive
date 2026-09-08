@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerAdminClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import { buildAuthErrorUrl } from '@/lib/authCallback'
+import { safeAuthRedirect } from '@/lib/authRedirect'
 
 // Validate host against allowed domains - prevents open redirect attacks
 function isAllowedHost(host: string): boolean {
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
   const providerErrorDescription = searchParams.get('error_description')
 
   // Validate 'next' parameter to prevent redirect to external URLs
-  const safeNext = next.startsWith('/') ? next : '/'
+  const safeNext = safeAuthRedirect(next)
 
   if (providerError) {
     console.warn('OAuth provider rejected sign-in', {

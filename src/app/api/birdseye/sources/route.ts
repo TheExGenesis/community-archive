@@ -1,9 +1,10 @@
+import { getBirdseyeSourceIndex } from '@/lib/community-apps/birdseye-source-index'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   loadAccessibleBirdseye,
   PRIVATE_HEADERS,
 } from '@/lib/community-apps/birdseye-access'
-import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
+import { getSourceTweets } from '@/lib/community-apps/source-tweets'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 export async function GET(request: NextRequest) {
@@ -25,14 +26,26 @@ export async function GET(request: NextRequest) {
       { error: 'Birdseye unavailable' },
       { status: 404, headers: PRIVATE_HEADERS },
     )
-  const ids = Array.from(new Set(cluster.tweetIds))
-  const page = ids.slice(offset, offset + 6)
-  const tweets = await getStrandTweets(page)
-  return NextResponse.json(
-    {
-      tweets: page.flatMap((id) => (tweets.has(id) ? [tweets.get(id)!] : [])),
-      nextOffset: offset + 6 < ids.length ? offset + 6 : null,
-    },
-    { headers: PRIVATE_HEADERS },
-  )
+  const excluded = new Set((params.get('exclude') ?? '').split(',').slice(0, 3))
+  try {
+    const index = (await getBirdseyeSourceIndex(cluster.tweetIds)).filter(
+      ({ id }) => !excluded.has(id),
+    )
+    const page = index.slice(offset, offset + 6)
+    const tweets = await getSourceTweets(page.map(({ id }) => id))
+    return NextResponse.json(
+      {
+        tweets: page.flatMap(({ id, threadId }) =>
+          tweets.has(id) ? [{ ...tweets.get(id)!, threadId }] : [],
+        ),
+        nextOffset: offset + 6 < index.length ? offset + 6 : null,
+      },
+      { headers: PRIVATE_HEADERS },
+    )
+  } catch {
+    return NextResponse.json(
+      { error: 'Source posts could not load' },
+      { status: 503, headers: PRIVATE_HEADERS },
+    )
+  }
 }

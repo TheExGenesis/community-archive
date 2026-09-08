@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { useNavigationAudience } from '@/components/NavigationAudience'
+import { LocalAdminMenu } from '@/components/LocalAdminMenu'
 import { LogIn, LogOut, Settings, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuthAndArchive } from '@/hooks/useAuthAndArchive'
@@ -16,6 +18,7 @@ import { userProfileHref } from '@/lib/navigation'
 import { capturePostHogEvent } from '@/lib/posthog'
 
 export default function MobileMenu() {
+  const { localPreview } = useNavigationAudience()
   const { userMetadata } = useAuthAndArchive()
   const profileHref = userProfileHref(
     userMetadata?.user_name,
@@ -41,6 +44,7 @@ export default function MobileMenu() {
     }
   }
 
+  if (localPreview) return <LocalAdminMenu active={localPreview === 'admin'} />
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

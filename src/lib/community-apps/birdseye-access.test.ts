@@ -1,3 +1,6 @@
+import { getBirdseyeSourceIndex } from './birdseye-source-index'
+import { isAdminUser } from '@/app/admin/data'
+import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import type { User } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import {
@@ -7,14 +10,19 @@ import {
 import { getAppDataManifest, getAppPolicy, getBirdseyeAnalysis } from './data'
 import {
   createBirdseyeShare,
+  getBirdseyeProfiles,
   loadAccessibleBirdseye,
   resolveBirdseyeShare,
   SHARE_COOKIE,
 } from './birdseye-access'
 import { GET as sources } from '@/app/api/birdseye/sources/route'
 import { POST, DELETE } from '@/app/api/birdseye/sharing/route'
-import { getStrandTweets } from './strand-tweets'
+import { getSourceTweets } from './source-tweets'
 import { NextRequest } from 'next/server'
+jest.mock('@/app/admin/data', () => ({ isAdminUser: jest.fn() }))
+jest.mock('@/lib/localAdminPreview', () => ({
+  getLocalAdminPreview: jest.fn(),
+}))
 jest.mock('next/headers', () => ({ cookies: jest.fn() }))
 jest.mock('next/cache', () => ({ unstable_noStore: jest.fn() }))
 jest.mock('@/utils/supabase', () => ({
@@ -26,7 +34,10 @@ jest.mock('./data', () => ({
   getAppPolicy: jest.fn(),
   getBirdseyeAnalysis: jest.fn(),
 }))
-jest.mock('./strand-tweets', () => ({ getStrandTweets: jest.fn() }))
+jest.mock('./birdseye-source-index', () => ({
+  getBirdseyeSourceIndex: jest.fn(),
+}))
+jest.mock('./source-tweets', () => ({ getSourceTweets: jest.fn() }))
 const owner = {
   id: '12345678-1234-1234-1234-123456789abc',
   app_metadata: { provider_id: '123' },
@@ -40,6 +51,11 @@ const getUserById = jest.fn()
 const member = jest.fn()
 beforeEach(() => {
   jest.clearAllMocks()
+  jest
+    .mocked(getBirdseyeSourceIndex)
+    .mockImplementation(async (ids) => ids.map((id) => ({ id, threadId: id })))
+  jest.mocked(isAdminUser).mockReturnValue(false)
+  jest.mocked(getLocalAdminPreview).mockResolvedValue(null)
   session = null
   stored = structuredClone(owner)
   cookie = undefined
@@ -84,7 +100,7 @@ beforeEach(() => {
       },
     ],
   } as never)
-  jest.mocked(getStrandTweets).mockResolvedValue(new Map())
+  jest.mocked(getSourceTweets).mockResolvedValue(new Map())
 })
 test('private by default: anonymous, another owner, and user-editable metadata cannot read analysis or sources', async () => {
   expect(await loadAccessibleBirdseye('alice')).toBeNull()
@@ -109,7 +125,8 @@ test('private by default: anonymous, another owner, and user-editable metadata c
     ).status,
   ).toBe(404)
   expect(getBirdseyeAnalysis).not.toHaveBeenCalled()
-  expect(getStrandTweets).not.toHaveBeenCalled()
+  expect(getSourceTweets).not.toHaveBeenCalled()
+  expect(getBirdseyeSourceIndex).not.toHaveBeenCalled()
 })
 test('owner identity and matching account are required, with consent rechecked on every read', async () => {
   session = owner
@@ -153,7 +170,7 @@ test('source pagination selects only this authorized topic and bounds each read 
     ),
   )
   expect(response.headers.get('cache-control')).toContain('no-store')
-  expect(getStrandTweets).toHaveBeenCalledWith([
+  expect(getSourceTweets).toHaveBeenCalledWith([
     '7',
     '8',
     '9',
@@ -219,4 +236,77 @@ test('a share link redirects without the secret and uses a private HttpOnly cook
     secure: true,
     sameSite: 'lax',
   })
+})
+
+test('real admins can list and read eligible profiles without becoming the owner', async () => {
+  session = {
+    ...owner,
+    identities: [
+      { provider: 'twitter', identity_data: { user_name: 'admin' } },
+    ],
+  } as unknown as User
+  jest.mocked(isAdminUser).mockReturnValue(true)
+  expect(await getBirdseyeProfiles()).toEqual(['alice'])
+  expect(await loadAccessibleBirdseye('alice')).toMatchObject({
+    isAdmin: true,
+    isOwner: false,
+  })
+  expect(member).not.toHaveBeenCalled()
+  jest.mocked(getAppPolicy).mockResolvedValue({
+    members: new Set(),
+    blocked: new Set(['alice']),
+    blockedIds: new Set(),
+  })
+  expect(await getBirdseyeProfiles()).toEqual([])
+  expect(await loadAccessibleBirdseye('alice')).toBeNull()
+})
+
+test('local admin can browse sources, logout removes access, and no Auth identity is fabricated', async () => {
+  jest.mocked(getLocalAdminPreview).mockResolvedValue('admin')
+  expect(await getBirdseyeProfiles()).toEqual(['alice'])
+  expect(await loadAccessibleBirdseye('alice')).toMatchObject({
+    isAdmin: true,
+    isOwner: false,
+    sharingEnabled: false,
+  })
+  expect(
+    (
+      await sources(
+        new NextRequest(
+          'http://localhost:3031/api/birdseye/sources?username=alice&cluster_id=topic',
+        ),
+      )
+    ).status,
+  ).toBe(200)
+  expect(updateUserById).not.toHaveBeenCalled()
+  jest.mocked(getLocalAdminPreview).mockResolvedValue('signed-out')
+  expect(await getBirdseyeProfiles()).toEqual([])
+  expect(await loadAccessibleBirdseye('alice')).toBeNull()
+})
+
+test('remaining sources skip the highlighted posts before applying pagination', async () => {
+  session = owner
+  const response = await sources(
+    new NextRequest(
+      'https://ca.test/api/birdseye/sources?username=alice&cluster_id=topic&exclude=1,5',
+    ),
+  )
+  expect(response.status).toBe(200)
+  expect(getSourceTweets).toHaveBeenCalledWith(['2', '3', '4', '6', '7', '8'])
+  expect(await response.json()).toMatchObject({ nextOffset: 6 })
+})
+
+test('source grouping failures remain private and retryable', async () => {
+  session = owner
+  jest
+    .mocked(getBirdseyeSourceIndex)
+    .mockRejectedValueOnce(new Error('offline'))
+  const response = await sources(
+    new NextRequest(
+      'https://ca.test/api/birdseye/sources?username=alice&cluster_id=topic',
+    ),
+  )
+  expect(response.status).toBe(503)
+  expect(response.headers.get('cache-control')).toContain('no-store')
+  expect(getSourceTweets).not.toHaveBeenCalled()
 })

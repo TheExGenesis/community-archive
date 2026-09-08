@@ -1755,26 +1755,6 @@ export type Database = {
       }
     }
     Functions: {
-      get_bulletin_opportunities: {
-        Args: { max_results?: number }
-        Returns: {
-          account_id: string
-          evidence: string
-          expires_at: string
-          full_text: string
-          kind: string
-          model: string
-          place: string
-          posted_at: string
-          respond: string
-          side: string
-          standing: boolean
-          summary: string
-          topics: string[]
-          tweet_id: string
-          username: string
-        }[]
-      }
       admin_activity_page: {
         Args: {
           p_before_at?: string
@@ -2055,6 +2035,28 @@ export type Database = {
           reply_to_user_id: string
           reply_to_username: string
           archive_upload_id: number
+        }[]
+      }
+      get_bulletin_opportunities: {
+        Args: {
+          max_results?: number
+        }
+        Returns: {
+          tweet_id: string
+          account_id: string
+          username: string
+          posted_at: string
+          full_text: string
+          side: string
+          kind: string
+          summary: string
+          evidence: string
+          topics: string[]
+          respond: string
+          standing: boolean
+          expires_at: string
+          place: string
+          model: string
         }[]
       }
       get_hourly_scraping_stats: {

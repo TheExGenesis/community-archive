@@ -5,6 +5,7 @@ import { getStrands } from '@/lib/community-apps/data'
 import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
 import StrandMinimap from '@/components/strands/StrandMinimap'
 import StrandTimeline from '@/components/strands/StrandTimeline'
+import { StrandEntry } from '@/components/strands/StrandEntry'
 import TweetCard from '@/components/TweetCard'
 import { AnalysisText } from '@/components/community-apps/AnalysisText'
 
@@ -52,18 +53,18 @@ export default async function StrandPage({
     tweet: tweets.get(p.id),
   }))
   return (
-    <main className="mx-auto max-w-[1500px] px-5 py-10 sm:px-7">
+    <main
+      id="strand-top"
+      className="mx-auto max-w-[1500px] scroll-mt-20 px-5 py-10 sm:px-7"
+    >
+      <StrandEntry seedId={strand.id} />
       <Link href="/strands" className="text-sm font-semibold text-brand">
         ← All strands
       </Link>
       <div className="mt-6 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_480px]">
         <article className="min-w-0">
           <h1 className="text-4xl font-bold leading-tight">{strand.title}</h1>
-          <p className="mb-7 mt-3 text-sm text-muted-foreground">
-            An AI-written reading of the conversation. Check the source posts
-            for context.
-          </p>
-          <div className="mb-8 border-2 border-foreground/80 bg-card p-5 shadow-[3px_3px_0_0_hsl(var(--foreground)/0.15)]">
+          <div className="mb-8 mt-7 border-2 border-foreground/80 bg-card p-5 shadow-[3px_3px_0_0_hsl(var(--foreground)/0.15)]">
             <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               The seed post · where this strand begins
             </p>
@@ -83,17 +84,21 @@ export default async function StrandPage({
               </p>
             )}
           </div>
+          <section className="mt-12 border-t border-border pt-7">
+            <h2 className="mb-5 text-2xl font-bold">
+              The story of this strand
+            </h2>
+            <p className="mb-5 text-sm text-muted-foreground">
+              An AI-written reading of the conversation. Check the source posts
+              for context.
+            </p>
+            <AnalysisText>{strand.summary}</AnalysisText>
+          </section>
           <StrandTimeline
             posts={posts}
             seedId={strand.id}
             color={strand.position?.color}
           />
-          <section className="mt-12 border-t border-border pt-7">
-            <h2 className="mb-5 text-2xl font-bold">
-              The story of this strand
-            </h2>
-            <AnalysisText>{strand.summary}</AnalysisText>
-          </section>
         </article>
         <StrandMinimap
           strands={strands.map(
@@ -104,6 +109,7 @@ export default async function StrandPage({
               position,
               text,
               mapLabel,
+              avatar: tweets.get(id)?.avatar,
             }),
           )}
           activeId={strand.id}

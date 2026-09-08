@@ -122,7 +122,7 @@ export default function StrandTimeline({
       {view === 'map' ? (
         <>
           <div className="mt-5 flex items-center justify-between text-xs text-muted-foreground">
-            <p>One dot per month. Select a post to read.</p>
+            <p>Posts are positioned by date. Select a post to read.</p>
             <div className="flex gap-2">
               <button
                 aria-label="Zoom out on timeline"
@@ -166,32 +166,22 @@ export default function StrandTimeline({
                 stroke="currentColor"
                 opacity="0.25"
               />
-              {months.map(({ month, nodes }) => (
-                <g key={month}>
-                  <circle
-                    data-month-dot={month}
-                    cx={nodes[0].x}
-                    cy={baseline}
-                    r={nodes.some((node) => node.id === current?.id) ? 6 : 3.5}
-                    fill={color}
-                  >
-                    <title>
-                      {monthLabel(month)} · {nodes.length}{' '}
-                      {nodes.length === 1 ? 'post' : 'posts'}
-                    </title>
-                  </circle>
+              {Array.from({ length: 6 }, (_, i) => {
+                const time = layout.min + ((layout.max - layout.min) * i) / 5
+                const x = 70 + ((width - 280) * i) / 5
+                return (
                   <text
-                    x={nodes[0].x}
-                    y={baseline + 22}
+                    key={i}
+                    x={x}
+                    y={baseline + 25}
                     fontSize="10"
                     fill="currentColor"
                     opacity="0.65"
-                    transform={`rotate(30 ${nodes[0].x} ${baseline + 22})`}
                   >
-                    {monthLabel(month)}
+                    {date(time)}
                   </text>
-                </g>
-              ))}
+                )
+              })}
               {layout.nodes.map((node, i) => {
                 const post = posts.find((p) => p.id === node.id)!,
                   y = 30 + node.lane * 82,
@@ -200,6 +190,13 @@ export default function StrandTimeline({
                   post.annotation.split(/[:.!?]/)[0].slice(0, 46) || 'Key post'
                 return (
                   <g key={node.id}>
+                    <circle
+                      data-post-dot={node.id}
+                      cx={node.x}
+                      cy={baseline}
+                      r={active ? 6 : 3.5}
+                      fill={color}
+                    />
                     <path
                       d={`M${node.x},${baseline} L${node.x},${y + 40} Q${node.x},${y + 18} ${node.x + 16},${y + 18}`}
                       stroke={color}

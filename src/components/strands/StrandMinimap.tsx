@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { TweetAvatar } from '@/components/portal/TweetRow'
 import { useRouter } from 'next/navigation'
 import type { Strand } from '@/lib/community-apps/types'
 import { decodeTweetText } from '@/lib/tweetText'
@@ -9,7 +10,7 @@ import { useStrandFocus } from './StrandFocus'
 export type MapStrand = Pick<
   Strand,
   'id' | 'title' | 'username' | 'position' | 'mapLabel' | 'text'
->
+> & { avatar?: string | null }
 export default function StrandMinimap({
   strands,
   activeId,
@@ -25,9 +26,11 @@ export default function StrandMinimap({
   const [highlightedCluster, setHighlightedCluster] = useState(initialCluster)
   const interactionId = hovered ?? focus?.id
   const selectedId = interactionId ?? activeId
+  const focusId =
+    interactionId ?? (highlightedCluster === undefined ? activeId : undefined)
   const isMuted = (strand: MapStrand) =>
-    interactionId
-      ? strand.id !== interactionId
+    focusId
+      ? strand.id !== focusId
       : highlightedCluster !== undefined &&
         strand.position?.cluster !== highlightedCluster
   const router = useRouter()
@@ -289,14 +292,37 @@ export default function StrandMinimap({
       >
         {selected ? (
           <>
-            <p className="font-bold">{selected.mapLabel ?? selected.title}</p>
-            <p className="mt-1 text-muted-foreground">
-              @{selected.username} ·{' '}
-              {STRAND_CLUSTER_NAMES[selected.position!.cluster]}
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Strand seed post
             </p>
+            <div className="flex items-center gap-3">
+              <TweetAvatar
+                tweet={{
+                  id: selected.id,
+                  username: selected.username,
+                  avatar: selected.avatar ?? null,
+                }}
+                size={36}
+              />
+              <div className="min-w-0">
+                <p className="font-bold">
+                  {selected.mapLabel ?? selected.title}
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  @{selected.username} ·{' '}
+                  {STRAND_CLUSTER_NAMES[selected.position!.cluster]}
+                </p>
+              </div>
+            </div>
             <p className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap">
               {decodeTweetText(selected.text)}
             </p>
+            <a
+              href={`/tweets/${selected.id}`}
+              className="mt-2 inline-block font-semibold text-brand"
+            >
+              Open seed post ↗
+            </a>
           </>
         ) : (
           <p className="text-muted-foreground">

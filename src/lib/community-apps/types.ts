@@ -1,3 +1,4 @@
+import type { PortalTweet } from '@/lib/portal/types'
 export interface EvidenceItem {
   label: string
   description: string
@@ -38,4 +39,14 @@ export interface AppDataManifest {
   importedAt: string
   strandsGeneratedAt: string
   birdseye: { username: string; hiddenClusterIds?: string[] }[]
+}
+
+export type StrandCardItem = Pick<
+  Strand,
+  'id' | 'title' | 'summary' | 'position' | 'activity' | 'totalPosts'
+> & { tweet?: PortalTweet }
+export interface StrandPageData {
+  items: StrandCardItem[]
+  total: number
+  nextOffset: number | null
 }

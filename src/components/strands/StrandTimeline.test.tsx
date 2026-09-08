@@ -51,7 +51,7 @@ test('map keyboard selection and chronological list retain all source posts', ()
     'Post 2',
   ])
 })
-test('posts within a month share one dot in both views and remain individually readable', () => {
+test('map uses individual posts while the timeline groups by month, preserving every post', () => {
   const { container } = render(
     <StrandTimeline
       seedId="1"
@@ -62,7 +62,11 @@ test('posts within a month share one dot in both views and remain individually r
       ]}
     />,
   )
-  expect(container.querySelectorAll('[data-month-dot]')).toHaveLength(2)
+  expect(container.querySelectorAll('[data-post-dot]')).toHaveLength(3)
+  const dots = container.querySelectorAll('[data-post-dot]')
+  expect(Number(dots[0].getAttribute('cx'))).toBeLessThan(
+    Number(dots[1].getAttribute('cx')),
+  )
   fireEvent.keyDown(screen.getByRole('button', { name: /2. @author/ }), {
     key: 'Enter',
   })

@@ -124,16 +124,20 @@ seed IDs and 2D display coordinates, imported from the original
 `bangers/public/strand_semantic_map.json`). Deterministic farthest-first k-means
 forms ten spatial clusters. Each cluster shares the hue of its centroid's angle
 around the collection centroid. Clustering happens before request filtering;
-only policy-eligible strands reach the minimap. Search and pagination preserve
-stable colors. Cluster buttons highlight in place without navigation or filtering
+only policy-eligible strands reach the minimap. Live search and incremental loading preserve stable colors. The server renders
+the initial 24 cards; `/api/strands` returns further batches of at most 24, applying
+the existing policy and tweet checks on every request. Search matches titles,
+handwritten labels, summaries, and usernames. Debounced search replaces only the
+feed; stale requests are aborted, and the minimap stays mounted. Intersection-based
+loading appends cards, with a manual retry/load-more fallback. Responses are no-store. Cluster buttons highlight in place without navigation or filtering
 the cards; All clears the highlight. The map supports zoom and source navigation.
 
-List cards pair the seed tweet with the first summary paragraph. Detail pages
-place the seed above a chronological key-post map, with dated avatar labels,
-keyboard/click selection, zoom, and a full timeline toggle. Marker lanes separate
-same-month cards, which share a single monthly dot in both views; vertical position does not claim influence or quote volume.
-The story follows the map. Dates use the source timestamp, or the exact tweet
-snowflake when a source is unavailable.
+List cards pair the seed tweet with the first summary paragraph. Detail-page entry explicitly resets scroll to the top after router navigation. Detail pages show the seed, then the story
+(with its AI/context note), then the chronological key-post map. Map dots use exact
+post timestamps and separate lanes for overlapping cards; only the Timeline view
+groups posts under one dot per occupied month. Each post remains readable.
+Vertical position does not claim influence or quote volume. Dates use the source
+timestamp, or the exact tweet snowflake when a source is unavailable.
 
 Visible seed and key posts use the shared `TweetCard`, preserving complete text,
 media and quoted tweets. Reads are limited to 24 seeds per list page or one
@@ -151,7 +155,9 @@ The minimap also retains all 22 nonempty handwritten labels from the original
 is hidden to avoid overlap. Zoom reveals more labels. Hover/focus previews the
 original seed text, and hovering or focusing a list card highlights its dot while
 graying out every other dot and label. Leaving the card restores the cluster
-highlight. Any hovered/focused dot shows its strand title (or handwritten label)
+highlight. Detail pages default to highlighting their seed. The preview identifies
+it as a strand seed post, includes the author avatar and a source link, and uses
+already-loaded avatar data when available. Any hovered/focused dot shows its strand title (or handwritten label)
 and cluster above it. Selecting a cluster without handwritten labels adds up to
 two representative strand labels, prioritizing them over other labels. The sidebar
 is 480px wide on desktop; the conversation map fits its container at default zoom
@@ -165,7 +171,8 @@ Only policy-eligible strands receive display metadata. Cards plot the saved
 monthly counts with per-month hover text; these are historical aggregates, not
 fresh activity counts or just the selected key tweets. Cards show the original
 total post count. The landing page’s “How does it work?” disclosure explains seed
-selection, structural and semantic connections, and the limits of this method.
+selection, structural and semantic connections, and AI narration in four numbered
+steps, followed by a short note about the limits of this method.
 
 Key posts offer an on-demand thread preview at
 `/api/strands/<seed>/context?tweet_id=<key-post>`. The endpoint first verifies

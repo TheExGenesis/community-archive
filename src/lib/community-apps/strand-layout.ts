@@ -72,7 +72,7 @@ export function postMonth(time: number) {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)
 }
 
-/** One shared monthly anchor, with separate lanes for each post’s card. */
+/** Exact timestamps anchor the map; separate lanes keep post cards readable. */
 export function timelinePositions(
   posts: { id: string; createdAt?: string }[],
   width: number,
@@ -81,14 +81,12 @@ export function timelinePositions(
     .map((p) => ({ ...p, time: postTimestamp(p.id, p.createdAt) }))
     .filter((p): p is typeof p & { time: number } => p.time !== null)
     .sort((a, b) => a.time - b.time || a.id.localeCompare(b.id))
-  const min = postMonth(sorted[0]?.time ?? 0),
-    max = postMonth(sorted.at(-1)?.time ?? min)
+  const min = sorted[0]?.time ?? 0,
+    max = sorted.at(-1)?.time ?? min
   const ends: number[] = []
   const nodes = sorted.map((p) => {
     const x =
-      70 +
-      ((postMonth(p.time) - min) / Math.max(86400000, max - min)) *
-        (width - 280)
+      70 + ((p.time - min) / Math.max(86400000, max - min)) * (width - 280)
     let lane = ends.findIndex((end) => end < x - 15)
     if (lane < 0) lane = ends.length
     ends[lane] = x + 180

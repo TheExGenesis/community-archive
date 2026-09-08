@@ -1,6 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import StrandMinimap from './StrandMinimap'
 import { StrandFocusProvider, StrandCardFocus } from './StrandFocus'
+jest.mock('@/components/portal/TweetRow', () => ({
+  TweetAvatar: () => <span>Seed author avatar</span>,
+}))
 const mockPush = jest.fn()
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }))
 const strands = [
@@ -110,4 +113,21 @@ test('an unlabeled cluster reveals representatives and any focused dot gets its 
   expect(
     Number(box.getAttribute('y')) + Number(box.getAttribute('height')),
   ).toBeLessThan(Number(dot.getAttribute('cy')))
+})
+
+test('detail view defaults to its seed, with avatar and seed identification', () => {
+  const { container } = render(<StrandMinimap strands={strands} activeId="2" />)
+  expect(container.querySelector('[data-strand-id="2"]')).toHaveAttribute(
+    'data-highlighted',
+    'true',
+  )
+  expect(container.querySelector('[data-strand-id="1"]')).toHaveAttribute(
+    'data-muted',
+    'true',
+  )
+  expect(screen.getByText('Strand seed post')).toBeInTheDocument()
+  expect(screen.getByText('Seed author avatar')).toBeInTheDocument()
+  expect(
+    screen.getByRole('link', { name: 'Open seed post ↗' }),
+  ).toHaveAttribute('href', '/tweets/2')
 })

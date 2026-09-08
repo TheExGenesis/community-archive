@@ -1755,6 +1755,27 @@ export type Database = {
       }
     }
     Functions: {
+      admin_activity_page: {
+        Args: {
+          p_before_at?: string
+          p_before_id?: string
+          p_kind?: string
+          p_search?: string
+          p_limit?: number
+        }
+        Returns: {
+          id: string
+          kind: string
+          occurred_at: string
+          account_id: string
+          username: string
+          status: string
+          detail: string
+          reason: string
+          error: string
+          date_basis: string
+        }[]
+      }
       admin_enqueue_delete_with_export: {
         Args: {
           p_account_id: string

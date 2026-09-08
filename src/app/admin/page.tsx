@@ -11,12 +11,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Suspense } from 'react'
 import { AdminTable } from './AdminTable'
-import { RecentPrivacyActivity } from './RecentPrivacyActivity'
-import { RecentOptIns } from './RecentOptIns'
-import { loadRecentOptIns } from './recentOptInsData'
-import { RecentArchiveUploads } from './RecentArchiveUploads'
-import { loadRecentArchiveUploads } from './recentUploads'
-import { loadRecentPrivacyActivity } from './activity'
+import { AdminActivityFeed } from './AdminActivityFeed'
+import { loadActivityPage } from './activityFeedData'
 import {
   ADMIN_USERNAMES,
   getDisplayUsername,
@@ -31,17 +27,23 @@ export const dynamic = 'force-dynamic'
 // export + tombstone work runs asynchronously on the Hetzner worker.
 export const maxDuration = 300
 
-async function RecentPrivacyActivitySection() {
-  const activity = await loadRecentPrivacyActivity()
-  return <RecentPrivacyActivity activity={activity} />
-}
-
-async function RecentUploadsSection() {
-  return <RecentArchiveUploads {...await loadRecentArchiveUploads()} />
-}
-
-async function RecentOptInsSection() {
-  return <RecentOptIns {...await loadRecentOptIns()} />
+async function ActivitySection() {
+  try {
+    const initialPage = await loadActivityPage()
+    return (
+      <AdminActivityFeed
+        key={JSON.stringify(initialPage)}
+        initialPage={initialPage}
+      />
+    )
+  } catch {
+    return (
+      <AdminActivityFeed
+        initialPage={null}
+        initialError="Activity could not be loaded. Please try again."
+      />
+    )
+  }
 }
 
 async function SubmissionsSection() {
@@ -147,26 +149,16 @@ export default async function AdminPage({
           </div>
         </section>
 
-        <Suspense fallback={<SectionSkeleton label="Loading recent opt-ins" />}>
-          <RecentOptInsSection />
-        </Suspense>
-
         <Suspense
-          fallback={<SectionSkeleton label="Loading recent archive uploads" />}
+          fallback={<SectionSkeleton label="Loading archive activity" />}
         >
-          <RecentUploadsSection />
+          <ActivitySection />
         </Suspense>
 
         <Suspense
           fallback={<SectionSkeleton label="Loading app submissions" />}
         >
           <SubmissionsSection />
-        </Suspense>
-
-        <Suspense
-          fallback={<SectionSkeleton label="Loading recent privacy activity" />}
-        >
-          <RecentPrivacyActivitySection />
         </Suspense>
 
         <Suspense fallback={<SectionSkeleton label="Loading accounts" />}>

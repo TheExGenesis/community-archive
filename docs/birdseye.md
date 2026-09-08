@@ -29,10 +29,16 @@ PostHog capture. Do not log share tokens or include them in analytics.
 ## Presentation
 
 Profiles open on an overview ordered by unique cited-post count. Topics show an
-expandable summary, three sample posts ranked by likes with owner posts prioritized,
+expandable summary, three fully rendered sample posts ranked by likes with owner posts prioritized,
 a monthly chart cropped to first/last cited month, horizontal yearly summaries,
 compact insight panels, and the remaining sources. Month counts work with hover,
 keyboard focus, and tap. Insight descriptions and source links open on demand.
+A “How Birdseye works” disclosure links to the original explanatory post.
+The narrower source feed supports most recent, most liked, and banger-score order;
+each reply group ranks by its newest or highest-scoring post, with parent-first
+order inside the group. Changing order resets pagination. Birdseye tweet images,
+including quotes, occupy at most 25svh (capped at 240px); the lightbox retains
+the full-size image.
 
 Sample ranking and reply grouping query only the topic's exact reference IDs.
 Standalone cards are limited to the profile owner's posts and cited reply groups
@@ -43,7 +49,10 @@ Full-fidelity TweetCard payloads use the configured archive reader and fresh opt
 checks; they never switch analytical record sources on failure. Related cited posts
 share thread blocks across six-post pages. No uncited parents or other conversation
 content is fetched. Samples are excluded from the remaining feed. A source without enough metadata to establish owner participation is omitted;
-lookup failures are retryable errors.
+lookup failures are retryable errors. Banger scores count distinct non-self quote
+tweets from current members using indexed, paginated quote-relation lookups for
+only the eligible topic IDs. Membership and opt-outs are checked after the cached
+quote-author metadata is read. Score failures produce retryable errors, not zeroes.
 
 Counts describe saved references, including conversation context, rather than all
 activity in an archive. Display changes do not refresh analyses.

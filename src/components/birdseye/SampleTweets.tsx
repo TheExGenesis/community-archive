@@ -28,9 +28,8 @@ export function SampleTweets({
             )}
             <TweetCard
               tweet={tweet}
-              compact
-              collapsible
-              quotedTweetDisplay="summary"
+              noClamp
+              constrainMedia
               showDate
               showExternalLink
             />

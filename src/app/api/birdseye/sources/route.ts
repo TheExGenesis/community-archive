@@ -1,3 +1,4 @@
+import { isBirdseyePostSort } from '@/lib/community-apps/birdseye-order'
 import { getBirdseyeSourceIndex } from '@/lib/community-apps/birdseye-source-index'
 import { NextRequest, NextResponse } from 'next/server'
 import {
@@ -10,6 +11,12 @@ export const maxDuration = 60
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
   const offset = Number(params.get('offset') ?? '0')
+  const sort = params.get('sort') ?? 'recent'
+  if (!isBirdseyePostSort(sort))
+    return NextResponse.json(
+      { error: 'Invalid sort' },
+      { status: 400, headers: PRIVATE_HEADERS },
+    )
   if (!Number.isSafeInteger(offset) || offset < 0)
     return NextResponse.json(
       { error: 'Invalid offset' },
@@ -29,7 +36,11 @@ export async function GET(request: NextRequest) {
   const excluded = new Set((params.get('exclude') ?? '').split(',').slice(0, 3))
   try {
     const index = (
-      await getBirdseyeSourceIndex(cluster.tweetIds, access.analysis.username)
+      await getBirdseyeSourceIndex(
+        cluster.tweetIds,
+        access.analysis.username,
+        sort,
+      )
     ).filter(({ id }) => !excluded.has(id))
     const page = index.slice(offset, offset + 6)
     const tweets = await getSourceTweets(page.map(({ id }) => id))

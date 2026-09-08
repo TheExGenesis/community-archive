@@ -332,6 +332,7 @@ test('paginates the owner-filtered index before fetching cards and preserves emb
   expect(getBirdseyeSourceIndex).toHaveBeenCalledWith(
     Array.from({ length: 14 }, (_, i) => String(i + 1)),
     'alice',
+    'recent',
   )
   expect(getSourceTweets).toHaveBeenCalledWith(['10', '11'])
   expect(await response.json()).toMatchObject({

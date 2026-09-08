@@ -187,3 +187,17 @@ describe('portal TweetRow media', () => {
     )
   })
 })
+
+test('unclamped Birdseye cards retain full text, bounded quote media, and a full-size lightbox', async () => {
+  const text = 'A complete featured post. '.repeat(30)
+  render(<TweetRow tweet={{ ...tweet, text }} noClamp constrainMedia />)
+  expect(screen.getByText(text.trim())).not.toHaveClass('line-clamp-2')
+  expect(screen.queryByText('Read more')).not.toBeInTheDocument()
+  expect(screen.getByAltText('Quoted tweet image 1')).toHaveClass(
+    'object-contain',
+  )
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Enlarge quoted tweet image 1' }),
+  )
+  expect(await screen.findByRole('dialog')).toBeInTheDocument()
+})

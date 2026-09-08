@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { HowItWorks } from './HowItWorks'
 import { Suspense } from 'react'
 import { ProfileIdentity } from './ProfileIdentity'
 import { TopicSummary } from './TopicSummary'
@@ -109,6 +110,9 @@ export function BirdseyeView({
             Change profile →
           </Link>
         )}
+      </div>
+      <div className="mt-2">
+        <HowItWorks />
       </div>
       <header className="mb-3 mt-2 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-2">
         <div className="min-w-0">

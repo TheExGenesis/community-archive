@@ -1,18 +1,64 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TweetCard } from '@/components/TweetCard'
+import {
+  isBirdseyePostSort,
+  type BirdseyePostSort,
+} from '@/lib/community-apps/birdseye-order'
 import type { PortalTweet } from '@/lib/portal/types'
 
 type SourceTweet = PortalTweet & { threadId?: string }
 
-export function SourcePosts({
+type SourceProps = {
+  username: string
+  clusterId: string
+  total: number
+  excludeIds?: string[]
+}
+export function SourcePosts(props: SourceProps) {
+  const [sort, setSort] = useState<BirdseyePostSort>('recent')
+  return (
+    <section className="mx-auto w-full max-w-[760px] px-2 py-4 sm:px-6">
+      <div className="mb-4 flex items-center justify-end gap-2 text-sm">
+        <label htmlFor="birdseye-post-sort">Order posts</label>
+        <select
+          id="birdseye-post-sort"
+          value={sort}
+          onChange={(event) => {
+            if (isBirdseyePostSort(event.target.value))
+              setSort(event.target.value)
+          }}
+          className="rounded-md border border-border bg-background px-3 py-2"
+        >
+          <option value="recent">Most recent</option>
+          <option value="likes">Most liked</option>
+          <option value="bangers">Banger score</option>
+        </select>
+      </div>
+      {sort === 'bangers' && (
+        <p className="mb-3 text-xs text-muted-foreground">
+          Banger score counts non-self quotes from archive members. Threads are
+          ordered by their highest-scoring post.
+        </p>
+      )}
+      <SourceFeed
+        key={`${props.username}:${props.clusterId}:${sort}`}
+        {...props}
+        sort={sort}
+      />
+    </section>
+  )
+}
+function SourceFeed({
   username,
   clusterId,
+  sort,
   total,
   excludeIds = [],
 }: {
   username: string
   clusterId: string
+  sort: BirdseyePostSort
   total: number
   excludeIds?: string[]
 }) {
@@ -36,6 +82,7 @@ export function SourcePosts({
         username,
         cluster_id: clusterId,
         offset: String(offset),
+        sort,
       })
       if (excluded) query.set('exclude', excluded)
       const response = await fetch(`/api/birdseye/sources?${query}`, {
@@ -68,7 +115,7 @@ export function SourcePosts({
       inFlight.current = false
       if (!abort.signal.aborted) setLoading(false)
     }
-  }, [username, clusterId, offset, excluded])
+  }, [username, clusterId, offset, excluded, sort])
   useEffect(() => () => controller.current?.abort(), [])
   useEffect(() => {
     if (!sentinel.current || error || offset === null) return
@@ -139,7 +186,13 @@ export function SourcePosts({
                   ? `By @${username}`
                   : `Conversation context · @${tweet.username}`}
               </p>
-              <TweetCard tweet={tweet} noClamp showDate showExternalLink />
+              <TweetCard
+                tweet={tweet}
+                noClamp
+                constrainMedia
+                showDate
+                showExternalLink
+              />
             </div>
           ))}
         </div>

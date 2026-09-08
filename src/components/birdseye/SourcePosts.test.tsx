@@ -53,11 +53,45 @@ test('loads on approach, retains earlier posts, retries a failed batch, and stop
   expect(screen.getByText('By @alice')).toBeInTheDocument()
   expect(screen.getByText('Conversation context · @bob')).toBeInTheDocument()
   await waitFor(() =>
-    expect(screen.queryByRole('button')).not.toBeInTheDocument(),
+    expect(
+      screen.queryByRole('button', { name: 'Load more posts' }),
+    ).not.toBeInTheDocument(),
   )
   expect(jest.mocked(fetch).mock.calls.map(([url]) => String(url))).toEqual([
-    '/api/birdseye/sources?username=alice&cluster_id=topic&offset=0',
-    '/api/birdseye/sources?username=alice&cluster_id=topic&offset=6',
-    '/api/birdseye/sources?username=alice&cluster_id=topic&offset=6',
+    '/api/birdseye/sources?username=alice&cluster_id=topic&offset=0&sort=recent',
+    '/api/birdseye/sources?username=alice&cluster_id=topic&offset=6&sort=recent',
+    '/api/birdseye/sources?username=alice&cluster_id=topic&offset=6&sort=recent',
   ])
+})
+
+test('changing sort clears the previous feed and restarts pagination', async () => {
+  jest
+    .mocked(fetch)
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        tweets: [{ id: '1', username: 'alice', text: 'Recent post' }],
+        nextOffset: 6,
+      }),
+    } as Response)
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        tweets: [{ id: '2', username: 'alice', text: 'Liked post' }],
+        nextOffset: null,
+      }),
+    } as Response)
+  render(<SourcePosts username="alice" clusterId="topic" total={12} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Load more posts' }))
+  expect(await screen.findByText('Recent post')).toBeInTheDocument()
+  fireEvent.change(screen.getByRole('combobox', { name: 'Order posts' }), {
+    target: { value: 'likes' },
+  })
+  expect(screen.queryByText('Recent post')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Load more posts' }))
+  expect(await screen.findByText('Liked post')).toBeInTheDocument()
+  expect(fetch).toHaveBeenLastCalledWith(
+    '/api/birdseye/sources?username=alice&cluster_id=topic&offset=0&sort=likes',
+    expect.anything(),
+  )
 })

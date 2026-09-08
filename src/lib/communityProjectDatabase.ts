@@ -4,6 +4,7 @@ import type {
   CommunityProject,
   CommunityProjectCategory,
 } from '@/lib/communityProjects'
+import { getAdminClient } from '@/app/admin/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 
 export type CommunityProjectRow = {
@@ -172,12 +173,14 @@ export async function loadCommunityProjectLikesForUser(
 export async function loadPendingCommunityProjects(): Promise<
   CommunityProjectRow[]
 > {
-  const admin = createServerServiceRoleClient()
+  const admin = await getAdminClient()
   const { data, error } = await admin
     .from('community_projects')
     .select(PROJECT_SELECT)
     .eq('status', 'pending')
     .order('submitted_at', { ascending: true })
+    .order('id')
+    .limit(50)
 
   if (error) throw new Error('Unable to load pending Community submissions')
   return (data ?? []) as unknown as CommunityProjectRow[]

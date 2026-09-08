@@ -3,7 +3,9 @@ import LoginContent from './LoginContent'
 
 jest.mock('@/components/SignIn', () => ({
   __esModule: true,
-  default: () => <button>Sign in with Twitter</button>,
+  default: ({ fullPage }: { fullPage?: boolean }) => (
+    <button data-full-page={fullPage}>Sign in with Twitter</button>
+  ),
 }))
 
 it.each(['/search?q=100%', '/search?q=%E0%A4%A', '/search?q=%26'])(
@@ -13,7 +15,7 @@ it.each(['/search?q=100%', '/search?q=%E0%A4%A', '/search?q=%26'])(
 
     expect(
       screen.getByRole('button', { name: 'Sign in with Twitter' }),
-    ).toBeInTheDocument()
+    ).toHaveAttribute('data-full-page', 'true')
     expect(
       screen.getByText(`You'll be redirected to: ${redirectUrl}`),
     ).toBeInTheDocument()

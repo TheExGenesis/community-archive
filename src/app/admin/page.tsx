@@ -1,3 +1,5 @@
+import { CommunitySubmissionQueue } from './CommunitySubmissionQueue'
+import { loadPendingCommunityProjects } from '@/lib/communityProjectDatabase'
 import { Badge } from '@/components/ui/badge'
 import {
   Card,
@@ -10,6 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Suspense } from 'react'
 import { AdminTable } from './AdminTable'
 import { RecentPrivacyActivity } from './RecentPrivacyActivity'
+import { RecentOptIns } from './RecentOptIns'
+import { loadRecentOptIns } from './recentOptInsData'
 import { RecentArchiveUploads } from './RecentArchiveUploads'
 import { loadRecentArchiveUploads } from './recentUploads'
 import { loadRecentPrivacyActivity } from './activity'
@@ -34,6 +38,30 @@ async function RecentPrivacyActivitySection() {
 
 async function RecentUploadsSection() {
   return <RecentArchiveUploads {...await loadRecentArchiveUploads()} />
+}
+
+async function RecentOptInsSection() {
+  return <RecentOptIns {...await loadRecentOptIns()} />
+}
+
+async function SubmissionsSection() {
+  try {
+    const projects = await loadPendingCommunityProjects()
+    return <CommunitySubmissionQueue initialProjects={projects} />
+  } catch {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>App submissions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p role="alert">
+            Submissions could not be loaded. Refresh to try again.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 }
 
 function SectionSkeleton({ label }: { label: string }) {
@@ -119,10 +147,20 @@ export default async function AdminPage({
           </div>
         </section>
 
+        <Suspense fallback={<SectionSkeleton label="Loading recent opt-ins" />}>
+          <RecentOptInsSection />
+        </Suspense>
+
         <Suspense
           fallback={<SectionSkeleton label="Loading recent archive uploads" />}
         >
           <RecentUploadsSection />
+        </Suspense>
+
+        <Suspense
+          fallback={<SectionSkeleton label="Loading app submissions" />}
+        >
+          <SubmissionsSection />
         </Suspense>
 
         <Suspense

@@ -34,7 +34,7 @@ describe('NavigationAudience', () => {
       screen.getByRole('link', { name: 'Upload archive' }),
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Graph' })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Trends' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Trends' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Admin dashboard' })).toBeNull()
   })
 

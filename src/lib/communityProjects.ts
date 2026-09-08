@@ -53,6 +53,7 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     category: 'Tools',
     tags: ['Personal archive', 'Topics', 'AI analysis'],
     projectUrl: '/birdseye',
+    image: '/images/community/birdseye-cover.png',
     coverClass: 'from-[#d7e4ef] via-[#8bd2ee] to-[#1e9bcd]',
     featured: true,
     publishedAt: '2026-09-07',

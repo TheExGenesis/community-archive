@@ -132,7 +132,8 @@ feed; stale requests are aborted, and the minimap stays mounted. Intersection-ba
 loading appends cards, with a manual retry/load-more fallback. Responses are no-store. Cluster buttons highlight in place without navigation or filtering
 the cards; All clears the highlight. The map supports zoom and source navigation.
 
-List cards pair the seed tweet with the first summary paragraph. Detail-page entry explicitly resets scroll to the top after router navigation. Detail pages show the seed, then the story
+List cards pair the seed tweet with the first summary paragraph. Strand cards and minimap nodes use standard document links. Detail-page entry
+explicitly resets scroll to the top; search and incremental loading stay in place. Detail pages show the seed, then the story
 (with its AI/context note), then the chronological key-post map. Map dots use exact
 post timestamps and separate lanes for overlapping cards; only the Timeline view
 groups posts under one dot per occupied month. Each post remains readable.

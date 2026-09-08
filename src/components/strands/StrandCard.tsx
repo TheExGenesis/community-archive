@@ -51,9 +51,9 @@ export function StrandCard({ strand }: { strand: StrandCardItem }) {
             )}
           </div>
           <h2 className="text-xl font-bold leading-tight">
-            <Link href={`/strands/${strand.id}`} className="hover:text-brand">
+            <a href={`/strands/${strand.id}`} className="hover:text-brand">
               {strand.title}
-            </Link>
+            </a>
           </h2>
           <div className="mt-3 text-sm leading-6">
             <AnalysisText>{strand.summary.split(/\n\n/)[0]}</AnalysisText>
@@ -62,12 +62,12 @@ export function StrandCard({ strand }: { strand: StrandCardItem }) {
             activity={strand.activity}
             color={strand.position?.color}
           />
-          <Link
+          <a
             href={`/strands/${strand.id}`}
             className="mt-4 inline-block text-sm font-semibold text-brand"
           >
             Explore the strand →
-          </Link>
+          </a>
         </div>
       </div>
     </StrandCardFocus>

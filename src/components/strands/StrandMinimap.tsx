@@ -1,7 +1,6 @@
 'use client'
 import { useState } from 'react'
 import { TweetAvatar } from '@/components/portal/TweetRow'
-import { useRouter } from 'next/navigation'
 import type { Strand } from '@/lib/community-apps/types'
 import { decodeTweetText } from '@/lib/tweetText'
 import { STRAND_CLUSTER_NAMES } from '@/lib/community-apps/strand-cluster-names'
@@ -33,7 +32,6 @@ export default function StrandMinimap({
       ? strand.id !== focusId
       : highlightedCluster !== undefined &&
         strand.position?.cluster !== highlightedCluster
-  const router = useRouter()
   const points = strands.filter((s) => s.position)
   const xs = points.map((s) => s.position!.x),
     ys = points.map((s) => s.position!.y)
@@ -202,7 +200,8 @@ export default function StrandMinimap({
             if (event.detail === 0) return
             const p = nearest(event)
             event.preventDefault()
-            if (p && p.distance <= 225) router.push(`/strands/${p.strand.id}`)
+            if (p && p.distance <= 225)
+              window.location.assign(`/strands/${p.strand.id}`)
           }}
         >
           {points.map((s) => {

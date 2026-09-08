@@ -5,7 +5,7 @@ import {
 
 describe('community project catalog', () => {
   it('contains only verified entries with source posts and no prototype filler', () => {
-    expect(COMMUNITY_PROJECTS).toHaveLength(12)
+    expect(COMMUNITY_PROJECTS).toHaveLength(13)
     expect(COMMUNITY_PROJECTS).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'Ratio Radar' }),
@@ -20,9 +20,10 @@ describe('community project catalog', () => {
         expect(project.image).toBe(
           '/images/community/conversation-map-cover.png',
         )
-      } else if (project.slug === 'birdseye') {
-        expect(project.projectUrl).toBe('/birdseye')
-        expect(project.sourceTweetId).toBeUndefined()
+      } else if (['birdseye', 'strands'].includes(project.slug)) {
+        expect(project.projectUrl).toBe('/' + project.slug)
+        if (project.slug === 'birdseye')
+          expect(project.sourceTweetId).toBeUndefined()
       } else expect(project.sourceTweetId).toMatch(/^\d+$/)
       expect(project.projectUrl ?? '').not.toContain('example.com')
       expect(project.image ?? '').not.toContain('pbs.twimg.com')

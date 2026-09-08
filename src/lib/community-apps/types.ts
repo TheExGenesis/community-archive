@@ -1,3 +1,4 @@
+import type { PortalTweet } from '@/lib/portal/types'
 export interface EvidenceItem {
   label: string
   description: string
@@ -17,9 +18,35 @@ export interface BirdseyeAnalysis {
   groups: { name: string; clusterIds: string[] }[]
   clusters: BirdseyeCluster[]
 }
+export interface Strand {
+  id: string
+  title: string
+  summary: string
+  rating: number
+  username: string
+  text: string
+  createdAt: string
+  participants: string[]
+  essentialTweets: { id: string; annotation: string }[]
+  totalPosts?: number
+  mapLabel?: string
+  activity?: { months: string[]; counts: number[] }
+  position?: { x: number; y: number; cluster: number; color: string }
+}
 export interface AppDataManifest {
   version: 1
   prefix: string
   importedAt: string
+  strandsGeneratedAt: string
   birdseye: { username: string; hiddenClusterIds?: string[] }[]
+}
+
+export type StrandCardItem = Pick<
+  Strand,
+  'id' | 'title' | 'summary' | 'position' | 'activity' | 'totalPosts'
+> & { tweet?: PortalTweet }
+export interface StrandPageData {
+  items: StrandCardItem[]
+  total: number
+  nextOffset: number | null
 }

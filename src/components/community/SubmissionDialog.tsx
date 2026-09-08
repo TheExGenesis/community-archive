@@ -73,7 +73,7 @@ export default function SubmissionDialog({
       <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
         {complete ? (
           <div className="py-4 text-center" aria-live="polite">
-            <div className="bg-brand/15 mx-auto flex h-12 w-12 items-center justify-center rounded-full text-brand">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand/15 text-brand">
               <CheckCircle2 className="h-6 w-6" />
             </div>
             <DialogHeader className="mt-5 text-center">

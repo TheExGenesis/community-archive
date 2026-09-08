@@ -1,9 +1,18 @@
 import 'server-only'
+import * as React from 'react'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { unstable_cache } from 'next/cache'
 import { createServerServiceRoleClient } from '@/utils/supabase'
-import type { AppDataManifest, BirdseyeAnalysis } from './types'
+import type { AppDataManifest, BirdseyeAnalysis, Strand } from './types'
+import positions from './strand-positions.json'
+import display from './strand-display.json'
+import { clusterPositions } from './strand-layout'
+
+const strandPositions = new Map(
+  clusterPositions(positions).map((p) => [p.id, p]),
+)
+
 const BUCKET = 'community-app-data'
 // Only normalized display data lives here. Never expose private Storage URLs,
 // credentials, pickle files, original archives, or embedding vectors.
@@ -111,3 +120,47 @@ export async function getBirdseyeAnalysis(
     ),
   }
 }
+async function loadStrands() {
+  const manifest = await getAppDataManifest()
+  const strands = (await readSnapshot(
+    `${manifest.prefix}/strands.json`,
+  )) as Strand[]
+  const policy = await getAppPolicy(strands.map((strand) => strand.username))
+  return {
+    generatedAt: manifest.strandsGeneratedAt,
+    strands: strands
+      .filter(
+        (strand) =>
+          policy.members.has(strand.username.toLowerCase()) &&
+          !hasBlockedParticipant(strand.participants, policy.blocked),
+      )
+      .map((strand) => ({
+        ...strand,
+        totalPosts: (display.strands as Record<string, { totalPosts: number }>)[
+          strand.id
+        ]?.totalPosts,
+        mapLabel: (display.labels as Record<string, string>)[strand.id],
+        activity: (display.strands as Record<string, { counts: number[] }>)[
+          strand.id
+        ]
+          ? {
+              months: display.months,
+              counts: (display.strands as Record<string, { counts: number[] }>)[
+                strand.id
+              ].counts,
+            }
+          : undefined,
+        position: strandPositions.get(strand.id),
+      })),
+  }
+}
+
+// Deduplicate metadata and page loading within one request, never across users
+// or requests. Tests use React 18 without the RSC cache implementation.
+const requestCache =
+  (
+    React as typeof React & {
+      cache?: <T>(loader: () => Promise<T>) => () => Promise<T>
+    }
+  ).cache ?? (<T>(loader: () => Promise<T>) => loader)
+export const getStrands = requestCache(loadStrands)

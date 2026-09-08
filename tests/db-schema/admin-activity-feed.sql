@@ -1,7 +1,7 @@
 -- Run only against a fresh disposable Postgres database, never staging or production:
 -- psql "$ACTIVITY_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 \
 --   -f tests/db-schema/fixtures/admin-activity-setup.sql \
---   -f supabase/migrations/20260908011039_admin_activity_feed.sql \
+--   -f supabase/migrations/20260908012946_admin_activity_feed.sql \
 --   -f tests/db-schema/admin-activity-feed.sql
 -- The assertions roll back their fixture rows.
 BEGIN;

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { Info } from 'lucide-react'
 import { getStrands } from '@/lib/community-apps/data'
 import { getStrandTweets } from '@/lib/community-apps/strand-tweets'
 import StrandMinimap from '@/components/strands/StrandMinimap'
@@ -63,16 +64,46 @@ export default async function StrandsPage({
       <header className="mb-8 mt-5 max-w-3xl">
         <h1 className="text-4xl font-bold">Strands</h1>
         <p className="mt-3 text-lg text-muted-foreground">
-          Ideas that took on a life of their own. Follow how a thought develops
-          across people, replies, and years.
+          How can we track stories over time? Explore the spread of an idea, or
+          the evolution of a practice or institution, across conversations.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
           AI-written summaries with links to the source conversations.
           Collection snapshot: {generatedAt.slice(0, 10)}.
         </p>
+        <details className="mt-4 text-sm text-muted-foreground">
+          <summary className="w-fit cursor-pointer font-semibold text-foreground">
+            <Info aria-hidden="true" className="mx-1 inline h-4 w-4" /> How does
+            it work?
+          </summary>
+          <div className="mt-3 space-y-3 leading-6">
+            <p>
+              A story rarely fits inside a single thread. Strands trace
+              connections beyond replies and quote tweets: the building of a
+              community like Portal, the documenting of Vibetober, people doing
+              a hundred things, or practices like Internal Family Systems (IFS)
+              and Alexander Technique.
+            </p>
+            <p>
+              We start with seed tweets: important posts that people reference
+              again and again. We gather their available structural connections—
+              replies, threads, and quote tweets—then use semantic search to
+              find related posts even when there is no explicit link. AI turns
+              this collection into a story with a selection of key posts you can
+              explore.
+            </p>
+            <p>
+              This is one experimental way to build a strand. Similarity does
+              not establish influence, and the archive and summaries can miss
+              context. In the future, AI research agents could investigate these
+              stories more thoroughly, checking evidence and alternative
+              interpretations with greater rigor.
+            </p>
+          </div>
+        </details>
       </header>
       <StrandFocusProvider>
-        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_480px]">
           <div className="min-w-0">
             <form action="/strands" className="mb-6 flex max-w-xl gap-3">
               <label className="min-w-0 flex-1">
@@ -126,17 +157,21 @@ export default async function StrandsPage({
                       )}
                     </div>
                     <div className="min-w-0 p-5">
-                      <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         {strand.position && (
                           <span className="flex items-center gap-1.5">
                             <span
-                              className="h-2.5 w-2.5 rounded-full"
+                              className="h-2.5 w-2.5 shrink-0 rounded-full"
                               style={{ background: strand.position.color }}
                             />
                             {STRAND_CLUSTER_NAMES[strand.position.cluster]}
                           </span>
                         )}
-                        <span>· {strand.essentialTweets.length} key posts</span>
+                        {strand.totalPosts !== undefined && (
+                          <span title="Posts included in the original strand snapshot">
+                            · {strand.totalPosts.toLocaleString('en-US')} posts
+                          </span>
+                        )}
                       </div>
                       <h2 className="text-xl font-bold leading-tight">
                         <Link

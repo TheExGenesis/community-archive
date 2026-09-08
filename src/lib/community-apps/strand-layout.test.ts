@@ -33,13 +33,14 @@ test('timeline sorts dates and separates overlapping labels, retaining exact sno
   const result = timelinePositions(
     [
       { id: 'later', createdAt: '2024-01-01' },
-      { id: 'b', createdAt: '2021-01-01' },
+      { id: 'b', createdAt: '2021-01-30' },
       { id: 'a', createdAt: '2021-01-01' },
     ],
     900,
   )
   expect(result.nodes.map((n) => n.id)).toEqual(['a', 'b', 'later'])
   expect(result.nodes[0].lane).not.toBe(result.nodes[1].lane)
+  expect(result.nodes[0].x).toBe(result.nodes[1].x)
   for (const node of result.nodes) expect(node.x + 190).toBeLessThan(900)
   expect(postTimestamp('bad')).toBeNull()
 })

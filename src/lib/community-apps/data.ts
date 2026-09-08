@@ -136,6 +136,9 @@ async function loadStrands() {
       )
       .map((strand) => ({
         ...strand,
+        totalPosts: (display.strands as Record<string, { totalPosts: number }>)[
+          strand.id
+        ]?.totalPosts,
         mapLabel: (display.labels as Record<string, string>)[strand.id],
         activity: (display.strands as Record<string, { counts: number[] }>)[
           strand.id

@@ -131,7 +131,7 @@ the cards; All clears the highlight. The map supports zoom and source navigation
 List cards pair the seed tweet with the first summary paragraph. Detail pages
 place the seed above a chronological key-post map, with dated avatar labels,
 keyboard/click selection, zoom, and a full timeline toggle. Marker lanes separate
-same-day labels; vertical position does not claim influence or quote volume.
+same-month cards, which share a single monthly dot in both views; vertical position does not claim influence or quote volume.
 The story follows the map. Dates use the source timestamp, or the exact tweet
 snowflake when a source is unavailable.
 
@@ -151,15 +151,21 @@ The minimap also retains all 22 nonempty handwritten labels from the original
 is hidden to avoid overlap. Zoom reveals more labels. Hover/focus previews the
 original seed text, and hovering or focusing a list card highlights its dot while
 graying out every other dot and label. Leaving the card restores the cluster
-highlight.
+highlight. Any hovered/focused dot shows its strand title (or handwritten label)
+and cluster above it. Selecting a cluster without handwritten labels adds up to
+two representative strand labels, prioritizing them over other labels. The sidebar
+is 480px wide on desktop; the conversation map fits its container at default zoom
+and hides its horizontal scrollbar when zoomed.
 The ten natural-language cluster names in `strand-cluster-names.ts` use the
 owner-selected wording, without changing membership.
 
 `strand-display.json` stores those labels and the original monthly histogram
-counts from `bangers/public/strand_histograms.json` (January 2015–December 2025).
+counts and `total_tweets` from `bangers/public/strand_histograms.json` (January 2015–December 2025).
 Only policy-eligible strands receive display metadata. Cards plot the saved
 monthly counts with per-month hover text; these are historical aggregates, not
-fresh activity counts or just the selected key tweets.
+fresh activity counts or just the selected key tweets. Cards show the original
+total post count. The landing page’s “How does it work?” disclosure explains seed
+selection, structural and semantic connections, and the limits of this method.
 
 Key posts offer an on-demand thread preview at
 `/api/strands/<seed>/context?tweet_id=<key-post>`. The endpoint first verifies

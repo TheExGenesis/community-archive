@@ -7,6 +7,7 @@ import type { PortalTweet } from '@/lib/portal/types'
 import {
   timelinePositions,
   postTimestamp,
+  postMonth,
 } from '@/lib/community-apps/strand-layout'
 import { StrandThreadContext } from './StrandThreadContext'
 
@@ -67,7 +68,7 @@ export default function StrandTimeline({
   const [view, setView] = useState<'map' | 'timeline'>('map')
   const [selected, setSelected] = useState(seedId)
   const [zoom, setZoom] = useState(1)
-  const width = 900 * zoom
+  const width = 810 * zoom
   const layout = useMemo(
     () =>
       timelinePositions(
@@ -80,6 +81,18 @@ export default function StrandTimeline({
   const current = posts.find((p) => p.id === selected) ?? ordered[0]
   const baseline = layout.lanes * 82 + 55,
     height = baseline + 60
+  const months = Array.from(
+    new Set(layout.nodes.map((node) => node.month)),
+  ).map((month) => ({
+    month,
+    nodes: layout.nodes.filter((node) => node.month === month),
+  }))
+  const monthLabel = (time: number) =>
+    new Date(time).toLocaleDateString('en-US', {
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    })
   const index = ordered.findIndex((p) => p.id === current?.id)
   return (
     <section
@@ -109,7 +122,7 @@ export default function StrandTimeline({
       {view === 'map' ? (
         <>
           <div className="mt-5 flex items-center justify-between text-xs text-muted-foreground">
-            <p>Posts are positioned by date. Select a marker to read.</p>
+            <p>One dot per month. Select a post to read.</p>
             <div className="flex gap-2">
               <button
                 aria-label="Zoom out on timeline"
@@ -130,17 +143,17 @@ export default function StrandTimeline({
             </div>
           </div>
           <div
-            className="mt-3 overflow-x-auto border border-border bg-card p-2"
+            className="mx-auto mt-3 w-full overflow-x-auto border border-border bg-card p-2 [scrollbar-width:none] sm:w-[90%] [&::-webkit-scrollbar]:hidden"
             tabIndex={0}
             aria-label="Scrollable key post map"
           >
             <svg
               viewBox={`0 0 ${width} ${height}`}
               style={{
-                width: `${width}px`,
+                width: `${zoom * 100}%`,
                 minWidth: '100%',
                 maxWidth: 'none',
-                height: `${height}px`,
+                height: 'auto',
               }}
               role="group"
               aria-label="Chronological key post map"
@@ -153,31 +166,32 @@ export default function StrandTimeline({
                 stroke="currentColor"
                 opacity="0.25"
               />
-              {Array.from({ length: 6 }, (_, i) => {
-                const time = layout.min + ((layout.max - layout.min) * i) / 5,
-                  x = 70 + ((width - 280) * i) / 5
-                return (
-                  <g key={i}>
-                    <line
-                      x1={x}
-                      x2={x}
-                      y1={baseline}
-                      y2={baseline + 6}
-                      stroke="currentColor"
-                      opacity="0.4"
-                    />
-                    <text
-                      x={x}
-                      y={baseline + 25}
-                      fontSize="10"
-                      fill="currentColor"
-                      opacity="0.65"
-                    >
-                      {date(time)}
-                    </text>
-                  </g>
-                )
-              })}
+              {months.map(({ month, nodes }) => (
+                <g key={month}>
+                  <circle
+                    data-month-dot={month}
+                    cx={nodes[0].x}
+                    cy={baseline}
+                    r={nodes.some((node) => node.id === current?.id) ? 6 : 3.5}
+                    fill={color}
+                  >
+                    <title>
+                      {monthLabel(month)} · {nodes.length}{' '}
+                      {nodes.length === 1 ? 'post' : 'posts'}
+                    </title>
+                  </circle>
+                  <text
+                    x={nodes[0].x}
+                    y={baseline + 22}
+                    fontSize="10"
+                    fill="currentColor"
+                    opacity="0.65"
+                    transform={`rotate(30 ${nodes[0].x} ${baseline + 22})`}
+                  >
+                    {monthLabel(month)}
+                  </text>
+                </g>
+              ))}
               {layout.nodes.map((node, i) => {
                 const post = posts.find((p) => p.id === node.id)!,
                   y = 30 + node.lane * 82,
@@ -192,12 +206,6 @@ export default function StrandTimeline({
                       opacity={active ? 1 : 0.3}
                       fill="none"
                       strokeWidth={active ? 2 : 1}
-                    />
-                    <circle
-                      cx={node.x}
-                      cy={baseline}
-                      r={active ? 6 : 3.5}
-                      fill={color}
                     />
                     <g
                       role="button"
@@ -297,13 +305,28 @@ export default function StrandTimeline({
         </>
       ) : (
         <ol className="mx-auto mt-8 max-w-2xl border-l border-border pl-7">
-          {ordered.map((post) => (
-            <li key={post.id} className="relative pb-10">
+          {months.map(({ month }) => (
+            <li key={month} className="relative pb-10">
               <span
+                data-timeline-month={month}
                 className="absolute -left-[33px] top-1 h-2.5 w-2.5 rounded-full"
                 style={{ background: color }}
               />
-              <Post post={post} seedId={seedId} />
+              <h3 className="mb-5 text-sm font-semibold">
+                {monthLabel(month)}
+              </h3>
+              <div className="space-y-8">
+                {ordered
+                  .filter(
+                    (post) =>
+                      postMonth(
+                        postTimestamp(post.id, post.tweet?.createdAt)!,
+                      ) === month,
+                  )
+                  .map((post) => (
+                    <Post key={post.id} post={post} seedId={seedId} />
+                  ))}
+              </div>
             </li>
           ))}
         </ol>

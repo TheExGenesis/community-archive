@@ -435,13 +435,13 @@ export function TweetRow({
 
   const details = (
     <div className="min-w-0 flex-1">
-      <div className="flex items-baseline gap-2 overflow-hidden">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <Link
           href={profileHref}
-          className="min-w-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
           <span
-            className={`truncate font-bold ${
+            className={`block max-w-full truncate font-bold ${
               isEditorial
                 ? 'text-[14px]'
                 : compact
@@ -451,7 +451,7 @@ export function TweetRow({
           >
             {tweet.name}
           </span>{' '}
-          <span className="text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
+          <span className="block max-w-full truncate text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
             @{tweet.username}
           </span>
         </Link>

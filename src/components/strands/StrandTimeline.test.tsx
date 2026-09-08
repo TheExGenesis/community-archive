@@ -51,3 +51,27 @@ test('map keyboard selection and chronological list retain all source posts', ()
     'Post 2',
   ])
 })
+test('posts within a month share one dot in both views and remain individually readable', () => {
+  const { container } = render(
+    <StrandTimeline
+      seedId="1"
+      posts={[
+        { id: '1', annotation: 'First', tweet: tweet('1', '2020-01-01') },
+        { id: '2', annotation: 'Second', tweet: tweet('2', '2020-01-30') },
+        { id: '3', annotation: 'Third', tweet: tweet('3', '2020-02-01') },
+      ]}
+    />,
+  )
+  expect(container.querySelectorAll('[data-month-dot]')).toHaveLength(2)
+  fireEvent.keyDown(screen.getByRole('button', { name: /2. @author/ }), {
+    key: 'Enter',
+  })
+  expect(screen.getByText('Post 2')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'timeline' }))
+  expect(container.querySelectorAll('[data-timeline-month]')).toHaveLength(2)
+  expect(screen.getAllByRole('article').map((el) => el.textContent)).toEqual([
+    'Post 1',
+    'Post 2',
+    'Post 3',
+  ])
+})

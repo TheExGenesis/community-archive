@@ -89,3 +89,25 @@ test('keyboard focus on a dot also isolates it', () => {
     'true',
   )
 })
+test('an unlabeled cluster reveals representatives and any focused dot gets its strand title above it', () => {
+  const unlabelled = strands.map(({ mapLabel, ...strand }) => strand)
+  const { container } = render(<StrandMinimap strands={unlabelled} />)
+  expect(container.querySelectorAll('[data-label-strand-id]')).toHaveLength(0)
+  fireEvent.click(
+    screen.getByRole('button', {
+      name: 'Cluster 2: Community and twitter tools',
+    }),
+  )
+  expect(
+    container.querySelector('[data-label-strand-id="2"]'),
+  ).toHaveTextContent('Another strand')
+  fireEvent.focus(screen.getByRole('link', { name: 'Explore Generated title' }))
+  const label = container.querySelector('[data-label-strand-id="1"]')!
+  expect(label).toHaveTextContent('Generated title')
+  expect(label).toHaveTextContent('Reply game and other visa classics')
+  const box = label.querySelector('rect')!
+  const dot = container.querySelector('[data-strand-id="1"]')!
+  expect(
+    Number(box.getAttribute('y')) + Number(box.getAttribute('height')),
+  ).toBeLessThan(Number(dot.getAttribute('cy')))
+})

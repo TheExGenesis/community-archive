@@ -43,8 +43,8 @@ export default function StrandMinimap({
       300 +
       ((s.position!.x - (minX + maxX) / 2) * 470) / Math.max(maxX - minX, 1),
     y:
-      220 -
-      ((s.position!.y - (minY + maxY) / 2) * 320) / Math.max(maxY - minY, 1),
+      232.5 -
+      ((s.position!.y - (minY + maxY) / 2) * 295) / Math.max(maxY - minY, 1),
   })
   const selected = points.find((s) => s.id === selectedId)
   const groups = Array.from(
@@ -61,24 +61,79 @@ export default function StrandMinimap({
       }))
       .sort((a, b) => a.distance - b.distance)[0]
   }
-  // Keep handwritten labels legible. Zoom makes more room for labels while
-  // every manually labeled dot keeps its emphasis even if its text won't fit.
+  // When a cluster has no handwritten labels, expose two representative
+  // strands: one near its center and one further away for spatial coverage.
+  const clusterPoints = points.filter(
+    (s) => s.position!.cluster === highlightedCluster,
+  )
+  const representatives = new Set<string>()
+  if (clusterPoints.length && !clusterPoints.some((s) => s.mapLabel)) {
+    const center = {
+      x:
+        clusterPoints.reduce((sum, s) => sum + s.position!.x, 0) /
+        clusterPoints.length,
+      y:
+        clusterPoints.reduce((sum, s) => sum + s.position!.y, 0) /
+        clusterPoints.length,
+    }
+    const distance = (s: MapStrand, p: { x: number; y: number }) =>
+      (s.position!.x - p.x) ** 2 + (s.position!.y - p.y) ** 2
+    const first = [...clusterPoints].sort(
+      (a, b) => distance(a, center) - distance(b, center),
+    )[0]
+    representatives.add(first.id)
+    const second = [...clusterPoints].sort(
+      (a, b) => distance(b, first.position!) - distance(a, first.position!),
+    )[0]
+    representatives.add(second.id)
+  }
+  const priority = (s: MapStrand) =>
+    s.id === selectedId
+      ? 100
+      : representatives.has(s.id)
+        ? 50
+        : s.position!.cluster === highlightedCluster
+          ? 30
+          : 0
   const boxes: { x: number; y: number; w: number; h: number }[] = []
   const labels = points
-    .filter((s) => s.mapLabel)
-    .sort((a, b) => Number(b.id === selectedId) - Number(a.id === selectedId))
+    .filter(
+      (s) => s.mapLabel || s.id === selectedId || representatives.has(s.id),
+    )
+    .sort((a, b) => priority(b) - priority(a))
     .flatMap((s) => {
-      const { x, y } = coords(s),
-        label = s.mapLabel!,
-        short = label.length > 34 ? label.slice(0, 33) + '…' : label
-      const w = (short.length * 9.5) / zoom + 8,
-        h = 25 / zoom
-      const candidates = [
-        { x: x - w / 2, y: y - 12 - h },
-        { x: x - w / 2, y: y + 12 },
-        { x: x + 13, y: y - h / 2 },
-        { x: x - 13 - w, y: y - h / 2 },
-      ]
+      const { x, y } = coords(s)
+      const label = s.mapLabel ?? s.title
+      const active = s.id === selectedId
+      const lines = active
+        ? (label.match(/.{1,36}(?:\s|$)|.{1,36}/g) ?? [label]).map((line) =>
+            line.trim(),
+          )
+        : [label.length > 34 ? label.slice(0, 33) + '…' : label]
+      const clusterName = active
+        ? STRAND_CLUSTER_NAMES[s.position!.cluster]
+        : undefined
+      const w =
+        (Math.max(
+          ...lines.map((line) => line.length),
+          clusterName ? clusterName.length * 0.78 : 0,
+        ) *
+          9.5) /
+          zoom +
+        12
+      const h = (lines.length * 23 + (clusterName ? 21 : 0) + 5) / zoom
+      const above = {
+        x: Math.max(3, Math.min(597 - w, x - w / 2)),
+        y: Math.max(3, y - 12 - h),
+      }
+      const candidates = active
+        ? [above]
+        : [
+            above,
+            { x: x - w / 2, y: y + 12 },
+            { x: x + 13, y: y - h / 2 },
+            { x: x - 13 - w, y: y - h / 2 },
+          ]
       const box = candidates
         .map((p) => ({ ...p, w, h }))
         .find(
@@ -97,7 +152,7 @@ export default function StrandMinimap({
         )
       if (!box) return []
       boxes.push(box)
-      return [{ s, short, box }]
+      return [{ s, lines, clusterName, box }]
     })
   return (
     <aside
@@ -129,7 +184,7 @@ export default function StrandMinimap({
         Nearby dots are related strands. Ringed dots have your original map
         labels. Zoom to see more labels.
       </p>
-      <div className="mt-3 max-h-96 overflow-auto border border-border bg-background">
+      <div className="mt-3 max-h-[29rem] overflow-auto border border-border bg-background">
         <svg
           viewBox="0 0 600 440"
           role="group"
@@ -183,7 +238,7 @@ export default function StrandMinimap({
             )
           })}
           <g pointerEvents="none" aria-hidden="true">
-            {labels.map(({ s, short, box }) => (
+            {labels.map(({ s, lines, clusterName, box }) => (
               <g
                 key={s.id}
                 data-label-strand-id={s.id}
@@ -201,13 +256,27 @@ export default function StrandMinimap({
                 />
                 <text
                   x={box.x + 4}
-                  y={box.y + box.h * 0.73}
+                  y={box.y + 20 / zoom}
                   fontSize={18 / zoom}
                   fill={
                     isMuted(s) ? 'hsl(var(--muted-foreground))' : 'currentColor'
                   }
                 >
-                  {short}
+                  {lines.map((line, i) => (
+                    <tspan key={i} x={box.x + 5} dy={i === 0 ? 0 : 23 / zoom}>
+                      {line}
+                    </tspan>
+                  ))}
+                  {clusterName && (
+                    <tspan
+                      x={box.x + 5}
+                      dy={21 / zoom}
+                      fontSize={14 / zoom}
+                      opacity="0.7"
+                    >
+                      {clusterName}
+                    </tspan>
+                  )}
                 </text>
               </g>
             ))}

@@ -69,12 +69,10 @@ test('scroll loads older rows once, preserves existing rows, and stops at the en
   ).not.toBeInTheDocument()
 })
 test('failed page keeps data and cursor, pauses auto-load, and retries on request', async () => {
-  load
-    .mockRejectedValueOnce(new Error('offline'))
-    .mockResolvedValueOnce({
-      events: [event('optout:older')],
-      nextCursor: null,
-    })
+  load.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({
+    events: [event('optout:older')],
+    nextCursor: null,
+  })
   render(<AdminActivityFeed initialPage={initial} />)
   fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
   expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -86,22 +84,15 @@ test('failed page keeps data and cursor, pauses auto-load, and retries on reques
   expect(load.mock.calls[1][0].cursor).toEqual(initial.nextCursor)
 })
 test('failed filter retries the requested filter from the beginning', async () => {
-  load
-    .mockRejectedValueOnce(new Error('offline'))
-    .mockResolvedValueOnce({
-      events: [event('optout:emergentvibe')],
-      nextCursor: null,
-    })
+  load.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({
+    events: [event('optout:emergentvibe')],
+    nextCursor: null,
+  })
   render(<AdminActivityFeed initialPage={initial} />)
   fireEvent.change(screen.getByLabelText('Account'), {
     target: { value: 'emergentvibe' },
   })
-  fireEvent.change(screen.getByLabelText('Event type'), {
-    target: { value: 'opt_out' },
-  })
-  fireEvent.submit(
-    screen.getByRole('form', { name: 'Filter archive activity' }),
-  )
+  fireEvent.click(screen.getByRole('button', { name: 'Opt-outs' }))
   await screen.findByRole('alert')
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
   expect(await screen.findByText('@optout:emergentvibe')).toBeInTheDocument()
@@ -124,4 +115,40 @@ test('initial read failure is retryable and not labelled as empty history', asyn
       screen.getByText('No matching activity records.'),
     ).toBeInTheDocument(),
   )
+})
+
+test('pills filter immediately and All clears the type while keeping the account search', async () => {
+  load.mockResolvedValue({ events: [], nextCursor: null })
+  render(<AdminActivityFeed initialPage={initial} />)
+  fireEvent.change(screen.getByLabelText('Account'), {
+    target: { value: 'alice' },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Uploads' }))
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Uploads' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    ),
+  )
+  expect(load).toHaveBeenLastCalledWith({
+    kind: 'archive_upload',
+    search: 'alice',
+    cursor: null,
+  })
+  expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'All' }))
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    ),
+  )
+  expect(load).toHaveBeenLastCalledWith({
+    kind: '',
+    search: 'alice',
+    cursor: null,
+  })
 })

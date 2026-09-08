@@ -16,8 +16,36 @@ import {
   ACTIVITY_KINDS,
   ACTIVITY_LABELS,
   type ActivityFilters,
+  type ActivityKind,
   type ActivityPage,
 } from './activityTypes'
+
+const activityStyles: Record<
+  ActivityKind,
+  { pill: string; row: string; label: string }
+> = {
+  archive_upload: {
+    label: 'Uploads',
+    pill: 'border-blue-300 bg-blue-100 text-blue-900 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-200',
+    row: 'border-l-blue-500 bg-blue-50/40 dark:border-l-blue-400 dark:bg-blue-950/20',
+  },
+  opt_in: {
+    label: 'Opt-ins',
+    pill: 'border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-200',
+    row: 'border-l-emerald-500 bg-emerald-50/40 dark:border-l-emerald-400 dark:bg-emerald-950/20',
+  },
+  opt_out: {
+    label: 'Opt-outs',
+    pill: 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200',
+    row: 'border-l-amber-500 bg-amber-50/40 dark:border-l-amber-400 dark:bg-amber-950/20',
+  },
+  archive_delete: {
+    label: 'Deletions',
+    pill: 'border-rose-300 bg-rose-100 text-rose-900 dark:border-rose-700 dark:bg-rose-950 dark:text-rose-200',
+    row: 'border-l-rose-500 bg-rose-50/40 dark:border-l-rose-400 dark:bg-rose-950/20',
+  },
+}
+const filterKinds: ActivityFilters['kind'][] = ['', ...ACTIVITY_KINDS]
 
 const emptyPage: ActivityPage = { events: [], nextCursor: null }
 const defaultFilters: ActivityFilters = { kind: '', search: '' }
@@ -143,30 +171,32 @@ export function AdminActivityFeed({
               }
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Event type
-            <select
-              className="h-10 rounded-md border border-input bg-background px-3"
-              value={draft.kind}
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  kind: event.target.value as ActivityFilters['kind'],
-                })
-              }
-            >
-              <option value="">All events</option>
-              {ACTIVITY_KINDS.map((kind) => (
-                <option key={kind} value={kind}>
-                  {ACTIVITY_LABELS[kind]}
-                </option>
-              ))}
-            </select>
-          </label>
           <Button type="submit" disabled={loading}>
-            Apply filters
+            Search
           </Button>
         </form>
+        <div
+          role="group"
+          aria-label="Activity type"
+          className="flex flex-wrap gap-2 p-1"
+        >
+          {filterKinds.map((kind) => (
+            <button
+              key={kind || 'all'}
+              type="button"
+              aria-pressed={filters.kind === kind}
+              disabled={loading}
+              onClick={() => {
+                const nextFilters = { ...draft, kind }
+                setDraft(nextFilters)
+                void request(true, nextFilters)
+              }}
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 disabled:cursor-wait disabled:opacity-50 ${kind ? activityStyles[kind].pill : 'border-border bg-muted text-foreground'} ${filters.kind === kind ? 'ring-2 ring-current ring-offset-2 ring-offset-background' : 'opacity-80 hover:opacity-100'}`}
+            >
+              {kind ? activityStyles[kind].label : 'All'}
+            </button>
+          ))}
+        </div>
         <p className="text-sm text-muted-foreground" aria-live="polite">
           Showing{' '}
           {filters.kind
@@ -202,7 +232,10 @@ export function AdminActivityFeed({
         >
           <ol className="divide-y">
             {page.events.map((event) => (
-              <li key={event.id} className="space-y-2 p-4">
+              <li
+                key={event.id}
+                className={`space-y-2 border-l-4 p-4 ${activityStyles[event.kind].row}`}
+              >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="break-all font-medium">
                     {event.username
@@ -211,7 +244,12 @@ export function AdminActivityFeed({
                         ? `Account ${event.account_id}`
                         : 'Unknown account'}
                   </span>
-                  <Badge variant="outline">{ACTIVITY_LABELS[event.kind]}</Badge>
+                  <Badge
+                    variant="outline"
+                    className={activityStyles[event.kind].pill}
+                  >
+                    {ACTIVITY_LABELS[event.kind]}
+                  </Badge>
                   <Badge
                     variant={
                       event.status === 'Failed' ? 'destructive' : 'secondary'

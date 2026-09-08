@@ -58,7 +58,9 @@ post count. Subtopics are ranked by cited count too. Profile switching lives at
 the profile itself. The large sidebar headings use sans-serif type, with subtle
 scrollbars revealed on hover or keyboard focus.
 
-Topic pages lead with two sample TweetCards. Exact-ID PostgreSQL metadata
+The compact profile header pairs the avatar and display name with a muted handle.
+Topic pages show an expandable two-line saved summary followed by three sample
+TweetCards in one desktop row (a swipeable row on mobile). Exact-ID PostgreSQL metadata
 lookups rank only that topic's cited references by likes, prioritizing the
 profile owner's posts. The final payloads use the configured shared archive
 reader and fresh opt-out checks; conversation-context samples are labeled.
@@ -69,11 +71,16 @@ it does not silently substitute arbitrary samples.
 Monthly bars derive UTC creation months from the saved tweet snowflakes,
 deduplicate references, fill interior empty months, and crop to the first/last
 cited month. Existing yearly summaries follow horizontally, cropped to the
-same year range. These counts include cited conversation context and do not
-claim full archive activity. Compact insight cards follow, starting with entities;
-known participant handles use available directory avatars, while unknown names
-remain text. The remaining six-at-a-time source feed excludes the samples and
-labels owner posts versus conversation context. Existing saved analysis content
+same year range. Hover, focus, or tap a month to see its count. These counts include cited conversation context and do not
+claim full archive activity. Compact insight panels follow, starting with entities. Each uses a three-column
+label grid; descriptions and source icons appear on hover or click, with keyboard
+and touch access. Known participant handles use available directory avatars.
+Popover portals carry the same analytics exclusion markers as the private page.
+The remaining six-at-a-time source feed excludes the three samples, labels owner
+posts versus conversation context, and groups related replies using exact-reference
+parent/conversation metadata. Each thread is ordered by tweet ID and stays together
+as subsequent pages load; no uncited parents or other thread content are fetched.
+Missing metadata leaves a post separate, and lookup failures are retryable errors. Existing saved analysis content
 and relationships are unchanged.
 
 The standard `dev` and `dev-remote-db` scripts bind to `127.0.0.1` and enable

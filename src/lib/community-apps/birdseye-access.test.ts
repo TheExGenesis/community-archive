@@ -1,3 +1,4 @@
+import { getBirdseyeSourceIndex } from './birdseye-source-index'
 import { isAdminUser } from '@/app/admin/data'
 import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import type { User } from '@supabase/supabase-js'
@@ -33,6 +34,9 @@ jest.mock('./data', () => ({
   getAppPolicy: jest.fn(),
   getBirdseyeAnalysis: jest.fn(),
 }))
+jest.mock('./birdseye-source-index', () => ({
+  getBirdseyeSourceIndex: jest.fn(),
+}))
 jest.mock('./strand-tweets', () => ({ getStrandTweets: jest.fn() }))
 const owner = {
   id: '12345678-1234-1234-1234-123456789abc',
@@ -47,6 +51,9 @@ const getUserById = jest.fn()
 const member = jest.fn()
 beforeEach(() => {
   jest.clearAllMocks()
+  jest
+    .mocked(getBirdseyeSourceIndex)
+    .mockImplementation(async (ids) => ids.map((id) => ({ id, threadId: id })))
   jest.mocked(isAdminUser).mockReturnValue(false)
   jest.mocked(getLocalAdminPreview).mockResolvedValue(null)
   session = null
@@ -119,6 +126,7 @@ test('private by default: anonymous, another owner, and user-editable metadata c
   ).toBe(404)
   expect(getBirdseyeAnalysis).not.toHaveBeenCalled()
   expect(getStrandTweets).not.toHaveBeenCalled()
+  expect(getBirdseyeSourceIndex).not.toHaveBeenCalled()
 })
 test('owner identity and matching account are required, with consent rechecked on every read', async () => {
   session = owner
@@ -276,7 +284,7 @@ test('local admin can browse sources, logout removes access, and no Auth identit
   expect(await loadAccessibleBirdseye('alice')).toBeNull()
 })
 
-test('remaining sources skip the two highlighted posts before applying pagination', async () => {
+test('remaining sources skip the highlighted posts before applying pagination', async () => {
   session = owner
   const response = await sources(
     new NextRequest(
@@ -286,4 +294,19 @@ test('remaining sources skip the two highlighted posts before applying paginatio
   expect(response.status).toBe(200)
   expect(getStrandTweets).toHaveBeenCalledWith(['2', '3', '4', '6', '7', '8'])
   expect(await response.json()).toMatchObject({ nextOffset: 6 })
+})
+
+test('source grouping failures remain private and retryable', async () => {
+  session = owner
+  jest
+    .mocked(getBirdseyeSourceIndex)
+    .mockRejectedValueOnce(new Error('offline'))
+  const response = await sources(
+    new NextRequest(
+      'https://ca.test/api/birdseye/sources?username=alice&cluster_id=topic',
+    ),
+  )
+  expect(response.status).toBe(503)
+  expect(response.headers.get('cache-control')).toContain('no-store')
+  expect(getStrandTweets).not.toHaveBeenCalled()
 })

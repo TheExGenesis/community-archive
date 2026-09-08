@@ -1,15 +1,5 @@
-import Link from 'next/link'
-import {
-  Box,
-  Heart,
-  Link2,
-  Smile,
-  Target,
-  UserRound,
-  Users,
-  Lightbulb,
-} from 'lucide-react'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { Box, Heart, Smile, Target, Users, Lightbulb } from 'lucide-react'
+import { InsightItem } from './InsightItem'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { participantUsername } from '@/lib/community-apps/birdseye-layout'
 import type { BirdseyeCluster } from '@/lib/community-apps/types'
@@ -63,73 +53,34 @@ export async function InsightCards({ cluster }: { cluster: BirdseyeCluster }) {
         avatars.set(row.username.toLowerCase(), row.avatar_media_url)
   }
   return (
-    <div className="grid items-start gap-4 xl:grid-cols-2">
+    <div className="grid items-start gap-3 xl:grid-cols-2">
       {sections.map((section) => {
         const Icon = sectionIcon(section.name)
         return (
           <section
             key={section.name}
-            className="rounded-2xl border border-border bg-card/60 p-4"
+            className="rounded-xl border border-border bg-card/40 p-3"
           >
-            <h3 className="mb-4 flex items-center gap-2 font-sans text-sm font-bold">
-              <Icon size={16} className="text-brand" />
+            <h3 className="mb-2 flex items-center gap-2 font-sans text-xs font-bold">
+              <Icon size={14} className="text-brand" />
               {section.name}
               <span className="ml-auto font-normal text-muted-foreground">
                 {section.items.length}
               </span>
             </h3>
-            <div className="divide-y divide-border/50">
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {section.items.map((item, index) => {
                 const username = participantUsername(
                   item.label,
                   cluster.participants,
                 )
                 return (
-                  <div
+                  <InsightItem
                     key={`${item.label}:${index}`}
-                    className="py-3 first:pt-0 last:pb-0"
-                  >
-                    <div className="flex items-center gap-2">
-                      {username && (
-                        <Avatar className="h-7 w-7 shrink-0">
-                          <AvatarImage src={avatars.get(username)} alt="" />
-                          <AvatarFallback>
-                            <UserRound size={14} />
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-                      <h4 className="font-sans text-sm font-semibold">
-                        {username ? (
-                          <Link
-                            href={`/user/${username}`}
-                            className="hover:text-brand"
-                          >
-                            @{username}
-                          </Link>
-                        ) : (
-                          item.label
-                        )}
-                      </h4>
-                    </div>
-                    {item.description && (
-                      <p className="mt-1 text-[13px] leading-5 text-muted-foreground">
-                        {item.description}
-                      </p>
-                    )}
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {Array.from(new Set(item.tweetIds)).map((id, i) => (
-                        <Link
-                          prefetch={false}
-                          key={id}
-                          href={`/tweets/${id}`}
-                          aria-label={`Source ${i + 1} for ${item.label}`}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-brand hover:bg-brand/10"
-                        >
-                          <Link2 size={13} />
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
+                    item={item}
+                    username={username}
+                    avatar={username ? avatars.get(username) : undefined}
+                  />
                 )
               })}
             </div>

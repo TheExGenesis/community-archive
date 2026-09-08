@@ -1,3 +1,5 @@
+'use client'
+import { useState } from 'react'
 import {
   monthlyActivity,
   yearlySummaries,
@@ -11,6 +13,7 @@ function monthLabel(month: string) {
   })
 }
 export function MonthlyTimeline({ cluster }: { cluster: BirdseyeCluster }) {
+  const [active, setActive] = useState<number | null>(null)
   const months = monthlyActivity(cluster.tweetIds)
   if (!months.length) return null
   const max = Math.max(1, ...months.map((month) => month.count))
@@ -28,7 +31,7 @@ export function MonthlyTimeline({ cluster }: { cluster: BirdseyeCluster }) {
     ]),
   )
   return (
-    <section aria-label="Topic timeline" className="space-y-4">
+    <section aria-label="Topic timeline" className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-sans text-lg font-bold">Through the years</h3>
         <p className="text-xs text-muted-foreground">
@@ -36,54 +39,92 @@ export function MonthlyTimeline({ cluster }: { cluster: BirdseyeCluster }) {
           {monthLabel(months[months.length - 1].month)}
         </p>
       </div>
-      <svg
-        viewBox="0 0 640 118"
-        role="img"
-        aria-label="Cited posts by month"
-        className="h-32 w-full overflow-visible text-brand"
-      >
-        {months.map(({ month, count }, index) => (
-          <g key={month}>
-            <title>{`${monthLabel(month)}: ${count} cited posts`}</title>
-            <rect
-              x={index * width + 0.5}
-              y={94 - (count / max) * 85}
-              width={Math.max(0.5, width - 1)}
-              height={Math.max(0.75, (count / max) * 85)}
-              rx={Math.min(2, width / 4)}
-              fill="currentColor"
-              opacity={count ? 0.7 : 0.1}
-            />
-          </g>
-        ))}
-        {ticks.map((index) => (
-          <text
-            key={index}
-            x={
-              index === 0
-                ? 0
-                : index === months.length - 1
-                  ? 640
-                  : (index + 0.5) * width
-            }
-            y="113"
-            fontSize="10"
-            fill="currentColor"
-            opacity="0.7"
-            textAnchor={
-              index === 0
-                ? 'start'
-                : index === months.length - 1
-                  ? 'end'
-                  : 'middle'
-            }
+      <div className="relative" onMouseLeave={() => setActive(null)}>
+        {active !== null && months[active] && (
+          <div
+            role="tooltip"
+            className="pointer-events-none absolute -top-1 z-10 -translate-x-1/2 rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-sm"
+            style={{
+              left: `${Math.max(12, Math.min(88, ((active + 0.5) / months.length) * 100))}%`,
+            }}
           >
-            {index === 0 || index === months.length - 1
-              ? monthLabel(months[index].month)
-              : months[index].month.slice(0, 4)}
-          </text>
-        ))}
-      </svg>
+            {monthLabel(months[active].month)} · {months[active].count}{' '}
+            {months[active].count === 1 ? 'post' : 'posts'}
+          </div>
+        )}
+        <svg
+          viewBox="0 0 640 118"
+          role="group"
+          aria-label="Cited posts by month"
+          className="h-24 w-full overflow-visible text-brand"
+        >
+          {months.map(({ month, count }, index) => (
+            <g
+              key={month}
+              role="button"
+              tabIndex={0}
+              aria-label={`${monthLabel(month)}: ${count} cited posts`}
+              onMouseEnter={() => setActive(index)}
+              onFocus={() => setActive(index)}
+              onBlur={() => setActive(null)}
+              onClick={() => setActive(index)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') setActive(null)
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  setActive(index)
+                }
+              }}
+              className="outline-none"
+            >
+              <rect
+                x={index * width}
+                y={0}
+                width={width}
+                height={96}
+                fill="transparent"
+              />
+              <title>{`${monthLabel(month)}: ${count} cited posts`}</title>
+              <rect
+                x={index * width + 0.5}
+                y={94 - (count / max) * 85}
+                width={Math.max(0.5, width - 1)}
+                height={Math.max(0.75, (count / max) * 85)}
+                rx={Math.min(2, width / 4)}
+                fill="currentColor"
+                opacity={active === index ? 1 : count ? 0.7 : 0.1}
+              />
+            </g>
+          ))}
+          {ticks.map((index) => (
+            <text
+              key={index}
+              x={
+                index === 0
+                  ? 0
+                  : index === months.length - 1
+                    ? 640
+                    : (index + 0.5) * width
+              }
+              y="113"
+              fontSize="10"
+              fill="currentColor"
+              opacity="0.7"
+              textAnchor={
+                index === 0
+                  ? 'start'
+                  : index === months.length - 1
+                    ? 'end'
+                    : 'middle'
+              }
+            >
+              {index === 0 || index === months.length - 1
+                ? monthLabel(months[index].month)
+                : months[index].month.slice(0, 4)}
+            </text>
+          ))}
+        </svg>
+      </div>
       <p className="text-xs text-muted-foreground">
         Monthly counts of cited posts, including conversation context. Empty
         months have no cited posts.

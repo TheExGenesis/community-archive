@@ -39,7 +39,7 @@ test('selects owner posts by likes using only cited IDs, then renders the config
     (await getBirdseyeSamples(['1', '2', '3', '1', 'bad'], 'alice')).map(
       (tweet) => tweet.id,
     ),
-  ).toEqual(['2', '3'])
+  ).toEqual(['2', '3', '1'])
   expect(query.in).toHaveBeenCalledWith('tweet_id', ['1', '2', '3'])
   expect(query.ilike).toHaveBeenCalledWith('username', 'alice')
   expect(getStrandTweets).toHaveBeenCalledWith(['2', '3', '1'])

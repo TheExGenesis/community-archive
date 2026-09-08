@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { AnalysisText } from '@/components/community-apps/AnalysisText'
+import { ProfileIdentity } from './ProfileIdentity'
+import { TopicSummary } from './TopicSummary'
 import type {
   BirdseyeAnalysis,
   BirdseyeCluster,
@@ -41,14 +42,6 @@ async function TopicContent({
         </p>
       )}
       <MonthlyTimeline cluster={cluster} />
-      <details className="rounded-xl bg-muted/30 p-4">
-        <summary className="cursor-pointer font-sans text-sm font-semibold">
-          About this topic · saved AI summary
-        </summary>
-        <div className="mt-3">
-          <AnalysisText>{cluster.summary}</AnalysisText>
-        </div>
-      </details>
       <Suspense
         fallback={
           <p className="text-sm text-muted-foreground">Loading insights…</p>
@@ -96,7 +89,7 @@ export function BirdseyeView({
   const topicHref = (cluster: BirdseyeCluster) =>
     `${overviewHref}&cluster_id=${encodeURIComponent(cluster.id)}`
   return (
-    <main className="ph-no-capture ph-mask mx-auto min-h-screen max-w-[1440px] px-5 py-5 sm:px-8">
+    <main className="ph-no-capture ph-mask mx-auto min-h-screen max-w-[1440px] px-5 py-3 sm:px-8">
       <div className="flex items-center justify-between gap-3 text-xs">
         <Link
           href="/community"
@@ -110,14 +103,20 @@ export function BirdseyeView({
           </Link>
         )}
       </div>
-      <header className="mb-6 mt-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
-        <div>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-brand">
+      <header className="mb-3 mt-2 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-2">
+        <div className="min-w-0">
+          <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-brand">
             Birdseye · Experimental
           </p>
-          <h1 className="break-all font-sans text-2xl font-bold tracking-tight sm:text-3xl">
-            <Link href={overviewHref}>@{analysis.username}</Link>
-          </h1>
+          <Suspense
+            fallback={
+              <h1 className="font-sans text-xl font-bold">
+                @{analysis.username}
+              </h1>
+            }
+          >
+            <ProfileIdentity username={analysis.username} />
+          </Suspense>
         </div>
         {isOwner ? (
           <ShareBirdseye initiallyEnabled={sharingEnabled} />
@@ -127,10 +126,10 @@ export function BirdseyeView({
           </span>
         )}
       </header>
-      <div className="grid items-start gap-6 lg:grid-cols-[290px_minmax(0,1fr)] lg:gap-10">
+      <div className="grid items-start gap-3 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-7">
         <nav
           aria-label="Archive topics"
-          className="birdseye-scroll max-h-28 space-y-5 overflow-y-auto pr-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-7rem)]"
+          className="birdseye-scroll max-h-20 space-y-5 overflow-y-auto pr-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-7rem)]"
         >
           <Link
             href={overviewHref}
@@ -177,24 +176,21 @@ export function BirdseyeView({
           ))}
         </nav>
         {selected ? (
-          <article className="min-w-0 space-y-7">
+          <article className="min-w-0 space-y-4">
             <div>
-              <h2 className="font-sans text-2xl font-bold leading-tight sm:text-3xl">
+              <h2 className="font-sans text-xl font-bold leading-tight sm:text-2xl">
                 {selected.name}
               </h2>
-              <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                @{analysis.username}’s posts and the conversations around them.
-                Saved analysis; interpretations may be mistaken.
-              </p>
+              <TopicSummary key={selected.id} text={selected.summary} />
             </div>
             <Suspense
               key={selected.id}
               fallback={
                 <section
                   aria-label="Loading sample tweets"
-                  className="grid gap-3 xl:grid-cols-2"
+                  className="grid gap-3 md:grid-cols-3"
                 >
-                  {[0, 1].map((i) => (
+                  {[0, 1, 2].map((i) => (
                     <div
                       key={i}
                       className="h-52 animate-pulse rounded-xl bg-muted/40 p-5 text-sm text-muted-foreground"

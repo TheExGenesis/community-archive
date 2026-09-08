@@ -42,7 +42,7 @@ const rankedIds = unstable_cache(
 export async function getBirdseyeSamples(ids: string[], username: string) {
   const own = await rankedIds(ids, username)
   const candidates = [...own]
-  if (own.length < 2) candidates.push(...(await rankedIds(ids, null)))
+  if (own.length < 3) candidates.push(...(await rankedIds(ids, null)))
   const posts = await getStrandTweets(Array.from(new Set(candidates)))
   return Array.from(posts.values())
     .sort(
@@ -52,5 +52,5 @@ export async function getBirdseyeSamples(ids: string[], username: string) {
         b.likes - a.likes ||
         b.id.localeCompare(a.id),
     )
-    .slice(0, 2) as PortalTweet[]
+    .slice(0, 3) as PortalTweet[]
 }

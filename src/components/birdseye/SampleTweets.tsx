@@ -8,28 +8,29 @@ export function SampleTweets({
   username: string
 }) {
   return (
-    <section aria-label="Sample tweets" className="space-y-3">
+    <section aria-label="Sample tweets" className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-sans text-sm font-semibold">Sample posts</h3>
         <span className="text-[11px] text-muted-foreground">
           @{username} first · ranked by likes
         </span>
       </div>
-      <div className="grid items-start gap-3 xl:grid-cols-2">
+      <div className="birdseye-scroll relative grid snap-x auto-cols-[88%] grid-flow-col items-start gap-2 overflow-x-auto pb-1 [contain:paint] md:auto-cols-auto md:grid-flow-row md:grid-cols-3 md:overflow-visible md:[contain:none]">
         {tweets.map((tweet) => (
           <div
             key={tweet.id}
-            className="overflow-hidden rounded-xl border border-border bg-card"
+            className="relative snap-start overflow-hidden rounded-xl border border-border bg-card"
           >
-            <p className="border-b border-border/50 px-4 py-2 text-[11px] font-semibold text-muted-foreground">
-              {tweet.username.toLowerCase() === username.toLowerCase()
-                ? `By @${username}`
-                : `Conversation context · @${tweet.username}`}
-            </p>
+            {tweet.username.toLowerCase() !== username.toLowerCase() && (
+              <p className="border-b border-border/50 px-3 py-1 text-[11px] font-semibold text-muted-foreground">
+                Conversation context · @{tweet.username}
+              </p>
+            )}
             <TweetCard
               tweet={tweet}
               compact
               collapsible
+              quotedTweetDisplay="summary"
               showDate
               showExternalLink
             />

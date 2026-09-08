@@ -77,7 +77,7 @@ export function StrandFeed({
     <>
       <p className="mb-5 text-sm text-muted-foreground" role="status">
         {page
-          ? `${page.total} ${page.total === 1 ? 'strand' : 'strands'} · ordered by the original analysis’s rating`
+          ? `${page.total} ${page.total === 1 ? 'strand' : 'strands'} · ${query ? 'ordered by search relevance' : 'ordered by the original analysis’s rating'}`
           : 'Searching strands…'}
       </p>
       <section aria-label="Strands" className="space-y-7" aria-busy={loading}>
@@ -134,7 +134,7 @@ export function StrandBrowser({
   }, [input])
   return (
     <StrandFocusProvider>
-      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_480px]">
+      <div className="grid w-full items-start gap-8 lg:grid-cols-[minmax(0,1fr)_480px]">
         <div className="min-w-0">
           <form
             onSubmit={(event) => {

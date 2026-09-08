@@ -10,12 +10,25 @@ export async function getStrandPage(
   const { strands } = await getStrands()
   const search = query.trim().slice(0, 120).toLowerCase()
   const filtered = strands
-    .filter((strand) =>
-      `${strand.title} ${strand.mapLabel ?? ''} ${strand.summary} ${strand.username}`
-        .toLowerCase()
-        .includes(search),
+    .map((strand) => ({
+      strand,
+      rank: search
+        ? [
+            `${strand.title} ${strand.mapLabel ?? ''}`,
+            strand.text ?? '',
+            [strand.username, ...(strand.participants ?? [])].join(' '),
+            strand.summary,
+          ].findIndex((field) => field.toLowerCase().includes(search))
+        : 0,
+    }))
+    .filter(({ rank }) => rank >= 0)
+    .sort(
+      (a, b) =>
+        a.rank - b.rank ||
+        b.strand.rating - a.strand.rating ||
+        a.strand.id.localeCompare(b.strand.id),
     )
-    .sort((a, b) => b.rating - a.rating || a.id.localeCompare(b.id))
+    .map(({ strand }) => strand)
   const visible = filtered.slice(offset, offset + 24)
   const tweets = await getStrandTweets(visible.map((s) => s.id))
   return {

@@ -126,8 +126,8 @@ forms ten spatial clusters. Each cluster shares the hue of its centroid's angle
 around the collection centroid. Clustering happens before request filtering;
 only policy-eligible strands reach the minimap. Live search and incremental loading preserve stable colors. The server renders
 the initial 24 cards; `/api/strands` returns further batches of at most 24, applying
-the existing policy and tweet checks on every request. Search matches titles,
-handwritten labels, summaries, and usernames. Debounced search replaces only the
+the existing policy and tweet checks on every request. Search ranks matches by title (including handwritten labels), seed-post text,
+author/participant usernames, then strand summary; original rating breaks ties. Debounced search replaces only the
 feed; stale requests are aborted, and the minimap stays mounted. Intersection-based
 loading appends cards, with a manual retry/load-more fallback. Responses are no-store. Cluster buttons highlight in place without navigation or filtering
 the cards; All clears the highlight. The map supports zoom and source navigation.
@@ -175,13 +175,14 @@ total post count. The landing page’s “How does it work?” disclosure explai
 selection, structural and semantic connections, and AI narration in four numbered
 steps, followed by a short note about the limits of this method.
 
-Key posts offer an on-demand thread preview at
+The map automatically renders the selected post inside its archived thread.
+Timeline rows offer the same context on demand at
 `/api/strands/<seed>/context?tweet_id=<key-post>`. The endpoint first verifies
 that the seed is still eligible and the selected ID belongs to that strand.
 It uses the existing ClickHouse thread read, or the existing permalink RPC
 when ClickHouse reads are disabled; it does not recover missing tweets or write
-data. Current opt-outs break traversal before selecting at most five ancestors
-and five chronological descendants. Nearby continuations take precedence over
+data. Current opt-outs break traversal before selecting at most 20 ancestors
+and 20 chronological descendants. Nearby continuations take precedence over
 much later direct replies. The bounded selection is hydrated with the same
 full-fidelity tweet cards and final opt-out checks as other Strands posts.
 Unavailable context has a retry state and a full-conversation link. Timeline

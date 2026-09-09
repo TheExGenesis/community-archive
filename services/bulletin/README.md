@@ -104,7 +104,8 @@ and caps prices at $0.15 input / $0.50 output per million tokens.
 An explicitly approved backfill can use `--backfill-budget-usd` (at most $1).
 Its cap is cumulative across runs of the exact same window. The monthly cap
 still applies. Approved backfill calls are separate from normal daily admission;
-never clear the cost ledger to reset spending.
+never clear the cost ledger to reset spending. Approved backfills retry after
+one minute, with the same three-attempt limit; normal runs wait one hour.
 
 ```sh
 # Scan only; no model calls. Repeat to resume a bounded partial scan.

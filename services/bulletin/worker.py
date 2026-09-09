@@ -243,9 +243,10 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
         if not enqueue_only and complete:
             if not os.environ.get('OPENROUTER_API_KEY'):
                 raise RuntimeError('missing_model_key')
+            retry_delay=dt.timedelta(minutes=1 if backfill_budget is not None else 60)
             jobs=db.execute('''SELECT * FROM bulletin.decisions WHERE status IN ('pending','failed')
-              AND attempts<3 AND (last_attempt_at IS NULL OR last_attempt_at<now()-interval '1 hour')
-              ORDER BY updated_at LIMIT %s''',(limit,)).fetchall()
+              AND attempts<3 AND (last_attempt_at IS NULL OR last_attempt_at<now()-%s)
+              ORDER BY updated_at LIMIT %s''',(retry_delay,limit)).fetchall()
             for job in jobs:
                 if time.monotonic()-started>MAX_SECONDS:
                     status='time_limit';break

@@ -119,6 +119,14 @@ class ClickHouseWorkerTests(unittest.TestCase):
         keys=self.db.execute("SELECT count(DISTINCT counts->>'scan_key') AS n FROM bulletin.runs").fetchone()['n']
         self.assertEqual(keys,1)
 
+    def test_approved_backfill_retries_earlier_without_resetting_attempts(self):
+        self.run_worker(enqueue_only=True)
+        self.db.execute("UPDATE bulletin.decisions SET status='failed',attempts=1,last_attempt_at=now()-interval '2 minutes'")
+        self.assertEqual(self.run_worker()[1],0)
+        result,calls=self.run_worker(backfill_budget=Decimal('.05'))
+        self.assertEqual((result['status'],calls),('ok',1))
+        self.assertEqual(self.db.execute('SELECT attempts FROM bulletin.decisions').fetchone()['attempts'],2)
+
     def test_browser_cannot_read_state_and_backfill_does_not_touch_daily_cursor(self):
         old=self.db.execute('SELECT cursor_at,cursor_id FROM bulletin.worker_state').fetchone()
         self.run_worker()

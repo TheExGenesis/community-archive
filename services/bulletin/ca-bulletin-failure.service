@@ -1,0 +1,6 @@
+[Unit]
+Description=Report failed Community Archive Bulletin run
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/logger -p daemon.err -t ca-bulletin Bulletin job failed; inspect ca-bulletin.service and bulletin.worker_state

@@ -18,3 +18,6 @@ ALTER SCHEMA "tes" OWNER TO "postgres";
 
 CREATE SCHEMA IF NOT EXISTS "ca_autorefresh";
 ALTER SCHEMA "ca_autorefresh" OWNER TO "postgres";
+
+-- Private Bulletin opportunities
+CREATE SCHEMA bulletin;

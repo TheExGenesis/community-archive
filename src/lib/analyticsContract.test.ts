@@ -1,3 +1,4 @@
+import { getMobileNav, navAnalyticsDestination } from './navigation'
 import fs from 'fs'
 import path from 'path'
 import ts from 'typescript'
@@ -129,4 +130,23 @@ it('normalizes route parameters and fails closed for unexpected routes', () => {
   expect(sanitizeAnalyticsUrl('https://outside.example/private?q=secret')).toBe(
     'https://outside.example',
   )
+})
+
+it('accepts every rendered navigation destination for all audiences', () => {
+  for (const member of [false, true]) {
+    for (const admin of [false, true]) {
+      for (const item of getMobileNav(member, admin)) {
+        const event = sanitizePostHogEvent({
+          event: 'navigation_item_clicked',
+          uuid: 'navigation-test',
+          properties: {
+            destination: navAnalyticsDestination(item.href),
+            surface: 'mobile',
+            already_active: false,
+          },
+        })
+        expect(event).not.toBeNull()
+      }
+    }
+  }
 })

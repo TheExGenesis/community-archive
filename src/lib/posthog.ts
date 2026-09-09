@@ -122,22 +122,10 @@ const isTrendsExplorerAction = isOneOf([
 ])
 const isProductPage = isOneOf(analyticsPageNames)
 const isNavigationDestination = isOneOf([
-  'admin',
-  'bangers',
-  'digest',
-  'docs',
-  'home',
-  'live_stream',
-  'research',
-  'search',
-  'settings',
+  ...analyticsPageNames,
   'sign_in',
   'sign_out',
-  'social_graph',
-  'trends',
   'upload_archive',
-  'user_directory',
-  'user_profile',
 ])
 const isNavigationSurface = isOneOf([
   'account_menu',

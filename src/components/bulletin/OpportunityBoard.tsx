@@ -50,7 +50,11 @@ function ScrollMore({
     return () => observer.disconnect()
   }, [count])
   return (
-    <div ref={sentinel} aria-label={`Load more ${side}`} className="min-h-px">
+    <div
+      ref={sentinel}
+      aria-label={`Load more ${side}`}
+      className="min-h-[1px]"
+    >
       {manual ? (
         <Button variant="outline" onClick={onMore}>
           Load more {side}

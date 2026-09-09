@@ -82,14 +82,19 @@ def intake(db, engine, counts, started, run_id, window=None, rescan=False):
             and not r['reply_to_tweet_id'] and not r['retweet'] and not r['full_text'].startswith('RT @')]
         shortlist=candidates(engine,rows)
         with db.transaction():
-            for r in rows:
-                db.execute('DELETE FROM bulletin.decisions WHERE tweet_id=%s AND (content_hash<>%s OR version<>%s)',
-                    (r['tweet_id'],r['content_hash'],VERSION))
-            for r in shortlist:
+            if rows:
+                db.execute('''DELETE FROM bulletin.decisions d USING
+                  jsonb_to_recordset(%s) AS source(tweet_id text,content_hash text)
+                  WHERE d.tweet_id=source.tweet_id AND (d.content_hash<>source.content_hash OR d.version<>%s)''',
+                  (Jsonb([{'tweet_id':r['tweet_id'],'content_hash':r['content_hash']} for r in rows]),VERSION))
+            if shortlist:
                 db.execute('''INSERT INTO bulletin.decisions(tweet_id,account_id,posted_at,content_hash,version,status)
-                  VALUES(%s,%s,%s,%s,%s,'pending') ON CONFLICT(tweet_id) DO UPDATE
+                  SELECT tweet_id,account_id,posted_at,content_hash,%s,'pending'
+                  FROM jsonb_to_recordset(%s) AS source(tweet_id text,account_id text,posted_at timestamptz,content_hash text)
+                  ON CONFLICT(tweet_id) DO UPDATE
                   SET account_id=excluded.account_id,posted_at=excluded.posted_at''',
-                  (r['tweet_id'],r['account_id'],r['created_at'],r['content_hash'],VERSION))
+                  (VERSION,Jsonb([{'tweet_id':r['tweet_id'],'account_id':r['account_id'],
+                    'posted_at':r['created_at'].isoformat(),'content_hash':r['content_hash']} for r in shortlist])))
             next_id=page['next']
             if page['scanned'] and (not next_id or int(next_id)<=int(after)):
                 raise RuntimeError('invalid_clickhouse_cursor')

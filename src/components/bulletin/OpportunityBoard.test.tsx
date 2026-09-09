@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { OpportunityBoard } from './OpportunityBoard'
 import type { Opportunity } from '@/lib/bulletin/types'
 const offer = {
@@ -32,7 +32,40 @@ jest.mock('@/components/TweetCard', () => ({
 jest.mock('@/components/portal/TweetRow', () => ({
   TweetAvatar: () => <span />,
 }))
-beforeEach(() => window.history.replaceState(null, '', '/opportunities'))
+let intersections: IntersectionObserverCallback[]
+beforeEach(() => {
+  window.history.replaceState(null, '', '/opportunities')
+  intersections = []
+  window.IntersectionObserver = jest.fn((callback) => {
+    intersections.push(callback)
+    return { observe: jest.fn(), disconnect: jest.fn() }
+  }) as unknown as typeof IntersectionObserver
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => ({ id: '1' }) })
+})
+test('loads the original automatically near the viewport without fetching every notice', async () => {
+  render(
+    <OpportunityBoard
+      opportunities={[offer, ask]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  expect(fetch).not.toHaveBeenCalled()
+  await act(async () => {
+    intersections[0](
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    )
+  })
+  expect(fetch).toHaveBeenCalledTimes(1)
+  expect(fetch).toHaveBeenCalledWith(
+    '/api/bulletin/tweet/1',
+    expect.objectContaining({ cache: 'no-store' }),
+  )
+  expect(screen.getByText('Original card')).toBeInTheDocument()
+  expect(screen.queryByText(/Until|On X since/)).not.toBeInTheDocument()
+})
 test('shows ask/offer columns and combines category and search filters', () => {
   render(
     <OpportunityBoard

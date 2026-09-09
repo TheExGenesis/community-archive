@@ -31,42 +31,41 @@ export default async function OpportunitiesPage({
     opportunities = null
   }
   return (
-    <main className="mx-auto min-h-[70vh] w-full min-w-0 max-w-6xl space-y-8 px-4 py-10 sm:px-6">
-      <header className="flex flex-wrap items-start justify-between gap-5">
-        <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Community bulletin
-          </p>
-          <h1 className="mt-2 text-4xl font-semibold tracking-tight">
+    <main className="mx-auto min-h-[70vh] w-full min-w-0 max-w-[1800px] space-y-4 px-4 py-4 sm:px-6">
+      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
             Opportunities
           </h1>
-          <p className="mt-3 text-base leading-7 text-muted-foreground">
-            Find someone to help, something to join, or an offer worth taking
-            up. Asks and offers from the community, collected daily.
+          <p className="hidden text-sm text-muted-foreground sm:block">
+            Asks and offers from the community, collected daily.
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {isAdmin && (
             <Link
               href="/admin/opportunities"
-              className="text-sm text-brand hover:underline"
+              className="text-xs text-brand hover:underline"
             >
-              Run dashboard →
+              <span className="sm:hidden">Runs</span>
+              <span className="hidden sm:inline">Run dashboard →</span>
             </Link>
           )}
           <RefreshButton />
         </div>
       </header>
-      <ViewerForm
-        username={searchParams?.me || personal.username}
-        unavailable={!!searchParams?.me && !personal.available}
-      />
       {opportunities === null ? (
         <div role="alert" className="rounded-lg border p-6">
           Opportunities could not be loaded. Refresh to try again.
         </div>
       ) : (
         <OpportunityBoard
+          viewerControl={
+            <ViewerForm
+              username={searchParams?.me || personal.username}
+              unavailable={!!searchParams?.me && !personal.available}
+            />
+          }
           opportunities={opportunities}
           me={personal.account_id}
           username={personal.username}

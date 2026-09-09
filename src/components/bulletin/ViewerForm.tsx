@@ -22,7 +22,7 @@ export function ViewerForm({
   }, [username])
   return (
     <form
-      className="flex flex-wrap items-end gap-3"
+      className="flex flex-wrap items-center gap-2"
       onSubmit={(event) => {
         event.preventDefault()
         const normalized = handle.trim().replace(/^@/, '')
@@ -37,18 +37,18 @@ export function ViewerForm({
       }}
     >
       <label className="text-sm">
-        See recommendations for
+        <span className="sr-only">See recommendations for</span>
         <input
           name="me"
           value={handle}
           onChange={(event) => setHandle(event.target.value)}
-          placeholder="Your X handle"
+          placeholder="@ Your X handle"
           maxLength={16}
           pattern="@?[A-Za-z0-9_]{1,15}"
-          className="mt-1 block rounded-md border bg-background px-3 py-2"
+          className="h-9 w-40 rounded-md border bg-background px-3 text-sm"
         />
       </label>
-      <button className="rounded-md border px-4 py-2 text-sm">Apply</button>
+      <button className="h-9 rounded-md border px-3 text-sm">Apply</button>
       {unavailable && (
         <p className="text-sm text-muted-foreground">
           No archived follow relationships available for this handle.

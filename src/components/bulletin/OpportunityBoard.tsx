@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTweetBatch } from './useTweetBatch'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { TweetCard } from '@/components/TweetCard'
@@ -16,7 +17,13 @@ const EMPTY_GRAPH: BulletinRelationships = {
   outgoing: {},
   available: false,
 }
-function Original({ id }: { id: string }) {
+function Original({
+  id,
+  loadTweet,
+}: {
+  id: string
+  loadTweet: (id: string) => Promise<PortalTweet>
+}) {
   const container = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
   const [tweet, setTweet] = useState<PortalTweet | null>(null)
@@ -43,20 +50,15 @@ function Original({ id }: { id: string }) {
     if (!visible) return
     const controller = new AbortController()
     setError(false)
-    fetch(`/api/bulletin/tweet/${id}`, {
-      signal: controller.signal,
-      cache: 'no-store',
-    })
-      .then(async (r) => {
-        if (!r.ok) throw new Error()
-        return r.json()
+    loadTweet(id)
+      .then((tweet) => {
+        if (!controller.signal.aborted) setTweet(tweet)
       })
-      .then(setTweet)
       .catch(() => {
         if (!controller.signal.aborted) setError(true)
       })
     return () => controller.abort()
-  }, [id, visible, attempt])
+  }, [id, visible, attempt, loadTweet])
   return (
     <div ref={container} className="min-w-0">
       {tweet ? (
@@ -105,6 +107,8 @@ export function OpportunityBoard({
   graph?: BulletinRelationships
   now?: number
 }) {
+  const loadTweet = useTweetBatch()
+  const [pageSize, setPageSize] = useState({ offer: 6, ask: 6 })
   const [kind, setKind] = useState('all')
   const [search, setSearch] = useState('')
   const [past, setPast] = useState(false)
@@ -150,6 +154,15 @@ export function OpportunityBoard({
         now,
       ),
     [opportunities, kind, past, search, recommended, me, graph, now],
+  )
+  useEffect(() => {
+    setPageSize({ offer: 6, ask: 6 })
+  }, [kind, search, past, recommended])
+  const shown = (['offer', 'ask'] as const).reduce(
+    (count, side) =>
+      count +
+      Math.min(pageSize[side], visible.filter((o) => o.side === side).length),
+    0,
   )
   const own = opportunities.filter((o) => o.account_id === me)
   const answered = opportunities.filter(
@@ -223,6 +236,7 @@ export function OpportunityBoard({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <p role="status">
           {visible.length} of {opportunities.length} notices
+          {shown < visible.length ? ` · ${shown} shown` : ''}
           {opportunities.length === 2000 ? ' · Latest 2,000 only' : ''}
         </p>
         <details>
@@ -266,6 +280,7 @@ export function OpportunityBoard({
             <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               {visible
                 .filter((o) => o.side === side)
+                .slice(0, pageSize[side])
                 .map((o) => {
                   const rel = relationship(o, me, graph)
                   const expired = isPast(o, now)
@@ -274,7 +289,7 @@ export function OpportunityBoard({
                       key={o.tweet_id}
                       className={`min-w-0 overflow-hidden rounded-lg border bg-card ${expired ? 'opacity-60' : ''} ${rel.rank < 3 ? 'border-brand/40' : ''}`}
                     >
-                      <Original id={o.tweet_id} />
+                      <Original id={o.tweet_id} loadTweet={loadTweet} />
                       <div className="h-24 space-y-1 border-t px-3 py-2">
                         <div className="flex items-center justify-between gap-2 text-[11px] leading-4">
                           <span className="rounded bg-muted px-1.5 py-0.5 font-medium text-muted-foreground">
@@ -298,6 +313,17 @@ export function OpportunityBoard({
                   )
                 })}
             </div>
+            {visible.filter((o) => o.side === side).length > pageSize[side] && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() =>
+                  setPageSize((size) => ({ ...size, [side]: size[side] + 6 }))
+                }
+              >
+                Load more {side === 'offer' ? 'offers' : 'asks'}
+              </Button>
+            )}
             {!visible.some((o) => o.side === side) && (
               <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
                 No matching {side === 'offer' ? 'offers' : 'asks'}.

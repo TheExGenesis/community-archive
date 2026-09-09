@@ -34,6 +34,7 @@ jest.mock('@/components/portal/TweetRow', () => ({
 }))
 let intersections: IntersectionObserverCallback[]
 beforeEach(() => {
+  jest.useFakeTimers()
   window.history.replaceState(null, '', '/opportunities')
   intersections = []
   window.IntersectionObserver = jest.fn((callback) => {
@@ -42,8 +43,12 @@ beforeEach(() => {
   }) as unknown as typeof IntersectionObserver
   global.fetch = jest
     .fn()
-    .mockResolvedValue({ ok: true, json: async () => ({ id: '1' }) })
+    .mockResolvedValue({
+      ok: true,
+      json: async () => ({ tweets: [{ id: '1' }, { id: '2' }] }),
+    })
 })
+afterEach(() => jest.useRealTimers())
 test('loads the original automatically near the viewport without fetching every notice', async () => {
   render(
     <OpportunityBoard
@@ -58,9 +63,12 @@ test('loads the original automatically near the viewport without fetching every 
       {} as IntersectionObserver,
     )
   })
+  await act(async () => {
+    jest.advanceTimersByTime(25)
+  })
   expect(fetch).toHaveBeenCalledTimes(1)
   expect(fetch).toHaveBeenCalledWith(
-    '/api/bulletin/tweet/1',
+    '/api/bulletin/tweets?ids=1',
     expect.objectContaining({ cache: 'no-store' }),
   )
   expect(screen.getByText('Original card')).toBeInTheDocument()
@@ -94,4 +102,66 @@ test('past toggle includes expired notices and preserves filters in the URL', ()
   expect(screen.getByRole('status')).toHaveTextContent('1 of 1 notices')
   expect(window.location.hash).toContain('past=1')
   expect(screen.getByText('Help with Python')).toBeInTheDocument()
+})
+
+test('coalesces visible cards into one request and reuses loaded cards after filtering', async () => {
+  render(
+    <OpportunityBoard
+      opportunities={[offer, ask]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  await act(async () => {
+    for (const callback of intersections)
+      callback(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      )
+  })
+  await act(async () => {
+    jest.advanceTimersByTime(25)
+  })
+  expect(fetch).toHaveBeenCalledTimes(1)
+  expect(fetch).toHaveBeenCalledWith(
+    '/api/bulletin/tweets?ids=1,2',
+    expect.any(Object),
+  )
+  expect(screen.getAllByText('Original card')).toHaveLength(2)
+  fireEvent.click(screen.getByRole('button', { name: 'Help 1' }))
+  fireEvent.click(screen.getByRole('button', { name: 'All categories 2' }))
+  await act(async () => {
+    intersections[intersections.length - 1](
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    )
+  })
+  await act(async () => {
+    jest.advanceTimersByTime(25)
+  })
+  expect(fetch).toHaveBeenCalledTimes(1)
+})
+
+test('pages cards while search and counts still cover all notices', () => {
+  const notices = Array.from({ length: 14 }, (_, i) => ({
+    ...offer,
+    tweet_id: String(i + 1),
+    summary: `Offer number ${i + 1}`,
+  }))
+  render(
+    <OpportunityBoard
+      opportunities={notices}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  expect(screen.getByRole('status')).toHaveTextContent('14 of 14 notices')
+  expect(screen.getAllByRole('article')).toHaveLength(6)
+  fireEvent.click(screen.getByRole('button', { name: 'Load more offers' }))
+  expect(screen.getAllByRole('article')).toHaveLength(12)
+  fireEvent.change(screen.getByLabelText('Search opportunities'), {
+    target: { value: 'Offer number 14' },
+  })
+  expect(screen.getByText('Offer number 14')).toBeInTheDocument()
+  expect(
+    screen.queryByRole('button', { name: 'Load more offers' }),
+  ).not.toBeInTheDocument()
 })

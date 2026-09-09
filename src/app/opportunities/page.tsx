@@ -17,14 +17,11 @@ export const metadata: Metadata = {
 
 export default async function OpportunitiesPage() {
   await requireOpportunityUser()
-  const isAdmin = await isBulletinAdmin()
-  const personal = await loadBulletinRelationships()
-  let opportunities
-  try {
-    opportunities = await loadOpportunities()
-  } catch {
-    opportunities = null
-  }
+  const [isAdmin, personal, opportunities] = await Promise.all([
+    isBulletinAdmin(),
+    loadBulletinRelationships(),
+    loadOpportunities().catch(() => null),
+  ])
   return (
     <main className="mx-auto min-h-[70vh] w-full min-w-0 max-w-[1800px] space-y-4 px-4 py-4 sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
@@ -59,6 +56,7 @@ export default async function OpportunitiesPage() {
         </div>
       ) : (
         <OpportunityBoard
+          key={Date.now()}
           opportunities={opportunities}
           me={personal.account_id}
           username={personal.username}

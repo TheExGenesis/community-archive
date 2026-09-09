@@ -1,4 +1,5 @@
 import { createHash } from 'crypto'
+import { GET as BATCH_GET } from '@/app/api/bulletin/tweets/route'
 import { GET } from '@/app/api/bulletin/tweet/[id]/route'
 import {
   loadBulletinBoardState,
@@ -101,4 +102,70 @@ test.each([
   const result = await call()
   expect(result.status).toBe(reason === 'missing notice' ? 404 : 503)
   expect(await result.json()).not.toHaveProperty('text')
+})
+
+test('a batch shares policy/source reads and suppresses a changed tweet independently', async () => {
+  const other = { ...notice, tweet_id: '124' }
+  jest
+    .mocked(loadBulletinBoardState)
+    .mockResolvedValue({ notices: [notice, other] })
+  jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
+    data: [
+      {
+        ...notice,
+        full_text: 'Offer: help',
+        reply_to_tweet_id: null,
+        retweet: false,
+      },
+      {
+        ...other,
+        full_text: 'Offer: help',
+        reply_to_tweet_id: null,
+        retweet: false,
+      },
+    ],
+  })
+  jest
+    .mocked(fetchClickHouseTweetPageData)
+    .mockImplementation(async (id) => ({
+      ...detail,
+      tweet_id: id,
+      full_text: id === '124' ? 'changed' : detail.full_text,
+    }))
+  const response = await BATCH_GET(
+    new Request('http://localhost/api/bulletin/tweets?ids=123,124'),
+  )
+  expect(response.status).toBe(200)
+  expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+  expect(await response.json()).toMatchObject({ tweets: [{ id: '123' }] })
+  expect(loadBulletinBoardState).toHaveBeenCalledTimes(1)
+  expect(fetchAnalyticsGatewayJson).toHaveBeenCalledTimes(1)
+  expect(fetchAnalyticsGatewayJson).toHaveBeenCalledWith(
+    ['bulletin-sources'],
+    new URLSearchParams({ ids: '123,124' }),
+  )
+})
+
+test.each(['', 'bad', '1,2,3,4,5,6,7,8,9'])(
+  'rejects invalid or oversized batches before reads: %s',
+  async (ids) => {
+    expect(
+      (
+        await BATCH_GET(
+          new Request('http://localhost/api/bulletin/tweets?ids=' + ids),
+        )
+      ).status,
+    ).toBe(400)
+    expect(loadBulletinBoardState).not.toHaveBeenCalled()
+    expect(fetchAnalyticsGatewayJson).not.toHaveBeenCalled()
+  },
+)
+
+test('batch reads require authentication', async () => {
+  jest.mocked(requireOpportunityUser).mockRejectedValue(new Error('Sign in'))
+  await expect(
+    BATCH_GET(new Request('http://localhost/api/bulletin/tweets?ids=123')),
+  ).rejects.toThrow('Sign in')
+  expect(loadBulletinBoardState).not.toHaveBeenCalled()
+  expect(fetchAnalyticsGatewayJson).not.toHaveBeenCalled()
 })

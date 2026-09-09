@@ -1,9 +1,14 @@
+import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
+import { createHash } from 'crypto'
 import type { User } from '@supabase/supabase-js'
 import { loadOpportunities, loadRunDashboard } from './data'
 import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { getAdminClient } from '@/app/admin/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
+jest.mock('@/lib/clickhouseGateway', () => ({
+  fetchAnalyticsGatewayJson: jest.fn(),
+}))
 jest.mock('@/lib/localAdminPreview', () => ({
   getLocalAdminPreview: jest.fn(),
 }))
@@ -45,8 +50,8 @@ test('verified members read the policy-aware RPC, with upstream errors kept dist
     .mockResolvedValueOnce({ data: [], error: null })
     .mockResolvedValueOnce({ data: null, error: { message: 'unavailable' } })
   await expect(loadOpportunities()).resolves.toEqual([])
-  expect(rpc).toHaveBeenCalledWith('get_bulletin_opportunities', {
-    max_results: 200,
+  expect(rpc).toHaveBeenCalledWith('get_bulletin_board_state', {
+    max_results: 2000,
   })
   await expect(loadOpportunities()).rejects.toThrow('could not be loaded')
 })
@@ -91,4 +96,33 @@ test('signed-out local preview still requires login', async () => {
   jest.mocked(getCurrentUser).mockResolvedValue(null)
   await expect(loadOpportunities()).rejects.toThrow('redirect:/login')
   expect(createServerServiceRoleClient).not.toHaveBeenCalled()
+})
+
+test('ClickHouse source changes suppress a notice and upstream outages fail the board', async () => {
+  jest
+    .mocked(getCurrentUser)
+    .mockResolvedValue({ id: 'member', is_anonymous: false } as User)
+  const hash = createHash('sha256').update('original').digest('hex')
+  rpc.mockResolvedValue({
+    data: [{ tweet_id: '1', account_id: '10', content_hash: hash }],
+    error: null,
+  })
+  jest
+    .mocked(fetchAnalyticsGatewayJson)
+    .mockResolvedValue({
+      data: [
+        {
+          tweet_id: '1',
+          account_id: '10',
+          full_text: 'edited',
+          reply_to_tweet_id: null,
+          retweet: false,
+        },
+      ],
+    })
+  await expect(loadOpportunities()).resolves.toEqual([])
+  jest
+    .mocked(fetchAnalyticsGatewayJson)
+    .mockRejectedValue(new Error('unavailable'))
+  await expect(loadOpportunities()).rejects.toThrow('unavailable')
 })

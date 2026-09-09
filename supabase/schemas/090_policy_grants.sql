@@ -194,3 +194,12 @@ REVOKE ALL ON FUNCTION public.get_bulletin_prompts(bigint) FROM PUBLIC,anon,auth
 REVOKE ALL ON FUNCTION public.save_bulletin_prompt(bigint,text,text,uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.get_bulletin_prompts(bigint) TO service_role;
 GRANT EXECUTE ON FUNCTION public.save_bulletin_prompt(bigint,text,text,uuid) TO service_role;
+
+ALTER TABLE bulletin.scans ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON bulletin.scans FROM PUBLIC,anon,authenticated;
+GRANT SELECT,INSERT,UPDATE,DELETE ON bulletin.scans TO service_role;
+REVOKE ALL ON FUNCTION public.get_bulletin_board_state(integer) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_bulletin_board_state(integer) TO service_role;
+
+REVOKE ALL ON FUNCTION public.get_bulletin_relationships(text,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_bulletin_relationships(text,text) TO service_role;

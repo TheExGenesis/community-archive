@@ -26,31 +26,42 @@ const ask = {
   summary: 'Feedback on a garden',
   topics: ['gardening'],
 }
-test('combines side, category and search filters, then resets them', () => {
-  render(<OpportunityBoard opportunities={[offer, ask]} />)
-  expect(screen.getByRole('status')).toHaveTextContent('2 of 2 notices')
-  fireEvent.click(screen.getByRole('button', { name: 'Asks' }))
-  expect(screen.queryByText('Help with Python')).not.toBeInTheDocument()
-  fireEvent.change(screen.getByLabelText('Category'), {
-    target: { value: 'help' },
-  })
-  expect(screen.getByText('No matching notices')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
-  fireEvent.change(screen.getByLabelText('Search opportunities'), {
-    target: { value: 'python' },
-  })
-  expect(screen.getByRole('status')).toHaveTextContent('1 of 2 notices')
-  expect(
-    screen.getByRole('link', { name: /View original post/ }),
-  ).toHaveAttribute(
-    'href',
-    expect.stringContaining('/tweets/1?from=opportunities'),
+jest.mock('@/components/TweetCard', () => ({
+  TweetCard: () => <div>Original card</div>,
+}))
+jest.mock('@/components/portal/TweetRow', () => ({
+  TweetAvatar: () => <span />,
+}))
+beforeEach(() => window.history.replaceState(null, '', '/opportunities'))
+test('shows ask/offer columns and combines category and search filters', () => {
+  render(
+    <OpportunityBoard
+      opportunities={[offer, ask]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
   )
+  expect(screen.getByRole('region', { name: 'Offers' })).toBeInTheDocument()
+  expect(screen.getByRole('region', { name: 'Asks' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Help 1' }))
+  expect(screen.queryByText('Feedback on a garden')).not.toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Search opportunities'), {
+    target: { value: 'gardening' },
+  })
+  expect(screen.getByRole('status')).toHaveTextContent('0 of 2 notices')
 })
-test('empty state is different from a search with no matches', () => {
-  render(<OpportunityBoard opportunities={[]} />)
-  expect(screen.getByText('No opportunities yet')).toBeInTheDocument()
-  expect(
-    screen.queryByRole('button', { name: 'Clear filters' }),
-  ).not.toBeInTheDocument()
+test('past toggle includes expired notices and preserves filters in the URL', () => {
+  render(
+    <OpportunityBoard
+      opportunities={[{ ...offer, expires_at: '2026-09-01' }]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  expect(screen.getByRole('status')).toHaveTextContent('0 of 1 notices')
+  fireEvent.click(screen.getByLabelText('Show past notices'))
+  expect(screen.getByRole('status')).toHaveTextContent('1 of 1 notices')
+  expect(window.location.hash).toContain('past=1')
+  expect(screen.getByRole('link', { name: /Send a DM on X/ })).toHaveAttribute(
+    'href',
+    'https://x.com/alice/status/1',
+  )
 })

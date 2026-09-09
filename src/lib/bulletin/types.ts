@@ -2,10 +2,21 @@ import type { Database } from '@/database-types'
 
 export type Opportunity = Omit<
   Database['public']['Functions']['get_bulletin_opportunities']['Returns'][number],
-  'full_text' | 'model'
->
+  'full_text' | 'model' | 'expires_at' | 'place'
+> & {
+  expires_at: string | null
+  place: string | null
+  account_created_at?: string | null
+  display_name?: string
+  avatar_url?: string | null
+  replies?: number
+  quotes?: number
+  reply_account_ids?: string[]
+  renewed_at?: string | null
+}
 export type RunCounts = Partial<
   Record<
+    | 'eligible_originals'
     | 'rows_seen'
     | 'candidates_seen'
     | 'calls'
@@ -16,7 +27,12 @@ export type RunCounts = Partial<
     | 'pending',
     number
   >
->
+> & {
+  source?: string
+  window_start?: string
+  window_end?: string
+  scan_key?: string
+}
 export type BulletinRun = {
   id: string
   started_at: string

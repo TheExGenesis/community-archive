@@ -3,9 +3,11 @@ import Link from 'next/link'
 import {
   isBulletinAdmin,
   loadOpportunities,
+  loadBulletinRelationships,
   requireOpportunityUser,
 } from '@/lib/bulletin/data'
 import { OpportunityBoard } from '@/components/bulletin/OpportunityBoard'
+import { ViewerForm } from '@/components/bulletin/ViewerForm'
 import { RefreshButton } from '@/components/bulletin/RefreshButton'
 
 export const dynamic = 'force-dynamic'
@@ -14,9 +16,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-export default async function OpportunitiesPage() {
+export default async function OpportunitiesPage({
+  searchParams,
+}: {
+  searchParams?: { me?: string }
+}) {
   await requireOpportunityUser()
   const isAdmin = await isBulletinAdmin()
+  const personal = await loadBulletinRelationships(searchParams?.me)
   let opportunities
   try {
     opportunities = await loadOpportunities()
@@ -50,12 +57,22 @@ export default async function OpportunitiesPage() {
           <RefreshButton />
         </div>
       </header>
+      <ViewerForm
+        username={searchParams?.me || personal.username}
+        unavailable={!!searchParams?.me && !personal.available}
+      />
       {opportunities === null ? (
         <div role="alert" className="rounded-lg border p-6">
           Opportunities could not be loaded. Refresh to try again.
         </div>
       ) : (
-        <OpportunityBoard opportunities={opportunities} />
+        <OpportunityBoard
+          opportunities={opportunities}
+          me={personal.account_id}
+          username={personal.username}
+          graph={personal}
+          now={Date.now()}
+        />
       )}
       <details className="rounded-lg border bg-card p-5 text-sm text-muted-foreground">
         <summary className="cursor-pointer font-medium text-foreground">
@@ -71,8 +88,10 @@ export default async function OpportunitiesPage() {
         <p className="mt-2 leading-6">
           This is a selection, not a complete directory. Replies, reposts, posts
           arriving more than two days late, and notices without matching phrases
-          can be missed. Explicitly expired notices disappear; undated notices
-          disappear after 30 days unless marked ongoing.
+          can be missed. The daily scan covers the previous two UTC days in
+          ClickHouse. Undated asks expire after 14 days and offers after 60
+          days; standing offers stay open. Use “Show past notices” to include
+          expired notices.
         </p>
       </details>
     </main>

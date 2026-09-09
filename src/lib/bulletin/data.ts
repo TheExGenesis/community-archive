@@ -4,9 +4,11 @@ import { getCurrentUser } from '@/lib/portal/auth'
 import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { getAdminClient, requireAdmin, checkIsAdmin } from '@/app/admin/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
+import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
+import { createHash } from 'crypto'
 import type { Opportunity, RunDashboard } from './types'
 
-export const OPPORTUNITY_LIMIT = 200
+export const OPPORTUNITY_LIMIT = 2000
 export const RUN_PAGE_SIZE = 25
 
 export async function requireOpportunityUser() {
@@ -19,15 +21,80 @@ export async function requireOpportunityUser() {
 }
 export async function loadOpportunities(): Promise<Opportunity[]> {
   await requireOpportunityUser()
-  const { data, error } = await createServerServiceRoleClient().rpc(
-    'get_bulletin_opportunities',
-    { max_results: OPPORTUNITY_LIMIT },
-  )
-  if (error) throw new Error('Opportunities could not be loaded')
-  return (data ?? []).map(
-    ({ full_text: _text, model: _model, ...notice }) => notice,
-  )
+  const { notices, allowedAccounts } = await loadBulletinBoardState()
+  const result: Opportunity[] = []
+  for (let offset = 0; offset < notices.length; offset += 100) {
+    const batch = notices.slice(offset, offset + 100)
+    const response = await fetchAnalyticsGatewayJson<{
+      data: Array<{
+        tweet_id: string
+        account_id: string
+        full_text: string
+        reply_to_tweet_id: string | null
+        retweet: boolean
+        created_at: string
+        username: string
+        display_name: string
+        account_created_at: string | null
+        avatar_url: string | null
+        replies: number
+        quotes: number
+        reply_account_ids: string[]
+        renewed_at: string | null
+      }>
+    }>(
+      ['bulletin-sources'],
+      new URLSearchParams({
+        ids: batch.map((o) => o.tweet_id).join(','),
+        enrich: 'true',
+      }),
+      { timeoutMs: 60000 },
+    )
+    const sources = new Map(response.data.map((row) => [row.tweet_id, row]))
+    for (const notice of batch) {
+      const source = sources.get(notice.tweet_id)
+      if (
+        !source ||
+        (notice.account_id
+          ? source.account_id !== notice.account_id
+          : !allowedAccounts?.includes(source.account_id)) ||
+        source.reply_to_tweet_id ||
+        source.retweet ||
+        source.full_text.startsWith('RT @') ||
+        createHash('sha256').update(source.full_text).digest('hex') !==
+          notice.content_hash
+      )
+        continue
+      result.push({
+        tweet_id: notice.tweet_id,
+        account_id: source.account_id,
+        username: source.username,
+        posted_at: utc(source.created_at),
+        side: notice.side,
+        kind: notice.kind,
+        summary: notice.summary,
+        evidence: notice.evidence,
+        topics: notice.topics,
+        respond: notice.respond,
+        standing: notice.standing,
+        expires_at: notice.expires_at,
+        place: notice.place,
+        display_name: source.display_name,
+        account_created_at: source.account_created_at,
+        avatar_url: source.avatar_url,
+        replies: source.replies,
+        quotes: source.quotes,
+        reply_account_ids: source.reply_account_ids,
+        renewed_at: source.renewed_at ? utc(source.renewed_at) : null,
+      })
+    }
+  }
+  return result
 }
+function utc(value: string) {
+  return /Z$|[+-]\d\d:\d\d$/.test(value) ? value : value.replace(' ', 'T') + 'Z'
+}
+
 export async function isBulletinAdmin() {
   return (await getLocalAdminPreview()) === 'admin' || (await checkIsAdmin())
 }
@@ -63,4 +130,53 @@ export async function loadRunDashboard(before?: string): Promise<RunDashboard> {
   })
   if (error || !data) throw new Error('Run history could not be loaded')
   return data as unknown as RunDashboard
+}
+
+export async function loadBulletinRelationships(handle?: string) {
+  const user = await requireOpportunityUser()
+  const me = String(user?.app_metadata?.provider_id || '')
+  const empty = {
+    account_id: me,
+    username: '',
+    following: [] as string[],
+    followers: [] as string[],
+    available: false,
+  }
+  if (process.env.BULLETIN_FOLLOW_SOURCE !== 'supabase') return empty
+  handle = handle?.replace(/^@/, '')
+  if (handle && !/^[A-Za-z0-9_]{1,15}$/.test(handle)) return empty
+  const { data, error } = await createServerServiceRoleClient().rpc(
+    'get_bulletin_relationships',
+    handle ? { viewer_username: handle } : { viewer_account_id: me },
+  )
+  if (error || !data) return empty
+  return data as unknown as typeof empty
+}
+
+export type StoredNotice = Opportunity & { content_hash: string }
+export async function loadBulletinBoardState(): Promise<{
+  notices: StoredNotice[]
+  allowedAccounts?: string[]
+}> {
+  await requireOpportunityUser()
+  if (
+    (await getLocalAdminPreview()) === 'admin' &&
+    process.env.BULLETIN_LOCAL_BOARD_PREVIEW_URL
+  ) {
+    const url = new URL(process.env.BULLETIN_LOCAL_BOARD_PREVIEW_URL)
+    if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1')
+      throw new Error('Invalid local board preview URL')
+    const response = await fetch(url, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(20000),
+    })
+    if (!response.ok) throw new Error('Local board snapshot unavailable')
+    return response.json()
+  }
+  const { data, error } = await createServerServiceRoleClient().rpc(
+    'get_bulletin_board_state',
+    { max_results: OPPORTUNITY_LIMIT },
+  )
+  if (error) throw new Error('Opportunities could not be loaded')
+  return { notices: (data ?? []) as unknown as StoredNotice[] }
 }

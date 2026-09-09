@@ -1,221 +1,169 @@
-# Private Bulletin opportunities
+# Community Bulletin
 
-One daily worker runs **after the existing autorefresh pipeline succeeds**.
-It uses the measured Bulletin phrase filter, then asks OpenRouter's
-`z-ai/glm-5.3-flash` to classify each new candidate. The website serves `/opportunities` to verified signed-in users and
-`/admin/opportunities` to the existing admin allowlist.
+Signed-in members use `/opportunities`; the existing admin allowlist controls
+`/admin/opportunities`. The worker runs after the daily autorefresh succeeds.
 
-## Storage and website access
+## Data and privacy
 
-- `bulletin.opportunities`: confirmed asks/offers, category, summary, exact
-  evidence, topics, response method, location, expiry and model.
-- `bulletin.decisions`: pending work plus positive/negative results, keyed by
-  tweet ID, source-text hash and classifier version. Unchanged text is not billed again.
-- `bulletin.calls`: durable cost reservations and reported costs. It retains
-  no tweet IDs, authored text or account data.
-- `bulletin.worker_state`: intake cursor, last run, result counts and health.
-- `bulletin.runs`: durable per-run aggregate counts, timestamps, status and model.
-  Calls link to runs for reported cost and unpriced reservations. No tweet or
-  author identifiers are stored in run history.
+**All Bulletin tweet reads use ClickHouse**, through two authenticated gateway
+routes: `bulletin-tweets` (bounded scan) and `bulletin-sources` (current source and
+public reply/quote evidence). Expanding a notice uses the existing ClickHouse
+tweet-detail adapter and canonical TweetCard, including media and quoted tweets.
+Bulletin archive-permalink links also require ClickHouse, even when the general
+website read flag is disabled. There is no Bulletin PostgreSQL tweet fallback.
 
-The `bulletin` schema is not exposed through the Data API. Browser roles have
-no schema/table privileges and all five tables have RLS enabled. The website's
-**server-side service-role client** can call:
+Supabase holds private decisions, opportunities, cost reservations, scan cursors,
+run history and immutable prompt versions. It remains authoritative for auth,
+membership, consent and scrape blocks. The gateway requires a fresh membership
+projection; the worker and board additionally check current Supabase policy.
+The decisions table no longer requires a matching PostgreSQL tweet row.
+Only derived notices and source hashes are stored, not a second tweet corpus.
 
-```ts
-const { data, error } = await serviceRoleClient.rpc(
-  'get_bulletin_opportunities', { max_results: 50 }
-)
-```
+Browser roles cannot access the `bulletin` schema or its service-only RPCs.
+Server routes verify the session before fetching private state. Opt-outs during
+a model call suppress publication. Every board read verifies current ClickHouse
+content, author, original-post status and hash. Missing, edited or deleted sources
+are hidden. Derived records may remain privately stored until reconciliation;
+physical source deletion no longer cascades across databases. Costs contain no
+tweet identifiers and remain available for budget accounting.
 
-Deployed pages authorize with the existing server-verified `getCurrentUser()`
-before calling the RPC, and do not accept member-preview cookies as authorization.
-Local development also supports the existing `LOCAL_ADMIN_PREVIEW` read-only
-convention: development mode, a loopback Host, and no Vercel deployment. It
-neither fabricates an Auth user nor grants write access. For local review before
-run-history rollout, `BULLETIN_LOCAL_RUN_PREVIEW_URL` can point to a read-only
-`http://127.0.0.1` status bridge. The UI explicitly labels its production snapshot;
-this fallback is never used on a deployed website.
-The board shows up to the latest 200 currently active notices, with filters over
-that displayed set. It links to the existing full tweet detail renderer rather
-than duplicating its media and quote logic. Reads are dynamic, private/no-store
-and noindex. Only summary fields and exact evidence reach the client board.
+`BULLETIN_FOLLOW_SOURCE=supabase` enables the original app's recommendation method
+using archived follower/following lists. It is deliberately opt-in pending the
+follow-source decision. Both directions of each relationship are combined,
+restricted to currently allowed members. These are historical observations, not
+live X follow state. Without that source the UI explicitly falls back to own
+notices and newest, and does not invent social recommendations.
 
-The admin page calls `get_bulletin_runs(before_id,max_results)` only after the
-existing `getAdminClient()` gate. Run history uses numeric-ID keyset pagination,
-25 runs per page. Each run records rows scanned, phrase candidates, AI calls,
-positive and negative decisions, failures, suppression and ending queue size.
-Scan overlap means counts are not unique tweets over multiple days. Candidates
-include cached matches; AI calls can include older queued work and retries.
-Positive counts are saved decisions, not today's visible board size.
+## Method and coverage
 
-History starts with the updated worker; earlier runs are not reconstructed.
-Progress persists after each scan page and each model call. Stopped workers keep
-partial counts: the UI flags a running row older than 25 minutes, and the next
-worker holding the shared lock marks the prior row interrupted. Interrupted runs
-have no invented finish timestamp. The dashboard exposes costs and read-only
-refresh, not controls that initiate paid calls.
+1. Page all distinct ClickHouse tweet IDs in the run's posting-date window.
+2. Re-read their latest content and keep eligible originals: permitted community
+   authors, live posts, no replies, no reposts.
+3. Apply the pinned upstream phrase patterns and cleaning gate (minimum 25
+   cleaned characters). Those matches are the candidates.
+4. Reuse unchanged positive/negative decisions; send remaining candidates to
+   `z-ai/glm-5.3-flash` through OpenRouter with the run's pinned prompt.
+5. Validate the result and exact evidence substring, recheck policy and source,
+   then save a positive or negative decision.
 
-Never call this using a browser service key or expose the table directly.
-This RPC rechecks current membership, explicit opt-outs, scrape blocks,
-tombstones, source text, reply/retweet status and expiry before returning data.
-Original tweet text comes from `public.tweets`; the worker does not keep a second
-copy. Physical source deletion cascades to decisions and opportunities. A daily
-cleanup removes derived data for tombstones and accounts no longer eligible.
-Undated, non-standing notices age out of reads after 30 days; explicit end dates
-are inclusive in UTC. The table retains expired records for private inspection.
+Daily runs scan the previous **two complete UTC days**. Each day gets a distinct
+scan key, so the overlap catches late arrivals without rebilling unchanged text.
+Posts arriving more than two days late need an explicit replay. Backfills have
+separate fixed windows and durable cursors; they do not advance the daily cursor.
+Use `--rescan` to revisit an already completed window after late arrivals or edits;
+its cached decisions and cumulative cost cap remain intact. A page's decision
+writes and cursor advance commit together. Empty returned
+member content does not end a scan: the source-ID cursor advances across holes.
+A zero source-ID page marks intake complete. A successful run also requires no
+unresolved decisions in the queue. An intake-complete cursor alone does not mean
+classification completed.
 
-## Intake and limits
+A run reads at most 100 pages of 500 IDs, makes at most 50 model calls, and has a
+15-minute soft / 20-minute systemd limit. Partial scans resume with the same
+window. Run counts show scanned source IDs, eligible originals, phrase matches,
+model calls, positives, negatives and unresolved work. Counts across overlapping
+runs are not unique totals. Old PostgreSQL runs remain labeled as legacy.
 
-The first run starts with the previous 24 hours of `tweets.updated_at`. Later
-runs use a saved `(updated_at, tweet_id)` cursor over a bounded recent-tweet set, so
-changes from all PostgreSQL ingestion sources can be seen after autorefresh.
-Only tweets posted within the two days before each scan boundary can become new
-candidates; the existing created-at index bounds the read. This avoids historical
-engagement updates and is not a backfill. Tweets arriving later than two days,
-and gaps after prolonged outages, need a separately scoped replay. A one-hour overlap covers ordinary late commits. Transactions
-that commit more than an hour after their update timestamp need a separately
-scoped replay. ClickHouse-only records are outside this initial worker's scope.
+Coverage is **the available ClickHouse projection**, not all tweets published on
+X. Missing ingestion, late arrivals, replies/reposts, phrase-filter misses and
+model mistakes limit recall. We have not measured how many genuine opportunities
+the filters miss; that would require a separately scoped random-sample audit.
 
-Each run scans at most 100,000 updated rows, in pages of 1,000, with a 30-second
-statement timeout. Partial intake saves its cursor and resumes next run.
-The worker requires current PostgreSQL membership and consent; no snapshot from
-the earlier local experiment is used. The exact pinned upstream DuckDB RE2
-patterns and Python cleaning gate live in `upstream_filter.py`.
+## Board behavior
 
-One advisory lock prevents overlapping workers. Classification has at most 50
-calls and a 15-minute soft runtime limit (20-minute systemd limit), 60 seconds
-per request, and 2,048 output tokens including reasoning. It sends original text
-and treats tweet content as data. Positive output must contain an exact source
-substring and pass type/category/date checks before publication.
+The board has offer/ask columns, category counts, search, recommended/newest
+sorting, past notices and expandable originals. Category, sort and past filters
+are preserved in the URL hash; the optional recommendation handle is a query
+parameter. The verified signed-in account is the default viewer.
 
-Application budgets are **$0.10/day and $1/calendar month**, UTC, with 10% headroom.
-Admission reserves an upper estimate before every call, then uses OpenRouter's
-reported cost where available. Ambiguous/time-out requests keep their reservation.
-OpenRouter routing is restricted to this model, no provider fallback, and maximum
-prices of $0.15 input / $0.50 output per million tokens. No automatic price/model
-escalation. Retries wait at least an hour, stop after three attempts per unchanged
-input, and share the same budget. Exhausted/failed work remains visible in the queue.
-Do not clear the call ledger to reset spending. These are application limits,
-not an OpenRouter account-level hard cap.
+Recommended order: own notices, mutuals, one-way follows, everyone else; newest
+within each group. Active notices precede past notices. Undated asks expire after
+14 days and offers after 60 days; standing notices do not expire. An explicit
+expiry date is inclusive in UTC. An archived self-quote renews the default
+undated lifetime, but does not override an explicit expiry date.
 
-## Deployment and credential handling
+Cards link to X for responding and to a prefilled GitHub issue for corrections.
+Neither link sends anything automatically. Counts cover distinct archived member
+repliers and quote posts, not DMs, successful outcomes or all X engagement.
+Personal activity covers only the notices loaded on this board. At most the
+latest 2,000 saved notices are loaded; the UI states when that cap is reached.
 
-Owner: Community Archive backend; host: `ca-autorefresh` (`95.217.12.23`).
-Source: `services/bulletin/` in the Community Archive repository.
-Install immutable release files under `/opt/community-archive-bulletin/releases/`
-and point `/opt/community-archive-bulletin/current` at the chosen release.
+## Prompts and budgets
 
-`ca-bulletin.service` is a oneshot with one CPU, 512 MiB memory, a private temp
-directory and restricted file permissions. PostgreSQL settings are read at
-runtime from `/root/CA_autorefresh/.env.prod`. The OpenRouter key is supplied by
-systemd's `LoadCredentialEncrypted`, named `openrouter_api_key`, from
-`/etc/credstore.encrypted/ca-bulletin-openrouter`. Keep plaintext out of argv,
-logs and persisted files; provision the encrypted secret only with authorization.
+Admins append prompt versions with a change note; history is immutable and
+stale concurrent edits fail. Each run pins one version at startup. Mid-run edits
+affect later runs only. Changing a prompt does not reclassify cached decisions.
+The dashboard displays each run's actual pinned prompt. Older runs without that
+metadata say so rather than inventing attribution.
 
-The daily cron keeps its existing 03:00 UTC schedule, working directory and
-pipeline lock. Only its command changes to:
+Normal admission limits are $0.10/day and $1/calendar month, UTC, with 10%
+headroom. Calls reserve a conservative maximum first; ambiguous or timed-out
+calls retain that reservation. Retries wait an hour and stop after three
+attempts per unchanged input. Model routing forbids fallback or price escalation
+and caps prices at $0.15 input / $0.50 output per million tokens.
+
+An explicitly approved backfill can use `--backfill-budget-usd` (at most $1).
+Its cap is cumulative across runs of the exact same window. The monthly cap
+still applies. Approved backfill calls are separate from normal daily admission;
+never clear the cost ledger to reset spending.
 
 ```sh
-python3 /opt/community-archive-bulletin/current/after_autorefresh.py \
-  --pipeline-root /opt/community-archive-canonical-autorefresh/releases/69deae9ad3c880d9e7823bcca42c664c1b219c0c
+# Scan only; no model calls. Repeat to resume a bounded partial scan.
+uv run worker.py --start 2026-08-26 --end 2026-09-09 --enqueue-only
+# After approval of the one-time cap; repeat until complete, respecting retries.
+uv run worker.py --start 2026-08-26 --end 2026-09-09 --backfill-budget-usd 1
 ```
 
-The wrapper runs the same `uv run --env-file .env.prod run_pipeline.py` first;
-only exit code zero starts Bulletin. It never reruns the scraper to retry a
-failed Bulletin job. For a manual Bulletin-only retry, use
-`systemctl start ca-bulletin.service`.
+## Runtime and rollout
 
-## Health, alerts, and rollback
+Owner: Community Archive backend. Existing worker host: `ca-autorefresh`
+(`95.217.12.23`), unit `ca-bulletin.service`, invoked after autorefresh succeeds.
+The wrapper never reruns scraping to retry Bulletin. Service failure invokes the
+existing journal failure unit. Inspect unit status, last-success age, queue and
+run dashboard; investigate non-complete status or freshness older than 36 hours.
 
-Check `systemctl status ca-bulletin.service` and `journalctl -u ca-bulletin.service`.
-Failure invokes `ca-bulletin-failure.service`, which writes a `daemon.err` journal
-alert. There is no external email/Slack notification configured by this change.
-The worker logs aggregate counts and error types only. Inspect its private state:
+The immutable release lives beneath `/opt/community-archive-bulletin/releases/`
+with a `current` symlink. PostgreSQL policy/state settings are read at runtime
+from `/root/CA_autorefresh/.env.prod`; the OpenRouter key remains in the existing
+systemd credential `openrouter_api_key`. Add server-only
+`CLICKHOUSE_ANALYTICS_API_URL` and `CLICKHOUSE_ANALYTICS_API_TOKEN` to the worker
+runtime and website configuration. Do not reuse the retired port-18123 sink URL.
+Never put these values in browser variables, source files, argv or logs.
 
-```sql
-SELECT status,last_started_at,last_finished_at,last_success_at,counts
-FROM bulletin.worker_state;
-SELECT status,count(*) FROM bulletin.decisions GROUP BY status;
-SELECT count(*) FROM public.get_bulletin_opportunities(200);
-```
+Rollout dependencies, in order:
 
-Investigate any non-`ok` result, failed systemd unit, or successful timestamp
-older than 36 hours. Check autorefresh first if no run started; an unsuccessful
-upstream run intentionally does not launch Bulletin. For failed decisions, inspect
-call status without copying provider responses or tweet text into logs.
+1. Verify the ClickHouse projection/ingestion gates and deploy the gateway PR,
+   reconciling its base with the actual live gateway SHA. Smoke authenticated
+   routes and unauthenticated rejection. Retain the previous complete release.
+2. Apply the run-history, prompt-version and ClickHouse Bulletin migrations.
+   Recheck private grants and migration ledger. This is a manual production gate.
+3. Install the worker and its gateway configuration while the unit is idle.
+   Preserve the previous symlink. Run a bounded scan/classification smoke.
+4. Complete the approved two-week backfill and verify zero unresolved work for
+   the window. Enable the approved follow-data source.
+5. Verify the logged-in board, admin counters and prompt saves, then merge/deploy
+   the dependent website. An open draft PR does not authorize these steps.
 
-To roll back scheduling, restore only the original autorefresh cron command
-from the deployment backup; preserve other cron entries. Stop the Bulletin unit
-if active. Autorefresh and the website continue operating. Leave the private
-tables and spend ledger intact. The opportunities and admin pages depend on the corresponding read RPCs.
+Old workers remain compatible with the additive columns and removed FK, but do
+not hydrate the new metadata. New website code requires the new RPCs and gateway.
+Rollback the website and worker independently; keep schema, prompts and cost
+history. Restore the prior gateway bundle only after its new callers are stopped.
 
-## Focused verification
+## Local preview and focused checks
 
-`test_worker.py` uses a disposable PostgreSQL database with only the necessary
-fixtures. Never point `BULLETIN_TEST_DSN` at a real project:
+Loopback-only `LOCAL_ADMIN_PREVIEW` permits read previews, never prompt writes.
+Optional `BULLETIN_LOCAL_RUN_PREVIEW_URL` and `BULLETIN_LOCAL_BOARD_PREVIEW_URL`
+accept only `http://127.0.0.1` bridges to private state. They are disabled outside
+that explicit local preview guard. Tweet reads still use ClickHouse.
 
 ```sh
 BULLETIN_TEST_DSN='host=127.0.0.1 port=55439 dbname=bulletin_test user=frsc' \
   uv run --with 'psycopg[binary]==3.2.9' --with duckdb==1.5.5 \
-  python -m unittest -v test_worker.py
+  python -m unittest -v test_worker.py test_clickhouse_worker.py
 ```
 
-It checks reruns and negative caching, edits, browser-role denial, backend reads,
-expiry, deletion cascades, opt-outs during calls, timeouts, spending admission,
-invalid evidence, overlapping workers, and ordering after autorefresh success.
-Local validation uses PostgreSQL 14; production PostgreSQL 15 gets a bounded
-post-migration privilege/read check. The full Supabase reset/diff path requires
-Docker and is not part of this focused check.
-
-The security advisor reports informational “RLS enabled, no policy” notices
-for these private tables. This is intentional: browser grants are revoked and only
-the backend bypass-RLS role may access them. No public row policies are needed.
-
-## Website/run-history rollout
-
-The original private-table migration and worker are already live. This follow-up
-requires the new `bulletin_run_history` and `bulletin_prompt_versions` migrations
-and an updated worker release.
-Apply the reviewed migration before switching the worker or merging the website.
-It adds only the private runs table, nullable `calls.run_id`, its index and the
-service-only run-history RPC. Old workers remain compatible.
-
-Deploy the committed worker as an immutable release and change `current` only
-while `ca-bulletin.service` is idle; retain the previous symlink target. The cron
-and encrypted credentials stay as configured. A Bulletin-only smoke run is
-bounded by the existing budgets and does not restart autorefresh. Confirm the
-new run row, its counters/costs and private RPC before merging the frontend.
-Rollback: restore the preceding worker symlink and revert the website commit;
-leave the additive schema and cost history intact.
-
-
-## Editable prompt versions
-
-The admin opportunities dashboard shows the active classifier prompt, its saved
-versions (20 per page), and each recorded run's exact prompt. **Save for future
-runs** appends a new version with the verified admin user ID, timestamp, and
-required change note. It becomes active immediately; stale edits fail instead
-of overwriting a newer save. **Use as draft** copies an older version into the
-editor; saving creates another version rather than changing history.
-
-`bulletin.prompt_versions` is private and append-only for the service role.
-`get_bulletin_prompts` and `save_bulletin_prompt` are service-only RPCs; the server
-action requires a real authenticated admin. The explicit local admin read
-preview cannot save. The initial prompt is frozen in the migration and
-`default-prompt.json`; `seed.sql` bootstraps it after a declarative reset.
-
-At startup the worker reads the newest version once and stores its ID on
-`bulletin.runs.prompt_version_id`. Every call in that run uses the captured text,
-including retries of queued candidates. A later save affects only later runs.
-Existing decisions are not reclassified merely because the prompt changed.
-Phrase filters, model, output validation and budgets remain code-controlled.
-The prompt limit is 16 KB; invalid JSON output still fails validation and follows
-the existing retry policy. Edits are not automatically evaluated for quality.
-
-Deploy both additive migrations before the new worker. Older workers remain
-compatible, but keep using their fixed prompt and do not record prompt versions.
-Older runs show “Prompt version not recorded”; no attribution is invented.
-The local production preview can show the original bootstrap prompt when the
-new RPC is absent, with saving explicitly unavailable. Prompt saves require the
-schema, updated worker, and an authenticated admin session.
+These tests require a named disposable local database. They exercise a fake
+ClickHouse source against real PostgreSQL policy/job state, including a tweet
+that does not exist in PostgreSQL, replay, edits, failure recovery, opt-out,
+private grants, budgets and prompt pinning. Gateway and website tests cover the
+corresponding read and ranking contracts. No production corpus reset is needed.

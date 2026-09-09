@@ -277,3 +277,20 @@ describe('getTweetPageData', () => {
     expect(result.quotingTweetCount).toBe(0)
   })
 })
+
+test('Bulletin permalinks never fall back to PostgreSQL, even with the general flag off', async () => {
+  jest.clearAllMocks()
+  clickHouseEnabledMock.mockReturnValue(false)
+  fetchClickHouseQuotePostsMock.mockResolvedValue({ tweets: [], totalCount: 0 })
+  fetchClickHouseTweetThreadPageDataMock.mockResolvedValue(null)
+  const missing = await getTweetPageData('123', { clickhouseOnly: true })
+  expect(missing.tweet).toBeNull()
+  expect(createServerClient).not.toHaveBeenCalled()
+  fetchClickHouseTweetThreadPageDataMock.mockRejectedValue(
+    new Error('source unavailable'),
+  )
+  await expect(
+    getTweetPageData('123', { clickhouseOnly: true }),
+  ).rejects.toThrow('source unavailable')
+  expect(createServerClient).not.toHaveBeenCalled()
+})

@@ -647,7 +647,9 @@ ALTER TABLE "public"."tweet_link_previews" OWNER TO "postgres";
 
 -- Private Bulletin opportunities
 CREATE TABLE bulletin.decisions (
-  tweet_id text PRIMARY KEY REFERENCES public.tweets(tweet_id) ON DELETE CASCADE,
+  tweet_id text PRIMARY KEY,
+  account_id text,
+  posted_at timestamptz,
   content_hash text NOT NULL,
   version text NOT NULL,
   status text NOT NULL CHECK (status IN ('pending','positive','negative','failed')),
@@ -718,3 +720,13 @@ CREATE TABLE bulletin.runs (
 );
 ALTER TABLE bulletin.calls ADD COLUMN run_id bigint REFERENCES bulletin.runs(id);
 CREATE INDEX bulletin_calls_run_idx ON bulletin.calls(run_id);
+
+CREATE TABLE bulletin.scans (
+  scan_key text PRIMARY KEY,
+  window_start timestamptz NOT NULL,
+  window_end timestamptz NOT NULL,
+  cursor_id text NOT NULL DEFAULT '0',
+  complete boolean NOT NULL DEFAULT false,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (window_end>window_start AND window_end-window_start<=interval '15 days')
+);

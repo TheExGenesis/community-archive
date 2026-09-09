@@ -109,9 +109,20 @@ interface TweetPageResult {
  */
 export async function getTweetPageData(
   tweetId: string,
+  options: { clickhouseOnly?: boolean } = {},
 ): Promise<TweetPageResult> {
-  const clickHousePage = await fetchClickHousePage(tweetId)
+  const clickHousePage = await fetchClickHousePage(
+    tweetId,
+    options.clickhouseOnly,
+  )
   if (clickHousePage) return clickHousePage
+  if (options.clickhouseOnly)
+    return {
+      tweet: null,
+      threadTree: null,
+      quotingTweets: [],
+      quotingTweetCount: 0,
+    }
 
   const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
@@ -209,13 +220,15 @@ export async function getTweetPageData(
 
 async function fetchClickHousePage(
   tweetId: string,
+  strict = false,
 ): Promise<TweetPageResult | null> {
-  if (!isClickHouseReadsEnabled()) return null
+  if (!strict && !isClickHouseReadsEnabled()) return null
 
   try {
     const [page, quotePosts] = await Promise.all([
       fetchClickHouseTweetThreadPageData(tweetId),
       fetchClickHouseQuotePosts(tweetId).catch((error) => {
+        if (strict) throw error
         console.error('ClickHouse quote posts failed:', {
           tweetId,
           error: error instanceof Error ? error.message : String(error),
@@ -230,6 +243,7 @@ async function fetchClickHousePage(
       quotingTweetCount: quotePosts.totalCount,
     }
   } catch (error) {
+    if (strict) throw error
     console.error('ClickHouse tweet thread failed; falling back to Supabase:', {
       tweetId,
       error: error instanceof Error ? error.message : String(error),

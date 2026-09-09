@@ -10,6 +10,7 @@ const number = (value: number | undefined) =>
   value === undefined ? '—' : value.toLocaleString('en-US')
 const columns = [
   ['rows_seen', 'Tweets scanned'],
+  ['eligible_originals', 'Eligible originals'],
   ['candidates_seen', 'Candidates'],
   ['calls', 'AI calls'],
   ['positive', 'Opportunities'],
@@ -134,6 +135,19 @@ export function RunDashboard({
                             </dd>
                           </div>
                           <div>
+                            <dt className="inline">Source / window: </dt>
+                            <dd className="inline">
+                              {run.counts.source || 'PostgreSQL (legacy)'} ·{' '}
+                              {run.counts.window_start
+                                ? formatTimestamp(run.counts.window_start)
+                                : 'Not recorded'}{' '}
+                              →{' '}
+                              {run.counts.window_end
+                                ? formatTimestamp(run.counts.window_end)
+                                : 'Not recorded'}
+                            </dd>
+                          </div>
+                          <div>
                             <dt className="inline">Model: </dt>
                             <dd className="inline">{run.model}</dd>
                           </div>
@@ -234,9 +248,10 @@ export function RunDashboard({
         </p>
         {latest && (
           <p>
-            Coverage: recent PostgreSQL posts only, within two days of each scan
-            boundary. No historical backfill. Phrase filters and AI can miss
-            notices.
+            Coverage: ClickHouse posts in the recorded UTC window. Daily scans
+            cover the previous two days. Historical runs cover their explicit
+            window. Previous PostgreSQL runs cover only that source. No
+            historical backfill. Phrase filters and AI can miss notices.
           </p>
         )}
       </section>

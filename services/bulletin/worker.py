@@ -18,6 +18,7 @@ from psycopg.types.json import Jsonb
 
 from labels import validate_label
 import upstream_filter as upstream
+import clickhouse_source
 
 MODEL = 'z-ai/glm-5.3-flash'
 VERSION = 'bulletin-143dc2d-v1'
@@ -54,61 +55,65 @@ def candidates(engine, rows):
         and upstream.side_of(upstream.clean_text(r['full_text'])) is not None]
 
 
-def intake(db, engine, counts, started, run_id):
-    db.execute('UPDATE bulletin.worker_state SET scan_until=coalesce(scan_until,now()) WHERE id=1')
-    state=db.execute('SELECT * FROM bulletin.worker_state WHERE id=1').fetchone()
+def intake(db, engine, counts, started, run_id, window=None, rescan=False):
+    now=dt.datetime.now(dt.timezone.utc)
+    end=window[1] if window else now.replace(hour=0,minute=0,second=0,microsecond=0)
+    start=window[0] if window else end-dt.timedelta(days=2)
+    key=('backfill:' if window else 'daily:')+start.isoformat()+':'+end.isoformat()
+    db.execute("INSERT INTO bulletin.scans(scan_key,window_start,window_end) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING",(key,start,end))
+    if rescan:
+        db.execute("UPDATE bulletin.scans SET cursor_id='0',complete=false WHERE scan_key=%s",(key,))
+    state=db.execute('SELECT * FROM bulletin.scans WHERE scan_key=%s',(key,)).fetchone()
+    counts.update(source='clickhouse',window_start=start.isoformat(),window_end=end.isoformat(),scan_key=key)
+    progress(db,run_id,counts)
+    if state['complete']:
+        return True
+    after=state['cursor_id']
     for _ in range(MAX_PAGES):
         if time.monotonic()-started>MAX_SECONDS:
             return False
-        rows=db.execute('''WITH recent AS MATERIALIZED (
-          SELECT tweet_id,account_id,created_at,updated_at,full_text,reply_to_tweet_id,is_tombstone
-          FROM public.tweets WHERE created_at>=%s-interval '2 days' AND created_at<%s
-        ), page AS MATERIALIZED (
-          SELECT * FROM recent WHERE (updated_at,tweet_id)>(%s,%s)
-            AND updated_at<%s ORDER BY updated_at,tweet_id LIMIT 1000
-        ), allowed AS MATERIALIZED (SELECT * FROM bulletin.allowed_accounts)
-        SELECT t.tweet_id,t.account_id,t.created_at,t.updated_at,t.full_text,
-          t.reply_to_tweet_id,t.is_tombstone,a.account_id IS NOT NULL AS allowed,
-          EXISTS(SELECT 1 FROM public.retweets r WHERE r.tweet_id=t.tweet_id) AS retweet,
-          encode(sha256(convert_to(t.full_text,'UTF8')),'hex') AS content_hash
-        FROM page t LEFT JOIN allowed a ON a.account_id=t.account_id
-        ORDER BY t.updated_at,t.tweet_id''',
-        (state['scan_until'],state['scan_until'],state['cursor_at'],state['cursor_id'],state['scan_until'])).fetchall()
-        if not rows:
-            # Revisit one hour to cover ordinary late commits. Content hashes prevent rebilling.
-            db.execute('''UPDATE bulletin.worker_state SET cursor_at=scan_until-interval '1 hour',
-              cursor_id='',scan_until=NULL WHERE id=1''')
-            return True
+        page=clickhouse_source.page(start,end,after)
+        rows=page['data']
+        # Membership, consent and scrape blocks remain transactional policy state.
+        allowed={r['account_id'] for r in db.execute('SELECT account_id FROM bulletin.allowed_accounts').fetchall()}
+        for r in rows:
+            r['allowed']=r['account_id'] in allowed and start<=r['created_at']<end
+        originals=[r for r in rows if r['allowed'] and not r['is_tombstone']
+            and not r['reply_to_tweet_id'] and not r['retweet'] and not r['full_text'].startswith('RT @')]
         shortlist=candidates(engine,rows)
         with db.transaction():
-            # One indexed page operation, not one network round trip per tweet.
-            db.execute('''DELETE FROM bulletin.decisions d USING public.tweets t
-              WHERE d.tweet_id=t.tweet_id AND t.tweet_id=ANY(%s)
-                AND (d.content_hash<>encode(sha256(convert_to(t.full_text,'UTF8')),'hex')
-                  OR d.version<>%s)''',([r['tweet_id'] for r in rows],VERSION))
+            for r in rows:
+                db.execute('DELETE FROM bulletin.decisions WHERE tweet_id=%s AND (content_hash<>%s OR version<>%s)',
+                    (r['tweet_id'],r['content_hash'],VERSION))
             for r in shortlist:
-                db.execute('''INSERT INTO bulletin.decisions(tweet_id,content_hash,version,status)
-                  SELECT tweet_id,%s,%s,'pending' FROM public.tweets
-                  WHERE tweet_id=%s AND NOT is_tombstone
-                  ON CONFLICT(tweet_id) DO NOTHING''',(r['content_hash'],VERSION,r['tweet_id']))
-            last=rows[-1]
-            db.execute('UPDATE bulletin.worker_state SET cursor_at=%s,cursor_id=%s WHERE id=1',
-                (last['updated_at'],last['tweet_id']))
-        state['cursor_at'],state['cursor_id']=last['updated_at'],last['tweet_id']
-        counts['rows_seen']+=len(rows)
+                db.execute('''INSERT INTO bulletin.decisions(tweet_id,account_id,posted_at,content_hash,version,status)
+                  VALUES(%s,%s,%s,%s,%s,'pending') ON CONFLICT(tweet_id) DO UPDATE
+                  SET account_id=excluded.account_id,posted_at=excluded.posted_at''',
+                  (r['tweet_id'],r['account_id'],r['created_at'],r['content_hash'],VERSION))
+            next_id=page['next']
+            if page['scanned'] and (not next_id or int(next_id)<=int(after)):
+                raise RuntimeError('invalid_clickhouse_cursor')
+            db.execute('UPDATE bulletin.scans SET cursor_id=%s,complete=%s,updated_at=now() WHERE scan_key=%s',
+                (next_id or after,page['scanned']==0,key))
+        counts['rows_seen']+=page['scanned']
+        counts['eligible_originals']=counts.get('eligible_originals',0)+len(originals)
         counts['candidates_seen']+=len(shortlist)
         progress(db,run_id,counts)
+        if page['scanned']==0:
+            return True
+        after=next_id
     return False
 
 
 def current(db, tweet_id, lock=False):
-    return db.execute('''SELECT t.tweet_id,t.account_id,t.created_at,t.full_text,a.username,
-      encode(sha256(convert_to(t.full_text,'UTF8')),'hex') AS content_hash
-      FROM public.tweets t JOIN bulletin.allowed_accounts a USING(account_id)
-      WHERE t.tweet_id=%s AND NOT t.is_tombstone AND t.reply_to_tweet_id IS NULL
-        AND t.full_text NOT LIKE 'RT @%%'
-        AND NOT EXISTS(SELECT 1 FROM public.retweets r WHERE r.tweet_id=t.tweet_id)
-      '''+(' FOR SHARE OF t' if lock else ''),(tweet_id,)).fetchone()
+    source=clickhouse_source.current(tweet_id)
+    if not source:
+        return None
+    allowed=db.execute('SELECT username FROM bulletin.allowed_accounts WHERE account_id=%s',(source['account_id'],)).fetchone()
+    if not allowed:
+        return None
+    source['username']=allowed['username']
+    return source
 
 
 def request_body(tweet, prompt):
@@ -127,16 +132,28 @@ def reservation(body):
     return (Decimal(len(body)+4096)*Decimal('.15')+MAX_OUTPUT*Decimal('.50'))/1_000_000
 
 
-def reserve(db, job, amount, run_id=None):
+def reserve(db, job, amount, run_id=None, backfill_budget=None):
     # The session advisory lock serializes admission across overlapping jobs.
     with db.transaction():
         spent=db.execute('''SELECT
           coalesce(sum(coalesce(actual_usd,reserved_usd)) FILTER
-            (WHERE created_at>=date_trunc('day',now())),0) AS day,
+            (WHERE c.created_at>=date_trunc('day',now()) AND NOT coalesce(r.counts ? 'backfill_budget_usd',false)),0) AS day,
           coalesce(sum(coalesce(actual_usd,reserved_usd)),0) AS month
-          FROM bulletin.calls WHERE created_at>=date_trunc('month',now())''').fetchone()
-        if spent['day']+amount>DAY_BUDGET*Decimal('.9') or spent['month']+amount>MONTH_BUDGET*Decimal('.9'):
+          FROM bulletin.calls c LEFT JOIN bulletin.runs r ON r.id=c.run_id
+          WHERE c.created_at>=date_trunc('month',now())''').fetchone()
+        if spent['month']+amount>MONTH_BUDGET*Decimal('.9'):
             return None
+        if backfill_budget is None:
+            if spent['day']+amount>DAY_BUDGET*Decimal('.9'):
+                return None
+        else:
+            # One explicit window owns a cumulative cap across retries/restarts.
+            spent_backfill=db.execute('''SELECT coalesce(sum(coalesce(c.actual_usd,c.reserved_usd)),0) AS spent
+              FROM bulletin.calls c JOIN bulletin.runs r ON r.id=c.run_id
+              WHERE r.counts->>'scan_key'=(SELECT counts->>'scan_key' FROM bulletin.runs WHERE id=%s)''',
+              (run_id,)).fetchone()['spent']
+            if spent_backfill+amount>backfill_budget:
+                return None
         call=db.execute('INSERT INTO bulletin.calls(reserved_usd,run_id) VALUES(%s,%s) RETURNING id',(amount,run_id)).fetchone()
         db.execute('''UPDATE bulletin.decisions SET attempts=attempts+1,last_attempt_at=now(),
           status='failed',updated_at=now() WHERE tweet_id=%s''',(job['tweet_id'],))
@@ -186,11 +203,15 @@ def progress(db, run_id, counts, status='running', finished=False):
           (Jsonb(counts),status,finished,run_id))
 
 
-def run(db, limit=MAX_CALLS, enqueue_only=False):
+def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=None, rescan=False):
+    if backfill_budget is not None and (window is None or not Decimal(0)<backfill_budget<=Decimal(1)):
+        raise ValueError('backfill_budget_requires_window_and_at_most_one_dollar')
     if not db.execute('SELECT pg_try_advisory_lock(%s) AS locked',(LOCK,)).fetchone()['locked']:
         return {'status':'already_running'}
     started=time.monotonic()
     counts=dict(rows_seen=0,candidates_seen=0,calls=0,positive=0,negative=0,failed=0,suppressed=0)
+    if backfill_budget is not None:
+        counts['backfill_budget_usd']=str(backfill_budget)
     run_id=None
     try:
         # Owning the lock proves earlier 'running' rows no longer have a live worker.
@@ -203,15 +224,14 @@ def run(db, limit=MAX_CALLS, enqueue_only=False):
                 (MODEL,VERSION,prompt['id'])).fetchone()['id']
             db.execute("UPDATE bulletin.worker_state SET last_started_at=now(),last_finished_at=NULL,status='running',counts=%s WHERE id=1",
                 (Jsonb(counts),))
-        # Small feature tables only; remove data no longer eligible under current policy.
-        db.execute('''DELETE FROM bulletin.decisions d USING public.tweets t
-          WHERE d.tweet_id=t.tweet_id AND (t.is_tombstone OR NOT EXISTS
-            (SELECT 1 FROM bulletin.allowed_accounts a WHERE a.account_id=t.account_id))''')
+        # Purge derived data when authoritative membership/consent changes.
+        db.execute('''DELETE FROM bulletin.decisions d WHERE d.account_id IS NOT NULL AND NOT EXISTS
+          (SELECT 1 FROM bulletin.allowed_accounts a WHERE a.account_id=d.account_id)''')
         engine=duckdb.connect()
         engine.execute('SET threads=1')
         engine.execute("SET memory_limit='128MB'")
         try:
-            complete=intake(db,engine,counts,started,run_id)
+            complete=intake(db,engine,counts,started,run_id,window,rescan)
         finally:
             engine.close()
         status='ok' if complete else 'intake_backlog'
@@ -232,7 +252,7 @@ def run(db, limit=MAX_CALLS, enqueue_only=False):
                 if len(body)>65536:
                     status='oversize_candidate';continue
                 amount=reservation(body)
-                call_id=reserve(db,job,amount,run_id)
+                call_id=reserve(db,job,amount,run_id,backfill_budget)
                 if call_id is None:
                     status='budget_limit';break
                 counts['calls']+=1
@@ -281,12 +301,24 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--enqueue-only',action='store_true')
     parser.add_argument('--limit',type=int,default=MAX_CALLS)
+    parser.add_argument('--start',help='Backfill UTC date, inclusive')
+    parser.add_argument('--end',help='Backfill UTC date, exclusive (at most 15 days)')
+    parser.add_argument('--backfill-budget-usd',type=Decimal,help='Explicit one-time cap, at most $1; requires start/end')
+    parser.add_argument('--rescan',action='store_true',help='Revisit the window from the start; keep cached decisions and spending')
     args=parser.parse_args()
+    window=None
+    if args.start or args.end:
+        try:
+            window=tuple(dt.datetime.combine(dt.date.fromisoformat(value),dt.time(),dt.timezone.utc) for value in (args.start,args.end))
+            if not dt.timedelta(0)<window[1]-window[0]<=dt.timedelta(days=15):
+                raise ValueError()
+        except (ValueError,TypeError):
+            parser.error('start/end must form a UTC window of at most 15 days')
     if not 0<=args.limit<=MAX_CALLS:
         parser.error('limit must be between 0 and 50')
     try:
         with connect() as db:
-            result=run(db,args.limit,args.enqueue_only)
+            result=run(db,args.limit,args.enqueue_only,window,args.backfill_budget_usd,args.rescan)
         print(json.dumps(result),flush=True)
         raise SystemExit(0 if result['status'] in ('ok','already_running','enqueued_only') else 1)
     except Exception as exc:

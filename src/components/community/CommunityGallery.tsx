@@ -4,6 +4,8 @@ import dynamic from 'next/dynamic'
 import { useGallerySessionReady } from './gallerySessionContext'
 import Image from 'next/image'
 import Link from 'next/link'
+import PostHogLink from '@/components/PostHogLink'
+import { capturePostHogEvent } from '@/lib/posthog'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowUpRight,
@@ -404,7 +406,14 @@ function ProjectCard({
     <div className="relative min-w-0">
       <button
         type="button"
-        onClick={onOpen}
+        onClick={() => {
+          capturePostHogEvent('community_app_action', {
+            action: 'details_opened',
+            app_slug: project.slug,
+            source: 'gallery_card',
+          })
+          onOpen()
+        }}
         className="group block w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-4 focus-visible:ring-offset-background"
       >
         <ProjectCover project={project} />
@@ -541,7 +550,14 @@ function ProjectDialog({
                     asChild
                     className="bg-brand text-brand-foreground hover:bg-brand/90"
                   >
-                    <Link
+                    <PostHogLink
+                      eventName="community_app_action"
+                      eventProperties={{
+                        action: 'launch_clicked',
+                        app_slug: project.slug,
+                        source: 'gallery_dialog',
+                        external: !project.projectUrl.startsWith('/'),
+                      }}
                       href={project.projectUrl}
                       target={
                         project.projectUrl.startsWith('/')
@@ -555,7 +571,7 @@ function ProjectDialog({
                       }
                     >
                       Open project <ArrowUpRight className="ml-2 h-4 w-4" />
-                    </Link>
+                    </PostHogLink>
                   </Button>
                 ) : null}
               </DialogFooter>

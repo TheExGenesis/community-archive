@@ -170,7 +170,36 @@ const isSearchInterfaceAction = isOneOf([
 ])
 const isSettingsTab = isOneOf(['archives', 'privacy', 'tweets'])
 
+const profileCurationProperties = {
+  action: isOneOf([
+    'add',
+    'dismiss',
+    'restore-item',
+    'toggle-feature',
+    'reorder',
+    'restore',
+  ]),
+  section: isOneOf(['bangers', 'people']),
+  source: isOneOf(['profile', 'tweet_card']),
+}
+
 export const allowedEventProperties = {
+  community_app_action: {
+    action: isOneOf(['details_opened', 'launch_clicked']),
+    // Public catalog slugs include newly approved apps; never a URL or user input.
+    app_slug: (value: unknown) =>
+      typeof value === 'string' &&
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) &&
+      value.length <= 120,
+    source: isOneOf(['gallery_card', 'gallery_dialog', 'homepage', 'tools']),
+    external: (value) => value === undefined || isBoolean(value),
+  },
+  profile_edit_started: {},
+  profile_curation_saved: {
+    ...profileCurationProperties,
+    is_featured: (value) => value === undefined || isBoolean(value),
+  },
+  profile_curation_failed: profileCurationProperties,
   site_page_viewed: { page: isProductPage },
   product_action: {
     feature: isOneOf(productFeatures),

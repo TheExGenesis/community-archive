@@ -1,3 +1,5 @@
+import { capturePostHogEvent } from '@/lib/posthog'
+jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import userEvent from '@testing-library/user-event'
@@ -238,6 +240,58 @@ test('shows owner-only curation controls and persists section edits', async () =
     }),
   )
   expect(fetchMock).toHaveBeenCalledWith('/api/profile/42/interactions')
+  expect(
+    jest
+      .mocked(capturePostHogEvent)
+      .mock.calls.filter(([event]) => event.startsWith('profile_')),
+  ).toEqual([
+    ['profile_edit_started'],
+    [
+      'profile_curation_saved',
+      { action: 'add', section: 'bangers', source: 'profile' },
+    ],
+    [
+      'profile_curation_saved',
+      { action: 'dismiss', section: 'bangers', source: 'profile' },
+    ],
+    [
+      'profile_curation_saved',
+      { action: 'restore-item', section: 'bangers', source: 'profile' },
+    ],
+    [
+      'profile_curation_saved',
+      {
+        action: 'toggle-feature',
+        section: 'bangers',
+        source: 'profile',
+        is_featured: true,
+      },
+    ],
+    [
+      'profile_curation_saved',
+      { action: 'restore', section: 'people', source: 'profile' },
+    ],
+  ])
+  jest.mocked(capturePostHogEvent).mockClear()
+  mockMutateProfileCuration.mockRejectedValueOnce(
+    new Error('private database detail'),
+  )
+  await user.click(screen.getByRole('button', { name: 'Restore Bangers' }))
+  await waitFor(() =>
+    expect(capturePostHogEvent).toHaveBeenCalledWith(
+      'profile_curation_failed',
+      {
+        action: 'restore',
+        section: 'bangers',
+        source: 'profile',
+      },
+    ),
+  )
+  expect(
+    jest
+      .mocked(capturePostHogEvent)
+      .mock.calls.filter(([event]) => event === 'profile_curation_saved'),
+  ).toEqual([])
 
   await user.click(screen.getByRole('link', { name: '2025 4' }))
   expect(screen.getByRole('button', { name: 'Edit profile' })).toBeVisible()
@@ -1002,4 +1056,8 @@ test('refills the visible people list from the reserve after a dismissal', async
   await waitFor(() => expect(screen.getByText('Person 8')).toBeVisible())
   expect(screen.queryByText('Person 0')).not.toBeInTheDocument()
   expect(screen.queryByText('Person 9')).not.toBeInTheDocument()
+})
+
+beforeEach(() => {
+  jest.mocked(capturePostHogEvent).mockClear()
 })

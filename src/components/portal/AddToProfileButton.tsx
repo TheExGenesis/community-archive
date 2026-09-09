@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Star } from 'lucide-react'
+import { capturePostHogEvent } from '@/lib/posthog'
 import { addTweetToOwnProfile } from '@/app/user/[account_id]/actions'
 import { createBrowserClient } from '@/utils/supabase'
 
@@ -55,8 +56,18 @@ export function AddToProfileButton({
         setState('saving')
         try {
           await addTweetToOwnProfile(tweetId)
+          capturePostHogEvent('profile_curation_saved', {
+            action: 'add',
+            section: 'bangers',
+            source: 'tweet_card',
+          })
           setState('added')
         } catch {
+          capturePostHogEvent('profile_curation_failed', {
+            action: 'add',
+            section: 'bangers',
+            source: 'tweet_card',
+          })
           setState('error')
         }
       }}

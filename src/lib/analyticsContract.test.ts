@@ -94,6 +94,41 @@ it.each([
     'search_results_failed',
     { error_category: 'request_failed', elapsed_ms: 125 },
   ],
+  [
+    'community_app_action',
+    {
+      action: 'launch_clicked',
+      app_slug: 'archive-quilt',
+      source: 'gallery_dialog',
+      external: true,
+    },
+  ],
+  [
+    'community_app_action',
+    { action: 'details_opened', app_slug: 'birdseye', source: 'gallery_card' },
+  ],
+  [
+    'profile_curation_saved',
+    { action: 'add', section: 'bangers', source: 'tweet_card' },
+  ],
+  [
+    'profile_curation_saved',
+    { action: 'restore', section: 'people', source: 'profile' },
+  ],
+  ['profile_edit_started', {}],
+  [
+    'profile_curation_saved',
+    {
+      action: 'toggle-feature',
+      section: 'people',
+      source: 'profile',
+      is_featured: false,
+    },
+  ],
+  [
+    'profile_curation_failed',
+    { action: 'add', section: 'bangers', source: 'tweet_card' },
+  ],
   ['own_tweet_deleted', {}],
   ['product_action', { feature: 'birdseye', action: 'topic_opened' }],
 ])(
@@ -105,6 +140,11 @@ it.each([
       properties: {
         ...properties,
         query: 'private words',
+        itemId: 'private-tweet',
+        itemIds: ['private-tweet'],
+        accountId: 'private-person',
+        error: 'private failure',
+        projectUrl: 'https://private.example/secret',
         topic: 'private topic',
         $current_url:
           'https://www.community-archive.org/birdseye?username=private&cluster_id=secret',
@@ -150,3 +190,20 @@ it('accepts every rendered navigation destination for all audiences', () => {
     }
   }
 })
+
+it.each(['https://private.example', 'private words', 'x'.repeat(121)])(
+  'rejects non-catalog app slugs: %s',
+  (app_slug) => {
+    const result = sanitizePostHogEvent({
+      event: 'community_app_action',
+      uuid: 'test-event',
+      properties: {
+        action: 'launch_clicked',
+        app_slug,
+        source: 'gallery_dialog',
+        external: true,
+      },
+    } as CaptureResult)
+    expect(result).toBeNull()
+  },
+)

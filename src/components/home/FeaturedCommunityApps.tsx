@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import PostHogLink from '@/components/PostHogLink'
 import { COMMUNITY_PROJECTS } from '@/lib/communityProjects'
 
 const FEATURED_SLUGS = ['birdseye', 'strands', 'bangers-page']
@@ -27,7 +28,14 @@ export default function FeaturedCommunityApps() {
           const project = COMMUNITY_PROJECTS.find((item) => item.slug === slug)!
           const external = project.projectUrl?.startsWith('https:')
           return (
-            <Link
+            <PostHogLink
+              eventName="community_app_action"
+              eventProperties={{
+                action: 'launch_clicked',
+                app_slug: slug,
+                source: 'homepage',
+                external: Boolean(external),
+              }}
               key={slug}
               href={project.projectUrl!}
               target={external ? '_blank' : undefined}
@@ -62,7 +70,7 @@ export default function FeaturedCommunityApps() {
               <p className="mt-1 text-sm text-muted-foreground">
                 {project.summary}
               </p>
-            </Link>
+            </PostHogLink>
           )
         })}
       </div>

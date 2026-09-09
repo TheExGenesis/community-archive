@@ -1,3 +1,5 @@
+import { capturePostHogEvent } from '@/lib/posthog'
+jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CommunityGallery from './CommunityGallery'
@@ -82,6 +84,21 @@ describe('CommunityGallery', () => {
     expect(
       screen.getByRole('dialog', { name: 'Tweet Harvest' }),
     ).toBeInTheDocument()
+    expect(capturePostHogEvent).toHaveBeenCalledWith('community_app_action', {
+      action: 'details_opened',
+      app_slug: 'tweet-harvest',
+      source: 'gallery_card',
+    })
+    await user.click(screen.getByRole('link', { name: /Open project/i }))
+    expect(capturePostHogEvent).toHaveBeenLastCalledWith(
+      'community_app_action',
+      {
+        action: 'launch_clicked',
+        app_slug: 'tweet-harvest',
+        source: 'gallery_dialog',
+        external: true,
+      },
+    )
     expect(screen.getByText('How it uses the archive')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Open project/i })).toHaveAttribute(
       'href',
@@ -384,5 +401,26 @@ describe('CommunityGallery', () => {
     const sortButton = screen.getByRole('button', { name: 'Most liked' })
     await user.click(sortButton)
     expect(sortButton).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+beforeEach(() => {
+  jest.mocked(capturePostHogEvent).mockClear()
+})
+
+it('tracks newly published apps after filtering without copying project content', async () => {
+  const user = userEvent.setup()
+  jest.spyOn(global, 'fetch').mockResolvedValue({
+    ok: true,
+    json: async () => ({ comments: [] }),
+  } as Response)
+  render(<CommunityGallery publishedProjects={[PUBLISHED_PROJECT]} />)
+  await openPublishedProject(user)
+  await user.click(screen.getByRole('link', { name: /Open project/i }))
+  expect(capturePostHogEvent).toHaveBeenLastCalledWith('community_app_action', {
+    action: 'launch_clicked',
+    app_slug: 'archive-quilt',
+    source: 'gallery_dialog',
+    external: true,
   })
 })

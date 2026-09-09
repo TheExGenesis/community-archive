@@ -35,8 +35,9 @@ Metric definitions:
 - Qualifying actions: archive search; tweet expand/open/archived-quotes/external/
   quoted-tweet opens; Bangers search/load-more; Trends terms-added/evidence-refresh;
   Digest story/keyword-search opens; directory profile opens; upload acceptance;
-  and deliberate `product_action` events. Navigation, pageviews, background result
-  delivery, and tweet collapse do not qualify.
+  deliberate `product_action` events; app launch clicks; and confirmed profile
+  curation saves. App details, edit starts, failed saves, navigation, pageviews,
+  background result delivery, and tweet collapse do not qualify.
 - Retention: weekly return activity from the first meaningful activity observed
   in the 30-day window, not a claim about lifetime-new users. Incomplete follow-up
   cells remain unavailable.
@@ -58,6 +59,29 @@ Outcome definitions for release verification:
 
 Signed-in and Community Archive member are different states. Expanded action
 instrumentation changes the baseline; do not invent historical zeroes.
+
+## Apps and profile curation
+
+- `community_app_action`: `details_opened` from gallery cards, or `launch_clicked`
+  from the gallery dialog, homepage featured apps, and `/tools`. Properties are
+  the public catalog `app_slug`, fixed `source`, and launch `external` flag.
+  Newly approved gallery apps are covered automatically. Slugs are bounded public
+  identifiers, not URLs, creators, descriptions, or search text. A launch measures
+  intent to open an app, not successful load or usage inside an external app.
+  Normal clicks, keyboard activation, and middle-clicks on launch links are covered;
+  browser context-menu actions cannot reliably be observed.
+- `profile_edit_started`: entering profile edit mode. Done editing is not a save.
+- `profile_curation_saved`: emitted only after the server confirms add, dismiss,
+  restore-item, feature toggle, reorder, or section restore. Includes `section`
+  (`bangers`/`people`), `source` (`profile`/`tweet_card`), and the resulting
+  `is_featured` for toggles. The separate Add to profile tweet button is covered.
+- `profile_curation_failed`: rejected saves with the same action/section/source.
+  No item IDs, account IDs, submitted text, or raw errors are collected.
+
+The weekly features table groups launches under Apps and saved edits under Profile
+editing. The actions table distinguishes apps by slug and profile changes by type
+and section. Tables keep This week leftmost, followed by Last week and older weeks.
+These events start after frontend release; absent historical rows are unmeasured.
 
 ## Adding pages and actions
 
@@ -89,7 +113,11 @@ are separate event families and must not be summed as page-view counts.
 pnpm exec jest --selectProjects server client --runInBand --runTestsByPath \
   src/lib/analyticsContract.test.ts src/lib/posthog.test.ts \
   src/lib/posthogProvider.test.tsx src/components/PostHogPageView.test.tsx \
-  src/components/birdseye/TopicSummary.analytics.test.tsx
+  src/components/birdseye/TopicSummary.analytics.test.tsx \
+  src/components/PostHogLink.test.tsx \
+  src/components/community/CommunityGallery.test.tsx \
+  src/components/metaTwitter/ProfileArchive.test.tsx \
+  src/components/portal/AddToProfileButton.test.tsx
 pnpm type-check
 ```
 
@@ -99,7 +127,8 @@ Navigation tests cover Strict Mode and revisits; the Birdseye interaction test
 covers a user action through the same sanitizer without private content.
 
 After release, inspect one short journey each for a direct page load, internal
-navigation, graph/strand selection, Birdseye expansion, and search. Confirm one
+navigation, graph/strand selection, Birdseye expansion, search, app launch, and
+profile save/failure. Confirm one
 intended event, allowed properties, correct identity, and arrival in PostHog.
 Do not run broad historical scans or inject fabricated production events to
 populate empty charts. Roll back the frontend commit independently from the new

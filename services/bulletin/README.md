@@ -2,8 +2,8 @@
 
 One daily worker runs **after the existing autorefresh pipeline succeeds**.
 It uses the measured Bulletin phrase filter, then asks OpenRouter's
-`z-ai/glm-5.3-flash` to classify each new candidate. There is no public website
-change in this release.
+`z-ai/glm-5.3-flash` to classify each new candidate. The website serves `/opportunities` to verified signed-in users and
+`/admin/opportunities` to the existing admin allowlist.
 
 ## Storage and website access
 
@@ -14,9 +14,12 @@ change in this release.
 - `bulletin.calls`: durable cost reservations and reported costs. It retains
   no tweet IDs, authored text or account data.
 - `bulletin.worker_state`: intake cursor, last run, result counts and health.
+- `bulletin.runs`: durable per-run aggregate counts, timestamps, status and model.
+  Calls link to runs for reported cost and unpriced reservations. No tweet or
+  author identifiers are stored in run history.
 
 The `bulletin` schema is not exposed through the Data API. Browser roles have
-no schema/table privileges and all four tables have RLS enabled. The website's
+no schema/table privileges and all five tables have RLS enabled. The website's
 **server-side service-role client** can call:
 
 ```ts
@@ -24,6 +27,28 @@ const { data, error } = await serviceRoleClient.rpc(
   'get_bulletin_opportunities', { max_results: 50 }
 )
 ```
+
+The page authorizes with the existing server-verified `getCurrentUser()` before
+calling the RPC, and does not accept member-preview cookies as authorization.
+The board shows up to the latest 200 currently active notices, with filters over
+that displayed set. It links to the existing full tweet detail renderer rather
+than duplicating its media and quote logic. Reads are dynamic, private/no-store
+and noindex. Only summary fields and exact evidence reach the client board.
+
+The admin page calls `get_bulletin_runs(before_id,max_results)` only after the
+existing `getAdminClient()` gate. Run history uses numeric-ID keyset pagination,
+25 runs per page. Each run records rows scanned, phrase candidates, AI calls,
+positive and negative decisions, failures, suppression and ending queue size.
+Scan overlap means counts are not unique tweets over multiple days. Candidates
+include cached matches; AI calls can include older queued work and retries.
+Positive counts are saved decisions, not today's visible board size.
+
+History starts with the updated worker; earlier runs are not reconstructed.
+Progress persists after each scan page and each model call. Stopped workers keep
+partial counts: the UI flags a running row older than 25 minutes, and the next
+worker holding the shared lock marks the prior row interrupted. Interrupted runs
+have no invented finish timestamp. The dashboard exposes costs and read-only
+refresh, not controls that initiate paid calls.
 
 Never call this using a browser service key or expose the table directly.
 This RPC rechecks current membership, explicit opt-outs, scrape blocks,
@@ -117,7 +142,7 @@ call status without copying provider responses or tweet text into logs.
 To roll back scheduling, restore only the original autorefresh cron command
 from the deployment backup; preserve other cron entries. Stop the Bulletin unit
 if active. Autorefresh and the website continue operating. Leave the private
-tables and spend ledger intact. The new RPC has no existing website callers.
+tables and spend ledger intact. The opportunities and admin pages depend on the corresponding read RPCs.
 
 ## Focused verification
 
@@ -138,5 +163,21 @@ post-migration privilege/read check. The full Supabase reset/diff path requires
 Docker and is not part of this focused check.
 
 The security advisor reports informational “RLS enabled, no policy” notices
-for these four tables. This is intentional: browser grants are revoked and only
+for these five tables. This is intentional: browser grants are revoked and only
 the backend bypass-RLS role may access them. No public row policies are needed.
+
+## Website/run-history rollout
+
+The original private-table migration and worker are already live. This follow-up
+requires the new `bulletin_run_history` migration and an updated worker release.
+Apply the reviewed migration before switching the worker or merging the website.
+It adds only the private runs table, nullable `calls.run_id`, its index and the
+service-only run-history RPC. Old workers remain compatible.
+
+Deploy the committed worker as an immutable release and change `current` only
+while `ca-bulletin.service` is idle; retain the previous symlink target. The cron
+and encrypted credentials stay as configured. A Bulletin-only smoke run is
+bounded by the existing budgets and does not restart autorefresh. Confirm the
+new run row, its counters/costs and private RPC before merging the frontend.
+Rollback: restore the preceding worker symlink and revert the website commit;
+leave the additive schema and cost history intact.

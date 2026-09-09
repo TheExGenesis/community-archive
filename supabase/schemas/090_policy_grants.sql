@@ -176,3 +176,11 @@ GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA bulletin TO service_ro
 GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA bulletin TO service_role;
 REVOKE ALL ON FUNCTION public.get_bulletin_opportunities(integer) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.get_bulletin_opportunities(integer) TO service_role;
+
+ALTER TABLE bulletin.runs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON bulletin.runs FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON SEQUENCE bulletin.runs_id_seq FROM PUBLIC,anon,authenticated;
+GRANT SELECT,INSERT,UPDATE,DELETE ON bulletin.runs TO service_role;
+GRANT USAGE,SELECT ON SEQUENCE bulletin.runs_id_seq TO service_role;
+REVOKE ALL ON FUNCTION public.get_bulletin_runs(bigint,integer) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_bulletin_runs(bigint,integer) TO service_role;

@@ -10,6 +10,7 @@ export function navAnalyticsDestination(href: string): string {
   if (href.startsWith('/bangers')) return 'bangers'
   if (href.startsWith('/community')) return 'community'
   if (href.startsWith('/digest')) return 'digest'
+  if (href.startsWith('/opportunities')) return 'opportunities'
   if (href.startsWith('/docs')) return 'docs'
   if (href.startsWith('/research')) return 'research'
   if (href.startsWith('/search')) return 'search'
@@ -29,6 +30,7 @@ export type TweetOrigin =
   | 'stream'
   | 'bangers'
   | 'digest'
+  | 'opportunities'
   | 'trends'
   | 'search'
   | 'profile'
@@ -77,6 +79,12 @@ const TWEET_ORIGINS: Record<
     href: '/digest',
     label: 'Back to What Happened Yesterday',
     matches: (href) => href === '/digest' || href.startsWith('/digest/'),
+  },
+  opportunities: {
+    href: '/opportunities',
+    label: 'Back to opportunities',
+    matches: (href) =>
+      href === '/opportunities' || href.startsWith('/opportunities?'),
   },
   trends: {
     href: '/trends',
@@ -161,6 +169,7 @@ export const getPrimaryNav = (
     ? [
         { href: BANGERS_WEEK_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
+        { href: '/opportunities', label: 'Opportunities' },
         { href: '/user-dir', label: 'Users' },
         { href: '/community', label: 'Apps' },
         { href: '/trends', label: 'Trends' },

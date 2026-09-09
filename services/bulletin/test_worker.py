@@ -63,13 +63,14 @@ class DatabaseTests(unittest.TestCase):
         cls.db.execute('DROP SCHEMA IF EXISTS bulletin CASCADE; DROP SCHEMA IF EXISTS tes CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public')
         cls.db.execute(FIXTURE)
         cls.db.execute(next((ROOT/'supabase/migrations').glob('*_bulletin_opportunities.sql')).read_text())
+        cls.db.execute(next((ROOT/'supabase/migrations').glob('*_bulletin_run_history.sql')).read_text())
 
     @classmethod
     def tearDownClass(cls):
         cls.db.close()
 
     def setUp(self):
-        self.db.execute('TRUNCATE public.tweets,public.all_account,public.members,public.optin,tes.blocked_scraping_users,public.retweets,bulletin.calls CASCADE')
+        self.db.execute('TRUNCATE public.tweets,public.all_account,public.members,public.optin,tes.blocked_scraping_users,public.retweets,bulletin.calls,bulletin.runs CASCADE')
         self.db.execute("UPDATE bulletin.worker_state SET cursor_at=now()-interval '1 day',cursor_id='',scan_until=NULL")
         self.db.execute("INSERT INTO public.all_account VALUES ('a','example',false); INSERT INTO public.members VALUES ('a')")
 
@@ -110,6 +111,8 @@ class DatabaseTests(unittest.TestCase):
                     self.db.execute('SELECT * FROM bulletin.opportunities')
                 with self.assertRaises(psycopg.errors.InsufficientPrivilege):
                     self.db.execute('SELECT * FROM public.get_bulletin_opportunities()')
+                with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                    self.db.execute('SELECT * FROM public.get_bulletin_runs()')
             finally:self.db.execute('RESET ROLE')
         self.db.execute('SET ROLE service_role')
         try:self.assertEqual(len(self.db.execute('SELECT * FROM public.get_bulletin_opportunities()').fetchall()),1)
@@ -138,6 +141,37 @@ class DatabaseTests(unittest.TestCase):
         result,calls=self.run_worker(self.response(evidence='Invented phrase'))
         self.assertEqual(result['failed'],1)
         self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.opportunities').fetchone()['n'],0)
+
+    def test_history_progress_failure_recovery_and_pagination(self):
+        self.tweet()
+        observed=[]
+        def response(_):
+            active=self.db.execute("SELECT * FROM bulletin.runs WHERE status='running'").fetchone()
+            observed.append(active['counts']['rows_seen'])
+            return self.response()
+        with patch.dict(os.environ,OPENROUTER_API_KEY='test'),patch.object(worker,'call_model',side_effect=response):
+            worker.run(self.db)
+        self.assertEqual(observed,[1])
+        first=self.db.execute('SELECT * FROM bulletin.runs').fetchone()
+        self.assertEqual(first['counts']['positive'],1)
+        self.assertEqual(first['status'],'ok')
+        self.assertIsNotNone(first['finished_at'])
+        self.db.execute("INSERT INTO bulletin.runs(model,classifier_version) VALUES ('test','test')")
+        with patch.object(worker,'intake',side_effect=RuntimeError):
+            with self.assertRaises(RuntimeError):worker.run(self.db)
+        self.assertEqual(self.db.execute("SELECT count(*) n FROM bulletin.runs WHERE status='interrupted'").fetchone()['n'],1)
+        latest=self.db.execute('SELECT * FROM bulletin.runs ORDER BY id DESC LIMIT 1').fetchone()
+        self.assertEqual(latest['status'],'failed:RuntimeError')
+        self.db.execute('SET ROLE service_role')
+        try:
+            page=self.db.execute('SELECT public.get_bulletin_runs(NULL,2) data').fetchone()['data']
+            self.assertEqual(len(page['runs']),2)
+            older=self.db.execute('SELECT public.get_bulletin_runs(%s,2) data',(int(page['runs'][-1]['id']),)).fetchone()['data']
+            self.assertEqual(older['runs'][0]['id'],str(first['id']))
+            self.assertEqual(Decimal(str(older['runs'][0]['actual_usd'])),Decimal('.001'))
+        finally:self.db.execute('RESET ROLE')
+        self.db.execute('DELETE FROM public.tweets')
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.runs').fetchone()['n'],3)
 
     def test_policy_change_during_call_and_lock(self):
         self.tweet()

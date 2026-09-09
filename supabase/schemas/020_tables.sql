@@ -696,3 +696,16 @@ CREATE TABLE bulletin.worker_state (
   counts jsonb NOT NULL DEFAULT '{}'
 );
 INSERT INTO bulletin.worker_state(id) VALUES (1);
+
+-- Aggregate run history contains no tweet text or author identifiers.
+CREATE TABLE bulletin.runs (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  finished_at timestamptz,
+  status text NOT NULL DEFAULT 'running',
+  counts jsonb NOT NULL DEFAULT '{}',
+  model text NOT NULL,
+  classifier_version text NOT NULL
+);
+ALTER TABLE bulletin.calls ADD COLUMN run_id bigint REFERENCES bulletin.runs(id);
+CREATE INDEX bulletin_calls_run_idx ON bulletin.calls(run_id);

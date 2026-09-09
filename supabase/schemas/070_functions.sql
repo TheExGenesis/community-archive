@@ -3667,3 +3667,25 @@ AS $$
  ORDER BY t.created_at DESC,t.tweet_id DESC
  LIMIT greatest(0,least(coalesce(max_results,50),200))
 $$;
+
+CREATE FUNCTION public.get_bulletin_runs(before_id bigint DEFAULT NULL, max_results integer DEFAULT 26)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
+ SELECT jsonb_build_object(
+   'runs', coalesce((SELECT jsonb_agg(to_jsonb(page) ORDER BY page.id::bigint DESC) FROM (
+     SELECT r.id::text AS id,r.started_at,r.finished_at,r.status,r.counts,r.model,r.classifier_version,
+       coalesce(c.actual_usd,0) AS actual_usd,coalesce(c.unpriced_reserved_usd,0) AS unpriced_reserved_usd
+     FROM bulletin.runs r LEFT JOIN LATERAL (
+       SELECT sum(actual_usd) AS actual_usd,
+         sum(reserved_usd) FILTER (WHERE actual_usd IS NULL) AS unpriced_reserved_usd
+       FROM bulletin.calls WHERE run_id=r.id
+     ) c ON true
+     WHERE before_id IS NULL OR r.id<before_id
+     ORDER BY r.id DESC LIMIT greatest(1,least(coalesce(max_results,26),51))
+   ) page),'[]'::jsonb),
+   'queue', (SELECT jsonb_build_object(
+     'pending',count(*) FILTER (WHERE status='pending'),
+     'retrying',count(*) FILTER (WHERE status='failed' AND attempts<3),
+     'exhausted',count(*) FILTER (WHERE status='failed' AND attempts>=3)) FROM bulletin.decisions),
+   'last_success_at',(SELECT last_success_at FROM bulletin.worker_state WHERE id=1)
+ )
+$$;

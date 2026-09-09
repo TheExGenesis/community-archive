@@ -54,7 +54,7 @@ def candidates(engine, rows):
         and upstream.side_of(upstream.clean_text(r['full_text'])) is not None]
 
 
-def intake(db, engine, counts, started):
+def intake(db, engine, counts, started, run_id):
     db.execute('UPDATE bulletin.worker_state SET scan_until=coalesce(scan_until,now()) WHERE id=1')
     state=db.execute('SELECT * FROM bulletin.worker_state WHERE id=1').fetchone()
     for _ in range(MAX_PAGES):
@@ -97,6 +97,7 @@ def intake(db, engine, counts, started):
         state['cursor_at'],state['cursor_id']=last['updated_at'],last['tweet_id']
         counts['rows_seen']+=len(rows)
         counts['candidates_seen']+=len(shortlist)
+        progress(db,run_id,counts)
     return False
 
 
@@ -126,7 +127,7 @@ def reservation(body):
     return (Decimal(len(body)+4096)*Decimal('.15')+MAX_OUTPUT*Decimal('.50'))/1_000_000
 
 
-def reserve(db, job, amount):
+def reserve(db, job, amount, run_id=None):
     # The session advisory lock serializes admission across overlapping jobs.
     with db.transaction():
         spent=db.execute('''SELECT
@@ -136,7 +137,7 @@ def reserve(db, job, amount):
           FROM bulletin.calls WHERE created_at>=date_trunc('month',now())''').fetchone()
         if spent['day']+amount>DAY_BUDGET*Decimal('.9') or spent['month']+amount>MONTH_BUDGET*Decimal('.9'):
             return None
-        call=db.execute('INSERT INTO bulletin.calls(reserved_usd) VALUES(%s) RETURNING id',(amount,)).fetchone()
+        call=db.execute('INSERT INTO bulletin.calls(reserved_usd,run_id) VALUES(%s,%s) RETURNING id',(amount,run_id)).fetchone()
         db.execute('''UPDATE bulletin.decisions SET attempts=attempts+1,last_attempt_at=now(),
           status='failed',updated_at=now() WHERE tweet_id=%s''',(job['tweet_id'],))
     return call['id']
@@ -177,13 +178,28 @@ def publish(db, job, label):
     return True
 
 
+def progress(db, run_id, counts, status='running', finished=False):
+    with db.transaction():
+        db.execute('UPDATE bulletin.worker_state SET counts=%s WHERE id=1',(Jsonb(counts),))
+        db.execute('''UPDATE bulletin.runs SET counts=%s,status=%s,
+          finished_at=CASE WHEN %s THEN now() ELSE finished_at END WHERE id=%s''',
+          (Jsonb(counts),status,finished,run_id))
+
+
 def run(db, limit=MAX_CALLS, enqueue_only=False):
     if not db.execute('SELECT pg_try_advisory_lock(%s) AS locked',(LOCK,)).fetchone()['locked']:
         return {'status':'already_running'}
     started=time.monotonic()
     counts=dict(rows_seen=0,candidates_seen=0,calls=0,positive=0,negative=0,failed=0,suppressed=0)
+    run_id=None
     try:
-        db.execute("UPDATE bulletin.worker_state SET last_started_at=now(),status='running' WHERE id=1")
+        # Owning the lock proves earlier 'running' rows no longer have a live worker.
+        with db.transaction():
+            db.execute("UPDATE bulletin.runs SET status='interrupted' WHERE status='running'")
+            run_id=db.execute('INSERT INTO bulletin.runs(model,classifier_version) VALUES(%s,%s) RETURNING id',
+                (MODEL,VERSION)).fetchone()['id']
+            db.execute("UPDATE bulletin.worker_state SET last_started_at=now(),last_finished_at=NULL,status='running',counts=%s WHERE id=1",
+                (Jsonb(counts),))
         # Small feature tables only; remove data no longer eligible under current policy.
         db.execute('''DELETE FROM bulletin.decisions d USING public.tweets t
           WHERE d.tweet_id=t.tweet_id AND (t.is_tombstone OR NOT EXISTS
@@ -192,7 +208,7 @@ def run(db, limit=MAX_CALLS, enqueue_only=False):
         engine.execute('SET threads=1')
         engine.execute("SET memory_limit='128MB'")
         try:
-            complete=intake(db,engine,counts,started)
+            complete=intake(db,engine,counts,started,run_id)
         finally:
             engine.close()
         status='ok' if complete else 'intake_backlog'
@@ -213,7 +229,7 @@ def run(db, limit=MAX_CALLS, enqueue_only=False):
                 if len(body)>65536:
                     status='oversize_candidate';continue
                 amount=reservation(body)
-                call_id=reserve(db,job,amount)
+                call_id=reserve(db,job,amount,run_id)
                 if call_id is None:
                     status='budget_limit';break
                 counts['calls']+=1
@@ -236,6 +252,7 @@ def run(db, limit=MAX_CALLS, enqueue_only=False):
                         ('failed:'+type(exc).__name__,call_id))
                     counts['failed']+=1
                     status='classification_failed'
+                progress(db,run_id,counts)
         pending=db.execute("SELECT count(*) AS n FROM bulletin.decisions WHERE status IN ('pending','failed')").fetchone()['n']
         counts['pending']=pending
         if enqueue_only:
@@ -245,8 +262,11 @@ def run(db, limit=MAX_CALLS, enqueue_only=False):
         db.execute('''UPDATE bulletin.worker_state SET last_finished_at=now(),status=%s,counts=%s,
           last_success_at=CASE WHEN %s='ok' THEN now() ELSE last_success_at END WHERE id=1''',
           (status,Jsonb(counts),status))
+        progress(db,run_id,counts,status,finished=True)
         return {'status':status,**counts}
     except Exception as exc:
+        if run_id is not None:
+            progress(db,run_id,counts,'failed:'+type(exc).__name__,finished=True)
         db.execute('''UPDATE bulletin.worker_state SET last_finished_at=now(),status=%s,counts=%s WHERE id=1''',
             ('failed:'+type(exc).__name__,Jsonb(counts)))
         raise

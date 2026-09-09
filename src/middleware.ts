@@ -521,6 +521,8 @@ export async function middleware(request: NextRequest) {
   // ── Stage 6: Security Headers (all responses) ──────────────────────────
   addSecurityHeaders(response)
   if (
+    pathname === '/opportunities' ||
+    pathname === '/admin/opportunities' ||
     pathname === '/birdseye' ||
     pathname.startsWith('/birdseye/') ||
     pathname.startsWith('/api/birdseye/')

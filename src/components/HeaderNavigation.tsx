@@ -21,7 +21,7 @@ export default function HeaderNavigation({ items }: { items: NavItem[] }) {
   const pathname = usePathname()
 
   return (
-    <NavigationMenu className="hidden xl:flex">
+    <NavigationMenu className="hidden 2xl:flex">
       <NavigationMenuList>
         {items.map((item) => {
           const isActive = isNavItemActive(pathname, item.href)

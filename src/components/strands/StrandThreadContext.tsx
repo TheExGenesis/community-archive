@@ -1,4 +1,6 @@
 'use client'
+
+import { captureProductAction } from '@/lib/productAnalytics'
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
@@ -56,7 +58,10 @@ export function StrandThreadContext({
         ) : (
           <button
             aria-expanded={open}
-            onClick={() => setOpen(!open)}
+            onClick={() => {
+              if (!open) captureProductAction('strands', 'thread_expanded')
+              setOpen(!open)
+            }}
             className="text-brand"
           >
             {open ? 'Hide thread context' : 'Show thread context'}

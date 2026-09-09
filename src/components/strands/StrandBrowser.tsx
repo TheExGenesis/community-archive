@@ -1,4 +1,5 @@
 'use client'
+import { captureProductAction } from '@/lib/productAnalytics'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { StrandPageData } from '@/lib/community-apps/types'
 import StrandMinimap, { type MapStrand } from './StrandMinimap'
@@ -129,9 +130,15 @@ export function StrandBrowser({
   const [input, setInput] = useState(initialQuery)
   const [query, setQuery] = useState(initialQuery)
   useEffect(() => {
-    const timer = setTimeout(() => setQuery(input.trim()), 300)
+    const timer = setTimeout(() => {
+      const next = input.trim()
+      if (next !== query) {
+        captureProductAction('strands', 'searched')
+        setQuery(next)
+      }
+    }, 300)
     return () => clearTimeout(timer)
-  }, [input])
+  }, [input, query])
   return (
     <StrandFocusProvider>
       <div className="grid w-full items-start gap-8 lg:grid-cols-[minmax(0,1fr)_480px]">
@@ -139,6 +146,8 @@ export function StrandBrowser({
           <form
             onSubmit={(event) => {
               event.preventDefault()
+              if (input.trim() !== query)
+                captureProductAction('strands', 'searched')
               setQuery(input.trim())
             }}
             className="mb-6 flex max-w-xl gap-3"

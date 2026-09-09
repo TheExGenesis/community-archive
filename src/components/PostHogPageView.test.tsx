@@ -1,5 +1,6 @@
 /** @jest-environment jsdom */
 
+import { StrictMode } from 'react'
 import { render } from '@testing-library/react'
 import PostHogPageView from './PostHogPageView'
 import { capturePostHogEvent } from '@/lib/posthog'
@@ -20,4 +21,29 @@ describe('PostHogPageView', () => {
       page: 'digest_story',
     })
   })
+})
+
+beforeEach(() => jest.clearAllMocks())
+
+it('records internal navigation once, including revisiting the original page', () => {
+  pathname = '/social-graph'
+  const view = render(
+    <StrictMode>
+      <PostHogPageView />
+    </StrictMode>,
+  )
+  expect(capturePostHogEvent).toHaveBeenCalledTimes(1)
+  pathname = '/strands/123'
+  view.rerender(
+    <StrictMode>
+      <PostHogPageView />
+    </StrictMode>,
+  )
+  pathname = '/social-graph'
+  view.rerender(
+    <StrictMode>
+      <PostHogPageView />
+    </StrictMode>,
+  )
+  expect(capturePostHogEvent).toHaveBeenCalledTimes(3)
 })

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import PostHogLink from '@/components/PostHogLink'
 import { HowItWorks } from './HowItWorks'
 import { Suspense } from 'react'
 import { ProfileIdentity } from './ProfileIdentity'
@@ -165,7 +166,12 @@ export function BirdseyeView({
               <ul className="space-y-0.5">
                 {group.topics.map((cluster) => (
                   <li key={cluster.id}>
-                    <Link
+                    <PostHogLink
+                      eventName="product_action"
+                      eventProperties={{
+                        feature: 'birdseye',
+                        action: 'topic_opened',
+                      }}
                       prefetch={false}
                       href={topicHref(cluster)}
                       aria-current={
@@ -179,7 +185,7 @@ export function BirdseyeView({
                         start={start}
                         end={end}
                       />
-                    </Link>
+                    </PostHogLink>
                   </li>
                 ))}
               </ul>

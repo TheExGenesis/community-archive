@@ -1,4 +1,6 @@
 'use client'
+
+import { captureProductAction } from '@/lib/productAnalytics'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Link2, UserRound } from 'lucide-react'
@@ -44,6 +46,8 @@ export function InsightItem({
             event.preventDefault()
             clearTimeout(timer.current)
             pinned.current = !pinned.current
+            if (pinned.current)
+              captureProductAction('birdseye', 'source_opened')
             setOpen(pinned.current)
           }}
           onMouseEnter={enter}

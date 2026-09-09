@@ -1,5 +1,7 @@
 'use client'
 
+import { captureProductAction } from '@/lib/productAnalytics'
+
 import {
   useCallback,
   useDeferredValue,
@@ -792,6 +794,7 @@ export default function SocialGraphExplorer({
       },
     )
     renderer.on('clickNode', ({ node }) => {
+      captureProductAction('social_graph', 'node_selected')
       setSelectedNodeId((current) => {
         if (current && current !== node) {
           setFocusHistory((history) => [...history.slice(-7), current])
@@ -1017,6 +1020,7 @@ export default function SocialGraphExplorer({
   }, [filtered.nodes, pendingFocusNodeId])
 
   const focusNode = (nodeId: string, rememberCurrent = true) => {
+    captureProductAction('social_graph', 'node_selected')
     const renderer = rendererRef.current
     const position = renderer?.getNodeDisplayData(nodeId)
     if (!baseVisibleNodeIds.has(nodeId)) setPinnedNodeId(nodeId)
@@ -1072,6 +1076,7 @@ export default function SocialGraphExplorer({
   }
 
   const toggleCommunity = (communityId: string) => {
+    captureProductAction('social_graph', 'group_selected')
     const isClearing = selectedCommunityId === communityId
     setSelectedCommunityId(isClearing ? null : communityId)
     setSelectedNodeId(null)

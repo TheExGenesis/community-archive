@@ -2,10 +2,10 @@
 
 import Link from 'next/link'
 import type { ComponentProps } from 'react'
-import { capturePostHogEvent } from '@/lib/posthog'
+import { capturePostHogEvent, type PostHogEventName } from '@/lib/posthog'
 
 type PostHogLinkProps = ComponentProps<typeof Link> & {
-  eventName: string
+  eventName: PostHogEventName
   eventProperties?: Record<string, unknown>
 }
 

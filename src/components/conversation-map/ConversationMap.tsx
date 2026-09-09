@@ -1,5 +1,7 @@
 'use client'
 
+import { captureProductAction } from '@/lib/productAnalytics'
+
 import Link from 'next/link'
 import {
   useCallback,
@@ -241,7 +243,10 @@ export default function ConversationMap({
           <select
             aria-label="Explore a year"
             value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
+            onChange={(e) => {
+              captureProductAction('conversation_map', 'filter_changed')
+              setYear(Number(e.target.value))
+            }}
           >
             {[...years].reverse().map((y) => (
               <option key={y} value={y}>
@@ -370,10 +375,15 @@ export default function ConversationMap({
             drag.current = undefined
             if (e.currentTarget.hasPointerCapture(e.pointerId))
               e.currentTarget.releasePointerCapture(e.pointerId)
+            if (d?.moved)
+              captureProductAction('conversation_map', 'view_changed')
             if (d && !d.moved && geometry.current) {
               const p = point(e),
                 annotation = hitMap(geometry.current, p.x, p.y)
-              if (annotation) preview(annotation, e.clientX, e.clientY)
+              if (annotation) {
+                captureProductAction('conversation_map', 'node_selected')
+                preview(annotation, e.clientX, e.clientY)
+              }
             }
           }}
           onPointerCancel={() => {
@@ -402,6 +412,7 @@ export default function ConversationMap({
             if (annotation && target) {
               e.preventDefault()
               const r = target.getBoundingClientRect()
+              captureProductAction('conversation_map', 'node_selected')
               preview(annotation, r.x, r.y, true)
             }
           }}

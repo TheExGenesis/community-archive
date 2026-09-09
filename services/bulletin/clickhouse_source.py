@@ -2,6 +2,8 @@
 import datetime as dt
 import json
 import os
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -11,8 +13,18 @@ def get(path, **params):
     token = os.environ['CLICKHOUSE_ANALYTICS_API_TOKEN']
     request = urllib.request.Request(base+'/'+path+'?'+urllib.parse.urlencode(params),
         headers={'Authorization':'Bearer '+token})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        result = json.load(response)
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                result = json.load(response)
+            break
+        except urllib.error.HTTPError as error:
+            if error.code not in (429, 500, 502, 503, 504) or attempt == 2:
+                raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if attempt == 2:
+                raise
+        time.sleep(2**attempt)
     if result.get('source') != 'clickhouse' or not isinstance(result.get('data'),list):
         raise RuntimeError('invalid_clickhouse_response')
     for row in result['data']:

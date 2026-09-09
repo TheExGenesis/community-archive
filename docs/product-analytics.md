@@ -7,20 +7,48 @@ cannot count clients that block or never execute analytics.
 ## Dashboard
 
 [Product Pulse v2](https://us.posthog.com/project/546185/dashboard/2080935)
-uses production pageviews, deduplicated engagement, feature reach, meaningful
-actions, retention, search conversion, and experience health. The
+leads with meaningful activity: weekly engaged people, weekly action volume,
+weekly feature and action tables, and return activity. The
 [original dashboard](https://us.posthog.com/project/546185/dashboard/2016936)
-remains available for detailed comparisons.
+remains available for traffic comparisons. Page visits are not verified humans
+and do not count as meaningful use.
+
+The activity charts cover four complete Monday–Sunday UTC weeks plus the current
+partial week. Weekly tables use relative columns so they keep rolling forward.
+Retention retains its existing 30-day observation window and incomplete-follow-up
+handling. Production host and PostHog bot filters apply; team activity is included.
+Bot filtering and meaningful-action requirements are not proof of humanity.
 
 Metric definitions:
 
-- Visitors: distinct people with a product `$pageview` in the period. Exclude
-  admin/auth/utility routes and bots; bots are a heuristic, not a guarantee.
-- Engagement: visitors who also performed a qualifying action in that same
-  period, counting a person once across all action types. Never add independent
-  per-event unique counts. A page or navbar click alone is not engagement.
-- Feature engagement: the same intersection by feature. Use `feature` on new
-  events and normalized page URLs on older events; do not expose dynamic IDs.
+- Engaged people: distinct people performing a qualifying action in the week,
+  counted once across action types. No pageview prerequisite or pageview-based
+  denominator. Never add per-event unique counts to calculate this metric.
+- Action volume: number of qualifying events in the week; repeated actions count.
+- Feature use: distinct people performing qualifying actions in each feature and
+  week. Attribute by event family, explicit product-event `feature`, or tweet
+  `origin`, rather than incidental page location. A search from the homepage
+  counts as Search; tweet actions with an unknown origin are labeled explicitly.
+  A person can use multiple features, so feature rows are not additive.
+- Actions table: distinct people per action and week; repeated uses of the same
+  action count once per person. This measures adoption, not raw event volume.
+- Qualifying actions: archive search; tweet expand/open/archived-quotes/external/
+  quoted-tweet opens; Bangers search/load-more; Trends terms-added/evidence-refresh;
+  Digest story/keyword-search opens; directory profile opens; upload acceptance;
+  and deliberate `product_action` events. Navigation, pageviews, background result
+  delivery, and tweet collapse do not qualify.
+- Retention: weekly return activity from the first meaningful activity observed
+  in the 30-day window, not a claim about lifetime-new users. Incomplete follow-up
+  cells remain unavailable.
+
+Search conversion and experience health are saved separately but removed from
+the main dashboard until their missing events arrive after the tracking release.
+Zeroes from absent instrumentation must not be presented as observed drop-off or
+zero failures. New feature instrumentation also has no recoverable historical
+baseline; the weekly tables describe recorded actions only.
+
+Outcome definitions for release verification:
+
 - Search results: `phase=canonical` is the complete result; previews are separate.
   Count failures separately from a successful empty result.
 - `archive_upload_completed` means browser upload accepted, not background
@@ -28,9 +56,8 @@ Metric definitions:
 - Ready durations: exclude `navigation_shell` for usable-data timing. A missing
   `elapsed_ms` means the navigation start was unknown, not zero milliseconds.
 
-Current weeks are partial. Expanded page coverage and new action instrumentation
-change the baseline. Mark missing instrumentation as unavailable; do not invent
-historical zeroes. Signed-in and Community Archive member are different states.
+Signed-in and Community Archive member are different states. Expanded action
+instrumentation changes the baseline; do not invent historical zeroes.
 
 ## Adding pages and actions
 

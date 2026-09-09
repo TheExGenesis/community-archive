@@ -2060,7 +2060,10 @@ export type Database = {
         }[]
       }
       get_bulletin_runs: {
-        Args: { before_id?: number; max_results?: number }
+        Args: {
+          before_id?: number
+          max_results?: number
+        }
         Returns: Json
       }
       get_hourly_scraping_stats: {

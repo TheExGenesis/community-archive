@@ -2038,7 +2038,9 @@ export type Database = {
         }[]
       }
       get_bulletin_board_state: {
-        Args: { max_results?: number }
+        Args: {
+          max_results?: number
+        }
         Returns: Json
       }
       get_bulletin_opportunities: {
@@ -2070,7 +2072,10 @@ export type Database = {
         Returns: Json
       }
       get_bulletin_relationships: {
-        Args: { viewer_account_id?: string; viewer_username?: string }
+        Args: {
+          viewer_username?: string
+          viewer_account_id?: string
+        }
         Returns: Json
       }
       get_bulletin_runs: {

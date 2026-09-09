@@ -1,7 +1,5 @@
 'use client'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { tweetPermalinkHref } from '@/lib/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { TweetCard } from '@/components/TweetCard'
@@ -65,7 +63,7 @@ function Original({ id }: { id: string }) {
         <TweetCard
           tweet={tweet}
           previewHeight={240}
-          clickable
+          clickable={false}
           showDate
           showExternalLink
           origin="opportunities"
@@ -280,27 +278,25 @@ export function OpportunityBoard({
                       className={`min-w-0 overflow-hidden rounded-lg border bg-card ${expired ? 'opacity-60' : ''} ${rel.rank < 3 ? 'border-brand/40' : ''}`}
                     >
                       <Original id={o.tweet_id} />
-                      <Link
-                        href={tweetPermalinkHref(
-                          o.tweet_id,
-                          'opportunities',
-                          '/opportunities',
-                        )}
-                        className="block h-24 space-y-1 border-t px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                      >
-                        <p
-                          className="line-clamp-3 text-xs leading-relaxed text-foreground/80"
-                          title={o.summary}
-                        >
+                      <div className="h-24 space-y-1 border-t px-3 py-2">
+                        <div className="flex items-center justify-between gap-2 text-[11px] leading-4">
+                          <span className="rounded bg-muted px-1.5 py-0.5 font-medium text-muted-foreground">
+                            {KIND_LABELS[o.kind]}
+                          </span>
                           {(rel.label || expired) && (
-                            <span className="float-right mb-1 ml-2 rounded bg-muted/60 px-1.5 py-0.5 text-right text-[10px] font-normal leading-4 text-muted-foreground">
+                            <span className="rounded border bg-muted/40 px-1.5 py-0.5 text-right text-muted-foreground">
                               {rel.label}
                               {expired ? `${rel.label ? ' · ' : ''}Past` : ''}
                             </span>
                           )}
+                        </div>
+                        <p
+                          className="line-clamp-3 text-xs leading-[18px] text-foreground/80"
+                          title={o.summary}
+                        >
                           {o.summary}
                         </p>
-                      </Link>
+                      </div>
                     </article>
                   )
                 })}

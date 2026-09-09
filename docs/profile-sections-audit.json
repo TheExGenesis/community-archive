@@ -1,0 +1,5657 @@
+{
+  "generatedAt": "2026-09-08T23:17:23.430Z",
+  "source": "https://fabxmporizzqflnftavs.supabase.co/storage/v1/object/public/community-archive-public-export/v1/2026-09-08T07-00-55Z/manifest.json",
+  "summary": {
+    "accounts": 52,
+    "yearsAudited": 569,
+    "filledBefore": 207,
+    "emptyBefore": 21,
+    "missingBefore": 341,
+    "filledByBangers": 12,
+    "filledByFallback": 293,
+    "filledAfter": 512,
+    "insufficientPosts": 47,
+    "noDefensibleSplit": 10,
+    "failures": 0
+  },
+  "years": [
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 14
+    },
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 17
+    },
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 17
+    },
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 9
+    },
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 7,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 3,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 1,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 6,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 46,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1721070150",
+      "username": "__drewface",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2024,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 8
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 8
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 40,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 20,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 33,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 7,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 7,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 22,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "752422021",
+      "username": "_brentbaum",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1725378831849304064",
+      "username": "1thousandfaces_",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1725378831849304064",
+      "username": "1thousandfaces_",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 12
+    },
+    {
+      "accountId": "1725378831849304064",
+      "username": "1thousandfaces_",
+      "year": 2024,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1725378831849304064",
+      "username": "1thousandfaces_",
+      "year": 2023,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 15,
+      "responses": 3,
+      "failures": 0
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 18
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 39
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 16
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 10
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 32,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 48,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "282948199",
+      "username": "algekalipso",
+      "year": 2011,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1445452517689552909",
+      "username": "anthrupad",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 12
+    },
+    {
+      "accountId": "1445452517689552909",
+      "username": "anthrupad",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 12
+    },
+    {
+      "accountId": "1445452517689552909",
+      "username": "anthrupad",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 16
+    },
+    {
+      "accountId": "1445452517689552909",
+      "username": "anthrupad",
+      "year": 2023,
+      "before": "missing",
+      "bangers": 4,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1445452517689552909",
+      "username": "anthrupad",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 27
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 16
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 15
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2020,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 13
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "no-defensible-split",
+      "candidates": 5,
+      "responses": 2,
+      "failures": 1
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 2,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 2,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 2,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 8,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 13,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "193553265",
+      "username": "AskYatharth",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 1,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "217268110",
+      "username": "bashu_thanks",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 10
+    },
+    {
+      "accountId": "217268110",
+      "username": "bashu_thanks",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "217268110",
+      "username": "bashu_thanks",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 21
+    },
+    {
+      "accountId": "217268110",
+      "username": "bashu_thanks",
+      "year": 2023,
+      "before": "empty",
+      "after": "bangers",
+      "bangers": 16
+    },
+    {
+      "accountId": "217268110",
+      "username": "bashu_thanks",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "217268110",
+      "username": "bashu_thanks",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 33,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "217268110",
+      "username": "bashu_thanks",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "1181349398283993089",
+      "username": "chercher_ai",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1181349398283993089",
+      "username": "chercher_ai",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 3,
+      "failures": 1
+    },
+    {
+      "accountId": "1181349398283993089",
+      "username": "chercher_ai",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 11
+    },
+    {
+      "accountId": "1181349398283993089",
+      "username": "chercher_ai",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 8
+    },
+    {
+      "accountId": "1181349398283993089",
+      "username": "chercher_ai",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 4,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1181349398283993089",
+      "username": "chercher_ai",
+      "year": 2021,
+      "before": "empty",
+      "bangers": 6,
+      "after": "bangers",
+      "candidates": 6,
+      "responses": 3,
+      "failures": 0
+    },
+    {
+      "accountId": "1181349398283993089",
+      "username": "chercher_ai",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1181349398283993089",
+      "username": "chercher_ai",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1170701109629018117",
+      "username": "chrislakin",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 26
+    },
+    {
+      "accountId": "1170701109629018117",
+      "username": "chrislakin",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 37
+    },
+    {
+      "accountId": "1170701109629018117",
+      "username": "chrislakin",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "1170701109629018117",
+      "username": "chrislakin",
+      "year": 2023,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 44,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1170701109629018117",
+      "username": "chrislakin",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "826134955549790208",
+      "username": "christineist",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 16
+    },
+    {
+      "accountId": "826134955549790208",
+      "username": "christineist",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 16
+    },
+    {
+      "accountId": "826134955549790208",
+      "username": "christineist",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 16
+    },
+    {
+      "accountId": "826134955549790208",
+      "username": "christineist",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 16
+    },
+    {
+      "accountId": "826134955549790208",
+      "username": "christineist",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 12
+    },
+    {
+      "accountId": "826134955549790208",
+      "username": "christineist",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 1,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "1038586640",
+      "username": "danielbrottman",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "1038586640",
+      "username": "danielbrottman",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 15
+    },
+    {
+      "accountId": "1038586640",
+      "username": "danielbrottman",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 10
+    },
+    {
+      "accountId": "1038586640",
+      "username": "danielbrottman",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 9
+    },
+    {
+      "accountId": "1038586640",
+      "username": "danielbrottman",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "1038586640",
+      "username": "danielbrottman",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1038586640",
+      "username": "danielbrottman",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1038586640",
+      "username": "danielbrottman",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "no-defensible-split",
+      "candidates": 5,
+      "responses": 3,
+      "failures": 0
+    },
+    {
+      "accountId": "1038586640",
+      "username": "danielbrottman",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "no-defensible-split",
+      "candidates": 4,
+      "responses": 3,
+      "failures": 0
+    },
+    {
+      "accountId": "1038586640",
+      "username": "danielbrottman",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 18,
+      "responses": 5,
+      "failures": 0
+    },
+    {
+      "accountId": "1038586640",
+      "username": "danielbrottman",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 7,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1038586640",
+      "username": "danielbrottman",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 1,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "1038586640",
+      "username": "danielbrottman",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2026,
+      "before": "empty",
+      "bangers": 7,
+      "after": "bangers",
+      "candidates": 7,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 8
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2023,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 22,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2011,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 26,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2010,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 45,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2009,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "13232322",
+      "username": "DanielleFong",
+      "year": 2008,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 16
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 4,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 18,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "no-defensible-split",
+      "candidates": 5,
+      "responses": 3,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 9,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 48,
+      "responses": 5,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2011,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2010,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 1
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2009,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "15484497",
+      "username": "davidad",
+      "year": 2008,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 2,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "1680757426889342977",
+      "username": "DefenderOfBasic",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 24
+    },
+    {
+      "accountId": "1680757426889342977",
+      "username": "DefenderOfBasic",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 55
+    },
+    {
+      "accountId": "1680757426889342977",
+      "username": "DefenderOfBasic",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 57
+    },
+    {
+      "accountId": "1680757426889342977",
+      "username": "DefenderOfBasic",
+      "year": 2023,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 12
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 10
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 27
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 55
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 26
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 27
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2020,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 28
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2019,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 3,
+      "failures": 0
+    },
+    {
+      "accountId": "1584642529",
+      "username": "eigenrobot",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 45,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 33
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 63
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 31
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 26,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 16,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 16,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 1,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "no-defensible-split",
+      "candidates": 16,
+      "responses": 6,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 11,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 1,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 9,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2011,
+      "before": "missing",
+      "bangers": 0,
+      "after": "no-defensible-split",
+      "candidates": 7,
+      "responses": 6,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2010,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 2,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2009,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 12,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2008,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 15,
+      "responses": 5,
+      "failures": 0
+    },
+    {
+      "accountId": "905201",
+      "username": "eshear",
+      "year": 2007,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 17
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 25
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 21
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 15
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 15
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 5,
+      "failures": 0
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "322603863",
+      "username": "exgenesis",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 17
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2024,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2023,
+      "before": "empty",
+      "bangers": 6,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 4,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 43,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 3,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 26,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 33,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "no-defensible-split",
+      "candidates": 9,
+      "responses": 6,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2011,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "185214623",
+      "username": "frideswyth",
+      "year": 2010,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 1,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "881192533056827392",
+      "username": "goblinodds",
+      "year": 2026,
+      "before": "empty",
+      "bangers": 13,
+      "after": "bangers",
+      "candidates": 13,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "881192533056827392",
+      "username": "goblinodds",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 13
+    },
+    {
+      "accountId": "881192533056827392",
+      "username": "goblinodds",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 22
+    },
+    {
+      "accountId": "881192533056827392",
+      "username": "goblinodds",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 22
+    },
+    {
+      "accountId": "881192533056827392",
+      "username": "goblinodds",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 22
+    },
+    {
+      "accountId": "881192533056827392",
+      "username": "goblinodds",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 14
+    },
+    {
+      "accountId": "881192533056827392",
+      "username": "goblinodds",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 4,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "881192533056827392",
+      "username": "goblinodds",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "881192533056827392",
+      "username": "goblinodds",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "881192533056827392",
+      "username": "goblinodds",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 2,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 4,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 11
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 9
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 18
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 18
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2020,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 22
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 2,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 3,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 3,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 18,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 39,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 21,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 38,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2011,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 34,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2010,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 16,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "22151118",
+      "username": "m_ashcroft",
+      "year": 2009,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 1,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 13
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 18
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 33
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 20
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2020,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 24
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2019,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 14
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2011,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2010,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 36,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "49044207",
+      "username": "Malcolm_Ocean",
+      "year": 2009,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 19,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "3467611",
+      "username": "mbateman",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "3467611",
+      "username": "mbateman",
+      "year": 2025,
+      "before": "empty",
+      "bangers": 9,
+      "after": "bangers",
+      "candidates": 9,
+      "responses": 3,
+      "failures": 0
+    },
+    {
+      "accountId": "3467611",
+      "username": "mbateman",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 17
+    },
+    {
+      "accountId": "3467611",
+      "username": "mbateman",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 11
+    },
+    {
+      "accountId": "3467611",
+      "username": "mbateman",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "3467611",
+      "username": "mbateman",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "3467611",
+      "username": "mbateman",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "3467611",
+      "username": "mbateman",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 25,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "3467611",
+      "username": "mbateman",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "3467611",
+      "username": "mbateman",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "1159211693546885120",
+      "username": "mechanical_monk",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 20,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1159211693546885120",
+      "username": "mechanical_monk",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 9
+    },
+    {
+      "accountId": "1159211693546885120",
+      "username": "mechanical_monk",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 9
+    },
+    {
+      "accountId": "1159211693546885120",
+      "username": "mechanical_monk",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 8
+    },
+    {
+      "accountId": "1159211693546885120",
+      "username": "mechanical_monk",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1159211693546885120",
+      "username": "mechanical_monk",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 10
+    },
+    {
+      "accountId": "1159211693546885120",
+      "username": "mechanical_monk",
+      "year": 2020,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 10
+    },
+    {
+      "accountId": "1159211693546885120",
+      "username": "mechanical_monk",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 49,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1184414112891260930",
+      "username": "metaLulie",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1184414112891260930",
+      "username": "metaLulie",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "1184414112891260930",
+      "username": "metaLulie",
+      "year": 2024,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1184414112891260930",
+      "username": "metaLulie",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 8
+    },
+    {
+      "accountId": "1184414112891260930",
+      "username": "metaLulie",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "1184414112891260930",
+      "username": "metaLulie",
+      "year": 2021,
+      "before": "empty",
+      "bangers": 8,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "1184414112891260930",
+      "username": "metaLulie",
+      "year": 2020,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 14
+    },
+    {
+      "accountId": "1184414112891260930",
+      "username": "metaLulie",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 37,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "163384337",
+      "username": "michaelcurzi",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "163384337",
+      "username": "michaelcurzi",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "163384337",
+      "username": "michaelcurzi",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 8
+    },
+    {
+      "accountId": "163384337",
+      "username": "michaelcurzi",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 24
+    },
+    {
+      "accountId": "163384337",
+      "username": "michaelcurzi",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 9
+    },
+    {
+      "accountId": "163384337",
+      "username": "michaelcurzi",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 25
+    },
+    {
+      "accountId": "163384337",
+      "username": "michaelcurzi",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 4,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "163384337",
+      "username": "michaelcurzi",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1333256431907299328",
+      "username": "myceliummage",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1333256431907299328",
+      "username": "myceliummage",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1333256431907299328",
+      "username": "myceliummage",
+      "year": 2024,
+      "before": "empty",
+      "bangers": 6,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "1333256431907299328",
+      "username": "myceliummage",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 18
+    },
+    {
+      "accountId": "1333256431907299328",
+      "username": "myceliummage",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 16
+    },
+    {
+      "accountId": "1333256431907299328",
+      "username": "myceliummage",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1333256431907299328",
+      "username": "myceliummage",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 6,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 11
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2024,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2023,
+      "before": "empty",
+      "bangers": 9,
+      "after": "bangers",
+      "candidates": 9,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2021,
+      "before": "empty",
+      "bangers": 7,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 4,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 24,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "161751748",
+      "username": "myhandle",
+      "year": 2010,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 1,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "65421745",
+      "username": "neats29",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "65421745",
+      "username": "neats29",
+      "year": 2025,
+      "before": "empty",
+      "bangers": 8,
+      "after": "bangers",
+      "candidates": 8,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "65421745",
+      "username": "neats29",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "65421745",
+      "username": "neats29",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "65421745",
+      "username": "neats29",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "65421745",
+      "username": "neats29",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "65421745",
+      "username": "neats29",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "65421745",
+      "username": "neats29",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 45,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "65421745",
+      "username": "neats29",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 1,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "65421745",
+      "username": "neats29",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 3,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "65421745",
+      "username": "neats29",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 2,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "65421745",
+      "username": "neats29",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 26,
+      "responses": 5,
+      "failures": 0
+    },
+    {
+      "accountId": "65421745",
+      "username": "neats29",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 1,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "942629708029607936",
+      "username": "nopranablem",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "942629708029607936",
+      "username": "nopranablem",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "942629708029607936",
+      "username": "nopranablem",
+      "year": 2024,
+      "before": "missing",
+      "bangers": 4,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "942629708029607936",
+      "username": "nopranablem",
+      "year": 2023,
+      "before": "empty",
+      "bangers": 6,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "942629708029607936",
+      "username": "nopranablem",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 8
+    },
+    {
+      "accountId": "942629708029607936",
+      "username": "nopranablem",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "942629708029607936",
+      "username": "nopranablem",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "942629708029607936",
+      "username": "nopranablem",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 30,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "942629708029607936",
+      "username": "nopranablem",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 11,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "942629708029607936",
+      "username": "nopranablem",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "1163743742764998658",
+      "username": "nosilverv",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 85
+    },
+    {
+      "accountId": "1163743742764998658",
+      "username": "nosilverv",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 67
+    },
+    {
+      "accountId": "1163743742764998658",
+      "username": "nosilverv",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 80
+    },
+    {
+      "accountId": "1163743742764998658",
+      "username": "nosilverv",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 40
+    },
+    {
+      "accountId": "1163743742764998658",
+      "username": "nosilverv",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 37
+    },
+    {
+      "accountId": "1163743742764998658",
+      "username": "nosilverv",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 26
+    },
+    {
+      "accountId": "1163743742764998658",
+      "username": "nosilverv",
+      "year": 2020,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 53
+    },
+    {
+      "accountId": "1163743742764998658",
+      "username": "nosilverv",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 11
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 4,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 3,
+      "failures": 0
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 19
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2020,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2019,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2011,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2010,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "20844341",
+      "username": "patio11",
+      "year": 2009,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "269148958",
+      "username": "Prigoose",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 8
+    },
+    {
+      "accountId": "269148958",
+      "username": "Prigoose",
+      "year": 2025,
+      "before": "empty",
+      "bangers": 8,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "269148958",
+      "username": "Prigoose",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 8
+    },
+    {
+      "accountId": "269148958",
+      "username": "Prigoose",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 13
+    },
+    {
+      "accountId": "269148958",
+      "username": "Prigoose",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "269148958",
+      "username": "Prigoose",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "269148958",
+      "username": "Prigoose",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 48,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "269148958",
+      "username": "Prigoose",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "269148958",
+      "username": "Prigoose",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 49,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "269148958",
+      "username": "Prigoose",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 32,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "269148958",
+      "username": "Prigoose",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 2,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "1225576032163360770",
+      "username": "PrinceVogel",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 4,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "1225576032163360770",
+      "username": "PrinceVogel",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 1
+    },
+    {
+      "accountId": "1225576032163360770",
+      "username": "PrinceVogel",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 11
+    },
+    {
+      "accountId": "1225576032163360770",
+      "username": "PrinceVogel",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 20
+    },
+    {
+      "accountId": "1225576032163360770",
+      "username": "PrinceVogel",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 9
+    },
+    {
+      "accountId": "1225576032163360770",
+      "username": "PrinceVogel",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 11
+    },
+    {
+      "accountId": "1225576032163360770",
+      "username": "PrinceVogel",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1016470827775086592",
+      "username": "QiaochuYuan",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 59
+    },
+    {
+      "accountId": "1016470827775086592",
+      "username": "QiaochuYuan",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 21
+    },
+    {
+      "accountId": "1016470827775086592",
+      "username": "QiaochuYuan",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 72
+    },
+    {
+      "accountId": "1016470827775086592",
+      "username": "QiaochuYuan",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 78
+    },
+    {
+      "accountId": "1016470827775086592",
+      "username": "QiaochuYuan",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 38
+    },
+    {
+      "accountId": "1016470827775086592",
+      "username": "QiaochuYuan",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 58
+    },
+    {
+      "accountId": "1016470827775086592",
+      "username": "QiaochuYuan",
+      "year": 2020,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 29
+    },
+    {
+      "accountId": "1016470827775086592",
+      "username": "QiaochuYuan",
+      "year": 2019,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 36
+    },
+    {
+      "accountId": "1089644895076261889",
+      "username": "qorprate",
+      "year": 2026,
+      "before": "empty",
+      "bangers": 6,
+      "after": "bangers",
+      "candidates": 6,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "1089644895076261889",
+      "username": "qorprate",
+      "year": 2025,
+      "before": "empty",
+      "bangers": 11,
+      "after": "bangers",
+      "candidates": 11,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1089644895076261889",
+      "username": "qorprate",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "1089644895076261889",
+      "username": "qorprate",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 9
+    },
+    {
+      "accountId": "1089644895076261889",
+      "username": "qorprate",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "1089644895076261889",
+      "username": "qorprate",
+      "year": 2021,
+      "before": "empty",
+      "bangers": 7,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "1089644895076261889",
+      "username": "qorprate",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1089644895076261889",
+      "username": "qorprate",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "584224699",
+      "username": "relic_radiation",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "584224699",
+      "username": "relic_radiation",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "584224699",
+      "username": "relic_radiation",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 18
+    },
+    {
+      "accountId": "584224699",
+      "username": "relic_radiation",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 26
+    },
+    {
+      "accountId": "584224699",
+      "username": "relic_radiation",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 15
+    },
+    {
+      "accountId": "584224699",
+      "username": "relic_radiation",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "584224699",
+      "username": "relic_radiation",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "584224699",
+      "username": "relic_radiation",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 3,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "1359981346119155719",
+      "username": "repligate",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 75
+    },
+    {
+      "accountId": "1359981346119155719",
+      "username": "repligate",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 70
+    },
+    {
+      "accountId": "1359981346119155719",
+      "username": "repligate",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 45
+    },
+    {
+      "accountId": "1359981346119155719",
+      "username": "repligate",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 15
+    },
+    {
+      "accountId": "1359981346119155719",
+      "username": "repligate",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1359981346119155719",
+      "username": "repligate",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 2,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 26
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 32
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 42
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 51
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 40
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 9
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2020,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 1
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 13,
+      "responses": 3,
+      "failures": 0
+    },
+    {
+      "accountId": "316970336",
+      "username": "RichDecibels",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 2,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "820288038",
+      "username": "RomeoStevens76",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "820288038",
+      "username": "RomeoStevens76",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 27
+    },
+    {
+      "accountId": "820288038",
+      "username": "RomeoStevens76",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 23
+    },
+    {
+      "accountId": "820288038",
+      "username": "RomeoStevens76",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 12
+    },
+    {
+      "accountId": "820288038",
+      "username": "RomeoStevens76",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 22
+    },
+    {
+      "accountId": "820288038",
+      "username": "RomeoStevens76",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 11
+    },
+    {
+      "accountId": "820288038",
+      "username": "RomeoStevens76",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "820288038",
+      "username": "RomeoStevens76",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "820288038",
+      "username": "RomeoStevens76",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "1543863542017040384",
+      "username": "sanjehorah",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1543863542017040384",
+      "username": "sanjehorah",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1543863542017040384",
+      "username": "sanjehorah",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "1543863542017040384",
+      "username": "sanjehorah",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 8
+    },
+    {
+      "accountId": "1543863542017040384",
+      "username": "sanjehorah",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 0,
+      "after": "no-defensible-split",
+      "candidates": 5,
+      "responses": 3,
+      "failures": 0
+    },
+    {
+      "accountId": "1302104431324876801",
+      "username": "slimepriestess",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1302104431324876801",
+      "username": "slimepriestess",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1302104431324876801",
+      "username": "slimepriestess",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 9
+    },
+    {
+      "accountId": "1302104431324876801",
+      "username": "slimepriestess",
+      "year": 2023,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1302104431324876801",
+      "username": "slimepriestess",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1302104431324876801",
+      "username": "slimepriestess",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1302104431324876801",
+      "username": "slimepriestess",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1163927704049262592",
+      "username": "strangestloop",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 9
+    },
+    {
+      "accountId": "1163927704049262592",
+      "username": "strangestloop",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 9
+    },
+    {
+      "accountId": "1163927704049262592",
+      "username": "strangestloop",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 15
+    },
+    {
+      "accountId": "1163927704049262592",
+      "username": "strangestloop",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 22
+    },
+    {
+      "accountId": "1163927704049262592",
+      "username": "strangestloop",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 21
+    },
+    {
+      "accountId": "1163927704049262592",
+      "username": "strangestloop",
+      "year": 2021,
+      "before": "empty",
+      "bangers": 7,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "1163927704049262592",
+      "username": "strangestloop",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 11
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 27
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 24
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 31
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2022,
+      "before": "empty",
+      "bangers": 28,
+      "after": "bangers",
+      "candidates": 28,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 21
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2020,
+      "before": "empty",
+      "bangers": 6,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2019,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 9
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2011,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2010,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2009,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2063951",
+      "username": "tasshinfogleman",
+      "year": 2007,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 14,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1223231444429856769",
+      "username": "the_wilderless",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1223231444429856769",
+      "username": "the_wilderless",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 14
+    },
+    {
+      "accountId": "1223231444429856769",
+      "username": "the_wilderless",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 59
+    },
+    {
+      "accountId": "1223231444429856769",
+      "username": "the_wilderless",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 69
+    },
+    {
+      "accountId": "1223231444429856769",
+      "username": "the_wilderless",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 50
+    },
+    {
+      "accountId": "1223231444429856769",
+      "username": "the_wilderless",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 10
+    },
+    {
+      "accountId": "1223231444429856769",
+      "username": "the_wilderless",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 11
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 4,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2024,
+      "before": "missing",
+      "bangers": 3,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2023,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 3,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2011,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2010,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "37547071",
+      "username": "TheZvi",
+      "year": 2009,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 4,
+      "failures": 0
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 24
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2025,
+      "before": "empty",
+      "bangers": 58,
+      "after": "bangers",
+      "candidates": 58,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 49
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 19
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 19
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 16
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2020,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 10
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 11,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 21,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 1,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 7,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 17,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 0,
+      "after": "no-defensible-split",
+      "candidates": 4,
+      "responses": 3,
+      "failures": 0
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2010,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "18280363",
+      "username": "TylerAlterman",
+      "year": 2009,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 39,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 45
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 36
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 100
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 100
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 100
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 100
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2020,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 100
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2019,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 100
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2018,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 100
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2017,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 2,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2015,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2014,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2013,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2012,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2011,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2010,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2009,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 19,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "16884623",
+      "username": "visakanv",
+      "year": 2008,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 1,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "1044604087013015552",
+      "username": "vividvoid",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 14
+    },
+    {
+      "accountId": "1044604087013015552",
+      "username": "vividvoid",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 38
+    },
+    {
+      "accountId": "1044604087013015552",
+      "username": "vividvoid",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 40
+    },
+    {
+      "accountId": "1044604087013015552",
+      "username": "vividvoid",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 35
+    },
+    {
+      "accountId": "1044604087013015552",
+      "username": "vividvoid",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 17
+    },
+    {
+      "accountId": "1044604087013015552",
+      "username": "vividvoid",
+      "year": 2021,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 17
+    },
+    {
+      "accountId": "1044604087013015552",
+      "username": "vividvoid",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 24,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "281798056",
+      "username": "voooooogel",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 46
+    },
+    {
+      "accountId": "281798056",
+      "username": "voooooogel",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 43
+    },
+    {
+      "accountId": "281798056",
+      "username": "voooooogel",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 23
+    },
+    {
+      "accountId": "281798056",
+      "username": "voooooogel",
+      "year": 2023,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "281798056",
+      "username": "voooooogel",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "281798056",
+      "username": "voooooogel",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 24,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "281798056",
+      "username": "voooooogel",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 3,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "281798056",
+      "username": "voooooogel",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 6,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "281798056",
+      "username": "voooooogel",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "no-defensible-split",
+      "candidates": 4,
+      "responses": 3,
+      "failures": 0
+    },
+    {
+      "accountId": "281798056",
+      "username": "voooooogel",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "insufficient-posts",
+      "candidates": 0,
+      "responses": 0,
+      "failures": 0
+    },
+    {
+      "accountId": "1684958423043944449",
+      "username": "xlr8harder",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 5,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1684958423043944449",
+      "username": "xlr8harder",
+      "year": 2025,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 10
+    },
+    {
+      "accountId": "1684958423043944449",
+      "username": "xlr8harder",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "1684958423043944449",
+      "username": "xlr8harder",
+      "year": 2023,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2159323615",
+      "username": "xsphi",
+      "year": 2026,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 6
+    },
+    {
+      "accountId": "2159323615",
+      "username": "xsphi",
+      "year": 2025,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2159323615",
+      "username": "xsphi",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 7
+    },
+    {
+      "accountId": "2159323615",
+      "username": "xsphi",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 8
+    },
+    {
+      "accountId": "2159323615",
+      "username": "xsphi",
+      "year": 2022,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 10
+    },
+    {
+      "accountId": "2159323615",
+      "username": "xsphi",
+      "year": 2021,
+      "before": "missing",
+      "bangers": 4,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2159323615",
+      "username": "xsphi",
+      "year": 2020,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2159323615",
+      "username": "xsphi",
+      "year": 2019,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2159323615",
+      "username": "xsphi",
+      "year": 2018,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2159323615",
+      "username": "xsphi",
+      "year": 2017,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 50,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "2159323615",
+      "username": "xsphi",
+      "year": 2016,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 16,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1579352423008722945",
+      "username": "yoltartar",
+      "year": 2026,
+      "before": "missing",
+      "bangers": 0,
+      "after": "fallback",
+      "candidates": 11,
+      "responses": 1,
+      "failures": 0
+    },
+    {
+      "accountId": "1579352423008722945",
+      "username": "yoltartar",
+      "year": 2025,
+      "before": "empty",
+      "bangers": 7,
+      "after": "bangers",
+      "candidates": 7,
+      "responses": 2,
+      "failures": 0
+    },
+    {
+      "accountId": "1579352423008722945",
+      "username": "yoltartar",
+      "year": 2024,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 15
+    },
+    {
+      "accountId": "1579352423008722945",
+      "username": "yoltartar",
+      "year": 2023,
+      "before": "filled",
+      "after": "frozen",
+      "bangers": 13
+    },
+    {
+      "accountId": "1579352423008722945",
+      "username": "yoltartar",
+      "year": 2022,
+      "before": "missing",
+      "bangers": 1,
+      "after": "fallback",
+      "candidates": 48,
+      "responses": 1,
+      "failures": 0
+    }
+  ],
+  "baseline": "4c3551c436579610e2001d503032c1af7328ab2b",
+  "note": "Counts consolidated across the initial run, corrected UTC extraction, and review of two overfragmented new years. Published successful years remained frozen.",
+  "review": "Reviewed representative outputs; regenerated two overfragmented new years; manually removed a bare-photo grouping, a mismatched tweet, and a vague Amazing grouping. No published successful year changed."
+}

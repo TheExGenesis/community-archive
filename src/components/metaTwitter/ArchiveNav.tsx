@@ -108,12 +108,12 @@ export function ArchiveNav({
               onMouseEnter={() => onIntent?.(chapter.year)}
               onFocus={() => onIntent?.(chapter.year)}
               aria-current={active ? 'page' : undefined}
-              className={`flex whitespace-nowrap rounded-lg px-3 py-2 text-sm ${
+              className={`flex whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold ${
                 sections.length ? 'lg:hidden' : 'lg:mt-1 lg:justify-between'
               } ${
                 active
-                  ? 'bg-accent font-bold text-accent-foreground'
-                  : 'text-foreground/80 hover:bg-muted hover:text-foreground'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
               <span>{chapter.year}</span>
@@ -122,7 +122,7 @@ export function ArchiveNav({
               </span>
             </Link>
             {sections.length > 0 && (
-              <div className="hidden whitespace-nowrap px-3 py-2 text-sm text-foreground/80 lg:mt-1 lg:flex lg:justify-between">
+              <div className="hidden whitespace-nowrap px-3 py-2 text-sm font-semibold text-muted-foreground lg:mt-1 lg:flex lg:justify-between">
                 <span>{chapter.year}</span>
                 <span className="ml-2 text-xs text-muted-foreground">
                   {formatNumber(chapter.count)}

@@ -1,4 +1,6 @@
 import 'server-only'
+import { unstable_cache } from 'next/cache'
+import { supplementalSectionIds } from './metaTwitter/sectionConfig'
 
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { devLog } from '@/lib/devLog'
@@ -147,15 +149,96 @@ export async function getProfileCurationRows(
   }
 }
 
+const getSectionTweets = unstable_cache(
+  async (accountId: string, year: number, ids: string[]) => {
+    const result: BangerTweet[] = []
+    // Keep gateway fan-out bounded. Do not turn gateway errors into cached empties.
+    for (let index = 0; index < ids.length; index += 4) {
+      const batch = await Promise.all(
+        ids
+          .slice(index, index + 4)
+          .map((id) => fetchClickHouseTweetPageData(id)),
+      )
+      for (const tweet of batch) {
+        if (
+          tweet &&
+          tweet.account_id === accountId &&
+          new Date(tweet.created_at).getUTCFullYear() === year
+        )
+          result.push(manuallyCuratedBanger(tweet))
+      }
+    }
+    return result
+  },
+  ['profile-section-tweets-v1'],
+  { revalidate: 300 },
+)
+
+/** Include configured representatives even when they are outside the banger set. */
+async function getSectionedProfilePage(
+  accountId: string,
+  options: ProfileBangersPageOptions,
+) {
+  const page = await getProfileBangersPage(accountId, options)
+  const supplemental = supplementalSectionIds(accountId)
+  if (!page.available || !Object.keys(supplemental).length) return page
+  const counts = new Map(page.yearCounts.map((row) => [row.year, row.count]))
+  for (const [year, ids] of Object.entries(supplemental))
+    counts.set(Number(year), (counts.get(Number(year)) ?? 0) + ids.length)
+  const yearCounts = Array.from(counts, ([year, count]) => ({
+    year,
+    count,
+  })).sort((a, b) => b.year - a.year)
+  if (options.year === undefined || !supplemental[options.year]?.length)
+    return { ...page, yearCounts }
+  const collection = await getProfileBangers(accountId)
+  if (!collection.available) return { ...page, available: false }
+  const known = new Set(collection.tweets.map((tweet) => tweet.tweet_id))
+  try {
+    const ids = supplemental[options.year].filter((id) => !known.has(id))
+    const extra = await getSectionTweets(accountId, options.year, ids)
+    const tweets = [
+      ...collection.tweets.filter(
+        (tweet) => new Date(tweet.created_at).getUTCFullYear() === options.year,
+      ),
+      ...extra,
+    ]
+    tweets.sort(
+      (a, b) =>
+        (options.sort === 'likes'
+          ? b.favorite_count - a.favorite_count
+          : options.sort === 'newest'
+            ? Date.parse(b.created_at) - Date.parse(a.created_at)
+            : b.quote_count - a.quote_count) ||
+        b.tweet_id.localeCompare(a.tweet_id),
+    )
+    const offset = options.offset ?? 0
+    const accurateYearCounts = yearCounts.map((row) =>
+      row.year === options.year ? { ...row, count: tweets.length } : row,
+    )
+    return {
+      ...page,
+      yearCounts: accurateYearCounts,
+      tweets: tweets.slice(offset, offset + options.limit),
+      total: tweets.length,
+      nextOffset:
+        offset + options.limit < tweets.length ? offset + options.limit : null,
+    }
+  } catch (error) {
+    devLog('profile section tweets unavailable', { accountId, error })
+    return { ...page, available: false, tweets: [], nextOffset: null }
+  }
+}
+
 export async function getCuratedProfileBangersPage(
   accountId: string,
   options: ProfileBangersPageOptions,
 ) {
   if (options.year !== undefined) {
-    return getProfileBangersPage(accountId, options)
+    return getSectionedProfilePage(accountId, options)
   }
   const [page, rows] = await Promise.all([
-    getProfileBangersPage(accountId, options),
+    getSectionedProfilePage(accountId, options),
     getProfileCurationRows(accountId, 'bangers'),
   ])
   if (!page.available || rows.length === 0) return page
@@ -215,7 +298,7 @@ export async function getCuratedProfileBangersPage(
   return {
     ...page,
     tweets,
-    yearCounts: collection.yearCounts,
+    yearCounts: page.yearCounts,
     total: curated.length,
     nextOffset,
   }

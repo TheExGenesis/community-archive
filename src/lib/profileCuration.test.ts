@@ -1,8 +1,20 @@
+import { supplementalSectionIds } from './metaTwitter/sectionConfig'
 import { getCuratedProfileBangersPage } from './profileCuration'
 import { getProfileBangers, getProfileBangersPage } from './metaTwitter/bangers'
 import { fetchClickHouseTweetPageData } from './clickhouseTweetPage'
 import type { BangerTweet } from './metaTwitter/types'
 
+jest.mock('next/cache', () => ({ unstable_cache: (fn: unknown) => fn }))
+jest.mock('./metaTwitter/sectionConfig', () => ({
+  supplementalSectionIds: jest.fn(() => ({})),
+}))
+const mockSupplemental = supplementalSectionIds as jest.MockedFunction<
+  typeof supplementalSectionIds
+>
+beforeEach(() => {
+  mockSupplemental.mockReturnValue({})
+  jest.clearAllMocks()
+})
 const mockFinalEq = jest.fn()
 
 jest.mock('@/utils/supabase', () => ({
@@ -123,6 +135,7 @@ test('hydrates an owned manually added tweet outside the generated bangers set',
     retweet_count: 2,
     favorite_count: 20,
     reply_to_tweet_id: null,
+    reply_to_username: undefined,
     quote_tweet_id: null,
     retweeted_tweet_id: null,
     avatar_media_url: null,
@@ -145,4 +158,88 @@ test('hydrates an owned manually added tweet outside the generated bangers set',
     curation: { is_featured: true, position: 0 },
   })
   expect(page.total).toBe(2)
+})
+
+test('hydrates and paginates fallback representatives, deduplicating posts that later became bangers', async () => {
+  mockSupplemental.mockReturnValue({ 2025: ['1', '2', '3', '4'] })
+  const generated = [banger('1', 10)]
+  mockGetProfileBangersPage.mockResolvedValue({
+    tweets: generated,
+    yearCounts: [{ year: 2025, count: 1 }],
+    total: 1,
+    nextOffset: null,
+    available: true,
+  })
+  mockGetProfileBangers.mockResolvedValue({
+    tweets: generated,
+    yearCounts: [{ year: 2025, count: 1 }],
+    total: 1,
+    available: true,
+  })
+  mockFetchTweet.mockImplementation(async (id) => ({
+    ...banger(id, 1),
+    reply_to_tweet_id: null,
+    reply_to_username: undefined,
+    retweeted_tweet_id: null,
+    urls: [],
+    quoted_tweet: undefined,
+    quote_tweet_id: null,
+    // Wrong owner and wrong year must never enter the chapter.
+    account_id: id === '3' ? '99' : '42',
+    created_at: id === '4' ? '2024-01-01T00:00:00Z' : '2025-01-01T00:00:00Z',
+    media: [],
+  }))
+  const first = await getCuratedProfileBangersPage('42', {
+    year: 2025,
+    limit: 1,
+  })
+  const second = await getCuratedProfileBangersPage('42', {
+    year: 2025,
+    limit: 1,
+    offset: first.nextOffset!,
+  })
+  expect(first.tweets.map((tweet) => tweet.tweet_id)).toEqual(['1'])
+  expect(second.tweets.map((tweet) => tweet.tweet_id)).toEqual(['2'])
+  expect(second.nextOffset).toBeNull()
+  expect(second.total).toBe(2)
+  expect(mockFetchTweet).not.toHaveBeenCalledWith('1')
+})
+
+test('adds zero-banger chapter links without hydrating every year on the all-time page', async () => {
+  mockSupplemental.mockReturnValue({ 2024: ['2', '3', '4', '5'] })
+  mockGetProfileBangersPage.mockResolvedValue({
+    tweets: [],
+    yearCounts: [],
+    total: 0,
+    nextOffset: null,
+    available: true,
+  })
+  mockFinalEq.mockResolvedValue({ data: [], error: null })
+  const page = await getCuratedProfileBangersPage('42', { limit: 20 })
+  expect(page.yearCounts).toEqual([{ year: 2024, count: 4 }])
+  expect(mockGetProfileBangers).not.toHaveBeenCalled()
+  expect(mockFetchTweet).not.toHaveBeenCalled()
+})
+
+test('fails visibly on a supplemental gateway failure instead of serving a successful empty chapter', async () => {
+  mockSupplemental.mockReturnValue({ 2025: ['2'] })
+  mockGetProfileBangersPage.mockResolvedValue({
+    tweets: [],
+    yearCounts: [],
+    total: 0,
+    nextOffset: null,
+    available: true,
+  })
+  mockGetProfileBangers.mockResolvedValue({
+    tweets: [],
+    yearCounts: [],
+    total: 0,
+    available: true,
+  })
+  mockFetchTweet.mockRejectedValue(new Error('gateway unavailable'))
+  const page = await getCuratedProfileBangersPage('42', {
+    year: 2025,
+    limit: 20,
+  })
+  expect(page.available).toBe(false)
 })

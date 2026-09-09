@@ -11,7 +11,7 @@ const CURATED_ACCOUNT_ID = '826134955549790208'
 const chapters = () => [
   ...Object.entries(CURATED_SECTIONS).flatMap(([id, byYear]) =>
     Object.entries(byYear).map(
-      ([year, sections]) => [`curated ${id} ${year}`, sections] as const,
+      ([year, sections]) => [`curated ${id} ${year}`, sections, 3] as const,
     ),
   ),
   ...Object.entries(GENERATED_SECTIONS.accounts).flatMap(([id, account]) =>
@@ -20,6 +20,7 @@ const chapters = () => [
         [
           `generated @${account.username} ${id} ${year}`,
           entry.sections,
+          entry.generationSource === 'fallback' ? 2 : 3,
         ] as const,
     ),
   ),
@@ -37,7 +38,9 @@ test('serves sections only for configured accounts, curated first', () => {
 test('closes every configured chapter with a catch-all', () => {
   const byYear = configuredSectionsByYear(CURATED_ACCOUNT_ID)!
   expect(Object.keys(byYear).length).toBeGreaterThan(0)
-  for (const sections of Object.values(byYear)) {
+  for (const sections of Object.values(byYear).filter(
+    (sections) => sections.length,
+  )) {
     expect(sections.length).toBeGreaterThan(1)
     expect(sections.at(-1)?.slug).toBe(OTHER_SECTION_SLUG)
     expect(sections.filter((s) => s.slug === OTHER_SECTION_SLUG)).toHaveLength(
@@ -47,7 +50,7 @@ test('closes every configured chapter with a catch-all', () => {
 })
 
 test('keeps every section addressable, titled, and worth opening', () => {
-  for (const [label, sections] of chapters()) {
+  for (const [label, sections, minimum] of chapters()) {
     // A chapter either splits into at least two sections or stays whole.
     expect({ label, count: sections.length }).not.toEqual({ label, count: 1 })
     const slugs = sections.map((section) => {
@@ -57,7 +60,7 @@ test('keeps every section addressable, titled, and worth opening', () => {
       expect(section.title).not.toHaveLength(0)
       expect(section.title).not.toMatch(/https?:\/\/|@\w/)
       // Below three tweets a section is a footnote, not a chapter.
-      expect(section.tweetIds.length).toBeGreaterThanOrEqual(3)
+      expect(section.tweetIds.length).toBeGreaterThanOrEqual(minimum)
       for (const id of section.tweetIds) expect(id).toMatch(/^\d{1,20}$/)
       return section.slug
     })

@@ -4,6 +4,8 @@ export type Opportunity = Omit<
   Database['public']['Functions']['get_bulletin_opportunities']['Returns'][number],
   'full_text' | 'model' | 'expires_at' | 'place'
 > & {
+  /** Current, policy-checked ClickHouse text for immediate card rendering. */
+  preview_text?: string
   expires_at: string | null
   place: string | null
   account_created_at?: string | null

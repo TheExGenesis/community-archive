@@ -17,13 +17,63 @@ const EMPTY_GRAPH: BulletinRelationships = {
   outgoing: {},
   available: false,
 }
+function ScrollMore({
+  count,
+  side,
+  onMore,
+}: {
+  count: number
+  side: string
+  onMore: () => void
+}) {
+  const sentinel = useRef<HTMLDivElement>(null)
+  const callback = useRef(onMore)
+  callback.current = onMore
+  const [manual, setManual] = useState(false)
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') {
+      setManual(true)
+      return
+    }
+    let fired = false
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !fired) {
+          fired = true
+          observer.disconnect()
+          callback.current()
+        }
+      },
+      { rootMargin: '600px' },
+    )
+    if (sentinel.current) observer.observe(sentinel.current)
+    return () => observer.disconnect()
+  }, [count])
+  return (
+    <div
+      ref={sentinel}
+      aria-label={`Load more ${side}`}
+      className="min-h-[1px]"
+    >
+      {manual ? (
+        <Button variant="outline" onClick={onMore}>
+          Load more {side}
+        </Button>
+      ) : (
+        <span className="sr-only">More {side} load as you scroll</span>
+      )}
+    </div>
+  )
+}
+
 function Original({
-  id,
+  notice,
   loadTweet,
 }: {
-  id: string
+  notice: Opportunity
   loadTweet: (id: string) => Promise<PortalTweet>
 }) {
+  const id = notice.tweet_id
   const container = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
   const [tweet, setTweet] = useState<PortalTweet | null>(null)
@@ -59,11 +109,32 @@ function Original({
       })
     return () => controller.abort()
   }, [id, visible, attempt, loadTweet])
+  const displayTweet =
+    tweet ||
+    (typeof notice.preview_text === 'string'
+      ? {
+          id,
+          accountId: notice.account_id,
+          username: notice.username,
+          name: notice.display_name || notice.username,
+          avatar: notice.avatar_url || null,
+          text: notice.preview_text,
+          createdAt: notice.posted_at,
+          observedAt: notice.posted_at,
+          likes: 0,
+          rts: 0,
+        }
+      : null)
   return (
-    <div ref={container} className="min-w-0">
-      {tweet ? (
+    <div
+      ref={container}
+      className="relative min-w-0"
+      aria-busy={!tweet && !error}
+    >
+      {displayTweet ? (
         <TweetCard
-          tweet={tweet}
+          tweet={displayTweet}
+          showEngagement={!!tweet}
           previewHeight={240}
           clickable={false}
           showDate
@@ -90,6 +161,14 @@ function Original({
           <div className="h-3 rounded bg-muted" />
           <div className="h-3 w-5/6 rounded bg-muted" />
         </div>
+      )}
+      {displayTweet && error && (
+        <button
+          className="absolute bottom-3 left-14 bg-card px-1 text-xs text-brand"
+          onClick={() => setAttempt((n) => n + 1)}
+        >
+          Retry post details
+        </button>
       )}
     </div>
   )
@@ -289,7 +368,7 @@ export function OpportunityBoard({
                       key={o.tweet_id}
                       className={`min-w-0 overflow-hidden rounded-lg border bg-card ${expired ? 'opacity-60' : ''} ${rel.rank < 3 ? 'border-brand/40' : ''}`}
                     >
-                      <Original id={o.tweet_id} loadTweet={loadTweet} />
+                      <Original notice={o} loadTweet={loadTweet} />
                       <div className="h-24 space-y-1 border-t px-3 py-2">
                         <div className="flex items-center justify-between gap-2 text-[11px] leading-4">
                           <span className="rounded bg-muted px-1.5 py-0.5 font-medium text-muted-foreground">
@@ -314,15 +393,14 @@ export function OpportunityBoard({
                 })}
             </div>
             {visible.filter((o) => o.side === side).length > pageSize[side] && (
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() =>
+              <ScrollMore
+                key={`${kind}:${search}:${past}:${recommended}`}
+                side={side === 'offer' ? 'offers' : 'asks'}
+                count={pageSize[side]}
+                onMore={() =>
                   setPageSize((size) => ({ ...size, [side]: size[side] + 6 }))
                 }
-              >
-                Load more {side === 'offer' ? 'offers' : 'asks'}
-              </Button>
+              />
             )}
             {!visible.some((o) => o.side === side) && (
               <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">

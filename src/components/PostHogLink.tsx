@@ -1,27 +1,35 @@
 'use client'
 
 import Link from 'next/link'
-import type { ComponentProps } from 'react'
-import { capturePostHogEvent } from '@/lib/posthog'
+import { forwardRef, type ComponentProps } from 'react'
+import { capturePostHogEvent, type PostHogEventName } from '@/lib/posthog'
 
 type PostHogLinkProps = ComponentProps<typeof Link> & {
-  eventName: string
+  eventName: PostHogEventName
   eventProperties?: Record<string, unknown>
 }
 
-export default function PostHogLink({
-  eventName,
-  eventProperties,
-  onClick,
-  ...props
-}: PostHogLinkProps) {
-  return (
-    <Link
-      {...props}
-      onClick={(event) => {
-        capturePostHogEvent(eventName, eventProperties)
-        onClick?.(event)
-      }}
-    />
-  )
-}
+const PostHogLink = forwardRef<HTMLAnchorElement, PostHogLinkProps>(
+  function PostHogLink(
+    { eventName, eventProperties, onClick, onAuxClick, ...props },
+    ref,
+  ) {
+    return (
+      <Link
+        {...props}
+        ref={ref}
+        onAuxClick={(event) => {
+          if (event.button === 1)
+            capturePostHogEvent(eventName, eventProperties)
+          onAuxClick?.(event)
+        }}
+        onClick={(event) => {
+          capturePostHogEvent(eventName, eventProperties)
+          onClick?.(event)
+        }}
+      />
+    )
+  },
+)
+
+export default PostHogLink

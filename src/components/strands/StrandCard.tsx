@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import PostHogLink from '@/components/PostHogLink'
 import TweetCard from '@/components/TweetCard'
 import type { StrandCardItem } from '@/lib/community-apps/types'
 import { StrandCardFocus } from './StrandFocus'
@@ -51,9 +52,14 @@ export function StrandCard({ strand }: { strand: StrandCardItem }) {
             )}
           </div>
           <h2 className="text-xl font-bold leading-tight">
-            <a href={`/strands/${strand.id}`} className="hover:text-brand">
+            <PostHogLink
+              eventName="product_action"
+              eventProperties={{ feature: 'strands', action: 'topic_opened' }}
+              href={`/strands/${strand.id}`}
+              className="hover:text-brand"
+            >
               {strand.title}
-            </a>
+            </PostHogLink>
           </h2>
           <div className="mt-3 text-sm leading-6">
             <AnalysisText>{strand.summary.split(/\n\n/)[0]}</AnalysisText>

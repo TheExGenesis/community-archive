@@ -1,3 +1,4 @@
+import { analyticsRoute } from './analyticsRoutes'
 import { BANGERS_WEEK_HREF } from './portal/bangers'
 import { isTwitterUsername } from './apiInputValidation'
 
@@ -7,22 +8,8 @@ export interface NavItem {
 }
 
 export function navAnalyticsDestination(href: string): string {
-  if (href.startsWith('/bangers')) return 'bangers'
-  if (href.startsWith('/community')) return 'community'
-  if (href.startsWith('/digest')) return 'digest'
-  if (href.startsWith('/opportunities')) return 'opportunities'
-  if (href.startsWith('/docs')) return 'docs'
-  if (href.startsWith('/research')) return 'research'
-  if (href.startsWith('/search')) return 'search'
-  if (href.startsWith('/settings')) return 'settings'
-  if (href.startsWith('/social-graph')) return 'social_graph'
-  if (href.startsWith('/stream')) return 'live_stream'
-  if (href.startsWith('/trends')) return 'trends'
-  if (href.startsWith('/user-dir')) return 'user_directory'
-  if (href.startsWith('/user/')) return 'user_profile'
   if (href.includes('#upload-archive')) return 'upload_archive'
-  if (href.startsWith('/admin')) return 'admin'
-  return 'home'
+  return analyticsRoute(href).page
 }
 
 export type TweetOrigin =

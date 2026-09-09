@@ -198,6 +198,10 @@ export default function TweetList({
         setCurrentPage(pageToLoad)
       } catch (error) {
         if (!isCurrent()) return
+        capturePostHogEvent('search_results_failed', {
+          error_category: 'request_failed',
+          elapsed_ms: Math.round(performance.now() - startedAt),
+        })
         setFailedPage(pageToLoad)
         console.error('Failed to load tweets for list:', error)
         setError(

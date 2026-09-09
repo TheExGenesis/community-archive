@@ -1,4 +1,6 @@
 'use client'
+
+import { captureProductAction } from '@/lib/productAnalytics'
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import TweetCard from '@/components/TweetCard'
@@ -77,6 +79,10 @@ export default function StrandTimeline({
 }) {
   const [view, setView] = useState<'map' | 'timeline'>('map')
   const [selected, setSelected] = useState(seedId)
+  const selectPost = (id: string) => {
+    captureProductAction('strands', 'node_selected')
+    setSelected(id)
+  }
   const [zoom, setZoom] = useState(1)
   const width = 810 * zoom
   const layout = useMemo(
@@ -121,7 +127,10 @@ export default function StrandTimeline({
             <button
               key={v}
               aria-pressed={view === v}
-              onClick={() => setView(v)}
+              onClick={() => {
+                captureProductAction('strands', 'view_changed')
+                setView(v)
+              }}
               className="px-4 py-2 text-sm capitalize aria-pressed:bg-foreground aria-pressed:text-background"
             >
               {v}
@@ -219,11 +228,11 @@ export default function StrandTimeline({
                       tabIndex={0}
                       aria-label={`${i + 1}. ${post.tweet ? '@' + post.tweet.username : 'Source post'} · ${date(node.time)} · ${label}`}
                       aria-pressed={active}
-                      onClick={() => setSelected(node.id)}
+                      onClick={() => selectPost(node.id)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault()
-                          setSelected(node.id)
+                          selectPost(node.id)
                         }
                       }}
                       className="cursor-pointer outline-none focus:stroke-foreground"
@@ -290,7 +299,7 @@ export default function StrandTimeline({
               <div className="mb-4 flex items-center justify-between">
                 <button
                   disabled={index <= 0}
-                  onClick={() => setSelected(ordered[index - 1].id)}
+                  onClick={() => selectPost(ordered[index - 1].id)}
                   className="text-sm text-brand disabled:opacity-30"
                 >
                   ← Previous post
@@ -300,7 +309,7 @@ export default function StrandTimeline({
                 </span>
                 <button
                   disabled={index >= ordered.length - 1}
-                  onClick={() => setSelected(ordered[index + 1].id)}
+                  onClick={() => selectPost(ordered[index + 1].id)}
                   className="text-sm text-brand disabled:opacity-30"
                 >
                   Next post →

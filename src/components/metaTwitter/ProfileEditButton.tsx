@@ -1,5 +1,6 @@
 'use client'
 
+import { capturePostHogEvent } from '@/lib/posthog'
 import { useProfileEditing } from './ProfileEditingContext'
 
 export function ProfileEditButton() {
@@ -8,9 +9,12 @@ export function ProfileEditButton() {
   return (
     <button
       type="button"
-      onClick={() => setEditing((current) => !current)}
+      onClick={() => {
+        if (!editing) capturePostHogEvent('profile_edit_started')
+        setEditing((current) => !current)
+      }}
       disabled={editSaving}
-      className="border-brand/35 hover:border-brand/55 rounded-full border bg-brand/5 px-4 py-[7px] text-sm font-semibold text-brand transition-colors hover:bg-brand/10 disabled:opacity-60"
+      className="rounded-full border border-brand/35 bg-brand/5 px-4 py-[7px] text-sm font-semibold text-brand transition-colors hover:border-brand/55 hover:bg-brand/10 disabled:opacity-60"
     >
       {editing ? 'Done editing' : 'Edit profile'}
     </button>

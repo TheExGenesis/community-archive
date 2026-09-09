@@ -1,4 +1,6 @@
 'use client'
+
+import { captureProductAction } from '@/lib/productAnalytics'
 import { useState } from 'react'
 import {
   monthlyActivity,
@@ -67,7 +69,10 @@ export function MonthlyTimeline({ cluster }: { cluster: BirdseyeCluster }) {
               onMouseEnter={() => setActive(index)}
               onFocus={() => setActive(index)}
               onBlur={() => setActive(null)}
-              onClick={() => setActive(index)}
+              onClick={() => {
+                captureProductAction('birdseye', 'filter_changed')
+                setActive(index)
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Escape') setActive(null)
                 if (event.key === 'Enter' || event.key === ' ') {

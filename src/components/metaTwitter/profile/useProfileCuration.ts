@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { capturePostHogEvent } from '@/lib/posthog'
 import { mutateProfileCuration } from '@/app/user/[account_id]/actions'
 import type { ProfileCurationSection } from '@/lib/profileCurationState'
 import type { ProfileBangerSort } from '@/lib/metaTwitter/profilePagination'
@@ -43,9 +44,20 @@ export function useProfileCuration({
     async (mutation: Parameters<typeof mutateProfileCuration>[0]) => {
       setEditSaving(true)
       setEditError(null)
+      const properties = {
+        action: mutation.action,
+        section: mutation.section,
+        source: 'profile',
+      }
       try {
-        return await mutateProfileCuration(mutation)
+        const result = await mutateProfileCuration(mutation)
+        capturePostHogEvent('profile_curation_saved', {
+          ...properties,
+          ...('isFeatured' in result ? { is_featured: result.isFeatured } : {}),
+        })
+        return result
       } catch (error) {
+        capturePostHogEvent('profile_curation_failed', properties)
         setEditError(
           error instanceof Error
             ? error.message

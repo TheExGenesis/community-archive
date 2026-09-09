@@ -1,3 +1,4 @@
+import PostHogLink from '@/components/PostHogLink'
 import { FaExternalLinkAlt } from 'react-icons/fa'
 import { PORTAL_TOOLS } from '@/components/portal/tools'
 import { MUTED, SERIF } from '@/components/portal/styles'
@@ -18,8 +19,15 @@ export default function ToolsPage() {
         </div>
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           {PORTAL_TOOLS.map((tool) => (
-            <a
-              key={tool.name}
+            <PostHogLink
+              eventName="community_app_action"
+              eventProperties={{
+                action: 'launch_clicked',
+                app_slug: tool.slug,
+                source: 'tools',
+                external: !tool.link.startsWith('/'),
+              }}
+              key={tool.slug}
               href={tool.link}
               target="_blank"
               rel="noopener noreferrer"
@@ -53,7 +61,7 @@ export default function ToolsPage() {
                   </span>
                 </span>
               </div>
-            </a>
+            </PostHogLink>
           ))}
         </div>
       </div>

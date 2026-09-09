@@ -1,3 +1,5 @@
+import { capturePostHogEvent } from '@/lib/posthog'
+jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {
@@ -37,6 +39,11 @@ test('lets the signed-in author add a tweet to their profile', async () => {
   await user.click(button)
 
   expect(mockAddTweet).toHaveBeenCalledWith('100')
+  expect(capturePostHogEvent).toHaveBeenCalledWith('profile_curation_saved', {
+    action: 'add',
+    section: 'bangers',
+    source: 'tweet_card',
+  })
   await waitFor(() =>
     expect(
       screen.getByRole('button', { name: 'Added to profile' }),
@@ -55,4 +62,33 @@ test('does not expose the action on someone elses tweet', async () => {
   expect(
     screen.queryByRole('button', { name: 'Add to profile' }),
   ).not.toBeInTheDocument()
+})
+
+beforeEach(() => {
+  jest.mocked(capturePostHogEvent).mockClear()
+})
+
+test('records failed saves separately and only counts a successful retry once', async () => {
+  const user = userEvent.setup()
+  mockGetUser.mockResolvedValue({
+    data: { user: { app_metadata: { provider_id: '42' } } },
+  })
+  mockAddTweet.mockRejectedValueOnce(new Error('private failure'))
+  render(<AddToProfileButton tweetId="100" accountId="42" />)
+  await user.click(
+    await screen.findByRole('button', { name: 'Add to profile' }),
+  )
+  expect(capturePostHogEvent).toHaveBeenCalledTimes(1)
+  expect(capturePostHogEvent).toHaveBeenLastCalledWith(
+    'profile_curation_failed',
+    { action: 'add', section: 'bangers', source: 'tweet_card' },
+  )
+  await user.click(
+    screen.getByRole('button', { name: 'Try adding to profile again' }),
+  )
+  expect(capturePostHogEvent).toHaveBeenCalledTimes(2)
+  expect(capturePostHogEvent).toHaveBeenLastCalledWith(
+    'profile_curation_saved',
+    { action: 'add', section: 'bangers', source: 'tweet_card' },
+  )
 })

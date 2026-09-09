@@ -1,4 +1,6 @@
 'use client'
+
+import { captureProductAction } from '@/lib/productAnalytics'
 import { useState } from 'react'
 import { AnalysisText } from '@/components/community-apps/AnalysisText'
 
@@ -14,7 +16,10 @@ export function TopicSummary({ text }: { text: string }) {
       </div>
       <button
         aria-expanded={expanded}
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => {
+          if (!expanded) captureProductAction('birdseye', 'summary_expanded')
+          setExpanded(!expanded)
+        }}
         className="mt-1 text-[11px] text-muted-foreground hover:text-brand"
       >
         Saved AI summary · {expanded ? 'Show less' : 'Read more'}

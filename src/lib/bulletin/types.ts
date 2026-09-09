@@ -57,7 +57,7 @@ export type RunDashboard = {
 
 export const KIND_LABELS: Record<string, string> = {
   free: 'Free things',
-  opportunity: 'Opportunities',
+  opportunity: 'Work & collaboration',
   invite: 'Invitations',
   intro: 'Introductions',
   help: 'Help',

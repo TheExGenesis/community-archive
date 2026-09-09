@@ -325,7 +325,7 @@ export function OpportunityBoard({
           </summary>
           <p className="mt-2 max-w-2xl">
             {recommended && graph.available
-              ? 'Free things first, then opportunities, invitations, introductions, help, and feedback. Within each category: your notices, then your top outgoing interactions, then everyone else. This uses the profile’s top 25 all-time interaction counts (mentions, replies, quotes and reposts); missing people are not necessarily strangers.'
+              ? 'Free things first, then work & collaboration, invitations, introductions, help, and feedback. Within each category: your notices, then your top outgoing interactions, then everyone else. This uses the profile’s top 25 all-time interaction counts (mentions, replies, quotes and reposts); missing people are not necessarily strangers.'
               : recommended
                 ? 'Top outgoing interactions are unavailable. Showing categories in priority order, with your notices first within each category, then newest.'
                 : 'Newest notices first.'}{' '}

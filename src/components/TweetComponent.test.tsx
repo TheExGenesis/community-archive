@@ -1,7 +1,10 @@
+import { capturePostHogEvent } from '@/lib/posthog'
 import '@testing-library/jest-dom'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import TweetComponent from './TweetComponent'
 import type { TweetData } from '@/lib/tweets/types'
+
+jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 
 jest.mock('@/components/TweetAvatarImage', () => ({
   __esModule: true,
@@ -75,3 +78,33 @@ test('keeps an unknown-author label for a normalized tweet with empty identity',
   )
   expect(screen.getAllByText('Unknown').length).toBeGreaterThan(0)
 })
+
+it.each([true, false])(
+  'records search result opens in compact=%s without tweet contents',
+  (compact) => {
+    jest.clearAllMocks()
+    render(
+      <TweetComponent
+        tweet={tweet}
+        compact={compact}
+        permalinkOrigin="search"
+      />,
+    )
+    const links = screen.getAllByRole('link', {
+      name: compact ? 'View tweet in Community Archive' : 'Archive',
+    })
+    for (const link of links) {
+      jest.clearAllMocks()
+      link.addEventListener('click', (event) => event.preventDefault())
+      fireEvent.click(link)
+      expect(capturePostHogEvent).toHaveBeenCalledTimes(1)
+      expect(capturePostHogEvent).toHaveBeenCalledWith('tweet_card_action', {
+        action: 'open',
+        origin: 'search',
+        has_media: false,
+        has_quoted_tweet: false,
+        is_featured: false,
+      })
+    }
+  },
+)

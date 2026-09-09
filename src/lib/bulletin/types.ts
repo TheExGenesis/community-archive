@@ -24,6 +24,8 @@ export type BulletinRun = {
   status: string
   counts: RunCounts
   model: string
+  prompt_version_id?: string | null
+  prompt_body?: string | null
   classifier_version: string
   actual_usd: number
   unpriced_reserved_usd: number
@@ -83,3 +85,18 @@ export function runStatus(run: BulletinRun) {
   }
   return labels[run.status] ?? 'Failed'
 }
+
+export type PromptVersion = {
+  id: string
+  body: string
+  note: string
+  created_at: string | null
+  created_by: string | null
+}
+export type PromptDashboard = {
+  active: PromptVersion
+  versions: PromptVersion[]
+  read_only?: boolean
+  preview_note?: string
+}
+export type PromptSaveResult = { error?: string; version?: string }

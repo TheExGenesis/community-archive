@@ -3668,13 +3668,14 @@ AS $$
  LIMIT greatest(0,least(coalesce(max_results,50),200))
 $$;
 
-CREATE FUNCTION public.get_bulletin_runs(before_id bigint DEFAULT NULL, max_results integer DEFAULT 26)
+CREATE OR REPLACE FUNCTION public.get_bulletin_runs(before_id bigint DEFAULT NULL, max_results integer DEFAULT 26)
 RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
  SELECT jsonb_build_object(
    'runs', coalesce((SELECT jsonb_agg(to_jsonb(page) ORDER BY page.id::bigint DESC) FROM (
      SELECT r.id::text AS id,r.started_at,r.finished_at,r.status,r.counts,r.model,r.classifier_version,
+       r.prompt_version_id::text AS prompt_version_id,p.body AS prompt_body,
        coalesce(c.actual_usd,0) AS actual_usd,coalesce(c.unpriced_reserved_usd,0) AS unpriced_reserved_usd
-     FROM bulletin.runs r LEFT JOIN LATERAL (
+     FROM bulletin.runs r LEFT JOIN bulletin.prompt_versions p ON p.id=r.prompt_version_id LEFT JOIN LATERAL (
        SELECT sum(actual_usd) AS actual_usd,
          sum(reserved_usd) FILTER (WHERE actual_usd IS NULL) AS unpriced_reserved_usd
        FROM bulletin.calls WHERE run_id=r.id
@@ -3688,4 +3689,35 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
      'exhausted',count(*) FILTER (WHERE status='failed' AND attempts>=3)) FROM bulletin.decisions),
    'last_success_at',(SELECT last_success_at FROM bulletin.worker_state WHERE id=1)
  )
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_bulletin_prompts(before_id bigint DEFAULT NULL)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
+ SELECT jsonb_build_object(
+   'active', (SELECT to_jsonb(p) FROM (SELECT id::text AS id,body,note,created_at,created_by FROM bulletin.prompt_versions ORDER BY id::bigint DESC LIMIT 1) p),
+   'versions', coalesce((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id::bigint DESC) FROM (
+     SELECT id::text AS id,body,note,created_at,created_by FROM bulletin.prompt_versions
+     WHERE before_id IS NULL OR id<before_id ORDER BY id::bigint DESC LIMIT 21
+   ) p),'[]'::jsonb)
+ )
+$$;
+
+CREATE OR REPLACE FUNCTION public.save_bulletin_prompt(expected_id bigint, prompt_body text, change_note text, actor_id uuid)
+RETURNS text LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+DECLARE active_id bigint; active_body text; new_id bigint;
+BEGIN
+  -- Serialize saves, but never block an already-running worker.
+  PERFORM pg_advisory_xact_lock(712606571);
+  SELECT id,body INTO active_id,active_body FROM bulletin.prompt_versions ORDER BY id DESC LIMIT 1;
+  IF expected_id IS DISTINCT FROM active_id THEN
+    RAISE EXCEPTION 'Prompt changed; reload before saving' USING ERRCODE='40001';
+  END IF;
+  IF actor_id IS NULL THEN RAISE EXCEPTION 'Admin identity required' USING ERRCODE='22023'; END IF;
+  IF prompt_body IS NOT DISTINCT FROM active_body THEN
+    RAISE EXCEPTION 'Prompt is unchanged' USING ERRCODE='22023';
+  END IF;
+  INSERT INTO bulletin.prompt_versions(body,note,created_by)
+    VALUES(prompt_body,change_note,actor_id) RETURNING id INTO new_id;
+  RETURN new_id::text;
+END
 $$;

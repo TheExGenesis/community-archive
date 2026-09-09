@@ -184,3 +184,13 @@ GRANT SELECT,INSERT,UPDATE,DELETE ON bulletin.runs TO service_role;
 GRANT USAGE,SELECT ON SEQUENCE bulletin.runs_id_seq TO service_role;
 REVOKE ALL ON FUNCTION public.get_bulletin_runs(bigint,integer) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.get_bulletin_runs(bigint,integer) TO service_role;
+
+ALTER TABLE bulletin.prompt_versions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON bulletin.prompt_versions FROM PUBLIC,anon,authenticated,service_role;
+GRANT SELECT,INSERT ON bulletin.prompt_versions TO service_role;
+REVOKE ALL ON SEQUENCE bulletin.prompt_versions_id_seq FROM PUBLIC,anon,authenticated;
+GRANT USAGE,SELECT ON SEQUENCE bulletin.prompt_versions_id_seq TO service_role;
+REVOKE ALL ON FUNCTION public.get_bulletin_prompts(bigint) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.save_bulletin_prompt(bigint,text,text,uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_bulletin_prompts(bigint) TO service_role;
+GRANT EXECUTE ON FUNCTION public.save_bulletin_prompt(bigint,text,text,uuid) TO service_role;

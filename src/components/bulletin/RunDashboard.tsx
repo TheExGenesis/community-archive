@@ -108,6 +108,20 @@ export function RunDashboard({
                       >
                         {runStatus(run)}
                       </p>
+                      {run.prompt_version_id && run.prompt_body ? (
+                        <details className="mt-2 max-w-md whitespace-normal text-xs">
+                          <summary className="cursor-pointer text-brand">
+                            Prompt version {run.prompt_version_id}
+                          </summary>
+                          <pre className="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap break-words rounded border p-3 font-mono leading-5">
+                            {run.prompt_body}
+                          </pre>
+                        </details>
+                      ) : (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Prompt version not recorded
+                        </p>
+                      )}
                       <details className="mt-2 text-xs text-muted-foreground">
                         <summary className="cursor-pointer">
                           Run #{run.id} details

@@ -13,6 +13,7 @@ from psycopg.rows import dict_row
 
 import after_autorefresh
 import worker
+from labels import SYSTEM
 
 ROOT=Path(__file__).resolve().parents[2]
 FIXTURE='''
@@ -64,6 +65,7 @@ class DatabaseTests(unittest.TestCase):
         cls.db.execute(FIXTURE)
         cls.db.execute(next((ROOT/'supabase/migrations').glob('*_bulletin_opportunities.sql')).read_text())
         cls.db.execute(next((ROOT/'supabase/migrations').glob('*_bulletin_run_history.sql')).read_text())
+        cls.db.execute(next((ROOT/'supabase/migrations').glob('*_bulletin_prompt_versions.sql')).read_text())
 
     @classmethod
     def tearDownClass(cls):
@@ -71,6 +73,8 @@ class DatabaseTests(unittest.TestCase):
 
     def setUp(self):
         self.db.execute('TRUNCATE public.tweets,public.all_account,public.members,public.optin,tes.blocked_scraping_users,public.retweets,bulletin.calls,bulletin.runs CASCADE')
+        self.db.execute('TRUNCATE bulletin.prompt_versions RESTART IDENTITY CASCADE')
+        self.db.execute("INSERT INTO bulletin.prompt_versions(body,note) VALUES (%s,'Initial prompt')",(SYSTEM,))
         self.db.execute("UPDATE bulletin.worker_state SET cursor_at=now()-interval '1 day',cursor_id='',scan_until=NULL")
         self.db.execute("INSERT INTO public.all_account VALUES ('a','example',false); INSERT INTO public.members VALUES ('a')")
 
@@ -87,6 +91,52 @@ class DatabaseTests(unittest.TestCase):
         with patch.dict(os.environ,OPENROUTER_API_KEY='test'),patch.object(worker,'call_model',return_value=result or self.response()) as model:
             output=worker.run(self.db)
         return output,model.call_count
+
+    def test_prompt_versions_pin_runs_and_only_affect_future_calls(self):
+        self.tweet('1')
+        self.tweet('2')
+        bodies=[]
+        newer=SYSTEM+'\nOnly return actionable offers.'
+        def response(body):
+            bodies.append(json.loads(body)['messages'][0]['content'])
+            if len(bodies)==1:
+                self.db.execute("SELECT public.save_bulletin_prompt(1,%s,'Tighter offers','00000000-0000-0000-0000-000000000001')",(newer,))
+            return self.response()
+        with patch.dict(os.environ,OPENROUTER_API_KEY='test'),patch.object(worker,'call_model',side_effect=response):
+            worker.run(self.db)
+        self.assertEqual(bodies,[SYSTEM,SYSTEM])
+        self.tweet('3')
+        with patch.dict(os.environ,OPENROUTER_API_KEY='test'),patch.object(worker,'call_model',side_effect=response):
+            worker.run(self.db)
+        self.assertEqual(bodies,[SYSTEM,SYSTEM,newer])
+        runs=self.db.execute('SELECT public.get_bulletin_runs() data').fetchone()['data']['runs']
+        self.assertEqual([r['prompt_version_id'] for r in runs],['2','1'])
+        self.assertEqual([r['prompt_body'] for r in runs],[newer,SYSTEM])
+
+    def test_prompt_permissions_conflicts_and_validation(self):
+        for role in ('anon','authenticated'):
+            self.db.execute('SET ROLE '+role)
+            try:
+                for sql in ["SELECT public.get_bulletin_prompts()", "SELECT public.save_bulletin_prompt(1,'test','note','00000000-0000-0000-0000-000000000001')"]:
+                    with self.assertRaises(psycopg.errors.InsufficientPrivilege):self.db.execute(sql)
+            finally:self.db.execute('RESET ROLE')
+        self.db.execute('SET ROLE service_role')
+        try:
+            for sql in ["UPDATE bulletin.prompt_versions SET body='changed'", "DELETE FROM bulletin.prompt_versions"]:
+                with self.assertRaises(psycopg.errors.InsufficientPrivilege):self.db.execute(sql)
+            with self.assertRaises(psycopg.errors.CheckViolation):
+                self.db.execute("SELECT public.save_bulletin_prompt(1,'','note','00000000-0000-0000-0000-000000000001')")
+            with self.assertRaises(psycopg.errors.InvalidParameterValue):
+                self.db.execute("SELECT public.save_bulletin_prompt(1,'test','note',NULL)")
+            self.db.execute("SELECT public.save_bulletin_prompt(1,'updated','note','00000000-0000-0000-0000-000000000001')")
+            with self.assertRaises(psycopg.errors.SerializationFailure):
+                self.db.execute("SELECT public.save_bulletin_prompt(1,'stale','note','00000000-0000-0000-0000-000000000001')")
+            page=self.db.execute('SELECT public.get_bulletin_prompts() data').fetchone()['data']
+            self.assertEqual(page['active']['body'],'updated')
+            older=self.db.execute('SELECT public.get_bulletin_prompts(%s) data',(int(page['active']['id']),)).fetchone()['data']
+            self.assertEqual(older['versions'][0]['id'],'1')
+            self.assertEqual(older['active']['body'],'updated')
+        finally:self.db.execute('RESET ROLE')
 
     def test_replay_negative_cache_and_changed_source(self):
         self.tweet()

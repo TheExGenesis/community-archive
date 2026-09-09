@@ -169,13 +169,14 @@ post-migration privilege/read check. The full Supabase reset/diff path requires
 Docker and is not part of this focused check.
 
 The security advisor reports informational “RLS enabled, no policy” notices
-for these five tables. This is intentional: browser grants are revoked and only
+for these private tables. This is intentional: browser grants are revoked and only
 the backend bypass-RLS role may access them. No public row policies are needed.
 
 ## Website/run-history rollout
 
 The original private-table migration and worker are already live. This follow-up
-requires the new `bulletin_run_history` migration and an updated worker release.
+requires the new `bulletin_run_history` and `bulletin_prompt_versions` migrations
+and an updated worker release.
 Apply the reviewed migration before switching the worker or merging the website.
 It adds only the private runs table, nullable `calls.run_id`, its index and the
 service-only run-history RPC. Old workers remain compatible.
@@ -187,3 +188,34 @@ bounded by the existing budgets and does not restart autorefresh. Confirm the
 new run row, its counters/costs and private RPC before merging the frontend.
 Rollback: restore the preceding worker symlink and revert the website commit;
 leave the additive schema and cost history intact.
+
+
+## Editable prompt versions
+
+The admin opportunities dashboard shows the active classifier prompt, its saved
+versions (20 per page), and each recorded run's exact prompt. **Save for future
+runs** appends a new version with the verified admin user ID, timestamp, and
+required change note. It becomes active immediately; stale edits fail instead
+of overwriting a newer save. **Use as draft** copies an older version into the
+editor; saving creates another version rather than changing history.
+
+`bulletin.prompt_versions` is private and append-only for the service role.
+`get_bulletin_prompts` and `save_bulletin_prompt` are service-only RPCs; the server
+action requires a real authenticated admin. The explicit local admin read
+preview cannot save. The initial prompt is frozen in the migration and
+`default-prompt.json`; `seed.sql` bootstraps it after a declarative reset.
+
+At startup the worker reads the newest version once and stores its ID on
+`bulletin.runs.prompt_version_id`. Every call in that run uses the captured text,
+including retries of queued candidates. A later save affects only later runs.
+Existing decisions are not reclassified merely because the prompt changed.
+Phrase filters, model, output validation and budgets remain code-controlled.
+The prompt limit is 16 KB; invalid JSON output still fails validation and follows
+the existing retry policy. Edits are not automatically evaluated for quality.
+
+Deploy both additive migrations before the new worker. Older workers remain
+compatible, but keep using their fixed prompt and do not record prompt versions.
+Older runs show “Prompt version not recorded”; no attribution is invented.
+The local production preview can show the original bootstrap prompt when the
+new RPC is absent, with saving explicitly unavailable. Prompt saves require the
+schema, updated worker, and an authenticated admin session.

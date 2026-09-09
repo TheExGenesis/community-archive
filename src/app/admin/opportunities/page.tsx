@@ -1,3 +1,5 @@
+import { loadPrompts } from '@/lib/bulletin/prompts'
+import { PromptEditor } from '@/components/bulletin/PromptEditor'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { loadRunDashboard, requireBulletinAdmin } from '@/lib/bulletin/data'
@@ -13,15 +15,13 @@ export const metadata: Metadata = {
 export default async function OpportunityRunsPage({
   searchParams,
 }: {
-  searchParams?: { before?: string }
+  searchParams?: { before?: string; prompts_before?: string }
 }) {
   await requireBulletinAdmin()
-  let data
-  try {
-    data = await loadRunDashboard(searchParams?.before)
-  } catch {
-    data = null
-  }
+  const [data, prompts] = await Promise.all([
+    loadRunDashboard(searchParams?.before).catch(() => null),
+    loadPrompts(searchParams?.prompts_before).catch(() => null),
+  ])
   return (
     <main className="mx-auto min-h-[70vh] w-full min-w-0 max-w-7xl space-y-8 px-4 py-10 sm:px-6">
       <header>
@@ -47,6 +47,14 @@ export default async function OpportunityRunsPage({
           found and what still needs attention.
         </p>
       </header>
+      {prompts ? (
+        <PromptEditor data={prompts} olderThan={searchParams?.prompts_before} />
+      ) : (
+        <p role="alert" className="rounded-lg border p-5">
+          Prompt history could not be loaded. Check that the prompt migration is
+          installed, then refresh.
+        </p>
+      )}
       {data ? (
         <RunDashboard data={data} olderThan={searchParams?.before} />
       ) : (

@@ -697,6 +697,14 @@ CREATE TABLE bulletin.worker_state (
 );
 INSERT INTO bulletin.worker_state(id) VALUES (1);
 
+-- Prompt versions are append-only for the application service role.
+CREATE TABLE bulletin.prompt_versions (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  body text NOT NULL CHECK (length(btrim(body)) > 0 AND octet_length(body) <= 16000),
+  note text NOT NULL CHECK (length(btrim(note)) BETWEEN 1 AND 300),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  created_by uuid
+);
 -- Aggregate run history contains no tweet text or author identifiers.
 CREATE TABLE bulletin.runs (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -705,7 +713,8 @@ CREATE TABLE bulletin.runs (
   status text NOT NULL DEFAULT 'running',
   counts jsonb NOT NULL DEFAULT '{}',
   model text NOT NULL,
-  classifier_version text NOT NULL
+  classifier_version text NOT NULL,
+  prompt_version_id bigint REFERENCES bulletin.prompt_versions(id)
 );
 ALTER TABLE bulletin.calls ADD COLUMN run_id bigint REFERENCES bulletin.runs(id);
 CREATE INDEX bulletin_calls_run_idx ON bulletin.calls(run_id);

@@ -16,7 +16,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from labels import SYSTEM, validate_label
+from labels import validate_label
 import upstream_filter as upstream
 
 MODEL = 'z-ai/glm-5.3-flash'
@@ -111,10 +111,10 @@ def current(db, tweet_id, lock=False):
       '''+(' FOR SHARE OF t' if lock else ''),(tweet_id,)).fetchone()
 
 
-def request_body(tweet):
+def request_body(tweet, prompt):
     payload={'author':'@'+tweet['username'],'posted_at':tweet['created_at'].isoformat(),
         'text':tweet['full_text']}
-    return json.dumps({'model':MODEL,'messages':[{'role':'system','content':SYSTEM},
+    return json.dumps({'model':MODEL,'messages':[{'role':'system','content':prompt},
         {'role':'user','content':json.dumps(payload,ensure_ascii=False)}],
         'response_format':{'type':'json_object'},'max_tokens':MAX_OUTPUT,
         'reasoning':{'effort':'low'},
@@ -196,8 +196,11 @@ def run(db, limit=MAX_CALLS, enqueue_only=False):
         # Owning the lock proves earlier 'running' rows no longer have a live worker.
         with db.transaction():
             db.execute("UPDATE bulletin.runs SET status='interrupted' WHERE status='running'")
-            run_id=db.execute('INSERT INTO bulletin.runs(model,classifier_version) VALUES(%s,%s) RETURNING id',
-                (MODEL,VERSION)).fetchone()['id']
+            prompt=db.execute('SELECT id,body FROM bulletin.prompt_versions ORDER BY id DESC LIMIT 1').fetchone()
+            if not prompt:
+                raise RuntimeError('missing_active_prompt')
+            run_id=db.execute('INSERT INTO bulletin.runs(model,classifier_version,prompt_version_id) VALUES(%s,%s,%s) RETURNING id',
+                (MODEL,VERSION,prompt['id'])).fetchone()['id']
             db.execute("UPDATE bulletin.worker_state SET last_started_at=now(),last_finished_at=NULL,status='running',counts=%s WHERE id=1",
                 (Jsonb(counts),))
         # Small feature tables only; remove data no longer eligible under current policy.
@@ -225,7 +228,7 @@ def run(db, limit=MAX_CALLS, enqueue_only=False):
                 if not source or source['content_hash']!=job['content_hash']:
                     db.execute('DELETE FROM bulletin.decisions WHERE tweet_id=%s',(job['tweet_id'],))
                     counts['suppressed']+=1;continue
-                body=request_body(source)
+                body=request_body(source,prompt['body'])
                 if len(body)>65536:
                     status='oversize_candidate';continue
                 amount=reservation(body)

@@ -137,7 +137,7 @@ test('recommendations use the existing ClickHouse top outgoing list instead of S
       { provider: 'twitter', identity_data: { user_name: 'exgenesis' } },
     ],
     user_metadata: { user_name: 'someone_else', provider_id: '999' },
-  } as User)
+  } as unknown as User)
   jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
     query: { accountId: '42', year: null, peopleLimit: 25 },
     data: { people: [{ accountId: '7', interactionCount: '12' }] },
@@ -159,7 +159,7 @@ test('unavailable interaction data stays unknown without falling back to follows
   jest.mocked(getCurrentUser).mockResolvedValue({
     id: 'member',
     app_metadata: { provider_id: '42' },
-  } as User)
+  } as unknown as User)
   jest
     .mocked(fetchAnalyticsGatewayJson)
     .mockRejectedValue(new Error('Unavailable'))
@@ -175,7 +175,7 @@ test('mutable user metadata cannot select a recommendation profile', async () =>
     id: 'member',
     app_metadata: {},
     user_metadata: { user_name: 'exgenesis', provider_id: '42' },
-  } as User)
+  } as unknown as User)
   await expect(loadBulletinRelationships()).resolves.toMatchObject({
     account_id: '',
     outgoing: {},
@@ -188,7 +188,7 @@ test('interaction responses for a different account are rejected', async () => {
   jest.mocked(getCurrentUser).mockResolvedValue({
     id: 'member',
     app_metadata: { provider_id: '42' },
-  } as User)
+  } as unknown as User)
   jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
     query: { accountId: '99', year: null, peopleLimit: 25 },
     data: { people: [{ accountId: '7', interactionCount: 12 }] },

@@ -199,3 +199,31 @@ test('interaction responses for a different account are rejected', async () => {
     available: false,
   })
 })
+
+test('immediate preview text comes only from a currently verified ClickHouse source', async () => {
+  jest
+    .mocked(getCurrentUser)
+    .mockResolvedValue({ id: 'member', is_anonymous: false } as User)
+  const text = 'Offer: current original'
+  const content_hash = createHash('sha256').update(text).digest('hex')
+  rpc.mockResolvedValue({
+    data: [{ tweet_id: '1', account_id: '10', content_hash }],
+    error: null,
+  })
+  jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
+    data: [
+      {
+        tweet_id: '1',
+        account_id: '10',
+        full_text: text,
+        reply_to_tweet_id: null,
+        retweet: false,
+        created_at: '2026-09-08 00:00:00',
+        username: 'alice',
+      },
+    ],
+  })
+  await expect(loadOpportunities()).resolves.toMatchObject([
+    { tweet_id: '1', preview_text: text },
+  ])
+})

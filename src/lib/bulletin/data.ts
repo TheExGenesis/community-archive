@@ -71,6 +71,7 @@ export async function loadOpportunities(): Promise<Opportunity[]> {
         account_id: source.account_id,
         username: source.username,
         posted_at: utc(source.created_at),
+        preview_text: source.full_text,
         side: notice.side,
         kind: notice.kind,
         summary: notice.summary,

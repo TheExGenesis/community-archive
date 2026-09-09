@@ -304,6 +304,8 @@ export interface TweetCardProps {
   showArchivedBadge?: boolean
   clickable?: boolean
   showExternalLink?: boolean
+  /** Hide unknown engagement counts while a partial tweet is being hydrated. */
+  showEngagement?: boolean
   quotedTweetDisplay?: 'full' | 'summary'
   origin?: TweetOrigin
   returnTo?: string
@@ -356,6 +358,7 @@ export function TweetRow({
   showArchivedBadge = false,
   clickable,
   showExternalLink = false,
+  showEngagement = true,
   quotedTweetDisplay = 'full',
   origin,
   returnTo,
@@ -545,20 +548,22 @@ export function TweetRow({
       {isPreview && expandButton}
       {!compact && (
         <div className="mt-1.5 flex shrink-0 flex-wrap gap-x-4 gap-y-1 text-[12px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
-          {tweet.quoteCount !== undefined && (
+          {showEngagement && tweet.quoteCount !== undefined && (
             <ArchivedQuotesMetric
               count={tweet.quoteCount}
               href={href}
               onOpen={() => captureAction('open_archived_quotes')}
             />
           )}
-          <CountMetric
-            count={tweet.likes}
-            label={tweet.likes === 1 ? 'like' : 'likes'}
-          >
-            <PiHeart />
-          </CountMetric>
-          {tweet.retweetCountAvailable !== false ? (
+          {showEngagement && (
+            <CountMetric
+              count={tweet.likes}
+              label={tweet.likes === 1 ? 'like' : 'likes'}
+            >
+              <PiHeart />
+            </CountMetric>
+          )}
+          {showEngagement && tweet.retweetCountAvailable !== false ? (
             <CountMetric
               count={tweet.rts}
               label={tweet.rts === 1 ? 'repost' : 'reposts'}
@@ -612,7 +617,7 @@ export function TweetRow({
         />
       </Link>
       {details}
-      {compact && (
+      {compact && showEngagement && (
         <div className="whitespace-nowrap text-[11.5px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
           <CountMetric
             count={tweet.likes}

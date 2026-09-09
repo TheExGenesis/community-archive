@@ -27,26 +27,33 @@ const ask = {
   topics: ['gardening'],
 }
 jest.mock('@/components/TweetCard', () => ({
-  TweetCard: () => <div>Original card</div>,
+  TweetCard: ({ tweet }: { tweet: { text?: string } }) => (
+    <div>
+      Original card<span>{tweet.text}</span>
+    </div>
+  ),
 }))
 jest.mock('@/components/portal/TweetRow', () => ({
   TweetAvatar: () => <span />,
 }))
 let intersections: IntersectionObserverCallback[]
+let observed: Map<IntersectionObserverCallback, Element>
 beforeEach(() => {
   jest.useFakeTimers()
   window.history.replaceState(null, '', '/opportunities')
   intersections = []
+  observed = new Map()
   window.IntersectionObserver = jest.fn((callback) => {
     intersections.push(callback)
-    return { observe: jest.fn(), disconnect: jest.fn() }
+    return {
+      observe: (element: Element) => observed.set(callback, element),
+      disconnect: jest.fn(),
+    }
   }) as unknown as typeof IntersectionObserver
-  global.fetch = jest
-    .fn()
-    .mockResolvedValue({
-      ok: true,
-      json: async () => ({ tweets: [{ id: '1' }, { id: '2' }] }),
-    })
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ tweets: [{ id: '1' }, { id: '2' }] }),
+  })
 })
 afterEach(() => jest.useRealTimers())
 test('loads the original automatically near the viewport without fetching every notice', async () => {
@@ -141,7 +148,7 @@ test('coalesces visible cards into one request and reuses loaded cards after fil
   expect(fetch).toHaveBeenCalledTimes(1)
 })
 
-test('pages cards while search and counts still cover all notices', () => {
+test('automatically pages once per sentinel and preserves global search and counts', () => {
   const notices = Array.from({ length: 14 }, (_, i) => ({
     ...offer,
     tweet_id: String(i + 1),
@@ -155,7 +162,23 @@ test('pages cards while search and counts still cover all notices', () => {
   )
   expect(screen.getByRole('status')).toHaveTextContent('14 of 14 notices')
   expect(screen.getAllByRole('article')).toHaveLength(6)
-  fireEvent.click(screen.getByRole('button', { name: 'Load more offers' }))
+  expect(
+    screen.queryByRole('button', { name: 'Load more offers' }),
+  ).not.toBeInTheDocument()
+  const sentinel = screen.getByLabelText('Load more offers')
+  const nextPage = intersections.find(
+    (callback) => observed.get(callback) === sentinel,
+  )!
+  act(() => {
+    nextPage(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    )
+    nextPage(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    )
+  })
   expect(screen.getAllByRole('article')).toHaveLength(12)
   fireEvent.change(screen.getByLabelText('Search opportunities'), {
     target: { value: 'Offer number 14' },
@@ -163,5 +186,23 @@ test('pages cards while search and counts still cover all notices', () => {
   expect(screen.getByText('Offer number 14')).toBeInTheDocument()
   expect(
     screen.queryByRole('button', { name: 'Load more offers' }),
+  ).not.toBeInTheDocument()
+})
+
+test('shows verified tweet text immediately before requesting richer cards', () => {
+  render(
+    <OpportunityBoard
+      opportunities={[
+        { ...offer, preview_text: 'Verified complete original text' },
+      ]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  expect(
+    screen.getByText('Verified complete original text'),
+  ).toBeInTheDocument()
+  expect(fetch).not.toHaveBeenCalled()
+  expect(
+    screen.queryByLabelText('Loading original tweet'),
   ).not.toBeInTheDocument()
 })

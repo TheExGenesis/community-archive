@@ -283,3 +283,20 @@ describe('TweetCard', () => {
     ).toHaveAttribute('href', 'https://x.com/alice/status/123')
   })
 })
+
+test('partial cards hide unknown counts without hiding text or outbound navigation', () => {
+  render(
+    <TweetCard
+      tweet={{ ...tweet, quotedTweet: undefined }}
+      showEngagement={false}
+      showExternalLink
+      previewHeight={240}
+    />,
+  )
+  expect(screen.queryByText('12 likes')).not.toBeInTheDocument()
+  expect(screen.queryByText('3 reposts')).not.toBeInTheDocument()
+  expect(
+    screen.getByRole('link', { name: 'View tweet on X (opens in a new tab)' }),
+  ).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Read more' })).toBeInTheDocument()
+})

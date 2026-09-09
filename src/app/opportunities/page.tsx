@@ -32,8 +32,12 @@ export default async function OpportunitiesPage() {
           <h1 className="text-2xl font-semibold tracking-tight">
             Opportunities
           </h1>
-          <p className="hidden text-sm text-muted-foreground sm:block">
-            Asks and offers from the community, collected daily.
+          <p className="text-xs text-muted-foreground">
+            Thanks to{' '}
+            <Link href="/user/maskys_" className="text-brand hover:underline">
+              @maskys_
+            </Link>{' '}
+            for the first prototype.
           </p>
         </div>
         <div className="flex items-center gap-3">

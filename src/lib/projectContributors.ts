@@ -17,6 +17,11 @@ export const currentProjectContributors: ProjectContributor[] = [
     username: 'christineist',
     role: 'Contributor',
   },
+  {
+    name: 'Kifah',
+    username: 'maskys_',
+    role: 'Bulletin prototype',
+  },
 ]
 
 export const pastProjectContributors: ProjectContributor[] = [

@@ -26,7 +26,7 @@ export default function MobileNavigation({ items }: { items: NavItem[] }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="2xl:hidden">
+        <Button variant="outline" size="icon" className="lg:hidden">
           <Menu className="h-5 w-5" />
           <span className="sr-only">Open navigation menu</span>
         </Button>
@@ -34,7 +34,7 @@ export default function MobileNavigation({ items }: { items: NavItem[] }) {
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="w-56 rounded-lg p-2 2xl:hidden"
+        className="w-56 rounded-lg p-2 lg:hidden"
       >
         <DropdownMenuLabel className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Navigation

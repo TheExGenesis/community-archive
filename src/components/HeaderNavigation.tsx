@@ -21,7 +21,7 @@ export default function HeaderNavigation({ items }: { items: NavItem[] }) {
   const pathname = usePathname()
 
   return (
-    <NavigationMenu className="hidden 2xl:flex">
+    <NavigationMenu className="hidden lg:flex">
       <NavigationMenuList>
         {items.map((item) => {
           const isActive = isNavItemActive(pathname, item.href)
@@ -38,7 +38,7 @@ export default function HeaderNavigation({ items }: { items: NavItem[] }) {
                   }
                   className={cn(
                     navigationMenuTriggerStyle(),
-                    'px-2.5 text-xs transition-colors duration-150 hover:bg-accent 2xl:px-2.5 2xl:text-sm',
+                    'px-1.5 text-xs transition-colors duration-150 hover:bg-accent 2xl:px-2.5 2xl:text-sm',
                     isActive ? 'bg-muted font-semibold' : '',
                   )}
                 >

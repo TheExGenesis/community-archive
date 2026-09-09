@@ -100,7 +100,7 @@ export default function RootLayout({
                           priority
                         />
                         <span
-                          className="hidden whitespace-nowrap text-lg font-bold text-foreground sm:inline"
+                          className="hidden whitespace-nowrap text-lg font-bold text-foreground sm:inline lg:hidden 2xl:inline"
                           style={{
                             fontFamily:
                               'var(--font-petrona), Georgia, "Times New Roman", serif',
@@ -111,7 +111,7 @@ export default function RootLayout({
                       </PostHogLink>
                       <AudienceHeaderNavigation kind="primary" />
                     </div>
-                    <div className="flex flex-shrink-0 items-center space-x-3">
+                    <div className="flex flex-shrink-0 items-center space-x-2 2xl:space-x-3">
                       <AudienceHeaderNavigation kind="utility" />
                       <HeaderSearch />
                       <div className="text-sm">

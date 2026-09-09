@@ -137,20 +137,52 @@ export async function loadBulletinRelationships(handle?: string) {
   const me = String(user?.app_metadata?.provider_id || '')
   const empty = {
     account_id: me,
-    username: '',
-    following: [] as string[],
-    followers: [] as string[],
+    username: handle?.replace(/^@/, '') || '',
+    outgoing: {} as Record<string, number>,
     available: false,
   }
-  if (process.env.BULLETIN_FOLLOW_SOURCE !== 'supabase') return empty
   handle = handle?.replace(/^@/, '')
   if (handle && !/^[A-Za-z0-9_]{1,15}$/.test(handle)) return empty
-  const { data, error } = await createServerServiceRoleClient().rpc(
-    'get_bulletin_relationships',
-    handle ? { viewer_username: handle } : { viewer_account_id: me },
-  )
-  if (error || !data) return empty
-  return data as unknown as typeof empty
+  const identifier = handle || me
+  if (!identifier) return empty
+  try {
+    const response = await fetchAnalyticsGatewayJson<{
+      data: {
+        people: Array<{ accountId: string; interactionCount: string | number }>
+      }
+      query: { accountId: string; year: number | null; peopleLimit: number }
+    }>(
+      ['user', identifier, 'interactions'],
+      new URLSearchParams({ limit: '25' }),
+      { timeoutMs: 30_000 },
+    )
+    if (
+      !/^\d{1,20}$/.test(response.query?.accountId) ||
+      (!handle && response.query.accountId !== me) ||
+      response.query.year !== null ||
+      response.query.peopleLimit !== 25 ||
+      !Array.isArray(response.data?.people)
+    )
+      return empty
+    const outgoing: Record<string, number> = {}
+    for (const person of response.data.people) {
+      const count = Number(person.interactionCount)
+      if (
+        /^\d{1,20}$/.test(person.accountId) &&
+        Number.isSafeInteger(count) &&
+        count > 0
+      )
+        outgoing[person.accountId] = count
+    }
+    return {
+      ...empty,
+      account_id: response.query.accountId,
+      outgoing,
+      available: true,
+    }
+  } catch {
+    return empty
+  }
 }
 
 export type StoredNotice = Opportunity & { content_hash: string }

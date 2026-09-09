@@ -36,22 +36,32 @@ export function ViewerForm({
         )
       }}
     >
-      <label className="text-sm">
-        <span className="sr-only">See recommendations for</span>
-        <input
-          name="me"
-          value={handle}
-          onChange={(event) => setHandle(event.target.value)}
-          placeholder="@ Your X handle"
-          maxLength={16}
-          pattern="@?[A-Za-z0-9_]{1,15}"
-          className="h-9 w-40 rounded-md border bg-background px-3 text-sm"
-        />
-      </label>
-      <button className="h-9 rounded-md border px-3 text-sm">Apply</button>
+      <div className="inline-flex items-center overflow-hidden rounded-md border bg-background focus-within:ring-2 focus-within:ring-brand/40">
+        <label className="flex items-center text-sm">
+          <span aria-hidden="true" className="pl-3 text-muted-foreground">
+            @
+          </span>
+          <span className="sr-only">See recommendations for</span>
+          <input
+            name="me"
+            value={handle}
+            onChange={(event) => setHandle(event.target.value)}
+            placeholder="X handle"
+            maxLength={16}
+            pattern="@?[A-Za-z0-9_]{1,15}"
+            className="h-9 w-32 bg-transparent px-2 text-sm outline-none"
+          />
+        </label>
+        <button
+          aria-label="Apply X handle"
+          className="h-9 border-l bg-muted/60 px-3 text-sm font-medium hover:bg-muted"
+        >
+          Apply
+        </button>
+      </div>
       {unavailable && (
         <p className="text-sm text-muted-foreground">
-          No archived follow relationships available for this handle.
+          Top outgoing interactions are unavailable for this handle.
         </p>
       )}
     </form>

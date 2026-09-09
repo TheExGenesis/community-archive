@@ -1,7 +1,11 @@
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 import { createHash } from 'crypto'
 import type { User } from '@supabase/supabase-js'
-import { loadOpportunities, loadRunDashboard } from './data'
+import {
+  loadOpportunities,
+  loadRunDashboard,
+  loadBulletinRelationships,
+} from './data'
 import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { getAdminClient } from '@/app/admin/data'
@@ -107,22 +111,51 @@ test('ClickHouse source changes suppress a notice and upstream outages fail the 
     data: [{ tweet_id: '1', account_id: '10', content_hash: hash }],
     error: null,
   })
-  jest
-    .mocked(fetchAnalyticsGatewayJson)
-    .mockResolvedValue({
-      data: [
-        {
-          tweet_id: '1',
-          account_id: '10',
-          full_text: 'edited',
-          reply_to_tweet_id: null,
-          retweet: false,
-        },
-      ],
-    })
+  jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
+    data: [
+      {
+        tweet_id: '1',
+        account_id: '10',
+        full_text: 'edited',
+        reply_to_tweet_id: null,
+        retweet: false,
+      },
+    ],
+  })
   await expect(loadOpportunities()).resolves.toEqual([])
   jest
     .mocked(fetchAnalyticsGatewayJson)
     .mockRejectedValue(new Error('unavailable'))
   await expect(loadOpportunities()).rejects.toThrow('unavailable')
+})
+
+test('recommendations use the existing ClickHouse top outgoing list instead of Supabase follows', async () => {
+  jest.mocked(getLocalAdminPreview).mockResolvedValue('admin')
+  jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
+    query: { accountId: '42', year: null, peopleLimit: 25 },
+    data: { people: [{ accountId: '7', interactionCount: '12' }] },
+  })
+  await expect(loadBulletinRelationships('@exgenesis')).resolves.toMatchObject({
+    account_id: '42',
+    username: 'exgenesis',
+    outgoing: { '7': 12 },
+    available: true,
+  })
+  expect(fetchAnalyticsGatewayJson).toHaveBeenCalledWith(
+    ['user', 'exgenesis', 'interactions'],
+    new URLSearchParams({ limit: '25' }),
+    expect.any(Object),
+  )
+  expect(createServerServiceRoleClient).not.toHaveBeenCalled()
+})
+test('unavailable interaction data stays unknown without falling back to follows', async () => {
+  jest.mocked(getLocalAdminPreview).mockResolvedValue('admin')
+  jest
+    .mocked(fetchAnalyticsGatewayJson)
+    .mockRejectedValue(new Error('Unavailable'))
+  await expect(loadBulletinRelationships('exgenesis')).resolves.toMatchObject({
+    outgoing: {},
+    available: false,
+  })
+  expect(createServerServiceRoleClient).not.toHaveBeenCalled()
 })

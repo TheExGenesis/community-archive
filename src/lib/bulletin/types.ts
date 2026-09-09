@@ -54,12 +54,12 @@ export type RunDashboard = {
 }
 
 export const KIND_LABELS: Record<string, string> = {
+  free: 'Free things',
+  opportunity: 'Opportunities',
+  invite: 'Invitations',
+  intro: 'Introductions',
   help: 'Help',
   feedback: 'Feedback',
-  intro: 'Introductions',
-  free: 'Free things',
-  invite: 'Invitations',
-  opportunity: 'Opportunities',
 }
 export const RESPONSE_LABELS: Record<string, string> = {
   dm: 'Send a DM',

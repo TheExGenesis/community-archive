@@ -29,10 +29,9 @@ test('asks age out after 14 days, offers after 60, and standing notices remain',
     isPast({ ...ask, standing: true, expires_at: '2026-08-15' }, now),
   ).toBe(true)
 })
-test('social ranking matches original and puts expired notices last', () => {
+test('outgoing ranking uses counts and puts expired notices last', () => {
   const graph = {
-    following: ['2', '3'],
-    followers: ['2', '4'],
+    outgoing: { '2': 5, '3': 2, '4': 10 },
     available: true,
   }
   const rows = ['5', '4', '3', '2', '1'].map((id) => notice(id))
@@ -40,10 +39,30 @@ test('social ranking matches original and puts expired notices last', () => {
     sortNotices(rows, true, '1', graph, Date.parse('2026-08-10')).map(
       (o) => o.account_id,
     ),
-  ).toEqual(['1', '2', '4', '3', '5'])
+  ).toEqual(['1', '4', '2', '3', '5'])
   rows[4].expires_at = '2026-08-01'
   expect(
     sortNotices(rows, true, '1', graph, Date.parse('2026-08-10')).at(-1)
       ?.account_id,
   ).toBe('1')
+})
+
+test('recommended follows category priority while newest remains chronological', () => {
+  const graph = { outgoing: {}, available: true }
+  const kinds = ['feedback', 'help', 'intro', 'invite', 'opportunity', 'free']
+  const rows = kinds.map((kind, i) => ({
+    ...notice(String(i)),
+    kind,
+    posted_at: `2026-08-0${6 - i}T00:00:00Z`,
+  }))
+  expect(
+    sortNotices(rows, true, '', graph, Date.parse('2026-08-10')).map(
+      (o) => o.kind,
+    ),
+  ).toEqual([...kinds].reverse())
+  expect(
+    sortNotices(rows, false, '', graph, Date.parse('2026-08-10')).map(
+      (o) => o.kind,
+    ),
+  ).toEqual(kinds)
 })

@@ -15,8 +15,7 @@ import {
 } from '@/lib/bulletin/board'
 
 const EMPTY_GRAPH: BulletinRelationships = {
-  following: [],
-  followers: [],
+  outgoing: {},
   available: false,
 }
 function Original({ id }: { id: string }) {
@@ -238,9 +237,9 @@ export function OpportunityBoard({
           </summary>
           <p className="mt-2 max-w-2xl">
             {recommended && graph.available
-              ? 'Your notices, then mutuals, people you follow or who follow you, then everyone else. Newest first within each group.'
+              ? 'Free things first, then opportunities, invitations, introductions, help, and feedback. Within each category: your notices, then your top outgoing interactions, then everyone else. This uses the profile’s top 25 all-time interaction counts (mentions, replies, quotes and reposts); missing people are not necessarily strangers.'
               : recommended
-                ? 'Follow relationships are unavailable; showing your notices first, then newest.'
+                ? 'Top outgoing interactions are unavailable. Showing categories in priority order, with your notices first within each category, then newest.'
                 : 'Newest notices first.'}{' '}
             Past notices appear last.
           </p>
@@ -290,17 +289,17 @@ export function OpportunityBoard({
                         className="block h-24 space-y-1 border-t px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                       >
                         <p
-                          className="line-clamp-3 text-xs leading-relaxed text-muted-foreground"
+                          className="line-clamp-3 text-xs leading-relaxed text-foreground/80"
                           title={o.summary}
                         >
+                          {(rel.label || expired) && (
+                            <span className="float-right mb-1 ml-2 rounded bg-muted/60 px-1.5 py-0.5 text-right text-[10px] font-normal leading-4 text-muted-foreground">
+                              {rel.label}
+                              {expired ? `${rel.label ? ' · ' : ''}Past` : ''}
+                            </span>
+                          )}
                           {o.summary}
                         </p>
-                        {(rel.label || expired) && (
-                          <p className="text-[11px] text-muted-foreground">
-                            {rel.label}
-                            {expired ? `${rel.label ? ' · ' : ''}Past` : ''}
-                          </p>
-                        )}
                       </Link>
                     </article>
                   )

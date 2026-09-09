@@ -1,8 +1,9 @@
-import type { Opportunity } from './types'
+import { KIND_LABELS, type Opportunity } from './types'
+
+const CATEGORY_ORDER = Object.keys(KIND_LABELS)
 
 export type BulletinRelationships = {
-  following: string[]
-  followers: string[]
+  outgoing: Record<string, number>
   available: boolean
 }
 export function expiry(notice: Opportunity): number | null {
@@ -25,11 +26,9 @@ export function relationship(
   graph: BulletinRelationships,
 ) {
   if (notice.account_id === me) return { rank: 0, label: 'You' }
-  const following = graph.following.includes(notice.account_id)
-  const follower = graph.followers.includes(notice.account_id)
-  if (following && follower) return { rank: 1, label: 'Mutual' }
-  if (following) return { rank: 2, label: 'You follow' }
-  if (follower) return { rank: 2, label: 'Follows you' }
+  const count = graph.outgoing?.[notice.account_id] || 0
+  if (count > 0)
+    return { rank: 1, label: `You → them · ${count.toLocaleString('en-US')}` }
   return { rank: 3, label: '' }
 }
 export function sortNotices(
@@ -43,7 +42,12 @@ export function sortNotices(
     (a, b) =>
       Number(isPast(a, now)) - Number(isPast(b, now)) ||
       (recommended
-        ? relationship(a, me, graph).rank - relationship(b, me, graph).rank
+        ? CATEGORY_ORDER.indexOf(a.kind) - CATEGORY_ORDER.indexOf(b.kind)
+        : 0) ||
+      (recommended
+        ? relationship(a, me, graph).rank - relationship(b, me, graph).rank ||
+          (graph.outgoing?.[b.account_id] || 0) -
+            (graph.outgoing?.[a.account_id] || 0)
         : 0) ||
       Date.parse(b.posted_at) - Date.parse(a.posted_at) ||
       b.tweet_id.localeCompare(a.tweet_id),

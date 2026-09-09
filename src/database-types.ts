@@ -2060,17 +2060,10 @@ export type Database = {
         }[]
       }
       get_bulletin_prompts: {
-        Args: { before_id?: number }
-        Returns: Json
-      }
-      save_bulletin_prompt: {
         Args: {
-          expected_id: number
-          prompt_body: string
-          change_note: string
-          actor_id: string
+          before_id?: number
         }
-        Returns: string
+        Returns: Json
       }
       get_bulletin_runs: {
         Args: {
@@ -2490,6 +2483,15 @@ export type Database = {
       refresh_global_activity_summary: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      save_bulletin_prompt: {
+        Args: {
+          expected_id: number
+          prompt_body: string
+          change_note: string
+          actor_id: string
+        }
+        Returns: string
       }
       search_tweets:
         | {

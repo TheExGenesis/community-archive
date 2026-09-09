@@ -7,7 +7,6 @@ import {
   requireOpportunityUser,
 } from '@/lib/bulletin/data'
 import { OpportunityBoard } from '@/components/bulletin/OpportunityBoard'
-import { ViewerForm } from '@/components/bulletin/ViewerForm'
 import { RefreshButton } from '@/components/bulletin/RefreshButton'
 
 export const dynamic = 'force-dynamic'
@@ -16,14 +15,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-export default async function OpportunitiesPage({
-  searchParams,
-}: {
-  searchParams?: { me?: string }
-}) {
+export default async function OpportunitiesPage() {
   await requireOpportunityUser()
   const isAdmin = await isBulletinAdmin()
-  const personal = await loadBulletinRelationships(searchParams?.me)
+  const personal = await loadBulletinRelationships()
   let opportunities
   try {
     opportunities = await loadOpportunities()
@@ -60,12 +55,6 @@ export default async function OpportunitiesPage({
         </div>
       ) : (
         <OpportunityBoard
-          viewerControl={
-            <ViewerForm
-              username={searchParams?.me || personal.username}
-              unavailable={!!searchParams?.me && !personal.available}
-            />
-          }
           opportunities={opportunities}
           me={personal.account_id}
           username={personal.username}

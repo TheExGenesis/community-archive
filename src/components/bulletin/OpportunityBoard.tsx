@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { TweetCard } from '@/components/TweetCard'
@@ -94,13 +94,11 @@ function Original({ id }: { id: string }) {
 }
 export function OpportunityBoard({
   opportunities,
-  viewerControl,
   me = '',
   username = '',
   graph = EMPTY_GRAPH,
   now = Date.now(),
 }: {
-  viewerControl?: ReactNode
   opportunities: Opportunity[]
   me?: string
   username?: string
@@ -161,7 +159,6 @@ export function OpportunityBoard({
     <div className="space-y-3">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          {viewerControl}
           <Button
             size="sm"
             aria-pressed={recommended}

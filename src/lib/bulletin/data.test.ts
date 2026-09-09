@@ -130,32 +130,72 @@ test('ClickHouse source changes suppress a notice and upstream outages fail the 
 })
 
 test('recommendations use the existing ClickHouse top outgoing list instead of Supabase follows', async () => {
-  jest.mocked(getLocalAdminPreview).mockResolvedValue('admin')
+  jest.mocked(getCurrentUser).mockResolvedValue({
+    id: 'member',
+    app_metadata: { provider_id: '42' },
+    identities: [
+      { provider: 'twitter', identity_data: { user_name: 'exgenesis' } },
+    ],
+    user_metadata: { user_name: 'someone_else', provider_id: '999' },
+  } as User)
   jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
     query: { accountId: '42', year: null, peopleLimit: 25 },
     data: { people: [{ accountId: '7', interactionCount: '12' }] },
   })
-  await expect(loadBulletinRelationships('@exgenesis')).resolves.toMatchObject({
+  await expect(loadBulletinRelationships()).resolves.toMatchObject({
     account_id: '42',
     username: 'exgenesis',
     outgoing: { '7': 12 },
     available: true,
   })
   expect(fetchAnalyticsGatewayJson).toHaveBeenCalledWith(
-    ['user', 'exgenesis', 'interactions'],
+    ['user', '42', 'interactions'],
     new URLSearchParams({ limit: '25' }),
     expect.any(Object),
   )
   expect(createServerServiceRoleClient).not.toHaveBeenCalled()
 })
 test('unavailable interaction data stays unknown without falling back to follows', async () => {
-  jest.mocked(getLocalAdminPreview).mockResolvedValue('admin')
+  jest.mocked(getCurrentUser).mockResolvedValue({
+    id: 'member',
+    app_metadata: { provider_id: '42' },
+  } as User)
   jest
     .mocked(fetchAnalyticsGatewayJson)
     .mockRejectedValue(new Error('Unavailable'))
-  await expect(loadBulletinRelationships('exgenesis')).resolves.toMatchObject({
+  await expect(loadBulletinRelationships()).resolves.toMatchObject({
     outgoing: {},
     available: false,
   })
   expect(createServerServiceRoleClient).not.toHaveBeenCalled()
+})
+
+test('mutable user metadata cannot select a recommendation profile', async () => {
+  jest.mocked(getCurrentUser).mockResolvedValue({
+    id: 'member',
+    app_metadata: {},
+    user_metadata: { user_name: 'exgenesis', provider_id: '42' },
+  } as User)
+  await expect(loadBulletinRelationships()).resolves.toMatchObject({
+    account_id: '',
+    outgoing: {},
+    available: false,
+  })
+  expect(fetchAnalyticsGatewayJson).not.toHaveBeenCalled()
+})
+
+test('interaction responses for a different account are rejected', async () => {
+  jest.mocked(getCurrentUser).mockResolvedValue({
+    id: 'member',
+    app_metadata: { provider_id: '42' },
+  } as User)
+  jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
+    query: { accountId: '99', year: null, peopleLimit: 25 },
+    data: { people: [{ accountId: '7', interactionCount: 12 }] },
+  })
+  await expect(loadBulletinRelationships()).resolves.toMatchObject({
+    account_id: '42',
+    outgoing: {},
+    available: false,
+  })
 })

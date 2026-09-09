@@ -1,3 +1,4 @@
+import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
 import 'server-only'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/portal/auth'
@@ -132,18 +133,21 @@ export async function loadRunDashboard(before?: string): Promise<RunDashboard> {
   return data as unknown as RunDashboard
 }
 
-export async function loadBulletinRelationships(handle?: string) {
+export async function loadBulletinRelationships() {
   const user = await requireOpportunityUser()
-  const me = String(user?.app_metadata?.provider_id || '')
+  const providerId = user?.app_metadata?.provider_id
+  const me =
+    typeof providerId === 'string' && /^\d{1,20}$/.test(providerId)
+      ? providerId
+      : ''
+  const username = user ? getSessionTwitterUsername(user) || '' : ''
   const empty = {
     account_id: me,
-    username: handle?.replace(/^@/, '') || '',
+    username,
     outgoing: {} as Record<string, number>,
     available: false,
   }
-  handle = handle?.replace(/^@/, '')
-  if (handle && !/^[A-Za-z0-9_]{1,15}$/.test(handle)) return empty
-  const identifier = handle || me
+  const identifier = me || username
   if (!identifier) return empty
   try {
     const response = await fetchAnalyticsGatewayJson<{
@@ -158,7 +162,7 @@ export async function loadBulletinRelationships(handle?: string) {
     )
     if (
       !/^\d{1,20}$/.test(response.query?.accountId) ||
-      (!handle && response.query.accountId !== me) ||
+      (!!me && response.query.accountId !== me) ||
       response.query.year !== null ||
       response.query.peopleLimit !== 25 ||
       !Array.isArray(response.data?.people)

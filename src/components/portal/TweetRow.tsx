@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import { PiArrowSquareOut, PiHeart, PiQuotes, PiRepeat } from 'react-icons/pi'
 import ImageLightbox from '@/components/ImageLightbox'
@@ -295,6 +295,8 @@ export interface TweetCardProps {
   compact?: boolean
   collapsible?: boolean
   noClamp?: boolean
+  /** Fixed-height preview with full text/media available through Read more. */
+  previewHeight?: number
   /** Keep media within a quarter viewport; lightbox still shows full size. */
   constrainMedia?: boolean
   featuredRank?: number
@@ -347,6 +349,7 @@ export function TweetRow({
   compact = false,
   collapsible = false,
   noClamp = false,
+  previewHeight,
   constrainMedia = false,
   featuredRank,
   showDate = false,
@@ -359,7 +362,15 @@ export function TweetRow({
 }: TweetCardProps) {
   const router = useRouter()
   const [isExpanded, setIsExpanded] = useState(false)
-  const canExpand = collapsible && !noClamp && tweet.text.length > 280
+  const isPreview = previewHeight !== undefined
+  const previewCollapsed = isPreview && !isExpanded
+  const previewContent = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (previewCollapsed && previewContent.current)
+      previewContent.current.scrollTop = 0
+  }, [previewCollapsed, tweet.id])
+  const canExpand =
+    isPreview || (collapsible && !noClamp && tweet.text.length > 280)
   const href = tweetPermalinkHref(tweet.id, origin, returnTo)
   const profileHref = userProfileHref(tweet.username, tweet.accountId)
   const isFeatured = featuredRank !== undefined
@@ -428,7 +439,7 @@ export function TweetRow({
               ? 'text-[14.5px] leading-relaxed'
               : 'text-[14px] leading-relaxed'
       } ${
-        noClamp
+        noClamp || isPreview
           ? ''
           : compact
             ? 'line-clamp-2'
@@ -441,8 +452,22 @@ export function TweetRow({
     </div>
   )
 
+  const expandButton = canExpand ? (
+    <button
+      type="button"
+      aria-expanded={isExpanded}
+      onClick={() => {
+        captureAction(isExpanded ? 'collapse' : 'expand')
+        setIsExpanded((expanded) => !expanded)
+      }}
+      className="mt-1 shrink-0 self-start text-[12px] font-semibold text-brand"
+    >
+      {isExpanded ? 'Show less' : 'Read more'}
+    </button>
+  ) : null
+
   const details = (
-    <div className="min-w-0 flex-1">
+    <div className={`min-w-0 flex-1 ${isPreview ? 'flex flex-col' : ''}`}>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <Link
           href={profileHref}
@@ -480,50 +505,46 @@ export function TweetRow({
           </span>
         </div>
       ) : null}
-      <Link
-        href={href}
-        onClick={() => captureAction('open')}
-        className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      <div
+        ref={previewContent}
+        className={
+          previewCollapsed ? 'min-h-0 flex-1 overflow-hidden' : undefined
+        }
       >
-        {tweetContent}
-      </Link>
-      {canExpand && (
-        <button
-          type="button"
-          aria-expanded={isExpanded}
-          onClick={() => {
-            captureAction(isExpanded ? 'collapse' : 'expand')
-            setIsExpanded((expanded) => !expanded)
-          }}
-          className="mt-1 text-[12px] font-semibold text-brand"
+        <Link
+          href={href}
+          onClick={() => captureAction('open')}
+          className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
-          {isExpanded ? 'Show less' : 'Read more'}
-        </button>
-      )}
-      <TweetImages
-        media={tweet.media}
-        compact={compact}
-        constrainMedia={constrainMedia}
-        label="Tweet image"
-      />
-      {/https?:\/\//.test(tweet.text) && (
-        <TweetLinkPreviews tweetId={tweet.id} compact={compact} />
-      )}
-      {tweet.quotedTweet && (
-        <QuotedTweet
-          tweet={tweet.quotedTweet}
+          {tweetContent}
+        </Link>
+        {!isPreview && expandButton}
+        <TweetImages
+          media={tweet.media}
           compact={compact}
-          summary={quotedTweetDisplay === 'summary'}
-          noClamp={noClamp}
           constrainMedia={constrainMedia}
-          showDate={showDate}
-          origin={origin}
-          returnTo={returnTo}
-          onOpen={() => captureAction('open_quoted_tweet')}
+          label="Tweet image"
         />
-      )}
+        {!previewCollapsed && /https?:\/\//.test(tweet.text) && (
+          <TweetLinkPreviews tweetId={tweet.id} compact={compact} />
+        )}
+        {tweet.quotedTweet && (
+          <QuotedTweet
+            tweet={tweet.quotedTweet}
+            compact={compact}
+            summary={quotedTweetDisplay === 'summary'}
+            noClamp={noClamp || (isPreview && isExpanded)}
+            constrainMedia={constrainMedia}
+            showDate={showDate}
+            origin={origin}
+            returnTo={returnTo}
+            onOpen={() => captureAction('open_quoted_tweet')}
+          />
+        )}
+      </div>
+      {isPreview && expandButton}
       {!compact && (
-        <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
+        <div className="mt-1.5 flex shrink-0 flex-wrap gap-x-4 gap-y-1 text-[12px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
           {tweet.quoteCount !== undefined && (
             <ArchivedQuotesMetric
               count={tweet.quoteCount}
@@ -561,7 +582,7 @@ export function TweetRow({
               aria-label="View tweet on X (opens in a new tab)"
               className="ml-auto inline-flex items-center gap-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             >
-              <span>View on X</span>
+              {!isPreview && <span>View on X</span>}
               <PiArrowSquareOut aria-hidden="true" />
             </a>
           )}
@@ -572,6 +593,7 @@ export function TweetRow({
 
   return (
     <article
+      style={previewCollapsed ? { height: previewHeight } : undefined}
       className={`${rowClassName} ${
         isClickable
           ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2'

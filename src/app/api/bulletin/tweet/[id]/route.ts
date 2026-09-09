@@ -58,24 +58,30 @@ export async function GET(
       { error: 'Invalid tweet' },
       { status: 400, headers },
     )
-  const { notices, allowedAccounts } = await loadBulletinBoardState()
-  const notice = notices.find((n) => n.tweet_id === params.id)
-  if (!notice)
-    return NextResponse.json(
-      { error: 'Notice unavailable' },
-      { status: 404, headers },
-    )
   try {
-    const current = await fetchAnalyticsGatewayJson<{
-      data: Array<{
-        tweet_id: string
-        account_id: string
-        content_hash: string
-        reply_to_tweet_id: string | null
-        retweet: boolean
-        full_text: string
-      }>
-    }>(['bulletin-sources'], new URLSearchParams({ ids: params.id }))
+    // These reads are independent; validate all results before returning content.
+    const [{ notices, allowedAccounts }, current, result] = await Promise.all([
+      loadBulletinBoardState(),
+      fetchAnalyticsGatewayJson<{
+        data: Array<{
+          tweet_id: string
+          account_id: string
+          content_hash: string
+          reply_to_tweet_id: string | null
+          retweet: boolean
+          full_text: string
+        }>
+      }>(['bulletin-sources'], new URLSearchParams({ ids: params.id })),
+      fetchClickHouseTweetPageData(params.id, (path, params) =>
+        fetchAnalyticsGatewayJson(path, params),
+      ),
+    ])
+    const notice = notices.find((n) => n.tweet_id === params.id)
+    if (!notice)
+      return NextResponse.json(
+        { error: 'Notice unavailable' },
+        { status: 404, headers },
+      )
     const source = current.data.find((row) => row.tweet_id === params.id)
     if (
       !source ||
@@ -85,10 +91,6 @@ export async function GET(
       source.full_text.startsWith('RT @')
     )
       throw new Error('Source unavailable')
-    const result = await fetchClickHouseTweetPageData(
-      params.id,
-      (path, params) => fetchAnalyticsGatewayJson(path, params),
-    )
     if (
       !result ||
       (notice.account_id

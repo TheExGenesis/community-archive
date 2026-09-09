@@ -93,8 +93,5 @@ test('past toggle includes expired notices and preserves filters in the URL', ()
   fireEvent.click(screen.getByLabelText('Show past notices'))
   expect(screen.getByRole('status')).toHaveTextContent('1 of 1 notices')
   expect(window.location.hash).toContain('past=1')
-  expect(screen.getByRole('link', { name: /Send a DM on X/ })).toHaveAttribute(
-    'href',
-    'https://x.com/alice/status/1',
-  )
+  expect(screen.getByText('Help with Python')).toBeInTheDocument()
 })

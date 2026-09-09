@@ -1,22 +1,18 @@
 'use client'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { tweetPermalinkHref } from '@/lib/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { TweetCard } from '@/components/TweetCard'
 import type { PortalTweet } from '@/lib/portal/types'
-import {
-  KIND_LABELS,
-  RESPONSE_LABELS,
-  type Opportunity,
-} from '@/lib/bulletin/types'
+import { KIND_LABELS, type Opportunity } from '@/lib/bulletin/types'
 import {
   isPast,
   relationship,
   sortNotices,
   type BulletinRelationships,
 } from '@/lib/bulletin/board'
-import { tweetPermalinkHref } from '@/lib/navigation'
 
 const EMPTY_GRAPH: BulletinRelationships = {
   following: [],
@@ -69,15 +65,15 @@ function Original({ id }: { id: string }) {
       {tweet ? (
         <TweetCard
           tweet={tweet}
-          noClamp
-          clickable={false}
+          previewHeight={240}
+          clickable
           showDate
           showExternalLink
           origin="opportunities"
           returnTo="/opportunities"
         />
       ) : error ? (
-        <div role="alert" className="p-4 text-sm">
+        <div role="alert" className="h-[240px] p-4 text-sm">
           The original could not be loaded.{' '}
           <button
             className="text-brand underline"
@@ -88,7 +84,7 @@ function Original({ id }: { id: string }) {
         </div>
       ) : (
         <div
-          className="min-h-40 animate-pulse space-y-3 p-4"
+          className="h-[240px] animate-pulse space-y-3 p-4"
           aria-label="Loading original tweet"
         >
           <div className="h-8 w-2/3 rounded bg-muted" />
@@ -279,77 +275,33 @@ export function OpportunityBoard({
                 .map((o) => {
                   const rel = relationship(o, me, graph)
                   const expired = isPast(o, now)
-                  const x = `https://x.com/${o.username}/status/${o.tweet_id}`
-                  const report =
-                    'https://github.com/TheExGenesis/community-archive/issues/new?' +
-                    new URLSearchParams({
-                      title: `Bulletin correction: ${o.tweet_id}`,
-                      body: `Post: ${x}\nShown as: ${o.side} / ${o.kind}\nSummary: ${o.summary}\n\nWhat should change?\n`,
-                    })
                   return (
                     <article
                       key={o.tweet_id}
                       className={`min-w-0 overflow-hidden rounded-lg border bg-card ${expired ? 'opacity-60' : ''} ${rel.rank < 3 ? 'border-brand/40' : ''}`}
                     >
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 pt-2 text-xs text-muted-foreground">
-                        <span>
-                          {KIND_LABELS[o.kind]}
-                          {expired ? ' · Past' : o.standing ? ' · Ongoing' : ''}
-                        </span>
-                        {rel.label && (
-                          <span className="ml-auto text-brand">
-                            {rel.label}
-                          </span>
-                        )}
-                      </div>
                       <Original id={o.tweet_id} />
-                      <div className="space-y-2 border-t px-3 py-3">
-                        <p className="text-xs leading-relaxed text-muted-foreground">
-                          <span className="font-medium">AI summary: </span>
+                      <Link
+                        href={tweetPermalinkHref(
+                          o.tweet_id,
+                          'opportunities',
+                          '/opportunities',
+                        )}
+                        className="block h-24 space-y-1 border-t px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      >
+                        <p
+                          className="line-clamp-3 text-xs leading-relaxed text-muted-foreground"
+                          title={o.summary}
+                        >
                           {o.summary}
-                          {o.place ? ` · ${o.place}` : ''}
                         </p>
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                          <Link
-                            href={tweetPermalinkHref(
-                              o.tweet_id,
-                              'opportunities',
-                              '/opportunities',
-                            )}
-                            className="text-muted-foreground hover:underline"
-                          >
-                            Open in archive
-                          </Link>
-                          <a
-                            href={x}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-medium text-brand hover:underline"
-                          >
-                            {RESPONSE_LABELS[o.respond]} on X ↗
-                          </a>
-                        </div>
-                        <details className="text-xs text-muted-foreground">
-                          <summary className="cursor-pointer">
-                            Notice details
-                          </summary>
-                          <p className="mt-2">
-                            {o.replies || 0} public repliers · {o.quotes || 0}{' '}
-                            quotes
+                        {(rel.label || expired) && (
+                          <p className="text-[11px] text-muted-foreground">
+                            {rel.label}
+                            {expired ? `${rel.label ? ' · ' : ''}Past` : ''}
                           </p>
-                          <p className="my-2">
-                            {Array.from(new Set(o.topics)).join(' · ')}
-                          </p>
-                          <a
-                            href={report}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hover:underline"
-                          >
-                            Not right? Report a correction
-                          </a>
-                        </details>
-                      </div>
+                        )}
+                      </Link>
                     </article>
                   )
                 })}

@@ -33,6 +33,11 @@ export function RunDashboard({
     Date.now() - Date.parse(data.last_success_at) > 36 * 60 * 60 * 1000
   return (
     <div className="space-y-6">
+      {data.preview_note && (
+        <p className="rounded-lg border bg-muted p-4 text-sm">
+          {data.preview_note}
+        </p>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           Last fully successful run: {formatTimestamp(data.last_success_at)}

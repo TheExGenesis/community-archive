@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { requireAdmin } from '@/app/admin/data'
-import { loadRunDashboard } from '@/lib/bulletin/data'
+import { loadRunDashboard, requireBulletinAdmin } from '@/lib/bulletin/data'
 import { RunDashboard } from '@/components/bulletin/RunDashboard'
 import { RefreshButton } from '@/components/bulletin/RefreshButton'
 
@@ -16,7 +15,7 @@ export default async function OpportunityRunsPage({
 }: {
   searchParams?: { before?: string }
 }) {
-  await requireAdmin('/admin/opportunities')
+  await requireBulletinAdmin()
   let data
   try {
     data = await loadRunDashboard(searchParams?.before)

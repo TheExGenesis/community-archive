@@ -1,7 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { checkIsAdmin } from '@/app/admin/data'
-import { loadOpportunities, requireOpportunityUser } from '@/lib/bulletin/data'
+import {
+  isBulletinAdmin,
+  loadOpportunities,
+  requireOpportunityUser,
+} from '@/lib/bulletin/data'
 import { OpportunityBoard } from '@/components/bulletin/OpportunityBoard'
 import { RefreshButton } from '@/components/bulletin/RefreshButton'
 
@@ -13,7 +16,7 @@ export const metadata: Metadata = {
 
 export default async function OpportunitiesPage() {
   await requireOpportunityUser()
-  const isAdmin = await checkIsAdmin()
+  const isAdmin = await isBulletinAdmin()
   let opportunities
   try {
     opportunities = await loadOpportunities()

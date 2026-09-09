@@ -28,8 +28,14 @@ const { data, error } = await serviceRoleClient.rpc(
 )
 ```
 
-The page authorizes with the existing server-verified `getCurrentUser()` before
-calling the RPC, and does not accept member-preview cookies as authorization.
+Deployed pages authorize with the existing server-verified `getCurrentUser()`
+before calling the RPC, and do not accept member-preview cookies as authorization.
+Local development also supports the existing `LOCAL_ADMIN_PREVIEW` read-only
+convention: development mode, a loopback Host, and no Vercel deployment. It
+neither fabricates an Auth user nor grants write access. For local review before
+run-history rollout, `BULLETIN_LOCAL_RUN_PREVIEW_URL` can point to a read-only
+`http://127.0.0.1` status bridge. The UI explicitly labels its production snapshot;
+this fallback is never used on a deployed website.
 The board shows up to the latest 200 currently active notices, with filters over
 that displayed set. It links to the existing full tweet detail renderer rather
 than duplicating its media and quote logic. Reads are dynamic, private/no-store

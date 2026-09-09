@@ -1,8 +1,12 @@
 import type { User } from '@supabase/supabase-js'
 import { loadOpportunities, loadRunDashboard } from './data'
+import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { getAdminClient } from '@/app/admin/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
+jest.mock('@/lib/localAdminPreview', () => ({
+  getLocalAdminPreview: jest.fn(),
+}))
 jest.mock('@/lib/portal/auth', () => ({ getCurrentUser: jest.fn() }))
 jest.mock('@/app/admin/data', () => ({ getAdminClient: jest.fn() }))
 jest.mock('@/utils/supabase', () => ({
@@ -16,6 +20,7 @@ jest.mock('next/navigation', () => ({
 const rpc = jest.fn()
 beforeEach(() => {
   jest.clearAllMocks()
+  jest.mocked(getLocalAdminPreview).mockResolvedValue(null)
   jest
     .mocked(createServerServiceRoleClient)
     .mockReturnValue({ rpc } as unknown as ReturnType<
@@ -73,4 +78,17 @@ test('run history uses bounded keyset pagination and rejects malformed cursors',
   for (const value of ['-1', '1 OR 1=1', '9e3', '9007199254740993'])
     await expect(loadRunDashboard(value)).rejects.toThrow('Invalid run cursor')
   expect(rpc).not.toHaveBeenCalled()
+})
+
+test('explicit local admin read preview does not fabricate an Auth user', async () => {
+  jest.mocked(getLocalAdminPreview).mockResolvedValue('admin')
+  rpc.mockResolvedValue({ data: [], error: null })
+  await expect(loadOpportunities()).resolves.toEqual([])
+  expect(getCurrentUser).not.toHaveBeenCalled()
+})
+test('signed-out local preview still requires login', async () => {
+  jest.mocked(getLocalAdminPreview).mockResolvedValue('signed-out')
+  jest.mocked(getCurrentUser).mockResolvedValue(null)
+  await expect(loadOpportunities()).rejects.toThrow('redirect:/login')
+  expect(createServerServiceRoleClient).not.toHaveBeenCalled()
 })

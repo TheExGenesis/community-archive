@@ -29,6 +29,7 @@ export type BulletinRun = {
   unpriced_reserved_usd: number
 }
 export type RunDashboard = {
+  preview_note?: string
   runs: BulletinRun[]
   queue: { pending: number; retrying: number; exhausted: number }
   last_success_at: string | null

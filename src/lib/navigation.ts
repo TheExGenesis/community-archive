@@ -17,6 +17,7 @@ export type TweetOrigin =
   | 'stream'
   | 'bangers'
   | 'digest'
+  | 'opportunities'
   | 'trends'
   | 'search'
   | 'profile'
@@ -65,6 +66,12 @@ const TWEET_ORIGINS: Record<
     href: '/digest',
     label: 'Back to What Happened Yesterday',
     matches: (href) => href === '/digest' || href.startsWith('/digest/'),
+  },
+  opportunities: {
+    href: '/opportunities',
+    label: 'Back to opportunities',
+    matches: (href) =>
+      href === '/opportunities' || href.startsWith('/opportunities?'),
   },
   trends: {
     href: '/trends',
@@ -149,6 +156,7 @@ export const getPrimaryNav = (
     ? [
         { href: BANGERS_WEEK_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
+        { href: '/opportunities', label: 'Opportunities' },
         { href: '/user-dir', label: 'Users' },
         { href: '/community', label: 'Apps' },
         { href: '/trends', label: 'Trends' },

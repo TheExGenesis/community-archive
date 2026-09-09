@@ -22,6 +22,7 @@ export const analyticsRoutes = {
   '/birdseye': ['birdseye', 'product'],
   '/birdseye/profiles': ['birdseye_profiles', 'admin'],
   '/community': ['community', 'product'],
+  '/opportunities': ['opportunities', 'product'],
   '/tools': ['tools', 'product'],
   '/explore': ['explore', 'product'],
   '/notes': ['notes', 'product'],
@@ -36,6 +37,7 @@ export const analyticsRoutes = {
   '/mission-control': ['mission_control', 'admin'],
   '/admin': ['admin', 'admin'],
   '/admin/digest': ['admin_digest', 'admin'],
+  '/admin/opportunities': ['admin_opportunities', 'admin'],
   '/login': ['login', 'authentication'],
   '/auth/auth-code-error': ['auth_error', 'authentication'],
 } as const

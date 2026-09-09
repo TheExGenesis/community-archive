@@ -59,6 +59,37 @@ const tweet: PortalTweet = {
 describe('TweetCard', () => {
   beforeEach(() => push.mockReset())
 
+  test('fixed previews expand full media and quotes, keep archive navigation, and use an outbound icon', () => {
+    render(
+      <TweetCard
+        tweet={tweet}
+        previewHeight={340}
+        clickable
+        showExternalLink
+        origin="opportunities"
+        returnTo="/opportunities"
+      />,
+    )
+    const card = screen.getByRole('link', { name: 'View tweet by @alice' })
+    expect(card).toHaveStyle({ height: '340px' })
+    const outbound = screen.getByRole('link', {
+      name: 'View tweet on X (opens in a new tab)',
+    })
+    expect(outbound).toHaveAttribute('href', 'https://x.com/alice/status/123')
+    expect(outbound.textContent).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: 'Read more' }))
+    expect(card).not.toHaveStyle({ height: '340px' })
+    expect(screen.getByText('The complete "quoted" tweet.')).toBeVisible()
+    expect(screen.getAllByTestId('tweet-image')).toHaveLength(2)
+    expect(push).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Show less' }))
+    expect(card).toHaveStyle({ height: '340px' })
+    fireEvent.click(card)
+    expect(push).toHaveBeenCalledWith(
+      '/tweets/123?from=opportunities&returnTo=%2Fopportunities',
+    )
+  })
+
   test('renders tweet media and the complete quoted tweet', () => {
     render(<TweetCard tweet={tweet} />)
 
@@ -251,4 +282,21 @@ describe('TweetCard', () => {
       }),
     ).toHaveAttribute('href', 'https://x.com/alice/status/123')
   })
+})
+
+test('partial cards hide unknown counts without hiding text or outbound navigation', () => {
+  render(
+    <TweetCard
+      tweet={{ ...tweet, quotedTweet: undefined }}
+      showEngagement={false}
+      showExternalLink
+      previewHeight={240}
+    />,
+  )
+  expect(screen.queryByText('12 likes')).not.toBeInTheDocument()
+  expect(screen.queryByText('3 reposts')).not.toBeInTheDocument()
+  expect(
+    screen.getByRole('link', { name: 'View tweet on X (opens in a new tab)' }),
+  ).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Read more' })).toBeInTheDocument()
 })

@@ -211,3 +211,13 @@ SELECT * FROM archived_members
 UNION ALL
 SELECT * FROM opted_in_members;
 ALTER TABLE "public"."user_directory" OWNER TO "postgres";
+
+-- Private Bulletin opportunities
+CREATE VIEW bulletin.allowed_accounts AS
+SELECT DISTINCT a.account_id,a.username
+FROM public.user_directory d JOIN public.all_account a USING (account_id)
+WHERE NOT a.is_tombstone
+ AND NOT EXISTS (SELECT 1 FROM public.optin o WHERE o.explicit_optout IS TRUE
+   AND (o.twitter_user_id=a.account_id OR lower(ltrim(o.username,'@'))=lower(a.username)))
+ AND NOT EXISTS (SELECT 1 FROM tes.blocked_scraping_users b
+   WHERE b.account_id=a.account_id OR lower(ltrim(b.username,'@'))=lower(a.username));

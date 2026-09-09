@@ -81,6 +81,7 @@ const isTweetCardAction = isOneOf([
   'open_quoted_tweet',
 ])
 const isTweetOrigin = isOneOf([
+  'opportunities',
   'bangers',
   'digest',
   'home',

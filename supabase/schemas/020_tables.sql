@@ -644,3 +644,89 @@ CREATE TABLE IF NOT EXISTS "public"."tweet_link_previews" (
     "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE "public"."tweet_link_previews" OWNER TO "postgres";
+
+-- Private Bulletin opportunities
+CREATE TABLE bulletin.decisions (
+  tweet_id text PRIMARY KEY,
+  account_id text,
+  posted_at timestamptz,
+  content_hash text NOT NULL,
+  version text NOT NULL,
+  status text NOT NULL CHECK (status IN ('pending','positive','negative','failed')),
+  attempts integer NOT NULL DEFAULT 0,
+  last_attempt_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX bulletin_pending_idx ON bulletin.decisions(updated_at)
+  WHERE status IN ('pending','failed');
+
+CREATE TABLE bulletin.opportunities (
+  tweet_id text PRIMARY KEY REFERENCES bulletin.decisions(tweet_id) ON DELETE CASCADE,
+  content_hash text NOT NULL,
+  side text NOT NULL CHECK (side IN ('ask','offer')),
+  kind text NOT NULL CHECK (kind IN ('help','feedback','intro','free','invite','opportunity')),
+  summary text NOT NULL CHECK (length(summary) BETWEEN 1 AND 500),
+  evidence text NOT NULL CHECK (length(evidence)>0),
+  topics text[] NOT NULL,
+  respond text NOT NULL CHECK (respond IN ('dm','reply','link','like','unknown')),
+  standing boolean NOT NULL,
+  expires_at date,
+  place text,
+  model text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Usage survives tweet deletion; it contains no tweet IDs, text or author data.
+CREATE TABLE bulletin.calls (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  reserved_usd numeric NOT NULL CHECK (reserved_usd>=0),
+  actual_usd numeric CHECK (actual_usd>=0),
+  status text NOT NULL DEFAULT 'reserved'
+);
+CREATE INDEX bulletin_calls_created_idx ON bulletin.calls(created_at);
+
+CREATE TABLE bulletin.worker_state (
+  id integer PRIMARY KEY CHECK (id=1),
+  cursor_at timestamptz NOT NULL DEFAULT now()-interval '1 day',
+  cursor_id text NOT NULL DEFAULT '',
+  scan_until timestamptz,
+  last_started_at timestamptz,
+  last_finished_at timestamptz,
+  last_success_at timestamptz,
+  status text NOT NULL DEFAULT 'not_started',
+  counts jsonb NOT NULL DEFAULT '{}'
+);
+INSERT INTO bulletin.worker_state(id) VALUES (1);
+
+-- Prompt versions are append-only for the application service role.
+CREATE TABLE bulletin.prompt_versions (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  body text NOT NULL CHECK (length(btrim(body)) > 0 AND octet_length(body) <= 16000),
+  note text NOT NULL CHECK (length(btrim(note)) BETWEEN 1 AND 300),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  created_by uuid
+);
+-- Aggregate run history contains no tweet text or author identifiers.
+CREATE TABLE bulletin.runs (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  finished_at timestamptz,
+  status text NOT NULL DEFAULT 'running',
+  counts jsonb NOT NULL DEFAULT '{}',
+  model text NOT NULL,
+  classifier_version text NOT NULL,
+  prompt_version_id bigint REFERENCES bulletin.prompt_versions(id)
+);
+ALTER TABLE bulletin.calls ADD COLUMN run_id bigint REFERENCES bulletin.runs(id);
+CREATE INDEX bulletin_calls_run_idx ON bulletin.calls(run_id);
+
+CREATE TABLE bulletin.scans (
+  scan_key text PRIMARY KEY,
+  window_start timestamptz NOT NULL,
+  window_end timestamptz NOT NULL,
+  cursor_id text NOT NULL DEFAULT '0',
+  complete boolean NOT NULL DEFAULT false,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (window_end>window_start AND window_end-window_start<=interval '15 days')
+);

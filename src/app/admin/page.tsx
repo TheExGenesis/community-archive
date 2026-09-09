@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { CommunitySubmissionQueue } from './CommunitySubmissionQueue'
 import { loadPendingCommunityProjects } from '@/lib/communityProjectDatabase'
 import { Badge } from '@/components/ui/badge'
@@ -148,6 +149,16 @@ export default async function AdminPage({
             <Badge variant="secondary">@{twitterUsername}</Badge>
           </div>
         </section>
+
+        <Link
+          href="/admin/opportunities"
+          className="rounded-lg border bg-card p-5 transition-colors hover:bg-accent"
+        >
+          <h2 className="font-semibold">Opportunity runs →</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Daily scans, candidates, opportunities produced, costs and failures.
+          </p>
+        </Link>
 
         <Suspense
           fallback={<SectionSkeleton label="Loading archive activity" />}

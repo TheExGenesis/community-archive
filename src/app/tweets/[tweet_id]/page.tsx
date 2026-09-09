@@ -19,7 +19,9 @@ export default async function TweetPage({
 }) {
   const { tweet_id } = params
   const { tweet, threadTree, quotingTweets, quotingTweetCount } =
-    await getTweetPageData(tweet_id)
+    await getTweetPageData(tweet_id, {
+      clickhouseOnly: searchParams?.from === 'opportunities',
+    })
 
   if (!tweet) {
     notFound()

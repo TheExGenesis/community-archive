@@ -3645,3 +3645,111 @@ $$;
 ALTER FUNCTION public.admin_activity_page(timestamptz, text, text, text, integer) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.admin_activity_page(timestamptz, text, text, text, integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_activity_page(timestamptz, text, text, text, integer) TO service_role;
+
+-- Private Bulletin opportunities
+-- Backend-only read path: always recheck current policy, source content and expiry.
+CREATE FUNCTION public.get_bulletin_opportunities(max_results integer DEFAULT 50)
+RETURNS TABLE(tweet_id text,account_id text,username text,posted_at timestamptz,
+  full_text text,side text,kind text,summary text,evidence text,topics text[],
+  respond text,standing boolean,expires_at date,place text,model text)
+LANGUAGE sql STABLE SECURITY INVOKER SET search_path=''
+AS $$
+ SELECT t.tweet_id,t.account_id,a.username,t.created_at,t.full_text,
+   o.side,o.kind,o.summary,o.evidence,o.topics,o.respond,o.standing,o.expires_at,o.place,o.model
+ FROM bulletin.opportunities o JOIN public.tweets t USING (tweet_id)
+ JOIN bulletin.allowed_accounts a ON a.account_id=t.account_id
+ WHERE NOT t.is_tombstone AND t.reply_to_tweet_id IS NULL
+   AND t.full_text NOT LIKE 'RT @%'
+   AND NOT EXISTS (SELECT 1 FROM public.retweets r WHERE r.tweet_id=t.tweet_id)
+   AND o.content_hash=encode(sha256(convert_to(t.full_text,'UTF8')),'hex')
+   AND (o.expires_at IS NULL OR o.expires_at >= (now() AT TIME ZONE 'UTC')::date)
+   AND (o.standing OR o.expires_at IS NOT NULL OR t.created_at >= now()-interval '30 days')
+ ORDER BY t.created_at DESC,t.tweet_id DESC
+ LIMIT greatest(0,least(coalesce(max_results,50),200))
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_bulletin_runs(before_id bigint DEFAULT NULL, max_results integer DEFAULT 26)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
+ SELECT jsonb_build_object(
+   'runs', coalesce((SELECT jsonb_agg(to_jsonb(page) ORDER BY page.id::bigint DESC) FROM (
+     SELECT r.id::text AS id,r.started_at,r.finished_at,r.status,r.counts,r.model,r.classifier_version,
+       r.prompt_version_id::text AS prompt_version_id,p.body AS prompt_body,
+       coalesce(c.actual_usd,0) AS actual_usd,coalesce(c.unpriced_reserved_usd,0) AS unpriced_reserved_usd
+     FROM bulletin.runs r LEFT JOIN bulletin.prompt_versions p ON p.id=r.prompt_version_id LEFT JOIN LATERAL (
+       SELECT sum(actual_usd) AS actual_usd,
+         sum(reserved_usd) FILTER (WHERE actual_usd IS NULL) AS unpriced_reserved_usd
+       FROM bulletin.calls WHERE run_id=r.id
+     ) c ON true
+     WHERE before_id IS NULL OR r.id<before_id
+     ORDER BY r.id DESC LIMIT greatest(1,least(coalesce(max_results,26),51))
+   ) page),'[]'::jsonb),
+   'queue', (SELECT jsonb_build_object(
+     'pending',count(*) FILTER (WHERE status='pending'),
+     'retrying',count(*) FILTER (WHERE status='failed' AND attempts<3),
+     'exhausted',count(*) FILTER (WHERE status='failed' AND attempts>=3)) FROM bulletin.decisions),
+   'last_success_at',(SELECT last_success_at FROM bulletin.worker_state WHERE id=1)
+ )
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_bulletin_prompts(before_id bigint DEFAULT NULL)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
+ SELECT jsonb_build_object(
+   'active', (SELECT to_jsonb(p) FROM (SELECT id::text AS id,body,note,created_at,created_by FROM bulletin.prompt_versions ORDER BY id::bigint DESC LIMIT 1) p),
+   'versions', coalesce((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.id::bigint DESC) FROM (
+     SELECT id::text AS id,body,note,created_at,created_by FROM bulletin.prompt_versions
+     WHERE before_id IS NULL OR id<before_id ORDER BY id::bigint DESC LIMIT 21
+   ) p),'[]'::jsonb)
+ )
+$$;
+
+CREATE OR REPLACE FUNCTION public.save_bulletin_prompt(expected_id bigint, prompt_body text, change_note text, actor_id uuid)
+RETURNS text LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+DECLARE active_id bigint; active_body text; new_id bigint;
+BEGIN
+  -- Serialize saves, but never block an already-running worker.
+  PERFORM pg_advisory_xact_lock(712606571);
+  SELECT id,body INTO active_id,active_body FROM bulletin.prompt_versions ORDER BY id DESC LIMIT 1;
+  IF expected_id IS DISTINCT FROM active_id THEN
+    RAISE EXCEPTION 'Prompt changed; reload before saving' USING ERRCODE='40001';
+  END IF;
+  IF actor_id IS NULL THEN RAISE EXCEPTION 'Admin identity required' USING ERRCODE='22023'; END IF;
+  IF prompt_body IS NOT DISTINCT FROM active_body THEN
+    RAISE EXCEPTION 'Prompt is unchanged' USING ERRCODE='22023';
+  END IF;
+  INSERT INTO bulletin.prompt_versions(body,note,created_by)
+    VALUES(prompt_body,change_note,actor_id) RETURNING id INTO new_id;
+  RETURN new_id::text;
+END
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_bulletin_board_state(max_results integer DEFAULT 2000)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
+ SELECT coalesce(jsonb_agg(to_jsonb(notice) ORDER BY notice.posted_at DESC,notice.tweet_id DESC),'[]'::jsonb)
+ FROM (
+   SELECT o.*,d.account_id,d.posted_at,a.username
+   FROM bulletin.opportunities o JOIN bulletin.decisions d USING(tweet_id)
+   JOIN bulletin.allowed_accounts a ON a.account_id=d.account_id
+   ORDER BY d.posted_at DESC,o.tweet_id DESC
+   LIMIT greatest(0,least(coalesce(max_results,2000),2000))
+ ) notice
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_bulletin_relationships(viewer_username text DEFAULT NULL, viewer_account_id text DEFAULT NULL)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
+ WITH viewer AS MATERIALIZED (
+   SELECT account_id,username FROM bulletin.allowed_accounts
+   WHERE (viewer_account_id IS NOT NULL AND account_id=viewer_account_id)
+      OR (viewer_account_id IS NULL AND lower(username)=lower(viewer_username)) LIMIT 1
+ ), outgoing AS (
+   SELECT f.following_account_id AS account_id FROM public.following f JOIN viewer v ON v.account_id=f.account_id
+   UNION
+   SELECT f.account_id FROM public.followers f JOIN viewer v ON v.account_id=f.follower_account_id
+ ), incoming AS (
+   SELECT f.follower_account_id AS account_id FROM public.followers f JOIN viewer v ON v.account_id=f.account_id
+   UNION
+   SELECT f.account_id FROM public.following f JOIN viewer v ON v.account_id=f.following_account_id
+ )
+ SELECT jsonb_build_object('account_id',v.account_id,'username',v.username,'available',true,
+   'following',(SELECT coalesce(jsonb_agg(a.account_id),'[]'::jsonb) FROM outgoing o JOIN bulletin.allowed_accounts a USING(account_id)),
+   'followers',(SELECT coalesce(jsonb_agg(a.account_id),'[]'::jsonb) FROM incoming i JOIN bulletin.allowed_accounts a USING(account_id))) FROM viewer v
+$$;

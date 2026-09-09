@@ -28,8 +28,7 @@ physical source deletion no longer cascades across databases. Costs contain no
 tweet identifiers and remain available for budget accounting.
 
 `BULLETIN_FOLLOW_SOURCE=supabase` enables the original app's recommendation method
-using archived follower/following lists. It is deliberately opt-in pending the
-follow-source decision. Both directions of each relationship are combined,
+using archived follower/following lists. Enable it for the initial release. Both directions of each relationship are combined,
 restricted to currently allowed members. These are historical observations, not
 live X follow state. Without that source the UI explicitly falls back to own
 notices and newest, and does not invent social recommendations.
@@ -126,8 +125,9 @@ The immutable release lives beneath `/opt/community-archive-bulletin/releases/`
 with a `current` symlink. PostgreSQL policy/state settings are read at runtime
 from `/root/CA_autorefresh/.env.prod`; the OpenRouter key remains in the existing
 systemd credential `openrouter_api_key`. Add server-only
-`CLICKHOUSE_ANALYTICS_API_URL` and `CLICKHOUSE_ANALYTICS_API_TOKEN` to the worker
-runtime and website configuration. Do not reuse the retired port-18123 sink URL.
+`CLICKHOUSE_ANALYTICS_API_URL` and `CLICKHOUSE_ANALYTICS_API_TOKEN` to the website configuration. The worker reads its gateway token from the
+existing systemd credential mechanism (`ca-bulletin-clickhouse`) and sets the
+public gateway URL in its unit. Do not reuse the retired port-18123 sink URL.
 Never put these values in browser variables, source files, argv or logs.
 
 Rollout dependencies, in order:

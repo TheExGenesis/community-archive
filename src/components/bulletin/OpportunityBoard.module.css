@@ -500,19 +500,34 @@
   color: var(--faint);
   white-space: nowrap;
 }
-.close {
+/* Open card: the sticker and the collapse control share the border line. */
+.stickerRow {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
-  border: 0;
-  background: var(--surface);
-  padding: 3px;
-  border-radius: 4px;
-  color: var(--faint);
-  display: inline-flex;
+  top: -12px;
+  left: 8px;
+  max-width: calc(100% - 16px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.close:hover {
+.stickerRow .kind {
+  position: static;
+}
+.collapse {
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.collapse:hover {
   color: var(--ink);
   background: var(--surface-3);
 }

@@ -5,7 +5,6 @@ import {
   PiArrowDown,
   PiArrowSquareOut,
   PiArrowUp,
-  PiArrowsDownUp,
   PiBriefcase,
   PiCalendarBlank,
   PiChatCircle,
@@ -646,7 +645,6 @@ export function OpportunityBoard({
             Show past
           </label>
           <div className={styles.sortLinks} role="group" aria-label="Sort">
-            <PiArrowsDownUp size={14} aria-hidden />
             {(
               [
                 ['relevance', 'Relevance', true],

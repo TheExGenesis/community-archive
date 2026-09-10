@@ -256,12 +256,8 @@
   align-items: center;
   gap: 6px;
 }
-.sortLinks > span,
-.sortLinks > svg {
+.sortLinks > span {
   color: var(--faint);
-}
-.sortLinks > svg {
-  margin-right: 2px;
 }
 .sortOption {
   display: inline-flex;

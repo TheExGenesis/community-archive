@@ -348,8 +348,17 @@ function NoticeCard({
       ) : (
         <>
           {label}
-          <span className={styles.readHint} aria-hidden>
-            click to read more
+          <span className={styles.corner}>
+            <time
+              dateTime={notice.posted_at}
+              title={exactStamp(notice.posted_at)}
+              className={styles.age}
+            >
+              {sinceLabel(notice.posted_at, now)}
+            </time>
+            <span className={styles.readHint} aria-hidden>
+              click to read more
+            </span>
           </span>
           <button
             type="button"
@@ -378,12 +387,6 @@ function NoticeCard({
                   <PiCheck size={12} aria-hidden /> you replied
                 </span>
               )}
-              <time
-                dateTime={notice.posted_at}
-                title={exactStamp(notice.posted_at)}
-              >
-                {sinceLabel(notice.posted_at, now)}
-              </time>
               {replies !== null && (
                 <span
                   className={styles.replies}

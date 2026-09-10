@@ -335,7 +335,7 @@
   border: 1px solid var(--card-line);
   border-radius: 8px;
   background: var(--surface);
-  padding: 18px 16px 12px;
+  padding: 18px 16px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -348,18 +348,30 @@
   border-color: var(--line-strong);
   box-shadow: 0 1px 3px rgb(0 0 0 / 4%);
 }
-.readHint {
+/* Top-right of the border line: posting age, swapped for the hint on hover. */
+.corner {
   position: absolute;
   top: -6px;
-  right: 14px;
+  right: 10px;
+  height: 12px;
   padding: 0 6px;
   background: var(--surface);
   font-size: 11px;
   line-height: 1;
   color: var(--faint);
   white-space: nowrap;
-  opacity: 0;
+  display: grid;
+}
+.corner > * {
+  grid-area: 1 / 1;
   transition: opacity 0.12s;
+}
+.readHint {
+  opacity: 0;
+  justify-self: end;
+}
+.notice:hover .age {
+  opacity: 0;
 }
 .notice:hover .readHint {
   opacity: 1;
@@ -381,10 +393,10 @@
 .kind {
   position: absolute;
   top: -12px;
-  left: 12px;
+  left: 8px;
   max-width: calc(100% - 24px);
   height: 24px;
-  padding: 0 9px;
+  padding: 0 8px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -513,7 +525,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--faint);
   white-space: nowrap;
 }

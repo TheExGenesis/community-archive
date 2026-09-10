@@ -90,7 +90,12 @@ test('loads full details only on inline expansion', async () => {
     expect.objectContaining({ cache: 'no-store' }),
   )
   expect(screen.getByText('Original card')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'DM on X' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'Open on X' })).toHaveAttribute(
+    'href',
+    'https://twitter.com/alice/status/1',
+  )
+  expect(screen.getByText(/Author asks for a/)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'DM' })).toHaveAttribute(
     'href',
     'https://twitter.com/messages/compose?recipient_id=a',
   )

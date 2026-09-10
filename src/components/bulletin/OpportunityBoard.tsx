@@ -28,7 +28,6 @@ import {
   BULLETIN_PAGE_SIZE,
   KIND_ICONS,
   KIND_LABELS,
-  RESPONSE_LABELS,
   cardLabel,
   kindKey,
   parseKinds,
@@ -151,21 +150,20 @@ function lifetime(notice: Opportunity, now: number) {
   const date = shortDate(new Date(until - 1).toISOString())
   return until <= now ? `ended ${date}` : `until ${date}`
 }
-/** One action per notice, named by how the author asked to be reached. */
-function respondAction(notice: Opportunity) {
-  const tweetUrl = `https://twitter.com/${encodeURIComponent(notice.username)}/status/${notice.tweet_id}`
+/** Opening the tweet always works; the author's own instruction is a hint. */
+function respondHint(notice: Opportunity) {
+  const dm = `https://twitter.com/messages/compose?recipient_id=${encodeURIComponent(notice.account_id)}`
   switch (notice.respond) {
     case 'dm':
-      return {
-        label: 'DM on X',
-        href: `https://twitter.com/messages/compose?recipient_id=${encodeURIComponent(notice.account_id)}`,
-      }
+      return { text: 'Author asks for a', link: { label: 'DM', href: dm } }
     case 'reply':
-      return { label: 'Reply on X', href: tweetUrl }
+      return { text: 'Author asks for a reply' }
+    case 'link':
+      return { text: 'Author points to a link in the tweet' }
     case 'like':
-      return { label: 'Like on X', href: tweetUrl }
+      return { text: 'Author asks for a like' }
     default:
-      return { label: 'Open on X', href: tweetUrl }
+      return null
   }
 }
 
@@ -218,7 +216,8 @@ function NoticeCard({
     rts: 0,
   }
   const past = isPast(notice, now)
-  const action = respondAction(notice)
+  const tweetUrl = `https://twitter.com/${encodeURIComponent(notice.username)}/status/${notice.tweet_id}`
+  const hint = respondHint(notice)
   const text = decodeTweetText(tweet?.text || notice.preview_text || '')
   const when = lifetime(notice, now)
   // Zero is hidden: the count only covers archived members, not all of X.
@@ -313,12 +312,11 @@ function NoticeCard({
             <p className={styles.acts}>
               <a
                 className={styles.primary}
-                href={action.href}
+                href={tweetUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                title={RESPONSE_LABELS[notice.respond]}
               >
-                {action.label} <PiArrowSquareOut size={12} aria-hidden />
+                Open on X <PiArrowSquareOut size={12} aria-hidden />
               </a>
               <Link
                 href={tweetPermalinkHref(
@@ -329,6 +327,23 @@ function NoticeCard({
               >
                 See on CA
               </Link>
+              {hint && (
+                <span className={styles.respondHint}>
+                  {hint.text}
+                  {hint.link && (
+                    <>
+                      {' '}
+                      <a
+                        href={hint.link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {hint.link.label}
+                      </a>
+                    </>
+                  )}
+                </span>
+              )}
             </p>
           </div>
           {tweet?.replies?.length ? (

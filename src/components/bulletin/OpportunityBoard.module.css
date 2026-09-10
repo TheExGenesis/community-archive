@@ -716,14 +716,24 @@
 .primary {
   height: 30px;
   padding: 0 12px;
-  border-radius: 7px;
-  background: var(--accent);
-  color: var(--surface) !important;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink) !important;
   font-weight: 600;
   text-decoration: none;
 }
 .primary:hover {
-  filter: brightness(1.08);
+  background: var(--surface-3);
+  border-color: var(--faint);
+}
+.respondHint {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--faint);
+}
+.respondHint a {
+  color: var(--accent);
 }
 .more {
   min-height: 1px;

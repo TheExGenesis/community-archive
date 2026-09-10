@@ -160,9 +160,9 @@
 }
 .chips button[aria-pressed='true'] {
   color: var(--ink);
-  font-weight: 600;
   border-color: var(--ink);
   background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--ink);
 }
 .chips button[aria-pressed='true'] .count {
   color: var(--muted);
@@ -177,8 +177,8 @@
   display: flex;
   align-items: stretch;
   gap: 4px;
-  flex: none;
-  width: 380px;
+  flex: 0 1 380px;
+  min-width: 260px;
   max-width: 100%;
   height: 34px;
   padding: 3px;

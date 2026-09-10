@@ -686,6 +686,13 @@
   border-bottom: 0 !important;
   background: transparent !important;
 }
+/* Tweet body: a step up from the card's 13px grey so it reads as the content. */
+.expanded > :global(article) :global(.whitespace-pre-wrap) {
+  font-size: 14px !important;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--ink) !important;
+}
 .fullText {
   margin: 0;
   white-space: pre-wrap;

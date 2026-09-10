@@ -534,10 +534,6 @@ export function OpportunityBoard({
     : visible.length
   const shown = initialPage ? visible.length : Math.min(limit, visible.length)
   const cursor = initialPage ? pages.page?.cursors[kind] : null
-  const own = loaded.filter((o) => o.account_id === me)
-  const answered = loaded.filter(
-    (o) => o.account_id !== me && o.reply_account_ids?.includes(me),
-  ).length
   return (
     <>
       <header className={styles.head}>
@@ -549,49 +545,24 @@ export function OpportunityBoard({
             </summary>
             <div className={styles.aboutPanel}>
               <p>
-                <b>What this is.</b> Asks and offers that members posted on
-                Twitter, found by a daily scan of the archive. Every card is a
-                real tweet. Nothing is posted on your behalf.
+                <b>What this is</b>
+                Asks and offers that members posted on Twitter, found by a daily
+                scan of the archive. Every card is a real tweet. Nothing is
+                posted for you.
               </p>
               <p>
-                <b>Put something up.</b> Post an original tweet, not a reply or
-                repost, that reads as an ask or an offer. Phrases like
-                &quot;happy to help&quot;, &quot;looking for&quot;, &quot;anyone
-                know&quot; or &quot;DM me&quot; get picked up. Starting with
-                &quot;offer:&quot; or &quot;ask:&quot; is the surest way. It
-                appears after the next daily scan, once your tweet is in the
-                archive and the labeler agrees.
+                <b>Put something up</b>
+                Tweet it. Starting with &quot;offer:&quot; or &quot;ask:&quot;
+                is the surest way in. It appears after the next daily scan.
               </p>
               <p>
-                <b>How long notices stay.</b> Asks 14 days, offers 60, unless
-                the tweet names a date. Standing offers stay up. Quote your own
-                notice to reset the clock.
+                <b>What the numbers mean</b>
+                Reply counts and follow labels come from the archive, so they
+                only see members. Read the tweet before acting on it.
               </p>
-              <p>
-                <b>Relevance.</b> Your notices first, then the 25 people you
-                reply to and quote most, then everyone else. Unanswered asks
-                come before answered ones. Click the active sort to reverse it.
-              </p>
-              <p>
-                <b>The reply count.</b> Public replies and quote posts from
-                archived members, shown with a speech bubble. It does not see
-                replies from people outside the archive, so no count means
-                unknown, not zero. DMs and outcomes are not counted.
-              </p>
-              <p>
-                <b>What gets missed.</b> Replies, reposts, tweets without
-                ask-or-offer phrasing, and anything not yet in the archive. The
-                labeler also makes mistakes. Read the tweet before acting on it.
-                The board keeps the latest 2,000 notices.
-              </p>
-              {me && (
-                <p>
-                  <b>You.</b> You (@{username || me}) have{' '}
-                  {own.filter((o) => o.side === 'offer').length} offers and{' '}
-                  {own.filter((o) => o.side === 'ask').length} asks here, and
-                  the archive shows you replying to {answered} other notices.
-                </p>
-              )}
+              <Link href="/opportunities/about" className={styles.aboutLink}>
+                How the scan, lifetimes and ordering work →
+              </Link>
             </div>
           </details>
         </div>

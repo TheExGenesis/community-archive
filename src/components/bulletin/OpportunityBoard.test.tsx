@@ -188,9 +188,6 @@ test('shows the ledger and relationship words only from own account and outgoing
   expect(cards[0]).not.toHaveTextContent(/mutual|following|follows you/)
   expect(cards[0]).not.toHaveTextContent('· you')
   expect(cards[1]).not.toHaveTextContent('near you')
-  expect(
-    screen.getByText(/You \(@alice\) have 1 offers and 0 asks/),
-  ).toHaveTextContent('replying to 1 other notices')
 })
 test('coalesces expanded cards and reuses their details after filtering', async () => {
   render(

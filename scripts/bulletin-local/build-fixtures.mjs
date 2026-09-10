@@ -1,25 +1,40 @@
 // Builds fixtures.json for the local Bulletin preview from the offering-board
 // prototype output (prototypes/offering-board/data/offers.json), which was
-// produced from real archive tweets. Run once, or again after editing the
+// produced from real archive tweets, plus the archive Parquet dump next to it
+// (prototypes/offering-board/data/dump/*.parquet, read by
+// build-fixtures-real.py through DuckDB). Run once, or again after editing the
 // selection below:
 //
 //   node scripts/bulletin-local/build-fixtures.mjs
 //
-// The output holds three things the mock gateway serves:
-//   notices       StoredNotice rows (board state), content_hash = sha256(text)
-//   sources       ClickHouse `bulletin-sources` / `tweet/<id>` rows by tweet id
-//   interactions  synthetic top-25 outgoing interactions for the "me" viewer
+// The output holds what the mock gateway serves:
+//   notices        StoredNotice rows (board state), content_hash = sha256(text)
+//   sources        ClickHouse `bulletin-sources` / `tweet/<id>` rows by tweet id;
+//                  created_at, likes/retweets, replies/quotes/reply_account_ids
+//                  and account_created_at come from the dump when the tweet is
+//                  in it (offers.json posted_at runs four hours ahead of the
+//                  archive's created_at)
+//   interactions   the viewer's real top-25 outgoing interactions (replies +
+//                  quotes by target account) from the dump
+//   relationships  the viewer's following/followers account ids from members'
+//                  own archive uploads (offers.json authors.*.followers/following)
+//   threads        archived replies under each notice, two levels deep, from
+//                  the dump, joined to profiles
 //
 // The four notices with tweet ids starting 9000… are synthetic and belong to
-// the "me" account so the You badge, renewals and personal stats show up.
+// the "me" account so the You badge, renewals and personal stats show up; they
+// have no dump rows, so the mock keeps serving synthetic replies for them.
 import { createHash } from 'node:crypto'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const source = resolve(here, '../../prototypes/offering-board/data/offers.json')
 const target = resolve(here, 'fixtures.json')
+const dump = resolve(here, '../../prototypes/offering-board/data/dump')
+const realScript = resolve(here, 'build-fixtures-real.py')
 
 const ME = {
   account_id: '815615492429754369',
@@ -235,30 +250,133 @@ converted.push(
   ),
 )
 
-// Synthetic "top outgoing interactions" so Recommended has relationships.
-const authorCounts = new Map()
-for (const c of converted)
-  if (c.notice.account_id !== ME.account_id)
-    authorCounts.set(
-      c.notice.account_id,
-      (authorCounts.get(c.notice.account_id) || 0) + 1,
+// Follow lists from members' own uploads. authors.<handle>.followers /
+// following are indices into members. The viewer's own lists come first; other
+// authors' lists pointing at the viewer fill in (an author whose `following`
+// has the viewer is a follower of the viewer, and vice versa).
+function relationships() {
+  const meIndex = proto.members.findIndex(
+    (m) => m[1].toLowerCase() === ME.username.toLowerCase(),
+  )
+  const id = (index) => proto.members[index]?.[0]
+  const following = new Set()
+  const followers = new Set()
+  const own = proto.authors?.[ME.username] || {}
+  for (const i of own.following || []) if (id(i)) following.add(id(i))
+  for (const i of own.followers || []) if (id(i)) followers.add(id(i))
+  for (const [handle, author] of Object.entries(proto.authors || {})) {
+    const member = byHandle.get(handle.toLowerCase())
+    if (!member || member[0] === ME.account_id || meIndex < 0) continue
+    if (author.following?.includes(meIndex)) followers.add(member[0])
+    if (author.followers?.includes(meIndex)) following.add(member[0])
+  }
+  const sort = (set) => [...set].sort((a, b) => a.localeCompare(b))
+  return { following: sort(following), followers: sort(followers) }
+}
+
+// Numbers only the dump has: outgoing interactions, engagement, uptake,
+// archived reply threads and profile facts. Runs the DuckDB script with uv.
+function fromDump() {
+  if (!existsSync(resolve(dump, 'tweets.parquet'))) {
+    console.warn(`no ${dump}/tweets.parquet; skipping dump-derived fields`)
+    return null
+  }
+  const request = {
+    me: ME.account_id,
+    notice_ids: converted
+      .map((c) => c.source.tweet_id)
+      .filter((id) => !id.startsWith('9000')),
+    author_ids: [...new Set(converted.map((c) => c.source.account_id))],
+  }
+  const run = spawnSync(
+    'uv',
+    ['run', '--with', 'duckdb', 'python3', realScript],
+    {
+      cwd: resolve(here, '../..'),
+      input: JSON.stringify(request),
+      encoding: 'utf8',
+      maxBuffer: 256 * 1024 * 1024,
+    },
+  )
+  if (run.status !== 0) {
+    console.error(run.stderr)
+    throw new Error(`build-fixtures-real.py exited with ${run.status}`)
+  }
+  return JSON.parse(run.stdout)
+}
+
+const real = fromDump()
+const diffs = []
+if (real) {
+  for (const { notice, source } of converted) {
+    if (source.synthetic) continue
+    const stats = real.engagement[source.tweet_id]
+    if (stats) {
+      source.likes = stats.favorite_count
+      source.retweets = stats.retweet_count
+      if (stats.created_at) {
+        source.created_at = stats.created_at
+        notice.posted_at = stats.created_at
+      }
+    }
+    const profile = real.profiles[source.account_id]
+    if (profile?.account_created_at)
+      source.account_created_at = profile.account_created_at
+    if (!source.avatar_url && profile?.avatar_media_url)
+      source.avatar_url = profile.avatar_media_url
+    // Uptake is recomputed only for tweets the dump has; notices posted after
+    // the export keep the offers.json figures (which came from an older dump).
+    if (!stats) continue
+    const uptake = real.uptake[source.tweet_id] || {
+      replies: 0,
+      replies_including_self: 0,
+      quotes: 0,
+      reply_account_ids: [],
+    }
+    const before = {
+      replies: source.replies,
+      quotes: source.quotes,
+      ids: source.reply_account_ids.length,
+    }
+    source.replies = uptake.replies
+    source.quotes = uptake.quotes
+    source.reply_account_ids = uptake.reply_account_ids
+    if (
+      before.replies !== uptake.replies ||
+      before.quotes !== uptake.quotes ||
+      before.ids !== uptake.reply_account_ids.length
     )
-const people = [...authorCounts.entries()]
-  .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-  .slice(0, 25)
-  .map(([accountId], i) => ({
-    accountId,
-    interactionCount: String(320 - i * 12),
-  }))
+      diffs.push({
+        tweet_id: source.tweet_id,
+        offers: before,
+        dump: {
+          replies: uptake.replies,
+          replies_including_self: uptake.replies_including_self,
+          quotes: uptake.quotes,
+          ids: uptake.reply_account_ids.length,
+        },
+      })
+  }
+}
 
 const fixtures = {
-  generated_from: 'prototypes/offering-board/data/offers.json',
+  generated_from: [
+    'prototypes/offering-board/data/offers.json',
+    ...(real
+      ? [
+          'prototypes/offering-board/data/dump/tweets.parquet',
+          'prototypes/offering-board/data/dump/profiles.parquet',
+        ]
+      : []),
+  ],
   me: { account_id: ME.account_id, username: ME.username },
   notices: converted.map((c) => c.notice),
   sources: Object.fromEntries(
     converted.map((c) => [c.source.tweet_id, c.source]),
   ),
-  interactions: { [ME.account_id]: people },
+  interactions: { [ME.account_id]: real?.interactions || [] },
+  relationships: relationships(),
+  threads: real?.threads || {},
 }
 writeFileSync(target, JSON.stringify(fixtures, null, 2) + '\n')
 const tally = {}
@@ -268,3 +386,20 @@ for (const { notice } of converted) {
 }
 console.log(`wrote ${converted.length} notices to ${target}`)
 console.log(tally)
+if (real) {
+  const withThreads = Object.keys(fixtures.threads).length
+  const replyRows = Object.values(fixtures.threads).reduce(
+    (n, list) => n + list.length,
+    0,
+  )
+  const inDump = Object.keys(real.engagement).length
+  console.log(
+    `dump: ${inDump}/${converted.length - 4} real notices found, ${withThreads} with archived replies (${replyRows} reply rows), ` +
+      `${fixtures.interactions[ME.account_id].length} outgoing interactions, ` +
+      `following ${fixtures.relationships.following.length} / followers ${fixtures.relationships.followers.length}`,
+  )
+  if (diffs.length) {
+    console.log(`uptake differs from offers.json for ${diffs.length} notices:`)
+    for (const d of diffs) console.log(' ', JSON.stringify(d))
+  }
+}

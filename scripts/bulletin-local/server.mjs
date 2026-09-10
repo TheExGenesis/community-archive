@@ -8,6 +8,7 @@
 //
 // Routes
 //   GET /board                               -> { notices, allowedAccounts }
+//   GET /relationships                       -> { following, followers } (account ids)
 //   GET /runs                                -> RunDashboard for the admin page
 //   GET /gateway/bulletin-sources?ids=&enrich= -> { data: [source rows] }
 //   GET /gateway/user/<id|handle>/interactions?limit=25
@@ -72,20 +73,12 @@ const server = createServer((req, res) => {
   if (path === '/board')
     return json(res, 200, { notices: fixtures.notices, allowedAccounts: [] })
   if (path === '/relationships') {
-    // Deterministic follow lists from fixture authors: first 30 followed,
-    // authors 15-44 follow back, so 15 are mutual.
-    const me = fixtures.me?.account_id
-    const authors = []
-    for (const n of fixtures.notices || [])
-      if (
-        n.account_id &&
-        n.account_id !== me &&
-        !authors.includes(n.account_id)
-      )
-        authors.push(n.account_id)
+    // The viewer's follow lists from members' archive uploads (fixtures.json
+    // `relationships`, built from offers.json by build-fixtures.mjs).
+    const graph = fixtures.relationships || {}
     return json(res, 200, {
-      following: authors.slice(0, 30),
-      followers: authors.slice(15, 45),
+      following: graph.following || [],
+      followers: graph.followers || [],
     })
   }
   if (path === '/runs')
@@ -138,8 +131,22 @@ const server = createServer((req, res) => {
         data: { tweet: detail(source), quotedTweet: null },
       })
     if (segments.length === 3 && segments[2] === 'thread') {
-      // Synthetic replies for the preview, one per archived replier id in
-      // the fixture (capped at 5), so the expanded card has something to show.
+      // Archived replies from the dump (fixtures.json `threads`). Only the
+      // synthetic 9000… notices, which have no dump rows, get made-up
+      // replies, one per replier id in the fixture (capped at 5).
+      const archived = fixtures.threads?.[source.tweet_id]
+      if (archived || !source.synthetic)
+        return json(res, 200, {
+          data: {
+            tweet: { ...detail(source), quotedTweet: null },
+            conversationTweets: (archived || []).map((reply) => ({
+              quoteTweetId: null,
+              quotedTweet: null,
+              retweetedTweetId: null,
+              ...reply,
+            })),
+          },
+        })
       const byAccount = new Map(
         Object.values(fixtures.sources).map((s) => [s.account_id, s]),
       )

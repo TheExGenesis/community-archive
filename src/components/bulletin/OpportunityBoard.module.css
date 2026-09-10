@@ -351,6 +351,9 @@
 }
 
 /* Board */
+/* Three dealt stacks: an open card pushes only the cards beneath it in its
+   own column. Below three columns the stacks dissolve into a grid and each
+   card's order restores rank order. */
 .board {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -360,6 +363,12 @@
   min-height: 50vh;
   max-width: 1280px;
   margin: 0 auto;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
 }
 .notice {
   position: relative;
@@ -390,31 +399,31 @@
   color: var(--faint);
   white-space: nowrap;
 }
-.age,
-.readHint {
+.age {
   display: inline-block;
   height: 12px;
   padding: 0 6px;
   background: var(--surface);
-  transition: opacity 0.12s;
 }
+/* Sits after the sticker, where "collapse" sits on an open card. */
 .readHint {
-  position: absolute;
-  top: 0;
-  right: 0;
+  height: 24px;
+  padding: 0 8px;
+  background: var(--surface);
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
   opacity: 0;
-}
-.notice:hover .age {
-  opacity: 0;
+  transition: opacity 0.12s;
 }
 .notice:hover .readHint {
   opacity: 1;
 }
 .past {
   opacity: 0.6;
-}
-.open {
-  grid-row: span 2;
 }
 .noticeHead {
   display: flex;
@@ -769,9 +778,11 @@
   padding: 6px;
 }
 .empty {
+  max-width: 1280px;
+  margin: 0 auto;
   font-size: 12px;
   color: var(--faint);
-  padding: 12px 32px;
+  padding: 0 32px 24px;
 }
 
 /* Footer */
@@ -795,6 +806,9 @@
   .board {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .stack {
+    display: contents;
+  }
 }
 @media (max-width: 840px) {
   .board {
@@ -813,9 +827,6 @@
   }
   .searchBox {
     width: 100%;
-  }
-  .open {
-    grid-row: auto;
   }
   .board {
     row-gap: 24px;

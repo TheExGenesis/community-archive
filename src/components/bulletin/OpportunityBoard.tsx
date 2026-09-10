@@ -51,6 +51,13 @@ const ExpandedTweetCard = lazy(() =>
 )
 
 const EMPTY_GRAPH: BulletinRelationships = { outgoing: {}, available: false }
+const STACKS = 3
+/** Deal cards round-robin into column stacks so an open card only pushes its own column. */
+export function dealStacks<T>(items: T[], stacks = STACKS): T[][] {
+  const out: T[][] = Array.from({ length: stacks }, () => [])
+  items.forEach((item, i) => out[i % stacks].push(item))
+  return out
+}
 const ICONS: Record<string, IconType> = {
   gift: PiGift,
   briefcase: PiBriefcase,
@@ -166,6 +173,7 @@ function NoticeCard({
   follow,
   replied,
   now,
+  order,
   onKind,
 }: {
   notice: Opportunity
@@ -174,6 +182,8 @@ function NoticeCard({
   follow: string
   replied: boolean
   now: number
+  /** Rank position; restores reading order when stacks collapse into a grid. */
+  order: number
   onKind: (kind: string) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -239,6 +249,7 @@ function NoticeCard({
   return (
     <article
       className={`${styles.notice} ${past ? styles.past : ''} ${open ? styles.open : ''}`}
+      style={{ order }}
       onClick={(event) => {
         if (open) return
         const target = event.target as HTMLElement
@@ -360,7 +371,12 @@ function NoticeCard({
         </>
       ) : (
         <>
-          {label}
+          <div className={styles.stickerRow}>
+            {label}
+            <span className={styles.readHint} aria-hidden>
+              click to read more
+            </span>
+          </div>
           <span className={styles.corner}>
             <time
               dateTime={notice.posted_at}
@@ -369,9 +385,6 @@ function NoticeCard({
             >
               {sinceLabel(notice.posted_at, now)}
             </time>
-            <span className={styles.readHint} aria-hidden>
-              click to read more
-            </span>
           </span>
           <button
             type="button"
@@ -696,34 +709,41 @@ export function OpportunityBoard({
       )}
       <div className={styles.board} aria-busy={pages.pending}>
         {!pages.pending &&
-          visible
-            .slice(0, initialPage ? undefined : limit)
-            .map((o) => (
-              <NoticeCard
-                key={o.tweet_id}
-                notice={o}
-                loadTweet={loadTweet}
-                badge={relationship(o, me, graph).label}
-                follow={
-                  o.account_id === me ? '' : followLabel(o.account_id, graph)
-                }
-                replied={
-                  !!me &&
-                  o.account_id !== me &&
-                  !!o.reply_account_ids?.includes(me)
-                }
-                now={now}
-                onKind={(id) =>
-                  setKinds((value) =>
-                    value.length === 1 && value[0] === id ? [] : [id],
-                  )
-                }
-              />
-            ))}
-        {!pages.pending && !visible.length && (
-          <p className={styles.empty}>No matching notices.</p>
-        )}
+          dealStacks(
+            visible
+              .slice(0, initialPage ? undefined : limit)
+              .map((o, index) => ({ o, index })),
+          ).map((stack, s) => (
+            <div key={s} className={styles.stack} data-testid="stack">
+              {stack.map(({ o, index }) => (
+                <NoticeCard
+                  key={o.tweet_id}
+                  notice={o}
+                  order={index}
+                  loadTweet={loadTweet}
+                  badge={relationship(o, me, graph).label}
+                  follow={
+                    o.account_id === me ? '' : followLabel(o.account_id, graph)
+                  }
+                  replied={
+                    !!me &&
+                    o.account_id !== me &&
+                    !!o.reply_account_ids?.includes(me)
+                  }
+                  now={now}
+                  onKind={(id) =>
+                    setKinds((value) =>
+                      value.length === 1 && value[0] === id ? [] : [id],
+                    )
+                  }
+                />
+              ))}
+            </div>
+          ))}
       </div>
+      {!pages.pending && !visible.length && (
+        <p className={styles.empty}>No matching notices.</p>
+      )}
       {!pages.pending &&
         (initialPage
           ? cursor && !pages.loading[kind] && !pages.laneErrors[kind]

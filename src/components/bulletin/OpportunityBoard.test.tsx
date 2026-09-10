@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
-import { OpportunityBoard, sinceLabel } from './OpportunityBoard'
+import { OpportunityBoard, dealStacks, sinceLabel } from './OpportunityBoard'
 import type { Opportunity } from '@/lib/bulletin/types'
 jest.mock('./OpportunityBoard.module.css', () => ({}))
 const offer = {
@@ -451,4 +451,41 @@ test('dates read as time since posting, with the exact stamp on hover', () => {
     'title',
     'Sep 8, 2026, 00:00 UTC',
   )
+})
+test('deals cards round-robin into three stacks and keeps rank order via style order', () => {
+  expect(dealStacks([1, 2, 3, 4, 5, 6, 7])).toEqual([
+    [1, 4, 7],
+    [2, 5],
+    [3, 6],
+  ])
+  const notices = Array.from({ length: 6 }, (_, i) => ({
+    ...offer,
+    tweet_id: String(i + 1),
+    posted_at: new Date(
+      Date.parse('2026-09-08T00:00:00Z') - i * 3600000,
+    ).toISOString(),
+    summary: `Offer number ${i + 1}`,
+  }))
+  render(
+    <OpportunityBoard
+      opportunities={notices}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  const stacks = screen.getAllByTestId('stack')
+  expect(stacks).toHaveLength(3)
+  expect(
+    within(stacks[0])
+      .getAllByRole('article')
+      .map((a) => a.textContent),
+  ).toEqual([
+    expect.stringContaining('Offer number 1'),
+    expect.stringContaining('Offer number 4'),
+  ])
+  expect(within(stacks[1]).getAllByRole('article')[1]).toHaveTextContent(
+    'Offer number 5',
+  )
+  expect(within(stacks[1]).getAllByRole('article')[1]).toHaveStyle({
+    order: 4,
+  })
 })

@@ -150,20 +150,12 @@ function lifetime(notice: Opportunity, now: number) {
   const date = shortDate(new Date(until - 1).toISOString())
   return until <= now ? `ended ${date}` : `until ${date}`
 }
-/** Opening the tweet always works; the author's own instruction is a hint. */
-function respondHint(notice: Opportunity) {
-  const dm = `https://twitter.com/messages/compose?recipient_id=${encodeURIComponent(notice.account_id)}`
-  switch (notice.respond) {
-    case 'dm':
-      return { text: 'Author asks for a', link: { label: 'DM', href: dm } }
-    case 'reply':
-      return { text: 'Author asks for a reply' }
-    case 'link':
-      return { text: 'Author points to a link in the tweet' }
-    case 'like':
-      return { text: 'Author asks for a like' }
-    default:
-      return null
+/** A secondary action only when the tweet asks for a DM. Opening the tweet always works. */
+function secondaryAction(notice: Opportunity) {
+  if (notice.respond !== 'dm') return null
+  return {
+    label: 'DM on X',
+    href: `https://twitter.com/messages/compose?recipient_id=${encodeURIComponent(notice.account_id)}`,
   }
 }
 
@@ -217,7 +209,7 @@ function NoticeCard({
   }
   const past = isPast(notice, now)
   const tweetUrl = `https://twitter.com/${encodeURIComponent(notice.username)}/status/${notice.tweet_id}`
-  const hint = respondHint(notice)
+  const secondary = secondaryAction(notice)
   const text = decodeTweetText(tweet?.text || notice.preview_text || '')
   const when = lifetime(notice, now)
   // Zero is hidden: the count only covers archived members, not all of X.
@@ -318,6 +310,16 @@ function NoticeCard({
               >
                 Open on X <PiArrowSquareOut size={12} aria-hidden />
               </a>
+              {secondary && (
+                <a
+                  className={styles.secondary}
+                  href={secondary.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {secondary.label} <PiArrowSquareOut size={12} aria-hidden />
+                </a>
+              )}
               <Link
                 href={tweetPermalinkHref(
                   notice.tweet_id,
@@ -327,23 +329,6 @@ function NoticeCard({
               >
                 See on CA
               </Link>
-              {hint && (
-                <span className={styles.respondHint}>
-                  {hint.text}
-                  {hint.link && (
-                    <>
-                      {' '}
-                      <a
-                        href={hint.link.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {hint.link.label}
-                      </a>
-                    </>
-                  )}
-                </span>
-              )}
             </p>
           </div>
           {tweet?.replies?.length ? (

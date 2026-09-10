@@ -727,13 +727,19 @@
   background: var(--surface-3);
   border-color: var(--faint);
 }
-.respondHint {
-  flex-basis: 100%;
-  font-size: 12px;
-  color: var(--faint);
+.secondary {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted) !important;
+  font-weight: 500;
+  text-decoration: none;
 }
-.respondHint a {
-  color: var(--accent);
+.secondary:hover {
+  background: var(--surface-3);
+  color: var(--ink) !important;
 }
 .more {
   min-height: 1px;

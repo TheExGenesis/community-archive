@@ -94,8 +94,7 @@ test('loads full details only on inline expansion', async () => {
     'href',
     'https://twitter.com/alice/status/1',
   )
-  expect(screen.getByText(/Author asks for a/)).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'DM' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'DM on X' })).toHaveAttribute(
     'href',
     'https://twitter.com/messages/compose?recipient_id=a',
   )

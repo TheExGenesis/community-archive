@@ -331,10 +331,11 @@
   margin: 0 auto;
 }
 .notice {
+  position: relative;
   border: 1px solid var(--card-line);
   border-radius: 8px;
   background: var(--surface);
-  padding: 14px 16px;
+  padding: 16px 16px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -369,17 +370,30 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  height: 16px;
+  height: 14px;
 }
+/* The kind sits astride the top border like a label pinned to the card. */
 .kind {
+  position: absolute;
+  top: -12px;
+  left: 12px;
+  max-width: calc(100% - 24px);
+  height: 24px;
+  padding: 0 9px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   min-width: 0;
+  border: 1px solid var(--card-line);
+  border-radius: 999px;
+  background: var(--surface);
   font-size: 12px;
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
+}
+.notice:hover .kind {
+  border-color: var(--line-strong);
 }
 .kindButton {
   border: 0;
@@ -678,5 +692,8 @@
   }
   .open {
     grid-row: auto;
+  }
+  .board {
+    row-gap: 20px;
   }
 }

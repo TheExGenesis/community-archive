@@ -55,13 +55,17 @@ export type RunDashboard = {
   last_success_at: string | null
 }
 
+/**
+ * Chip order is deliberate: kinds where a response builds a connection come
+ * first, and the one that is purely about receiving comes last.
+ */
 export const KIND_LABELS: Record<string, string> = {
-  free: 'Free things',
-  opportunity: 'Work & collaboration',
-  invite: 'Invitations',
-  intro: 'Introductions',
   help: 'Help',
+  intro: 'Introductions',
+  invite: 'Invitations',
   feedback: 'Feedback',
+  opportunity: 'Work & collaboration',
+  free: 'Free things',
 }
 /** Phosphor icon name per kind; resolved in the client component. */
 export const KIND_ICONS: Record<string, string> = {

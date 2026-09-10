@@ -240,7 +240,7 @@ function NoticeCard({
         aria-label={`Filter by ${KIND_LABELS[notice.kind] || notice.kind}`}
         onClick={() => onKind(notice.kind)}
       >
-        <KindIcon kind={notice.kind} size={13} />
+        <KindIcon kind={notice.kind} size={14} />
         {cardLabel(notice)}
       </button>
       {badge && <span className={styles.rel}>{badge}</span>}

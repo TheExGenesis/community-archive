@@ -323,9 +323,9 @@
 .board {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 24px;
   align-items: start;
-  padding: 16px 32px 32px;
+  padding: 20px 32px 32px;
   min-height: 50vh;
   max-width: 1280px;
   margin: 0 auto;
@@ -335,7 +335,7 @@
   border: 1px solid var(--card-line);
   border-radius: 8px;
   background: var(--surface);
-  padding: 18px 16px 14px;
+  padding: 20px 16px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -395,11 +395,11 @@
 /* The kind sits astride the top border like a label pinned to the card. */
 .kind {
   position: absolute;
-  top: -12px;
+  top: -13px;
   left: 8px;
   max-width: calc(100% - 24px);
-  height: 24px;
-  padding: 0 8px;
+  height: 26px;
+  padding: 0 9px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -410,7 +410,7 @@
   border-right: 1px solid var(--line-strong);
   border-radius: 7px;
   background: var(--surface);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
@@ -500,7 +500,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   min-height: calc(3 * 1.35em);
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.35;
   font-weight: 600;
   letter-spacing: -0.005em;
@@ -731,6 +731,6 @@
     grid-row: auto;
   }
   .board {
-    row-gap: 20px;
+    row-gap: 24px;
   }
 }

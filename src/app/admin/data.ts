@@ -203,7 +203,7 @@ export async function checkIsAdmin(): Promise<boolean> {
 export async function requireAdmin(
   loginReturnPath:
     | '/admin'
-    | '/admin/opportunities'
+    | '/admin/bulletin'
     | '/social-graph'
     | '/settings' = '/admin',
 ) {

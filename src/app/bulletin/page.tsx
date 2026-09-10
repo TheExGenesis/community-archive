@@ -1,17 +1,17 @@
 import type { Metadata } from 'next'
-import styles from '@/components/bulletin/OpportunityBoard.module.css'
-import { isBulletinAdmin, requireOpportunityUser } from '@/lib/bulletin/data'
+import styles from '@/components/bulletin/BulletinBoard.module.css'
+import { isBulletinAdmin, requireBulletinUser } from '@/lib/bulletin/data'
 import { loadBulletinPage } from '@/lib/bulletin/page'
 import { DEFAULT_BULLETIN_FILTERS } from '@/lib/bulletin/types'
-import { OpportunityBoard } from '@/components/bulletin/OpportunityBoard'
+import { BulletinBoard } from '@/components/bulletin/BulletinBoard'
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
-  title: 'Opportunities | Community Archive',
+  title: 'Bulletin | Community Archive',
   robots: { index: false, follow: false },
 }
 
-export default async function OpportunitiesPage() {
-  await requireOpportunityUser()
+export default async function BulletinBoardPage() {
+  await requireBulletinUser()
   const [isAdmin, page] = await Promise.all([
     isBulletinAdmin(),
     loadBulletinPage(DEFAULT_BULLETIN_FILTERS).catch(() => null),
@@ -20,12 +20,12 @@ export default async function OpportunitiesPage() {
     <main className={styles.page}>
       {page === null ? (
         <div role="alert" className="rounded-lg border p-6">
-          Opportunities could not be loaded. Refresh to try again.
+          The bulletin could not be loaded. Refresh to try again.
         </div>
       ) : (
-        <OpportunityBoard
+        <BulletinBoard
           key={Date.now()}
-          opportunities={page.opportunities}
+          notices={page.notices}
           initialPage={page}
           me={page.personal.account_id}
           username={page.personal.username}

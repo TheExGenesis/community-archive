@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { savePrompt } from '@/app/admin/opportunities/actions'
+import { savePrompt } from '@/app/admin/bulletin/actions'
 import { formatTimestamp, type PromptDashboard } from '@/lib/bulletin/types'
 
 export function PromptEditor({
@@ -179,11 +179,11 @@ export function PromptEditor({
             aria-label="Prompt history pages"
           >
             {olderThan && (
-              <Link href="/admin/opportunities#prompts">Latest versions</Link>
+              <Link href="/admin/bulletin#prompts">Latest versions</Link>
             )}
             {data.versions.length > 20 && (
               <Link
-                href={`/admin/opportunities?prompts_before=${versions[versions.length - 1].id}#prompts`}
+                href={`/admin/bulletin?prompts_before=${versions[versions.length - 1].id}#prompts`}
               >
                 Older versions →
               </Link>

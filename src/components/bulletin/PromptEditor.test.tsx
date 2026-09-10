@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { PromptEditor } from './PromptEditor'
-import { savePrompt } from '@/app/admin/opportunities/actions'
+import { savePrompt } from '@/app/admin/bulletin/actions'
 import type { PromptDashboard } from '@/lib/bulletin/types'
-jest.mock('@/app/admin/opportunities/actions', () => ({
+jest.mock('@/app/admin/bulletin/actions', () => ({
   savePrompt: jest.fn(),
 }))
 const original = {

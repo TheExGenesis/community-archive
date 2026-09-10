@@ -2,7 +2,8 @@ import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 import { createHash } from 'crypto'
 import type { User } from '@supabase/supabase-js'
 import {
-  loadOpportunities,
+  hydrateBulletinNotices,
+  loadBulletinBoardState,
   loadRunDashboard,
   loadBulletinRelationships,
 } from './data'
@@ -27,6 +28,9 @@ jest.mock('next/navigation', () => ({
   },
 }))
 const rpc = jest.fn()
+// The board page composes these two steps; exercise them the same way.
+const loadNotices = async () =>
+  hydrateBulletinNotices(await loadBulletinBoardState())
 beforeEach(() => {
   jest.clearAllMocks()
   jest.mocked(getLocalAdminPreview).mockResolvedValue(null)
@@ -40,8 +44,8 @@ test.each([null, { is_anonymous: true }])(
   'signed-out/anonymous visitors never reach private data',
   async (user) => {
     jest.mocked(getCurrentUser).mockResolvedValue(user as User | null)
-    await expect(loadOpportunities()).rejects.toThrow(
-      'redirect:/login?redirect=/opportunities',
+    await expect(loadNotices()).rejects.toThrow(
+      'redirect:/login?redirect=/bulletin',
     )
     expect(createServerServiceRoleClient).not.toHaveBeenCalled()
   },
@@ -53,11 +57,11 @@ test('verified members read the policy-aware RPC, with upstream errors kept dist
   rpc
     .mockResolvedValueOnce({ data: [], error: null })
     .mockResolvedValueOnce({ data: null, error: { message: 'unavailable' } })
-  await expect(loadOpportunities()).resolves.toEqual([])
+  await expect(loadNotices()).resolves.toEqual([])
   expect(rpc).toHaveBeenCalledWith('get_bulletin_board_state', {
     max_results: 2000,
   })
-  await expect(loadOpportunities()).rejects.toThrow('could not be loaded')
+  await expect(loadNotices()).rejects.toThrow('could not be loaded')
 })
 test('run history always requires admin authorization', async () => {
   jest.mocked(getAdminClient).mockRejectedValueOnce(new Error('not authorized'))
@@ -92,13 +96,13 @@ test('run history uses bounded keyset pagination and rejects malformed cursors',
 test('explicit local admin read preview does not fabricate an Auth user', async () => {
   jest.mocked(getLocalAdminPreview).mockResolvedValue('admin')
   rpc.mockResolvedValue({ data: [], error: null })
-  await expect(loadOpportunities()).resolves.toEqual([])
+  await expect(loadNotices()).resolves.toEqual([])
   expect(getCurrentUser).not.toHaveBeenCalled()
 })
 test('signed-out local preview still requires login', async () => {
   jest.mocked(getLocalAdminPreview).mockResolvedValue('signed-out')
   jest.mocked(getCurrentUser).mockResolvedValue(null)
-  await expect(loadOpportunities()).rejects.toThrow('redirect:/login')
+  await expect(loadNotices()).rejects.toThrow('redirect:/login')
   expect(createServerServiceRoleClient).not.toHaveBeenCalled()
 })
 
@@ -122,11 +126,11 @@ test('ClickHouse source changes suppress a notice and upstream outages fail the 
       },
     ],
   })
-  await expect(loadOpportunities()).resolves.toEqual([])
+  await expect(loadNotices()).resolves.toEqual([])
   jest
     .mocked(fetchAnalyticsGatewayJson)
     .mockRejectedValue(new Error('unavailable'))
-  await expect(loadOpportunities()).rejects.toThrow('unavailable')
+  await expect(loadNotices()).rejects.toThrow('unavailable')
 })
 
 test('recommendations use the ClickHouse top outgoing list, and follow lists come from the RPC by trusted id', async () => {
@@ -233,7 +237,7 @@ test('immediate preview text comes only from a currently verified ClickHouse sou
       },
     ],
   })
-  await expect(loadOpportunities()).resolves.toMatchObject([
+  await expect(loadNotices()).resolves.toMatchObject([
     { tweet_id: '1', preview_text: text },
   ])
 })

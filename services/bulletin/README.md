@@ -1,7 +1,7 @@
 # Community Bulletin
 
-Signed-in members use `/opportunities`; the existing admin allowlist controls
-`/admin/opportunities`. The worker runs after the daily autorefresh succeeds.
+Signed-in members use `/bulletin`; the existing admin allowlist controls
+`/admin/bulletin`. The worker runs after the daily autorefresh succeeds.
 
 ## Data and privacy
 

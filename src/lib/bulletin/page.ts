@@ -12,12 +12,12 @@ import {
   parseKinds,
   type BulletinFilters,
   type BulletinPage,
-  type Opportunity,
+  type Notice,
 } from './types'
 
 export class BulletinCursorExpired extends Error {}
 
-function matches(notice: Opportunity, search: string) {
+function matches(notice: Notice, search: string) {
   if (!search) return true
   return [
     notice.summary,
@@ -57,7 +57,7 @@ export async function loadBulletinPage(
   )
   const byKind = known.filter(inKinds)
   const eligible = bySide.filter(inKinds)
-  const verified = new Map<string, Opportunity>()
+  const verified = new Map<string, Notice>()
   const rejected = new Set<string>()
   async function hydrate(notices: StoredNotice[]) {
     if (!notices.length) return
@@ -67,8 +67,8 @@ export async function loadBulletinPage(
       if (!found.has(o.tweet_id)) rejected.add(o.tweet_id)
     for (const o of rows) verified.set(o.tweet_id, o)
   }
-  const live = (o: StoredNotice): Opportunity => verified.get(o.tweet_id) || o
-  const shown = (o: Opportunity) =>
+  const live = (o: StoredNotice): Notice => verified.get(o.tweet_id) || o
+  const shown = (o: Notice) =>
     !rejected.has(o.tweet_id) &&
     (filters.past || !isPast(o, now)) &&
     matches(o, search)
@@ -109,7 +109,7 @@ export async function loadBulletinPage(
   if (after && index < 0)
     throw new BulletinCursorExpired('The board changed. Refresh to continue.')
   let position = index + 1
-  const selected: Opportunity[] = []
+  const selected: Notice[] = []
   // Fill holes from removed/edited posts without returning unverified summaries.
   while (selected.length < BULLETIN_PAGE_SIZE && position < rows.length) {
     const chunk = rows.slice(
@@ -139,7 +139,7 @@ export async function loadBulletinPage(
   for (const o of byKind.map(live)) if (shown(o)) counts[o.side]++
 
   return {
-    opportunities: selected,
+    notices: selected,
     counts,
     cursors: {
       [filters.kind]:

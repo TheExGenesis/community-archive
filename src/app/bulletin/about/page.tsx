@@ -10,7 +10,7 @@ export default function BulletinAboutPage() {
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6">
       <Link
-        href="/opportunities"
+        href="/bulletin"
         className="text-sm text-brand hover:underline"
       >
         ← Back to the board

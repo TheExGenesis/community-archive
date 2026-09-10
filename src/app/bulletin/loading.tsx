@@ -1,12 +1,12 @@
-import styles from '@/components/bulletin/OpportunityBoard.module.css'
+import styles from '@/components/bulletin/BulletinBoard.module.css'
 
-export default function LoadingOpportunities() {
+export default function LoadingBulletin() {
   return (
     <main className={styles.page} aria-busy="true">
       <header className={styles.head}>
-        <h1 className={styles.title}>Opportunities</h1>
+        <h1 className={styles.title}>Bulletin</h1>
         <p role="status" className={styles.lede}>
-          Loading opportunities…
+          Loading notices…
         </p>
       </header>
       <div className={styles.board} aria-hidden="true">

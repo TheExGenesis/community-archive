@@ -13,7 +13,7 @@ const columns = [
   ['eligible_originals', 'Eligible originals'],
   ['candidates_seen', 'Candidates'],
   ['calls', 'AI calls'],
-  ['positive', 'Opportunities'],
+  ['positive', 'Notices'],
   ['negative', 'Not notices'],
   ['failed', 'Failed'],
   ['pending', 'Left in queue'],
@@ -206,14 +206,14 @@ export function RunDashboard({
             className="flex justify-between border-t p-5"
           >
             <Link
-              href="/admin/opportunities"
+              href="/admin/bulletin"
               className="text-sm text-brand hover:underline"
             >
               Latest runs
             </Link>
             {hasOlder && (
               <Link
-                href={`/admin/opportunities?before=${runs[runs.length - 1].id}`}
+                href={`/admin/bulletin?before=${runs[runs.length - 1].id}`}
                 className="text-sm text-brand hover:underline"
               >
                 Older runs →
@@ -233,9 +233,9 @@ export function RunDashboard({
         </p>
         <p>
           <strong>AI calls</strong> includes retries and candidates left from
-          earlier scans. <strong>Opportunities</strong> counts positive
-          decisions saved during this run, before expiry and later consent
-          changes. It is not the number currently visible on the website.{' '}
+          earlier scans. <strong>Notices</strong> counts positive decisions
+          saved during this run, before expiry and later consent changes. It is
+          not the number currently visible on the website.{' '}
           <strong>Left in queue</strong> includes waiting, failed and exhausted
           decisions at the end of that run.
         </p>

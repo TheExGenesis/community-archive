@@ -13,7 +13,7 @@ export async function savePrompt(form: FormData): Promise<PromptSaveResult> {
       error:
         'Local admin preview is read-only. Sign in as an admin with preview disabled to save.',
     }
-  const { user } = await requireAdmin('/admin/opportunities')
+  const { user } = await requireAdmin('/admin/bulletin')
   const body = form.get('body')
   const note = form.get('note')
   const expected = form.get('expected_id')
@@ -49,6 +49,6 @@ export async function savePrompt(form: FormData): Promise<PromptSaveResult> {
           ? 'Another edit was saved first. Copy your draft, then reload to review the latest version.'
           : 'Prompt could not be saved. Your draft is still here.',
     }
-  revalidatePath('/admin/opportunities')
+  revalidatePath('/admin/bulletin')
   return { version: data }
 }

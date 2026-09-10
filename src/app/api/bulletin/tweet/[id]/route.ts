@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireOpportunityUser } from '@/lib/bulletin/data'
+import { requireBulletinUser } from '@/lib/bulletin/data'
 import { loadBulletinTweets } from '@/lib/bulletin/tweets'
 
 export const dynamic = 'force-dynamic'
@@ -8,7 +8,7 @@ export async function GET(
   _request: Request,
   { params }: { params: { id: string } },
 ) {
-  await requireOpportunityUser()
+  await requireBulletinUser()
   if (!/^\d{1,20}$/.test(params.id))
     return NextResponse.json(
       { error: 'Invalid tweet' },

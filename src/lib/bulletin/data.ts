@@ -7,22 +7,18 @@ import { getAdminClient, requireAdmin, checkIsAdmin } from '@/app/admin/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 import { createHash } from 'crypto'
-import type { Opportunity, RunDashboard } from './types'
+import type { Notice, RunDashboard } from './types'
 
-export const OPPORTUNITY_LIMIT = 2000
+export const BULLETIN_LIMIT = 2000
 export const RUN_PAGE_SIZE = 25
 
-export async function requireOpportunityUser() {
+export async function requireBulletinUser() {
   if ((await getLocalAdminPreview()) === 'admin') return null
   // Member-preview cookies never authorize reads. The explicit loopback-only
   // local admin read preview follows the same convention as Birdseye.
   const user = await getCurrentUser()
-  if (!user || user.is_anonymous) redirect('/login?redirect=/opportunities')
+  if (!user || user.is_anonymous) redirect('/login?redirect=/bulletin')
   return user
-}
-export async function loadOpportunities(): Promise<Opportunity[]> {
-  await requireOpportunityUser()
-  return hydrateBulletinNotices(await loadBulletinBoardState())
 }
 
 /** Hydrate only the selected notices, retaining the live source/policy checks. */
@@ -32,8 +28,8 @@ export async function hydrateBulletinNotices({
 }: {
   notices: StoredNotice[]
   allowedAccounts?: string[]
-}): Promise<Opportunity[]> {
-  const result: Opportunity[] = []
+}): Promise<Notice[]> {
+  const result: Notice[] = []
   for (let offset = 0; offset < notices.length; offset += 100) {
     const batch = notices.slice(offset, offset + 100)
     const response = await fetchAnalyticsGatewayJson<{
@@ -112,7 +108,7 @@ export async function isBulletinAdmin() {
 }
 export async function requireBulletinAdmin() {
   if ((await getLocalAdminPreview()) !== 'admin')
-    await requireAdmin('/admin/opportunities')
+    await requireAdmin('/admin/bulletin')
 }
 export async function loadRunDashboard(before?: string): Promise<RunDashboard> {
   const localPreview = (await getLocalAdminPreview()) === 'admin'
@@ -145,7 +141,7 @@ export async function loadRunDashboard(before?: string): Promise<RunDashboard> {
 }
 
 export async function loadBulletinRelationships() {
-  const user = await requireOpportunityUser()
+  const user = await requireBulletinUser()
   // The loopback admin preview has no session. Let a local fixture name the
   // viewer so badges and Recommended can be exercised; never trusted elsewhere.
   const preview = !user && (await getLocalAdminPreview()) === 'admin'
@@ -252,12 +248,12 @@ async function loadFollowLists(me: string, username: string, preview: boolean) {
   }
 }
 
-export type StoredNotice = Opportunity & { content_hash: string }
+export type StoredNotice = Notice & { content_hash: string }
 export async function loadBulletinBoardState(): Promise<{
   notices: StoredNotice[]
   allowedAccounts?: string[]
 }> {
-  await requireOpportunityUser()
+  await requireBulletinUser()
   if (
     (await getLocalAdminPreview()) === 'admin' &&
     process.env.BULLETIN_LOCAL_BOARD_PREVIEW_URL
@@ -274,8 +270,8 @@ export async function loadBulletinBoardState(): Promise<{
   }
   const { data, error } = await createServerServiceRoleClient().rpc(
     'get_bulletin_board_state',
-    { max_results: OPPORTUNITY_LIMIT },
+    { max_results: BULLETIN_LIMIT },
   )
-  if (error) throw new Error('Opportunities could not be loaded')
+  if (error) throw new Error('Bulletin notices could not be loaded')
   return { notices: (data ?? []) as unknown as StoredNotice[] }
 }

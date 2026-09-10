@@ -8,11 +8,11 @@ import { RefreshButton } from '@/components/bulletin/RefreshButton'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
-  title: 'Opportunity runs | CA admin',
+  title: 'Bulletin runs | CA admin',
   robots: { index: false, follow: false },
 }
 
-export default async function OpportunityRunsPage({
+export default async function BulletinRunsPage({
   searchParams,
 }: {
   searchParams?: { before?: string; prompts_before?: string }
@@ -33,13 +33,10 @@ export default async function OpportunityRunsPage({
         </p>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-3xl font-semibold tracking-tight">
-            Opportunity runs
+            Bulletin runs
           </h1>
-          <Link
-            href="/opportunities"
-            className="text-sm text-brand hover:underline"
-          >
-            Open opportunities →
+          <Link href="/bulletin" className="text-sm text-brand hover:underline">
+            Open the bulletin →
           </Link>
         </div>
         <p className="mt-3 text-muted-foreground">

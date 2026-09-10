@@ -67,7 +67,7 @@ describe('TweetCard', () => {
         clickable
         showExternalLink
         origin="opportunities"
-        returnTo="/opportunities"
+        returnTo="/bulletin"
       />,
     )
     const card = screen.getByRole('link', { name: 'View tweet by @alice' })
@@ -86,7 +86,7 @@ describe('TweetCard', () => {
     expect(card).toHaveStyle({ height: '340px' })
     fireEvent.click(card)
     expect(push).toHaveBeenCalledWith(
-      '/tweets/123?from=opportunities&returnTo=%2Fopportunities',
+      '/tweets/123?from=opportunities&returnTo=%2Fbulletin',
     )
   })
 

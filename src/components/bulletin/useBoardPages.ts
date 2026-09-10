@@ -108,16 +108,13 @@ export function useBoardPages(
         if (controller.signal.aborted || currentKey.current !== key) return
         setState((value) => {
           if (value.key !== key || !value.page) return value
-          const notices = new Map(
-            value.page.opportunities.map((o) => [o.tweet_id, o]),
-          )
-          for (const notice of page.opportunities)
-            notices.set(notice.tweet_id, notice)
+          const merged = new Map(value.page.notices.map((o) => [o.tweet_id, o]))
+          for (const notice of page.notices) merged.set(notice.tweet_id, notice)
           return {
             key,
             page: {
               ...value.page,
-              opportunities: Array.from(notices.values()),
+              notices: Array.from(merged.values()),
               counts: { ...value.page.counts, ...page.counts },
               cursors: { ...value.page.cursors, ...page.cursors },
             },

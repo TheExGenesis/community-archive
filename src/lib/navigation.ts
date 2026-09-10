@@ -67,11 +67,12 @@ const TWEET_ORIGINS: Record<
     label: 'Back to What Happened Yesterday',
     matches: (href) => href === '/digest' || href.startsWith('/digest/'),
   },
+  // Bulletin launched as /opportunities. The origin key stays so ?from= links
+  // and PostHog tweet-origin breakdowns remain continuous.
   opportunities: {
-    href: '/opportunities',
-    label: 'Back to opportunities',
-    matches: (href) =>
-      href === '/opportunities' || href.startsWith('/opportunities?'),
+    href: '/bulletin',
+    label: 'Back to Bulletin',
+    matches: (href) => href === '/bulletin' || href.startsWith('/bulletin?'),
   },
   trends: {
     href: '/trends',
@@ -156,7 +157,7 @@ export const getPrimaryNav = (
     ? [
         { href: BANGERS_WEEK_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
-        { href: '/opportunities', label: 'Opportunities' },
+        { href: '/bulletin', label: 'Bulletin' },
         { href: '/user-dir', label: 'Users' },
         { href: '/community', label: 'Apps' },
         { href: '/trends', label: 'Trends' },

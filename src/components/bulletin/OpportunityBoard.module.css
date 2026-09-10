@@ -693,6 +693,7 @@
   font-weight: 400;
   line-height: 1.6;
   color: var(--ink) !important;
+  text-wrap: pretty;
 }
 .fullText {
   margin: 0;

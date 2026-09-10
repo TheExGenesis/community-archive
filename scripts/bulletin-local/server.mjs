@@ -130,64 +130,21 @@ const server = createServer((req, res) => {
       return json(res, 200, {
         data: { tweet: detail(source), quotedTweet: null },
       })
-    if (segments.length === 3 && segments[2] === 'thread') {
-      // Archived replies from the dump (fixtures.json `threads`). Only the
-      // synthetic 9000… notices, which have no dump rows, get made-up
-      // replies, one per replier id in the fixture (capped at 5).
-      const archived = fixtures.threads?.[source.tweet_id]
-      if (archived || !source.synthetic)
-        return json(res, 200, {
-          data: {
-            tweet: { ...detail(source), quotedTweet: null },
-            conversationTweets: (archived || []).map((reply) => ({
+    if (segments.length === 3 && segments[2] === 'thread')
+      // Archived replies from the dump (fixtures.json `threads`).
+      return json(res, 200, {
+        data: {
+          tweet: { ...detail(source), quotedTweet: null },
+          conversationTweets: (fixtures.threads?.[source.tweet_id] || []).map(
+            (reply) => ({
               quoteTweetId: null,
               quotedTweet: null,
               retweetedTweetId: null,
               ...reply,
-            })),
-          },
-        })
-      const byAccount = new Map(
-        Object.values(fixtures.sources).map((s) => [s.account_id, s]),
-      )
-      const texts = [
-        'Happy to help with this, sent you a DM.',
-        'I know someone who did exactly this last year, intro incoming.',
-        'Following along, curious what answers you get.',
-        'Tried this a while back. What worked for me was keeping it small first.',
-        'Count me in if there is still room.',
-      ]
-      const conversationTweets = (source.reply_account_ids || [])
-        .slice(0, 5)
-        .map((accountId, i) => {
-          const who = byAccount.get(accountId)
-          return {
-            tweetId: `${source.tweet_id}0${i}`,
-            accountId,
-            createdAt: new Date(
-              Date.parse(source.created_at) + (i + 1) * 3600e3,
-            ).toISOString(),
-            fullText: texts[i % texts.length],
-            replyToTweetId: source.tweet_id,
-            replyToUsername: source.username,
-            favoriteCount: (i * 3) % 7,
-            retweetCount: 0,
-            username: who?.username || `member${i + 1}`,
-            accountDisplayName: who?.display_name || `Member ${i + 1}`,
-            avatarMediaUrl: who?.avatar_url || null,
-            media: [],
-            quoteTweetId: null,
-            quotedTweet: null,
-            retweetedTweetId: null,
-          }
-        })
-      return json(res, 200, {
-        data: {
-          tweet: { ...detail(source), quotedTweet: null },
-          conversationTweets,
+            }),
+          ),
         },
       })
-    }
   }
   return json(res, 404, { error: `Unmocked gateway endpoint ${path}` })
 })

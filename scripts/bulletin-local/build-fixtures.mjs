@@ -21,9 +21,8 @@
 //   threads        archived replies under each notice, two levels deep, from
 //                  the dump, joined to profiles
 //
-// The four notices with tweet ids starting 9000… are synthetic and belong to
-// the "me" account so the You badge, renewals and personal stats show up; they
-// have no dump rows, so the mock keeps serving synthetic replies for them.
+// Every notice is a real archive tweet; the viewer's own real notice is always
+// kept so the You badge shows up.
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -136,120 +135,6 @@ for (const n of proto.notices)
 
 const converted = picked.map(convert).filter(Boolean)
 
-// Synthetic notices for the "me" account. Tweet ids beginning 9000 never
-// collide with real snowflake ids from the archive.
-function mine(id, fields, text, extra = {}) {
-  const posted = utc(fields.posted_at)
-  return {
-    notice: {
-      tweet_id: id,
-      account_id: ME.account_id,
-      username: ME.username,
-      posted_at: posted,
-      side: fields.side,
-      kind: fields.kind,
-      summary: fields.summary,
-      evidence: evidence(text),
-      topics: fields.topics,
-      respond: fields.respond,
-      standing: !!fields.standing,
-      expires_at: fields.expires_at || null,
-      place: fields.place || null,
-      content_hash: sha(text),
-    },
-    source: {
-      tweet_id: id,
-      account_id: ME.account_id,
-      full_text: text,
-      reply_to_tweet_id: null,
-      retweet: false,
-      created_at: posted,
-      username: ME.username,
-      display_name: ME.display_name,
-      account_created_at: '2017-01-01T00:00:00Z',
-      avatar_url: ME.avatar_url,
-      replies: extra.replies || 0,
-      quotes: extra.quotes || 0,
-      reply_account_ids: extra.reply_account_ids || [],
-      renewed_at: extra.renewed_at ? utc(extra.renewed_at) : null,
-      likes: extra.likes || 0,
-      retweets: 0,
-      content_hash: sha(text),
-      synthetic: true,
-    },
-  }
-}
-const others = converted
-  .map((c) => c.notice.account_id)
-  .filter((id) => id !== ME.account_id)
-converted.push(
-  mine(
-    '900000000000000001',
-    {
-      side: 'ask',
-      kind: 'help',
-      posted_at: '2026-09-05T14:10:00Z',
-      summary:
-        'Help speeding up a DuckDB window-function query over the archive dump, in exchange for a Roam onboarding session.',
-      topics: ['duckdb', 'sql', 'archive dump'],
-      respond: 'reply',
-    },
-    'ask: anyone here fluent in DuckDB window functions? computing tenure buckets over 10M archive rows takes 40 minutes and I am sure it is my query, not the machine. will trade a Roam onboarding session.',
-    { replies: 3, likes: 7, reply_account_ids: others.slice(0, 3) },
-  ),
-  mine(
-    '900000000000000002',
-    {
-      side: 'offer',
-      kind: 'feedback',
-      posted_at: '2026-08-20T09:30:00Z',
-      summary:
-        'A blunt written UX critique of any Community Archive tool or prototype, five bullets within a week.',
-      topics: ['ux', 'critique', 'community archive'],
-      respond: 'dm',
-      standing: true,
-    },
-    'standing offer: I will give a blunt written UX critique of any community archive tool or prototype. send a link, get five bullets back within a week. no charge, I just like doing it.',
-    { replies: 1, quotes: 1, likes: 12, reply_account_ids: others.slice(3, 4) },
-  ),
-  mine(
-    '900000000000000003',
-    {
-      side: 'ask',
-      kind: 'intro',
-      posted_at: '2026-09-07T18:45:00Z',
-      summary:
-        'An intro to someone who has run a small grants program for open-source community tooling.',
-      topics: ['grants', 'open source', 'intro'],
-      respond: 'dm',
-      expires_at: '2026-09-25',
-    },
-    'ask: looking for an intro to someone who has run a small grants program (under $50k total) for open-source community tooling. I want to copy their application form, not their money. closing this on the 25th.',
-    { likes: 4 },
-  ),
-  mine(
-    '900000000000000004',
-    {
-      side: 'offer',
-      kind: 'invite',
-      posted_at: '2026-06-10T16:00:00Z',
-      summary:
-        'A monthly 30-minute archive builders call on the second Thursday; bring something half-working.',
-      topics: ['community call', 'builders', 'monthly'],
-      respond: 'link',
-      place: 'online',
-    },
-    'offer: monthly archive builders call, second thursday, 30 minutes, bring a half-working thing and leave with two people who want to see it work. link in bio, renewed each month.',
-    {
-      replies: 5,
-      quotes: 2,
-      likes: 19,
-      renewed_at: '2026-09-04T12:00:00Z',
-      reply_account_ids: others.slice(4, 9),
-    },
-  ),
-)
-
 // Follow lists from members' own uploads. authors.<handle>.followers /
 // following are indices into members. The viewer's own lists come first; other
 // authors' lists pointing at the viewer fill in (an author whose `following`
@@ -283,9 +168,7 @@ function fromDump() {
   }
   const request = {
     me: ME.account_id,
-    notice_ids: converted
-      .map((c) => c.source.tweet_id)
-      .filter((id) => !id.startsWith('9000')),
+    notice_ids: converted.map((c) => c.source.tweet_id),
     author_ids: [...new Set(converted.map((c) => c.source.account_id))],
   }
   const run = spawnSync(
@@ -309,7 +192,6 @@ const real = fromDump()
 const diffs = []
 if (real) {
   for (const { notice, source } of converted) {
-    if (source.synthetic) continue
     const stats = real.engagement[source.tweet_id]
     if (stats) {
       source.likes = stats.favorite_count
@@ -394,7 +276,7 @@ if (real) {
   )
   const inDump = Object.keys(real.engagement).length
   console.log(
-    `dump: ${inDump}/${converted.length - 4} real notices found, ${withThreads} with archived replies (${replyRows} reply rows), ` +
+    `dump: ${inDump}/${converted.length} notices found, ${withThreads} with archived replies (${replyRows} reply rows), ` +
       `${fixtures.interactions[ME.account_id].length} outgoing interactions, ` +
       `following ${fixtures.relationships.following.length} / followers ${fixtures.relationships.followers.length}`,
   )

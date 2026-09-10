@@ -22,7 +22,6 @@
     "dev:downloadarchive": "tsx --env-file=.env scripts/download_supabase_storage.mts",
     "dev:testconversationids": "tsx --env-file=.env scripts/testConversationIds.ts",
     "dev:generate-mock-archives": "tsx tests/db-insertion/fixtures/generate-mock-archives.ts",
-    "dev:bulletin-local": "node scripts/bulletin-local/start.mjs",
     "build": "NODE_ENV=production next build",
     "start": "next start",
     "lint": "next lint",

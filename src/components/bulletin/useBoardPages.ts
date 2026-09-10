@@ -13,6 +13,7 @@ function filterKey(filters: BulletinFilters) {
     filters.search.trim(),
     filters.past,
     filters.recommended,
+    filters.ascending,
   ])
 }
 function query(filters: BulletinFilters) {
@@ -22,6 +23,7 @@ function query(filters: BulletinFilters) {
     q: filters.search.trim(),
     past: filters.past ? '1' : '0',
     sort: filters.recommended ? 'recommended' : 'newest',
+    dir: filters.ascending ? 'asc' : 'desc',
   })
 }
 async function fetchPage(

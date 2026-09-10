@@ -1,23 +1,48 @@
 'use client'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { PiArrowSquareOut } from 'react-icons/pi'
+import {
+  PiArrowDown,
+  PiArrowSquareOut,
+  PiArrowUp,
+  PiArrowsDownUp,
+  PiBriefcase,
+  PiCalendarBlank,
+  PiChatCircle,
+  PiChatsCircle,
+  PiCheck,
+  PiGift,
+  PiHandHeart,
+  PiQuestion,
+  PiUsersThree,
+  PiX,
+} from 'react-icons/pi'
+import type { IconType } from 'react-icons'
 import { useTweetBatch } from './useTweetBatch'
 import { useBoardPages } from './useBoardPages'
-import { RefreshButton } from './RefreshButton'
 import { TweetAvatar } from '@/components/TweetAvatar'
 import type { PortalTweet } from '@/lib/portal/types'
+import type { BulletinTweet } from '@/lib/bulletin/tweets'
 import { decodeTweetText } from '@/lib/tweetText'
 import { tweetPermalinkHref, userProfileHref } from '@/lib/navigation'
 import {
+  BULLETIN_PAGE_SIZE,
+  KIND_ICONS,
   KIND_LABELS,
+  RESPONSE_LABELS,
+  cardLabel,
+  kindKey,
+  parseKinds,
   type BulletinPage,
   type Opportunity,
 } from '@/lib/bulletin/types'
 import {
+  expiry,
+  followLabel,
   isPast,
   relationship,
   sortNotices,
+  uptake,
   type BulletinRelationships,
 } from '@/lib/bulletin/board'
 import styles from './OpportunityBoard.module.css'
@@ -29,24 +54,21 @@ const ExpandedTweetCard = lazy(() =>
 )
 
 const EMPTY_GRAPH: BulletinRelationships = { outgoing: {}, available: false }
-const LANE_GROUPS = [
-  ['free'],
-  ['opportunity'],
-  ['invite'],
-  ['intro'],
-  ['help', 'feedback'],
-]
-const PAGE_SIZE = 4
+const ICONS: Record<string, IconType> = {
+  gift: PiGift,
+  briefcase: PiBriefcase,
+  calendar: PiCalendarBlank,
+  users: PiUsersThree,
+  'hand-heart': PiHandHeart,
+  chats: PiChatsCircle,
+}
+function KindIcon({ kind, size = 14 }: { kind: string; size?: number }) {
+  const Icon = ICONS[KIND_ICONS[kind]]
+  return Icon ? <Icon size={size} aria-hidden /> : null
+}
+const KINDS = Object.keys(KIND_LABELS)
 
-function ScrollMore({
-  count,
-  label,
-  onMore,
-}: {
-  count: number
-  label: string
-  onMore: () => void
-}) {
+function ScrollMore({ count, onMore }: { count: number; onMore: () => void }) {
   const sentinel = useRef<HTMLDivElement>(null)
   const callback = useRef(onMore)
   callback.current = onMore
@@ -71,33 +93,67 @@ function ScrollMore({
     return () => observer.disconnect()
   }, [count])
   return (
-    <div
-      ref={sentinel}
-      aria-label={`Load more ${label}`}
-      className={styles.more}
-    >
+    <div ref={sentinel} aria-label="Load more notices" className={styles.more}>
       {manual ? (
         <button onClick={onMore}>Show more</button>
       ) : (
-        <span className="sr-only">More {label} load as you scroll</span>
+        <span className="sr-only">More notices load as you scroll</span>
       )}
     </div>
   )
+}
+
+function shortDate(value: string) {
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+/** Only a date the author gave. Default lifetimes are not shown as if stated. */
+function lifetime(notice: Opportunity, now: number) {
+  if (!notice.expires_at) return ''
+  const until = expiry(notice)!
+  const date = shortDate(new Date(until - 1).toISOString())
+  return until <= now ? `ended ${date}` : `until ${date}`
+}
+/** One action per notice, named by how the author asked to be reached. */
+function respondAction(notice: Opportunity) {
+  const tweetUrl = `https://twitter.com/${encodeURIComponent(notice.username)}/status/${notice.tweet_id}`
+  switch (notice.respond) {
+    case 'dm':
+      return {
+        label: 'DM on X',
+        href: `https://twitter.com/messages/compose?recipient_id=${encodeURIComponent(notice.account_id)}`,
+      }
+    case 'reply':
+      return { label: 'Reply on X', href: tweetUrl }
+    case 'like':
+      return { label: 'Like on X', href: tweetUrl }
+    default:
+      return { label: 'Open on X', href: tweetUrl }
+  }
 }
 
 function NoticeCard({
   notice,
   loadTweet,
   badge,
-  expired,
+  follow,
+  replied,
+  now,
+  onKind,
 }: {
   notice: Opportunity
-  loadTweet: (id: string) => Promise<PortalTweet>
+  loadTweet: (id: string) => Promise<BulletinTweet>
   badge: string
-  expired: boolean
+  follow: string
+  replied: boolean
+  now: number
+  onKind: (kind: string) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [tweet, setTweet] = useState<PortalTweet | null>(null)
+  const [tweet, setTweet] = useState<BulletinTweet | null>(null)
   const [error, setError] = useState(false)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
@@ -127,114 +183,178 @@ function NoticeCard({
     likes: 0,
     rts: 0,
   }
-  const date = new Date(notice.posted_at).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  })
+  const past = isPast(notice, now)
+  const action = respondAction(notice)
   const text = decodeTweetText(tweet?.text || notice.preview_text || '')
+  const when = lifetime(notice, now)
+  // Zero is hidden: the count only covers archived members, not all of X.
+  const replies = uptake(notice) || null
+  const meta = (when || replies !== null || replied) && (
+    <p className={styles.meta}>
+      {when && <span>{when}</span>}
+      {replied && (
+        <span className={styles.youReplied}>
+          <PiCheck size={12} aria-hidden /> you replied
+        </span>
+      )}
+      {replies !== null && (
+        <span
+          className={styles.replies}
+          aria-label={`${replies} ${replies === 1 ? 'reply' : 'replies'} from archived members`}
+        >
+          <PiChatCircle size={13} aria-hidden />
+          {replies}
+        </span>
+      )}
+    </p>
+  )
+  const label = (
+    <span
+      className={`${styles.kind} ${notice.side === 'offer' ? styles.offer : styles.ask}`}
+    >
+      <button
+        type="button"
+        className={styles.kindButton}
+        aria-label={`Filter by ${KIND_LABELS[notice.kind] || notice.kind}`}
+        onClick={() => onKind(notice.kind)}
+      >
+        <KindIcon kind={notice.kind} size={13} />
+        {cardLabel(notice)}
+      </button>
+      {badge && <span className={styles.rel}> · {badge}</span>}
+      {notice.place && <span className={styles.rel}> · {notice.place}</span>}
+    </span>
+  )
   return (
     <article
-      className={styles.notice}
-      style={expired ? { opacity: 0.6 } : undefined}
+      className={`${styles.notice} ${past ? styles.past : ''} ${open ? styles.open : ''}`}
+      onClick={(event) => {
+        if (open) return
+        const target = event.target as HTMLElement
+        if (target.closest('a, button')) return
+        setOpen(true)
+      }}
     >
-      <div className={styles.noticeHead}>
-        <span
-          className={`${styles.kind} ${notice.side === 'offer' ? styles.offer : styles.ask}`}
-        >
-          {notice.side === 'offer' ? 'Offer' : 'Ask'}
-        </span>
-        <time dateTime={notice.posted_at} className={styles.date}>
-          {date}
-        </time>
-      </div>
-      <p className={styles.summary}>
-        <Link
-          href={tweetPermalinkHref(
-            notice.tweet_id,
-            'opportunities',
-            '/opportunities',
-          )}
-        >
-          {notice.summary}
-        </Link>
-      </p>
-      <button
-        className={styles.textButton}
-        aria-label={`${open ? 'Collapse' : 'Read full'} tweet by @${notice.username}`}
-        aria-expanded={open}
-        aria-controls={`original-${notice.tweet_id}`}
-        onClick={() => setOpen((value) => !value)}
-      >
-        {!open && (
-          <span className={styles.text}>{text || 'Read original tweet'}</span>
-        )}
-        <span className={styles.readMore}>
-          {open ? 'Show less' : 'Read more'}
-        </span>
-      </button>
-      {open && (
-        <div id={`original-${notice.tweet_id}`} className={styles.expanded}>
-          <Suspense fallback={<p className={styles.fullText}>{text}</p>}>
-            <ExpandedTweetCard
-              tweet={tweet || fallback}
-              showEngagement={!!tweet}
-              clickable={false}
-              showDate
-              showExternalLink
-              origin="opportunities"
-              returnTo="/opportunities"
-            />
-          </Suspense>
-          {!tweet && !error && (
-            <p className="text-xs text-muted-foreground">
-              Loading post details…
-            </p>
-          )}
-          {error && (
+      {open ? (
+        <>
+          <div className={styles.noticeHead}>
+            {label}
             <button
-              className="text-sm text-brand"
-              onClick={() => setAttempt((n) => n + 1)}
+              type="button"
+              className={styles.close}
+              aria-label={`Collapse tweet by @${notice.username}`}
+              aria-expanded
+              aria-controls={`original-${notice.tweet_id}`}
+              onClick={() => setOpen(false)}
             >
-              Retry post details
+              <PiX size={15} />
             </button>
-          )}
-        </div>
-      )}
-      <footer className={styles.noticeFoot}>
-        <Link
-          href={userProfileHref(notice.username, notice.account_id)}
-          aria-label={`View @${notice.username}'s profile`}
-        >
-          <TweetAvatar tweet={tweet || fallback} size={22} />
-        </Link>
-        <Link
-          className={styles.handle}
-          href={userProfileHref(notice.username, notice.account_id)}
-        >
-          @{notice.username}
-        </Link>
-        <span
-          className={styles.likes}
-          aria-label={tweet ? `${tweet.likes} likes` : undefined}
-        >
-          {tweet ? `♡ ${tweet.likes.toLocaleString()}` : ''}
-        </span>
-        <a
-          className={styles.outbound}
-          href={`https://twitter.com/${encodeURIComponent(notice.username)}/status/${notice.tweet_id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="View original on X"
-        >
-          <PiArrowSquareOut size={12} />
-        </a>
-      </footer>
-      {(badge || expired) && (
-        <span className={styles.badge}>
-          {badge}
-          {expired ? `${badge ? ' · ' : ''}Past` : ''}
-        </span>
+          </div>
+          <div id={`original-${notice.tweet_id}`} className={styles.expanded}>
+            <Suspense fallback={<p className={styles.fullText}>{text}</p>}>
+              <ExpandedTweetCard
+                tweet={tweet || fallback}
+                showEngagement={!!tweet}
+                clickable={false}
+                showDate
+                stacked
+                origin="opportunities"
+                returnTo="/opportunities"
+              />
+            </Suspense>
+            {!tweet && !error && (
+              <p className={styles.hint}>Loading post details…</p>
+            )}
+            {error && (
+              <button
+                type="button"
+                className={styles.hintButton}
+                onClick={() => setAttempt((n) => n + 1)}
+              >
+                Retry post details
+              </button>
+            )}
+            {tweet?.replies?.length ? (
+              <div className={styles.replyList}>
+                <p className={styles.replyHead}>
+                  {tweet.replies.length === 1
+                    ? '1 reply'
+                    : `${tweet.replies.length} replies`}{' '}
+                  from members
+                </p>
+                {tweet.replies.map((reply) => (
+                  <ExpandedTweetCard
+                    key={reply.id}
+                    tweet={reply}
+                    compact
+                    noClamp
+                    stacked
+                    clickable={false}
+                    showDate
+                    origin="opportunities"
+                    returnTo="/opportunities"
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <div className={styles.foot}>
+            {meta}
+            <p className={styles.acts}>
+              <a
+                className={styles.primary}
+                href={action.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={RESPONSE_LABELS[notice.respond]}
+              >
+                {action.label} <PiArrowSquareOut size={12} aria-hidden />
+              </a>
+              <Link
+                href={tweetPermalinkHref(
+                  notice.tweet_id,
+                  'opportunities',
+                  '/opportunities',
+                )}
+              >
+                See on CA
+              </Link>
+            </p>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className={styles.noticeHead}>
+            {label}
+            <span className={styles.readHint} aria-hidden>
+              click to read more
+            </span>
+            <time dateTime={notice.posted_at} className={styles.date}>
+              {shortDate(notice.posted_at)}
+            </time>
+          </div>
+          <button
+            type="button"
+            className={styles.summaryButton}
+            aria-label={`Read full tweet by @${notice.username}`}
+            aria-expanded={false}
+            aria-controls={`original-${notice.tweet_id}`}
+            onClick={() => setOpen(true)}
+          >
+            <span className={styles.summary}>{notice.summary}</span>
+          </button>
+          <div className={styles.who}>
+            <Link
+              href={userProfileHref(notice.username, notice.account_id)}
+              className={styles.author}
+            >
+              <TweetAvatar tweet={tweet || fallback} size={18} />
+              <span>{notice.display_name || `@${notice.username}`}</span>
+            </Link>
+            {follow && <span className={styles.follow}>{follow}</span>}
+          </div>
+          {meta}
+        </>
       )}
     </article>
   )
@@ -258,28 +378,30 @@ export function OpportunityBoard({
   isAdmin?: boolean
 }) {
   const loadTweet = useTweetBatch()
-  const [pageSize, setPageSize] = useState<Record<string, number>>({})
+  const [limit, setLimit] = useState(BULLETIN_PAGE_SIZE)
   const [side, setSide] = useState('all')
-  const [kind, setKind] = useState('all')
+  const [kinds, setKinds] = useState<string[]>([])
+  const kind = kindKey(kinds)
   const [search, setSearch] = useState('')
   const [past, setPast] = useState(false)
   const [recommended, setRecommended] = useState(true)
+  const [ascending, setAscending] = useState(false)
   const [hydrated, setHydrated] = useState(false)
   const pages = useBoardPages(
     initialPage,
-    { kind, side, search, past, recommended },
+    { kind, side, search, past, recommended, ascending },
     hydrated,
   )
   const loaded = pages.page?.opportunities || opportunities
   useEffect(() => {
     const p = new URLSearchParams(window.location.hash.slice(1))
-    const savedKind = p.get('kind') || 'all'
-    setKind(savedKind in KIND_LABELS ? savedKind : 'all')
+    setKinds(parseKinds(p.get('kind') || 'all') ?? [])
     setSide(
       ['ask', 'offer'].includes(p.get('side') || '') ? p.get('side')! : 'all',
     )
     setPast(p.get('past') === '1')
     setRecommended(p.get('sort') !== 'newest')
+    setAscending(p.get('dir') === 'asc')
     setHydrated(true)
   }, [])
   useEffect(() => {
@@ -289,6 +411,7 @@ export function OpportunityBoard({
     if (side !== 'all') p.set('side', side)
     if (past) p.set('past', '1')
     if (!recommended) p.set('sort', 'newest')
+    if (ascending) p.set('dir', 'asc')
     window.history.replaceState(
       null,
       '',
@@ -296,252 +419,289 @@ export function OpportunityBoard({
         window.location.search +
         (p.toString() ? '#' + p.toString() : ''),
     )
-  }, [kind, side, past, recommended, hydrated])
+  }, [kind, side, past, recommended, ascending, hydrated])
+  const needle = search.trim().toLowerCase()
+  const matches = (o: Opportunity) =>
+    (past || !isPast(o, now)) &&
+    [o.summary, o.preview_text, o.username, o.place, ...o.topics]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .includes(needle)
   const visible = useMemo(
     () =>
       sortNotices(
         loaded.filter(
           (o) =>
-            (past || !isPast(o, now)) &&
-            (kind === 'all' || o.kind === kind) &&
-            (side === 'all' || o.side === side) &&
-            [o.summary, o.preview_text, o.username, o.place, ...o.topics]
-              .filter(Boolean)
-              .join(' ')
-              .toLowerCase()
-              .includes(search.trim().toLowerCase()),
+            matches(o) &&
+            (!kinds.length || kinds.includes(o.kind)) &&
+            (side === 'all' || o.side === side),
         ),
         recommended,
         me,
         graph,
         now,
+        ascending,
       ),
-    [loaded, kind, side, past, search, recommended, me, graph, now],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loaded, kind, side, past, needle, recommended, ascending, me, graph, now],
   )
   useEffect(() => {
-    setPageSize({})
-  }, [kind, side, search, past, recommended])
-  const shown = initialPage
-    ? visible.length
-    : Object.keys(KIND_LABELS).reduce(
-        (count, id) =>
-          count +
-          Math.min(
-            pageSize[id] || PAGE_SIZE,
-            visible.filter((o) => o.kind === id).length,
-          ),
+    setLimit(BULLETIN_PAGE_SIZE)
+  }, [kind, side, needle, past, recommended, ascending])
+  // Counts under the other dimension's filter: server-provided when paging
+  // server-side, otherwise derived from the notices in hand.
+  const count = (key: string) => {
+    if (initialPage) return pages.page?.counts[key] || 0
+    return loaded.filter(
+      (o) =>
+        matches(o) &&
+        (KINDS.includes(key)
+          ? o.kind === key && (side === 'all' || o.side === side)
+          : o.side === key && (!kinds.length || kinds.includes(o.kind))),
+    ).length
+  }
+  const matching = initialPage
+    ? KINDS.filter((id) => !kinds.length || kinds.includes(id)).reduce(
+        (n, id) => n + count(id),
         0,
       )
-  const count = initialPage
-    ? Object.values(pages.page?.counts || {}).reduce((n, count) => n + count, 0)
     : visible.length
-  const total = pages.page?.total ?? opportunities.length
+  const shown = initialPage ? visible.length : Math.min(limit, visible.length)
+  const cursor = initialPage ? pages.page?.cursors[kind] : null
   const own = loaded.filter((o) => o.account_id === me)
   const answered = loaded.filter(
     (o) => o.account_id !== me && o.reply_account_ids?.includes(me),
   ).length
   return (
     <>
-      <header className={styles.subbar}>
-        <h1 className={styles.title}>Opportunities</h1>
-        <p className={styles.lede}>{count} notices · collected daily</p>
-        <div className={styles.controls}>
-          <div
-            className={styles.segmented}
-            role="group"
-            aria-label="Notice type"
-          >
-            {(['all', 'offer', 'ask'] as const).map((id) => (
+      <header className={styles.head}>
+        <div className={styles.titleRow}>
+          <h1 className={styles.title}>Opportunities</h1>
+          <details className={styles.about}>
+            <summary aria-label="About this board">
+              <PiQuestion size={20} aria-hidden />
+            </summary>
+            <div className={styles.aboutPanel}>
+              <p>
+                <b>What this is.</b> Asks and offers that members posted on X,
+                found by a daily scan of the archive. Every card is a real
+                tweet. Nothing is posted on your behalf.
+              </p>
+              <p>
+                <b>Put something up.</b> Post an original tweet, not a reply or
+                repost, that reads as an ask or an offer. Phrases like
+                &quot;happy to help&quot;, &quot;looking for&quot;, &quot;anyone
+                know&quot; or &quot;DM me&quot; get picked up. Starting with
+                &quot;offer:&quot; or &quot;ask:&quot; is the surest way. It
+                appears after the next daily scan, once your tweet is in the
+                archive and the labeler agrees.
+              </p>
+              <p>
+                <b>How long notices stay.</b> Asks 14 days, offers 60, unless
+                the tweet names a date. Standing offers stay up. Quote your own
+                notice to reset the clock.
+              </p>
+              <p>
+                <b>Relevance.</b> Your notices first, then the 25 people you
+                reply to and quote most, then everyone else. Unanswered asks
+                come before answered ones. Click the active sort to reverse it.
+              </p>
+              <p>
+                <b>The reply count.</b> Public replies and quote posts from
+                archived members, shown with a speech bubble. It does not see
+                replies from people outside the archive, so no count means
+                unknown, not zero. DMs and outcomes are not counted.
+              </p>
+              <p>
+                <b>What gets missed.</b> Replies, reposts, tweets without
+                ask-or-offer phrasing, and anything not yet in the archive. The
+                labeler also makes mistakes. Read the tweet before acting on it.
+                The board keeps the latest 2,000 notices.
+              </p>
+              {me && (
+                <p>
+                  <b>You.</b> You (@{username || me}) have{' '}
+                  {own.filter((o) => o.side === 'offer').length} offers and{' '}
+                  {own.filter((o) => o.side === 'ask').length} asks here, and
+                  the archive shows you replying to {answered} other notices.
+                </p>
+              )}
+            </div>
+          </details>
+        </div>
+        <p className={styles.lede}>
+          What members have offered each other, and asked for.
+        </p>
+      </header>
+      <div className={styles.sticky}>
+        <div className={styles.controlRow}>
+          <div className={styles.chips} role="group" aria-label="Category">
+            {KINDS.map((id) => (
               <button
                 key={id}
                 type="button"
-                aria-pressed={side === id}
-                onClick={() => setSide(id)}
+                aria-pressed={kinds.includes(id)}
+                onClick={() =>
+                  setKinds((value) =>
+                    value.includes(id)
+                      ? value.filter((k) => k !== id)
+                      : [...value, id],
+                  )
+                }
               >
-                {id === 'all' ? 'All' : id === 'offer' ? 'Offers' : 'Asks'}
+                <KindIcon kind={id} />
+                {KIND_LABELS[id]}
+                <span className={styles.count}>{count(id)}</span>
               </button>
             ))}
           </div>
-          <input
-            className={styles.field}
-            type="search"
-            aria-label="Filter notices"
-            placeholder="Filter notices"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <RefreshButton className={styles.refresh} />
+          <div className={styles.searchBox} role="search">
+            <input
+              className={styles.field}
+              type="search"
+              aria-label="Filter notices"
+              placeholder="Filter notices"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <div
+              className={styles.segmented}
+              role="group"
+              aria-label="Notice type"
+            >
+              {(['all', 'offer', 'ask'] as const).map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={side === id}
+                  onClick={() => setSide(id)}
+                >
+                  {id === 'all' ? 'All' : id === 'offer' ? 'Offers' : 'Asks'}
+                  {id !== 'all' && (
+                    <span className={styles.count}>{count(id)}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-        <p className={styles.description}>
-          This page may contain opportunities. We filter tweets for asks and
-          offers. Things like free services, invitations to events, grants,
-          collaborations, requests for feedback or introductions, and more. We
-          show you things that may be relevant to you first.
-        </p>
-      </header>
+        <div className={styles.bar}>
+          <div className={styles.sortLinks} role="group" aria-label="Sort">
+            <PiArrowsDownUp size={14} aria-hidden />
+            {(
+              [
+                ['relevance', 'Relevance', true],
+                ['date', 'Date', false],
+              ] as const
+            ).map(([id, text, rec], i) => {
+              const active = recommended === rec
+              const Arrow = ascending ? PiArrowUp : PiArrowDown
+              return (
+                <span key={id} className={styles.sortOption}>
+                  {i > 0 && <span aria-hidden>·</span>}
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    aria-label={`Sort by ${text.toLowerCase()}${active ? `, ${ascending ? 'ascending' : 'descending'}` : ''}`}
+                    title={active ? 'Reverse order' : undefined}
+                    onClick={() => {
+                      if (active) setAscending((value) => !value)
+                      else {
+                        setRecommended(rec)
+                        setAscending(false)
+                      }
+                    }}
+                  >
+                    {text}
+                    {active && <Arrow size={12} aria-hidden />}
+                  </button>
+                </span>
+              )
+            })}
+          </div>
+          <label className={styles.pastToggle}>
+            <input
+              type="checkbox"
+              aria-label="Show past notices"
+              checked={past}
+              onChange={(e) => setPast(e.target.checked)}
+            />
+            Show past
+          </label>
+          <span role="status" className={styles.barCount}>
+            {shown < matching ? `${shown} of ${matching}` : matching}{' '}
+            {matching === 1 ? 'notice' : 'notices'}
+          </span>
+        </div>
+      </div>
       {pages.pending && (
-        <p role="status" className="px-8 py-4 text-sm text-muted-foreground">
+        <p role="status" className={styles.pending}>
           {pages.error || 'Loading matching notices…'}
           {pages.error && (
-            <button className="ml-2 text-brand" onClick={pages.retry}>
+            <button className={styles.hintButton} onClick={pages.retry}>
               Retry
             </button>
           )}
         </p>
       )}
       <div className={styles.board} aria-busy={pages.pending}>
-        {LANE_GROUPS.filter(
-          (group) => !pages.pending && (kind === 'all' || group.includes(kind)),
-        ).map((group) => (
-          <div className={styles.laneGroup} key={group[0]}>
-            {group
-              .filter((id) => kind === 'all' || kind === id)
-              .map((id) => {
-                const notices = visible.filter((o) => o.kind === id)
-                const limit = initialPage
-                  ? notices.length
-                  : pageSize[id] || PAGE_SIZE
-                return (
-                  <section
-                    key={id}
-                    className={styles.lane}
-                    aria-label={KIND_LABELS[id]}
-                  >
-                    <div className={styles.laneHead}>
-                      <h2>{KIND_LABELS[id]}</h2>
-                      <span className={styles.laneCount}>
-                        {initialPage
-                          ? pages.page?.counts[id] || 0
-                          : notices.length}
-                      </span>
-                    </div>
-                    {notices.slice(0, limit).map((o) => (
-                      <NoticeCard
-                        key={o.tweet_id}
-                        notice={o}
-                        loadTweet={loadTweet}
-                        badge={relationship(o, me, graph).label}
-                        expired={isPast(o, now)}
-                      />
-                    ))}
-                    {(initialPage
-                      ? pages.page?.cursors[id] &&
-                        !pages.loading[id] &&
-                        !pages.laneErrors[id]
-                      : notices.length > limit) && (
-                      <ScrollMore
-                        key={`${kind}:${side}:${search}:${past}:${recommended}`}
-                        label={KIND_LABELS[id]}
-                        count={limit}
-                        onMore={() =>
-                          initialPage
-                            ? void pages.loadMore(id)
-                            : setPageSize((size) => ({
-                                ...size,
-                                [id]: (size[id] || PAGE_SIZE) + PAGE_SIZE,
-                              }))
-                        }
-                      />
-                    )}
-                    {pages.loading[id] && (
-                      <p className={styles.empty}>Loading more…</p>
-                    )}
-                    {pages.laneErrors[id] && (
-                      <p className={styles.empty}>
-                        {pages.laneErrors[id]}{' '}
-                        <button onClick={() => void pages.loadMore(id)}>
-                          Retry
-                        </button>
-                      </p>
-                    )}
-                    {!notices.length && (
-                      <p className={styles.empty}>No matching notices.</p>
-                    )}
-                  </section>
-                )
-              })}
-          </div>
-        ))}
+        {!pages.pending &&
+          visible
+            .slice(0, initialPage ? undefined : limit)
+            .map((o) => (
+              <NoticeCard
+                key={o.tweet_id}
+                notice={o}
+                loadTweet={loadTweet}
+                badge={relationship(o, me, graph).label}
+                follow={
+                  o.account_id === me ? '' : followLabel(o.account_id, graph)
+                }
+                replied={
+                  !!me &&
+                  o.account_id !== me &&
+                  !!o.reply_account_ids?.includes(me)
+                }
+                now={now}
+                onKind={(id) =>
+                  setKinds((value) =>
+                    value.length === 1 && value[0] === id ? [] : [id],
+                  )
+                }
+              />
+            ))}
+        {!pages.pending && !visible.length && (
+          <p className={styles.empty}>No matching notices.</p>
+        )}
       </div>
-      <footer className={styles.footer}>
-        <p role="status">
-          {count} of {total} notices
-          {shown < count ? ` · ${shown} shown` : ''}
-          {total === 2000 ? ' · Latest 2,000 only' : ''}
+      {!pages.pending &&
+        (initialPage
+          ? cursor && !pages.loading[kind] && !pages.laneErrors[kind]
+          : visible.length > limit) && (
+          <ScrollMore
+            key={`${kind}:${side}:${needle}:${past}:${recommended}`}
+            count={shown}
+            onMore={() =>
+              initialPage
+                ? void pages.loadMore(kind)
+                : setLimit((n) => n + BULLETIN_PAGE_SIZE)
+            }
+          />
+        )}
+      {pages.loading[kind] && <p className={styles.empty}>Loading more…</p>}
+      {pages.laneErrors[kind] && (
+        <p className={styles.empty}>
+          {pages.laneErrors[kind]}{' '}
+          <button onClick={() => void pages.loadMore(kind)}>Retry</button>
         </p>
+      )}
+      <footer className={styles.footer}>
         <p>
           Thanks to <Link href="/user/maskys_">@maskys_</Link> for the first
           prototype.
         </p>
         {isAdmin && <Link href="/admin/opportunities">Run dashboard →</Link>}
-        <details className={styles.options}>
-          <summary>Options & about this board</summary>
-          <div className={styles.optionFields}>
-            <label>
-              Sort{' '}
-              <select
-                value={recommended ? 'recommended' : 'newest'}
-                onChange={(e) =>
-                  setRecommended(e.target.value === 'recommended')
-                }
-              >
-                <option value="recommended">Recommended</option>
-                <option value="newest">Newest</option>
-              </select>
-            </label>
-            <label>
-              Category{' '}
-              <select value={kind} onChange={(e) => setKind(e.target.value)}>
-                <option value="all">All categories</option>
-                {Object.entries(KIND_LABELS).map(([id, label]) => (
-                  <option key={id} value={id}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={past}
-                onChange={(e) => setPast(e.target.checked)}
-              />
-              Show past notices
-            </label>
-          </div>
-          <p className={styles.method}>
-            {recommended
-              ? graph.available
-                ? 'Recommended puts your notices and people you interact with most first within each category, using your top 25 all-time outgoing interactions. Missing people are not necessarily strangers.'
-                : 'Top outgoing interactions are unavailable. Showing your notices first within each category, then newest.'
-              : 'Newest notices first within each category.'}{' '}
-            Past notices appear last.
-          </p>
-          {me && (
-            <p className={styles.method}>
-              @{username || me} · {own.filter((o) => o.side === 'offer').length}{' '}
-              offers · {own.filter((o) => o.side === 'ask').length} asks ·{' '}
-              {own.reduce((n, o) => n + (o.replies || 0) + (o.quotes || 0), 0)}{' '}
-              public responses · Replied to {answered} other notices. Public
-              archive activity within the loaded notices only.
-            </p>
-          )}
-          <p className={styles.method}>
-            After the daily archive refresh, phrase filters and AI find asks and
-            offers in recent original ClickHouse posts from participating
-            accounts. This is a selection, not a complete directory: replies,
-            reposts, late arrivals and notices without matching phrases may be
-            missed. Read the original before responding. Counts may adjust as
-            more posts are checked.
-          </p>
-          <p className={styles.method}>
-            The daily scan covers the previous two UTC days. Undated asks expire
-            after 14 days and offers after 60 days; standing offers stay open.
-            Post an “offer:”, “ask:”, or “standing offer:” on X with what you
-            need or offer and how to respond. Quote your own notice to renew an
-            undated notice when it reaches the archive.
-          </p>
-        </details>
       </footer>
     </>
   )

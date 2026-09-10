@@ -272,6 +272,8 @@ export interface TweetCardProps {
   /** Hide unknown engagement counts while a partial tweet is being hydrated. */
   showEngagement?: boolean
   quotedTweetDisplay?: 'full' | 'summary'
+  /** Avatar and byline on one row, text full width beneath. */
+  stacked?: boolean
   origin?: TweetOrigin
   returnTo?: string
 }
@@ -320,6 +322,7 @@ export function TweetRow({
   constrainMedia = false,
   featuredRank,
   showDate = false,
+  stacked = false,
   showArchivedBadge = false,
   clickable,
   showExternalLink = false,
@@ -434,38 +437,57 @@ export function TweetRow({
     </button>
   ) : null
 
-  const details = (
-    <div className={`min-w-0 flex-1 ${isPreview ? 'flex flex-col' : ''}`}>
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <Link
-          href={profileHref}
-          className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-        >
-          <span
-            className={`block max-w-full truncate font-bold ${
-              isEditorial
-                ? 'text-[14px]'
-                : compact
-                  ? 'text-[13px]'
-                  : 'text-[13.5px]'
-            }`}
-          >
-            {tweet.name}
-          </span>{' '}
-          <span className="block max-w-full truncate text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
-            @{tweet.username}
-          </span>
-        </Link>
-        <span
-          suppressHydrationWarning
-          className="flex-shrink-0 text-[12px] text-zinc-500 dark:text-[#a7a7b4]"
-        >
-          ·{' '}
+  const byline = stacked ? (
+    <div className="min-w-0 leading-tight">
+      <Link
+        href={profileHref}
+        className="block max-w-full truncate rounded-sm text-[13.5px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      >
+        {tweet.name}
+      </Link>
+      <div className="truncate text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
+        @{tweet.username}
+        <span suppressHydrationWarning>
+          {' · '}
           {showDate
             ? shortDate(tweet.createdAt)
             : relativeTime(tweet.createdAt)}
         </span>
       </div>
+    </div>
+  ) : (
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      <Link
+        href={profileHref}
+        className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      >
+        <span
+          className={`block max-w-full truncate font-bold ${
+            isEditorial
+              ? 'text-[14px]'
+              : compact
+                ? 'text-[13px]'
+                : 'text-[13.5px]'
+          }`}
+        >
+          {tweet.name}
+        </span>{' '}
+        <span className="block max-w-full truncate text-[12px] text-zinc-500 dark:text-[#a7a7b4]">
+          @{tweet.username}
+        </span>
+      </Link>
+      <span
+        suppressHydrationWarning
+        className="flex-shrink-0 text-[12px] text-zinc-500 dark:text-[#a7a7b4]"
+      >
+        ·{' '}
+        {showDate ? shortDate(tweet.createdAt) : relativeTime(tweet.createdAt)}
+      </span>
+    </div>
+  )
+  const details = (
+    <div className={`min-w-0 flex-1 ${isPreview ? 'flex flex-col' : ''}`}>
+      {stacked ? null : byline}
       {tweet.communityAuthored ? (
         <div className="mt-1">
           <span className="inline-flex rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">
@@ -564,7 +586,7 @@ export function TweetRow({
   return (
     <article
       style={previewCollapsed ? { height: previewHeight } : undefined}
-      className={`${rowClassName} ${
+      className={`${rowClassName} ${stacked ? 'flex-col' : ''} ${
         isClickable
           ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2'
           : ''
@@ -575,12 +597,27 @@ export function TweetRow({
       tabIndex={isClickable ? 0 : undefined}
       aria-label={isClickable ? `View tweet by @${tweet.username}` : undefined}
     >
-      <Link href={profileHref} aria-label={`View @${tweet.username}'s profile`}>
-        <TweetAvatar
-          tweet={tweet}
-          size={isEditorial ? 44 : isFeatured ? 38 : 34}
-        />
-      </Link>
+      {stacked ? (
+        <div className="flex items-center gap-2">
+          <Link
+            href={profileHref}
+            aria-label={`View @${tweet.username}'s profile`}
+          >
+            <TweetAvatar tweet={tweet} size={28} />
+          </Link>
+          {byline}
+        </div>
+      ) : (
+        <Link
+          href={profileHref}
+          aria-label={`View @${tweet.username}'s profile`}
+        >
+          <TweetAvatar
+            tweet={tweet}
+            size={isEditorial ? 44 : isFeatured ? 38 : 34}
+          />
+        </Link>
+      )}
       {details}
       {compact && showEngagement && (
         <div className="whitespace-nowrap text-[11.5px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">

@@ -1,9 +1,6 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { OpportunityBoard } from './OpportunityBoard'
 import type { Opportunity } from '@/lib/bulletin/types'
-jest.mock('./RefreshButton', () => ({
-  RefreshButton: () => <button>Refresh</button>,
-}))
 jest.mock('./OpportunityBoard.module.css', () => ({}))
 const offer = {
   tweet_id: '1',
@@ -25,10 +22,14 @@ const offer = {
 const ask = {
   ...offer,
   tweet_id: '2',
+  account_id: 'b',
+  username: 'bob',
   side: 'ask',
   kind: 'feedback',
   summary: 'Feedback on a garden',
   topics: ['gardening'],
+  replies: 0,
+  quotes: 0,
 }
 jest.mock('@/components/TweetCard', () => ({
   TweetCard: ({ tweet }: { tweet: { text?: string } }) => (
@@ -42,6 +43,8 @@ jest.mock('@/components/TweetAvatar', () => ({
 }))
 let intersections: IntersectionObserverCallback[]
 let observed: Map<IntersectionObserverCallback, Element>
+const category = () => screen.getByRole('group', { name: 'Category' })
+const chip = (name: RegExp) => within(category()).getByRole('button', { name })
 beforeEach(() => {
   jest.useFakeTimers()
   window.history.replaceState(null, '', '/opportunities')
@@ -75,7 +78,7 @@ test('loads full details only on inline expansion', async () => {
   expect(fetch).not.toHaveBeenCalled()
   await act(async () => {
     fireEvent.click(
-      screen.getAllByRole('button', { name: 'Read full tweet by @alice' })[0],
+      screen.getByRole('button', { name: 'Read full tweet by @alice' }),
     )
   })
   await act(async () => {
@@ -86,35 +89,62 @@ test('loads full details only on inline expansion', async () => {
     '/api/bulletin/tweets?ids=1',
     expect.objectContaining({ cache: 'no-store' }),
   )
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-
   expect(screen.getByText('Original card')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'DM on X' })).toHaveAttribute(
+    'href',
+    'https://twitter.com/messages/compose?recipient_id=a',
+  )
+  expect(screen.queryByText('Help with Python')).not.toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: '@alice' })).not.toBeInTheDocument()
   fireEvent.click(
     screen.getByRole('button', { name: 'Collapse tweet by @alice' }),
   )
   expect(screen.queryByText('Original card')).not.toBeInTheDocument()
-  expect(screen.queryByText(/Until|On X since/)).not.toBeInTheDocument()
+  expect(screen.getByText('Help with Python')).toBeInTheDocument()
 })
-test('shows category lanes and combines side, category and search filters', () => {
+test('shows one stream with combined labels, and combines side, category and search filters', () => {
   render(
     <OpportunityBoard
       opportunities={[offer, ask]}
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
-  expect(screen.getByRole('region', { name: 'Help' })).toBeInTheDocument()
-  expect(screen.getByRole('region', { name: 'Feedback' })).toBeInTheDocument()
-  fireEvent.change(screen.getByLabelText('Category'), {
-    target: { value: 'help' },
-  })
+  expect(screen.queryByRole('region')).not.toBeInTheDocument()
+  const cards = screen.getAllByRole('article')
+  expect(cards).toHaveLength(2)
+  expect(within(cards[0]).getByText('Feedback wanted')).toBeInTheDocument()
+  expect(within(cards[1]).getByText('Help')).toBeInTheDocument()
+  expect(
+    screen.queryByLabelText(/replies from archived members/),
+  ).not.toBeInTheDocument()
+  for (const card of cards)
+    expect(card).not.toHaveTextContent(/until|standing|answered|taken up/)
+  fireEvent.click(chip(/^Help/))
   expect(screen.queryByText('Feedback on a garden')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Asks' }))
+  expect(window.location.hash).toContain('kind=help')
+  fireEvent.click(screen.getByRole('button', { name: /^Asks/ }))
   expect(screen.queryByText('Help with Python')).not.toBeInTheDocument()
   expect(window.location.hash).toContain('side=ask')
+  fireEvent.click(chip(/^Help/))
+  expect(window.location.hash).not.toContain('kind=')
+  expect(screen.getByText('Feedback on a garden')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /^All/ }))
+  fireEvent.click(chip(/^Help/))
+  fireEvent.click(chip(/^Feedback/))
+  expect(window.location.hash).toContain('kind=feedback%2Chelp')
+  expect(screen.getAllByRole('article')).toHaveLength(2)
+  fireEvent.click(chip(/^Help/))
+  expect(window.location.hash).toContain('kind=feedback')
+  expect(screen.getAllByRole('article')).toHaveLength(1)
+  fireEvent.click(chip(/^Feedback/))
   fireEvent.change(screen.getByLabelText('Filter notices'), {
     target: { value: 'gardening' },
   })
-  expect(screen.getByRole('status')).toHaveTextContent('0 of 2 notices')
+  expect(screen.getByRole('status')).toHaveTextContent('1 notice')
+  fireEvent.change(screen.getByLabelText('Filter notices'), {
+    target: { value: 'nothing here' },
+  })
+  expect(screen.getByRole('status')).toHaveTextContent('0 notices')
 })
 test('past toggle includes expired notices and preserves filters in the URL', () => {
   render(
@@ -123,13 +153,45 @@ test('past toggle includes expired notices and preserves filters in the URL', ()
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
-  expect(screen.getByRole('status')).toHaveTextContent('0 of 1 notices')
+  expect(screen.getByRole('status')).toHaveTextContent('0 notices')
   fireEvent.click(screen.getByLabelText('Show past notices'))
-  expect(screen.getByRole('status')).toHaveTextContent('1 of 1 notices')
+  expect(screen.getByRole('status')).toHaveTextContent('1 notice')
   expect(window.location.hash).toContain('past=1')
   expect(screen.getByText('Help with Python')).toBeInTheDocument()
+  expect(screen.getByText('ended Sep 1')).toBeInTheDocument()
 })
-
+test('shows the ledger and relationship words only from own account and outgoing counts', () => {
+  render(
+    <OpportunityBoard
+      opportunities={[
+        offer,
+        { ...ask, replies: 2, quotes: 1, reply_account_ids: ['a'] },
+      ]}
+      me="a"
+      username="alice"
+      graph={{
+        outgoing: { b: 4 },
+        available: true,
+        following: ['b'],
+        followers: ['a', 'b'],
+      }}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  const cards = screen.getAllByRole('article')
+  expect(cards[1]).toHaveTextContent('mutual')
+  expect(cards[1]).toHaveTextContent('you replied')
+  expect(cards[0]).not.toHaveTextContent('you replied')
+  expect(
+    screen.getByLabelText('3 replies from archived members'),
+  ).toBeInTheDocument()
+  expect(cards[0]).not.toHaveTextContent(/mutual|following|follows you/)
+  expect(cards[0]).not.toHaveTextContent('· you')
+  expect(cards[1]).not.toHaveTextContent('near you')
+  expect(
+    screen.getByText(/You \(@alice\) have 1 offers and 0 asks/),
+  ).toHaveTextContent('replying to 1 other notices')
+})
 test('coalesces expanded cards and reuses their details after filtering', async () => {
   render(
     <OpportunityBoard
@@ -138,29 +200,23 @@ test('coalesces expanded cards and reuses their details after filtering', async 
     />,
   )
   await act(async () => {
-    for (const button of screen.getAllByRole('button', {
-      name: 'Read full tweet by @alice',
-    }))
-      fireEvent.click(button)
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Read full tweet by @alice' }),
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Read full tweet by @bob' }),
+    )
   })
   await act(async () => {
     jest.advanceTimersByTime(25)
   })
   expect(fetch).toHaveBeenCalledTimes(1)
-  expect(fetch).toHaveBeenCalledWith(
-    '/api/bulletin/tweets?ids=1,2',
-    expect.any(Object),
-  )
-  expect(screen.getAllByLabelText('0 likes')).toHaveLength(2)
-  fireEvent.change(screen.getByLabelText('Category'), {
-    target: { value: 'help' },
-  })
-  fireEvent.change(screen.getByLabelText('Category'), {
-    target: { value: 'all' },
-  })
+  expect(String(jest.mocked(fetch).mock.calls[0][0])).toMatch(/ids=(1,2|2,1)$/)
+  fireEvent.click(chip(/^Help/))
+  fireEvent.click(chip(/^Help/))
   await act(async () => {
     for (const button of screen.queryAllByRole('button', {
-      name: 'Read full tweet by @alice',
+      name: /Read full tweet by/,
     }))
       fireEvent.click(button)
   })
@@ -171,7 +227,7 @@ test('coalesces expanded cards and reuses their details after filtering', async 
 })
 
 test('automatically pages once per sentinel and preserves global search and counts', () => {
-  const notices = Array.from({ length: 14 }, (_, i) => ({
+  const notices = Array.from({ length: 40 }, (_, i) => ({
     ...offer,
     tweet_id: String(i + 1),
     summary: `Offer number ${i + 1}`,
@@ -182,12 +238,12 @@ test('automatically pages once per sentinel and preserves global search and coun
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
-  expect(screen.getByRole('status')).toHaveTextContent('14 of 14 notices')
-  expect(screen.getAllByRole('article')).toHaveLength(4)
+  expect(screen.getByRole('status')).toHaveTextContent('18 of 40 notices')
+  expect(screen.getAllByRole('article')).toHaveLength(18)
   expect(
-    screen.queryByRole('button', { name: 'Load more Help' }),
+    screen.queryByRole('button', { name: 'Show more' }),
   ).not.toBeInTheDocument()
-  const sentinel = screen.getByLabelText('Load more Help')
+  const sentinel = screen.getByLabelText('Load more notices')
   const nextPage = intersections.find(
     (callback) => observed.get(callback) === sentinel,
   )!
@@ -201,17 +257,16 @@ test('automatically pages once per sentinel and preserves global search and coun
       {} as IntersectionObserver,
     )
   })
-  expect(screen.getAllByRole('article')).toHaveLength(8)
+  expect(screen.getAllByRole('article')).toHaveLength(36)
   fireEvent.change(screen.getByLabelText('Filter notices'), {
-    target: { value: 'Offer number 14' },
+    target: { value: 'Offer number 40' },
   })
-  expect(screen.getByText('Offer number 14')).toBeInTheDocument()
-  expect(
-    screen.queryByRole('button', { name: 'Load more Help' }),
-  ).not.toBeInTheDocument()
+  expect(screen.getByText('Offer number 40')).toBeInTheDocument()
+  expect(screen.queryByLabelText('Load more notices')).not.toBeInTheDocument()
 })
 
-test('shows verified tweet text immediately before requesting richer cards', () => {
+test('expands to verified text before richer details arrive', async () => {
+  jest.mocked(fetch).mockImplementation(() => new Promise(() => {}))
   render(
     <OpportunityBoard
       opportunities={[
@@ -221,21 +276,33 @@ test('shows verified tweet text immediately before requesting richer cards', () 
     />,
   )
   expect(
+    screen.queryByText('Verified complete original text'),
+  ).not.toBeInTheDocument()
+  await act(async () => {
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Read full tweet by @alice' }),
+    )
+  })
+  expect(
     screen.getByText('Verified complete original text'),
   ).toBeInTheDocument()
-  expect(fetch).not.toHaveBeenCalled()
-  expect(
-    screen.queryByLabelText('Loading original tweet'),
-  ).not.toBeInTheDocument()
+  expect(screen.getByText('Loading post details…')).toBeInTheDocument()
 })
 
 const page = (notices: Opportunity[], cursor: string | null = null) => ({
   opportunities: notices,
-  counts: { help: 8 },
-  cursors: { help: cursor },
+  counts: { help: 8, offer: 8, ask: 0 },
+  cursors: { all: cursor },
   total: 8,
   now: Date.parse('2026-09-09T00:00:00Z'),
-  personal: { account_id: '', username: '', outgoing: {}, available: false },
+  personal: {
+    account_id: '',
+    username: '',
+    outgoing: {},
+    available: false,
+    following: [],
+    followers: [],
+  },
 })
 test('requests and appends a server page on scroll without fetching tweet details', async () => {
   const initial = page([offer], '1')
@@ -251,7 +318,9 @@ test('requests and appends a server page on scroll without fetching tweet detail
     />,
   )
   expect(fetch).not.toHaveBeenCalled()
-  const sentinel = screen.getByLabelText('Load more Help')
+  expect(chip(/^Help/)).toHaveTextContent('8')
+  expect(screen.getByRole('button', { name: /^Offers/ })).toHaveTextContent('8')
+  const sentinel = screen.getByLabelText('Load more notices')
   const callback = intersections.find((cb) => observed.get(cb) === sentinel)!
   await act(async () => {
     callback(
@@ -260,11 +329,11 @@ test('requests and appends a server page on scroll without fetching tweet detail
     )
   })
   expect(fetch).toHaveBeenCalledTimes(1)
-  expect(String(jest.mocked(fetch).mock.calls[0][0])).toContain('kind=help')
+  expect(String(jest.mocked(fetch).mock.calls[0][0])).toContain('kind=all')
   expect(String(jest.mocked(fetch).mock.calls[0][0])).toContain('after=1')
   expect(screen.getByText('Help with Python')).toBeInTheDocument()
   expect(screen.getByText('Another offer')).toBeInTheDocument()
-  expect(screen.queryByLabelText('Load more Help')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Load more notices')).not.toBeInTheDocument()
 })
 test('searches the server for unloaded matches and ignores stale filter responses', async () => {
   const initial = page([offer])
@@ -304,4 +373,67 @@ test('searches the server for unloaded matches and ignores stale filter response
   })
   expect(screen.getByText('Unloaded match')).toBeInTheDocument()
   expect(screen.queryByText('Help with Python')).not.toBeInTheDocument()
+})
+test('clicking a kind on a card filters to that kind and clicking again clears it', () => {
+  render(
+    <OpportunityBoard
+      opportunities={[offer, ask]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  fireEvent.click(
+    screen.getAllByRole('button', { name: 'Filter by Feedback' })[0],
+  )
+  expect(window.location.hash).toContain('kind=feedback')
+  expect(screen.getAllByRole('article')).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: 'Filter by Feedback' }))
+  expect(window.location.hash).not.toContain('kind=')
+  expect(screen.getAllByRole('article')).toHaveLength(2)
+})
+test('clicking anywhere on a closed card expands it, except links and buttons', async () => {
+  render(
+    <OpportunityBoard
+      opportunities={[offer]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  fireEvent.click(screen.getByRole('link', { name: '@alice' }))
+  expect(screen.queryByText('Original card')).not.toBeInTheDocument()
+  await act(async () => {
+    fireEvent.click(screen.getByRole('article'))
+  })
+  expect(screen.getByText('Original card')).toBeInTheDocument()
+})
+test('renders member replies beneath the expanded tweet', async () => {
+  jest.mocked(fetch).mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      tweets: [
+        {
+          id: '1',
+          likes: 0,
+          text: 'Original text',
+          replies: [
+            { id: '9', username: 'ray', name: 'Ray', text: 'A helpful reply' },
+          ],
+        },
+      ],
+    }),
+  } as Response)
+  render(
+    <OpportunityBoard
+      opportunities={[offer]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  await act(async () => {
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Read full tweet by @alice' }),
+    )
+  })
+  await act(async () => {
+    jest.advanceTimersByTime(25)
+  })
+  expect(screen.getByText('1 reply from members')).toBeInTheDocument()
+  expect(screen.getByText('A helpful reply')).toBeInTheDocument()
 })

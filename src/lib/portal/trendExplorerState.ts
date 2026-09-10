@@ -44,10 +44,10 @@ export function defaultTrendExplorerState(
   const terms = uniqueTerms(defaultTerms)
   return {
     terms,
-    shown: terms.slice(0, 4),
+    shown: terms.slice(0, 6),
     included: terms.slice(0, 1),
     scale: 'normalized',
-    granularity: 'year',
+    granularity: 'month',
     range: null,
   }
 }
@@ -63,7 +63,7 @@ export function parseTrendExplorerState(
   const shownParams = params.getAll('show')
   const includedParams = params.getAll('include')
   const granularity: TrendGranularity =
-    params.get('granularity') === 'month' ? 'month' : 'year'
+    params.get('granularity') === 'year' ? 'year' : 'month'
   const from = params.get('from')
   const to = params.get('to')
   const validRange =
@@ -78,7 +78,7 @@ export function parseTrendExplorerState(
     shown:
       shownParams.length > 0
         ? selectedTerms(shownParams, resolvedTerms)
-        : resolvedTerms.slice(0, 4),
+        : resolvedTerms.slice(0, 6),
     included:
       includedParams.length > 0
         ? selectedTerms(includedParams, resolvedTerms)

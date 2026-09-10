@@ -20,6 +20,7 @@ import {
   getInitialPortalBangersPage,
   getPortalBangersPage,
   getPortalData,
+  getPortalTrendSnapshot,
   startHomepageData,
   getPortalStreamPage,
   getPortalStreamUpdates,
@@ -989,4 +990,13 @@ describe('daily banger selection', () => {
     expect((await loadRecentBangerSelection(now))[0].id).toBe('today')
     expect(fetchPortalRecentBangers).toHaveBeenCalledTimes(1)
   })
+})
+
+test('live keyword seeds avoid the old corpus-wide default chart queries', async () => {
+  jest.mocked(fetchPortalWeeklyTrends).mockResolvedValue([])
+  jest.mocked(fetchPortalTrends).mockClear()
+  const data = await getPortalTrendSnapshot()
+  expect(data.series).toEqual([])
+  expect(fetchPortalWeeklyTrends).toHaveBeenCalled()
+  expect(fetchPortalTrends).not.toHaveBeenCalled()
 })

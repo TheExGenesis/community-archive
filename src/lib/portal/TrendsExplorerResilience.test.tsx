@@ -91,6 +91,7 @@ describe('TrendsExplorer request isolation', () => {
     render(
       <TrendsExplorer
         initialTrends={emptyPortalTrends(new Date('2026-08-07T12:00:00.000Z'))}
+        initialSearch="granularity=year"
         initialLoadFailed
       />,
     )
@@ -111,7 +112,12 @@ describe('TrendsExplorer request isolation', () => {
       json: async () => ({ error: 'Matching tweets are unavailable' }),
     } as Response)
 
-    render(<TrendsExplorer initialTrends={successfulTrends} />)
+    render(
+      <TrendsExplorer
+        initialSearch="granularity=year"
+        initialTrends={successfulTrends}
+      />,
+    )
 
     expect(
       await screen.findByText('Matching tweets are unavailable'),
@@ -138,6 +144,16 @@ describe('TrendsExplorer request isolation', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
+          weekly: CHART_TERMS.map((row) => ({
+            ...row,
+            lane: 'emerging',
+            deltaPct: null,
+          })),
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
           granularity: 'year',
           buckets: years.map(String),
           series: series.map((item) => ({
@@ -157,6 +173,7 @@ describe('TrendsExplorer request isolation', () => {
     render(
       <TrendsExplorer
         initialTrends={emptyPortalTrends(new Date('2026-08-07T12:00:00.000Z'))}
+        initialSearch="granularity=year"
         initialLoadFailed
       />,
     )
@@ -169,7 +186,7 @@ describe('TrendsExplorer request isolation', () => {
       ).not.toBeInTheDocument(),
     )
     expect(screen.getByText('7/12 trends')).toBeVisible()
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
   test('removes terms and uses a binary include filter', async () => {
@@ -179,7 +196,12 @@ describe('TrendsExplorer request isolation', () => {
       json: async () => ({ tweets: [] }),
     } as Response)
 
-    render(<TrendsExplorer initialTrends={successfulTrends} />)
+    render(
+      <TrendsExplorer
+        initialSearch="granularity=year"
+        initialTrends={successfulTrends}
+      />,
+    )
 
     const included = await screen.findByRole('button', {
       name: 'tpot is included. Click to turn it off.',
@@ -245,7 +267,12 @@ describe('TrendsExplorer request isolation', () => {
       } as Response
     })
 
-    render(<TrendsExplorer initialTrends={defaultTrends} />)
+    render(
+      <TrendsExplorer
+        initialSearch="granularity=year"
+        initialTrends={defaultTrends}
+      />,
+    )
     const input = screen.getByLabelText('Words or phrases to chart')
 
     await user.type(input, 'custom idea')
@@ -280,7 +307,12 @@ describe('TrendsExplorer request isolation', () => {
       json: async () => ({ tweets: [] }),
     } as Response)
 
-    render(<TrendsExplorer initialTrends={twoTrends} />)
+    render(
+      <TrendsExplorer
+        initialSearch="granularity=year"
+        initialTrends={twoTrends}
+      />,
+    )
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     expect(String(fetchMock.mock.calls[0][0])).toContain('include=tpot')
@@ -312,7 +344,12 @@ describe('TrendsExplorer request isolation', () => {
         json: async () => ({ tweets: [feedTweet('range', 2025)] }),
       } as Response)
 
-    render(<TrendsExplorer initialTrends={successfulTrends} />)
+    render(
+      <TrendsExplorer
+        initialSearch="granularity=year"
+        initialTrends={successfulTrends}
+      />,
+    )
 
     expect(await screen.findByText('tweet-2025-old')).toBeVisible()
     expect(screen.getByText('tweet-2026-new')).toBeVisible()
@@ -347,7 +384,12 @@ describe('TrendsExplorer request isolation', () => {
       json: async () => ({ tweets }),
     } as Response)
 
-    render(<TrendsExplorer initialTrends={successfulTrends} />)
+    render(
+      <TrendsExplorer
+        initialSearch="granularity=year"
+        initialTrends={successfulTrends}
+      />,
+    )
 
     expect(await screen.findByText('tweet-2026-0')).toBeVisible()
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -379,7 +421,12 @@ describe('TrendsExplorer request isolation', () => {
         }),
       } as Response)
 
-    render(<TrendsExplorer initialTrends={successfulTrends} />)
+    render(
+      <TrendsExplorer
+        initialSearch="granularity=year"
+        initialTrends={successfulTrends}
+      />,
+    )
 
     expect(await screen.findByText('tweet-2026-0')).toBeVisible()
     const sidebar = screen.getByLabelText('Matching tweets')
@@ -415,7 +462,12 @@ describe('TrendsExplorer request isolation', () => {
         } as Response
       })
 
-    render(<TrendsExplorer initialTrends={successfulTrends} />)
+    render(
+      <TrendsExplorer
+        initialSearch="granularity=year"
+        initialTrends={successfulTrends}
+      />,
+    )
 
     expect(await screen.findByText('tweet-2026-latest')).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Oldest first' }))
@@ -434,7 +486,12 @@ describe('TrendsExplorer request isolation', () => {
       json: async () => ({ tweets: [] }),
     } as Response)
 
-    render(<TrendsExplorer initialTrends={successfulTrends} />)
+    render(
+      <TrendsExplorer
+        initialSearch="granularity=year"
+        initialTrends={successfulTrends}
+      />,
+    )
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
 
     const chart = screen.getByRole('img', {
@@ -489,7 +546,12 @@ describe('TrendsExplorer request isolation', () => {
       json: async () => ({ tweets: [] }),
     } as Response)
 
-    render(<TrendsExplorer initialTrends={successfulTrends} />)
+    render(
+      <TrendsExplorer
+        initialSearch="granularity=year"
+        initialTrends={successfulTrends}
+      />,
+    )
     await user.selectOptions(screen.getByLabelText('Tweets from year'), '2025')
 
     const chart = screen.getByRole('img', {
@@ -573,4 +635,85 @@ describe('TrendsExplorer request isolation', () => {
       ),
     ).toBe(true)
   })
+})
+
+test('charts the six live keyword defaults monthly and shows their categories', async () => {
+  const terms = [
+    'astra',
+    'navier stokes',
+    'nathan fielder',
+    'ai risk',
+    'monitorability',
+    'blender',
+  ]
+  const weekly = terms.map((term, index) => ({
+    term,
+    lane: (index < 2 ? 'emerging' : index < 4 ? 'rising' : 'falling') as
+      | 'emerging'
+      | 'rising'
+      | 'falling',
+    last7: 40,
+    prev7: 20,
+    deltaPct: 100,
+    status: 'comparable' as const,
+    sinceDate: '2026-09-03',
+    untilDate: '2026-09-09',
+  }))
+  const calls: URL[] = []
+  jest.spyOn(global, 'fetch').mockImplementation(async (input) => {
+    const url = new URL(String(input), 'https://example.test')
+    calls.push(url)
+    return {
+      ok: true,
+      json: async () =>
+        url.searchParams.get('view') === 'series'
+          ? {
+              granularity: 'month',
+              buckets: ['2026-08', '2026-09'],
+              series: terms.map((term) => ({
+                term,
+                color: '#3b82f6',
+                tweetsPerBucket: [1, 2],
+                perBucket: [10, 20],
+              })),
+            }
+          : { tweets: [] },
+    } as Response
+  })
+  render(
+    <TrendsExplorer
+      initialTrends={{ ...emptyPortalTrends(new Date('2026-09-10')), weekly }}
+    />,
+  )
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: 'Remove astra trend' }),
+    ).toBeVisible(),
+  )
+  expect(screen.getByRole('button', { name: 'Months' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  expect(
+    screen.getByRole('region', { name: 'Live trending words' }),
+  ).toHaveTextContent('Cooling off')
+  expect(screen.getByText('6/12 trends')).toBeVisible()
+  expect(
+    calls
+      .find((url) => url.searchParams.get('view') === 'series')
+      ?.searchParams.getAll('q'),
+  ).toEqual(terms)
+  expect(
+    calls
+      .find((url) => url.searchParams.get('view') === 'series')
+      ?.searchParams.get('granularity'),
+  ).toBe('month')
+  expect(screen.getByRole('link', { name: /navier stokes/ })).toHaveAttribute(
+    'href',
+    '/trends?q=navier+stokes&granularity=month',
+  )
+  await act(async () => {
+    await Promise.resolve()
+  })
+  jest.restoreAllMocks()
 })

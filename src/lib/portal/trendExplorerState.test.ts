@@ -38,7 +38,7 @@ describe('trend explorer URL state', () => {
       shown: defaults,
       included: ['tpot'],
       scale: 'normalized',
-      granularity: 'year',
+      granularity: 'month',
       range: null,
     })
   })
@@ -52,4 +52,13 @@ describe('trend explorer URL state', () => {
       ]),
     ).toEqual({ start: '2019-01', end: '2019-03' })
   })
+})
+
+test('starts with monthly live defaults and honors explicit shared yearly charts', () => {
+  expect(
+    parseTrendExplorerState('', ['astra', 'navier stokes']).granularity,
+  ).toBe('month')
+  expect(
+    parseTrendExplorerState('q=blender&granularity=year', ['astra']),
+  ).toMatchObject({ terms: ['blender'], granularity: 'year' })
 })

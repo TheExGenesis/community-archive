@@ -1,4 +1,5 @@
 import 'server-only'
+import { emptyPortalTrends } from './trendConfig'
 import { measureServerRead } from '@/lib/performance/server'
 import { unstable_cache } from 'next/cache'
 import {
@@ -780,15 +781,6 @@ async function fetchPortalJoinedThisWeek(): Promise<number> {
 
 // Arguments participate in the cache key, keeping staging/prod sources and
 // deployment environments isolated even when the Data Cache survives deploys.
-const getCachedExplorerTrends = unstable_cache(
-  async (_sourceKey: string) =>
-    fetchPortalTrends(new Date(), undefined, true, false),
-  ['portal-explorer-trends-v1'],
-  // Preserve the historical seed's daily refresh; query pruning must not
-  // increase how often corpus-wide analytical queries run.
-  { revalidate: 86_400 },
-)
-
 const getCachedTrendsSnapshot = unstable_cache(
   async (_sourceKey: string) => fetchPortalTrends(),
   ['portal-trends-snapshot-v1'],
@@ -1007,9 +999,9 @@ export async function getInitialPortalBangersPage(
   )
 }
 
-/** Cached corpus-wide seed series for the authenticated trends explorer. */
+/** Discover current terms first; the browser requests only its selected chart resolution. */
 export async function getPortalTrendSnapshot(): Promise<PortalTrends> {
-  return getCachedExplorerTrends(portalDataSourceKey())
+  return { ...emptyPortalTrends(), weekly: await fetchPortalWeeklyTrends() }
 }
 
 export async function getPortalData(

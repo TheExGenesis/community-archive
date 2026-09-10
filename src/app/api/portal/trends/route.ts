@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   fetchPortalTrendEvidence,
   fetchPortalTrendSeries,
+  fetchPortalWeeklyTrends,
   portalTrendTokens,
 } from '@/lib/portal/analytics'
 import { getIsMember } from '@/lib/portal/auth'
@@ -70,10 +71,13 @@ export async function GET(request: NextRequest) {
     const params = new URL(request.url).searchParams
     const view = params.get('view')
 
+    if (view === 'defaults')
+      return privateJson({ weekly: await fetchPortalWeeklyTrends() })
+
     if (view === 'series') {
       const terms = normalizedTerms(params.getAll('q'))
       if (terms.length === 0) throw new Error('Enter at least one term')
-      const requestedGranularity = params.get('granularity') ?? 'year'
+      const requestedGranularity = params.get('granularity') ?? 'month'
       if (requestedGranularity !== 'year' && requestedGranularity !== 'month') {
         throw new Error('Choose year or month granularity')
       }

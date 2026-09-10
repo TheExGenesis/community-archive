@@ -1,5 +1,6 @@
 import type {
   PortalTrendSeries,
+  TermWeek,
   PortalTweet,
   TrendGranularity,
 } from '@/lib/portal/types'
@@ -72,4 +73,23 @@ export async function requestTrendEvidence(
     throw new Error('The tweet feed returned an invalid response')
   }
   return { tweets: body.tweets, nextOffset: body.nextOffset ?? null }
+}
+
+export async function requestDefaultKeywords(): Promise<TermWeek[]> {
+  const response = await fetch('/api/portal/trends?view=defaults', {
+    cache: 'no-store',
+  })
+  const body = await response.json().catch(() => null)
+  if (
+    !response.ok ||
+    !body ||
+    !Array.isArray(body.weekly) ||
+    body.weekly.some(
+      (row: TermWeek) =>
+        !row || typeof row.term !== 'string' || !row.term.trim(),
+    )
+  ) {
+    throw new Error('The current trending words could not be loaded.')
+  }
+  return body.weekly
 }

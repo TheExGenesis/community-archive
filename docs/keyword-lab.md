@@ -52,3 +52,14 @@ No database migration or new environment variable is required. The existing
 analytics URL and bearer token are used. Before release, smoke-test the gateway
 and the website with a real admin session; the local PR checks use mocked auth
 and the saved September 3–9 aggregate snapshot, not production deployment.
+
+## Trends explorer defaults
+
+`/trends` starts with the same six dynamic terms as the homepage, displaying
+their three categories above the chart. Monthly resolution is the default;
+explicit shared term lists and `granularity=year` remain supported. The initial
+server request only discovers terms, then the browser loads the selected
+resolution instead of fetching unused annual watchlist charts. Retry defaults
+rediscovers the current words through a member-gated, non-cacheable endpoint.
+The monthly historical chart still uses full-corpus tweet counts, while the
+weekly discovery badges use author-weighted member activity.

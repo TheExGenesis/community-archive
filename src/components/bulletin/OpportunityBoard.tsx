@@ -632,6 +632,10 @@ export function OpportunityBoard({
           </div>
         </div>
         <div className={styles.bar}>
+          <span role="status" className={styles.barCount}>
+            {shown < matching ? `${shown} of ${matching}` : matching}{' '}
+            {matching === 1 ? 'notice' : 'notices'}
+          </span>
           <div className={styles.sortLinks} role="group" aria-label="Sort">
             <PiArrowsDownUp size={14} aria-hidden />
             {(
@@ -674,10 +678,6 @@ export function OpportunityBoard({
             />
             Show past
           </label>
-          <span role="status" className={styles.barCount}>
-            {shown < matching ? `${shown} of ${matching}` : matching}{' '}
-            {matching === 1 ? 'notice' : 'notices'}
-          </span>
         </div>
       </div>
       {pages.pending && (

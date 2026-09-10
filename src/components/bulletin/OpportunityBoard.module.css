@@ -296,7 +296,7 @@
   margin: 0;
 }
 .barCount {
-  margin-left: auto;
+  margin-right: auto;
   color: var(--faint);
 }
 .pending {

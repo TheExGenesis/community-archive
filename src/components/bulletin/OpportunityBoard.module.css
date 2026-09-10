@@ -836,6 +836,29 @@
   .searchBox {
     width: 100%;
   }
+  /* One scrolling row of chips, bleeding to the screen edges. */
+  .chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    width: calc(100% + 32px);
+    margin: 0 -16px;
+    padding: 2px 16px;
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 16px,
+      black calc(100% - 28px),
+      transparent
+    );
+  }
+  .chips::-webkit-scrollbar {
+    display: none;
+  }
+  .chips button {
+    flex: none;
+  }
   .board {
     row-gap: 24px;
   }

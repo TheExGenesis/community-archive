@@ -408,10 +408,10 @@
   text-underline-offset: 2px;
 }
 .offer {
-  color: var(--accent);
+  color: color-mix(in srgb, var(--accent) 74%, var(--muted));
 }
 .ask {
-  color: var(--ask);
+  color: color-mix(in srgb, var(--ask) 78%, var(--muted));
 }
 .rel {
   display: inline-flex;
@@ -489,8 +489,11 @@
   color: var(--muted);
 }
 .author span {
-  color: var(--ink);
+  color: var(--muted);
   font-weight: 500;
+}
+.author:hover span {
+  color: var(--ink);
 }
 .author {
   display: inline-flex;

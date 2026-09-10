@@ -189,7 +189,7 @@ function NoticeCard({
   const when = lifetime(notice, now)
   // Zero is hidden: the count only covers archived members, not all of X.
   const replies = uptake(notice) || null
-  const meta = (when || (!open && (replies !== null || replied))) && (
+  const meta = (!open || when) && (
     <p className={styles.meta}>
       {when && <span>{when}</span>}
       {!open && replied && (
@@ -338,6 +338,7 @@ function NoticeCard({
             type="button"
             className={styles.summaryButton}
             aria-label={`Read full tweet by @${notice.username}`}
+            title={notice.summary}
             aria-expanded={false}
             aria-controls={`original-${notice.tweet_id}`}
             onClick={() => setOpen(true)}
@@ -532,7 +533,8 @@ export function OpportunityBoard({
           </details>
         </div>
         <p className={styles.lede}>
-          What members have offered each other, and asked for.
+          Asks and offers that members posted on X, gathered from the archive
+          each day.
         </p>
       </header>
       <div className={styles.sticky}>

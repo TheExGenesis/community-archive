@@ -369,6 +369,7 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  height: 16px;
 }
 .kind {
   display: inline-flex;
@@ -458,7 +459,12 @@
   color: inherit;
 }
 .summary {
-  display: block;
+  /* Three lines reserved and clamped so author rows align across a row. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: calc(3 * 1.35em);
   font-size: 14.5px;
   line-height: 1.35;
   font-weight: 600;
@@ -466,6 +472,9 @@
   color: var(--ink);
   overflow-wrap: anywhere;
   text-wrap: pretty;
+}
+.summaryButton {
+  width: 100%;
 }
 .summaryButton:hover .summary {
   color: var(--accent);
@@ -475,6 +484,7 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+  height: 20px;
   font-size: 13px;
   color: var(--muted);
 }
@@ -487,6 +497,7 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+  flex: 0 1 auto;
   color: inherit;
   text-decoration: none;
 }
@@ -515,7 +526,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: 1.4em;
   font-size: 12px;
+  line-height: 1.4;
   color: var(--faint);
 }
 .replies {

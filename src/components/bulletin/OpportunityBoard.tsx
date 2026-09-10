@@ -1,29 +1,50 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { PiArrowSquareOut } from 'react-icons/pi'
 import { useTweetBatch } from './useTweetBatch'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { TweetCard } from '@/components/TweetCard'
+import { useBoardPages } from './useBoardPages'
+import { RefreshButton } from './RefreshButton'
+import { TweetAvatar } from '@/components/TweetAvatar'
 import type { PortalTweet } from '@/lib/portal/types'
-import { KIND_LABELS, type Opportunity } from '@/lib/bulletin/types'
+import { decodeTweetText } from '@/lib/tweetText'
+import { tweetPermalinkHref, userProfileHref } from '@/lib/navigation'
+import {
+  KIND_LABELS,
+  type BulletinPage,
+  type Opportunity,
+} from '@/lib/bulletin/types'
 import {
   isPast,
   relationship,
   sortNotices,
   type BulletinRelationships,
 } from '@/lib/bulletin/board'
+import styles from './OpportunityBoard.module.css'
 
-const EMPTY_GRAPH: BulletinRelationships = {
-  outgoing: {},
-  available: false,
-}
+const ExpandedTweetCard = lazy(() =>
+  import('@/components/TweetCard').then((module) => ({
+    default: module.TweetCard,
+  })),
+)
+
+const EMPTY_GRAPH: BulletinRelationships = { outgoing: {}, available: false }
+const LANE_GROUPS = [
+  ['free'],
+  ['opportunity'],
+  ['invite'],
+  ['intro'],
+  ['help', 'feedback'],
+]
+const PAGE_SIZE = 4
+
 function ScrollMore({
   count,
-  side,
+  label,
   onMore,
 }: {
   count: number
-  side: string
+  label: string
   onMore: () => void
 }) {
   const sentinel = useRef<HTMLDivElement>(null)
@@ -44,7 +65,7 @@ function ScrollMore({
           callback.current()
         }
       },
-      { rootMargin: '600px' },
+      { rootMargin: '200px' },
     )
     if (sentinel.current) observer.observe(sentinel.current)
     return () => observer.disconnect()
@@ -52,150 +73,211 @@ function ScrollMore({
   return (
     <div
       ref={sentinel}
-      aria-label={`Load more ${side}`}
-      className="min-h-[1px]"
+      aria-label={`Load more ${label}`}
+      className={styles.more}
     >
       {manual ? (
-        <Button variant="outline" onClick={onMore}>
-          Load more {side}
-        </Button>
+        <button onClick={onMore}>Show more</button>
       ) : (
-        <span className="sr-only">More {side} load as you scroll</span>
+        <span className="sr-only">More {label} load as you scroll</span>
       )}
     </div>
   )
 }
 
-function Original({
+function NoticeCard({
   notice,
   loadTweet,
+  badge,
+  expired,
 }: {
   notice: Opportunity
   loadTweet: (id: string) => Promise<PortalTweet>
+  badge: string
+  expired: boolean
 }) {
-  const id = notice.tweet_id
-  const container = useRef<HTMLDivElement>(null)
-  const [visible, setVisible] = useState(false)
+  const [open, setOpen] = useState(false)
   const [tweet, setTweet] = useState<PortalTweet | null>(null)
   const [error, setError] = useState(false)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') {
-      setVisible(true)
-      return
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true)
-          observer.disconnect()
-        }
-      },
-      { rootMargin: '200px' },
-    )
-    if (container.current) observer.observe(container.current)
-    return () => observer.disconnect()
-  }, [])
-  useEffect(() => {
-    if (!visible) return
-    const controller = new AbortController()
+    if (!open) return
+    let active = true
     setError(false)
-    loadTweet(id)
-      .then((tweet) => {
-        if (!controller.signal.aborted) setTweet(tweet)
+    loadTweet(notice.tweet_id)
+      .then((value) => {
+        if (active) setTweet(value)
       })
       .catch(() => {
-        if (!controller.signal.aborted) setError(true)
+        if (active) setError(true)
       })
-    return () => controller.abort()
-  }, [id, visible, attempt, loadTweet])
-  const displayTweet =
-    tweet ||
-    (typeof notice.preview_text === 'string'
-      ? {
-          id,
-          accountId: notice.account_id,
-          username: notice.username,
-          name: notice.display_name || notice.username,
-          avatar: notice.avatar_url || null,
-          text: notice.preview_text,
-          createdAt: notice.posted_at,
-          observedAt: notice.posted_at,
-          likes: 0,
-          rts: 0,
-        }
-      : null)
+    return () => {
+      active = false
+    }
+  }, [notice.tweet_id, open, attempt, loadTweet])
+  const fallback: PortalTweet = {
+    id: notice.tweet_id,
+    accountId: notice.account_id,
+    username: notice.username,
+    name: notice.display_name || notice.username,
+    avatar: notice.avatar_url || null,
+    text: notice.preview_text || '',
+    createdAt: notice.posted_at,
+    observedAt: notice.posted_at,
+    likes: 0,
+    rts: 0,
+  }
+  const date = new Date(notice.posted_at).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  })
+  const text = decodeTweetText(tweet?.text || notice.preview_text || '')
   return (
-    <div
-      ref={container}
-      className="relative min-w-0"
-      aria-busy={!tweet && !error}
+    <article
+      className={styles.notice}
+      style={expired ? { opacity: 0.6 } : undefined}
     >
-      {displayTweet ? (
-        <TweetCard
-          tweet={displayTweet}
-          showEngagement={!!tweet}
-          previewHeight={240}
-          clickable={false}
-          showDate
-          showExternalLink
-          origin="opportunities"
-          returnTo="/opportunities"
-        />
-      ) : error ? (
-        <div role="alert" className="h-[240px] p-4 text-sm">
-          The original could not be loaded.{' '}
-          <button
-            className="text-brand underline"
-            onClick={() => setAttempt((n) => n + 1)}
-          >
-            Retry
-          </button>
-        </div>
-      ) : (
-        <div
-          className="h-[240px] animate-pulse space-y-3 p-4"
-          aria-label="Loading original tweet"
+      <div className={styles.noticeHead}>
+        <span
+          className={`${styles.kind} ${notice.side === 'offer' ? styles.offer : styles.ask}`}
         >
-          <div className="h-8 w-2/3 rounded bg-muted" />
-          <div className="h-3 rounded bg-muted" />
-          <div className="h-3 w-5/6 rounded bg-muted" />
+          {notice.side === 'offer' ? 'Offer' : 'Ask'}
+        </span>
+        <time dateTime={notice.posted_at} className={styles.date}>
+          {date}
+        </time>
+      </div>
+      <p className={styles.summary}>
+        <Link
+          href={tweetPermalinkHref(
+            notice.tweet_id,
+            'opportunities',
+            '/opportunities',
+          )}
+        >
+          {notice.summary}
+        </Link>
+      </p>
+      <button
+        className={styles.textButton}
+        aria-label={`${open ? 'Collapse' : 'Read full'} tweet by @${notice.username}`}
+        aria-expanded={open}
+        aria-controls={`original-${notice.tweet_id}`}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {!open && (
+          <span className={styles.text}>{text || 'Read original tweet'}</span>
+        )}
+        <span className={styles.readMore}>
+          {open ? 'Show less' : 'Read more'}
+        </span>
+      </button>
+      {open && (
+        <div id={`original-${notice.tweet_id}`} className={styles.expanded}>
+          <Suspense fallback={<p className={styles.fullText}>{text}</p>}>
+            <ExpandedTweetCard
+              tweet={tweet || fallback}
+              showEngagement={!!tweet}
+              clickable={false}
+              showDate
+              showExternalLink
+              origin="opportunities"
+              returnTo="/opportunities"
+            />
+          </Suspense>
+          {!tweet && !error && (
+            <p className="text-xs text-muted-foreground">
+              Loading post details…
+            </p>
+          )}
+          {error && (
+            <button
+              className="text-sm text-brand"
+              onClick={() => setAttempt((n) => n + 1)}
+            >
+              Retry post details
+            </button>
+          )}
         </div>
       )}
-      {displayTweet && error && (
-        <button
-          className="absolute bottom-3 left-14 bg-card px-1 text-xs text-brand"
-          onClick={() => setAttempt((n) => n + 1)}
+      <footer className={styles.noticeFoot}>
+        <Link
+          href={userProfileHref(notice.username, notice.account_id)}
+          aria-label={`View @${notice.username}'s profile`}
         >
-          Retry post details
-        </button>
+          <TweetAvatar tweet={tweet || fallback} size={22} />
+        </Link>
+        <Link
+          className={styles.handle}
+          href={userProfileHref(notice.username, notice.account_id)}
+        >
+          @{notice.username}
+        </Link>
+        <span
+          className={styles.likes}
+          aria-label={tweet ? `${tweet.likes} likes` : undefined}
+        >
+          {tweet ? `♡ ${tweet.likes.toLocaleString()}` : ''}
+        </span>
+        <a
+          className={styles.outbound}
+          href={`https://twitter.com/${encodeURIComponent(notice.username)}/status/${notice.tweet_id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View original on X"
+        >
+          <PiArrowSquareOut size={12} />
+        </a>
+      </footer>
+      {(badge || expired) && (
+        <span className={styles.badge}>
+          {badge}
+          {expired ? `${badge ? ' · ' : ''}Past` : ''}
+        </span>
       )}
-    </div>
+    </article>
   )
 }
+
 export function OpportunityBoard({
   opportunities,
+  initialPage,
   me = '',
   username = '',
   graph = EMPTY_GRAPH,
   now = Date.now(),
+  isAdmin = false,
 }: {
   opportunities: Opportunity[]
+  initialPage?: BulletinPage
   me?: string
   username?: string
   graph?: BulletinRelationships
   now?: number
+  isAdmin?: boolean
 }) {
   const loadTweet = useTweetBatch()
-  const [pageSize, setPageSize] = useState({ offer: 6, ask: 6 })
+  const [pageSize, setPageSize] = useState<Record<string, number>>({})
+  const [side, setSide] = useState('all')
   const [kind, setKind] = useState('all')
   const [search, setSearch] = useState('')
   const [past, setPast] = useState(false)
   const [recommended, setRecommended] = useState(true)
   const [hydrated, setHydrated] = useState(false)
+  const pages = useBoardPages(
+    initialPage,
+    { kind, side, search, past, recommended },
+    hydrated,
+  )
+  const loaded = pages.page?.opportunities || opportunities
   useEffect(() => {
     const p = new URLSearchParams(window.location.hash.slice(1))
-    setKind(p.get('kind') || 'all')
+    const savedKind = p.get('kind') || 'all'
+    setKind(savedKind in KIND_LABELS ? savedKind : 'all')
+    setSide(
+      ['ask', 'offer'].includes(p.get('side') || '') ? p.get('side')! : 'all',
+    )
     setPast(p.get('past') === '1')
     setRecommended(p.get('sort') !== 'newest')
     setHydrated(true)
@@ -204,6 +286,7 @@ export function OpportunityBoard({
     if (!hydrated) return
     const p = new URLSearchParams()
     if (kind !== 'all') p.set('kind', kind)
+    if (side !== 'all') p.set('side', side)
     if (past) p.set('past', '1')
     if (!recommended) p.set('sort', 'newest')
     window.history.replaceState(
@@ -213,15 +296,16 @@ export function OpportunityBoard({
         window.location.search +
         (p.toString() ? '#' + p.toString() : ''),
     )
-  }, [kind, past, recommended, hydrated])
+  }, [kind, side, past, recommended, hydrated])
   const visible = useMemo(
     () =>
       sortNotices(
-        opportunities.filter(
+        loaded.filter(
           (o) =>
             (past || !isPast(o, now)) &&
             (kind === 'all' || o.kind === kind) &&
-            [o.summary, o.username, o.place, ...o.topics]
+            (side === 'all' || o.side === side) &&
+            [o.summary, o.preview_text, o.username, o.place, ...o.topics]
               .filter(Boolean)
               .join(' ')
               .toLowerCase()
@@ -232,193 +316,233 @@ export function OpportunityBoard({
         graph,
         now,
       ),
-    [opportunities, kind, past, search, recommended, me, graph, now],
+    [loaded, kind, side, past, search, recommended, me, graph, now],
   )
   useEffect(() => {
-    setPageSize({ offer: 6, ask: 6 })
-  }, [kind, search, past, recommended])
-  const shown = (['offer', 'ask'] as const).reduce(
-    (count, side) =>
-      count +
-      Math.min(pageSize[side], visible.filter((o) => o.side === side).length),
-    0,
-  )
-  const own = opportunities.filter((o) => o.account_id === me)
-  const answered = opportunities.filter(
+    setPageSize({})
+  }, [kind, side, search, past, recommended])
+  const shown = initialPage
+    ? visible.length
+    : Object.keys(KIND_LABELS).reduce(
+        (count, id) =>
+          count +
+          Math.min(
+            pageSize[id] || PAGE_SIZE,
+            visible.filter((o) => o.kind === id).length,
+          ),
+        0,
+      )
+  const count = initialPage
+    ? Object.values(pages.page?.counts || {}).reduce((n, count) => n + count, 0)
+    : visible.length
+  const total = pages.page?.total ?? opportunities.length
+  const own = loaded.filter((o) => o.account_id === me)
+  const answered = loaded.filter(
     (o) => o.account_id !== me && o.reply_account_ids?.includes(me),
   ).length
   return (
-    <div className="space-y-3">
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            aria-pressed={recommended}
-            variant={recommended ? 'default' : 'outline'}
-            onClick={() => setRecommended(true)}
+    <>
+      <header className={styles.subbar}>
+        <h1 className={styles.title}>Opportunities</h1>
+        <p className={styles.lede}>{count} notices · collected daily</p>
+        <div className={styles.controls}>
+          <div
+            className={styles.segmented}
+            role="group"
+            aria-label="Notice type"
           >
-            Recommended
-          </Button>
-          <Button
-            size="sm"
-            aria-pressed={!recommended}
-            variant={!recommended ? 'default' : 'outline'}
-            onClick={() => setRecommended(false)}
-          >
-            Newest
-          </Button>
-          <Input
-            className="h-9 min-w-[160px] flex-1 sm:max-w-xs"
-            aria-label="Search opportunities"
-            placeholder="Search topics, people, or places"
+            {(['all', 'offer', 'ask'] as const).map((id) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={side === id}
+                onClick={() => setSide(id)}
+              >
+                {id === 'all' ? 'All' : id === 'offer' ? 'Offers' : 'Asks'}
+              </button>
+            ))}
+          </div>
+          <input
+            className={styles.field}
+            type="search"
+            aria-label="Filter notices"
+            placeholder="Filter notices"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <label className="flex items-center gap-2 text-xs">
-            <input
-              type="checkbox"
-              checked={past}
-              onChange={(e) => setPast(e.target.checked)}
-            />
-            Show past notices
-          </label>
+          <RefreshButton className={styles.refresh} />
         </div>
-        <div
-          className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap"
-          aria-label="Categories"
-        >
-          {Object.entries({ all: 'All categories', ...KIND_LABELS }).map(
-            ([id, label]) => (
-              <Button
-                key={id}
-                className="shrink-0"
-                size="sm"
-                variant={kind === id ? 'default' : 'outline'}
-                aria-pressed={kind === id}
-                onClick={() => setKind(id)}
-              >
-                {label}
-                <span className="ml-1.5 opacity-60">
-                  {
-                    opportunities.filter(
-                      (o) =>
-                        (past || !isPast(o, now)) &&
-                        (id === 'all' || o.kind === id),
-                    ).length
-                  }
-                </span>
-              </Button>
-            ),
-          )}
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <p role="status">
-          {visible.length} of {opportunities.length} notices
-          {shown < visible.length ? ` · ${shown} shown` : ''}
-          {opportunities.length === 2000 ? ' · Latest 2,000 only' : ''}
+        <p className={styles.description}>
+          This page may contain opportunities. We filter tweets for asks and
+          offers. Things like free services, invitations to events, grants,
+          collaborations, requests for feedback or introductions, and more. We
+          show you things that may be relevant to you first.
         </p>
-        <details>
-          <summary className="cursor-pointer">
-            {recommended ? 'About recommendations' : 'About sorting'}
-            {me ? ' & your activity' : ''}
-          </summary>
-          <p className="mt-2 max-w-2xl">
-            {recommended && graph.available
-              ? 'Free things first, then work & collaboration, invitations, introductions, help, and feedback. Within each category: your notices, then your top outgoing interactions, then everyone else. This uses the profile’s top 25 all-time interaction counts (mentions, replies, quotes and reposts); missing people are not necessarily strangers.'
-              : recommended
-                ? 'Top outgoing interactions are unavailable. Showing categories in priority order, with your notices first within each category, then newest.'
-                : 'Newest notices first.'}{' '}
+      </header>
+      {pages.pending && (
+        <p role="status" className="px-8 py-4 text-sm text-muted-foreground">
+          {pages.error || 'Loading matching notices…'}
+          {pages.error && (
+            <button className="ml-2 text-brand" onClick={pages.retry}>
+              Retry
+            </button>
+          )}
+        </p>
+      )}
+      <div className={styles.board} aria-busy={pages.pending}>
+        {LANE_GROUPS.filter(
+          (group) => !pages.pending && (kind === 'all' || group.includes(kind)),
+        ).map((group) => (
+          <div className={styles.laneGroup} key={group[0]}>
+            {group
+              .filter((id) => kind === 'all' || kind === id)
+              .map((id) => {
+                const notices = visible.filter((o) => o.kind === id)
+                const limit = initialPage
+                  ? notices.length
+                  : pageSize[id] || PAGE_SIZE
+                return (
+                  <section
+                    key={id}
+                    className={styles.lane}
+                    aria-label={KIND_LABELS[id]}
+                  >
+                    <div className={styles.laneHead}>
+                      <h2>{KIND_LABELS[id]}</h2>
+                      <span className={styles.laneCount}>
+                        {initialPage
+                          ? pages.page?.counts[id] || 0
+                          : notices.length}
+                      </span>
+                    </div>
+                    {notices.slice(0, limit).map((o) => (
+                      <NoticeCard
+                        key={o.tweet_id}
+                        notice={o}
+                        loadTweet={loadTweet}
+                        badge={relationship(o, me, graph).label}
+                        expired={isPast(o, now)}
+                      />
+                    ))}
+                    {(initialPage
+                      ? pages.page?.cursors[id] &&
+                        !pages.loading[id] &&
+                        !pages.laneErrors[id]
+                      : notices.length > limit) && (
+                      <ScrollMore
+                        key={`${kind}:${side}:${search}:${past}:${recommended}`}
+                        label={KIND_LABELS[id]}
+                        count={limit}
+                        onMore={() =>
+                          initialPage
+                            ? void pages.loadMore(id)
+                            : setPageSize((size) => ({
+                                ...size,
+                                [id]: (size[id] || PAGE_SIZE) + PAGE_SIZE,
+                              }))
+                        }
+                      />
+                    )}
+                    {pages.loading[id] && (
+                      <p className={styles.empty}>Loading more…</p>
+                    )}
+                    {pages.laneErrors[id] && (
+                      <p className={styles.empty}>
+                        {pages.laneErrors[id]}{' '}
+                        <button onClick={() => void pages.loadMore(id)}>
+                          Retry
+                        </button>
+                      </p>
+                    )}
+                    {!notices.length && (
+                      <p className={styles.empty}>No matching notices.</p>
+                    )}
+                  </section>
+                )
+              })}
+          </div>
+        ))}
+      </div>
+      <footer className={styles.footer}>
+        <p role="status">
+          {count} of {total} notices
+          {shown < count ? ` · ${shown} shown` : ''}
+          {total === 2000 ? ' · Latest 2,000 only' : ''}
+        </p>
+        <p>
+          Thanks to <Link href="/user/maskys_">@maskys_</Link> for the first
+          prototype.
+        </p>
+        {isAdmin && <Link href="/admin/opportunities">Run dashboard →</Link>}
+        <details className={styles.options}>
+          <summary>Options & about this board</summary>
+          <div className={styles.optionFields}>
+            <label>
+              Sort{' '}
+              <select
+                value={recommended ? 'recommended' : 'newest'}
+                onChange={(e) =>
+                  setRecommended(e.target.value === 'recommended')
+                }
+              >
+                <option value="recommended">Recommended</option>
+                <option value="newest">Newest</option>
+              </select>
+            </label>
+            <label>
+              Category{' '}
+              <select value={kind} onChange={(e) => setKind(e.target.value)}>
+                <option value="all">All categories</option>
+                {Object.entries(KIND_LABELS).map(([id, label]) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={past}
+                onChange={(e) => setPast(e.target.checked)}
+              />
+              Show past notices
+            </label>
+          </div>
+          <p className={styles.method}>
+            {recommended
+              ? graph.available
+                ? 'Recommended puts your notices and people you interact with most first within each category, using your top 25 all-time outgoing interactions. Missing people are not necessarily strangers.'
+                : 'Top outgoing interactions are unavailable. Showing your notices first within each category, then newest.'
+              : 'Newest notices first within each category.'}{' '}
             Past notices appear last.
           </p>
           {me && (
-            <p className="my-2">
-              <strong>{username ? '@' + username : 'Your activity'}</strong> ·{' '}
-              {own.filter((o) => o.side === 'offer').length} offers ·{' '}
-              {own.filter((o) => o.side === 'ask').length} asks ·{' '}
+            <p className={styles.method}>
+              @{username || me} · {own.filter((o) => o.side === 'offer').length}{' '}
+              offers · {own.filter((o) => o.side === 'ask').length} asks ·{' '}
               {own.reduce((n, o) => n + (o.replies || 0) + (o.quotes || 0), 0)}{' '}
               public responses · Replied to {answered} other notices. Public
               archive activity within the loaded notices only.
             </p>
           )}
+          <p className={styles.method}>
+            After the daily archive refresh, phrase filters and AI find asks and
+            offers in recent original ClickHouse posts from participating
+            accounts. This is a selection, not a complete directory: replies,
+            reposts, late arrivals and notices without matching phrases may be
+            missed. Read the original before responding. Counts may adjust as
+            more posts are checked.
+          </p>
+          <p className={styles.method}>
+            The daily scan covers the previous two UTC days. Undated asks expire
+            after 14 days and offers after 60 days; standing offers stay open.
+            Post an “offer:”, “ask:”, or “standing offer:” on X with what you
+            need or offer and how to respond. Quote your own notice to renew an
+            undated notice when it reaches the archive.
+          </p>
         </details>
-      </div>
-      <div className="grid items-start gap-6 lg:grid-cols-2">
-        {(['offer', 'ask'] as const).map((side) => (
-          <section
-            key={side}
-            className="space-y-3"
-            aria-label={side === 'offer' ? 'Offers' : 'Asks'}
-          >
-            <h2 className="flex items-center justify-between border-b pb-2 text-xl font-semibold">
-              {side === 'offer' ? 'Offers' : 'Asks'}{' '}
-              <span className="text-base text-muted-foreground">
-                {visible.filter((o) => o.side === side).length}
-              </span>
-            </h2>
-            <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-              {visible
-                .filter((o) => o.side === side)
-                .slice(0, pageSize[side])
-                .map((o) => {
-                  const rel = relationship(o, me, graph)
-                  const expired = isPast(o, now)
-                  return (
-                    <article
-                      key={o.tweet_id}
-                      className={`min-w-0 overflow-hidden rounded-lg border bg-card ${expired ? 'opacity-60' : ''} ${rel.rank < 3 ? 'border-brand/40' : ''}`}
-                    >
-                      <Original notice={o} loadTweet={loadTweet} />
-                      <div className="h-24 space-y-1 border-t px-3 py-2">
-                        <div className="flex items-center justify-between gap-2 text-[11px] leading-4">
-                          <span className="rounded bg-muted px-1.5 py-0.5 font-medium text-muted-foreground">
-                            {KIND_LABELS[o.kind]}
-                          </span>
-                          {(rel.label || expired) && (
-                            <span className="rounded border bg-muted/40 px-1.5 py-0.5 text-right text-muted-foreground">
-                              {rel.label}
-                              {expired ? `${rel.label ? ' · ' : ''}Past` : ''}
-                            </span>
-                          )}
-                        </div>
-                        <p
-                          className="line-clamp-3 text-xs leading-[18px] text-foreground/80"
-                          title={o.summary}
-                        >
-                          {o.summary}
-                        </p>
-                      </div>
-                    </article>
-                  )
-                })}
-            </div>
-            {visible.filter((o) => o.side === side).length > pageSize[side] && (
-              <ScrollMore
-                key={`${kind}:${search}:${past}:${recommended}`}
-                side={side === 'offer' ? 'offers' : 'asks'}
-                count={pageSize[side]}
-                onMore={() =>
-                  setPageSize((size) => ({ ...size, [side]: size[side] + 6 }))
-                }
-              />
-            )}
-            {!visible.some((o) => o.side === side) && (
-              <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                No matching {side === 'offer' ? 'offers' : 'asks'}.
-              </p>
-            )}
-          </section>
-        ))}
-      </div>
-      <aside className="rounded-lg bg-muted/40 p-5 text-sm">
-        <strong>Put a notice on the board</strong>
-        <p className="mt-2 text-muted-foreground">
-          Post an “offer:”, “ask:”, or “standing offer:” on X. Say what you’re
-          offering or looking for and how to respond. Participating accounts are
-          checked after the daily refresh. Quote your own notice to renew an
-          undated notice when that quote reaches the archive.
-        </p>
-      </aside>
-    </div>
+      </footer>
+    </>
   )
 }

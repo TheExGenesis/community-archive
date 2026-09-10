@@ -118,3 +118,32 @@ export type PromptDashboard = {
   preview_note?: string
 }
 export type PromptSaveResult = { error?: string; version?: string }
+
+export type BulletinFilters = {
+  kind: string
+  side: string
+  search: string
+  past: boolean
+  recommended: boolean
+}
+export type BulletinPage = {
+  opportunities: Opportunity[]
+  counts: Record<string, number>
+  cursors: Record<string, string | null>
+  total: number
+  now: number
+  personal: {
+    account_id: string
+    username: string
+    outgoing: Record<string, number>
+    available: boolean
+  }
+}
+export const BULLETIN_PAGE_SIZE = 4
+export const DEFAULT_BULLETIN_FILTERS: BulletinFilters = {
+  kind: 'all',
+  side: 'all',
+  search: '',
+  past: false,
+  recommended: true,
+}

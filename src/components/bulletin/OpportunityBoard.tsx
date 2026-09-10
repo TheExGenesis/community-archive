@@ -636,6 +636,15 @@ export function OpportunityBoard({
             {shown < matching ? `${shown} of ${matching}` : matching}{' '}
             {matching === 1 ? 'notice' : 'notices'}
           </span>
+          <label className={styles.pastToggle}>
+            <input
+              type="checkbox"
+              aria-label="Show past notices"
+              checked={past}
+              onChange={(e) => setPast(e.target.checked)}
+            />
+            Show past
+          </label>
           <div className={styles.sortLinks} role="group" aria-label="Sort">
             <PiArrowsDownUp size={14} aria-hidden />
             {(
@@ -669,15 +678,6 @@ export function OpportunityBoard({
               )
             })}
           </div>
-          <label className={styles.pastToggle}>
-            <input
-              type="checkbox"
-              aria-label="Show past notices"
-              checked={past}
-              onChange={(e) => setPast(e.target.checked)}
-            />
-            Show past
-          </label>
         </div>
       </div>
       {pages.pending && (

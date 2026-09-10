@@ -389,7 +389,7 @@
   align-items: center;
   gap: 5px;
   min-width: 0;
-  border: 1px solid color-mix(in srgb, currentColor 35%, var(--surface));
+  border: 1px solid var(--card-line);
   border-radius: 6px;
   background: var(--surface);
   font-size: 12px;
@@ -398,7 +398,7 @@
   white-space: nowrap;
 }
 .notice:hover .kind {
-  border-color: color-mix(in srgb, currentColor 55%, var(--surface));
+  border-color: var(--line-strong);
 }
 .kindButton {
   border: 0;

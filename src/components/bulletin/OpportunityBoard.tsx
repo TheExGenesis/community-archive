@@ -46,10 +46,9 @@ import {
 } from '@/lib/bulletin/board'
 import styles from './OpportunityBoard.module.css'
 
+const loadTweetCard = () => import('@/components/TweetCard')
 const ExpandedTweetCard = lazy(() =>
-  import('@/components/TweetCard').then((module) => ({
-    default: module.TweetCard,
-  })),
+  loadTweetCard().then((module) => ({ default: module.TweetCard })),
 )
 
 const EMPTY_GRAPH: BulletinRelationships = { outgoing: {}, available: false }
@@ -272,7 +271,22 @@ function NoticeCard({
             </button>
           </div>
           <div id={`original-${notice.tweet_id}`} className={styles.expanded}>
-            <Suspense fallback={<p className={styles.fullText}>{text}</p>}>
+            <Suspense
+              fallback={
+                <div className={styles.fallbackCard}>
+                  <div className={styles.fallbackByline}>
+                    <TweetAvatar tweet={tweet || fallback} size={28} />
+                    <div>
+                      <div className={styles.fallbackName}>{fallback.name}</div>
+                      <div className={styles.fallbackHandle}>
+                        @{notice.username}
+                      </div>
+                    </div>
+                  </div>
+                  <p className={styles.fullText}>{text}</p>
+                </div>
+              }
+            >
               <ExpandedTweetCard
                 tweet={tweet || fallback}
                 showEngagement={!!tweet}
@@ -295,30 +309,6 @@ function NoticeCard({
                 Retry post details
               </button>
             )}
-            {tweet?.replies?.length ? (
-              <div className={styles.replyList}>
-                <p className={styles.replyHead}>
-                  {tweet.replies.length === 1
-                    ? '1 reply'
-                    : `${tweet.replies.length} replies`}{' '}
-                  from members
-                </p>
-                {tweet.replies.map((reply) => (
-                  <ExpandedTweetCard
-                    key={reply.id}
-                    tweet={reply}
-                    compact
-                    noClamp
-                    stacked
-                    clickable={false}
-                    showEngagement={false}
-                    showDate
-                    origin="opportunities"
-                    returnTo="/opportunities"
-                  />
-                ))}
-              </div>
-            ) : null}
           </div>
           <div className={styles.foot}>
             {meta}
@@ -343,6 +333,30 @@ function NoticeCard({
               </Link>
             </p>
           </div>
+          {tweet?.replies?.length ? (
+            <div className={styles.replyList}>
+              <p className={styles.replyHead}>
+                {tweet.replies.length === 1
+                  ? '1 reply'
+                  : `${tweet.replies.length} replies`}{' '}
+                from members
+              </p>
+              {tweet.replies.map((reply) => (
+                <ExpandedTweetCard
+                  key={reply.id}
+                  tweet={reply}
+                  compact
+                  noClamp
+                  stacked
+                  clickable={false}
+                  showEngagement={false}
+                  showDate
+                  origin="opportunities"
+                  returnTo="/opportunities"
+                />
+              ))}
+            </div>
+          ) : null}
         </>
       ) : (
         <>
@@ -436,6 +450,16 @@ export function OpportunityBoard({
     hydrated,
   )
   const loaded = pages.page?.opportunities || opportunities
+  useEffect(() => {
+    // Warm the expanded-card chunk so the first click does not flash.
+    const warm = () => void loadTweetCard().catch(() => {})
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(warm)
+      return () => window.cancelIdleCallback(id)
+    }
+    const id = setTimeout(warm, 800)
+    return () => clearTimeout(id)
+  }, [])
   useEffect(() => {
     const p = new URLSearchParams(window.location.hash.slice(1))
     setKinds(parseKinds(p.get('kind') || 'all') ?? [])

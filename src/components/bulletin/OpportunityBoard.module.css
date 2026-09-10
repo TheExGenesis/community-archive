@@ -686,19 +686,20 @@
   border-bottom: 0 !important;
   background: transparent !important;
 }
-/* Tweet body: a step up from the card's 13px grey so it reads as the content. */
+/* Tweet body: the content the reader opened the card for, so it matches the
+   summary's size at regular weight and reads as prose. */
 .expanded > :global(article) :global(.whitespace-pre-wrap) {
-  font-size: 14px !important;
-  font-weight: 500;
-  line-height: 1.55;
+  font-size: 15px !important;
+  font-weight: 400;
+  line-height: 1.6;
   color: var(--ink) !important;
 }
 .fullText {
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
   color: var(--ink);
 }
 /* Mirrors the stacked tweet card while its chunk loads. */

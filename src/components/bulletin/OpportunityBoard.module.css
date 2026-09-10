@@ -480,11 +480,13 @@
   white-space: nowrap;
 }
 .close {
-  margin-left: auto;
-  margin-right: -4px;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
   border: 0;
-  background: transparent;
-  padding: 2px;
+  background: var(--surface);
+  padding: 3px;
   border-radius: 4px;
   color: var(--faint);
   display: inline-flex;
@@ -632,7 +634,7 @@
   flex-direction: column;
   gap: 8px;
   /* Cancel the tweet card's own inset so it shares the card's edges. */
-  margin: -8px -16px 0;
+  margin: -6px -16px 0;
 }
 /* The tweet card root is an <article>: drop its rule and hover tint. */
 .expanded > :global(article) {

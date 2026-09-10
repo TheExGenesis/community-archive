@@ -257,19 +257,17 @@ function NoticeCard({
     >
       {open ? (
         <>
-          <div className={styles.noticeHead}>
-            {label}
-            <button
-              type="button"
-              className={styles.close}
-              aria-label={`Collapse tweet by @${notice.username}`}
-              aria-expanded
-              aria-controls={`original-${notice.tweet_id}`}
-              onClick={() => setOpen(false)}
-            >
-              <PiX size={15} />
-            </button>
-          </div>
+          {label}
+          <button
+            type="button"
+            className={styles.close}
+            aria-label={`Collapse tweet by @${notice.username}`}
+            aria-expanded
+            aria-controls={`original-${notice.tweet_id}`}
+            onClick={() => setOpen(false)}
+          >
+            <PiX size={15} />
+          </button>
           <div id={`original-${notice.tweet_id}`} className={styles.expanded}>
             <Suspense
               fallback={

@@ -259,6 +259,20 @@
 .sortLinks > span {
   color: var(--faint);
 }
+.sortDirection {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 2px;
+  margin-right: 2px;
+  border-radius: 4px;
+  color: var(--muted);
+}
+.sortDirection:hover {
+  color: var(--ink);
+  background: var(--surface-3);
+}
 .sortOption {
   display: inline-flex;
   align-items: center;

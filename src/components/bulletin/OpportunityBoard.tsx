@@ -2,9 +2,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
-  PiArrowDown,
   PiArrowSquareOut,
-  PiArrowUp,
   PiBriefcase,
   PiCalendarBlank,
   PiChatCircle,
@@ -13,6 +11,8 @@ import {
   PiGift,
   PiHandHeart,
   PiQuestion,
+  PiSortAscending,
+  PiSortDescending,
   PiUsersThree,
   PiX,
 } from 'react-icons/pi'
@@ -527,9 +527,9 @@ export function OpportunityBoard({
             </summary>
             <div className={styles.aboutPanel}>
               <p>
-                <b>What this is.</b> Asks and offers that members posted on X,
-                found by a daily scan of the archive. Every card is a real
-                tweet. Nothing is posted on your behalf.
+                <b>What this is.</b> Asks and offers that members posted on
+                Twitter, found by a daily scan of the archive. Every card is a
+                real tweet. Nothing is posted on your behalf.
               </p>
               <p>
                 <b>Put something up.</b> Post an original tweet, not a reply or
@@ -574,8 +574,8 @@ export function OpportunityBoard({
           </details>
         </div>
         <p className={styles.lede}>
-          Asks and offers that members posted on X, gathered from the archive
-          each day.
+          Asks and offers that members posted on Twitter, gathered from the
+          archive each day.
         </p>
       </header>
       <div className={styles.sticky}>
@@ -645,6 +645,19 @@ export function OpportunityBoard({
             Show past
           </label>
           <div className={styles.sortLinks} role="group" aria-label="Sort">
+            <button
+              type="button"
+              className={styles.sortDirection}
+              aria-label={`Order ${ascending ? 'ascending' : 'descending'}. Reverse`}
+              title="Reverse order"
+              onClick={() => setAscending((value) => !value)}
+            >
+              {ascending ? (
+                <PiSortAscending size={15} aria-hidden />
+              ) : (
+                <PiSortDescending size={15} aria-hidden />
+              )}
+            </button>
             {(
               [
                 ['relevance', 'Relevance', true],
@@ -652,7 +665,6 @@ export function OpportunityBoard({
               ] as const
             ).map(([id, text, rec], i) => {
               const active = recommended === rec
-              const Arrow = ascending ? PiArrowUp : PiArrowDown
               return (
                 <span key={id} className={styles.sortOption}>
                   {i > 0 && <span aria-hidden>·</span>}
@@ -670,7 +682,6 @@ export function OpportunityBoard({
                     }}
                   >
                     {text}
-                    {active && <Arrow size={12} aria-hidden />}
                   </button>
                 </span>
               )

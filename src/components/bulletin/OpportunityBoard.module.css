@@ -475,12 +475,13 @@
   color: inherit;
 }
 .summary {
-  /* Two lines reserved, three at most: even rows for the common case. */
+  /* Three lines reserved and clamped: every closed card is the same height,
+     and the footer is pinned to the bottom so short titles leave air above it. */
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: calc(2 * 1.35em);
+  min-height: calc(3 * 1.35em);
   font-size: 14.5px;
   line-height: 1.35;
   font-weight: 600;
@@ -501,7 +502,8 @@
   gap: 6px;
   min-width: 0;
   height: 20px;
-  margin-top: 2px;
+  margin-top: auto;
+  padding-top: 2px;
   font-size: 13px;
   color: var(--muted);
 }

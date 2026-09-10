@@ -834,6 +834,8 @@
     padding-right: 16px;
   }
   .searchBox {
+    flex: 1 1 100%;
+    min-width: 0;
     width: 100%;
   }
   /* One scrolling row of chips, bleeding to the screen edges. */

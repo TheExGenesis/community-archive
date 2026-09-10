@@ -7,7 +7,7 @@ import {
   type StoredNotice,
 } from './data'
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
-import { fetchClickHouseTweetPageData } from '@/lib/clickhouseTweetPage'
+import { fetchClickHouseTweetThreadPageData } from '@/lib/clickhouseTweetPage'
 import type { TweetData } from '@/lib/tweets/types'
 
 jest.mock('./data', () => ({
@@ -18,7 +18,7 @@ jest.mock('@/lib/clickhouseGateway', () => ({
   fetchAnalyticsGatewayJson: jest.fn(),
 }))
 jest.mock('@/lib/clickhouseTweetPage', () => ({
-  fetchClickHouseTweetPageData: jest.fn(),
+  fetchClickHouseTweetThreadPageData: jest.fn(),
 }))
 const hash = createHash('sha256').update('Offer: help').digest('hex')
 const notice = {
@@ -51,7 +51,9 @@ beforeEach(() => {
       },
     ],
   })
-  jest.mocked(fetchClickHouseTweetPageData).mockResolvedValue(detail)
+  jest
+    .mocked(fetchClickHouseTweetThreadPageData)
+    .mockResolvedValue({ tweet: detail, threadTree: null })
 })
 test('starts independent reads together but does not publish until consent state resolves', async () => {
   let release!: (state: { notices: StoredNotice[] }) => void
@@ -63,7 +65,7 @@ test('starts independent reads together but does not publish until consent state
   const response = call()
   await Promise.resolve()
   expect(fetchAnalyticsGatewayJson).toHaveBeenCalledTimes(1)
-  expect(fetchClickHouseTweetPageData).toHaveBeenCalledTimes(1)
+  expect(fetchClickHouseTweetThreadPageData).toHaveBeenCalledTimes(1)
   release({ notices: [notice] })
   const result = await response
   expect(result.status).toBe(200)
@@ -88,13 +90,15 @@ test.each([
   if (reason === 'missing notice')
     jest.mocked(loadBulletinBoardState).mockResolvedValue({ notices: [] })
   if (reason === 'changed author')
-    jest
-      .mocked(fetchClickHouseTweetPageData)
-      .mockResolvedValue({ ...detail, account_id: 'b' })
+    jest.mocked(fetchClickHouseTweetThreadPageData).mockResolvedValue({
+      tweet: { ...detail, account_id: 'b' },
+      threadTree: null,
+    })
   if (reason === 'changed text')
-    jest
-      .mocked(fetchClickHouseTweetPageData)
-      .mockResolvedValue({ ...detail, full_text: 'Changed' })
+    jest.mocked(fetchClickHouseTweetThreadPageData).mockResolvedValue({
+      tweet: { ...detail, full_text: 'Changed' },
+      threadTree: null,
+    })
   if (reason === 'upstream failure')
     jest
       .mocked(fetchAnalyticsGatewayJson)
@@ -126,11 +130,14 @@ test('a batch shares policy/source reads and suppresses a changed tweet independ
     ],
   })
   jest
-    .mocked(fetchClickHouseTweetPageData)
+    .mocked(fetchClickHouseTweetThreadPageData)
     .mockImplementation(async (id) => ({
-      ...detail,
-      tweet_id: id,
-      full_text: id === '124' ? 'changed' : detail.full_text,
+      tweet: {
+        ...detail,
+        tweet_id: id,
+        full_text: id === '124' ? 'changed' : detail.full_text,
+      },
+      threadTree: null,
     }))
   const response = await BATCH_GET(
     new Request('http://localhost/api/bulletin/tweets?ids=123,124'),
@@ -168,4 +175,42 @@ test('batch reads require authentication', async () => {
   ).rejects.toThrow('Sign in')
   expect(loadBulletinBoardState).not.toHaveBeenCalled()
   expect(fetchAnalyticsGatewayJson).not.toHaveBeenCalled()
+})
+test('returns archived replies beneath the notice, oldest first, without placeholders', async () => {
+  const reply = (tweet_id: string, created_at: string, extra = {}) => ({
+    tweet_id,
+    account_id: 'r',
+    username: 'ray',
+    account_display_name: 'Ray',
+    full_text: `Reply ${tweet_id}`,
+    created_at,
+    favorite_count: 1,
+    retweet_count: 0,
+    reply_to_tweet_id: '123',
+    reply_to_user_id: null,
+    reply_to_username: 'alice',
+    ...extra,
+  })
+  jest.mocked(fetchClickHouseTweetThreadPageData).mockResolvedValue({
+    tweet: detail,
+    threadTree: {
+      root: '123',
+      roots: ['123'],
+      tweets: {
+        '123': reply('123', '2026-09-01T00:00:00Z'),
+        '2': reply('2', '2026-09-03T00:00:00Z'),
+        '3': reply('3', '2026-09-02T00:00:00Z'),
+        '4': reply('4', '2026-09-04T00:00:00Z', {
+          is_deleted_placeholder: true,
+        }),
+        '5': reply('5', '2026-09-05T00:00:00Z'),
+      },
+      children: { '123': ['2', '3', '4'], '4': ['5'] },
+      parents: {},
+      paths: {},
+    } as never,
+  })
+  const body = await (await call()).json()
+  expect(body.replies.map((r: { id: string }) => r.id)).toEqual(['3', '2', '5'])
+  expect(body.replies[0]).toMatchObject({ username: 'ray', text: 'Reply 3' })
 })

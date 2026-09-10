@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { uiFont, displayFont } from './fonts'
 import styles from '@/components/bulletin/OpportunityBoard.module.css'
 import { isBulletinAdmin, requireOpportunityUser } from '@/lib/bulletin/data'
 import { loadBulletinPage } from '@/lib/bulletin/page'
@@ -18,9 +17,7 @@ export default async function OpportunitiesPage() {
     loadBulletinPage(DEFAULT_BULLETIN_FILTERS).catch(() => null),
   ])
   return (
-    <main
-      className={`${styles.page} ${uiFont.variable} ${displayFont.variable}`}
-    >
+    <main className={styles.page}>
       {page === null ? (
         <div role="alert" className="rounded-lg border p-6">
           Opportunities could not be loaded. Refresh to try again.

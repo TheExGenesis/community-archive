@@ -1,4 +1,11 @@
-import { expiry, isPast, sortNotices } from './board'
+import {
+  expiry,
+  followLabel,
+  isPast,
+  relationship,
+  sortNotices,
+  uptake,
+} from './board'
 import type { Opportunity } from './types'
 const notice = (id: string, side = 'offer'): Opportunity => ({
   tweet_id: id,
@@ -46,23 +53,74 @@ test('outgoing ranking uses counts and puts expired notices last', () => {
       ?.account_id,
   ).toBe('1')
 })
-
-test('recommended follows category priority while newest remains chronological', () => {
+test('relationship labels are grounded in own account and outgoing interactions', () => {
+  const graph = { outgoing: { '2': 3 }, available: true }
+  expect(relationship(notice('1'), '1', graph)).toEqual({ rank: 0, label: '' })
+  expect(relationship(notice('2'), '1', graph)).toEqual({ rank: 1, label: '' })
+  expect(relationship(notice('3'), '1', graph).label).toBe('')
+  expect(relationship(notice('1'), '', graph).label).toBe('')
+})
+test('uptake is unknown before hydration and counts replies plus quotes after', () => {
+  expect(uptake(notice('1'))).toBeNull()
+  expect(uptake({ ...notice('1'), replies: 2, quotes: 1 })).toBe(3)
+  expect(uptake({ ...notice('1'), replies: 0, quotes: 0 })).toBe(0)
+})
+test('recommended lifts unanswered asks within a group while newest stays chronological', () => {
   const graph = { outgoing: {}, available: true }
-  const kinds = ['feedback', 'help', 'intro', 'invite', 'opportunity', 'free']
-  const rows = kinds.map((kind, i) => ({
-    ...notice(String(i)),
-    kind,
-    posted_at: `2026-08-0${6 - i}T00:00:00Z`,
-  }))
+  const rows = [
+    { ...notice('a'), posted_at: '2026-08-05T00:00:00Z' },
+    {
+      ...notice('b', 'ask'),
+      posted_at: '2026-08-03T00:00:00Z',
+      replies: 0,
+      quotes: 0,
+    },
+    {
+      ...notice('c', 'ask'),
+      posted_at: '2026-08-04T00:00:00Z',
+      replies: 2,
+      quotes: 0,
+    },
+    { ...notice('d', 'ask'), posted_at: '2026-08-02T00:00:00Z' },
+  ]
   expect(
     sortNotices(rows, true, '', graph, Date.parse('2026-08-10')).map(
-      (o) => o.kind,
+      (o) => o.tweet_id,
     ),
-  ).toEqual([...kinds].reverse())
+  ).toEqual(['b', 'a', 'c', 'd'])
   expect(
     sortNotices(rows, false, '', graph, Date.parse('2026-08-10')).map(
-      (o) => o.kind,
+      (o) => o.tweet_id,
     ),
-  ).toEqual(kinds)
+  ).toEqual(['a', 'c', 'b', 'd'])
+})
+test('ascending reverses the order but keeps past notices last', () => {
+  const graph = { outgoing: {}, available: true }
+  const rows = [
+    { ...notice('a'), posted_at: '2026-08-05T00:00:00Z' },
+    { ...notice('b'), posted_at: '2026-08-03T00:00:00Z' },
+    {
+      ...notice('c'),
+      posted_at: '2026-08-04T00:00:00Z',
+      expires_at: '2026-08-06',
+    },
+  ]
+  expect(
+    sortNotices(rows, false, '', graph, Date.parse('2026-08-10'), true).map(
+      (o) => o.tweet_id,
+    ),
+  ).toEqual(['b', 'a', 'c'])
+})
+test('follow labels come from archived follow lists', () => {
+  const graph = {
+    outgoing: {},
+    available: true,
+    following: ['1', '2'],
+    followers: ['2', '3'],
+  }
+  expect(followLabel('1', graph)).toBe('following')
+  expect(followLabel('2', graph)).toBe('mutual')
+  expect(followLabel('3', graph)).toBe('follows you')
+  expect(followLabel('4', graph)).toBe('')
+  expect(followLabel('1', { outgoing: {}, available: false })).toBe('')
 })

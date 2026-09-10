@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireOpportunityUser } from '@/lib/bulletin/data'
 import { BulletinCursorExpired, loadBulletinPage } from '@/lib/bulletin/page'
-import { KIND_LABELS } from '@/lib/bulletin/types'
+import { parseKinds } from '@/lib/bulletin/types'
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
 export async function GET(request: Request) {
@@ -12,11 +12,10 @@ export async function GET(request: Request) {
   const search = (p.get('q') || '').trim()
   const after = p.get('after') || undefined
   if (
-    (kind !== 'all' &&
-      !Object.prototype.hasOwnProperty.call(KIND_LABELS, kind)) ||
+    parseKinds(kind) === null ||
     !['all', 'ask', 'offer'].includes(side) ||
     search.length > 300 ||
-    (after && (!/^\d{1,20}$/.test(after) || kind === 'all'))
+    (after && !/^\d{1,20}$/.test(after))
   )
     return NextResponse.json(
       { error: 'Invalid board filters' },
@@ -31,6 +30,7 @@ export async function GET(request: Request) {
           search,
           past: p.get('past') === '1',
           recommended: p.get('sort') !== 'newest',
+          ascending: p.get('dir') === 'asc',
         },
         after,
       ),

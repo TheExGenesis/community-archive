@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef } from 'react'
-import type { PortalTweet } from '@/lib/portal/types'
+import type { BulletinTweet as PortalTweet } from '@/lib/bulletin/tweets'
 
 const BATCH_SIZE = 8
 

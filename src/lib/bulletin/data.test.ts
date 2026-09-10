@@ -129,7 +129,7 @@ test('ClickHouse source changes suppress a notice and upstream outages fail the 
   await expect(loadOpportunities()).rejects.toThrow('unavailable')
 })
 
-test('recommendations use the existing ClickHouse top outgoing list instead of Supabase follows', async () => {
+test('recommendations use the ClickHouse top outgoing list, and follow lists come from the RPC by trusted id', async () => {
   jest.mocked(getCurrentUser).mockResolvedValue({
     id: 'member',
     app_metadata: { provider_id: '42' },
@@ -142,20 +142,28 @@ test('recommendations use the existing ClickHouse top outgoing list instead of S
     query: { accountId: '42', year: null, peopleLimit: 25 },
     data: { people: [{ accountId: '7', interactionCount: '12' }] },
   })
+  rpc.mockResolvedValue({
+    data: { following: ['7', 'bad'], followers: ['8'] },
+    error: null,
+  })
   await expect(loadBulletinRelationships()).resolves.toMatchObject({
     account_id: '42',
     username: 'exgenesis',
     outgoing: { '7': 12 },
     available: true,
+    following: ['7'],
+    followers: ['8'],
   })
   expect(fetchAnalyticsGatewayJson).toHaveBeenCalledWith(
     ['user', '42', 'interactions'],
     new URLSearchParams({ limit: '25' }),
     expect.any(Object),
   )
-  expect(createServerServiceRoleClient).not.toHaveBeenCalled()
+  expect(rpc).toHaveBeenCalledWith('get_bulletin_relationships', {
+    viewer_account_id: '42',
+  })
 })
-test('unavailable interaction data stays unknown without falling back to follows', async () => {
+test('unavailable interaction data stays unknown, and a failed follow RPC yields empty lists', async () => {
   jest.mocked(getCurrentUser).mockResolvedValue({
     id: 'member',
     app_metadata: { provider_id: '42' },
@@ -163,11 +171,13 @@ test('unavailable interaction data stays unknown without falling back to follows
   jest
     .mocked(fetchAnalyticsGatewayJson)
     .mockRejectedValue(new Error('Unavailable'))
+  rpc.mockResolvedValue({ data: null, error: { message: 'down' } })
   await expect(loadBulletinRelationships()).resolves.toMatchObject({
     outgoing: {},
     available: false,
+    following: [],
+    followers: [],
   })
-  expect(createServerServiceRoleClient).not.toHaveBeenCalled()
 })
 
 test('mutable user metadata cannot select a recommendation profile', async () => {

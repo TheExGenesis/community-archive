@@ -2,9 +2,67 @@ import 'server-only'
 import { createHash } from 'crypto'
 import { loadBulletinBoardState } from './data'
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
-import { fetchClickHouseTweetPageData } from '@/lib/clickhouseTweetPage'
+import {
+  fetchClickHouseTweetThreadPageData,
+  type ClickHouseTweetThreadPageData,
+} from '@/lib/clickhouseTweetPage'
+import type { ConversationTree, ThreadTweet } from '@/lib/threadUtils'
 import type { PortalTweet } from '@/lib/portal/types'
 import type { TweetData } from '@/lib/tweets/types'
+
+export type BulletinTweet = PortalTweet & {
+  /** Replies and their replies from archived members, oldest first. */
+  replies?: PortalTweet[]
+}
+const MAX_REPLIES = 20
+
+function replyCard(tweet: ThreadTweet): PortalTweet {
+  const media = (tweet as ThreadTweet & { media?: TweetData['media'] }).media
+  return {
+    id: tweet.tweet_id,
+    accountId: tweet.account_id,
+    username: tweet.username,
+    name: tweet.account_display_name,
+    avatar: tweet.avatar_media_url || null,
+    text: tweet.full_text,
+    createdAt: tweet.created_at,
+    observedAt: tweet.created_at,
+    likes: tweet.favorite_count || 0,
+    rts: tweet.retweet_count || 0,
+    media: (media || []).map((m) => ({
+      url: m.media_url,
+      type: m.media_type,
+      width: m.width,
+      height: m.height,
+    })),
+  }
+}
+/** Every archived reply beneath the notice, in posting order. */
+export function repliesTo(
+  tweetId: string,
+  tree: ConversationTree | null,
+): PortalTweet[] {
+  if (!tree) return []
+  const found: ThreadTweet[] = []
+  const queue = [...(tree.children[tweetId] || [])]
+  const seen = new Set<string>([tweetId])
+  while (queue.length) {
+    const id = queue.shift()!
+    if (seen.has(id)) continue
+    seen.add(id)
+    const tweet = tree.tweets[id]
+    if (
+      tweet &&
+      !(tweet as { is_deleted_placeholder?: boolean }).is_deleted_placeholder
+    )
+      found.push(tweet)
+    queue.push(...(tree.children[id] || []))
+  }
+  return found
+    .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
+    .slice(0, MAX_REPLIES)
+    .map(replyCard)
+}
 
 function card(tweet: TweetData): PortalTweet {
   const mapMedia = (items: TweetData['media'] | undefined) =>
@@ -60,15 +118,15 @@ export async function loadBulletinTweets(ids: string[]) {
       }>
     }>(['bulletin-sources'], new URLSearchParams({ ids: ids.join(',') })),
     (async () => {
-      const details: Array<TweetData | null> = []
-      // Avoid an unbounded fan-out of expensive full-fidelity detail queries.
+      const details: Array<ClickHouseTweetThreadPageData | null> = []
+      // Avoid an unbounded fan-out of expensive full-fidelity thread queries.
       for (let offset = 0; offset < ids.length; offset += 4) {
         details.push(
           ...(await Promise.all(
             ids
               .slice(offset, offset + 4)
               .map((id) =>
-                fetchClickHouseTweetPageData(id, (path, params) =>
+                fetchClickHouseTweetThreadPageData(id, (path, params) =>
                   fetchAnalyticsGatewayJson(path, params),
                 ).catch(() => null),
               ),
@@ -84,7 +142,7 @@ export async function loadBulletinTweets(ids: string[]) {
   const sources = new Map(
     current.data.map((source) => [source.tweet_id, source]),
   )
-  const tweets: PortalTweet[] = []
+  const tweets: BulletinTweet[] = []
   const errors: Record<string, number> = {}
   ids.forEach((id, index) => {
     const notice = notices.get(id)
@@ -93,7 +151,8 @@ export async function loadBulletinTweets(ids: string[]) {
       return
     }
     const source = sources.get(id)
-    const detail = details[index]
+    const page = details[index]
+    const detail = page?.tweet
     if (
       !source ||
       !detail ||
@@ -112,7 +171,7 @@ export async function loadBulletinTweets(ids: string[]) {
       errors[id] = 503
       return
     }
-    tweets.push(card(detail))
+    tweets.push({ ...card(detail), replies: repliesTo(id, page!.threadTree) })
   })
   return { tweets, errors }
 }

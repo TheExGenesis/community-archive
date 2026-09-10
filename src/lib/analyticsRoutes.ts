@@ -23,6 +23,7 @@ export const analyticsRoutes = {
   '/birdseye/profiles': ['birdseye_profiles', 'admin'],
   '/community': ['community', 'product'],
   '/opportunities': ['opportunities', 'product'],
+  '/opportunities/about': ['opportunities_about', 'information'],
   '/tools': ['tools', 'product'],
   '/explore': ['explore', 'product'],
   '/notes': ['notes', 'product'],

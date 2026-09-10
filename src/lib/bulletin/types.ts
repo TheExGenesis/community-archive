@@ -55,13 +55,40 @@ export type RunDashboard = {
   last_success_at: string | null
 }
 
+/**
+ * Chip order is deliberate: kinds where a response builds a connection come
+ * first, and the one that is purely about receiving comes last.
+ */
 export const KIND_LABELS: Record<string, string> = {
-  free: 'Free things',
-  opportunity: 'Work & collaboration',
-  invite: 'Invitations',
-  intro: 'Introductions',
   help: 'Help',
+  intro: 'Introductions',
+  invite: 'Invitations',
   feedback: 'Feedback',
+  opportunity: 'Work & collaboration',
+  free: 'Free things',
+}
+/** Phosphor icon name per kind; resolved in the client component. */
+export const KIND_ICONS: Record<string, string> = {
+  free: 'gift',
+  opportunity: 'briefcase',
+  invite: 'calendar',
+  intro: 'users',
+  help: 'hand-heart',
+  feedback: 'chats',
+}
+/** Card label combining side and kind, indexed [offer, ask]. */
+export const CARD_LABELS: Record<string, [string, string]> = {
+  free: ['Free', 'Free wanted'],
+  opportunity: ['Work offered', 'Work wanted'],
+  invite: ['Invitation', 'Company wanted'],
+  intro: ['Intro', 'Intro wanted'],
+  help: ['Help', 'Help wanted'],
+  feedback: ['Feedback', 'Feedback wanted'],
+}
+export function cardLabel(notice: { side: string; kind: string }) {
+  const pair = CARD_LABELS[notice.kind]
+  if (!pair) return notice.side === 'ask' ? 'Ask' : 'Offer'
+  return pair[notice.side === 'ask' ? 1 : 0]
 }
 export const RESPONSE_LABELS: Record<string, string> = {
   dm: 'Send a DM',
@@ -120,11 +147,13 @@ export type PromptDashboard = {
 export type PromptSaveResult = { error?: string; version?: string }
 
 export type BulletinFilters = {
+  /** 'all', or a sorted comma-separated set of kinds, e.g. 'feedback,help'. */
   kind: string
   side: string
   search: string
   past: boolean
   recommended: boolean
+  ascending: boolean
 }
 export type BulletinPage = {
   opportunities: Opportunity[]
@@ -137,13 +166,25 @@ export type BulletinPage = {
     username: string
     outgoing: Record<string, number>
     available: boolean
+    /** Accounts the viewer follows / is followed by, from archive uploads. */
+    following: string[]
+    followers: string[]
   }
 }
-export const BULLETIN_PAGE_SIZE = 4
+export function parseKinds(kind: string): string[] | null {
+  if (kind === 'all') return []
+  const parts = Array.from(new Set(kind.split(',').filter(Boolean))).sort()
+  return parts.length && parts.every((k) => k in KIND_LABELS) ? parts : null
+}
+export function kindKey(kinds: string[]) {
+  return kinds.length ? [...kinds].sort().join(',') : 'all'
+}
+export const BULLETIN_PAGE_SIZE = 18
 export const DEFAULT_BULLETIN_FILTERS: BulletinFilters = {
   kind: 'all',
   side: 'all',
   search: '',
   past: false,
   recommended: true,
+  ascending: false,
 }

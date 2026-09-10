@@ -189,15 +189,15 @@ function NoticeCard({
   const when = lifetime(notice, now)
   // Zero is hidden: the count only covers archived members, not all of X.
   const replies = uptake(notice) || null
-  const meta = (when || replies !== null || replied) && (
+  const meta = (when || (!open && (replies !== null || replied))) && (
     <p className={styles.meta}>
       {when && <span>{when}</span>}
-      {replied && (
+      {!open && replied && (
         <span className={styles.youReplied}>
           <PiCheck size={12} aria-hidden /> you replied
         </span>
       )}
-      {replies !== null && (
+      {!open && replies !== null && (
         <span
           className={styles.replies}
           aria-label={`${replies} ${replies === 1 ? 'reply' : 'replies'} from archived members`}
@@ -290,6 +290,7 @@ function NoticeCard({
                     noClamp
                     stacked
                     clickable={false}
+                    showEngagement={false}
                     showDate
                     origin="opportunities"
                     returnTo="/opportunities"

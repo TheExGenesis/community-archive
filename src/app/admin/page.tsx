@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import {
   Card,
@@ -112,6 +113,17 @@ export default async function AdminPage({
             <Badge variant="secondary">@{twitterUsername}</Badge>
           </div>
         </section>
+
+        <Link
+          href="/admin/keywords"
+          className="rounded-lg border bg-background p-5 hover:border-brand"
+        >
+          <span className="font-semibold text-brand">Keyword lab →</span>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Live trending terms, author weighting, phrase groups, and ranking
+            controls.
+          </p>
+        </Link>
 
         <Suspense
           fallback={<SectionSkeleton label="Loading recent privacy activity" />}

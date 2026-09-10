@@ -33,6 +33,7 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
   ]),
   'word-trend': new Set(['q', 'bucket', 'match', 'from', 'to']),
   'weekly-keywords': new Set(),
+  'keyword-lab': new Set(['days']),
   'stream-stats': new Set(['start', 'end', 'granularity', 'scope']),
   'recent-bangers': new Set(['limit', 'hours', 'end', 'target_ca_users_only']),
   'daily-interactions': new Set([

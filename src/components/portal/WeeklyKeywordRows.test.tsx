@@ -39,7 +39,7 @@ test('shows all groups, date-scoped phrase links, new terms, and falls to zero',
     ),
   ).toBeVisible()
   expect(
-    within(screen.getByRole('region', { name: 'Big and falling' })).getByText(
+    within(screen.getByRole('region', { name: 'Cooling off' })).getByText(
       '−100%',
     ),
   ).toBeVisible()

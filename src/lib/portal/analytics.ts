@@ -890,7 +890,11 @@ export async function fetchPortalWeeklyTrends(
 ): Promise<TermWeek[]> {
   try {
     return mapWeeklyKeywords(
-      await fetcher<WeeklyKeywordsResponse>(['weekly-keywords']),
+      await fetcher<WeeklyKeywordsResponse>(
+        ['weekly-keywords'],
+        new URLSearchParams(),
+        { timeoutMs: 60_000 },
+      ),
     )
   } catch (error) {
     // The gateway and website deploy independently. Only an absent route uses

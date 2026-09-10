@@ -16,8 +16,9 @@ const GROUPS = [
   },
   {
     lane: 'falling',
-    title: 'Big and falling',
-    description: 'Established terms losing the most share of conversation.',
+    title: 'Cooling off',
+    description:
+      'Terms previously in the top 20 breakouts or risers, now losing share.',
   },
 ] as const
 
@@ -75,7 +76,7 @@ export function WeeklyKeywordRows({
           className="text-right"
           title={
             dynamic
-              ? 'Change in the share of member tweets mentioning this term, compared with the previous complete week.'
+              ? 'Change in author-weighted share: each author contributes the square root of their posts mentioning the term. Compared with the previous complete week.'
               : undefined
           }
         >
@@ -104,7 +105,7 @@ export function WeeklyKeywordRows({
                   : row.deltaPct === null
                     ? '—'
                     : `${row.deltaPct >= 0 ? '+' : '−'}${Math.abs(row.deltaPct).toLocaleString('en-US')}%`
-              const details = `${row.last7.toLocaleString('en-US')} tweets${row.currentAuthors === undefined ? '' : ` from ${row.currentAuthors} authors`}; ${row.prev7.toLocaleString('en-US')} tweets in the previous week. ${dynamic ? 'Percentage compares shares of member tweets excluding retweets.' : ''}`
+              const details = `${row.last7.toLocaleString('en-US')} tweets${row.currentAuthors === undefined ? '' : ` from ${row.currentAuthors} authors`}; ${row.prev7.toLocaleString('en-US')} tweets in the previous week. ${dynamic ? 'Percentage compares author-weighted shares, excluding retweets.' : ''}`
               return (
                 <div
                   key={row.term}
@@ -151,7 +152,7 @@ export function WeeklyKeywordRows({
       ))}
       <p className={`mt-auto pt-2 text-[10px] leading-relaxed ${MUTED}`}>
         {dynamic
-          ? 'Share vs the previous week; excludes retweets.'
+          ? 'Author-weighted share vs the previous week; excludes retweets.'
           : 'Tweet counts vs the previous week.'}
         {through && <> Through {through} (UTC).</>}
       </p>

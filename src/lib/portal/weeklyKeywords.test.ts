@@ -35,7 +35,11 @@ const response: WeeklyKeywordsResponse = {
 test('maps discovered terms and complete date windows to the homepage', async () => {
   const fetcher = jest.fn().mockResolvedValue(response)
   const result = await fetchPortalWeeklyTrends(new Date('2026-09-07'), fetcher)
-  expect(fetcher).toHaveBeenCalledWith(['weekly-keywords'])
+  expect(fetcher).toHaveBeenCalledWith(
+    ['weekly-keywords'],
+    new URLSearchParams(),
+    { timeoutMs: 60000 },
+  )
   expect(result).toEqual([
     {
       term: 'ai agents',

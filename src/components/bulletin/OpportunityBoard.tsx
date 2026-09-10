@@ -225,23 +225,9 @@ function NoticeCard({
   const when = lifetime(notice, now)
   // Zero is hidden: the count only covers archived members, not all of X.
   const replies = uptake(notice) || null
-  const meta = (!open || when) && (
+  const meta = open && when && (
     <p className={styles.meta}>
-      {when && <span>{when}</span>}
-      {!open && replied && (
-        <span className={styles.youReplied}>
-          <PiCheck size={12} aria-hidden /> you replied
-        </span>
-      )}
-      {!open && replies !== null && (
-        <span
-          className={styles.replies}
-          aria-label={`${replies} ${replies === 1 ? 'reply' : 'replies'} from archived members`}
-        >
-          <PiChatCircle size={13} aria-hidden />
-          {replies}
-        </span>
-      )}
+      <span>{when}</span>
     </p>
   )
   const label = (
@@ -361,19 +347,10 @@ function NoticeCard({
         </>
       ) : (
         <>
-          <div className={styles.noticeHead}>
-            {label}
-            <span className={styles.readHint} aria-hidden>
-              click to read more
-            </span>
-            <time
-              dateTime={notice.posted_at}
-              title={exactStamp(notice.posted_at)}
-              className={styles.date}
-            >
-              {sinceLabel(notice.posted_at, now)}
-            </time>
-          </div>
+          {label}
+          <span className={styles.readHint} aria-hidden>
+            click to read more
+          </span>
           <button
             type="button"
             className={styles.summaryButton}
@@ -394,8 +371,30 @@ function NoticeCard({
               <span>{notice.display_name || `@${notice.username}`}</span>
             </Link>
             {follow && <span className={styles.follow}>{follow}</span>}
+            <span className={styles.facts}>
+              {when && <span>{when}</span>}
+              {replied && (
+                <span className={styles.youReplied}>
+                  <PiCheck size={12} aria-hidden /> you replied
+                </span>
+              )}
+              <time
+                dateTime={notice.posted_at}
+                title={exactStamp(notice.posted_at)}
+              >
+                {sinceLabel(notice.posted_at, now)}
+              </time>
+              {replies !== null && (
+                <span
+                  className={styles.replies}
+                  aria-label={`${replies} ${replies === 1 ? 'reply' : 'replies'} from archived members`}
+                >
+                  <PiChatCircle size={13} aria-hidden />
+                  {replies}
+                </span>
+              )}
+            </span>
           </div>
-          {meta}
         </>
       )}
     </article>

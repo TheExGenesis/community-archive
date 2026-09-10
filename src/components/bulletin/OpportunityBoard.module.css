@@ -335,7 +335,7 @@
   border: 1px solid var(--card-line);
   border-radius: 8px;
   background: var(--surface);
-  padding: 16px 16px 14px;
+  padding: 18px 16px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -349,6 +349,11 @@
   box-shadow: 0 1px 3px rgb(0 0 0 / 4%);
 }
 .readHint {
+  position: absolute;
+  top: -6px;
+  right: 14px;
+  padding: 0 6px;
+  background: var(--surface);
   font-size: 11px;
   line-height: 1;
   color: var(--faint);
@@ -384,8 +389,8 @@
   align-items: center;
   gap: 5px;
   min-width: 0;
-  border: 1px solid var(--card-line);
-  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 35%, var(--surface));
+  border-radius: 6px;
   background: var(--surface);
   font-size: 12px;
   font-weight: 600;
@@ -393,7 +398,7 @@
   white-space: nowrap;
 }
 .notice:hover .kind {
-  border-color: var(--line-strong);
+  border-color: color-mix(in srgb, currentColor 55%, var(--surface));
 }
 .kindButton {
   border: 0;
@@ -473,12 +478,12 @@
   color: inherit;
 }
 .summary {
-  /* Three lines reserved and clamped so author rows align across a row. */
+  /* Two lines reserved, three at most: even rows for the common case. */
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: calc(3 * 1.35em);
+  min-height: calc(2 * 1.35em);
   font-size: 14.5px;
   line-height: 1.35;
   font-weight: 600;
@@ -499,8 +504,23 @@
   gap: 6px;
   min-width: 0;
   height: 20px;
+  margin-top: 2px;
   font-size: 13px;
   color: var(--muted);
+}
+.facts {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.facts > * + *::before {
+  content: '·';
+  margin-right: 8px;
 }
 .author span {
   color: var(--muted);

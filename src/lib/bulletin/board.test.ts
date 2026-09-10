@@ -6,8 +6,8 @@ import {
   sortNotices,
   uptake,
 } from './board'
-import type { Opportunity } from './types'
-const notice = (id: string, side = 'offer'): Opportunity => ({
+import type { Notice } from './types'
+const notice = (id: string, side = 'offer'): Notice => ({
   tweet_id: id,
   account_id: id,
   username: id,

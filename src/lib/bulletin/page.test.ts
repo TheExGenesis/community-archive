@@ -57,7 +57,7 @@ afterEach(() => jest.restoreAllMocks())
 test('hydrates only one page of sources, keeps metadata private, and advances a single cursor', async () => {
   expect(BULLETIN_PAGE_SIZE).toBe(18)
   const first = await loadBulletinPage(filters)
-  expect(first.opportunities.map((o) => o.tweet_id)).toEqual(ids(40, 23))
+  expect(first.notices.map((o) => o.tweet_id)).toEqual(ids(40, 23))
   expect(hydrateBulletinNotices).toHaveBeenCalledTimes(1)
   expect(
     jest.mocked(hydrateBulletinNotices).mock.calls[0][0].notices,
@@ -65,14 +65,14 @@ test('hydrates only one page of sources, keeps metadata private, and advances a 
   expect(JSON.stringify(first)).not.toContain('content_hash')
   expect(first.cursors).toEqual({ help: '23' })
   const second = await loadBulletinPage(filters, first.cursors.help!)
-  expect(second.opportunities.map((o) => o.tweet_id)).toEqual(ids(22, 5))
+  expect(second.notices.map((o) => o.tweet_id)).toEqual(ids(22, 5))
   const third = await loadBulletinPage(filters, second.cursors.help!)
-  expect(third.opportunities.map((o) => o.tweet_id)).toEqual(ids(4, 1))
+  expect(third.notices.map((o) => o.tweet_id)).toEqual(ids(4, 1))
   expect(third.cursors.help).toBeNull()
 })
 test('pages the all-categories stream under one cursor with side and category counts', async () => {
   const page = await loadBulletinPage(DEFAULT_BULLETIN_FILTERS)
-  expect(page.opportunities).toHaveLength(18)
+  expect(page.notices).toHaveLength(18)
   expect(page.cursors).toEqual({ all: '23' })
   expect(page.counts).toMatchObject({
     help: 40,
@@ -88,7 +88,7 @@ test('refills holes from removed sources and rejects missing cursors', async () 
       notices.filter((o) => o.tweet_id !== '40'),
     )
   const first = await loadBulletinPage(filters)
-  expect(first.opportunities.map((o) => o.tweet_id)).toEqual(ids(39, 22))
+  expect(first.notices.map((o) => o.tweet_id)).toEqual(ids(39, 22))
   expect(first.counts.help).toBe(39)
   await expect(loadBulletinPage(filters, '999')).rejects.toBeInstanceOf(
     BulletinCursorExpired,
@@ -117,14 +117,14 @@ test('preserves self-quote renewal and full-text search beyond the first page', 
     jest.mocked(hydrateBulletinNotices).mock.calls[0][0].notices,
   ).toHaveLength(19)
   const result = await loadBulletinPage({ ...filters, search: 'needle' })
-  expect(result.opportunities.map((o) => o.tweet_id)).toEqual(['1'])
+  expect(result.notices.map((o) => o.tweet_id)).toEqual(['1'])
 })
 test('accepts a set of kinds and keys the cursor by that set', async () => {
   const page = await loadBulletinPage({
     ...DEFAULT_BULLETIN_FILTERS,
     kind: 'feedback,help',
   })
-  expect(page.opportunities).toHaveLength(18)
+  expect(page.notices).toHaveLength(18)
   expect(page.cursors).toEqual({ 'feedback,help': '23' })
   expect(page.counts.help).toBe(40)
 })

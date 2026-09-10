@@ -32,7 +32,7 @@ import {
   kindKey,
   parseKinds,
   type BulletinPage,
-  type Opportunity,
+  type Notice,
 } from '@/lib/bulletin/types'
 import {
   expiry,
@@ -43,7 +43,7 @@ import {
   uptake,
   type BulletinRelationships,
 } from '@/lib/bulletin/board'
-import styles from './OpportunityBoard.module.css'
+import styles from './BulletinBoard.module.css'
 
 const loadTweetCard = () => import('@/components/TweetCard')
 const ExpandedTweetCard = lazy(() =>
@@ -151,14 +151,14 @@ function shortDate(value: string) {
   })
 }
 /** Only a date the author gave. Default lifetimes are not shown as if stated. */
-function lifetime(notice: Opportunity, now: number) {
+function lifetime(notice: Notice, now: number) {
   if (!notice.expires_at) return ''
   const until = expiry(notice)!
   const date = shortDate(new Date(until - 1).toISOString())
   return until <= now ? `ended ${date}` : `until ${date}`
 }
 /** A secondary action only when the tweet asks for a DM. Opening the tweet always works. */
-function secondaryAction(notice: Opportunity) {
+function secondaryAction(notice: Notice) {
   if (notice.respond !== 'dm') return null
   return {
     label: 'DM on X',
@@ -176,7 +176,7 @@ function NoticeCard({
   order,
   onKind,
 }: {
-  notice: Opportunity
+  notice: Notice
   loadTweet: (id: string) => Promise<BulletinTweet>
   badge: string
   follow: string
@@ -296,7 +296,7 @@ function NoticeCard({
                 showDate
                 stacked
                 origin="opportunities"
-                returnTo="/opportunities"
+                returnTo="/bulletin"
               />
             </Suspense>
             {!tweet && !error && (
@@ -337,7 +337,7 @@ function NoticeCard({
                 href={tweetPermalinkHref(
                   notice.tweet_id,
                   'opportunities',
-                  '/opportunities',
+                  '/bulletin',
                 )}
               >
                 See on CA
@@ -363,7 +363,7 @@ function NoticeCard({
                   showEngagement={false}
                   showDate
                   origin="opportunities"
-                  returnTo="/opportunities"
+                  returnTo="/bulletin"
                 />
               ))}
             </div>
@@ -430,8 +430,8 @@ function NoticeCard({
   )
 }
 
-export function OpportunityBoard({
-  opportunities,
+export function BulletinBoard({
+  notices,
   initialPage,
   me = '',
   username = '',
@@ -439,7 +439,7 @@ export function OpportunityBoard({
   now = Date.now(),
   isAdmin = false,
 }: {
-  opportunities: Opportunity[]
+  notices: Notice[]
   initialPage?: BulletinPage
   me?: string
   username?: string
@@ -462,7 +462,7 @@ export function OpportunityBoard({
     { kind, side, search, past, recommended, ascending },
     hydrated,
   )
-  const loaded = pages.page?.opportunities || opportunities
+  const loaded = pages.page?.notices || notices
   useEffect(() => {
     // Warm the expanded-card chunk so the first click does not flash.
     const warm = () => void loadTweetCard().catch(() => {})
@@ -501,7 +501,7 @@ export function OpportunityBoard({
     )
   }, [kind, side, past, recommended, ascending, hydrated])
   const needle = search.trim().toLowerCase()
-  const matches = (o: Opportunity) =>
+  const matches = (o: Notice) =>
     (past || !isPast(o, now)) &&
     [o.summary, o.preview_text, o.username, o.place, ...o.topics]
       .filter(Boolean)
@@ -553,7 +553,7 @@ export function OpportunityBoard({
     <>
       <header className={styles.head}>
         <div className={styles.titleRow}>
-          <h1 className={styles.title}>Opportunities</h1>
+          <h1 className={styles.title}>Bulletin</h1>
           <details className={styles.about}>
             <summary aria-label="About this board">
               <PiQuestion size={20} aria-hidden />
@@ -575,7 +575,7 @@ export function OpportunityBoard({
                 Reply counts and follow labels come from the archive, so they
                 only see members. Read the tweet before acting on it.
               </p>
-              <Link href="/opportunities/about" className={styles.aboutLink}>
+              <Link href="/bulletin/about" className={styles.aboutLink}>
                 How the scan, lifetimes and ordering work →
               </Link>
             </div>
@@ -770,7 +770,7 @@ export function OpportunityBoard({
           Thanks to <Link href="/user/maskys_">@maskys_</Link> for the first
           prototype.
         </p>
-        {isAdmin && <Link href="/admin/opportunities">Run dashboard →</Link>}
+        {isAdmin && <Link href="/admin/bulletin">Run dashboard →</Link>}
       </footer>
     </>
   )

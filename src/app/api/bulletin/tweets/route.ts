@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { requireOpportunityUser } from '@/lib/bulletin/data'
+import { requireBulletinUser } from '@/lib/bulletin/data'
 import { loadBulletinTweets } from '@/lib/bulletin/tweets'
 
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
 export async function GET(request: Request) {
-  await requireOpportunityUser()
+  await requireBulletinUser()
   const ids = Array.from(
     new Set((new URL(request.url).searchParams.get('ids') || '').split(',')),
   )

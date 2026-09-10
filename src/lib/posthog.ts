@@ -81,6 +81,7 @@ const isTweetCardAction = isOneOf([
   'open_quoted_tweet',
 ])
 const isTweetOrigin = isOneOf([
+  // 'opportunities' is the Bulletin page's launch name, kept for event continuity.
   'opportunities',
   'bangers',
   'digest',

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
-import { OpportunityBoard, dealStacks, sinceLabel } from './OpportunityBoard'
-import type { Opportunity } from '@/lib/bulletin/types'
-jest.mock('./OpportunityBoard.module.css', () => ({}))
+import { BulletinBoard, dealStacks, sinceLabel } from './BulletinBoard'
+import type { Notice } from '@/lib/bulletin/types'
+jest.mock('./BulletinBoard.module.css', () => ({}))
 const offer = {
   tweet_id: '1',
   account_id: 'a',
@@ -18,7 +18,7 @@ const offer = {
   expires_at: null,
   place: null,
   model: 'test',
-} as unknown as Opportunity
+} as unknown as Notice
 const ask = {
   ...offer,
   tweet_id: '2',
@@ -47,7 +47,7 @@ const category = () => screen.getByRole('group', { name: 'Category' })
 const chip = (name: RegExp) => within(category()).getByRole('button', { name })
 beforeEach(() => {
   jest.useFakeTimers()
-  window.history.replaceState(null, '', '/opportunities')
+  window.history.replaceState(null, '', '/bulletin')
   intersections = []
   observed = new Map()
   window.IntersectionObserver = jest.fn((callback) => {
@@ -70,8 +70,8 @@ beforeEach(() => {
 afterEach(() => jest.useRealTimers())
 test('loads full details only on inline expansion', async () => {
   render(
-    <OpportunityBoard
-      opportunities={[offer, ask]}
+    <BulletinBoard
+      notices={[offer, ask]}
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
@@ -108,8 +108,8 @@ test('loads full details only on inline expansion', async () => {
 })
 test('shows one stream with combined labels, and combines side, category and search filters', () => {
   render(
-    <OpportunityBoard
-      opportunities={[offer, ask]}
+    <BulletinBoard
+      notices={[offer, ask]}
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
@@ -152,8 +152,8 @@ test('shows one stream with combined labels, and combines side, category and sea
 })
 test('past toggle includes expired notices and preserves filters in the URL', () => {
   render(
-    <OpportunityBoard
-      opportunities={[{ ...offer, expires_at: '2026-09-01' }]}
+    <BulletinBoard
+      notices={[{ ...offer, expires_at: '2026-09-01' }]}
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
@@ -166,8 +166,8 @@ test('past toggle includes expired notices and preserves filters in the URL', ()
 })
 test('shows the ledger and relationship words only from own account and outgoing counts', () => {
   render(
-    <OpportunityBoard
-      opportunities={[
+    <BulletinBoard
+      notices={[
         offer,
         { ...ask, replies: 2, quotes: 1, reply_account_ids: ['a'] },
       ]}
@@ -195,8 +195,8 @@ test('shows the ledger and relationship words only from own account and outgoing
 })
 test('coalesces expanded cards and reuses their details after filtering', async () => {
   render(
-    <OpportunityBoard
-      opportunities={[offer, ask]}
+    <BulletinBoard
+      notices={[offer, ask]}
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
@@ -234,8 +234,8 @@ test('automatically pages once per sentinel and preserves global search and coun
     summary: `Offer number ${i + 1}`,
   }))
   render(
-    <OpportunityBoard
-      opportunities={notices}
+    <BulletinBoard
+      notices={notices}
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
@@ -269,10 +269,8 @@ test('automatically pages once per sentinel and preserves global search and coun
 test('expands to verified text before richer details arrive', async () => {
   jest.mocked(fetch).mockImplementation(() => new Promise(() => {}))
   render(
-    <OpportunityBoard
-      opportunities={[
-        { ...offer, preview_text: 'Verified complete original text' },
-      ]}
+    <BulletinBoard
+      notices={[{ ...offer, preview_text: 'Verified complete original text' }]}
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
@@ -290,8 +288,8 @@ test('expands to verified text before richer details arrive', async () => {
   expect(screen.getByText('Loading post details…')).toBeInTheDocument()
 })
 
-const page = (notices: Opportunity[], cursor: string | null = null) => ({
-  opportunities: notices,
+const page = (notices: Notice[], cursor: string | null = null) => ({
+  notices,
   counts: { help: 8, offer: 8, ask: 0 },
   cursors: { all: cursor },
   total: 8,
@@ -312,11 +310,7 @@ test('requests and appends a server page on scroll without fetching tweet detail
     .mocked(fetch)
     .mockResolvedValue({ ok: true, json: async () => page([more]) } as Response)
   render(
-    <OpportunityBoard
-      opportunities={[offer]}
-      initialPage={initial}
-      now={initial.now}
-    />,
+    <BulletinBoard notices={[offer]} initialPage={initial} now={initial.now} />,
   )
   expect(fetch).not.toHaveBeenCalled()
   expect(chip(/^Help/)).toHaveTextContent('8')
@@ -351,11 +345,7 @@ test('searches the server for unloaded matches and ignores stale filter response
       page([{ ...offer, tweet_id: '99', summary: 'Unloaded match' }]),
   } as Response)
   render(
-    <OpportunityBoard
-      opportunities={[offer]}
-      initialPage={initial}
-      now={initial.now}
-    />,
+    <BulletinBoard notices={[offer]} initialPage={initial} now={initial.now} />,
   )
   fireEvent.change(screen.getByLabelText('Filter notices'), {
     target: { value: 'old' },
@@ -377,8 +367,8 @@ test('searches the server for unloaded matches and ignores stale filter response
 })
 test('clicking a kind on a card filters to that kind and clicking again clears it', () => {
   render(
-    <OpportunityBoard
-      opportunities={[offer, ask]}
+    <BulletinBoard
+      notices={[offer, ask]}
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
@@ -393,8 +383,8 @@ test('clicking a kind on a card filters to that kind and clicking again clears i
 })
 test('clicking anywhere on a closed card expands it, except links and buttons', async () => {
   render(
-    <OpportunityBoard
-      opportunities={[offer]}
+    <BulletinBoard
+      notices={[offer]}
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
@@ -422,8 +412,8 @@ test('renders member replies beneath the expanded tweet', async () => {
     }),
   } as Response)
   render(
-    <OpportunityBoard
-      opportunities={[offer]}
+    <BulletinBoard
+      notices={[offer]}
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
@@ -446,7 +436,7 @@ test('dates read as time since posting, with the exact stamp on hover', () => {
   expect(sinceLabel('2026-08-19T12:00:00Z', now)).toBe('3wk ago')
   expect(sinceLabel('2026-06-10T12:00:00Z', now)).toBe('Jun 10')
   expect(sinceLabel('2025-06-10T12:00:00Z', now)).toBe('Jun 10, 2025')
-  render(<OpportunityBoard opportunities={[offer]} now={now} />)
+  render(<BulletinBoard notices={[offer]} now={now} />)
   expect(screen.getByText('2d ago')).toHaveAttribute(
     'title',
     'Sep 8, 2026, 00:00 UTC',
@@ -467,8 +457,8 @@ test('deals cards round-robin into three stacks and keeps rank order via style o
     summary: `Offer number ${i + 1}`,
   }))
   render(
-    <OpportunityBoard
-      opportunities={notices}
+    <BulletinBoard
+      notices={notices}
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )

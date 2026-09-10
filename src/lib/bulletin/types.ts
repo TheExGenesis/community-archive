@@ -1,6 +1,6 @@
 import type { Database } from '@/database-types'
 
-export type Opportunity = Omit<
+export type Notice = Omit<
   Database['public']['Functions']['get_bulletin_opportunities']['Returns'][number],
   'full_text' | 'model' | 'expires_at' | 'place'
 > & {
@@ -156,7 +156,7 @@ export type BulletinFilters = {
   ascending: boolean
 }
 export type BulletinPage = {
-  opportunities: Opportunity[]
+  notices: Notice[]
   counts: Record<string, number>
   cursors: Record<string, string | null>
   total: number

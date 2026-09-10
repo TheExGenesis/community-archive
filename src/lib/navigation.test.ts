@@ -32,7 +32,7 @@ describe('member navigation', () => {
     expect(getPrimaryNav(true)).toEqual([
       { href: '/bangers?period=week', label: 'Bangers' },
       { href: '/digest', label: 'Digest' },
-      { href: '/opportunities', label: 'Opportunities' },
+      { href: '/bulletin', label: 'Bulletin' },
       { href: '/user-dir', label: 'Users' },
       { href: '/community', label: 'Apps' },
       { href: '/trends', label: 'Trends' },
@@ -163,16 +163,14 @@ describe('tweet detail navigation', () => {
   })
 })
 
-test('opportunities navigation is signed-in only and preserves the source return link', () => {
-  expect(
-    getPrimaryNav(false).some((item) => item.href === '/opportunities'),
-  ).toBe(false)
-  expect(getMobileNav(true)).toContainEqual({
-    href: '/opportunities',
-    label: 'Opportunities',
-  })
-  expect(navAnalyticsDestination('/opportunities')).toBe('opportunities')
-  expect(getTweetBackLink({ from: 'opportunities' }).href).toBe(
-    '/opportunities',
+test('bulletin navigation is signed-in only and preserves the source return link', () => {
+  expect(getPrimaryNav(false).some((item) => item.href === '/bulletin')).toBe(
+    false,
   )
+  expect(getMobileNav(true)).toContainEqual({
+    href: '/bulletin',
+    label: 'Bulletin',
+  })
+  expect(navAnalyticsDestination('/bulletin')).toBe('opportunities')
+  expect(getTweetBackLink({ from: 'opportunities' }).href).toBe('/bulletin')
 })

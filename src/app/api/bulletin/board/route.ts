@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { requireOpportunityUser } from '@/lib/bulletin/data'
+import { requireBulletinUser } from '@/lib/bulletin/data'
 import { BulletinCursorExpired, loadBulletinPage } from '@/lib/bulletin/page'
 import { parseKinds } from '@/lib/bulletin/types'
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
 export async function GET(request: Request) {
-  await requireOpportunityUser()
+  await requireBulletinUser()
   const p = new URL(request.url).searchParams
   const kind = p.get('kind') || 'all'
   const side = p.get('side') || 'all'

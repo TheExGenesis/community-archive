@@ -3,7 +3,7 @@ import { GET as BATCH_GET } from '@/app/api/bulletin/tweets/route'
 import { GET } from '@/app/api/bulletin/tweet/[id]/route'
 import {
   loadBulletinBoardState,
-  requireOpportunityUser,
+  requireBulletinUser,
   type StoredNotice,
 } from './data'
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
@@ -12,7 +12,7 @@ import type { TweetData } from '@/lib/tweets/types'
 
 jest.mock('./data', () => ({
   loadBulletinBoardState: jest.fn(),
-  requireOpportunityUser: jest.fn(),
+  requireBulletinUser: jest.fn(),
 }))
 jest.mock('@/lib/clickhouseGateway', () => ({
   fetchAnalyticsGatewayJson: jest.fn(),
@@ -76,7 +76,7 @@ test('starts independent reads together but does not publish until consent state
   })
 })
 test('never starts reads before authentication succeeds', async () => {
-  jest.mocked(requireOpportunityUser).mockRejectedValue(new Error('Sign in'))
+  jest.mocked(requireBulletinUser).mockRejectedValue(new Error('Sign in'))
   await expect(call()).rejects.toThrow('Sign in')
   expect(fetchAnalyticsGatewayJson).not.toHaveBeenCalled()
   expect(loadBulletinBoardState).not.toHaveBeenCalled()
@@ -169,7 +169,7 @@ test.each(['', 'bad', '1,2,3,4,5,6,7,8,9'])(
 )
 
 test('batch reads require authentication', async () => {
-  jest.mocked(requireOpportunityUser).mockRejectedValue(new Error('Sign in'))
+  jest.mocked(requireBulletinUser).mockRejectedValue(new Error('Sign in'))
   await expect(
     BATCH_GET(new Request('http://localhost/api/bulletin/tweets?ids=123')),
   ).rejects.toThrow('Sign in')

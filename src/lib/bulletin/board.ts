@@ -1,4 +1,4 @@
-import type { Opportunity } from './types'
+import type { Notice } from './types'
 
 export type BulletinRelationships = {
   outgoing: Record<string, number>
@@ -15,7 +15,7 @@ export function followLabel(accountId: string, graph: BulletinRelationships) {
   if (followed) return 'follows you'
   return ''
 }
-export function expiry(notice: Opportunity): number | null {
+export function expiry(notice: Notice): number | null {
   if (notice.expires_at)
     return Date.parse(notice.expires_at + 'T00:00:00Z') + 86400000
   if (notice.standing) return null
@@ -25,20 +25,20 @@ export function expiry(notice: Opportunity): number | null {
   )
   return start + (notice.side === 'ask' ? 14 : 60) * 86400000
 }
-export function isPast(notice: Opportunity, now: number) {
+export function isPast(notice: Notice, now: number) {
   const until = expiry(notice)
   return until !== null && until <= now
 }
 /** Public replies plus quote posts by archived members, once hydrated. */
-export function uptake(notice: Opportunity): number | null {
+export function uptake(notice: Notice): number | null {
   if (notice.replies === undefined && notice.quotes === undefined) return null
   return (notice.replies || 0) + (notice.quotes || 0)
 }
-function unansweredAsk(notice: Opportunity) {
+function unansweredAsk(notice: Notice) {
   return notice.side === 'ask' && uptake(notice) === 0
 }
 export function relationship(
-  notice: Opportunity,
+  notice: Notice,
   me: string,
   graph: BulletinRelationships,
 ) {
@@ -54,14 +54,14 @@ export function relationship(
  * order inside the active/past split.
  */
 export function sortNotices(
-  notices: Opportunity[],
+  notices: Notice[],
   recommended: boolean,
   me: string,
   graph: BulletinRelationships,
   now: number,
   ascending = false,
 ) {
-  const inner = (a: Opportunity, b: Opportunity) =>
+  const inner = (a: Notice, b: Notice) =>
     (recommended
       ? relationship(a, me, graph).rank - relationship(b, me, graph).rank ||
         Number(unansweredAsk(b)) - Number(unansweredAsk(a)) ||

@@ -389,8 +389,10 @@
   align-items: center;
   gap: 5px;
   min-width: 0;
-  border: 1px solid var(--card-line);
-  border-radius: 6px;
+  /* Bracket ticks only: the label reads as slotted into the border line. */
+  border: 0;
+  border-left: 1px solid var(--line-strong);
+  border-right: 1px solid var(--line-strong);
   background: var(--surface);
   font-size: 12px;
   font-weight: 600;
@@ -398,7 +400,7 @@
   white-space: nowrap;
 }
 .notice:hover .kind {
-  border-color: var(--line-strong);
+  border-color: var(--faint);
 }
 .kindButton {
   border: 0;

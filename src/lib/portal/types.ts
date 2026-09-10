@@ -78,6 +78,10 @@ export interface PortalStats {
 }
 
 export interface TermWeek {
+  /** Present for automatically discovered, share-normalized homepage terms. */
+  lane?: 'emerging' | 'rising' | 'falling'
+  currentAuthors?: number
+  previousAuthors?: number
   sinceDate?: string
   untilDate?: string
   term: string

@@ -17,10 +17,14 @@ export const SERIES_COLORS = [
 ]
 export const DEFAULT_TREND_TERMS = CHART_TERMS.map(({ term }) => term)
 
-export function isDefaultTrendSet(terms: string[]): boolean {
+export function isDefaultTrendSet(
+  terms: string[],
+  defaults = DEFAULT_TREND_TERMS,
+): boolean {
   return (
-    terms.length === DEFAULT_TREND_TERMS.length &&
-    terms.every((term, index) => term === DEFAULT_TREND_TERMS[index])
+    terms.length > 0 &&
+    terms.length === defaults.length &&
+    terms.every((term, index) => term === defaults[index])
   )
 }
 

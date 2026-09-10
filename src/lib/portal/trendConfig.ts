@@ -2,7 +2,7 @@ import type { PortalTrends } from './types'
 
 export const FIRST_TREND_YEAR = 2019
 
-/** Default terms plotted when the trends explorer first loads. */
+/** Legacy seed terms for compatibility snapshots; the explorer uses live keywords. */
 export const CHART_TERMS: { term: string; color: string }[] = [
   { term: 'tpot', color: '#3b82f6' },
   { term: 'postrat', color: '#f59e0b' },

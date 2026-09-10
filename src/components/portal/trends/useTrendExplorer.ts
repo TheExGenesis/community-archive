@@ -8,7 +8,6 @@ import {
   useState,
   type FormEvent,
 } from 'react'
-import { CHART_TERMS } from '@/lib/portal/trendConfig'
 import {
   clampTrendRange,
   parseTrendExplorerState,
@@ -22,7 +21,7 @@ import type {
   TrendGranularity,
 } from '@/lib/portal/types'
 import { capturePostHogEvent } from '@/lib/posthog'
-import { requestTrendSeries } from './requests'
+import { requestDefaultKeywords, requestTrendSeries } from './requests'
 import {
   annualSeries,
   snapshotBuckets,
@@ -32,7 +31,6 @@ import {
 import {
   MAX_SERIES,
   SERIES_COLORS,
-  DEFAULT_TREND_TERMS,
   isDefaultTrendSet,
   type TrendsExplorerAction,
 } from './config'
@@ -48,11 +46,16 @@ export function useTrendExplorer({
   initialLoadFailed: boolean
   initialSearch: string
 }) {
+  const [weekly, setWeekly] = useState(initialTrends.weekly)
+  const defaultTerms = useMemo(
+    () =>
+      (weekly.length ? weekly : initialTrends.series)
+        .map(({ term }) => term)
+        .slice(0, MAX_SERIES),
+    [weekly, initialTrends.series],
+  )
   const initialUrlState = useRef(
-    parseTrendExplorerState(
-      initialSearch,
-      initialTrends.series.map(({ term }) => term),
-    ),
+    parseTrendExplorerState(initialSearch, defaultTerms),
   ).current
   const initialAnnualSeries = useRef(annualSeries(initialTrends)).current
   const initialAnnualByTerm = useMemo(
@@ -98,8 +101,9 @@ export function useTrendExplorer({
   const [termInput, setTermInput] = useState('')
   const [isAdding, setIsAdding] = useState(false)
   const [isLoadingSeries, setIsLoadingSeries] = useState(
-    initialUrlState.granularity === 'month' ||
-      initialUrlState.terms.some((term) => !initialAnnualByTerm.has(term)),
+    initialUrlState.terms.length > 0 &&
+      (initialUrlState.granularity === 'month' ||
+        initialUrlState.terms.some((term) => !initialAnnualByTerm.has(term))),
   )
   const [isRetryingDefaults, setIsRetryingDefaults] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
@@ -116,6 +120,11 @@ export function useTrendExplorer({
   const seriesRequestIdRef = useRef(0)
   const loadConfiguredSeries = useCallback(
     async (terms: string[], nextGranularity: TrendGranularity) => {
+      if (!terms.length) {
+        setSeries([])
+        setIsLoadingSeries(false)
+        return
+      }
       const requestId = ++seriesRequestIdRef.current
       setIsLoadingSeries(true)
       setChartError(null)
@@ -197,7 +206,7 @@ export function useTrendExplorer({
     const needsSeriesRequest =
       granularity === 'month' ||
       configuredTerms.some((term) => !initialAnnualByTerm.has(term))
-    if (needsSeriesRequest) {
+    if (needsSeriesRequest && configuredTerms.length) {
       void loadConfiguredSeries(configuredTerms, granularity)
     }
     // Only hydrate series missing from the server snapshot on first mount.
@@ -240,6 +249,7 @@ export function useTrendExplorer({
 
   const addTerms = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (isLoadingSeries) return
     setAddError(null)
 
     const requested = Array.from(
@@ -259,7 +269,7 @@ export function useTrendExplorer({
     const alreadyPresent = requested.filter((term) => existing.has(term))
     const newTerms = requested.filter((term) => !existing.has(term))
     const replaceDefaults =
-      newTerms.length > 0 && isDefaultTrendSet(configuredTerms)
+      newTerms.length > 0 && isDefaultTrendSet(configuredTerms, defaultTerms)
     const nextConfiguredTerms = replaceDefaults
       ? [...alreadyPresent, ...newTerms]
       : [...configuredTerms, ...newTerms]
@@ -351,20 +361,22 @@ export function useTrendExplorer({
   const retryDefaultTrends = async () => {
     setIsRetryingDefaults(true)
     try {
-      const body = await requestTrendSeries(DEFAULT_TREND_TERMS, granularity)
-      const defaultColors = new Map(
-        CHART_TERMS.map(({ term, color }) => [term, color]),
-      )
-      const defaults = body.series.map((item) => ({
+      const nextWeekly = await requestDefaultKeywords()
+      const terms = nextWeekly.map((row) => row.term).slice(0, MAX_SERIES)
+      const body = terms.length
+        ? await requestTrendSeries(terms, granularity)
+        : { buckets: [], series: [] }
+      setWeekly(nextWeekly)
+      const defaults = body.series.map((item, index) => ({
         ...item,
-        color: defaultColors.get(item.term) ?? item.color,
+        color: SERIES_COLORS[index % SERIES_COLORS.length],
       }))
       setBuckets(body.buckets)
       setSeries(defaults)
-      setConfiguredTerms(DEFAULT_TREND_TERMS)
+      setConfiguredTerms(terms)
       setChartEnabled(
         Object.fromEntries(
-          defaults.map(({ term }, index) => [term, index < 4]),
+          defaults.map(({ term }, index) => [term, index < 6]),
         ),
       )
       setFeedFilters(
@@ -377,7 +389,7 @@ export function useTrendExplorer({
       )
       captureExplorerAction('retry_defaults', {
         seriesCount: defaults.length,
-        enabledSeriesCount: Math.min(defaults.length, 4),
+        enabledSeriesCount: Math.min(defaults.length, 6),
         includedSeriesCount: defaults.length > 0 ? 1 : 0,
       })
       setChartError(null)
@@ -406,6 +418,7 @@ export function useTrendExplorer({
   }
 
   return {
+    weekly,
     configuredTerms,
     granularity,
     buckets,

@@ -1,4 +1,11 @@
-import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
+import {
+  AnalyticsGatewayError,
+  fetchAnalyticsGatewayJson,
+} from '@/lib/clickhouseGateway'
+import {
+  mapWeeklyKeywords,
+  type WeeklyKeywordsResponse,
+} from './weeklyKeywords'
 import { CHART_TERMS, FIRST_TREND_YEAR, TREND_COLORS } from './trendConfig'
 import type {
   PortalBangersPage,
@@ -877,7 +884,23 @@ export async function fetchPortalTrends(
 }
 
 /** The homepage displays only weekly bars, including for signed-in visitors. */
-export async function fetchPortalWeeklyTrends() {
-  return (await fetchPortalTrends(new Date(), fetchAnalyticsGatewayJson, false))
-    .weekly
+export async function fetchPortalWeeklyTrends(
+  now = new Date(),
+  fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
+): Promise<TermWeek[]> {
+  try {
+    return mapWeeklyKeywords(
+      await fetcher<WeeklyKeywordsResponse>(
+        ['weekly-keywords'],
+        new URLSearchParams(),
+        { timeoutMs: 60_000 },
+      ),
+    )
+  } catch (error) {
+    // The gateway and website deploy independently. Only an absent route uses
+    // the old watchlist; upstream failures remain failures rather than fake data.
+    if (!(error instanceof AnalyticsGatewayError) || error.status !== 404)
+      throw error
+    return (await fetchPortalTrends(now, fetcher, false)).weekly
+  }
 }

@@ -56,8 +56,8 @@ describe('portal trends route', () => {
 
   test('normalizes and deduplicates concurrent series terms', async () => {
     fetchPortalTrendSeriesMock.mockResolvedValue({
-      granularity: 'year',
-      buckets: ['2026'],
+      granularity: 'month',
+      buckets: ['2026-08'],
       series: [],
       computedAt: '2026-08-07T12:00:00.000Z',
     })
@@ -73,7 +73,7 @@ describe('portal trends route', () => {
       ['alpha', 'ai agents'],
       expect.any(Date),
       undefined,
-      'year',
+      'month',
     )
   })
 

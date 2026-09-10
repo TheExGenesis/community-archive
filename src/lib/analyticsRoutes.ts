@@ -38,6 +38,7 @@ export const analyticsRoutes = {
   '/missing-accounts': ['missing_accounts', 'utility'],
   '/mission-control': ['mission_control', 'admin'],
   '/admin': ['admin', 'admin'],
+  '/admin/keywords': ['admin_keywords', 'admin'],
   '/admin/digest': ['admin_digest', 'admin'],
   '/admin/bulletin': ['admin_opportunities', 'admin'],
   '/login': ['login', 'authentication'],

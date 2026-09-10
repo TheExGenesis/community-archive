@@ -151,6 +151,17 @@ export default async function AdminPage({
         </section>
 
         <Link
+          href="/admin/keywords"
+          className="rounded-lg border bg-background p-5 hover:border-brand"
+        >
+          <span className="font-semibold text-brand">Keyword lab →</span>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Live trending terms, author weighting, phrase groups, and ranking
+            controls.
+          </p>
+        </Link>
+
+        <Link
           href="/admin/bulletin"
           className="rounded-lg border bg-card p-5 transition-colors hover:bg-accent"
         >

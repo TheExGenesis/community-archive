@@ -404,8 +404,11 @@
   align-items: center;
   gap: 5px;
   min-width: 0;
-  /* No box: the label's background simply interrupts the border line. */
+  /* Rounded bracket strokes: side borders only, with the corners rounded. */
   border: 0;
+  border-left: 1px solid var(--line-strong);
+  border-right: 1px solid var(--line-strong);
+  border-radius: 7px;
   background: var(--surface);
   font-size: 12px;
   font-weight: 600;

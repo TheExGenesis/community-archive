@@ -354,21 +354,24 @@
   top: -6px;
   right: 10px;
   height: 12px;
-  padding: 0 6px;
-  background: var(--surface);
   font-size: 11px;
   line-height: 1;
   color: var(--faint);
   white-space: nowrap;
-  display: grid;
 }
-.corner > * {
-  grid-area: 1 / 1;
+.age,
+.readHint {
+  display: inline-block;
+  height: 12px;
+  padding: 0 6px;
+  background: var(--surface);
   transition: opacity 0.12s;
 }
 .readHint {
+  position: absolute;
+  top: 0;
+  right: 0;
   opacity: 0;
-  justify-self: end;
 }
 .notice:hover .age {
   opacity: 0;

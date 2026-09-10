@@ -349,6 +349,7 @@
 }
 .readHint {
   font-size: 11px;
+  line-height: 1;
   color: var(--faint);
   white-space: nowrap;
   opacity: 0;
@@ -370,18 +371,21 @@
   min-width: 0;
 }
 .kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
   font-size: 12px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .kindButton {
   border: 0;
   background: transparent;
   padding: 0;
   font: inherit;
+  line-height: 1;
   color: inherit;
   cursor: pointer;
   border-radius: 3px;
@@ -409,13 +413,24 @@
   color: var(--ask);
 }
 .rel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--faint);
   font-weight: 500;
+  line-height: 1;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rel::before {
+  content: '·';
+  color: var(--faint);
 }
 .date {
   margin-left: auto;
   font-size: 11px;
+  line-height: 1;
   color: var(--faint);
   white-space: nowrap;
 }

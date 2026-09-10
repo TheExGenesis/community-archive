@@ -221,8 +221,8 @@ function NoticeCard({
         <KindIcon kind={notice.kind} size={13} />
         {cardLabel(notice)}
       </button>
-      {badge && <span className={styles.rel}> · {badge}</span>}
-      {notice.place && <span className={styles.rel}> · {notice.place}</span>}
+      {badge && <span className={styles.rel}>{badge}</span>}
+      {notice.place && <span className={styles.rel}>{notice.place}</span>}
     </span>
   )
   return (

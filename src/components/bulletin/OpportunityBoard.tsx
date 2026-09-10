@@ -103,6 +103,42 @@ function ScrollMore({ count, onMore }: { count: number; onMore: () => void }) {
   )
 }
 
+/** "3h ago", "4d ago", "3wk ago"; a short date once it is older than ~2 months. */
+export function sinceLabel(value: string, now: number) {
+  const diff = now - Date.parse(value)
+  if (diff < 60_000) return 'just now'
+  const minutes = Math.round(diff / 60_000)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.round(hours / 24)
+  if (days < 7) return `${days}d ago`
+  const weeks = Math.round(days / 7)
+  if (weeks < 9) return `${weeks}wk ago`
+  const date = new Date(value)
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year:
+      date.getUTCFullYear() === new Date(now).getUTCFullYear()
+        ? undefined
+        : 'numeric',
+    timeZone: 'UTC',
+  })
+}
+function exactStamp(value: string) {
+  return (
+    new Date(value).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'UTC',
+    }) + ' UTC'
+  )
+}
 function shortDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', {
     month: 'short',
@@ -330,8 +366,12 @@ function NoticeCard({
             <span className={styles.readHint} aria-hidden>
               click to read more
             </span>
-            <time dateTime={notice.posted_at} className={styles.date}>
-              {shortDate(notice.posted_at)}
+            <time
+              dateTime={notice.posted_at}
+              title={exactStamp(notice.posted_at)}
+              className={styles.date}
+            >
+              {sinceLabel(notice.posted_at, now)}
             </time>
           </div>
           <button

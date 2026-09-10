@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
-import { OpportunityBoard } from './OpportunityBoard'
+import { OpportunityBoard, sinceLabel } from './OpportunityBoard'
 import type { Opportunity } from '@/lib/bulletin/types'
 jest.mock('./OpportunityBoard.module.css', () => ({}))
 const offer = {
@@ -436,4 +436,18 @@ test('renders member replies beneath the expanded tweet', async () => {
   })
   expect(screen.getByText('1 reply from members')).toBeInTheDocument()
   expect(screen.getByText('A helpful reply')).toBeInTheDocument()
+})
+test('dates read as time since posting, with the exact stamp on hover', () => {
+  const now = Date.parse('2026-09-09T12:00:00Z')
+  expect(sinceLabel('2026-09-09T11:59:30Z', now)).toBe('just now')
+  expect(sinceLabel('2026-09-09T09:00:00Z', now)).toBe('3h ago')
+  expect(sinceLabel('2026-09-05T12:00:00Z', now)).toBe('4d ago')
+  expect(sinceLabel('2026-08-19T12:00:00Z', now)).toBe('3wk ago')
+  expect(sinceLabel('2026-06-10T12:00:00Z', now)).toBe('Jun 10')
+  expect(sinceLabel('2025-06-10T12:00:00Z', now)).toBe('Jun 10, 2025')
+  render(<OpportunityBoard opportunities={[offer]} now={now} />)
+  expect(screen.getByText('2d ago')).toHaveAttribute(
+    'title',
+    'Sep 8, 2026, 00:00 UTC',
+  )
 })

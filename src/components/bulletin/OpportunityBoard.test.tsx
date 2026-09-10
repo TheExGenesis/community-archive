@@ -1,12 +1,16 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { OpportunityBoard } from './OpportunityBoard'
 import type { Opportunity } from '@/lib/bulletin/types'
+jest.mock('./RefreshButton', () => ({
+  RefreshButton: () => <button>Refresh</button>,
+}))
+jest.mock('./OpportunityBoard.module.css', () => ({}))
 const offer = {
   tweet_id: '1',
   account_id: 'a',
   username: 'alice',
   posted_at: '2026-09-08T00:00:00Z',
-  full_text: 'Happy to help with Python.',
+  preview_text: 'Happy to help with Python.',
   side: 'offer',
   kind: 'help',
   summary: 'Help with Python',
@@ -33,7 +37,7 @@ jest.mock('@/components/TweetCard', () => ({
     </div>
   ),
 }))
-jest.mock('@/components/portal/TweetRow', () => ({
+jest.mock('@/components/TweetAvatar', () => ({
   TweetAvatar: () => <span />,
 }))
 let intersections: IntersectionObserverCallback[]
@@ -52,11 +56,16 @@ beforeEach(() => {
   }) as unknown as typeof IntersectionObserver
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,
-    json: async () => ({ tweets: [{ id: '1' }, { id: '2' }] }),
+    json: async () => ({
+      tweets: [
+        { id: '1', likes: 0 },
+        { id: '2', likes: 0 },
+      ],
+    }),
   })
 })
 afterEach(() => jest.useRealTimers())
-test('loads the original automatically near the viewport without fetching every notice', async () => {
+test('loads full details only on inline expansion', async () => {
   render(
     <OpportunityBoard
       opportunities={[offer, ask]}
@@ -65,9 +74,8 @@ test('loads the original automatically near the viewport without fetching every 
   )
   expect(fetch).not.toHaveBeenCalled()
   await act(async () => {
-    intersections[0](
-      [{ isIntersecting: true } as IntersectionObserverEntry],
-      {} as IntersectionObserver,
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'Read full tweet by @alice' })[0],
     )
   })
   await act(async () => {
@@ -78,21 +86,32 @@ test('loads the original automatically near the viewport without fetching every 
     '/api/bulletin/tweets?ids=1',
     expect.objectContaining({ cache: 'no-store' }),
   )
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
   expect(screen.getByText('Original card')).toBeInTheDocument()
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Collapse tweet by @alice' }),
+  )
+  expect(screen.queryByText('Original card')).not.toBeInTheDocument()
   expect(screen.queryByText(/Until|On X since/)).not.toBeInTheDocument()
 })
-test('shows ask/offer columns and combines category and search filters', () => {
+test('shows category lanes and combines side, category and search filters', () => {
   render(
     <OpportunityBoard
       opportunities={[offer, ask]}
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
-  expect(screen.getByRole('region', { name: 'Offers' })).toBeInTheDocument()
-  expect(screen.getByRole('region', { name: 'Asks' })).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Help 1' }))
+  expect(screen.getByRole('region', { name: 'Help' })).toBeInTheDocument()
+  expect(screen.getByRole('region', { name: 'Feedback' })).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Category'), {
+    target: { value: 'help' },
+  })
   expect(screen.queryByText('Feedback on a garden')).not.toBeInTheDocument()
-  fireEvent.change(screen.getByLabelText('Search opportunities'), {
+  fireEvent.click(screen.getByRole('button', { name: 'Asks' }))
+  expect(screen.queryByText('Help with Python')).not.toBeInTheDocument()
+  expect(window.location.hash).toContain('side=ask')
+  fireEvent.change(screen.getByLabelText('Filter notices'), {
     target: { value: 'gardening' },
   })
   expect(screen.getByRole('status')).toHaveTextContent('0 of 2 notices')
@@ -111,7 +130,7 @@ test('past toggle includes expired notices and preserves filters in the URL', ()
   expect(screen.getByText('Help with Python')).toBeInTheDocument()
 })
 
-test('coalesces visible cards into one request and reuses loaded cards after filtering', async () => {
+test('coalesces expanded cards and reuses their details after filtering', async () => {
   render(
     <OpportunityBoard
       opportunities={[offer, ask]}
@@ -119,11 +138,10 @@ test('coalesces visible cards into one request and reuses loaded cards after fil
     />,
   )
   await act(async () => {
-    for (const callback of intersections)
-      callback(
-        [{ isIntersecting: true } as IntersectionObserverEntry],
-        {} as IntersectionObserver,
-      )
+    for (const button of screen.getAllByRole('button', {
+      name: 'Read full tweet by @alice',
+    }))
+      fireEvent.click(button)
   })
   await act(async () => {
     jest.advanceTimersByTime(25)
@@ -133,14 +151,18 @@ test('coalesces visible cards into one request and reuses loaded cards after fil
     '/api/bulletin/tweets?ids=1,2',
     expect.any(Object),
   )
-  expect(screen.getAllByText('Original card')).toHaveLength(2)
-  fireEvent.click(screen.getByRole('button', { name: 'Help 1' }))
-  fireEvent.click(screen.getByRole('button', { name: 'All categories 2' }))
+  expect(screen.getAllByLabelText('0 likes')).toHaveLength(2)
+  fireEvent.change(screen.getByLabelText('Category'), {
+    target: { value: 'help' },
+  })
+  fireEvent.change(screen.getByLabelText('Category'), {
+    target: { value: 'all' },
+  })
   await act(async () => {
-    intersections[intersections.length - 1](
-      [{ isIntersecting: true } as IntersectionObserverEntry],
-      {} as IntersectionObserver,
-    )
+    for (const button of screen.queryAllByRole('button', {
+      name: 'Read full tweet by @alice',
+    }))
+      fireEvent.click(button)
   })
   await act(async () => {
     jest.advanceTimersByTime(25)
@@ -161,11 +183,11 @@ test('automatically pages once per sentinel and preserves global search and coun
     />,
   )
   expect(screen.getByRole('status')).toHaveTextContent('14 of 14 notices')
-  expect(screen.getAllByRole('article')).toHaveLength(6)
+  expect(screen.getAllByRole('article')).toHaveLength(4)
   expect(
-    screen.queryByRole('button', { name: 'Load more offers' }),
+    screen.queryByRole('button', { name: 'Load more Help' }),
   ).not.toBeInTheDocument()
-  const sentinel = screen.getByLabelText('Load more offers')
+  const sentinel = screen.getByLabelText('Load more Help')
   const nextPage = intersections.find(
     (callback) => observed.get(callback) === sentinel,
   )!
@@ -179,13 +201,13 @@ test('automatically pages once per sentinel and preserves global search and coun
       {} as IntersectionObserver,
     )
   })
-  expect(screen.getAllByRole('article')).toHaveLength(12)
-  fireEvent.change(screen.getByLabelText('Search opportunities'), {
+  expect(screen.getAllByRole('article')).toHaveLength(8)
+  fireEvent.change(screen.getByLabelText('Filter notices'), {
     target: { value: 'Offer number 14' },
   })
   expect(screen.getByText('Offer number 14')).toBeInTheDocument()
   expect(
-    screen.queryByRole('button', { name: 'Load more offers' }),
+    screen.queryByRole('button', { name: 'Load more Help' }),
   ).not.toBeInTheDocument()
 })
 
@@ -205,4 +227,81 @@ test('shows verified tweet text immediately before requesting richer cards', () 
   expect(
     screen.queryByLabelText('Loading original tweet'),
   ).not.toBeInTheDocument()
+})
+
+const page = (notices: Opportunity[], cursor: string | null = null) => ({
+  opportunities: notices,
+  counts: { help: 8 },
+  cursors: { help: cursor },
+  total: 8,
+  now: Date.parse('2026-09-09T00:00:00Z'),
+  personal: { account_id: '', username: '', outgoing: {}, available: false },
+})
+test('requests and appends a server page on scroll without fetching tweet details', async () => {
+  const initial = page([offer], '1')
+  const more = { ...offer, tweet_id: '3', summary: 'Another offer' }
+  jest
+    .mocked(fetch)
+    .mockResolvedValue({ ok: true, json: async () => page([more]) } as Response)
+  render(
+    <OpportunityBoard
+      opportunities={[offer]}
+      initialPage={initial}
+      now={initial.now}
+    />,
+  )
+  expect(fetch).not.toHaveBeenCalled()
+  const sentinel = screen.getByLabelText('Load more Help')
+  const callback = intersections.find((cb) => observed.get(cb) === sentinel)!
+  await act(async () => {
+    callback(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    )
+  })
+  expect(fetch).toHaveBeenCalledTimes(1)
+  expect(String(jest.mocked(fetch).mock.calls[0][0])).toContain('kind=help')
+  expect(String(jest.mocked(fetch).mock.calls[0][0])).toContain('after=1')
+  expect(screen.getByText('Help with Python')).toBeInTheDocument()
+  expect(screen.getByText('Another offer')).toBeInTheDocument()
+  expect(screen.queryByLabelText('Load more Help')).not.toBeInTheDocument()
+})
+test('searches the server for unloaded matches and ignores stale filter responses', async () => {
+  const initial = page([offer])
+  let resolveOld!: (value: Response) => void
+  jest.mocked(fetch).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveOld = resolve
+      }),
+  )
+  jest.mocked(fetch).mockResolvedValueOnce({
+    ok: true,
+    json: async () =>
+      page([{ ...offer, tweet_id: '99', summary: 'Unloaded match' }]),
+  } as Response)
+  render(
+    <OpportunityBoard
+      opportunities={[offer]}
+      initialPage={initial}
+      now={initial.now}
+    />,
+  )
+  fireEvent.change(screen.getByLabelText('Filter notices'), {
+    target: { value: 'old' },
+  })
+  await act(async () => {
+    jest.advanceTimersByTime(200)
+  })
+  fireEvent.change(screen.getByLabelText('Filter notices'), {
+    target: { value: 'Unloaded match' },
+  })
+  await act(async () => {
+    jest.advanceTimersByTime(200)
+  })
+  await act(async () => {
+    resolveOld({ ok: true, json: async () => page([offer]) } as Response)
+  })
+  expect(screen.getByText('Unloaded match')).toBeInTheDocument()
+  expect(screen.queryByText('Help with Python')).not.toBeInTheDocument()
 })

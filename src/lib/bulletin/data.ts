@@ -22,7 +22,17 @@ export async function requireOpportunityUser() {
 }
 export async function loadOpportunities(): Promise<Opportunity[]> {
   await requireOpportunityUser()
-  const { notices, allowedAccounts } = await loadBulletinBoardState()
+  return hydrateBulletinNotices(await loadBulletinBoardState())
+}
+
+/** Hydrate only the selected notices, retaining the live source/policy checks. */
+export async function hydrateBulletinNotices({
+  notices,
+  allowedAccounts,
+}: {
+  notices: StoredNotice[]
+  allowedAccounts?: string[]
+}): Promise<Opportunity[]> {
   const result: Opportunity[] = []
   for (let offset = 0; offset < notices.length; offset += 100) {
     const batch = notices.slice(offset, offset + 100)

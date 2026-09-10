@@ -6,14 +6,14 @@ import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import { PiArrowSquareOut, PiHeart, PiQuotes, PiRepeat } from 'react-icons/pi'
 import ImageLightbox from '@/components/ImageLightbox'
-import TweetAvatarImage from '@/components/TweetAvatarImage'
+import { TweetAvatar } from '@/components/TweetAvatar'
+export { TweetAvatar, avatarHue } from '@/components/TweetAvatar'
 import {
   tweetPermalinkHref,
   userProfileHref,
   type TweetOrigin,
 } from '@/lib/navigation'
 import { decodeTweetText } from '@/lib/tweetText'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   Tooltip,
   TooltipContent,
@@ -25,17 +25,8 @@ import { capturePostHogEvent } from '@/lib/posthog'
 import { TweetLinkPreviews } from '@/components/TweetLinkPreviews'
 import { AddToProfileButton } from './AddToProfileButton'
 
-const HUES = [262, 32, 145, 4, 155, 200, 217, 88, 240, 190, 340, 45, 280, 20]
 const FEATURED_CARD_HOVER =
   'transition-[transform,border-color,box-shadow] duration-100 ease-out hover:-translate-y-0.5 hover:border-[#d4d4d7]/75 hover:shadow-[0_3px_9px_rgba(24,24,27,0.08)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 dark:hover:border-[#404046]/80 dark:hover:shadow-[0_3px_9px_rgba(0,0,0,0.22)]'
-
-export const avatarHue = (username: string) => {
-  let h = 0
-  for (let i = 0; i < username.length; i++) {
-    h = (h * 31 + username.charCodeAt(i)) >>> 0
-  }
-  return HUES[h % HUES.length]
-}
 
 export const formatCount = (n: number) =>
   n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n)
@@ -81,32 +72,6 @@ function CountMetric({
       <span aria-hidden="true">{formatCount(count)}</span>
       <span className="sr-only">{`${formatCount(count)} ${label}`}</span>
     </span>
-  )
-}
-
-export function TweetAvatar({
-  tweet,
-  size = 34,
-}: {
-  tweet: Pick<PortalTweet, 'id' | 'username' | 'avatar'>
-  size?: number
-}) {
-  const initials = tweet.username.slice(0, 2).toUpperCase()
-  return (
-    <Avatar className="flex-shrink-0" style={{ width: size, height: size }}>
-      <TweetAvatarImage
-        src={tweet.avatar}
-        alt=""
-        username={tweet.username}
-        tweetId={tweet.id}
-      />
-      <AvatarFallback
-        className="text-[12px] font-extrabold text-white"
-        style={{ background: `hsl(${avatarHue(tweet.username)},42%,42%)` }}
-      >
-        {initials}
-      </AvatarFallback>
-    </Avatar>
   )
 }
 

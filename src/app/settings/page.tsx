@@ -1,6 +1,4 @@
 import { requireAuth } from '@/lib/auth-utils'
-import { isAdminUser } from '@/app/admin/data'
-import { loadPendingCommunityProjects } from '@/lib/communityProjectDatabase'
 import { getPublicProfileSettings } from '@/lib/profileCuration'
 import { createServerAdminClient, createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
@@ -9,7 +7,6 @@ import {
   maskSubscriptionEmail,
 } from '@/lib/digest/emailSubscriptions'
 import ProfileContent from '../profile/ProfileContent'
-import { CommunitySubmissionQueue } from './CommunitySubmissionQueue'
 import {
   DigestEmailSettings,
   type DigestEmailStatus,
@@ -30,7 +27,6 @@ const getTwitterUsername = (
 
 export default async function SettingsPage() {
   const { user } = await requireAuth('/settings')
-  const isAdmin = isAdminUser(user)
   const cookieStore = await cookies()
   const supabase = createServerClient(cookieStore)
   const admin = createServerAdminClient(cookieStore)
@@ -50,19 +46,14 @@ export default async function SettingsPage() {
         .maybeSingle()
     : admin.from('optin').select('*').eq('user_id', user.id).maybeSingle()
 
-  const [
-    optInResponse,
-    archivesResponse,
-    settings,
-    pendingCommunityProjects,
-    digestSubscription,
-  ] = await Promise.all([
-    optInQuery,
-    twitterAccountId
-      ? supabase
-          .from('archive_upload')
-          .select(
-            `
+  const [optInResponse, archivesResponse, settings, digestSubscription] =
+    await Promise.all([
+      optInQuery,
+      twitterAccountId
+        ? supabase
+            .from('archive_upload')
+            .select(
+              `
             id,
             account_id,
             upload_phase,
@@ -76,20 +67,17 @@ export default async function SettingsPage() {
               profile:all_profile(avatar_media_url)
             )
           `,
-          )
-          .eq('account_id', twitterAccountId)
-          .order('created_at', { ascending: false })
-      : Promise.resolve({ data: [], error: null }),
-    twitterAccountId
-      ? getPublicProfileSettings(twitterAccountId)
-      : Promise.resolve({ downloadArchiveVisible: true }),
-    isAdmin
-      ? loadPendingCommunityProjects().catch(() => [])
-      : Promise.resolve([]),
-    twitterAccountId
-      ? getSubscriptionForAccount(twitterAccountId).catch(() => null)
-      : Promise.resolve(null),
-  ])
+            )
+            .eq('account_id', twitterAccountId)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      twitterAccountId
+        ? getPublicProfileSettings(twitterAccountId)
+        : Promise.resolve({ downloadArchiveVisible: true }),
+      twitterAccountId
+        ? getSubscriptionForAccount(twitterAccountId).catch(() => null)
+        : Promise.resolve(null),
+    ])
 
   const digestEmailStatus: DigestEmailStatus = !digestSubscription
     ? 'none'
@@ -100,13 +88,6 @@ export default async function SettingsPage() {
   return (
     <main className="min-h-screen bg-card dark:bg-background">
       <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-        {isAdmin ? (
-          <div className="mb-8">
-            <CommunitySubmissionQueue
-              initialProjects={pendingCommunityProjects}
-            />
-          </div>
-        ) : null}
         <DigestEmailSettings
           initialStatus={digestEmailStatus}
           initialEmail={

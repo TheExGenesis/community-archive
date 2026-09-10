@@ -1,3 +1,5 @@
+import { capturePostHogEvent } from '@/lib/posthog'
+jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import userEvent from '@testing-library/user-event'
@@ -238,6 +240,58 @@ test('shows owner-only curation controls and persists section edits', async () =
     }),
   )
   expect(fetchMock).toHaveBeenCalledWith('/api/profile/42/interactions')
+  expect(
+    jest
+      .mocked(capturePostHogEvent)
+      .mock.calls.filter(([event]) => event.startsWith('profile_')),
+  ).toEqual([
+    ['profile_edit_started'],
+    [
+      'profile_curation_saved',
+      { action: 'add', section: 'bangers', source: 'profile' },
+    ],
+    [
+      'profile_curation_saved',
+      { action: 'dismiss', section: 'bangers', source: 'profile' },
+    ],
+    [
+      'profile_curation_saved',
+      { action: 'restore-item', section: 'bangers', source: 'profile' },
+    ],
+    [
+      'profile_curation_saved',
+      {
+        action: 'toggle-feature',
+        section: 'bangers',
+        source: 'profile',
+        is_featured: true,
+      },
+    ],
+    [
+      'profile_curation_saved',
+      { action: 'restore', section: 'people', source: 'profile' },
+    ],
+  ])
+  jest.mocked(capturePostHogEvent).mockClear()
+  mockMutateProfileCuration.mockRejectedValueOnce(
+    new Error('private database detail'),
+  )
+  await user.click(screen.getByRole('button', { name: 'Restore Bangers' }))
+  await waitFor(() =>
+    expect(capturePostHogEvent).toHaveBeenCalledWith(
+      'profile_curation_failed',
+      {
+        action: 'restore',
+        section: 'bangers',
+        source: 'profile',
+      },
+    ),
+  )
+  expect(
+    jest
+      .mocked(capturePostHogEvent)
+      .mock.calls.filter(([event]) => event === 'profile_curation_saved'),
+  ).toEqual([])
 
   await user.click(screen.getByRole('link', { name: '2025 4' }))
   expect(screen.getByRole('button', { name: 'Edit profile' })).toBeVisible()
@@ -963,4 +1017,47 @@ test('shows no sections when none are provided', () => {
 
   // Sectionless chapters stay directly clickable.
   expect(screen.getAllByRole('link', { name: '2025 4' })).not.toHaveLength(0)
+})
+
+test('refills the visible people list from the reserve after a dismissal', async () => {
+  const user = userEvent.setup()
+  renderProfileArchive(
+    <ProfileArchive
+      accountId="42"
+      avatarUrl={null}
+      basePath="/user/alice"
+      chapters={chapters}
+      displayName="Alice"
+      initialYear={null}
+      initialPage={{
+        tweets: [],
+        yearCounts: [],
+        total: 0,
+        nextOffset: null,
+        available: true,
+      }}
+      initialSidebar={{
+        media: [],
+        mediaCount: 0,
+        people: Array.from({ length: 10 }, (_, i) => ({
+          user_id: String(100 + i),
+          screen_name: `person${i}`,
+          name: `Person ${i}`,
+          interactions: 20 - i,
+        })),
+      }}
+    />,
+    { withEditButton: true },
+  )
+  await user.click(screen.getByRole('button', { name: 'Edit profile' }))
+  expect(screen.getByText('Person 0')).toBeVisible()
+  expect(screen.queryByText('Person 8')).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Dismiss @person0' }))
+  await waitFor(() => expect(screen.getByText('Person 8')).toBeVisible())
+  expect(screen.queryByText('Person 0')).not.toBeInTheDocument()
+  expect(screen.queryByText('Person 9')).not.toBeInTheDocument()
+})
+
+beforeEach(() => {
+  jest.mocked(capturePostHogEvent).mockClear()
 })

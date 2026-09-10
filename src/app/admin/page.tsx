@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { CommunitySubmissionQueue } from './CommunitySubmissionQueue'
+import { loadPendingCommunityProjects } from '@/lib/communityProjectDatabase'
 import { Badge } from '@/components/ui/badge'
 import {
   Card,
@@ -10,8 +12,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Suspense } from 'react'
 import { AdminTable } from './AdminTable'
-import { RecentPrivacyActivity } from './RecentPrivacyActivity'
-import { loadRecentPrivacyActivity } from './activity'
+import { AdminActivityFeed } from './AdminActivityFeed'
+import { loadActivityPage } from './activityFeedData'
 import {
   ADMIN_USERNAMES,
   getDisplayUsername,
@@ -26,9 +28,43 @@ export const dynamic = 'force-dynamic'
 // export + tombstone work runs asynchronously on the Hetzner worker.
 export const maxDuration = 300
 
-async function RecentPrivacyActivitySection() {
-  const activity = await loadRecentPrivacyActivity()
-  return <RecentPrivacyActivity activity={activity} />
+async function ActivitySection() {
+  try {
+    const initialPage = await loadActivityPage()
+    return (
+      <AdminActivityFeed
+        key={JSON.stringify(initialPage)}
+        initialPage={initialPage}
+      />
+    )
+  } catch {
+    return (
+      <AdminActivityFeed
+        initialPage={null}
+        initialError="Activity could not be loaded. Please try again."
+      />
+    )
+  }
+}
+
+async function SubmissionsSection() {
+  try {
+    const projects = await loadPendingCommunityProjects()
+    return <CommunitySubmissionQueue initialProjects={projects} />
+  } catch {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>App submissions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p role="alert">
+            Submissions could not be loaded. Refresh to try again.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 }
 
 function SectionSkeleton({ label }: { label: string }) {
@@ -125,10 +161,26 @@ export default async function AdminPage({
           </p>
         </Link>
 
-        <Suspense
-          fallback={<SectionSkeleton label="Loading recent privacy activity" />}
+        <Link
+          href="/admin/bulletin"
+          className="rounded-lg border bg-card p-5 transition-colors hover:bg-accent"
         >
-          <RecentPrivacyActivitySection />
+          <h2 className="font-semibold">Bulletin runs →</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Daily scans, candidates, notices produced, costs and failures.
+          </p>
+        </Link>
+
+        <Suspense
+          fallback={<SectionSkeleton label="Loading archive activity" />}
+        >
+          <ActivitySection />
+        </Suspense>
+
+        <Suspense
+          fallback={<SectionSkeleton label="Loading app submissions" />}
+        >
+          <SubmissionsSection />
         </Suspense>
 
         <Suspense fallback={<SectionSkeleton label="Loading accounts" />}>

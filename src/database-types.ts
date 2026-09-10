@@ -190,6 +190,8 @@ export type Database = {
           id: number
           keep_private: boolean | null
           start_date: string | null
+          storage_path: string | null
+          storage_sha256: string | null
           upload_likes: boolean | null
           upload_phase: Database["public"]["Enums"]["upload_phase_enum"] | null
           username: string | null
@@ -202,6 +204,8 @@ export type Database = {
           id?: never
           keep_private?: boolean | null
           start_date?: string | null
+          storage_path?: string | null
+          storage_sha256?: string | null
           upload_likes?: boolean | null
           upload_phase?: Database["public"]["Enums"]["upload_phase_enum"] | null
           username?: string | null
@@ -214,6 +218,8 @@ export type Database = {
           id?: never
           keep_private?: boolean | null
           start_date?: string | null
+          storage_path?: string | null
+          storage_sha256?: string | null
           upload_likes?: boolean | null
           upload_phase?: Database["public"]["Enums"]["upload_phase_enum"] | null
           username?: string | null
@@ -1749,6 +1755,27 @@ export type Database = {
       }
     }
     Functions: {
+      admin_activity_page: {
+        Args: {
+          p_before_at?: string
+          p_before_id?: string
+          p_kind?: string
+          p_search?: string
+          p_limit?: number
+        }
+        Returns: {
+          id: string
+          kind: string
+          occurred_at: string
+          account_id: string
+          username: string
+          status: string
+          detail: string
+          reason: string
+          error: string
+          date_basis: string
+        }[]
+      }
       admin_enqueue_delete_with_export: {
         Args: {
           p_account_id: string
@@ -2009,6 +2036,54 @@ export type Database = {
           reply_to_username: string
           archive_upload_id: number
         }[]
+      }
+      get_bulletin_board_state: {
+        Args: {
+          max_results?: number
+        }
+        Returns: Json
+      }
+      get_bulletin_opportunities: {
+        Args: {
+          max_results?: number
+        }
+        Returns: {
+          tweet_id: string
+          account_id: string
+          username: string
+          posted_at: string
+          full_text: string
+          side: string
+          kind: string
+          summary: string
+          evidence: string
+          topics: string[]
+          respond: string
+          standing: boolean
+          expires_at: string
+          place: string
+          model: string
+        }[]
+      }
+      get_bulletin_prompts: {
+        Args: {
+          before_id?: number
+        }
+        Returns: Json
+      }
+      get_bulletin_relationships: {
+        Args: {
+          viewer_username?: string
+          viewer_account_id?: string
+        }
+        Returns: Json
+      }
+      get_bulletin_runs: {
+        Args: {
+          before_id?: number
+          max_results?: number
+        }
+        Returns: Json
       }
       get_hourly_scraping_stats: {
         Args: {
@@ -2421,6 +2496,15 @@ export type Database = {
       refresh_global_activity_summary: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      save_bulletin_prompt: {
+        Args: {
+          expected_id: number
+          prompt_body: string
+          change_note: string
+          actor_id: string
+        }
+        Returns: string
       }
       search_tweets:
         | {

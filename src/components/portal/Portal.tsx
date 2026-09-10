@@ -24,7 +24,8 @@ import { CHROME_EXTENSION_URL } from '@/lib/browserExtension'
 export type PortalView = 'home' | 'stream'
 
 const HOME_LIVE_STREAM_LIMIT = 12
-const ARCHIVE_EXPORT_URL = '/docs#bulk-dump'
+const ARCHIVE_EXPORT_URL =
+  'https://github.com/TheExGenesis/community-archive/releases/latest'
 const COMMUNITY_BUILDS_URL = '/tweets/1835411943735140798'
 
 type DashboardDestination =
@@ -703,8 +704,10 @@ export function HomePortalLayout({
 >) {
   return (
     <div className="mx-auto max-w-[1320px] px-4 py-6 sm:px-6">
+      <div id="daily-digest" className="scroll-mt-20">
+        {digest}
+      </div>
       {overview}
-      {digest}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
         <div className="flex h-full min-h-0 flex-col gap-4 lg:overflow-hidden">
@@ -720,9 +723,9 @@ export function HomePortalLayout({
             <UtilityLink
               href={ARCHIVE_EXPORT_URL}
               destination="data_export"
-              title="Bulk export paused"
-              note="Why the historical Parquet file is private"
-              action="Details"
+              title="Daily data export"
+              note="Tweets and profiles in Parquet"
+              action="Download"
               icon={<FaDatabase className="h-[17px] w-[17px]" />}
             />
             <UtilityLink

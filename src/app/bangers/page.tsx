@@ -40,14 +40,15 @@ export default function BangersPage({
     periodValue === 'week' ||
     periodValue === 'three-months'
       ? periodValue
-      : undefined
-  const allTime =
-    periodValue === 'all' || (period === undefined && year === undefined)
+      : periodValue === 'all' || year !== undefined
+        ? undefined
+        : 'week'
+  const allTime = periodValue === 'all'
   const query = paramValue(searchParams.q).trim().slice(0, 120)
   const initialPage = getInitialPortalBangersPage({
     scope,
     sort,
-    ...(period ? { period } : { year }),
+    ...(period ? { period } : { year: allTime ? undefined : year }),
     query,
   })
 
@@ -82,7 +83,7 @@ export default function BangersPage({
             scope={scope}
             sort={sort}
             currentYear={currentYear}
-            year={period ? undefined : year}
+            year={period || allTime ? undefined : year}
             period={period}
             allTime={allTime}
             initialQuery={query}

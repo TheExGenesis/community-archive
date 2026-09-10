@@ -108,6 +108,7 @@ CREATE POLICY "Users can update their own archive" ON "storage"."objects"
   FOR UPDATE TO "authenticated"
   USING (
     ("bucket_id" = 'archives'::"text")
+    AND cardinality("storage"."foldername"("name")) = 1
     AND ("storage"."filename"("name") = 'archive.json'::"text")
     AND (
       "lower"(("storage"."foldername"("name"))[1]) =
@@ -120,6 +121,7 @@ CREATE POLICY "Users can update their own archive" ON "storage"."objects"
   )
   WITH CHECK (
     ("bucket_id" = 'archives'::"text")
+    AND cardinality("storage"."foldername"("name")) = 1
     AND ("storage"."filename"("name") = 'archive.json'::"text")
     AND (
       "lower"(("storage"."foldername"("name"))[1]) =

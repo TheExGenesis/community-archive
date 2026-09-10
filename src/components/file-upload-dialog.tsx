@@ -138,6 +138,9 @@ export function FileUploadDialog({
       })
       console.log('Upload successful')
     } catch (error) {
+      capturePostHogEvent('archive_upload_failed', {
+        error_category: 'upload_failed',
+      })
       console.error('Upload failed:', error)
       setState((prev) => ({
         ...prev,

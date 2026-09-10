@@ -42,6 +42,23 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    // The member Bulletin launched as /opportunities. Query strings carry over;
+    // browsers keep the hash on their own.
+    return [
+      { source: '/opportunities', destination: '/bulletin', permanent: true },
+      {
+        source: '/opportunities/about',
+        destination: '/bulletin/about',
+        permanent: true,
+      },
+      {
+        source: '/admin/opportunities',
+        destination: '/admin/bulletin',
+        permanent: true,
+      },
+    ]
+  },
   async headers() {
     return [
       {

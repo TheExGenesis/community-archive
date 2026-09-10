@@ -1,4 +1,5 @@
 const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
+  'bulletin-sources': new Set(['ids', 'enrich']),
   'corpus-count': new Set(),
   summary: new Set(),
   'member-directory': new Set([

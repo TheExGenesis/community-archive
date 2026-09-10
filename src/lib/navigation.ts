@@ -1,4 +1,5 @@
-import { BANGERS_ALL_TIME_HREF } from './portal/bangers'
+import { analyticsRoute } from './analyticsRoutes'
+import { BANGERS_WEEK_HREF } from './portal/bangers'
 import { isTwitterUsername } from './apiInputValidation'
 
 export interface NavItem {
@@ -7,21 +8,8 @@ export interface NavItem {
 }
 
 export function navAnalyticsDestination(href: string): string {
-  if (href.startsWith('/bangers')) return 'bangers'
-  if (href.startsWith('/community')) return 'community'
-  if (href.startsWith('/digest')) return 'digest'
-  if (href.startsWith('/docs')) return 'docs'
-  if (href.startsWith('/research')) return 'research'
-  if (href.startsWith('/search')) return 'search'
-  if (href.startsWith('/settings')) return 'settings'
-  if (href.startsWith('/social-graph')) return 'social_graph'
-  if (href.startsWith('/stream')) return 'live_stream'
-  if (href.startsWith('/trends')) return 'trends'
-  if (href.startsWith('/user-dir')) return 'user_directory'
-  if (href.startsWith('/user/')) return 'user_profile'
   if (href.includes('#upload-archive')) return 'upload_archive'
-  if (href.startsWith('/admin')) return 'admin'
-  return 'home'
+  return analyticsRoute(href).page
 }
 
 export type TweetOrigin =
@@ -29,6 +17,7 @@ export type TweetOrigin =
   | 'stream'
   | 'bangers'
   | 'digest'
+  | 'opportunities'
   | 'trends'
   | 'search'
   | 'profile'
@@ -77,6 +66,13 @@ const TWEET_ORIGINS: Record<
     href: '/digest',
     label: 'Back to What Happened Yesterday',
     matches: (href) => href === '/digest' || href.startsWith('/digest/'),
+  },
+  // Bulletin launched as /opportunities. The origin key stays so ?from= links
+  // and PostHog tweet-origin breakdowns remain continuous.
+  opportunities: {
+    href: '/bulletin',
+    label: 'Back to Bulletin',
+    matches: (href) => href === '/bulletin' || href.startsWith('/bulletin?'),
   },
   trends: {
     href: '/trends',
@@ -159,20 +155,22 @@ export const getPrimaryNav = (
 ): NavItem[] =>
   isMember || _isAdmin
     ? [
-        { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
+        { href: BANGERS_WEEK_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
+        { href: '/bulletin', label: 'Bulletin' },
         { href: '/user-dir', label: 'Users' },
-        { href: '/community', label: 'Gallery' },
+        { href: '/community', label: 'Apps' },
         { href: '/trends', label: 'Trends' },
         { href: '/stream', label: 'Live stream' },
         { href: '/social-graph', label: 'Graph' },
         { href: '/research', label: 'Research' },
       ]
     : [
-        { href: BANGERS_ALL_TIME_HREF, label: 'Bangers' },
+        { href: BANGERS_WEEK_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
         { href: '/user-dir', label: 'Users' },
-        { href: '/community', label: 'Gallery' },
+        { href: '/community', label: 'Apps' },
+        { href: '/trends', label: 'Trends' },
         { href: '/social-graph', label: 'Graph' },
         { href: '/docs', label: 'Docs' },
         { href: '/#upload-archive', label: 'Upload archive' },

@@ -45,17 +45,23 @@ const suggestion = (
 
 const memberSuggestion = suggestion('exgenesis')
 
-function SearchHarness() {
+function SearchHarness({ onSubmit }: { onSubmit?: jest.Mock } = {}) {
   const [value, setValue] = useState('')
 
   return (
-    <div className="relative">
+    <form
+      className="relative"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onSubmit?.(value)
+      }}
+    >
       <UserSearchInput
         aria-label="Search Community Archive"
         value={value}
         onValueChange={setValue}
       />
-    </div>
+    </form>
   )
 }
 
@@ -76,6 +82,64 @@ describe('UserSearchInput', () => {
     mockPush.mockReset()
     mockedFetchMemberDirectorySuggestions.mockReset()
     mockedFetchMemberSuggestions.mockReset()
+  })
+
+  it.each([false, true])(
+    'submits Enter exactly once with suggestions visible: %s',
+    async (showSuggestions) => {
+      mockedFetchMemberSuggestions.mockResolvedValue(
+        showSuggestions ? [memberSuggestion] : [],
+      )
+      mockedFetchMemberDirectorySuggestions.mockResolvedValue([])
+      const onSubmit = jest.fn()
+      render(<SearchHarness onSubmit={onSubmit} />)
+      const input = screen.getByRole('combobox')
+      await userEvent.type(input, 'cuties ai')
+      if (showSuggestions) await screen.findAllByRole('option')
+
+      // keyDown alone has no implicit form submission in jsdom: this catches
+      // regressions back to relying on the browser's default Enter action.
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(onSubmit).toHaveBeenCalledTimes(1)
+      expect(onSubmit).toHaveBeenCalledWith('cuties ai')
+      expect(mockPush).not.toHaveBeenCalled()
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    },
+  )
+
+  it('submits once even when a native bubbling listener cancels Enter', async () => {
+    setDefaultSuggestions()
+    const onSubmit = jest.fn()
+    render(<SearchHarness onSubmit={onSubmit} />)
+    const input = screen.getByRole('combobox')
+    await userEvent.type(input, 'cuties ai')
+    await screen.findAllByRole('option')
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') event.preventDefault()
+    })
+
+    await userEvent.keyboard('{Enter}')
+
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    expect(onSubmit).toHaveBeenCalledWith('cuties ai')
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  })
+
+  it('does not submit or select a suggestion while committing composed text', async () => {
+    setDefaultSuggestions()
+    const onSubmit = jest.fn()
+    render(<SearchHarness onSubmit={onSubmit} />)
+    const input = screen.getByRole('combobox')
+    await userEvent.type(input, 'exg')
+    await screen.findAllByRole('option')
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true })
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 })
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
   })
 
   it('offers a profile row before a from: filter row', async () => {

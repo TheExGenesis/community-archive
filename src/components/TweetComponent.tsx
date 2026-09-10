@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { capturePostHogEvent } from '@/lib/posthog'
 import Link from 'next/link'
 import {
   tweetPermalinkHref,
@@ -53,6 +54,26 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
   highlightQuery,
 }) => {
   const [isTextExpanded, setIsTextExpanded] = React.useState(false)
+  const captureAction = (
+    action:
+      | 'open'
+      | 'open_external'
+      | 'open_quoted_tweet'
+      | 'expand'
+      | 'collapse',
+  ) => {
+    capturePostHogEvent('tweet_card_action', {
+      action,
+      origin: permalinkOrigin ?? 'unknown',
+      has_media: Boolean(tweet.media?.length),
+      has_quoted_tweet: Boolean(tweet.quoted_tweet),
+      is_featured: false,
+    })
+  }
+  const toggleText = () => {
+    captureAction(isTextExpanded ? 'collapse' : 'expand')
+    setIsTextExpanded(!isTextExpanded)
+  }
   const originalUsername = tweet.username || 'Unknown'
   const originalDisplayName = tweet.account_display_name || 'Unknown'
   const originalProfilePicUrl = tweet.avatar_media_url || undefined
@@ -344,6 +365,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
               </div>
               <div className="flex items-center space-x-3">
                 <a
+                  onClick={() => captureAction('open_quoted_tweet')}
                   href={tweetPermalinkHref(
                     quotedTweet.tweet_id,
                     permalinkOrigin,
@@ -355,6 +377,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                   <FaExternalLinkAlt className="h-3 w-3" />
                 </a>
                 <a
+                  onClick={() => captureAction('open_external')}
                   href={`https://twitter.com/${quotedTweet.username}/status/${quotedTweet.tweet_id}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -378,6 +401,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       aria-label="Tweet links"
     >
       <a
+        onClick={() => captureAction('open')}
         href={tweetPermalinkHref(
           tweet.tweet_id,
           permalinkOrigin,
@@ -391,6 +415,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
         Archive
       </a>
       <a
+        onClick={() => captureAction('open_external')}
         href={`https://twitter.com/${displayUsername}/status/${tweet.tweet_id}`}
         target="_blank"
         rel="noopener noreferrer"
@@ -475,7 +500,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
             {canCollapseText && (
               <button
                 type="button"
-                onClick={() => setIsTextExpanded((expanded) => !expanded)}
+                onClick={toggleText}
                 className="text-xs font-medium text-brand"
               >
                 {isTextExpanded ? 'Show less' : 'Show more'}
@@ -606,7 +631,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       {canCollapseText && (
         <button
           type="button"
-          onClick={() => setIsTextExpanded((expanded) => !expanded)}
+          onClick={toggleText}
           className="mb-2 text-sm font-medium text-brand"
         >
           {isTextExpanded ? 'Show less' : 'Show more'}
@@ -630,6 +655,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
           <span>{new Date(tweet.created_at).toLocaleDateString()}</span>
           {!isPermalinkPage && (
             <a
+              onClick={() => captureAction('open')}
               href={tweetPermalinkHref(
                 tweet.tweet_id,
                 permalinkOrigin,
@@ -643,6 +669,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
             </a>
           )}
           <a
+            onClick={() => captureAction('open_external')}
             href={`https://twitter.com/${displayUsername}/status/${tweet.tweet_id}`}
             target="_blank"
             rel="noopener noreferrer"

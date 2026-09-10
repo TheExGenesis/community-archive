@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import UserSearchInput from '@/components/UserSearchInput'
@@ -24,18 +25,30 @@ export default function HeaderSearch() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="hidden items-center sm:flex">
-      <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <UserSearchInput
-          placeholder="Search tweets..."
-          value={query}
-          onValueChange={setQuery}
-          className="h-9 w-40 border-border bg-muted py-1.5 pl-8 pr-3 text-sm focus:ring-brand lg:w-56"
-          aria-label="Search Community Archive"
-          autoComplete="off"
-        />
-      </div>
-    </form>
+    <>
+      <Link
+        href="/search"
+        aria-label="Search Community Archive"
+        className="hidden h-9 w-9 items-center justify-center rounded-md border border-input hover:bg-accent lg:inline-flex 2xl:hidden"
+      >
+        <Search className="h-4 w-4" aria-hidden="true" />
+      </Link>
+      <form
+        onSubmit={handleSubmit}
+        className="hidden items-center sm:flex lg:hidden 2xl:flex"
+      >
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <UserSearchInput
+            placeholder="Search tweets..."
+            value={query}
+            onValueChange={setQuery}
+            className="h-9 w-40 border-border bg-muted py-1.5 pl-8 pr-3 text-sm focus:ring-brand lg:w-56"
+            aria-label="Search Community Archive"
+            autoComplete="off"
+          />
+        </div>
+      </form>
+    </>
   )
 }

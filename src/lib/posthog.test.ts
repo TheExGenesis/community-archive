@@ -70,8 +70,9 @@ describe('sanitizePostHogEvent', () => {
       has_query: true,
       active_filter_count: 2,
       surface: 'advanced',
-      $current_url: 'https://example.com/search?q=private-words',
-      $session_entry_url: 'https://example.com/search?q=private-words',
+      $current_url: 'https://www.community-archive.org/search?q=private-words',
+      $session_entry_url:
+        'https://www.community-archive.org/search?q=private-words',
       utm_campaign: 'archive-launch',
       query: 'private-words',
       email: 'private@example.com',
@@ -81,8 +82,12 @@ describe('sanitizePostHogEvent', () => {
       $geoip_disable: true,
       token: 'project-token',
       distinct_id: 'user-123',
-      $current_url: 'https://example.com/search?q=private-words',
-      $session_entry_url: 'https://example.com/search?q=private-words',
+      $current_url: 'https://www.community-archive.org/search',
+      $session_entry_url: 'https://www.community-archive.org/search',
+      analytics_version: 2,
+      route_name: 'search',
+      page_group: 'product',
+      feature: 'search',
       utm_campaign: 'archive-launch',
       has_query: true,
       active_filter_count: 2,
@@ -163,6 +168,7 @@ describe('sanitizePostHogEvent', () => {
   ])('keeps aggregate properties for %s', (eventName, properties) => {
     const event = captureResult(eventName, {
       ...properties,
+      analytics_version: 2,
       query: 'do not send this',
       tweet_id: '1234567890',
     })
@@ -170,6 +176,7 @@ describe('sanitizePostHogEvent', () => {
     expect(sanitizePostHogEvent(event)?.properties).toEqual({
       $geoip_disable: true,
       ...properties,
+      analytics_version: 2,
     })
   })
 
@@ -179,7 +186,8 @@ describe('sanitizePostHogEvent', () => {
         token: 'project-token',
         distinct_id: 'user-123',
         $anon_distinct_id: 'anonymous-123',
-        $current_url: 'https://example.com/search?q=private-words',
+        $current_url:
+          'https://www.community-archive.org/search?q=private-words',
       }),
       $set: {
         username: 'archive_user',
@@ -188,7 +196,8 @@ describe('sanitizePostHogEvent', () => {
         secret: 'not-a-person-property',
       },
       $set_once: {
-        $initial_current_url: 'https://example.com/search?q=private-words',
+        $initial_current_url:
+          'https://www.community-archive.org/search?q=private-words',
       },
     }
 
@@ -205,7 +214,7 @@ describe('sanitizePostHogEvent', () => {
         name: 'Archive User',
       },
       $set_once: {
-        $initial_current_url: 'https://example.com/search?q=private-words',
+        $initial_current_url: 'https://www.community-archive.org/search',
       },
     })
   })
@@ -249,9 +258,13 @@ describe('sanitizePostHogEvent', () => {
     })
 
     expect(sanitizePostHogEvent(pageview)?.properties).toEqual({
-      $current_url: 'https://example.com/search?q=public-query',
-      $referrer: 'https://example.org/',
+      $current_url: 'https://example.com',
+      $referrer: 'https://example.org',
       $geoip_disable: true,
+      analytics_version: 2,
+      route_name: 'search',
+      page_group: 'product',
+      feature: 'search',
     })
   })
 
@@ -292,7 +305,7 @@ describe('createPostHogConfig', () => {
       save_campaign_params: true,
       save_referrer: true,
       session_recording: {
-        maskAllInputs: false,
+        maskAllInputs: true,
         maskInputOptions: { password: true },
         recordBody: false,
         recordHeaders: false,

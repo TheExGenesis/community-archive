@@ -1,5 +1,6 @@
 'use client'
 
+import { productFeatures, productActions } from './productActionSchema'
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import type {
   CaptureResult,
@@ -7,6 +8,12 @@ import type {
   PostHogConfig,
   Properties,
 } from 'posthog-js/dist/module.slim'
+import {
+  analyticsRoute,
+  analyticsFeature,
+  analyticsPageNames,
+  sanitizeAnalyticsUrl,
+} from './analyticsRoutes'
 import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
 
 type PostHogClient = Pick<
@@ -20,7 +27,7 @@ type PostHogInitializationOptions = {
 }
 
 type SafeProperty = string | number | boolean
-type PropertyValidator = (value: unknown) => value is SafeProperty
+type PropertyValidator = (value: unknown) => boolean
 
 const isSafeProperty = (value: unknown): value is SafeProperty =>
   ['string', 'number', 'boolean'].includes(typeof value)
@@ -74,6 +81,8 @@ const isTweetCardAction = isOneOf([
   'open_quoted_tweet',
 ])
 const isTweetOrigin = isOneOf([
+  // 'opportunities' is the Bulletin page's launch name, kept for event continuity.
+  'opportunities',
   'bangers',
   'digest',
   'home',
@@ -113,36 +122,12 @@ const isTrendsExplorerAction = isOneOf([
   'year_filter_applied',
   'year_filter_cleared',
 ])
-const isProductPage = isOneOf([
-  'bangers',
-  'digest',
-  'digest_story',
-  'home',
-  'live_stream',
-  'research',
-  'search',
-  'settings',
-  'trends',
-  'user_directory',
-  'user_profile',
-])
+const isProductPage = isOneOf(analyticsPageNames)
 const isNavigationDestination = isOneOf([
-  'admin',
-  'bangers',
-  'digest',
-  'docs',
-  'home',
-  'live_stream',
-  'research',
-  'search',
-  'settings',
+  ...analyticsPageNames,
   'sign_in',
   'sign_out',
-  'social_graph',
-  'trends',
   'upload_archive',
-  'user_directory',
-  'user_profile',
 ])
 const isNavigationSurface = isOneOf([
   'account_menu',
@@ -187,10 +172,85 @@ const isSearchInterfaceAction = isOneOf([
 ])
 const isSettingsTab = isOneOf(['archives', 'privacy', 'tweets'])
 
-const allowedEventProperties: Record<
-  string,
-  Readonly<Record<string, PropertyValidator>>
-> = {
+const profileCurationProperties = {
+  action: isOneOf([
+    'add',
+    'dismiss',
+    'restore-item',
+    'toggle-feature',
+    'reorder',
+    'restore',
+  ]),
+  section: isOneOf(['bangers', 'people']),
+  source: isOneOf(['profile', 'tweet_card']),
+}
+
+export const allowedEventProperties = {
+  community_app_action: {
+    action: isOneOf(['details_opened', 'launch_clicked']),
+    // Public catalog slugs include newly approved apps; never a URL or user input.
+    app_slug: (value: unknown) =>
+      typeof value === 'string' &&
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) &&
+      value.length <= 120,
+    source: isOneOf(['gallery_card', 'gallery_dialog', 'homepage', 'tools']),
+    external: (value) => value === undefined || isBoolean(value),
+  },
+  profile_edit_started: {},
+  profile_curation_saved: {
+    ...profileCurationProperties,
+    is_featured: (value) => value === undefined || isBoolean(value),
+  },
+  profile_curation_failed: profileCurationProperties,
+  site_page_viewed: { page: isProductPage },
+  product_action: {
+    feature: isOneOf(productFeatures),
+    action: isOneOf(productActions),
+  },
+  own_tweet_deleted: {},
+  archive_upload_failed: { error_category: isOneOf(['upload_failed']) },
+  search_results_failed: {
+    error_category: isOneOf(['request_failed']),
+    elapsed_ms: isNonnegativeInteger,
+  },
+  search_results_received: {
+    phase: isOneOf(['preview', 'canonical']),
+    result_count: isNonnegativeInteger,
+    elapsed_ms: isNonnegativeInteger,
+    page: isNonnegativeInteger,
+  },
+  website_section_ready: {
+    page: isOneOf([
+      'home',
+      'directory',
+      'profile',
+      'tweet',
+      'search',
+      'bangers',
+      'digest',
+      'gallery',
+      'graph',
+      'stream',
+      'trends',
+      'research',
+      'docs',
+    ]),
+    section: isOneOf([
+      'navigation_shell',
+      'homepage_stats',
+      'homepage_digest',
+      'homepage_stream',
+      'bangers_results',
+      'stream_feed',
+      'gallery_catalog',
+      'profile_feed',
+      'profile_header',
+      'directory_rows',
+      'digest_article',
+    ]),
+    navigation_type: isOneOf(['client', 'history', 'document', 'unknown']),
+    elapsed_ms: (value) => value === undefined || isNonnegativeInteger(value),
+  },
   archive_upload_started: {
     includes_likes: isBoolean,
     date_filter_applied: isBoolean,
@@ -279,7 +339,9 @@ const allowedEventProperties: Record<
     has_include_filter: isBoolean,
     has_exclude_filter: isBoolean,
   },
-}
+} satisfies Record<string, Readonly<Record<string, PropertyValidator>>>
+
+export type PostHogEventName = keyof typeof allowedEventProperties
 
 const safeSdkProperties = new Set([
   'token',
@@ -350,13 +412,26 @@ export function sanitizePostHogEvent(
 ): CaptureResult | null {
   if (!event) return null
 
-  const eventProperties = allowedEventProperties[event.event]
+  const eventProperties = (
+    allowedEventProperties as Record<
+      string,
+      Readonly<Record<string, PropertyValidator>>
+    >
+  )[event.event]
   const isSdkEvent = event.event.startsWith('$')
-  if (!eventProperties && !isSdkEvent) return null
+  if (!eventProperties && !isSdkEvent) {
+    if (process.env.NODE_ENV === 'development')
+      console.warn('PostHog rejected an unregistered event')
+    return null
+  }
 
   if (eventProperties) {
     for (const [key, validator] of Object.entries(eventProperties)) {
-      if (!validator(event.properties[key])) return null
+      if (!validator(event.properties[key])) {
+        if (process.env.NODE_ENV === 'development')
+          console.warn('PostHog rejected an invalid event schema')
+        return null
+      }
     }
   }
 
@@ -369,7 +444,7 @@ export function sanitizePostHogEvent(
         key.startsWith('$') ||
         campaignProperties.has(key) ||
         (safeSdkProperties.has(key) && isSafeProperty(value)) ||
-        validator?.(value)
+        (value !== undefined && validator?.(value))
       ) {
         properties[key] = value
       }
@@ -378,9 +453,50 @@ export function sanitizePostHogEvent(
     properties = { ...event.properties, $geoip_disable: true }
   }
 
+  for (const key of [
+    '$current_url',
+    '$session_entry_url',
+    '$session_exit_url',
+    '$referrer',
+    '$initial_current_url',
+    '$initial_referrer',
+  ]) {
+    if (key in properties)
+      properties[key] = sanitizeAnalyticsUrl(properties[key])
+  }
+  if (typeof properties.$pathname === 'string')
+    properties.$pathname = analyticsRoute(properties.$pathname).path
+  const rawUrl = event.properties.$current_url
+  let pathname: string | undefined
+  try {
+    if (typeof rawUrl === 'string') pathname = new URL(rawUrl).pathname
+  } catch {
+    /* invalid context */
+  }
+  if (!pathname && typeof window !== 'undefined')
+    pathname = window.location.pathname
+  if (pathname) {
+    const route = analyticsRoute(pathname)
+    properties.route_name = route.page
+    properties.page_group = route.group
+    if (event.event !== 'product_action')
+      properties.feature = analyticsFeature(route.page)
+  }
+  properties.analytics_version = 2
+
   const sanitizedEvent: CaptureResult = {
     ...event,
     properties,
+  }
+
+  for (const key of ['$set', '$set_once'] as const) {
+    const source = sanitizedEvent[key]
+    if (!source) continue
+    sanitizedEvent[key] = { ...source }
+    for (const property of Object.keys(source)) {
+      if (/url|referrer/.test(property))
+        sanitizedEvent[key]![property] = sanitizeAnalyticsUrl(source[property])
+    }
   }
 
   if (event.event === '$identify') {
@@ -434,8 +550,8 @@ export function createPostHogConfig(
     disable_surveys: true,
     disable_web_experiments: true,
     enable_recording_console_log: false,
-    mask_all_element_attributes: false,
-    mask_all_text: false,
+    mask_all_element_attributes: true,
+    mask_all_text: true,
     opt_in_site_apps: false,
     persistence: 'localStorage+cookie',
     person_profiles: 'identified_only',
@@ -443,7 +559,9 @@ export function createPostHogConfig(
     save_campaign_params: true,
     save_referrer: true,
     session_recording: {
-      maskAllInputs: false,
+      maskAllInputs: true,
+      maskTextSelector: '*',
+      blockSelector: '.ph-no-capture',
       maskInputOptions: { password: true },
       recordBody: false,
       recordHeaders: false,
@@ -542,21 +660,27 @@ async function loadPostHogClient(
 }
 
 export function capturePostHogEvent(
-  eventName: string,
+  eventName: PostHogEventName,
   properties?: Record<string, unknown>,
 ) {
   void capturePostHogEventWhenReady(
     loadPostHogClient,
     () => identityReadyPromise,
     eventName,
-    properties,
+    {
+      // Snapshot context before async SDK/identity initialization or navigation.
+      ...(typeof window === 'undefined'
+        ? {}
+        : { $current_url: window.location.href }),
+      ...properties,
+    },
   )
 }
 
 export async function capturePostHogEventWhenReady(
   loadClient: () => Promise<PostHogClient | null>,
   waitUntilIdentityReady: () => Promise<void>,
-  eventName: string,
+  eventName: PostHogEventName,
   properties?: Record<string, unknown>,
 ): Promise<boolean> {
   await waitUntilIdentityReady()
@@ -578,7 +702,7 @@ export function disablePostHogAfterIdentityFailure() {
 
 export function capturePostHogEventWithClient(
   client: Pick<PostHogClient, 'capture'>,
-  eventName: string,
+  eventName: PostHogEventName,
   properties?: Record<string, unknown>,
 ): boolean {
   try {

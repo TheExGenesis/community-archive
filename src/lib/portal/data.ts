@@ -297,15 +297,13 @@ function validatedPageCursor(
   return { createdAt: createdAt.toISOString(), id: cursor.id }
 }
 
-interface ClickHousePortalStreamTweet {
+interface ClickHousePortalTweet {
   tweetId: string
   accountId: string
   createdAt: string
-  latestObservedAt: string
   fullText: string
   favoriteCount: string | number
   retweetCount: string | number
-  followerCount: string | number
   username: string | null
   accountDisplayName: string | null
   avatarMediaUrl: string | null
@@ -315,6 +313,13 @@ interface ClickHousePortalStreamTweet {
     width: number | null
     height: number | null
   }>
+}
+
+interface ClickHousePortalStreamTweet extends ClickHousePortalTweet {
+  latestObservedAt: string
+  followerCount: string | number
+  quoteTweetId?: string | null
+  quotedTweet?: ClickHousePortalTweet | null
 }
 
 interface ClickHousePortalStreamResponse {
@@ -343,9 +348,9 @@ function clickHousePortalTimestamp(value: string, field: string): string {
   return timestamp.toISOString()
 }
 
-function mapClickHousePortalStreamTweet(
-  row: ClickHousePortalStreamTweet,
-): PortalTweet {
+function mapClickHousePortalTweet(
+  row: ClickHousePortalTweet,
+): PortalQuotedTweet {
   if (
     !/^\d{1,32}$/.test(row.tweetId) ||
     !/^\d{1,32}$/.test(row.accountId) ||
@@ -361,14 +366,9 @@ function mapClickHousePortalStreamTweet(
     name: row.accountDisplayName || username,
     avatar: row.avatarMediaUrl || null,
     text: row.fullText,
-    observedAt: clickHousePortalTimestamp(
-      row.latestObservedAt,
-      'observation timestamp',
-    ),
     createdAt: clickHousePortalTimestamp(row.createdAt, 'authored timestamp'),
     likes: clickHousePortalCount(row.favoriteCount, 'favorite count'),
     rts: clickHousePortalCount(row.retweetCount, 'repost count'),
-    followers: clickHousePortalCount(row.followerCount, 'follower count'),
     media: (row.media || []).flatMap((item): PortalMedia[] => {
       if (!item.mediaUrl || !item.mediaType) return []
       return [
@@ -380,6 +380,37 @@ function mapClickHousePortalStreamTweet(
         },
       ]
     }),
+  }
+}
+
+function mapClickHousePortalStreamTweet(
+  row: ClickHousePortalStreamTweet,
+): PortalTweet {
+  const tweet = mapClickHousePortalTweet(row)
+  const quotedTweet = row.quotedTweet
+    ? mapClickHousePortalTweet(row.quotedTweet)
+    : row.quoteTweetId && /^\d{1,32}$/.test(row.quoteTweetId)
+      ? {
+          id: row.quoteTweetId,
+          username: '',
+          name: '',
+          avatar: null,
+          text: '',
+          createdAt: tweet.createdAt,
+          likes: 0,
+          rts: 0,
+          media: [],
+          isDeleted: true,
+        }
+      : undefined
+  return {
+    ...tweet,
+    observedAt: clickHousePortalTimestamp(
+      row.latestObservedAt,
+      'observation timestamp',
+    ),
+    followers: clickHousePortalCount(row.followerCount, 'follower count'),
+    ...(quotedTweet ? { quotedTweet } : {}),
   }
 }
 
@@ -654,6 +685,7 @@ export function selectDailyRecentBangers(
   tweets: PortalTweet[],
   now = new Date(),
   poolSize = 10,
+  randomize = true,
 ): PortalTweet[] {
   const windowEnd = now.getTime()
   const windowStart = windowEnd - 24 * 60 * 60 * 1_000
@@ -662,6 +694,7 @@ export function selectDailyRecentBangers(
       const createdAt = new Date(tweet.createdAt)
       const createdAtTime = createdAt.getTime()
       return (
+        (tweet.quoteCount ?? 0) >= 2 &&
         !Number.isNaN(createdAtTime) &&
         createdAtTime >= windowStart &&
         createdAtTime <= windowEnd
@@ -677,11 +710,30 @@ export function selectDailyRecentBangers(
     })
     .slice(0, Math.max(1, poolSize))
 
-  if (candidates.length < 2) return candidates
+  if (candidates.length < 2 || !randomize) return candidates
   const day = now.toISOString().slice(0, 10)
   const selectedIndex = stableHash(day) % candidates.length
   const selected = candidates[selectedIndex]
   return [selected, ...candidates.filter((_, index) => index !== selectedIndex)]
+}
+
+/** Keep the current window when it qualifies; otherwise use the previous day's best. */
+export async function loadRecentBangerSelection(
+  now = new Date(),
+): Promise<PortalTweet[]> {
+  const current = selectDailyRecentBangers(
+    await fetchPortalRecentBangers(50, 24),
+    now,
+  )
+  if (current.length) return current
+  const previousEnd = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  const previous = await fetchPortalRecentBangers(
+    50,
+    24,
+    undefined,
+    previousEnd.toISOString(),
+  )
+  return selectDailyRecentBangers(previous, previousEnd, 1, false)
 }
 
 async function fetchCorpusRange(): Promise<PortalCorpusRange> {
@@ -787,10 +839,8 @@ async function getCachedHistoricalBangers(sourceKey: string, day: string) {
 }
 const getCachedRecentBangers = unstable_cache(
   async (_sourceKey: string) =>
-    enrichPortalTweets(
-      selectDailyRecentBangers(await fetchPortalRecentBangers(50, 24)),
-    ),
-  ['portal-recent-bangers-v5'],
+    enrichPortalTweets(await loadRecentBangerSelection()),
+  ['portal-recent-bangers-v6'],
   { revalidate: 1_800 },
 )
 

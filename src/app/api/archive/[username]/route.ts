@@ -2,6 +2,7 @@ import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import { archiveStoragePath } from '@/lib/upload-archive/archiveStorageReference'
 
 const USERNAME = /^[A-Za-z0-9_]{1,15}$/
 
@@ -39,9 +40,25 @@ export async function GET(
     return NextResponse.json({ error: 'Archive not found' }, { status: 404 })
   }
 
+  const { data: upload, error: uploadError } = await supabase
+    .from('archive_upload')
+    .select('storage_path,storage_sha256')
+    .eq('account_id', providerId)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (uploadError)
+    return NextResponse.json({ error: 'Archive not found' }, { status: 404 })
+  let objectPath: string
+  try {
+    objectPath = archiveStoragePath(username, upload ?? undefined)
+  } catch {
+    return NextResponse.json({ error: 'Archive not found' }, { status: 404 })
+  }
   const { data, error } = await supabase.storage
     .from('archives')
-    .createSignedUrl(`${username}/archive.json`, 60)
+    .createSignedUrl(objectPath, 60)
   if (error || !data?.signedUrl) {
     return NextResponse.json({ error: 'Archive not found' }, { status: 404 })
   }

@@ -162,3 +162,44 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA temp
   REVOKE EXECUTE ON FUNCTIONS
   FROM PUBLIC, anon, authenticated, readclient, service_role;
+
+-- Private Bulletin opportunities
+ALTER TABLE bulletin.decisions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bulletin.opportunities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bulletin.calls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bulletin.worker_state ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON SCHEMA bulletin FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON ALL TABLES IN SCHEMA bulletin FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA bulletin FROM PUBLIC,anon,authenticated;
+GRANT USAGE ON SCHEMA bulletin TO service_role;
+GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA bulletin TO service_role;
+GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA bulletin TO service_role;
+REVOKE ALL ON FUNCTION public.get_bulletin_opportunities(integer) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_bulletin_opportunities(integer) TO service_role;
+
+ALTER TABLE bulletin.runs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON bulletin.runs FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON SEQUENCE bulletin.runs_id_seq FROM PUBLIC,anon,authenticated;
+GRANT SELECT,INSERT,UPDATE,DELETE ON bulletin.runs TO service_role;
+GRANT USAGE,SELECT ON SEQUENCE bulletin.runs_id_seq TO service_role;
+REVOKE ALL ON FUNCTION public.get_bulletin_runs(bigint,integer) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_bulletin_runs(bigint,integer) TO service_role;
+
+ALTER TABLE bulletin.prompt_versions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON bulletin.prompt_versions FROM PUBLIC,anon,authenticated,service_role;
+GRANT SELECT,INSERT ON bulletin.prompt_versions TO service_role;
+REVOKE ALL ON SEQUENCE bulletin.prompt_versions_id_seq FROM PUBLIC,anon,authenticated;
+GRANT USAGE,SELECT ON SEQUENCE bulletin.prompt_versions_id_seq TO service_role;
+REVOKE ALL ON FUNCTION public.get_bulletin_prompts(bigint) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.save_bulletin_prompt(bigint,text,text,uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_bulletin_prompts(bigint) TO service_role;
+GRANT EXECUTE ON FUNCTION public.save_bulletin_prompt(bigint,text,text,uuid) TO service_role;
+
+ALTER TABLE bulletin.scans ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON bulletin.scans FROM PUBLIC,anon,authenticated;
+GRANT SELECT,INSERT,UPDATE,DELETE ON bulletin.scans TO service_role;
+REVOKE ALL ON FUNCTION public.get_bulletin_board_state(integer) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_bulletin_board_state(integer) TO service_role;
+
+REVOKE ALL ON FUNCTION public.get_bulletin_relationships(text,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_bulletin_relationships(text,text) TO service_role;

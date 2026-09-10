@@ -14,7 +14,7 @@ export const uploadArchive = async (
   progressCallback({ phase: 'Uploading archive to storage', percent: 0 })
 
   // Use the new function here
-  const objectPath = await uploadArchiveToStorage(supabase, archive)
+  const storageReference = await uploadArchiveToStorage(supabase, archive)
 
   progressCallback({ phase: 'Archive Uploaded to storage', percent: 100 })
 
@@ -23,13 +23,18 @@ export const uploadArchive = async (
     'Uploaded to storage, insertion into db will be handled by our worker.',
   )
   try {
-    await insertArchiveForProcessing(supabase, archive, progressCallback)
+    await insertArchiveForProcessing(
+      supabase,
+      archive,
+      progressCallback,
+      storageReference,
+    )
   } catch (error) {
     // A policy change can land after the Storage statement but before the
     // PostgreSQL metadata write. Remove the partial raw object on that path.
     const { error: cleanupError } = await supabase.storage
       .from('archives')
-      .remove([objectPath])
+      .remove([storageReference.storage_path])
     if (cleanupError) {
       console.error('Failed to remove rejected archive upload:', cleanupError)
     }

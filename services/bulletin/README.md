@@ -209,7 +209,8 @@ Unresolved work from an earlier run remains eligible after an hour, when the
 next run starts; there is no standalone retry timer.
 Model routing allows provider fallback for the same model while requiring the
 request's parameters and capping prices at $0.15 input / $0.50 output per million tokens.
-Requests use a strict JSON schema for label types, categories, response methods,
+Routing prioritizes low latency within those price ceilings. Requests use a
+strict JSON schema for label types, categories, response methods,
 and availability. Routing requires structured-output support. Python still checks
 all semantic constraints and exact source/author evidence before publication;
 schema compliance does not establish that a classification is correct. Logs

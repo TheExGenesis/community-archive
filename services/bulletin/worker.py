@@ -189,7 +189,7 @@ def request_body(tweet, prompt, context):
         {'role':'user','content':json.dumps(payload,ensure_ascii=False)}],
         'response_format':output_schema.FORMAT,'max_tokens':MAX_OUTPUT,
         'reasoning':{'effort':'low'},
-        'provider':{'allow_fallbacks':True,'require_parameters':True,
+        'provider':{'allow_fallbacks':True,'require_parameters':True,'sort':'latency',
           'max_price':{'prompt':0.15,'completion':0.50}}},ensure_ascii=False).encode()
 
 

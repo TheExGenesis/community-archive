@@ -124,7 +124,7 @@ class TweetContextTests(unittest.TestCase):
         self.assertNotIn('dm or reply', properties['respond']['enum'])
         self.assertNotIn('work', properties['kind']['enum'])
         self.assertEqual(json.loads(body)['provider'], {
-            'allow_fallbacks': True, 'require_parameters': True,
+            'allow_fallbacks': True, 'require_parameters': True, 'sort': 'latency',
             'max_price': {'prompt': 0.15, 'completion': 0.50},
         })
         messages = json.loads(body)['messages']

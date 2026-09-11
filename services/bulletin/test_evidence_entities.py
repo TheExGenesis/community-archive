@@ -26,5 +26,10 @@ class EvidenceEntityTests(unittest.TestCase):
         self.assertEqual(validate_label(label,{'text':text})['evidence'],label['evidence'])
         self.assertIn('&gt;',text)
 
+    def test_entities_that_decode_to_empty_or_whitespace_are_not_evidence(self):
+        for evidence in ['&#x0b;', '&#32;', '&NewLine;']:
+            with self.subTest(evidence=evidence):
+                self.assertFalse(evidence_matches(evidence,'Any source text.\n'))
+
 
 if __name__=='__main__':unittest.main()

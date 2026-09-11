@@ -12,7 +12,8 @@ SYSTEM = json.loads(Path(__file__).with_name('default-prompt.json').read_text())
 
 def evidence_matches(evidence, text):
     """Compare visible characters; do not relax case, spacing or wording."""
-    return html.unescape(evidence) in html.unescape(text)
+    decoded = html.unescape(evidence)
+    return bool(decoded.strip()) and decoded in html.unescape(text)
 
 def validate_label(label, tweet, reference=False):
     if not isinstance(label, dict):

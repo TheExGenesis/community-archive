@@ -13,6 +13,7 @@ describe('trend explorer URL state', () => {
       shown: ['ai agents'],
       included: ['tpot'],
       scale: 'raw',
+      axis: 'log',
       granularity: 'month',
       range: { start: '2025-03', end: '2026-08' },
     })
@@ -22,6 +23,7 @@ describe('trend explorer URL state', () => {
       shown: ['ai agents'],
       included: ['tpot'],
       scale: 'raw',
+      axis: 'log',
       granularity: 'month',
       range: { start: '2025-03', end: '2026-08' },
     })

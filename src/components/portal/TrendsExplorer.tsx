@@ -33,7 +33,6 @@ export default function TrendsExplorer({
   initialSearch?: string
 }) {
   const {
-    weekly,
     configuredTerms,
     granularity,
     buckets,
@@ -44,6 +43,8 @@ export default function TrendsExplorer({
     setFeedFilters,
     scale,
     setScale,
+    axis,
+    setAxis,
     termInput,
     setTermInput,
     isAdding,
@@ -109,64 +110,9 @@ export default function TrendsExplorer({
 
         <ExtensionInstallPrompt surface="trends" className="mb-5" />
 
-        <section
-          aria-label="Live trending words"
-          className={`${CARD} mb-5 p-4 sm:p-5`}
-        >
-          <h2 className="text-sm font-bold">Trending this week</h2>
-          <p className={`mt-1 text-xs ${MUTED}`}>
-            Default chart terms come from the same daily discovery as the
-            homepage. Growth below uses author-weighted member activity; the
-            historical chart uses full-corpus tweet counts.
-          </p>
-          <div className="mt-3 grid gap-4 sm:grid-cols-3">
-            {(
-              [
-                { lane: 'emerging', label: 'Breaking out' },
-                { lane: 'rising', label: 'Big & rising' },
-                { lane: 'falling', label: 'Cooling off' },
-              ] as const
-            ).map((group) => (
-              <div key={group.lane}>
-                <h3 className={`mb-2 text-xs font-semibold ${MUTED}`}>
-                  {group.label}
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {weekly
-                    .filter((row) => row.lane === group.lane)
-                    .map((row) => (
-                      <Link
-                        key={row.term}
-                        href={`/trends?${new URLSearchParams({ q: row.term, granularity: 'month' })}`}
-                        className="rounded border px-2.5 py-1.5 text-xs text-brand hover:bg-accent"
-                      >
-                        {row.term}{' '}
-                        <span className={MUTED}>
-                          {row.deltaPct === null
-                            ? 'New'
-                            : `${row.deltaPct >= 0 ? '+' : ''}${Math.round(row.deltaPct)}%`}
-                        </span>
-                      </Link>
-                    ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          {weekly.some((row) => row.untilDate) && (
-            <p className={`mt-3 text-xs ${MUTED}`}>
-              Complete week through{' '}
-              {weekly.find((row) => row.untilDate)?.untilDate} (UTC). Click a
-              word to open its monthly history.
-            </p>
-          )}
-          {!weekly.some((row) => row.lane) && (
-            <p className={`mt-3 text-xs ${MUTED}`}>
-              {initialLoadFailed
-                ? 'Live keywords are temporarily unavailable. Retry defaults below.'
-                : 'No dynamic movers are available yet.'}
-            </p>
-          )}
-        </section>
+        <p className={`mb-4 text-xs ${MUTED}`}>
+          Default terms are trending this week in the community.
+        </p>
 
         <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)]">
           <section className="min-w-0">
@@ -267,9 +213,34 @@ export default function TrendsExplorer({
                       </button>
                     ))}
                   </div>
+                  <div
+                    className="inline-flex rounded-[4px] border border-zinc-300 p-0.5 dark:border-[#34343a]"
+                    aria-label="Chart axis"
+                  >
+                    {(['linear', 'log'] as const).map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        aria-pressed={axis === option}
+                        onClick={() => setAxis(option)}
+                        className={`rounded-[3px] px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors ${
+                          axis === option
+                            ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                            : `${MUTED} hover:text-foreground`
+                        }`}
+                      >
+                        {option === 'linear' ? 'Linear' : 'Log'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
+              {axis === 'log' && (
+                <p className={`px-4 pt-2 text-[11px] ${MUTED}`}>
+                  Log scale compresses large peaks while keeping zero visible.
+                </p>
+              )}
               {chartError && (
                 <div
                   className="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[4px] border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-950 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-100 sm:mx-5"
@@ -298,6 +269,7 @@ export default function TrendsExplorer({
                 enabledSeries={enabledSeries}
                 granularity={granularity}
                 scale={scale}
+                axis={axis}
                 selectedRange={selectedRange}
                 setSelectedRange={setSelectedRange}
                 isLoadingSeries={isLoadingSeries}
@@ -489,7 +461,7 @@ export default function TrendsExplorer({
 
             <div
               ref={evidenceScrollRef}
-              className={`${CARD} max-h-[760px] overflow-y-auto`}
+              className={`${CARD} relative max-h-[760px] overflow-y-auto`}
               aria-label="Matching tweets"
               aria-live="polite"
               onScroll={(event) => {

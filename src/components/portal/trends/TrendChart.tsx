@@ -43,6 +43,7 @@ export function TrendChart({
   enabledSeries,
   granularity,
   scale,
+  axis = 'linear',
   selectedRange,
   setSelectedRange,
   isLoadingSeries,
@@ -54,6 +55,7 @@ export function TrendChart({
   enabledSeries: TrendBucketSeries[]
   granularity: TrendGranularity
   scale: TrendExplorerUrlState['scale']
+  axis?: 'linear' | 'log'
   selectedRange: TrendRange | null
   setSelectedRange: Dispatch<SetStateAction<TrendRange | null>>
   isLoadingSeries: boolean
@@ -70,13 +72,17 @@ export function TrendChart({
     ...enabledSeries.flatMap((item) => valuesFor(item)),
   )
   const chartMax = niceCeiling(maxValue)
-  const gridValues = [
-    0,
-    chartMax / 4,
-    chartMax / 2,
-    (chartMax * 3) / 4,
-    chartMax,
-  ]
+  const gridValues =
+    axis === 'log'
+      ? [
+          0,
+          ...Array.from(
+            { length: Math.ceil(Math.log10(chartMax)) + 1 },
+            (_, i) => 10 ** i,
+          ).filter((value) => value < chartMax),
+          chartMax,
+        ]
+      : [0, chartMax / 4, chartMax / 2, (chartMax * 3) / 4, chartMax]
   const W = 760
   const H = 360
   const X0 = 62
@@ -95,7 +101,12 @@ export function TrendChart({
         index === buckets.length - 1 ||
         index % 12 === 0,
     )
-  const yPosition = (value: number) => Y0 - (value / chartMax) * (Y0 - Y1)
+  const yPosition = (value: number) =>
+    Y0 -
+    (axis === 'log'
+      ? Math.log1p(value) / Math.log1p(chartMax)
+      : value / chartMax) *
+      (Y0 - Y1)
   const selectedStartIndex = selectedRange
     ? buckets.indexOf(selectedRange.start)
     : -1
@@ -156,7 +167,7 @@ export function TrendChart({
           viewBox={`0 0 ${W} ${H}`}
           className="block w-full touch-none select-none"
           role="img"
-          aria-label={`${granularity === 'year' ? 'Yearly' : 'Monthly'} term trends shown as ${scale === 'normalized' ? 'occurrences per 100,000 tweets' : 'raw tweet counts'}`}
+          aria-label={`${granularity === 'year' ? 'Yearly' : 'Monthly'} term trends shown as ${scale === 'normalized' ? 'occurrences per 100,000 tweets' : 'raw tweet counts'}${axis === 'log' ? ' on a logarithmic axis' : ''}`}
         >
           {gridValues.map((value) => (
             <g key={value}>

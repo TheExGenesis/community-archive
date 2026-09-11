@@ -98,6 +98,9 @@ export function useTrendExplorer({
       ),
   )
   const [scale, setScale] = useState(initialUrlState.scale)
+  const [axis, setAxis] = useState<'linear' | 'log'>(
+    initialUrlState.axis ?? 'linear',
+  )
   const [termInput, setTermInput] = useState('')
   const [isAdding, setIsAdding] = useState(false)
   const [isLoadingSeries, setIsLoadingSeries] = useState(
@@ -184,10 +187,12 @@ export function useTrendExplorer({
       shown: configuredTerms.filter((term) => chartEnabled[term]),
       included: includeTerms,
       scale,
+      axis,
       granularity,
       range: selectedRange,
     }),
     [
+      axis,
       chartEnabled,
       configuredTerms,
       granularity,
@@ -429,6 +434,8 @@ export function useTrendExplorer({
     setFeedFilters,
     scale,
     setScale,
+    axis,
+    setAxis,
     termInput,
     setTermInput,
     isAdding,

@@ -31,6 +31,13 @@ class ResolutionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'reply_tree'):
             resolution.validate(self.value,self.seed,self.context)
 
+    def test_entity_equivalent_author_evidence_keeps_raw_source_hash(self):
+        self.reply['full_text']='All claimed &amp; closed.'
+        self.context.sources['2']=fingerprint(self.reply)
+        self.value['evidence']='All claimed & closed.'
+        result=resolution.validate(self.value,self.seed,self.context)
+        self.assertEqual(result['content_hash'],fingerprint(self.reply)[1])
+
     def test_invented_evidence_unknown_and_missing_output(self):
         self.value['evidence']='The role is filled'
         with self.assertRaisesRegex(ValueError,'exact_author_evidence'):

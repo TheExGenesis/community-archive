@@ -3,6 +3,7 @@ import hashlib
 import datetime as dt
 
 import tweet_context
+from labels import evidence_matches
 
 RULES = '''For every positive notice, also return an availability object, for example:
 {"state":"unknown","tweet_id":null,"evidence":null}.
@@ -35,7 +36,7 @@ def validate(value, seed, context):
     row = context.records.get(ident) if isinstance(ident, str) else None
     if (not row or row['account_id'] != seed['account_id']
             or not isinstance(evidence, str) or not evidence.strip()
-            or len(evidence) > 1000 or evidence not in row['full_text']):
+            or len(evidence) > 1000 or not evidence_matches(evidence, row['full_text'])):
         raise ValueError('availability_requires_exact_author_evidence')
     # A quote or unrelated post by the same author cannot close this notice.
     node, seen = ident, set()

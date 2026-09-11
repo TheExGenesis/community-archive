@@ -1,5 +1,6 @@
 """Bulletin classification prompt and strict output validation."""
 import datetime as dt
+import html
 import re
 
 KINDS = ['help', 'feedback', 'intro', 'free', 'invite', 'opportunity']
@@ -8,6 +9,10 @@ KINDS = ['help', 'feedback', 'intro', 'free', 'invite', 'opportunity']
 import json
 from pathlib import Path
 SYSTEM = json.loads(Path(__file__).with_name('default-prompt.json').read_text())
+
+def evidence_matches(evidence, text):
+    """Compare visible characters; do not relax case, spacing or wording."""
+    return html.unescape(evidence) in html.unescape(text)
 
 def validate_label(label, tweet, reference=False):
     if not isinstance(label, dict):
@@ -38,7 +43,7 @@ def validate_label(label, tweet, reference=False):
     if place is not None and (not isinstance(place, str) or len(place) > 160):
         raise ValueError('invalid place')
     evidence = label.get('evidence')
-    if not reference and (not isinstance(evidence, str) or not evidence.strip() or evidence not in tweet['text']):
+    if not reference and (not isinstance(evidence, str) or not evidence.strip() or not evidence_matches(evidence, tweet['text'])):
         raise ValueError('evidence must be an exact source substring')
     return {'is_notice': True, 'side': label['side'], 'kind': label['kind'],
             'summary': summary.strip(), 'topics': topics, 'respond': label['respond'],

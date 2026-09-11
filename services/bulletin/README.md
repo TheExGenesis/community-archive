@@ -85,6 +85,11 @@ or logs. Every printed source's hash and current consent are checked again befor
 saving; a change leaves the decision pending without repeating the paid call
 immediately or removing its cost from the ledger.
 
+Evidence comparisons decode HTML entities once on both sides, so archived
+`&gt;` and visible `>` match. Case, whitespace and wording must still match exactly.
+Raw source text, hashes and stored model evidence are unchanged. This applies
+to label evidence and author availability evidence; author/reply-tree checks remain.
+
 The graph endpoint may cache reply discovery for an hour. The classifier version
 bump reconsiders encountered candidates in newly scanned windows; it does not
 trigger a historical backfill. Candidate phrase filters are unchanged.

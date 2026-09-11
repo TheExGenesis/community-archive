@@ -207,8 +207,8 @@ toward the run's 50-call cap and must fit within the remaining time allowance.
 Successful recovery makes the run `ok`; `failed` still counts failed attempts.
 Unresolved work from an earlier run remains eligible after an hour, when the
 next run starts; there is no standalone retry timer.
-Model routing forbids fallback or price escalation
-and caps prices at $0.15 input / $0.50 output per million tokens.
+Model routing allows provider fallback for the same model while requiring the
+request's parameters and capping prices at $0.15 input / $0.50 output per million tokens.
 
 An explicitly approved backfill can use `--backfill-budget-usd` (at most $1).
 Its cap is cumulative across runs of the exact same window. The monthly cap

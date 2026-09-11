@@ -47,8 +47,18 @@
 }
 .titleRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+}
+.adminLink {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.adminLink:hover {
+  text-decoration: underline;
 }
 .about {
   position: relative;

@@ -1,0 +1,21 @@
+[Unit]
+Description=Community Archive admin Bulletin refresh queue
+After=network-online.target
+Wants=network-online.target
+OnFailure=ca-bulletin-failure.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/community-archive-bulletin/current
+Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
+LoadCredentialEncrypted=openrouter_api_key:/etc/credstore.encrypted/ca-bulletin-openrouter
+LoadCredentialEncrypted=clickhouse_api_token:/etc/credstore.encrypted/ca-bulletin-clickhouse
+Environment=CLICKHOUSE_ANALYTICS_API_URL=https://analytics.community-archive.org/analytics
+ExecStart=/usr/bin/python3 /opt/community-archive-bulletin/current/run_service.py --queued-only
+TimeoutStartSec=20min
+MemoryMax=512M
+CPUQuota=100%
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+

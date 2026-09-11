@@ -23,12 +23,12 @@ class ClickHouseWorkerTests(unittest.TestCase):
             raise RuntimeError('Tests require a named local disposable database')
         cls.db.execute('DROP SCHEMA IF EXISTS bulletin CASCADE; DROP SCHEMA IF EXISTS tes CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public')
         cls.db.execute(FIXTURE)
-        for name in ('opportunities','run_history','prompt_versions','clickhouse'):
+        for name in ('opportunities','run_history','prompt_versions','clickhouse','refresh_requests'):
             cls.db.execute(next((ROOT/'supabase/migrations').glob('*_bulletin_'+name+'.sql')).read_text())
     @classmethod
     def tearDownClass(cls): cls.db.close()
     def setUp(self):
-        self.db.execute('TRUNCATE bulletin.decisions,bulletin.calls,bulletin.runs,bulletin.scans,bulletin.prompt_versions,public.all_account,public.members,public.optin,tes.blocked_scraping_users RESTART IDENTITY CASCADE')
+        self.db.execute('TRUNCATE bulletin.decisions,bulletin.calls,bulletin.runs,bulletin.scans,bulletin.refresh_requests,bulletin.prompt_versions,public.all_account,public.members,public.optin,tes.blocked_scraping_users RESTART IDENTITY CASCADE')
         self.db.execute("INSERT INTO public.all_account VALUES ('10','alice',false); INSERT INTO public.members VALUES ('10')")
         self.db.execute("INSERT INTO bulletin.prompt_versions(body,note) VALUES (%s,'Initial')",(SYSTEM,))
         self.window=(dt.datetime(2026,9,1,tzinfo=dt.timezone.utc),dt.datetime(2026,9,2,tzinfo=dt.timezone.utc))
@@ -72,6 +72,123 @@ class ClickHouseWorkerTests(unittest.TestCase):
             self.assertEqual(older['versions'][0]['id'],'1')
             self.assertEqual(older['active']['body'],'updated')
         finally:self.db.execute('RESET ROLE')
+
+    def queue_refresh(self,request_id='00000000-0000-4000-8000-000000000001',budget='.10',selection='latest',prompt=1):
+        return self.db.execute('SELECT public.request_bulletin_refresh(%s,%s,%s,%s,%s) id',
+            (request_id,selection,prompt,Decimal(budget),'00000000-0000-0000-0000-000000000001')).fetchone()['id']
+
+    def run_refresh(self,**kwargs):
+        with patch.object(worker,'call_model',side_effect=self.response) as model:
+            result=worker.run(self.db,queued_only=True,**kwargs)
+        return result,model.call_count
+
+    def test_refresh_reclassifies_and_removes_notice_with_pinned_prompt(self):
+        self.run_worker()
+        self.db.execute("INSERT INTO bulletin.prompt_versions(body,note) VALUES ('Changed prompt','Change')")
+        request=self.queue_refresh(prompt=2)
+        self.db.execute("INSERT INTO bulletin.prompt_versions(body,note) VALUES ('Later prompt','Later')")
+        self.label={'is_notice':False}
+        original=self.response
+        def respond(body):
+            self.assertEqual(json.loads(body)['messages'][0]['content'],'Changed prompt')
+            return original(body)
+        self.response=respond
+        result,calls=self.run_refresh()
+        self.assertEqual((result['status'],calls),('ok',1))
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.opportunities').fetchone()['n'],0)
+        self.assertEqual(self.db.execute('SELECT status FROM bulletin.refresh_requests WHERE id=%s',(request,)).fetchone()['status'],'complete')
+        self.assertEqual(self.run_refresh()[0]['status'],'queue_empty')
+
+    def test_refresh_updates_positive_and_preserves_notice_on_model_failure(self):
+        self.run_worker();self.queue_refresh()
+        self.label['summary']='Updated offer.'
+        self.run_refresh()
+        self.assertEqual(self.db.execute('SELECT summary FROM bulletin.opportunities').fetchone()['summary'],'Updated offer.')
+        self.queue_refresh('00000000-0000-4000-8000-000000000002')
+        with patch.object(worker,'call_model',side_effect=self.http_error(401)):
+            self.assertEqual(worker.run(self.db,queued_only=True)['status'],'classification_failed')
+        self.assertEqual(self.db.execute('SELECT summary FROM bulletin.opportunities').fetchone()['summary'],'Updated offer.')
+
+    def test_refresh_resumes_without_resetting_attempts_or_cost_cap(self):
+        self.run_worker();self.queue_refresh(budget='.01')
+        with patch.object(worker,'MAX_PAGES',1):
+            self.assertEqual(self.run_refresh()[0]['status'],'intake_backlog')
+        self.db.execute("UPDATE bulletin.decisions SET attempts=2,last_attempt_at=now()-interval '2 minutes'")
+        result,calls=self.run_refresh()
+        self.assertEqual((result['status'],calls),('ok',1))
+        self.assertEqual(self.db.execute('SELECT attempts FROM bulletin.decisions').fetchone()['attempts'],3)
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.calls').fetchone()['n'],2)
+
+    def test_refresh_budget_and_monthly_limit_stop_without_losing_notice(self):
+        self.run_worker();request=self.queue_refresh(budget='.01')
+        with patch.object(worker,'MAX_PAGES',1):self.run_refresh()
+        self.db.execute("INSERT INTO bulletin.calls(reserved_usd,run_id) SELECT .01,id FROM bulletin.runs ORDER BY id DESC LIMIT 1")
+        result,calls=self.run_refresh()
+        self.assertEqual((result['status'],calls),('budget_limit',0))
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.opportunities').fetchone()['n'],1)
+        dashboard=self.db.execute('SELECT public.get_bulletin_refreshes() data').fetchone()['data']
+        self.assertEqual((dashboard[0]['status'],dashboard[0]['spent_usd']),('stopped',.01))
+        self.queue_refresh('00000000-0000-4000-8000-000000000002',budget='1')
+        self.db.execute('INSERT INTO bulletin.calls(reserved_usd) VALUES (.90)')
+        self.assertEqual(self.run_refresh()[0]['status'],'budget_limit')
+
+    def test_refresh_is_idempotent_serialized_and_private(self):
+        self.run_worker();request=self.queue_refresh()
+        self.assertEqual(self.queue_refresh(),request)
+        with self.assertRaises(psycopg.errors.ObjectNotInPrerequisiteState):
+            self.queue_refresh('00000000-0000-4000-8000-000000000002')
+        for role in ('anon','authenticated'):
+            self.db.execute('SET ROLE '+role)
+            try:
+                with self.assertRaises(psycopg.errors.InsufficientPrivilege):self.queue_refresh()
+                with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                    self.db.execute('SELECT public.get_bulletin_refreshes()')
+            finally:self.db.execute('RESET ROLE')
+
+    def test_service_role_can_queue_and_read_but_not_delete_refresh_history(self):
+        self.run_worker()
+        self.db.execute('SET ROLE service_role')
+        try:
+            request=self.queue_refresh()
+            dashboard=self.db.execute('SELECT public.get_bulletin_refreshes() data').fetchone()['data']
+            self.assertEqual(dashboard[0]['id'],request)
+            with self.assertRaises(psycopg.errors.InsufficientPrivilege):
+                self.db.execute('DELETE FROM bulletin.refresh_requests')
+        finally:self.db.execute('RESET ROLE')
+
+    def test_refresh_waits_for_daily_lock_without_changing_request(self):
+        self.run_worker();self.queue_refresh()
+        with psycopg.connect(os.environ['BULLETIN_TEST_DSN'],autocommit=True) as other:
+            other.execute('SELECT pg_advisory_lock(%s)',(worker.LOCK,))
+            self.assertEqual(self.run_refresh()[0]['status'],'already_running')
+            self.assertEqual(self.db.execute('SELECT status FROM bulletin.refresh_requests').fetchone()['status'],'queued')
+        self.assertEqual(self.run_refresh()[0]['status'],'ok')
+
+    def test_refresh_rejects_stale_prompt_and_invalid_cap_and_covers_fourteen_days(self):
+        with self.assertRaises(psycopg.errors.SerializationFailure):self.queue_refresh(prompt=2)
+        with self.assertRaises(psycopg.errors.InvalidParameterValue):self.queue_refresh(budget='1.01')
+        with self.assertRaises(psycopg.errors.InvalidParameterValue):self.queue_refresh()
+        self.queue_refresh(selection='two_weeks')
+        request=self.db.execute('SELECT * FROM bulletin.refresh_requests').fetchone()
+        self.assertEqual(request['window_end']-request['window_start'],dt.timedelta(days=14))
+        self.assertEqual(request['window_end'].hour,0)
+
+    def test_daily_run_does_not_consume_refresh_candidates(self):
+        self.run_worker();self.queue_refresh()
+        with patch.object(worker,'MAX_PAGES',1):self.run_refresh()
+        self.assertEqual(self.run_worker()[1],0)
+        self.assertEqual(self.run_refresh()[1],1)
+
+    def test_refresh_rechecks_policy_and_recovers_abandoned_running_request(self):
+        self.run_worker();self.queue_refresh()
+        self.db.execute("UPDATE bulletin.refresh_requests SET status='running'")
+        original=self.response
+        def optout(body):
+            self.db.execute("INSERT INTO public.optin VALUES ('10','alice',true)")
+            return original(body)
+        self.response=optout
+        self.assertEqual(self.run_refresh()[0]['suppressed'],1)
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.opportunities').fetchone()['n'],0)
 
     def test_clickhouse_only_tweet_publishes_and_replay_reuses_decision(self):
         result,calls=self.run_worker()

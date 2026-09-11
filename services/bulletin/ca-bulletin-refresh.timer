@@ -1,0 +1,10 @@
+[Unit]
+Description=Check for explicitly requested Bulletin refreshes
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=1min
+Unit=ca-bulletin-refresh.service
+
+[Install]
+WantedBy=timers.target

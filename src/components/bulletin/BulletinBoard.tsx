@@ -435,6 +435,7 @@ export function BulletinBoard({
   graph: initialGraph = EMPTY_GRAPH,
   now = Date.now(),
   isAdmin = false,
+  adminControls,
 }: {
   notices: Notice[]
   initialPage?: BulletinPage
@@ -443,6 +444,7 @@ export function BulletinBoard({
   graph?: BulletinRelationships
   now?: number
   isAdmin?: boolean
+  adminControls?: React.ReactNode
 }) {
   const loadTweet = useTweetBatch()
   const [limit, setLimit] = useState(BULLETIN_PAGE_SIZE)
@@ -590,11 +592,24 @@ export function BulletinBoard({
               </Link>
             </div>
           </details>
+          {isAdmin && (
+            <Link href="/admin/bulletin" className={styles.adminLink}>
+              Bulletin admin →
+            </Link>
+          )}
         </div>
         <p className={styles.lede}>
           Asks and offers that members posted on Twitter, gathered from the
           archive each day.
         </p>
+        {isAdmin && adminControls ? (
+          <details className="mt-4">
+            <summary className="cursor-pointer text-sm text-brand">
+              Refresh notices
+            </summary>
+            <div className="mt-3">{adminControls}</div>
+          </details>
+        ) : null}
       </header>
       <div className={styles.sticky}>
         <div className={styles.controlRow}>
@@ -778,7 +793,6 @@ export function BulletinBoard({
           Thanks to <Link href="/user/maskys_">@maskys_</Link> for the first
           prototype.
         </p>
-        {isAdmin && <Link href="/admin/bulletin">Run dashboard →</Link>}
       </footer>
     </>
   )

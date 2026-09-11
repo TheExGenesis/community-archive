@@ -92,11 +92,13 @@ def candidates(engine, rows):
         and upstream.side_of(upstream.clean_text(r['full_text'])) is not None]
 
 
-def intake(db, engine, counts, started, run_id, window=None, rescan=False):
+def intake(db, engine, counts, started, run_id, window=None, rescan=False, refresh=None):
     now=dt.datetime.now(dt.timezone.utc)
     end=window[1] if window else now.replace(hour=0,minute=0,second=0,microsecond=0)
     start=window[0] if window else end-dt.timedelta(days=2)
     key=('backfill:' if window else 'daily:')+start.isoformat()+':'+end.isoformat()
+    if refresh:
+        key='refresh:'+str(refresh['id'])
     db.execute("INSERT INTO bulletin.scans(scan_key,window_start,window_end) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING",(key,start,end))
     if rescan:
         db.execute("UPDATE bulletin.scans SET cursor_id='0',complete=false WHERE scan_key=%s",(key,))
@@ -132,6 +134,13 @@ def intake(db, engine, counts, started, run_id, window=None, rescan=False):
                   SET account_id=excluded.account_id,posted_at=excluded.posted_at''',
                   (VERSION,Jsonb([{'tweet_id':r['tweet_id'],'account_id':r['account_id'],
                     'posted_at':r['created_at'].isoformat(),'content_hash':r['content_hash']} for r in shortlist])))
+                if refresh:
+                    # Reset once per explicit refresh, never on a resumed page.
+                    # Preserve the previous notice until a new decision succeeds.
+                    db.execute('''UPDATE bulletin.decisions SET status='pending',attempts=0,
+                      last_attempt_at=NULL,refresh_request_id=%s,updated_at=now()
+                      WHERE tweet_id=ANY(%s) AND refresh_request_id IS DISTINCT FROM %s''',
+                      (refresh['id'],[r['tweet_id'] for r in shortlist],refresh['id']))
             next_id=page['next']
             if page['scanned'] and (not next_id or int(next_id)<=int(after)):
                 raise RuntimeError('invalid_clickhouse_cursor')
@@ -230,10 +239,15 @@ def publish(db, job, label):
             db.execute('''INSERT INTO bulletin.opportunities
               (tweet_id,content_hash,side,kind,summary,evidence,topics,respond,standing,expires_at,place,model)
               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-              ON CONFLICT(tweet_id) DO NOTHING''',
+              ON CONFLICT(tweet_id) DO UPDATE SET content_hash=excluded.content_hash,
+                side=excluded.side,kind=excluded.kind,summary=excluded.summary,evidence=excluded.evidence,
+                topics=excluded.topics,respond=excluded.respond,standing=excluded.standing,
+                expires_at=excluded.expires_at,place=excluded.place,model=excluded.model''',
               (job['tweet_id'],job['content_hash'],label['side'],label['kind'],label['summary'],
                label['evidence'],label['topics'],label['respond'],label['standing'],
                label['expires_at'],label['place'],MODEL))
+        else:
+            db.execute('DELETE FROM bulletin.opportunities WHERE tweet_id=%s',(job['tweet_id'],))
     return True
 
 
@@ -245,7 +259,7 @@ def progress(db, run_id, counts, status='running', finished=False):
           (Jsonb(counts),status,finished,run_id))
 
 
-def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=None, rescan=False):
+def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=None, rescan=False, queued_only=False):
     if backfill_budget is not None and (window is None or not Decimal(0)<backfill_budget<=Decimal(1)):
         raise ValueError('backfill_budget_requires_window_and_at_most_one_dollar')
     if not db.execute('SELECT pg_try_advisory_lock(%s) AS locked',(LOCK,)).fetchone()['locked']:
@@ -255,11 +269,22 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
     if backfill_budget is not None:
         counts['backfill_budget_usd']=str(backfill_budget)
     run_id=None
+    refresh=None
     try:
+        if queued_only:
+            refresh=db.execute("SELECT * FROM bulletin.refresh_requests WHERE status IN ('queued','running') ORDER BY created_at LIMIT 1").fetchone()
+            if not refresh:
+                return {'status':'queue_empty'}
+            window=(refresh['window_start'],refresh['window_end'])
+            backfill_budget=refresh['budget_usd']
+            counts.update(refresh_request_id=str(refresh['id']),backfill_budget_usd=str(backfill_budget))
+            db.execute("UPDATE bulletin.refresh_requests SET status='running',updated_at=now() WHERE id=%s",(refresh['id'],))
         # Owning the lock proves earlier 'running' rows no longer have a live worker.
         with db.transaction():
             db.execute("UPDATE bulletin.runs SET status='interrupted' WHERE status='running'")
-            prompt=db.execute('SELECT id,body FROM bulletin.prompt_versions ORDER BY id DESC LIMIT 1').fetchone()
+            prompt=(db.execute('SELECT id,body FROM bulletin.prompt_versions WHERE id=%s',
+                (refresh['prompt_version_id'],)).fetchone() if refresh else
+                db.execute('SELECT id,body FROM bulletin.prompt_versions ORDER BY id DESC LIMIT 1').fetchone())
             if not prompt:
                 raise RuntimeError('missing_active_prompt')
             run_id=db.execute('INSERT INTO bulletin.runs(model,classifier_version,prompt_version_id) VALUES(%s,%s,%s) RETURNING id',
@@ -273,7 +298,7 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
         engine.execute('SET threads=1')
         engine.execute("SET memory_limit='128MB'")
         try:
-            complete=intake(db,engine,counts,started,run_id,window,rescan)
+            complete=intake(db,engine,counts,started,run_id,window,rescan,refresh)
         finally:
             engine.close()
         status='ok' if complete else 'intake_backlog'
@@ -282,8 +307,9 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
                 raise RuntimeError('missing_model_key')
             retry_delay=dt.timedelta(minutes=1 if backfill_budget is not None else 60)
             jobs=deque(db.execute('''SELECT * FROM bulletin.decisions WHERE status IN ('pending','failed')
+              AND refresh_request_id IS NOT DISTINCT FROM %s::uuid
               AND attempts<3 AND (last_attempt_at IS NULL OR last_attempt_at<now()-%s)
-              ORDER BY updated_at LIMIT %s''',(retry_delay,limit)).fetchall())
+              ORDER BY updated_at LIMIT %s''',(refresh['id'] if refresh else None,retry_delay,limit)).fetchall())
             while jobs:
                 if counts['calls'] >= limit:
                     status='call_limit';break
@@ -337,7 +363,10 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
                         time.sleep(delay)
                         jobs.appendleft(job)
                 progress(db,run_id,counts)
-        pending=db.execute("SELECT count(*) AS n FROM bulletin.decisions WHERE status IN ('pending','failed')").fetchone()['n']
+        remaining=db.execute("""SELECT count(*) AS n,count(*) FILTER (WHERE attempts>=3) AS exhausted
+          FROM bulletin.decisions WHERE status IN ('pending','failed')
+          AND refresh_request_id IS NOT DISTINCT FROM %s::uuid""",(refresh['id'] if refresh else None,)).fetchone()
+        pending=remaining['n']
         counts['pending']=pending
         if not pending and status=='classification_failed':
             status='ok'
@@ -349,11 +378,20 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
           last_success_at=CASE WHEN %s='ok' THEN now() ELSE last_success_at END WHERE id=1''',
           (status,Jsonb(counts),status))
         progress(db,run_id,counts,status,finished=True)
+        if refresh:
+            request_status=('complete' if status=='ok' else 'queued'
+                if status in ('intake_backlog','call_limit','time_limit','pending_review') and not remaining['exhausted']
+                else 'stopped')
+            db.execute('''UPDATE bulletin.refresh_requests SET status=%s,last_status=%s,updated_at=now()
+              WHERE id=%s''',(request_status,status,refresh['id']))
         return {'status':status,**counts}
     except Exception as exc:
         log_failure(exc,run_id=run_id,stage='worker')
         if run_id is not None:
             progress(db,run_id,counts,'failed:'+type(exc).__name__,finished=True)
+        if refresh:
+            db.execute("UPDATE bulletin.refresh_requests SET status='stopped',last_status=%s,updated_at=now() WHERE id=%s",
+                ('failed:'+type(exc).__name__,refresh['id']))
         db.execute('''UPDATE bulletin.worker_state SET last_finished_at=now(),status=%s,counts=%s WHERE id=1''',
             ('failed:'+type(exc).__name__,Jsonb(counts)))
         raise
@@ -369,6 +407,7 @@ if __name__=='__main__':
     parser.add_argument('--end',help='Backfill UTC date, exclusive (at most 15 days)')
     parser.add_argument('--backfill-budget-usd',type=Decimal,help='Explicit one-time cap, at most $1; requires start/end')
     parser.add_argument('--rescan',action='store_true',help='Revisit the window from the start; keep cached decisions and spending')
+    parser.add_argument('--queued-only',action='store_true',help='Process one bounded pass of an admin refresh; otherwise do nothing')
     args=parser.parse_args()
     window=None
     if args.start or args.end:
@@ -380,11 +419,14 @@ if __name__=='__main__':
             parser.error('start/end must form a UTC window of at most 15 days')
     if not 0<=args.limit<=MAX_CALLS:
         parser.error('limit must be between 0 and 50')
+    if args.queued_only and (window or args.enqueue_only or args.rescan or args.backfill_budget_usd is not None):
+        parser.error('queued-only cannot be combined with manual scan options')
     try:
         with connect() as db:
-            result=run(db,args.limit,args.enqueue_only,window,args.backfill_budget_usd,args.rescan)
+            result=run(db,args.limit,args.enqueue_only,window,args.backfill_budget_usd,args.rescan,args.queued_only)
         print(json.dumps(result),flush=True)
-        raise SystemExit(0 if result['status'] in ('ok','already_running','enqueued_only') else 1)
+        raise SystemExit(0 if result['status'] in ('ok','already_running','enqueued_only','queue_empty') or
+            (args.queued_only and result['status'] in ('intake_backlog','call_limit','time_limit','pending_review')) else 1)
     except Exception as exc:
         print(json.dumps({'status':'failed','error_type':type(exc).__name__}),flush=True)
         raise SystemExit(1)

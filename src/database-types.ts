@@ -2071,6 +2071,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_bulletin_refreshes: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_bulletin_relationships: {
         Args: {
           viewer_username?: string
@@ -2496,6 +2500,16 @@ export type Database = {
       refresh_global_activity_summary: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      request_bulletin_refresh: {
+        Args: {
+          request_id: string
+          selection: string
+          expected_prompt_id: number
+          budget_usd: number
+          actor_id: string
+        }
+        Returns: string
       }
       save_bulletin_prompt: {
         Args: {

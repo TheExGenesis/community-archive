@@ -574,3 +574,37 @@ test('explorer snapshot requests historical charts without twelve unused weekly 
   for (const call of (fetcher as jest.Mock).mock.calls)
     expect(call[1].get('bucket')).toBe('year')
 })
+
+test.each(['day', 'week'] as const)(
+  'fetches bounded %s detail with per-bucket normalization',
+  async (granularity) => {
+    const fetcher = jest.fn(async () => ({
+      data: [
+        {
+          bucket:
+            granularity === 'day'
+              ? '2026-09-10 00:00:00.000'
+              : '2026-09-07 00:00:00.000',
+          tweets: '4',
+          totalTweets: '200',
+          ratePerThousand: 0,
+        },
+      ],
+    })) as unknown as AnalyticsFetcher
+    const result = await fetchPortalTrendSeries(
+      ['astra'],
+      new Date('2026-09-10T12:00:00Z'),
+      fetcher,
+      granularity,
+    )
+    expect(result.buckets).toHaveLength(granularity === 'day' ? 90 : 52)
+    expect(result.series[0].tweetsPerBucket.at(-1)).toBe(4)
+    expect(result.series[0].perBucket.at(-1)).toBe(2000)
+    const params = (fetcher as jest.Mock).mock.calls[0][1] as URLSearchParams
+    expect(params.get('bucket')).toBe(granularity)
+    expect(params.get('from')).toBe(
+      granularity === 'day' ? '2026-06-13' : '2025-09-15',
+    )
+    expect(params.get('to')).toBe('2026-09-10')
+  },
+)

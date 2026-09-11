@@ -1,3 +1,9 @@
+import {
+  presetGranularity,
+  type TimelinePreset,
+  bucketDate,
+  dayKey,
+} from './trendTimeline'
 import type { TrendGranularity } from './types'
 
 export type TrendScale = 'raw' | 'normalized'
@@ -13,6 +19,8 @@ export interface TrendExplorerUrlState {
   included: string[]
   scale: TrendScale
   axis?: 'linear' | 'log'
+  timeline?: TimelinePreset
+  chartRange?: TrendRange | null
   granularity: TrendGranularity
   range: TrendRange | null
 }
@@ -31,6 +39,8 @@ function uniqueTerms(values: string[]): string[] {
 }
 
 function bucketPattern(granularity: TrendGranularity): RegExp {
+  if (granularity === 'day' || granularity === 'week')
+    return /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
   return granularity === 'month' ? /^\d{4}-(0[1-9]|1[0-2])$/ : /^\d{4}$/
 }
 
@@ -63,15 +73,39 @@ export function parseTrendExplorerState(
   const resolvedTerms = terms.length > 0 ? terms : defaults.terms
   const shownParams = params.getAll('show')
   const includedParams = params.getAll('include')
-  const granularity: TrendGranularity =
-    params.get('granularity') === 'year' ? 'year' : 'month'
+  const timelineValue = params.get('timeline')
+  const timeline =
+    timelineValue === '12m' ||
+    timelineValue === '12w' ||
+    timelineValue === '15d'
+      ? timelineValue
+      : undefined
+  const requested = params.get('granularity')
+  const granularity: TrendGranularity = timeline
+    ? presetGranularity[timeline]
+    : requested === 'year' || requested === 'week' || requested === 'day'
+      ? requested
+      : 'month'
+  const validBucket = (value: string) =>
+    bucketPattern(granularity).test(value) &&
+    (value.length !== 10 || dayKey(bucketDate(value)) === value)
+  const chartFrom = params.get('chartFrom')
+  const chartTo = params.get('chartTo')
+  const chartRange =
+    chartFrom &&
+    chartTo &&
+    validBucket(chartFrom) &&
+    validBucket(chartTo) &&
+    chartFrom <= chartTo
+      ? { start: chartFrom, end: chartTo }
+      : null
   const from = params.get('from')
   const to = params.get('to')
   const validRange =
     from !== null &&
     to !== null &&
-    bucketPattern(granularity).test(from) &&
-    bucketPattern(granularity).test(to) &&
+    validBucket(from) &&
+    validBucket(to) &&
     from <= to
 
   return {
@@ -87,6 +121,7 @@ export function parseTrendExplorerState(
     scale: params.get('scale') === 'raw' ? 'raw' : 'normalized',
     ...(params.get('axis') === 'log' ? { axis: 'log' as const } : {}),
     granularity,
+    ...(timeline ? { timeline } : chartRange ? { chartRange } : {}),
     range: validRange ? { start: from, end: to } : null,
   }
 }
@@ -101,6 +136,11 @@ export function serializeTrendExplorerState(
   params.set('scale', state.scale)
   if (state.axis === 'log') params.set('axis', 'log')
   params.set('granularity', state.granularity)
+  if (state.timeline) params.set('timeline', state.timeline)
+  else if (state.chartRange) {
+    params.set('chartFrom', state.chartRange.start)
+    params.set('chartTo', state.chartRange.end)
+  }
   if (state.range) {
     params.set('from', state.range.start)
     params.set('to', state.range.end)

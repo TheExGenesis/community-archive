@@ -713,9 +713,10 @@ test('charts six live monthly defaults with a brief note and independent log tog
   ).toBe('month')
   const requestsBeforeAxisChange = calls.length
   fireEvent.click(screen.getByRole('button', { name: 'Log' }))
-  expect(
-    screen.getByRole('button', { name: 'Log' }),
-  ).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('button', { name: 'Log' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
   expect(
     screen.getByRole('img', { name: /Monthly term trends/ }),
   ).toHaveAccessibleName(/logarithmic axis/)
@@ -728,5 +729,81 @@ test('charts six live monthly defaults with a brief note and independent log tog
   await act(async () => {
     await Promise.resolve()
   })
+  jest.restoreAllMocks()
+})
+
+test('zooms monthly data locally and loads real weekly/daily detail for short presets', async () => {
+  const { snapshotBuckets } = await import('@/components/portal/trends/model')
+  const snapshot = { ...successfulTrends, computedAt: '2026-09-10T12:00:00Z' }
+  const calls: URL[] = []
+  jest.spyOn(global, 'fetch').mockImplementation(async (input) => {
+    const url = new URL(String(input), 'https://example.test')
+    calls.push(url)
+    const granularity = url.searchParams.get('granularity') as
+      | 'day'
+      | 'week'
+      | 'month'
+      | 'year'
+    const buckets = granularity ? snapshotBuckets(snapshot, granularity) : []
+    return {
+      ok: true,
+      json: async () =>
+        granularity
+          ? {
+              granularity,
+              buckets,
+              series: [
+                {
+                  term: 'tpot',
+                  color: '#0088cc',
+                  tweetsPerBucket: buckets.map((_, i) => i + 1),
+                  perBucket: buckets.map((_, i) => i + 1),
+                },
+              ],
+            }
+          : { tweets: [] },
+    } as Response
+  })
+  render(
+    <TrendsExplorer initialTrends={snapshot} initialSearch="q=tpot&axis=log" />,
+  )
+  const preset = (name: string) => screen.getByRole('button', { name })
+  const points = () =>
+    screen.getByRole('img', { name: /term trends/ }).querySelectorAll('circle')
+  await waitFor(() => expect(preset('Last 12 months')).toBeEnabled())
+  const requests = calls.length
+  fireEvent.click(preset('Last 12 months'))
+  expect(points()).toHaveLength(12)
+  expect(calls).toHaveLength(requests)
+  expect(screen.getByLabelText('Chart from')).toHaveValue('2025-10')
+  fireEvent.change(screen.getByLabelText('Chart from'), {
+    target: { value: '2026-01' },
+  })
+  expect(points()).toHaveLength(9)
+  expect(calls).toHaveLength(requests)
+  expect(new URLSearchParams(window.location.search).get('chartFrom')).toBe(
+    '2026-01',
+  )
+  for (const [label, granularity, count] of [
+    ['Last 12 weeks', 'week', 12],
+    ['Last 15 days', 'day', 15],
+  ] as const) {
+    fireEvent.click(preset(label))
+    await waitFor(() => expect(preset(label)).toBeEnabled())
+    expect(points()).toHaveLength(count)
+    expect(calls.at(-1)?.searchParams.get('granularity')).toBe(granularity)
+    expect(preset('Log')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText(`Tweets from ${granularity}`)).toHaveValue('')
+  }
+  expect(new URLSearchParams(window.location.search).get('timeline')).toBe(
+    '15d',
+  )
+  expect(
+    calls.filter((url) => url.searchParams.get('view') === 'feed'),
+  ).toHaveLength(1)
+  fireEvent.click(preset('All time'))
+  await waitFor(() => expect(preset('All time')).toBeEnabled())
+  expect(points()).toHaveLength(21)
+  expect(preset('Months')).toHaveAttribute('aria-pressed', 'true')
   jest.restoreAllMocks()
 })

@@ -6,6 +6,7 @@ import {
   mapWeeklyKeywords,
   type WeeklyKeywordsResponse,
 } from './weeklyKeywords'
+import { recentBuckets, dayKey } from './trendTimeline'
 import { CHART_TERMS, FIRST_TREND_YEAR, TREND_COLORS } from './trendConfig'
 import type {
   PortalBangersPage,
@@ -269,6 +270,11 @@ function trendBuckets(
   granularity: TrendGranularity,
   now: Date,
 ): { buckets: string[]; from: string; to: string } {
+  if (granularity === 'day' || granularity === 'week') {
+    const buckets = recentBuckets(granularity, now)
+    // The gateway's `to` date is inclusive. Include today, which may be partial.
+    return { buckets, from: buckets[0], to: dayKey(now) }
+  }
   const currentYear = now.getUTCFullYear()
   if (granularity === 'year') {
     return {
@@ -301,6 +307,7 @@ function trendBucketKey(bucket: string, granularity: TrendGranularity): string {
   if (Number.isNaN(date.getTime())) {
     throw new Error('ClickHouse word-trend returned an invalid bucket')
   }
+  if (granularity === 'day' || granularity === 'week') return dayKey(date)
   const year = String(date.getUTCFullYear())
   return granularity === 'year'
     ? year

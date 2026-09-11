@@ -17,11 +17,6 @@ export const currentProjectContributors: ProjectContributor[] = [
     username: 'christineist',
     role: 'Contributor',
   },
-  {
-    name: 'Kifah',
-    username: 'maskys_',
-    role: 'Bulletin prototype',
-  },
 ]
 
 export const pastProjectContributors: ProjectContributor[] = [
@@ -30,11 +25,13 @@ export const pastProjectContributors: ProjectContributor[] = [
   { name: 'Alexandre Variengien', username: 'A_Variengien' },
 ]
 
-const projectContributorUsernames = new Set(
-  [...currentProjectContributors, ...pastProjectContributors].map(
+const projectContributorUsernames = new Set([
+  ...[...currentProjectContributors, ...pastProjectContributors].map(
     ({ username }) => username.toLowerCase(),
   ),
-)
+  // Badge recognition does not require an About-page contributor listing.
+  'maskys_',
+])
 
 export function isProjectContributor(username: string) {
   return projectContributorUsernames.has(

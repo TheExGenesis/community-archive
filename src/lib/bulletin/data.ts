@@ -2,6 +2,7 @@ import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
 import 'server-only'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/portal/auth'
+import { getOptInStatus } from '@/lib/auth-utils'
 import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { getAdminClient, requireAdmin, checkIsAdmin } from '@/app/admin/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
@@ -18,6 +19,13 @@ export async function requireBulletinUser() {
   // local admin read preview follows the same convention as Birdseye.
   const user = await getCurrentUser()
   if (!user || user.is_anonymous) redirect('/login?redirect=/bulletin')
+  // Read current consent from PostgreSQL, never session metadata or archive
+  // membership. An explicit opt-out overrides even a stale positive flag.
+  const { data: consent, error } = await getOptInStatus(user.id)
+  if (error && error.code !== 'PGRST116')
+    throw new Error('Bulletin opt-in status could not be checked. Try again.')
+  if (error || consent?.opted_in !== true || consent.explicit_optout === true)
+    redirect('/opt-in?redirect=/bulletin')
   return user
 }
 

@@ -1,7 +1,8 @@
 # Community Bulletin
 
-Signed-in members use `/bulletin`; the existing admin allowlist controls
-`/admin/bulletin`. The worker runs after the daily autorefresh succeeds.
+Signed-in users with an active streaming opt-in use `/bulletin`; the existing
+admin allowlist controls `/admin/bulletin`. The worker runs after the daily
+autorefresh succeeds.
 
 ## Data and privacy
 
@@ -20,7 +21,13 @@ The decisions table no longer requires a matching PostgreSQL tweet row.
 Only derived notices and source hashes are stored, not a second tweet corpus.
 
 Browser roles cannot access the `bulletin` schema or its service-only RPCs.
-Server routes verify the session before fetching private state. Opt-outs during
+The board and tweet API routes verify the session and current PostgreSQL
+`optin` record before fetching private state: `opted_in` must be true and
+`explicit_optout` must not be true. Archive membership alone does not grant
+viewer access. Signed-out visitors go to login; other visitors without consent
+go to the opt-in page with a return link after opting in. Consent lookup failures
+deny access. The existing loopback-only local admin preview remains available.
+Opt-outs during
 a model call suppress publication. Every board read verifies current ClickHouse
 content, author, original-post status and hash. Missing, edited or deleted sources
 are hidden. Derived records may remain privately stored until reconciliation;

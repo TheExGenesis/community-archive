@@ -7,9 +7,11 @@ import {
   loadRunDashboard,
   loadBulletinRelationships,
   loadBulletinViewer,
+  requireBulletinUser,
 } from './data'
 import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { getCurrentUser } from '@/lib/portal/auth'
+import { getOptInStatus } from '@/lib/auth-utils'
 import { getAdminClient } from '@/app/admin/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 jest.mock('@/lib/clickhouseGateway', () => ({
@@ -19,6 +21,7 @@ jest.mock('@/lib/localAdminPreview', () => ({
   getLocalAdminPreview: jest.fn(),
 }))
 jest.mock('@/lib/portal/auth', () => ({ getCurrentUser: jest.fn() }))
+jest.mock('@/lib/auth-utils', () => ({ getOptInStatus: jest.fn() }))
 jest.mock('@/app/admin/data', () => ({ getAdminClient: jest.fn() }))
 jest.mock('@/utils/supabase', () => ({
   createServerServiceRoleClient: jest.fn(),
@@ -34,6 +37,10 @@ const loadNotices = async () =>
   hydrateBulletinNotices(await loadBulletinBoardState())
 beforeEach(() => {
   jest.clearAllMocks()
+  jest.mocked(getOptInStatus).mockResolvedValue({
+    data: { opted_in: true, explicit_optout: false },
+    error: null,
+  } as Awaited<ReturnType<typeof getOptInStatus>>)
   jest.mocked(getLocalAdminPreview).mockResolvedValue(null)
   jest
     .mocked(createServerServiceRoleClient)
@@ -49,9 +56,10 @@ test.each([null, { is_anonymous: true }])(
       'redirect:/login?redirect=/bulletin',
     )
     expect(createServerServiceRoleClient).not.toHaveBeenCalled()
+    expect(getOptInStatus).not.toHaveBeenCalled()
   },
 )
-test('verified members read the policy-aware RPC, with upstream errors kept distinct from empty results', async () => {
+test('opted-in users read the policy-aware RPC, with upstream errors kept distinct from empty results', async () => {
   jest
     .mocked(getCurrentUser)
     .mockResolvedValue({ id: 'member', is_anonymous: false } as User)
@@ -59,6 +67,7 @@ test('verified members read the policy-aware RPC, with upstream errors kept dist
     .mockResolvedValueOnce({ data: [], error: null })
     .mockResolvedValueOnce({ data: null, error: { message: 'unavailable' } })
   await expect(loadNotices()).resolves.toEqual([])
+  expect(getOptInStatus).toHaveBeenCalledWith('member')
   expect(rpc).toHaveBeenCalledWith('get_bulletin_board_state', {
     max_results: 2000,
   })
@@ -68,6 +77,62 @@ test('run history always requires admin authorization', async () => {
   jest.mocked(getAdminClient).mockRejectedValueOnce(new Error('not authorized'))
   await expect(loadRunDashboard()).rejects.toThrow('not authorized')
   expect(rpc).not.toHaveBeenCalled()
+})
+
+test.each([
+  { data: null, error: null },
+  { data: null, error: { code: 'PGRST116' } },
+  { data: { opted_in: false, explicit_optout: false }, error: null },
+  { data: { opted_in: null, explicit_optout: null }, error: null },
+  { data: { opted_in: true, explicit_optout: true }, error: null },
+])(
+  'users without active consent cannot read bulletin data: %j',
+  async (status) => {
+    jest.mocked(getCurrentUser).mockResolvedValue({
+      id: 'signed-in-user',
+      user_metadata: { opted_in: true, is_member: true },
+    } as unknown as User)
+    jest
+      .mocked(getOptInStatus)
+      .mockResolvedValue(status as Awaited<ReturnType<typeof getOptInStatus>>)
+    for (const read of [
+      loadNotices,
+      loadBulletinViewer,
+      loadBulletinRelationships,
+    ])
+      await expect(read()).rejects.toThrow(
+        'redirect:/opt-in?redirect=/bulletin',
+      )
+    expect(getOptInStatus).toHaveBeenCalledWith('signed-in-user')
+    expect(createServerServiceRoleClient).not.toHaveBeenCalled()
+    expect(fetchAnalyticsGatewayJson).not.toHaveBeenCalled()
+  },
+)
+
+test('consent lookup failures deny access without pretending the user has not opted in', async () => {
+  jest.mocked(getCurrentUser).mockResolvedValue({ id: 'member' } as User)
+  jest.mocked(getOptInStatus).mockResolvedValue({
+    data: null,
+    error: { code: '08006', message: 'Connection unavailable' },
+  } as Awaited<ReturnType<typeof getOptInStatus>>)
+  await expect(loadNotices()).rejects.toThrow(
+    'opt-in status could not be checked',
+  )
+  expect(createServerServiceRoleClient).not.toHaveBeenCalled()
+  expect(fetchAnalyticsGatewayJson).not.toHaveBeenCalled()
+})
+
+test('consent is checked again after opt-out, even with the same authenticated session', async () => {
+  jest.mocked(getCurrentUser).mockResolvedValue({ id: 'member' } as User)
+  await expect(requireBulletinUser()).resolves.toMatchObject({ id: 'member' })
+  jest.mocked(getOptInStatus).mockResolvedValue({
+    data: { opted_in: false, explicit_optout: true },
+    error: null,
+  } as Awaited<ReturnType<typeof getOptInStatus>>)
+  await expect(requireBulletinUser()).rejects.toThrow(
+    'redirect:/opt-in?redirect=/bulletin',
+  )
+  expect(getOptInStatus).toHaveBeenCalledTimes(2)
 })
 test('run history uses bounded keyset pagination and rejects malformed cursors', async () => {
   jest
@@ -99,6 +164,7 @@ test('explicit local admin read preview does not fabricate an Auth user', async 
   rpc.mockResolvedValue({ data: [], error: null })
   await expect(loadNotices()).resolves.toEqual([])
   expect(getCurrentUser).not.toHaveBeenCalled()
+  expect(getOptInStatus).not.toHaveBeenCalled()
 })
 test('signed-out local preview still requires login', async () => {
   jest.mocked(getLocalAdminPreview).mockResolvedValue('signed-out')

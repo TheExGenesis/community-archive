@@ -81,6 +81,8 @@ export interface TermWeek {
   /** Present for automatically discovered, share-normalized homepage terms. */
   lane?: 'emerging' | 'rising' | 'falling'
   currentAuthors?: number
+  currentPer100k?: number
+  previousPer100k?: number
   previousAuthors?: number
   sinceDate?: string
   untilDate?: string

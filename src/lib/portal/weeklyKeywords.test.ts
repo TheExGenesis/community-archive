@@ -48,6 +48,8 @@ test('maps discovered terms and complete date windows to the homepage', async ()
       prev7: 0,
       currentAuthors: 20,
       previousAuthors: 0,
+      currentPer100k: 200,
+      previousPer100k: 0,
       sinceDate: '2026-08-31',
       untilDate: '2026-09-06',
       deltaPct: null,
@@ -118,4 +120,15 @@ test('gateway exposes a structured HTTP status for deployment fallback', async (
       fetchImpl,
     }),
   ).rejects.toMatchObject({ status: 404 })
+})
+
+test('rejects invalid shares before using them for bar widths or effect ordering', () => {
+  for (const currentPer100k of [-1, NaN, Infinity]) {
+    expect(() =>
+      mapWeeklyKeywords({
+        ...response,
+        data: [{ ...response.data[0], currentPer100k }],
+      }),
+    ).toThrow('invalid')
+  }
 })

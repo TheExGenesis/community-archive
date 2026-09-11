@@ -12,6 +12,7 @@ export interface TrendExplorerUrlState {
   shown: string[]
   included: string[]
   scale: TrendScale
+  axis?: 'linear' | 'log'
   granularity: TrendGranularity
   range: TrendRange | null
 }
@@ -84,6 +85,7 @@ export function parseTrendExplorerState(
         ? selectedTerms(includedParams, resolvedTerms)
         : resolvedTerms.slice(0, 1),
     scale: params.get('scale') === 'raw' ? 'raw' : 'normalized',
+    ...(params.get('axis') === 'log' ? { axis: 'log' as const } : {}),
     granularity,
     range: validRange ? { start: from, end: to } : null,
   }
@@ -97,6 +99,7 @@ export function serializeTrendExplorerState(
   state.shown.forEach((term) => params.append('show', term))
   state.included.forEach((term) => params.append('include', term))
   params.set('scale', state.scale)
+  if (state.axis === 'log') params.set('axis', 'log')
   params.set('granularity', state.granularity)
   if (state.range) {
     params.set('from', state.range.start)

@@ -83,6 +83,9 @@ export function mapWeeklyKeywords(
         row.currentAuthors,
         row.previousAuthors,
       ].some((count) => !Number.isSafeInteger(count) || count < 0) ||
+      [row.currentPer100k, row.previousPer100k].some(
+        (share) => !Number.isFinite(share) || share < 0,
+      ) ||
       row.currentAuthors > row.currentTweets ||
       row.previousAuthors > row.previousTweets ||
       (row.changePct !== null &&
@@ -97,6 +100,8 @@ export function mapWeeklyKeywords(
       last7: row.currentTweets,
       prev7: row.previousTweets,
       currentAuthors: row.currentAuthors,
+      currentPer100k: row.currentPer100k,
+      previousPer100k: row.previousPer100k,
       previousAuthors: row.previousAuthors,
       sinceDate,
       untilDate,

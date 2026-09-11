@@ -637,7 +637,7 @@ describe('TrendsExplorer request isolation', () => {
   })
 })
 
-test('charts the six live keyword defaults monthly and shows their categories', async () => {
+test('charts six live monthly defaults with a brief note and independent log toggle', async () => {
   const terms = [
     'astra',
     'navier stokes',
@@ -695,8 +695,11 @@ test('charts the six live keyword defaults monthly and shows their categories', 
     'true',
   )
   expect(
-    screen.getByRole('region', { name: 'Live trending words' }),
-  ).toHaveTextContent('Cooling off')
+    screen.queryByRole('region', { name: 'Live trending words' }),
+  ).not.toBeInTheDocument()
+  expect(
+    screen.getByText('Default terms are trending this week in the community.'),
+  ).toBeVisible()
   expect(screen.getByText('6/12 trends')).toBeVisible()
   expect(
     calls
@@ -708,10 +711,20 @@ test('charts the six live keyword defaults monthly and shows their categories', 
       .find((url) => url.searchParams.get('view') === 'series')
       ?.searchParams.get('granularity'),
   ).toBe('month')
-  expect(screen.getByRole('link', { name: /navier stokes/ })).toHaveAttribute(
-    'href',
-    '/trends?q=navier+stokes&granularity=month',
+  const requestsBeforeAxisChange = calls.length
+  fireEvent.click(screen.getByRole('button', { name: 'Log' }))
+  expect(
+    screen.getByRole('button', { name: 'Log' }),
+  ).toHaveAttribute('aria-pressed', 'true')
+  expect(
+    screen.getByRole('img', { name: /Monthly term trends/ }),
+  ).toHaveAccessibleName(/logarithmic axis/)
+  expect(screen.getByRole('button', { name: 'Per 100k' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
   )
+  expect(new URLSearchParams(window.location.search).get('axis')).toBe('log')
+  expect(calls).toHaveLength(requestsBeforeAxisChange)
   await act(async () => {
     await Promise.resolve()
   })

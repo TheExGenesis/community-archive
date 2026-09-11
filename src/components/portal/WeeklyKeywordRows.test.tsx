@@ -49,6 +49,9 @@ test('orders one list by absolute share change, preserving new terms and falls t
     'dolly',
     'ai agents',
   ])
+  const growth = screen.getByRole('img', { name: /model: 400 tweets/ })
+  expect(growth).toHaveAccessibleName(/green overlay shows the gain/)
+  expect(growth.lastElementChild).toHaveStyle({ left: '50%', width: '50%' })
   expect(screen.queryByText(/Through Sep 6/)).not.toBeInTheDocument()
   const href = screen
     .getByRole('link', { name: 'ai agents' })
@@ -118,9 +121,9 @@ test('shows previous share behind declines even when raw tweet counts increased'
   )
   expect(previousWidth).toBe(5)
   expect(currentWidth).toBe(2.5)
-  expect(screen.getByRole('img', { name: /ai agents:/ }).children).toHaveLength(
-    1,
-  )
+  expect(
+    screen.getByRole('img', { name: /ai agents:/ }).lastElementChild,
+  ).toHaveStyle({ left: '0%', width: '100%' })
 })
 
 test('makes the explanation available on keyboard focus', async () => {
@@ -133,5 +136,6 @@ test('makes the explanation available on keyboard focus', async () => {
   const tip = await screen.findByRole('tooltip')
   expect(tip).toHaveTextContent('Through Sep 6 (UTC).')
   expect(tip).toHaveTextContent('absolute change in author-weighted share')
-  expect(tip).toHaveTextContent('faded extension')
+  expect(tip).toHaveTextContent('faded blue extension')
+  expect(tip).toHaveTextContent('green overlay')
 })

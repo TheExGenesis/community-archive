@@ -78,6 +78,47 @@ test('run history always requires admin authorization', async () => {
   await expect(loadRunDashboard()).rejects.toThrow('not authorized')
   expect(rpc).not.toHaveBeenCalled()
 })
+test.each(['valid', 'edited', 'missing', 'other-author'])(
+  'resolution evidence is verified before default filtering: %s',
+  async (state) => {
+    jest.mocked(getCurrentUser).mockResolvedValue({ id: 'member' } as User)
+    rpc.mockResolvedValue({
+      data: [
+        {
+          tweet_id: '1',
+          account_id: '10',
+          resolution_state: 'resolved',
+          resolution_tweet_id: '2',
+          resolution_content_hash: createHash('sha256')
+            .update('All claimed.')
+            .digest('hex'),
+        },
+      ],
+      error: null,
+    })
+    jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
+      data:
+        state === 'missing'
+          ? []
+          : [
+              {
+                tweet_id: '2',
+                account_id: state === 'other-author' ? '20' : '10',
+                full_text:
+                  state === 'edited' ? 'Still available.' : 'All claimed.',
+              },
+            ],
+    })
+    const result = await loadBulletinBoardState()
+    expect(result.notices[0].resolution_state).toBe(
+      state === 'valid' ? 'resolved' : 'unknown',
+    )
+    expect(fetchAnalyticsGatewayJson).toHaveBeenCalledWith(
+      ['bulletin-sources'],
+      new URLSearchParams({ ids: '2' }),
+    )
+  },
+)
 
 test.each([
   { data: null, error: null },

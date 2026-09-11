@@ -64,7 +64,7 @@ skill installation. There are no extra runtime packages or image-model calls.
 The existing gateway thread endpoint fetches at most 500 conversation tweets.
 The renderer selects a reply-edge radius of two plus one outgoing quote hop,
 then limits input to 21 tweets and a soft 12,000-character target. It prioritizes
-the seed and the author's replies, keeps the seed whole, and explicitly marks
+the seed and the author's newest replies, keeps the seed whole, and explicitly marks
 omissions. The existing 64 KiB request ceiling and byte-based cost reservation
 still apply to the complete model request, including context.
 
@@ -85,14 +85,52 @@ or logs. Every printed source's hash and current consent are checked again befor
 saving; a change leaves the decision pending without repeating the paid call
 immediately or removing its cost from the ledger.
 
-Context is a bounded snapshot, not continuous reply monitoring. New replies do
-not automatically invalidate an already saved decision; the graph endpoint may
-cache reply discovery for an hour. The classifier version bump reconsiders
-encountered candidates in newly scanned windows. It does not trigger a historical
-backfill. Candidate phrase filters are unchanged.
+The graph endpoint may cache reply discovery for an hour. The classifier version
+bump reconsiders encountered candidates in newly scanned windows; it does not
+trigger a historical backfill. Candidate phrase filters are unchanged.
+
+### Resolution and reopening
+
+Positive labels include `availability` with `state` (`unknown`, `open`, or
+`resolved`), `tweet_id`, and exact `evidence`. Unknown has null evidence fields.
+An explicit author statement can resolve or reopen a notice. Evidence must occur
+in the seed or a printed descendant reply by the same author; unrelated posts,
+quotes, other participants' interest, generic thanks, silence, and partial uptake
+do not establish closure. The model uses the latest applicable author statement.
+A resolved notice remains a positive notice, preserving it for later viewing.
+
+The database stores only the availability state and evidence tweet ID/hash, plus
+the checked context digest/time. It does not store reply text. Before displaying
+resolved status (or hiding the card by default), the board verifies the evidence's
+current author and content hash. Missing or changed evidence makes the status
+unknown in that response. Confirmed resolved notices are hidden by default;
+`Show resolved` includes them independently of `Show past`, with a badge linking
+to the author update. An explicit reopening restores default visibility.
+
+Each regular daily run checks at most **20** saved positive notices, oldest check
+first, that have not been checked for a day. It covers notices posted in the past
+60 days, unexpired dated notices, and standing notices, including resolved ones.
+Unchanged rendered context updates the check time without a model call. Changed
+context joins the existing durable queue; existing call, day/month budget, retry,
+and run-time limits still apply. Fresh candidates precede newly queued rechecks.
+More than 20 due notices rotate across runs; this is periodic checking, not a
+guarantee that all author updates appear within 24 hours. Backfills and explicit
+refresh jobs do not start unrelated availability checks.
+
+New intake and rechecks use the same classifier/output validator. Failed or
+ambiguous rechecks do not silently mark a notice resolved, and unknown does not
+erase an earlier confirmed resolution. Older evidence cannot override a newer
+author update. A failed recheck preserves its prior card
+and cost history. Context changes during a model call retain the normal pending
+retry behavior rather than publishing stale results.
 
 Deployment requires the complete `services/bulletin` directory, including the
-vendored helpers. The existing gateway endpoints and database schema suffice.
+vendored helpers. The existing gateway endpoints suffice. Apply
+`20260911222035_bulletin_resolution_status.sql` before deploying this worker;
+it adds private opportunity metadata and a recheck index. The public RPC remains
+JSON, so its generated TypeScript signature is unchanged. Old frontend/worker
+releases tolerate the added columns; rollback the worker and frontend separately
+while retaining the resolution metadata and cost ledger.
 Before production rollout, inspect a small, separately budgeted model pilot for
 real asks, jokes, vague posts, and clarifying replies. Worker deployment and any
 historical reclassification remain separate from merging the web access gate.
@@ -287,7 +325,7 @@ that explicit local preview guard. Tweet reads still use ClickHouse.
 ```sh
 BULLETIN_TEST_DSN='host=127.0.0.1 port=55439 dbname=bulletin_test user=frsc' \
   uv run --with 'psycopg[binary]==3.2.9' --with duckdb==1.5.5 \
-  python -m unittest -v test_worker.py test_retries.py test_tweet_context.py test_clickhouse_worker.py
+  python -m unittest -v test_worker.py test_retries.py test_tweet_context.py test_resolution.py test_clickhouse_worker.py
 ```
 
 These tests require a named disposable local database. They exercise a fake

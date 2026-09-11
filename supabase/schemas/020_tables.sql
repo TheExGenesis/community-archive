@@ -673,8 +673,21 @@ CREATE TABLE bulletin.opportunities (
   expires_at date,
   place text,
   model text NOT NULL,
+  resolution_state text NOT NULL DEFAULT 'unknown'
+    CHECK (resolution_state IN ('unknown','open','resolved')),
+  resolution_tweet_id text,
+  resolution_content_hash text,
+  context_digest text,
+  context_checked_at timestamptz,
+  CONSTRAINT bulletin_resolution_evidence CHECK (
+    (resolution_state='unknown' AND resolution_tweet_id IS NULL AND resolution_content_hash IS NULL)
+    OR (resolution_state IN ('open','resolved') AND resolution_tweet_id ~ '^[0-9]{1,20}$'
+      AND resolution_content_hash ~ '^[0-9a-f]{64}$'
+      AND resolution_tweet_id IS NOT NULL AND resolution_content_hash IS NOT NULL)),
   created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX bulletin_resolution_recheck_idx
+  ON bulletin.opportunities(context_checked_at NULLS FIRST,tweet_id);
 
 -- Usage survives tweet deletion; it contains no tweet IDs, text or author data.
 CREATE TABLE bulletin.calls (

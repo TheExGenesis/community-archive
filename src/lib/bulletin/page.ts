@@ -6,7 +6,7 @@ import {
   loadBulletinViewer,
   type StoredNotice,
 } from './data'
-import { isPast, sortNotices } from './board'
+import { isPast, sortNotices, visibleStatus } from './board'
 import {
   BULLETIN_PAGE_SIZE,
   KIND_LABELS,
@@ -74,7 +74,7 @@ export async function loadBulletinPage(
   const live = (o: StoredNotice): Notice => verified.get(o.tweet_id) || o
   const shown = (o: Notice) =>
     !rejected.has(o.tweet_id) &&
-    (filters.past || !isPast(o, now)) &&
+    visibleStatus(o, now, filters.past, filters.resolved) &&
     matches(o, search)
 
   // Select the first page from metadata order, then verify it against the
@@ -90,7 +90,9 @@ export async function loadBulletinPage(
     filters.ascending,
     false, // Live uptake ranks loaded cards in the client, never a partial server cursor.
   )
-  const active = metadataOrder.filter((o) => filters.past || !isPast(o, now))
+  const active = metadataOrder.filter((o) =>
+    visibleStatus(o, now, filters.past, filters.resolved),
+  )
   const start = after ? active.findIndex((o) => o.tweet_id === after) + 1 : 0
   const first = active.slice(start, start + BULLETIN_PAGE_SIZE)
   const preflight = new Map(

@@ -12,6 +12,7 @@ function filterKey(filters: BulletinFilters) {
     filters.side,
     filters.search.trim(),
     filters.past,
+    filters.resolved,
     filters.recommended,
     filters.ascending,
   ])
@@ -22,6 +23,7 @@ function query(filters: BulletinFilters) {
     side: filters.side,
     q: filters.search.trim(),
     past: filters.past ? '1' : '0',
+    resolved: filters.resolved ? '1' : '0',
     sort: filters.recommended ? 'recommended' : 'newest',
     dir: filters.ascending ? 'asc' : 'desc',
   })

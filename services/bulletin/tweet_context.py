@@ -1,5 +1,5 @@
 """Policy-safe prompt context using the pinned tweet-plaintext skill helpers."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import os
 from pathlib import Path
@@ -35,6 +35,7 @@ reply, or quoted tweet. Missing context is unknown, not proof of deletion or res
 class PreparedContext:
     text: str
     sources: dict[str, tuple[str, str]]
+    records: dict = field(default_factory=dict)
 
 
 def fingerprint(row):
@@ -72,7 +73,9 @@ def prepare(db, seed):
         records, primary, _ = plaintext.normalize_payload([seed])
         notes.append('Cached seed differs or is absent; reply/quote context omitted.')
     ids, missing = plaintext.select_context(records, primary, seed_id, 'radius', 2)
-    # Prefer the author's clarifications, retaining stable order within each group.
+    # Prefer the author's newest clarifications; the renderer restores parent
+    # order. Old discussion must not crowd out a recent resolution/reopening.
+    ids.sort(key=lambda ident: str(records[ident].get('created_at') or ''), reverse=True)
     ids.sort(key=lambda ident: (ident != seed_id,
         str(records[ident].get('account_id')) != str(seed['account_id'])))
     if len(ids) > MAX_TWEETS:
@@ -109,8 +112,9 @@ def prepare(db, seed):
                 break
     text, omitted = plaintext.render_context(safe, list(safe), seed_id,
         max_characters=MAX_CHARACTERS, notes=list(dict.fromkeys(notes)))
-    return PreparedContext(text, {ident: fingerprint(safe[ident])
-        for ident in safe if ident not in omitted})
+    printed = {ident: safe[ident] for ident in safe if ident not in omitted}
+    return PreparedContext(text, {ident: fingerprint(row)
+        for ident, row in printed.items()}, printed)
 
 
 def still_current(db, prepared):

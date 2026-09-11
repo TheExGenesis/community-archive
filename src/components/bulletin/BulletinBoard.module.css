@@ -491,6 +491,17 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+.resolvedPill {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.resolvedPill:hover {
+  text-decoration: underline;
+}
 .newPill {
   flex-shrink: 0;
   border-radius: 999px;

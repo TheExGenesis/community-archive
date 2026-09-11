@@ -15,6 +15,9 @@ export type Notice = Omit<
   quotes?: number
   reply_account_ids?: string[]
   renewed_at?: string | null
+  resolution_state?: 'unknown' | 'open' | 'resolved'
+  resolution_tweet_id?: string | null
+  resolution_content_hash?: string | null
 }
 export type RunCounts = Partial<
   Record<
@@ -152,6 +155,7 @@ export type BulletinFilters = {
   side: string
   search: string
   past: boolean
+  resolved: boolean
   recommended: boolean
   ascending: boolean
 }
@@ -184,6 +188,7 @@ export const DEFAULT_BULLETIN_FILTERS: BulletinFilters = {
   side: 'all',
   search: '',
   past: false,
+  resolved: false,
   recommended: true,
   ascending: false,
 }

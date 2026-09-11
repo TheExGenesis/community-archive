@@ -38,6 +38,8 @@ import {
 import {
   expiry,
   isPast,
+  isResolved,
+  visibleStatus,
   relationship,
   sortNotices,
   uptake,
@@ -219,6 +221,7 @@ function NoticeCard({
     rts: 0,
   }
   const past = isPast(notice, now)
+  const resolved = isResolved(notice)
   const postAge = now - Date.parse(notice.posted_at)
   const isNew = postAge >= 0 && postAge < 24 * 60 * 60 * 1000
   const tweetUrl = `https://twitter.com/${encodeURIComponent(notice.username)}/status/${notice.tweet_id}`
@@ -245,7 +248,18 @@ function NoticeCard({
         <KindIcon kind={notice.kind} size={13} />
         {cardLabel(notice)}
       </button>
-      {isNew && (
+      {resolved && (
+        <a
+          className={styles.resolvedPill}
+          href={`https://x.com/${encodeURIComponent(notice.username)}/status/${notice.resolution_tweet_id || notice.tweet_id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Resolved based on an author update. Open the evidence on X."
+        >
+          Resolved
+        </a>
+      )}
+      {isNew && !resolved && (
         <span
           className={styles.newPill}
           title="Posted within the last 24 hours"
@@ -259,7 +273,7 @@ function NoticeCard({
   )
   return (
     <article
-      className={`${styles.notice} ${past ? styles.past : ''} ${open ? styles.open : ''}`}
+      className={`${styles.notice} ${past || resolved ? styles.past : ''} ${open ? styles.open : ''}`}
       style={{ order }}
       onClick={(event) => {
         if (open) return
@@ -467,12 +481,13 @@ export function BulletinBoard({
   const kind = kindKey(kinds)
   const [search, setSearch] = useState('')
   const [past, setPast] = useState(false)
+  const [resolved, setResolved] = useState(false)
   const [recommended, setRecommended] = useState(true)
   const [ascending, setAscending] = useState(false)
   const [hydrated, setHydrated] = useState(false)
   const pages = useBoardPages(
     initialPage,
-    { kind, side, search, past, recommended, ascending },
+    { kind, side, search, past, resolved, recommended, ascending },
     hydrated,
     Object.values(expanded).some(Boolean),
   )
@@ -496,6 +511,7 @@ export function BulletinBoard({
       ['ask', 'offer'].includes(p.get('side') || '') ? p.get('side')! : 'all',
     )
     setPast(p.get('past') === '1')
+    setResolved(p.get('resolved') === '1')
     setRecommended(p.get('sort') !== 'newest')
     setAscending(p.get('dir') === 'asc')
     setHydrated(true)
@@ -506,6 +522,7 @@ export function BulletinBoard({
     if (kind !== 'all') p.set('kind', kind)
     if (side !== 'all') p.set('side', side)
     if (past) p.set('past', '1')
+    if (resolved) p.set('resolved', '1')
     if (!recommended) p.set('sort', 'newest')
     if (ascending) p.set('dir', 'asc')
     window.history.replaceState(
@@ -515,10 +532,10 @@ export function BulletinBoard({
         window.location.search +
         (p.toString() ? '#' + p.toString() : ''),
     )
-  }, [kind, side, past, recommended, ascending, hydrated])
+  }, [kind, side, past, resolved, recommended, ascending, hydrated])
   const needle = search.trim().toLowerCase()
   const matches = (o: Notice) =>
-    (past || !isPast(o, now)) &&
+    visibleStatus(o, now, past, resolved) &&
     [o.summary, o.preview_text, o.username, o.place, ...o.topics]
       .filter(Boolean)
       .join(' ')
@@ -545,6 +562,7 @@ export function BulletinBoard({
       kind,
       side,
       past,
+      resolved,
       needle,
       recommended,
       ascending,
@@ -556,7 +574,7 @@ export function BulletinBoard({
   useEffect(() => {
     setLimit(BULLETIN_PAGE_SIZE)
     setExpanded({})
-  }, [kind, side, needle, past, recommended, ascending])
+  }, [kind, side, needle, past, resolved, recommended, ascending])
   // Counts under the other dimension's filter: server-provided when paging
   // server-side, otherwise derived from the notices in hand.
   const count = (key: string) => {
@@ -693,6 +711,15 @@ export function BulletinBoard({
             />
             Show past
           </label>
+          <label className={styles.pastToggle}>
+            <input
+              type="checkbox"
+              aria-label="Show resolved notices"
+              checked={resolved}
+              onChange={(e) => setResolved(e.target.checked)}
+            />
+            Show resolved
+          </label>
           <div className={styles.sortLinks} role="group" aria-label="Sort">
             <button
               type="button"
@@ -792,7 +819,7 @@ export function BulletinBoard({
           ? cursor && !pages.loading[kind] && !pages.laneErrors[kind]
           : visible.length > limit) && (
           <ScrollMore
-            key={`${kind}:${side}:${needle}:${past}:${recommended}`}
+            key={`${kind}:${side}:${needle}:${past}:${resolved}:${recommended}`}
             count={shown}
             onMore={() =>
               initialPage

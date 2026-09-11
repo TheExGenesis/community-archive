@@ -164,6 +164,33 @@ test('past toggle includes expired notices and preserves filters in the URL', ()
   expect(screen.getByText('Help with Python')).toBeInTheDocument()
   expect(screen.getByText('ended Sep 1')).toBeInTheDocument()
 })
+test('resolved notices have their own toggle and link to the author evidence', () => {
+  render(
+    <BulletinBoard
+      notices={[
+        {
+          ...offer,
+          resolution_state: 'resolved',
+          resolution_tweet_id: '987',
+          expires_at: '2026-01-01',
+        },
+      ]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  expect(screen.getByRole('status')).toHaveTextContent('0 notices')
+  fireEvent.click(screen.getByLabelText('Show past notices'))
+  expect(screen.getByRole('status')).toHaveTextContent('0 notices')
+  fireEvent.click(screen.getByLabelText('Show resolved notices'))
+  expect(screen.getByRole('status')).toHaveTextContent('1 notice')
+  expect(window.location.hash).toContain('resolved=1')
+  expect(screen.getByRole('link', { name: 'Resolved' })).toHaveAttribute(
+    'href',
+    `https://x.com/${offer.username}/status/987`,
+  )
+  fireEvent.click(screen.getByLabelText('Show resolved notices'))
+  expect(screen.getByRole('status')).toHaveTextContent('0 notices')
+})
 test('shows the ledger and relationship words only from own account and outgoing counts', () => {
   render(
     <BulletinBoard

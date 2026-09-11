@@ -24,9 +24,10 @@ from labels import validate_label
 import upstream_filter as upstream
 import clickhouse_source
 import tweet_context
+import resolution
 
 MODEL = 'z-ai/glm-5.3-flash'
-VERSION = 'bulletin-143dc2d-v2-context'
+VERSION = 'bulletin-143dc2d-v3-resolution'
 DAY_BUDGET = Decimal('0.10')
 MONTH_BUDGET = Decimal('1.00')
 MAX_OUTPUT = 2048
@@ -172,11 +173,11 @@ def request_body(tweet, prompt, context):
     payload={'author':'@'+tweet['username'],'posted_at':tweet['created_at'].isoformat(),
         'text':tweet['full_text'], 'context':context.text}
     return json.dumps({'model':MODEL,'messages':[{'role':'system','content':prompt},
-        {'role':'system','content':tweet_context.CONTEXT_RULES},
+        {'role':'system','content':tweet_context.CONTEXT_RULES+'\n'+resolution.RULES},
         {'role':'user','content':json.dumps(payload,ensure_ascii=False)}],
         'response_format':{'type':'json_object'},'max_tokens':MAX_OUTPUT,
         'reasoning':{'effort':'low'},
-        'provider':{'allow_fallbacks':False,'require_parameters':True,
+        'provider':{'allow_fallbacks':True,'require_parameters':True,
           'max_price':{'prompt':0.15,'completion':0.50}}},ensure_ascii=False).encode()
 
 
@@ -229,7 +230,7 @@ def actual_cost(result):
     return cost if cost.is_finite() and cost>=0 else None
 
 
-def publish(db, job, label, context):
+def publish(db, job, label, context, availability=None):
     with db.transaction():
         source=current(db,job['tweet_id'],lock=True)
         if not source or source['content_hash']!=job['content_hash']:
@@ -255,6 +256,25 @@ def publish(db, job, label, context):
               (job['tweet_id'],job['content_hash'],label['side'],label['kind'],label['summary'],
                label['evidence'],label['topics'],label['respond'],label['standing'],
                label['expires_at'],label['place'],MODEL))
+            availability = availability or dict(state='unknown',tweet_id=None,content_hash=None)
+            previous=db.execute('SELECT resolution_tweet_id FROM bulletin.opportunities WHERE tweet_id=%s',
+                (job['tweet_id'],)).fetchone()
+            # Tweet IDs are chronological snowflakes. Truncated context must
+            # not let an older "still available" override a newer resolution.
+            if (availability['state']!='unknown' and previous['resolution_tweet_id']
+                    and int(availability['tweet_id'])<int(previous['resolution_tweet_id'])):
+                availability=dict(state='unknown',tweet_id=None,content_hash=None)
+            # Unknown is not evidence that a confirmed resolution has reopened.
+            # Its existing evidence is still verified on every board read.
+            db.execute('''UPDATE bulletin.opportunities SET
+              context_digest=%s,context_checked_at=now(),
+              resolution_state=CASE WHEN %s='unknown' THEN resolution_state ELSE %s END,
+              resolution_tweet_id=CASE WHEN %s='unknown' THEN resolution_tweet_id ELSE %s END,
+              resolution_content_hash=CASE WHEN %s='unknown' THEN resolution_content_hash ELSE %s END
+              WHERE tweet_id=%s''',
+              (resolution.digest(context),availability['state'],availability['state'],
+               availability['state'],availability['tweet_id'],
+               availability['state'],availability['content_hash'],job['tweet_id']))
         else:
             db.execute('DELETE FROM bulletin.opportunities WHERE tweet_id=%s',(job['tweet_id'],))
     return True
@@ -314,6 +334,9 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
         if not enqueue_only and complete:
             if not os.environ.get('OPENROUTER_API_KEY'):
                 raise RuntimeError('missing_model_key')
+            contexts = (resolution.enqueue_rechecks(db,started,MAX_SECONDS,current,time.monotonic)
+                if window is None and refresh is None else {})
+            counts['resolution_rechecks_queued'] = len(contexts)
             retry_delay=dt.timedelta(minutes=1 if backfill_budget is not None else 60)
             jobs=deque(db.execute('''SELECT * FROM bulletin.decisions WHERE status IN ('pending','failed')
               AND refresh_request_id IS NOT DISTINCT FROM %s::uuid
@@ -330,7 +353,9 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
                     db.execute('DELETE FROM bulletin.decisions WHERE tweet_id=%s',(job['tweet_id'],))
                     counts['suppressed']+=1;continue
                 try:
-                    context=tweet_context.prepare(db,source)
+                    context=contexts.pop(job['tweet_id'],None)
+                    if context is None or not tweet_context.still_current(db,context):
+                        context=tweet_context.prepare(db,source)
                 except Exception as exc:
                     log_failure(exc,run_id=run_id,stage='context_preparation')
                     raise
@@ -354,9 +379,12 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
                     choice=result['choices'][0]
                     if choice.get('finish_reason')!='stop':
                         raise ValueError('incomplete_output')
-                    label=validate_label(json.loads(choice['message']['content']),{'text':source['full_text']})
+                    raw_label=json.loads(choice['message']['content'])
+                    label=validate_label(raw_label,{'text':source['full_text']})
+                    availability=(resolution.validate(raw_label.get('availability'),source,context)
+                        if label['is_notice'] else None)
                     stage='publish'
-                    stored=publish(db,job,label,context)
+                    stored=publish(db,job,label,context,availability)
                     counts['positive' if label['is_notice'] else 'negative']+=int(stored)
                     counts['suppressed']+=int(not stored)
                     db.execute('UPDATE bulletin.calls SET status=%s WHERE id=%s',

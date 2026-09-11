@@ -53,6 +53,20 @@ export default function BulletinAboutPage() {
           </p>
         </section>
         <section>
+          <h2 className="text-base font-semibold text-foreground">
+            Resolved notices
+          </h2>
+          <p className="mt-2">
+            An explicit author update can mark a notice resolved—for example,
+            when a role is filled or an item is claimed. Replies, thank-yous, or
+            silence alone do not mean it is resolved. These notices stay
+            available under &quot;Show resolved&quot;; their badge links to the
+            author update. An explicit reopening can return them to the board.
+            Checks are periodic and use available archived replies, so updates
+            may take time to appear.
+          </p>
+        </section>
+        <section>
           <h2 className="text-base font-semibold text-foreground">Ordering</h2>
           <p className="mt-2">
             Relevance puts your own notices first, then people you reply to and

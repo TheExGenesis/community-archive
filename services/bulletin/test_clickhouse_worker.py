@@ -23,7 +23,7 @@ class ClickHouseWorkerTests(unittest.TestCase):
             raise RuntimeError('Tests require a named local disposable database')
         cls.db.execute('DROP SCHEMA IF EXISTS bulletin CASCADE; DROP SCHEMA IF EXISTS tes CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public')
         cls.db.execute(FIXTURE)
-        for name in ('opportunities','run_history','prompt_versions','clickhouse','refresh_requests'):
+        for name in ('opportunities','run_history','prompt_versions','clickhouse','refresh_requests','resolution_status'):
             cls.db.execute(next((ROOT/'supabase/migrations').glob('*_bulletin_'+name+'.sql')).read_text())
     @classmethod
     def tearDownClass(cls): cls.db.close()
@@ -35,7 +35,8 @@ class ClickHouseWorkerTests(unittest.TestCase):
         text='Happy to help anyone with their Python project; DM me.'
         self.source=dict(tweet_id='1',account_id='10',created_at=self.window[0],updated_at=self.window[0],
           full_text=text,content_hash=hashlib.sha256(text.encode()).hexdigest(),reply_to_tweet_id=None,is_tombstone=0,retweet=False,allowed=True,username='alice')
-        self.label=dict(is_notice=True,side='offer',kind='help',summary='Offers Python help.',evidence='Happy to help',topics=['python'],respond='dm',standing=False,expires_at=None,place=None)
+        self.label=dict(is_notice=True,side='offer',kind='help',summary='Offers Python help.',evidence='Happy to help',topics=['python'],respond='dm',standing=False,expires_at=None,place=None,
+            availability=dict(state='unknown',tweet_id=None,evidence=None))
         self.context_rows=[]
         self.patches=[patch.object(worker.clickhouse_source,'page',side_effect=self.page),
           patch.object(worker.clickhouse_source,'current',side_effect=lambda _:dict(self.source) if self.source else None),
@@ -54,6 +55,81 @@ class ClickHouseWorkerTests(unittest.TestCase):
         self.db.execute("INSERT INTO public.all_account VALUES ('20','bob',false); INSERT INTO public.members VALUES ('20')")
         self.context_rows=[dict(self.source,tweet_id='2',account_id='20',username='bob',
             reply_to_tweet_id='1',full_text='The example project uses Python 3.11.')]
+
+    def test_resolution_persists_and_rechecks_only_changed_context(self):
+        self.context_rows=[dict(self.source,tweet_id='2',reply_to_tweet_id='1',
+            full_text='All places are filled now, thank you.')]
+        self.label['availability']=dict(state='resolved',tweet_id='2',evidence='All places are filled now')
+        result,calls=self.run_worker()
+        self.assertEqual((result['positive'],calls),(1,1))
+        saved=self.db.execute('SELECT * FROM bulletin.opportunities').fetchone()
+        self.assertEqual((saved['resolution_state'],saved['resolution_tweet_id']),('resolved','2'))
+        self.assertEqual(saved['resolution_content_hash'],hashlib.sha256(self.context_rows[0]['full_text'].encode()).hexdigest())
+        # An old seed statement cannot reopen a later author-confirmed closure.
+        self.db.execute("UPDATE bulletin.decisions SET status='pending',attempts=0,last_attempt_at=NULL")
+        self.label['availability']=dict(state='open',tweet_id='1',evidence='Happy to help')
+        self.run_worker()
+        self.assertEqual(self.db.execute('SELECT resolution_state FROM bulletin.opportunities').fetchone()['resolution_state'],'resolved')
+        self.db.execute("UPDATE bulletin.opportunities SET context_checked_at=now()-interval '2 days'")
+        prepared=worker.resolution.enqueue_rechecks(self.db,0,900,worker.current,lambda:0)
+        self.assertEqual(prepared,{})
+        self.assertEqual(self.db.execute('SELECT status FROM bulletin.decisions').fetchone()['status'],'positive')
+        self.context_rows.append(dict(self.source,tweet_id='3',reply_to_tweet_id='1',
+            full_text='One place has reopened. Still available!',created_at=self.source['created_at']+dt.timedelta(hours=2)))
+        self.db.execute("UPDATE bulletin.opportunities SET context_checked_at=now()-interval '2 days'")
+        self.label['availability']=dict(state='open',tweet_id='3',evidence='One place has reopened')
+        with patch.object(worker,'intake',return_value=True),patch.object(worker,'call_model',side_effect=self.response) as model:
+            result=worker.run(self.db)
+        self.assertEqual((result['positive'],model.call_count,result['resolution_rechecks_queued']),(1,1,1))
+        self.assertEqual(self.db.execute('SELECT resolution_state FROM bulletin.opportunities').fetchone()['resolution_state'],'open')
+
+    def test_completed_refresh_notices_can_join_daily_resolution_queue(self):
+        self.run_worker()
+        request=self.queue_refresh()
+        self.run_refresh()
+        self.assertEqual(self.db.execute('SELECT status FROM bulletin.refresh_requests').fetchone()['status'],'complete')
+        self.context_rows=[dict(self.source,tweet_id='2',reply_to_tweet_id='1',full_text='All filled now.')]
+        self.db.execute("UPDATE bulletin.opportunities SET context_checked_at=now()-interval '2 days'")
+        self.db.execute("UPDATE bulletin.refresh_requests SET status='running' WHERE id=%s",(request,))
+        self.assertEqual(worker.resolution.enqueue_rechecks(self.db,0,900,worker.current,lambda:0),{})
+        self.db.execute("UPDATE bulletin.refresh_requests SET status='complete' WHERE id=%s",(request,))
+        prepared=worker.resolution.enqueue_rechecks(self.db,0,900,worker.current,lambda:0)
+        self.assertEqual(list(prepared),['1'])
+        row=self.db.execute('SELECT status,refresh_request_id FROM bulletin.decisions').fetchone()
+        self.assertEqual(row,dict(status='pending',refresh_request_id=None))
+
+    def test_resolution_checks_all_due_items_beyond_twenty(self):
+        self.run_worker()
+        self.db.execute('''INSERT INTO bulletin.decisions(tweet_id,account_id,posted_at,content_hash,version,status)
+          SELECT n::text,d.account_id,d.posted_at,d.content_hash,d.version,'positive'
+          FROM bulletin.decisions d CROSS JOIN generate_series(2,27) n WHERE d.tweet_id='1' ''')
+        self.db.execute('''INSERT INTO bulletin.opportunities(tweet_id,content_hash,side,kind,summary,evidence,topics,respond,standing,model)
+          SELECT n::text,o.content_hash,o.side,o.kind,o.summary,o.evidence,o.topics,o.respond,o.standing,o.model
+          FROM bulletin.opportunities o CROSS JOIN generate_series(2,27) n WHERE o.tweet_id='1' ''')
+        prepared=worker.tweet_context.prepare(self.db,self.source)
+        with patch.object(worker.tweet_context,'prepare',return_value=prepared) as check:
+            result=worker.resolution.enqueue_rechecks(self.db,0,900,
+                lambda db,ident:dict(self.source,tweet_id=ident),lambda:0)
+        self.assertEqual((len(result),check.call_count),(26,26))
+
+    def test_expired_ask_is_skipped_unless_renewed_by_self_quote(self):
+        self.run_worker()
+        self.db.execute("UPDATE bulletin.decisions SET posted_at=now()-interval '20 days'")
+        self.db.execute("UPDATE bulletin.opportunities SET side='ask',context_checked_at=NULL,context_digest=NULL")
+        with patch.object(worker.clickhouse_source,'get',return_value={'data':[]}) as fetch:
+            self.assertEqual(worker.resolution.enqueue_rechecks(self.db,0,900,worker.current,lambda:0),{})
+        fetch.assert_called_once_with('bulletin-sources',ids='1',enrich='true')
+        with patch.object(worker.clickhouse_source,'get',return_value={'data':[{'renewed_at':dt.datetime.now(dt.timezone.utc).isoformat()}]}):
+            self.assertEqual(list(worker.resolution.enqueue_rechecks(self.db,0,900,worker.current,lambda:0)),['1'])
+
+    def test_invalid_resolution_evidence_does_not_hide_notice(self):
+        self.run_worker()
+        self.queue_refresh()
+        self.add_context_reply()
+        self.label['availability']=dict(state='resolved',tweet_id='2',evidence='Python 3.11')
+        result,calls=self.run_refresh()
+        self.assertEqual((result['status'],calls),('classification_failed',1))
+        self.assertEqual(self.db.execute('SELECT resolution_state FROM bulletin.opportunities').fetchone()['resolution_state'],'unknown')
 
     def test_automated_call_uses_attributed_plaintext_context(self):
         self.add_context_reply()

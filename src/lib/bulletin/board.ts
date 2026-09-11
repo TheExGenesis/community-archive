@@ -18,6 +18,17 @@ export function isPast(notice: Notice, now: number) {
   const until = expiry(notice)
   return until !== null && until <= now
 }
+export function isResolved(notice: Notice) {
+  return notice.resolution_state === 'resolved'
+}
+export function visibleStatus(
+  notice: Notice,
+  now: number,
+  past: boolean,
+  resolved: boolean,
+) {
+  return isResolved(notice) ? resolved : past || !isPast(notice, now)
+}
 /** Public replies plus quote posts by archived members, once hydrated. */
 export function uptake(notice: Notice): number | null {
   if (notice.replies === undefined && notice.quotes === undefined) return null
@@ -64,6 +75,7 @@ export function sortNotices(
     b.tweet_id.localeCompare(a.tweet_id)
   return [...notices].sort(
     (a, b) =>
+      Number(isResolved(a)) - Number(isResolved(b)) ||
       Number(isPast(a, now)) - Number(isPast(b, now)) ||
       (ascending ? -inner(a, b) : inner(a, b)),
   )

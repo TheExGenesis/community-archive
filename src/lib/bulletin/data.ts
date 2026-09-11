@@ -102,6 +102,8 @@ export async function hydrateBulletinNotices({
         quotes: source.quotes,
         reply_account_ids: source.reply_account_ids,
         renewed_at: source.renewed_at ? utc(source.renewed_at) : null,
+        resolution_state: notice.resolution_state,
+        resolution_tweet_id: notice.resolution_tweet_id,
       })
     }
   }
@@ -252,5 +254,43 @@ export async function loadBulletinBoardState(): Promise<{
     { max_results: BULLETIN_LIMIT },
   )
   if (error) throw new Error('Bulletin notices could not be loaded')
-  return { notices: (data ?? []) as unknown as StoredNotice[] }
+  const notices = (data ?? []) as unknown as StoredNotice[]
+  // Verify resolution evidence even for notices hidden by the default filter.
+  // A deleted/edited update must not leave a notice silently hidden forever.
+  const resolved = notices.filter((o) => o.resolution_state === 'resolved')
+  for (let offset = 0; offset < resolved.length; offset += 100) {
+    const batch = resolved.slice(offset, offset + 100)
+    const ids = Array.from(
+      new Set(
+        batch
+          .map((o) => o.resolution_tweet_id)
+          .filter((id): id is string => !!id && /^\d{1,20}$/.test(id)),
+      ),
+    )
+    const sources = ids.length
+      ? (
+          await fetchAnalyticsGatewayJson<{
+            data: Array<{
+              tweet_id: string
+              account_id: string
+              full_text: string
+            }>
+          }>(['bulletin-sources'], new URLSearchParams({ ids: ids.join(',') }))
+        ).data
+      : []
+    const byId = new Map(sources.map((o) => [o.tweet_id, o]))
+    for (const notice of batch) {
+      const evidence = byId.get(notice.resolution_tweet_id || '')
+      if (
+        !evidence ||
+        evidence.account_id !== notice.account_id ||
+        createHash('sha256').update(evidence.full_text).digest('hex') !==
+          notice.resolution_content_hash
+      ) {
+        notice.resolution_state = 'unknown'
+        notice.resolution_tweet_id = null
+      }
+    }
+  }
+  return { notices }
 }

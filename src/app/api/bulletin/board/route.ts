@@ -29,6 +29,7 @@ export async function GET(request: Request) {
           side,
           search,
           past: p.get('past') === '1',
+          resolved: p.get('resolved') === '1',
           recommended: p.get('sort') !== 'newest',
           ascending: p.get('dir') === 'asc',
         },

@@ -46,14 +46,12 @@ beforeEach(() => {
     outgoing: {},
     available: false,
   })
-  jest
-    .mocked(loadBulletinViewer)
-    .mockResolvedValue({
-      account_id: '42',
-      username: 'alice',
-      outgoing: {},
-      available: false,
-    })
+  jest.mocked(loadBulletinViewer).mockResolvedValue({
+    account_id: '42',
+    username: 'alice',
+    outgoing: {},
+    available: false,
+  })
   jest.mocked(hydrateBulletinNotices).mockImplementation(async ({ notices }) =>
     notices.map(({ content_hash, ...o }) => ({
       ...o,
@@ -62,6 +60,29 @@ beforeEach(() => {
   )
 })
 afterEach(() => jest.restoreAllMocks())
+test('resolved notices are hidden by default and independently included even when expired', async () => {
+  jest
+    .mocked(loadBulletinBoardState)
+    .mockResolvedValue({
+      notices: [
+        notice(1),
+        {
+          ...notice(2),
+          resolution_state: 'resolved',
+          resolution_tweet_id: '3',
+          expires_at: '2026-01-01',
+        },
+      ],
+    })
+  const normal = await loadBulletinPage(filters)
+  expect(normal.notices.map((o) => o.tweet_id)).toEqual(['1'])
+  expect(normal.counts.help).toBe(1)
+  const pastOnly = await loadBulletinPage({ ...filters, past: true })
+  expect(pastOnly.notices.map((o) => o.tweet_id)).toEqual(['1'])
+  const resolved = await loadBulletinPage({ ...filters, resolved: true })
+  expect(resolved.notices.map((o) => o.tweet_id)).toEqual(['1', '2'])
+  expect(resolved.counts.help).toBe(2)
+})
 test('hydrates only one page of sources, keeps metadata private, and advances a single cursor', async () => {
   expect(BULLETIN_PAGE_SIZE).toBe(18)
   const first = await loadBulletinPage(filters)

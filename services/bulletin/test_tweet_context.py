@@ -116,6 +116,10 @@ class TweetContextTests(unittest.TestCase):
     def test_contract_keeps_joke_exclusion_and_seed_evidence(self):
         prepared = context.prepare(self.db, self.seed)
         body = worker.request_body(self.seed, SYSTEM, prepared)
+        self.assertEqual(json.loads(body)['provider'], {
+            'allow_fallbacks': True, 'require_parameters': True,
+            'max_price': {'prompt': 0.15, 'completion': 0.50},
+        })
         messages = json.loads(body)['messages']
         self.assertEqual(messages[0]['content'], SYSTEM)
         self.assertIn('Keep excluding jokes', messages[1]['content'])

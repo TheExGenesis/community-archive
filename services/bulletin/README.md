@@ -89,6 +89,13 @@ latest 2,000 saved notices are loaded; the UI states when that cap is reached.
 
 ## Prompts and budgets
 
+The admin dashboard includes a read-only candidate-filter summary and exact
+patterns/code generated from this worker. After changing `candidates`,
+`clean_text`, `side_of`, or the phrase patterns, run
+`python3 services/bulletin/export_filters.py` from the repository root.
+`python3 services/bulletin/export_filters.py --check` verifies the snapshot.
+The website shows its packaged source snapshot; worker rollout is independent.
+
 Admins append prompt versions with a change note; history is immutable and
 stale concurrent edits fail. Each run pins one version at startup. Mid-run edits
 affect later runs only. Changing a prompt does not reclassify cached decisions.

@@ -1,9 +1,9 @@
 """Conservative author-evidenced availability and bounded daily rechecks."""
 import hashlib
+import datetime as dt
 
 import tweet_context
 
-MAX_RECHECKS = 20
 RULES = '''For every positive notice, also return an availability object, for example:
 {"state":"unknown","tweet_id":null,"evidence":null}.
 State must be exactly unknown, open, or resolved.
@@ -52,20 +52,31 @@ def validate(value, seed, context):
 
 def enqueue_rechecks(db, started, max_seconds, current, clock):
     """Only daily runs revisit saved notices; all paid work uses the normal queue."""
-    rows = db.execute('''SELECT o.tweet_id,o.context_digest,d.content_hash
+    rows = db.execute('''SELECT o.tweet_id,o.context_digest,d.content_hash,
+        o.standing,o.expires_at,o.side,d.posted_at
       FROM bulletin.opportunities o JOIN bulletin.decisions d USING(tweet_id)
       LEFT JOIN bulletin.refresh_requests r ON r.id=d.refresh_request_id
       WHERE d.status='positive'
         AND (d.refresh_request_id IS NULL OR r.status IN ('complete','stopped'))
-        AND (o.context_checked_at IS NULL OR o.context_checked_at<now()-interval '1 day')
-        AND (o.standing OR o.expires_at>=CURRENT_DATE
-          OR d.posted_at>=now()-interval '60 days')
-      ORDER BY o.context_checked_at ASC NULLS FIRST,o.tweet_id LIMIT %s''',
-      (MAX_RECHECKS,)).fetchall()
+        AND (o.context_checked_at IS NULL OR o.context_checked_at<date_trunc('day',now()))
+      ORDER BY o.context_checked_at ASC NULLS FIRST,o.tweet_id''').fetchall()
     prepared = {}
     for row in rows:
         if clock()-started > max_seconds:
-            break
+            raise RuntimeError('resolution_checks_time_limit')
+        now = dt.datetime.now(dt.timezone.utc)
+        if row['expires_at']:
+            if row['expires_at'] < now.date():
+                continue
+        elif not row['standing']:
+            duration = dt.timedelta(days=14 if row['side']=='ask' else 60)
+            if row['posted_at']+duration <= now:
+                # Self-quotes renew undated cards in the UI. Check that live
+                # signal before skipping a notice whose original date is old.
+                sources=tweet_context.clickhouse_source.get('bulletin-sources',ids=row['tweet_id'],enrich='true')['data']
+                renewed=sources[0].get('renewed_at') if sources else None
+                if not renewed or dt.datetime.fromisoformat(renewed.replace(' ','T').replace('Z','+00:00')).replace(tzinfo=dt.timezone.utc)+duration <= now:
+                    continue
         seed = current(db, row['tweet_id'])
         if not seed or seed['content_hash'] != row['content_hash']:
             db.execute('DELETE FROM bulletin.decisions WHERE tweet_id=%s', (row['tweet_id'],))

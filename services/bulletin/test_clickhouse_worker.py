@@ -98,6 +98,30 @@ class ClickHouseWorkerTests(unittest.TestCase):
         row=self.db.execute('SELECT status,refresh_request_id FROM bulletin.decisions').fetchone()
         self.assertEqual(row,dict(status='pending',refresh_request_id=None))
 
+    def test_resolution_checks_all_due_items_beyond_twenty(self):
+        self.run_worker()
+        self.db.execute('''INSERT INTO bulletin.decisions(tweet_id,account_id,posted_at,content_hash,version,status)
+          SELECT n::text,d.account_id,d.posted_at,d.content_hash,d.version,'positive'
+          FROM bulletin.decisions d CROSS JOIN generate_series(2,27) n WHERE d.tweet_id='1' ''')
+        self.db.execute('''INSERT INTO bulletin.opportunities(tweet_id,content_hash,side,kind,summary,evidence,topics,respond,standing,model)
+          SELECT n::text,o.content_hash,o.side,o.kind,o.summary,o.evidence,o.topics,o.respond,o.standing,o.model
+          FROM bulletin.opportunities o CROSS JOIN generate_series(2,27) n WHERE o.tweet_id='1' ''')
+        prepared=worker.tweet_context.prepare(self.db,self.source)
+        with patch.object(worker.tweet_context,'prepare',return_value=prepared) as check:
+            result=worker.resolution.enqueue_rechecks(self.db,0,900,
+                lambda db,ident:dict(self.source,tweet_id=ident),lambda:0)
+        self.assertEqual((len(result),check.call_count),(26,26))
+
+    def test_expired_ask_is_skipped_unless_renewed_by_self_quote(self):
+        self.run_worker()
+        self.db.execute("UPDATE bulletin.decisions SET posted_at=now()-interval '20 days'")
+        self.db.execute("UPDATE bulletin.opportunities SET side='ask',context_checked_at=NULL,context_digest=NULL")
+        with patch.object(worker.clickhouse_source,'get',return_value={'data':[]}) as fetch:
+            self.assertEqual(worker.resolution.enqueue_rechecks(self.db,0,900,worker.current,lambda:0),{})
+        fetch.assert_called_once_with('bulletin-sources',ids='1',enrich='true')
+        with patch.object(worker.clickhouse_source,'get',return_value={'data':[{'renewed_at':dt.datetime.now(dt.timezone.utc).isoformat()}]}):
+            self.assertEqual(list(worker.resolution.enqueue_rechecks(self.db,0,900,worker.current,lambda:0)),['1'])
+
     def test_invalid_resolution_evidence_does_not_hide_notice(self):
         self.run_worker()
         self.queue_refresh()

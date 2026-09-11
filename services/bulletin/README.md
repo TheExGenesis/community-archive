@@ -107,15 +107,17 @@ unknown in that response. Confirmed resolved notices are hidden by default;
 `Show resolved` includes them independently of `Show past`, with a badge linking
 to the author update. An explicit reopening restores default visibility.
 
-Each regular daily run checks at most **20** saved positive notices, oldest check
-first, that have not been checked for a day. It covers notices posted in the past
-60 days, unexpired dated notices, and standing notices, including resolved ones.
+Each regular daily run checks **all active saved notices** not yet checked that
+UTC day, oldest check first. Active follows the board's lifetime: 14 days for
+undated asks, 60 for offers, explicit dates, standing notices, and self-quote
+renewals. This includes resolved notices still within that lifetime so they can reopen.
 Unchanged rendered context updates the check time without a model call. Changed
 context joins the existing durable queue; existing call, day/month budget, retry,
 and run-time limits still apply. Fresh candidates precede newly queued rechecks.
-More than 20 due notices rotate across runs; this is periodic checking, not a
-guarantee that all author updates appear within 24 hours. Backfills and explicit
-refresh jobs do not start unrelated availability checks.
+There is no per-run item cap. If the run-time limit prevents finishing context
+checks, the run reports a failure and keeps completed checkpoints for resumption.
+Model-call and spending limits can still defer changed-context classifications.
+Backfills and explicit refresh jobs do not start unrelated availability checks.
 
 New intake and rechecks use the same classifier/output validator. Failed or
 ambiguous rechecks do not silently mark a notice resolved, and unknown does not

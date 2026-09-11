@@ -219,6 +219,8 @@ function NoticeCard({
     rts: 0,
   }
   const past = isPast(notice, now)
+  const postAge = now - Date.parse(notice.posted_at)
+  const isNew = postAge >= 0 && postAge < 24 * 60 * 60 * 1000
   const tweetUrl = `https://twitter.com/${encodeURIComponent(notice.username)}/status/${notice.tweet_id}`
   const secondary = secondaryAction(notice)
   const text = decodeTweetText(tweet?.text || notice.preview_text || '')
@@ -243,6 +245,14 @@ function NoticeCard({
         <KindIcon kind={notice.kind} size={13} />
         {cardLabel(notice)}
       </button>
+      {isNew && (
+        <span
+          className={styles.newPill}
+          title="Posted within the last 24 hours"
+        >
+          New
+        </span>
+      )}
       {badge && <span className={styles.rel}>{badge}</span>}
       {notice.place && <span className={styles.rel}>{notice.place}</span>}
     </span>

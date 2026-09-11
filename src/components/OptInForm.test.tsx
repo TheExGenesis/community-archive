@@ -51,6 +51,21 @@ jest.mock('@/hooks/useAuthAndArchive', () => ({
 }))
 
 describe('OptInForm opted-in experience', () => {
+  it('lets an explicitly opted-out user opt back in despite a stale positive flag', () => {
+    render(
+      <OptInForm
+        userId="user-1"
+        initialOptInStatus={{ opted_in: true, explicit_optout: true }}
+      />,
+    )
+    expect(
+      screen.getByRole('button', { name: /opt in to tweet streaming/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Thanks for opting in!' }),
+    ).not.toBeInTheDocument()
+  })
+
   it('celebrates the opt-in and offers archive and exploration next steps', () => {
     render(
       <OptInForm userId="user-1" initialOptInStatus={{ opted_in: true }} />,

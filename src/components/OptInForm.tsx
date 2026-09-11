@@ -44,7 +44,8 @@ export default function OptInForm({
   const router = useRouter()
   const { userMetadata } = useAuthAndArchive()
   const [isOptedIn, setIsOptedIn] = useState(
-    initialOptInStatus?.opted_in || false,
+    initialOptInStatus?.opted_in === true &&
+      initialOptInStatus.explicit_optout !== true,
   )
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')

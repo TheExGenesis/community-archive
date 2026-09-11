@@ -161,8 +161,8 @@ async function bulletinViewer() {
   return { me, username, preview }
 }
 
-/** Only the outgoing interactions used for ranking belong on the page load path. */
-export async function loadBulletinRelationships() {
+/** Trusted identity only: no network lookup for recommendations. */
+export async function loadBulletinViewer() {
   const { me, username } = await bulletinViewer()
   const empty = {
     account_id: me,
@@ -170,6 +170,13 @@ export async function loadBulletinRelationships() {
     outgoing: {} as Record<string, number>,
     available: false,
   }
+  return empty
+}
+
+/** Recommendations use ClickHouse outgoing interactions, never follow lists. */
+export async function loadBulletinRelationships() {
+  const empty = await loadBulletinViewer()
+  const { account_id: me, username } = empty
   const identifier = me || username
   if (!identifier) return empty
   try {
@@ -209,47 +216,6 @@ export async function loadBulletinRelationships() {
     }
   } catch {
     return empty
-  }
-}
-
-const ID = /^\d{1,20}$/
-function idList(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((v): v is string => typeof v === 'string' && ID.test(v))
-    : []
-}
-/** Follow lists from members' own archive uploads: a snapshot, not live X. */
-export async function loadBulletinFollowLists() {
-  const { me, username, preview } = await bulletinViewer()
-  const none = { following: [] as string[], followers: [] as string[] }
-  if (!me && !username) return none
-  try {
-    if (preview && process.env.BULLETIN_LOCAL_RELATIONSHIPS_URL) {
-      const url = new URL(process.env.BULLETIN_LOCAL_RELATIONSHIPS_URL)
-      if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1') return none
-      const response = await fetch(url, {
-        cache: 'no-store',
-        signal: AbortSignal.timeout(10000),
-      })
-      if (!response.ok) return none
-      const data = await response.json()
-      return {
-        following: idList(data?.following),
-        followers: idList(data?.followers),
-      }
-    }
-    const { data, error } = await createServerServiceRoleClient().rpc(
-      'get_bulletin_relationships',
-      me ? { viewer_account_id: me } : { viewer_username: username },
-    )
-    if (error || !data || typeof data !== 'object') return none
-    const graph = data as { following?: unknown; followers?: unknown }
-    return {
-      following: idList(graph.following),
-      followers: idList(graph.followers),
-    }
-  } catch {
-    return none
   }
 }
 

@@ -3,6 +3,7 @@ import {
   hydrateBulletinNotices,
   loadBulletinBoardState,
   loadBulletinRelationships,
+  loadBulletinViewer,
   type StoredNotice,
 } from './data'
 import { BULLETIN_PAGE_SIZE, DEFAULT_BULLETIN_FILTERS } from './types'
@@ -10,6 +11,7 @@ jest.mock('./data', () => ({
   hydrateBulletinNotices: jest.fn(),
   loadBulletinBoardState: jest.fn(),
   loadBulletinRelationships: jest.fn(),
+  loadBulletinViewer: jest.fn(),
 }))
 const filters = { ...DEFAULT_BULLETIN_FILTERS, kind: 'help' }
 const notice = (i: number): StoredNotice => ({
@@ -44,6 +46,14 @@ beforeEach(() => {
     outgoing: {},
     available: false,
   })
+  jest
+    .mocked(loadBulletinViewer)
+    .mockResolvedValue({
+      account_id: '42',
+      username: 'alice',
+      outgoing: {},
+      available: false,
+    })
   jest.mocked(hydrateBulletinNotices).mockImplementation(async ({ notices }) =>
     notices.map(({ content_hash, ...o }) => ({
       ...o,
@@ -152,4 +162,17 @@ test('partial uptake enrichment never repeats notices or adds source round trips
   expect(new Set(all).size).toBe(40)
   expect(all).toHaveLength(40)
   expect(hydrateBulletinNotices).toHaveBeenCalledTimes(3)
+})
+
+test('first paint and newest sorting never wait for interactions', async () => {
+  jest
+    .mocked(loadBulletinRelationships)
+    .mockImplementation(() => new Promise(() => {}))
+  const first = await loadBulletinPage(filters, undefined, false)
+  expect(first.notices).toHaveLength(18)
+  expect(first.recommendationsReady).toBe(false)
+  expect(first.personal.account_id).toBe('42')
+  const newest = await loadBulletinPage({ ...filters, recommended: false })
+  expect(newest.notices).toHaveLength(18)
+  expect(loadBulletinRelationships).not.toHaveBeenCalled()
 })

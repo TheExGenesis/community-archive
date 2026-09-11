@@ -3,6 +3,7 @@ import {
   hydrateBulletinNotices,
   loadBulletinBoardState,
   loadBulletinRelationships,
+  loadBulletinViewer,
   type StoredNotice,
 } from './data'
 import { isPast, sortNotices } from './board'
@@ -40,12 +41,15 @@ function matches(notice: Notice, search: string) {
 export async function loadBulletinPage(
   filters: BulletinFilters,
   after?: string,
+  personalize = true,
 ): Promise<BulletinPage> {
   const now = Date.now()
   const search = filters.search.trim().toLowerCase()
   const [state, personal] = await Promise.all([
     loadBulletinBoardState(),
-    loadBulletinRelationships(),
+    personalize && filters.recommended
+      ? loadBulletinRelationships()
+      : loadBulletinViewer(),
   ])
   const me = personal.account_id
   const chosenKinds = parseKinds(filters.kind) ?? []
@@ -150,5 +154,6 @@ export async function loadBulletinPage(
     total: state.notices.length,
     now,
     personal,
+    recommendationsReady: personalize || !filters.recommended,
   }
 }

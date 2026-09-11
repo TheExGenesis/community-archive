@@ -9,10 +9,7 @@ export const metadata: Metadata = {
 export default function BulletinAboutPage() {
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6">
-      <Link
-        href="/bulletin"
-        className="text-sm text-brand hover:underline"
-      >
+      <Link href="/bulletin" className="text-sm text-brand hover:underline">
         ← Back to the board
       </Link>
       <h1 className="mt-6 font-serif text-3xl font-semibold tracking-tight">
@@ -71,10 +68,8 @@ export default function BulletinAboutPage() {
           <p className="mt-2">
             The reply count is public replies and quote posts from archived
             members. It cannot see replies from anyone outside the archive, so
-            no count means unknown, not zero. &quot;following&quot;,
-            &quot;follows you&quot; and &quot;mutual&quot; come from the follow
-            lists in members&apos; own archive uploads, which are snapshots, not
-            live Twitter state.
+            no count means unknown, not zero. Recommendations use outgoing
+            interactions, not archived follow lists.
           </p>
         </section>
         <section>

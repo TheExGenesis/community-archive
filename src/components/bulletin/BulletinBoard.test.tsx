@@ -2,10 +2,6 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { BulletinBoard, dealStacks, sinceLabel } from './BulletinBoard'
 import type { Notice } from '@/lib/bulletin/types'
 jest.mock('./BulletinBoard.module.css', () => ({}))
-// The independent badge request is covered in useFollowBadges.test.tsx.
-jest.mock('./useFollowBadges', () => ({
-  useFollowBadges: (graph: unknown) => graph,
-}))
 const offer = {
   tweet_id: '1',
   account_id: 'a',
@@ -180,14 +176,12 @@ test('shows the ledger and relationship words only from own account and outgoing
       graph={{
         outgoing: { b: 4 },
         available: true,
-        following: ['b'],
-        followers: ['a', 'b'],
       }}
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
   const cards = screen.getAllByRole('article')
-  expect(cards[1]).toHaveTextContent('mutual')
+  expect(cards[1]).not.toHaveTextContent(/mutual|following|follows you/)
   expect(cards[1]).toHaveTextContent('you replied')
   expect(cards[0]).not.toHaveTextContent('you replied')
   expect(
@@ -303,8 +297,6 @@ const page = (notices: Notice[], cursor: string | null = null) => ({
     username: '',
     outgoing: {},
     available: false,
-    following: [],
-    followers: [],
   },
 })
 test('requests and appends a server page on scroll without fetching tweet details', async () => {
@@ -482,4 +474,48 @@ test('deals cards round-robin into three stacks and keeps rank order via style o
   expect(within(stacks[1]).getAllByRole('article')[1]).toHaveStyle({
     order: 4,
   })
+})
+
+test('shows cards before interactions finish, then replaces the page and cursor together', async () => {
+  const initial = { ...page([offer], '1'), recommendationsReady: false }
+  let resolve!: (value: Response) => void
+  jest.mocked(fetch).mockImplementationOnce(
+    () =>
+      new Promise((r) => {
+        resolve = r
+      }),
+  )
+  jest
+    .mocked(fetch)
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => page([offer]),
+    } as Response)
+  render(
+    <BulletinBoard notices={[offer]} initialPage={initial} now={initial.now} />,
+  )
+  await act(async () => {
+    jest.advanceTimersByTime(200)
+  })
+  expect(screen.getByText('Help with Python')).toBeInTheDocument()
+  expect(screen.queryByLabelText('Load more notices')).not.toBeInTheDocument()
+  expect(fetch).toHaveBeenCalledTimes(1)
+  expect(String(jest.mocked(fetch).mock.calls[0][0])).not.toContain('after=')
+  await act(async () =>
+    resolve({
+      ok: true,
+      json: async () => ({ ...page([ask], '2'), recommendationsReady: true }),
+    } as Response),
+  )
+  expect(screen.getByText('Feedback on a garden')).toBeInTheDocument()
+  expect(screen.queryByText('Help with Python')).not.toBeInTheDocument()
+  const sentinel = screen.getByLabelText('Load more notices')
+  const callback = intersections.find((cb) => observed.get(cb) === sentinel)!
+  await act(async () =>
+    callback(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    ),
+  )
+  expect(String(jest.mocked(fetch).mock.calls[1][0])).toContain('after=2')
 })

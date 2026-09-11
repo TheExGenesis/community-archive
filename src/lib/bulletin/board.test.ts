@@ -1,11 +1,4 @@
-import {
-  expiry,
-  followLabel,
-  isPast,
-  relationship,
-  sortNotices,
-  uptake,
-} from './board'
+import { expiry, isPast, relationship, sortNotices, uptake } from './board'
 import type { Notice } from './types'
 const notice = (id: string, side = 'offer'): Notice => ({
   tweet_id: id,
@@ -110,17 +103,4 @@ test('ascending reverses the order but keeps past notices last', () => {
       (o) => o.tweet_id,
     ),
   ).toEqual(['b', 'a', 'c'])
-})
-test('follow labels come from archived follow lists', () => {
-  const graph = {
-    outgoing: {},
-    available: true,
-    following: ['1', '2'],
-    followers: ['2', '3'],
-  }
-  expect(followLabel('1', graph)).toBe('following')
-  expect(followLabel('2', graph)).toBe('mutual')
-  expect(followLabel('3', graph)).toBe('follows you')
-  expect(followLabel('4', graph)).toBe('')
-  expect(followLabel('1', { outgoing: {}, available: false })).toBe('')
 })

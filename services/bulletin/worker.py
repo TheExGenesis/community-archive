@@ -25,6 +25,7 @@ import upstream_filter as upstream
 import clickhouse_source
 import tweet_context
 import resolution
+import output_schema
 
 MODEL = 'z-ai/glm-5.3-flash'
 VERSION = 'bulletin-143dc2d-v3-resolution'
@@ -67,6 +68,17 @@ def log_failure(exc, *, run_id, call_id=None, attempt=None, stage, retry_seconds
         attempt=attempt, stage=stage, error_type=type(exc).__name__, retry_seconds=retry_seconds)
     if isinstance(exc, urllib.error.HTTPError):
         event['http_status'] = exc.code
+    reasons = {
+        'label must be an object', 'is_notice must be boolean',
+        'invalid side or category', 'invalid summary', 'standing must be boolean',
+        'invalid response mode', 'invalid topics', 'invalid expiry', 'invalid place',
+        'evidence must be an exact source substring', 'incomplete_output',
+        'invalid_availability', 'unknown_availability_has_evidence',
+        'availability_requires_exact_author_evidence',
+        'availability_evidence_not_in_reply_tree', 'availability_evidence_predates_notice',
+    }
+    if isinstance(exc, ValueError) and str(exc) in reasons:
+        event['validation_code'] = str(exc).replace(' ', '_')
     print(json.dumps(event), flush=True)
 
 
@@ -173,11 +185,11 @@ def request_body(tweet, prompt, context):
     payload={'author':'@'+tweet['username'],'posted_at':tweet['created_at'].isoformat(),
         'text':tweet['full_text'], 'context':context.text}
     return json.dumps({'model':MODEL,'messages':[{'role':'system','content':prompt},
-        {'role':'system','content':tweet_context.CONTEXT_RULES+'\n'+resolution.RULES},
+        {'role':'system','content':tweet_context.CONTEXT_RULES+'\n'+resolution.RULES+'\n'+output_schema.RULES},
         {'role':'user','content':json.dumps(payload,ensure_ascii=False)}],
-        'response_format':{'type':'json_object'},'max_tokens':MAX_OUTPUT,
+        'response_format':output_schema.FORMAT,'max_tokens':MAX_OUTPUT,
         'reasoning':{'effort':'low'},
-        'provider':{'allow_fallbacks':True,'require_parameters':True,
+        'provider':{'allow_fallbacks':True,'require_parameters':True,'sort':'latency',
           'max_price':{'prompt':0.15,'completion':0.50}}},ensure_ascii=False).encode()
 
 

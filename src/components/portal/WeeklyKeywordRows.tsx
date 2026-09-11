@@ -71,7 +71,9 @@ export function WeeklyKeywordRows({
       >
         <span>Term</span>
         <span className="text-right">Tweets</span>
-        <span>Volume</span>
+        <span title="Bar widths use log(1 + tweet count), on the same scale across all terms.">
+          Volume (log)
+        </span>
         <span
           className="text-right"
           title={
@@ -129,13 +131,15 @@ export function WeeklyKeywordRows({
                   </span>
                   <div
                     role="img"
-                    aria-label={`${row.term}: ${row.last7.toLocaleString('en-US')} tweets in the last seven days`}
-                    title={`${row.last7.toLocaleString('en-US')} tweets; all bars use the same scale.`}
+                    aria-label={`${row.term}: ${row.last7.toLocaleString('en-US')} tweets in the last seven days; logarithmic volume scale`}
+                    title={`${row.last7.toLocaleString('en-US')} tweets; all bars use the same logarithmic scale.`}
                     className="h-2 overflow-hidden rounded bg-zinc-100 dark:bg-[#26262a]"
                   >
                     <div
                       className="h-full rounded bg-chart-accent"
-                      style={{ width: `${(row.last7 / max) * 100}%` }}
+                      style={{
+                        width: `${(Math.log1p(row.last7) / Math.log1p(max)) * 100}%`,
+                      }}
                     />
                   </div>
                   <span

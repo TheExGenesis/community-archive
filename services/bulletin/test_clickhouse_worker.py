@@ -36,12 +36,55 @@ class ClickHouseWorkerTests(unittest.TestCase):
         self.source=dict(tweet_id='1',account_id='10',created_at=self.window[0],updated_at=self.window[0],
           full_text=text,content_hash=hashlib.sha256(text.encode()).hexdigest(),reply_to_tweet_id=None,is_tombstone=0,retweet=False,allowed=True,username='alice')
         self.label=dict(is_notice=True,side='offer',kind='help',summary='Offers Python help.',evidence='Happy to help',topics=['python'],respond='dm',standing=False,expires_at=None,place=None)
+        self.context_rows=[]
         self.patches=[patch.object(worker.clickhouse_source,'page',side_effect=self.page),
           patch.object(worker.clickhouse_source,'current',side_effect=lambda _:dict(self.source) if self.source else None),
-          patch.dict(os.environ,OPENROUTER_API_KEY='test')]
+          patch.object(worker.tweet_context.plaintext,'fetch_context',side_effect=lambda *args:
+              [dict(self.source), *self.context_rows]),
+          patch.object(worker.tweet_context,'fresh_rows',side_effect=lambda ids:
+              [dict(row) for row in ([self.source] if self.source else [])+self.context_rows
+               if row['tweet_id'] in ids]),
+          patch.dict(os.environ,OPENROUTER_API_KEY='test',
+              CLICKHOUSE_ANALYTICS_API_TOKEN='test',CLICKHOUSE_ANALYTICS_API_URL='https://gateway.invalid')]
         for p in self.patches:p.start();self.addCleanup(p.stop)
     def page(self,start,end,after):
         return {'data':[dict(self.source)] if after=='0' else [],'scanned':500 if after=='0' else 0,'next':'500' if after=='0' else None,'source':'clickhouse'}
+
+    def add_context_reply(self):
+        self.db.execute("INSERT INTO public.all_account VALUES ('20','bob',false); INSERT INTO public.members VALUES ('20')")
+        self.context_rows=[dict(self.source,tweet_id='2',account_id='20',username='bob',
+            reply_to_tweet_id='1',full_text='The example project uses Python 3.11.')]
+
+    def test_automated_call_uses_attributed_plaintext_context(self):
+        self.add_context_reply()
+        def response(body):
+            payload=json.loads(json.loads(body)['messages'][-1]['content'])
+            self.assertIn('[SEED]',payload['context'])
+            self.assertIn('@bob',payload['context'])
+            self.assertIn('Python 3.11',payload['context'])
+            return self.response(body)
+        with patch.object(worker,'call_model',side_effect=response):
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['status'],result['positive']),('ok',1))
+
+    def test_context_optout_during_call_does_not_publish_or_repeat_paid_call(self):
+        self.add_context_reply()
+        def response(body):
+            self.db.execute("INSERT INTO public.optin VALUES ('20','bob',true)")
+            return self.response(body)
+        with patch.object(worker,'call_model',side_effect=response) as model:
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((model.call_count,result['pending'],result['suppressed']),(1,1,1))
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.opportunities').fetchone()['n'],0)
+        self.assertEqual(self.db.execute('SELECT actual_usd FROM bulletin.calls').fetchone()['actual_usd'],Decimal('.001'))
+
+    def test_context_failure_does_not_reserve_or_send_paid_request(self):
+        with patch.object(worker.tweet_context.plaintext,'fetch_context',side_effect=TimeoutError()), \
+                patch.object(worker,'call_model') as model:
+            with self.assertRaises(TimeoutError):
+                worker.run(self.db,window=self.window)
+        model.assert_not_called()
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.calls').fetchone()['n'],0)
     def response(self,body):
         return {'choices':[{'finish_reason':'stop','message':{'content':json.dumps(self.label)}}],'usage':{'cost':.001}}
     def run_worker(self,**kwargs):
@@ -280,7 +323,7 @@ class ClickHouseWorkerTests(unittest.TestCase):
         self.assertEqual((result['calls'],result['pending']),(2,1))
 
     def test_retry_must_reserve_budget_again(self):
-        body=worker.request_body(self.source,SYSTEM)
+        body=worker.request_body(self.source,SYSTEM,worker.tweet_context.prepare(self.db,self.source))
         cap=worker.reservation(body)*Decimal('1.5')
         with patch.object(worker,'call_model',side_effect=self.http_error()),patch.object(worker.time,'sleep'):
             result=worker.run(self.db,window=self.window,backfill_budget=cap)

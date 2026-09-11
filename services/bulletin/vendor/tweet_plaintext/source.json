@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/TheExGenesis/community-archive-control-panel",
+  "revision": "36f8c2563513116948cf2b93a638c6de3ea74af1",
+  "path": "scripts/reference",
+  "sha256": {
+    "tweet_plaintext.py": "a56108eec42693f44ef65a4e9f671e0470bedf9719a4453c2e0834295629392f",
+    "conversation_explorer.py": "592e23619e59558caeefff0c745c64ee46a38fc0abc3b328d5cc60541c2a543e",
+    "image_describer.py": "9c204c80a2ef5f7bce7a3895614ac824566677ea973f81599a693a2b40d9094e"
+  }
+}

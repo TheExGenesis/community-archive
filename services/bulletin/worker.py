@@ -23,9 +23,10 @@ from psycopg.types.json import Jsonb
 from labels import validate_label
 import upstream_filter as upstream
 import clickhouse_source
+import tweet_context
 
 MODEL = 'z-ai/glm-5.3-flash'
-VERSION = 'bulletin-143dc2d-v1'
+VERSION = 'bulletin-143dc2d-v2-context'
 DAY_BUDGET = Decimal('0.10')
 MONTH_BUDGET = Decimal('1.00')
 MAX_OUTPUT = 2048
@@ -167,10 +168,11 @@ def current(db, tweet_id, lock=False):
     return source
 
 
-def request_body(tweet, prompt):
+def request_body(tweet, prompt, context):
     payload={'author':'@'+tweet['username'],'posted_at':tweet['created_at'].isoformat(),
-        'text':tweet['full_text']}
+        'text':tweet['full_text'], 'context':context.text}
     return json.dumps({'model':MODEL,'messages':[{'role':'system','content':prompt},
+        {'role':'system','content':tweet_context.CONTEXT_RULES},
         {'role':'user','content':json.dumps(payload,ensure_ascii=False)}],
         'response_format':{'type':'json_object'},'max_tokens':MAX_OUTPUT,
         'reasoning':{'effort':'low'},
@@ -227,11 +229,18 @@ def actual_cost(result):
     return cost if cost.is_finite() and cost>=0 else None
 
 
-def publish(db, job, label):
+def publish(db, job, label, context):
     with db.transaction():
         source=current(db,job['tweet_id'],lock=True)
         if not source or source['content_hash']!=job['content_hash']:
             db.execute('DELETE FROM bulletin.decisions WHERE tweet_id=%s',(job['tweet_id'],))
+            return False
+        if not tweet_context.still_current(db, context):
+            # Keep the paid call in the ledger, but retry classification later
+            # with fresh context. Never persist the context text itself.
+            db.execute("UPDATE bulletin.decisions SET status='pending',updated_at=now() WHERE tweet_id=%s",
+                (job['tweet_id'],))
+            db.execute('DELETE FROM bulletin.opportunities WHERE tweet_id=%s',(job['tweet_id'],))
             return False
         db.execute('UPDATE bulletin.decisions SET status=%s,updated_at=now() WHERE tweet_id=%s',
             ('positive' if label['is_notice'] else 'negative',job['tweet_id']))
@@ -320,7 +329,14 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
                 if not source or source['content_hash']!=job['content_hash']:
                     db.execute('DELETE FROM bulletin.decisions WHERE tweet_id=%s',(job['tweet_id'],))
                     counts['suppressed']+=1;continue
-                body=request_body(source,prompt['body'])
+                try:
+                    context=tweet_context.prepare(db,source)
+                except Exception as exc:
+                    log_failure(exc,run_id=run_id,stage='context_preparation')
+                    raise
+                if time.monotonic()-started>MAX_SECONDS:
+                    status='time_limit';break
+                body=request_body(source,prompt['body'],context)
                 if len(body)>65536:
                     status='oversize_candidate';continue
                 amount=reservation(body)
@@ -340,7 +356,7 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
                         raise ValueError('incomplete_output')
                     label=validate_label(json.loads(choice['message']['content']),{'text':source['full_text']})
                     stage='publish'
-                    stored=publish(db,job,label)
+                    stored=publish(db,job,label,context)
                     counts['positive' if label['is_notice'] else 'negative']+=int(stored)
                     counts['suppressed']+=int(not stored)
                     db.execute('UPDATE bulletin.calls SET status=%s WHERE id=%s',

@@ -47,10 +47,55 @@ notices and newest, and does not invent social recommendations.
    authors, live posts, no replies, no reposts.
 3. Apply the pinned upstream phrase patterns and cleaning gate (minimum 25
    cleaned characters). Those matches are the candidates.
-4. Reuse unchanged positive/negative decisions; send remaining candidates to
-   `z-ai/glm-5.3-flash` through OpenRouter with the run's pinned prompt.
+4. Reuse unchanged positive/negative decisions. Prepare remaining candidates
+   with the maintained `tweet-plaintext` renderer: seed, nearby replies, and
+   directly quoted tweets. Send them to `z-ai/glm-5.3-flash` through OpenRouter
+   with the run's pinned prompt and the worker's versioned context instructions.
 5. Validate the result and exact evidence substring, recheck policy and source,
    then save a positive or negative decision.
+
+### Automated plaintext context
+
+`tweet_context.py` calls the same helpers as the operator `tweet-plaintext`
+skill. The exact source files are bundled under `vendor/tweet_plaintext/` with
+a pinned commit and checksums, so worker releases do not depend on a laptop's
+skill installation. There are no extra runtime packages or image-model calls.
+
+The existing gateway thread endpoint fetches at most 500 conversation tweets.
+The renderer selects a reply-edge radius of two plus one outgoing quote hop,
+then limits input to 21 tweets and a soft 12,000-character target. It prioritizes
+the seed and the author's replies, keeps the seed whole, and explicitly marks
+omissions. The existing 64 KiB request ceiling and byte-based cost reservation
+still apply to the complete model request, including context.
+
+Cached conversation records are checked against fresh `bulletin-sources` text
+and current PostgreSQL `bulletin.allowed_accounts` before rendering. Changed,
+deleted, reposted, or disallowed context is omitted. A missing/stale cached seed
+uses current seed-only text with an explicit limitation. A thread 404 is marked
+unavailable; other gateway failures stop the run before model spending. Context
+preparation failures emit a `context_preparation` error stage.
+
+The model classifies the seed, not another participant's offer. The joke
+exclusion remains, and neither a question nor a vague post qualifies on its own.
+Author replies or an explicitly shared quote may clarify a real ask/offer, but
+missing replies, links, and undescribed images are not assumed to contain details.
+Summaries and extracted fields stay grounded in the seed; exact evidence must
+still occur in its text. Context text is never written to the bulletin database
+or logs. Every printed source's hash and current consent are checked again before
+saving; a change leaves the decision pending without repeating the paid call
+immediately or removing its cost from the ledger.
+
+Context is a bounded snapshot, not continuous reply monitoring. New replies do
+not automatically invalidate an already saved decision; the graph endpoint may
+cache reply discovery for an hour. The classifier version bump reconsiders
+encountered candidates in newly scanned windows. It does not trigger a historical
+backfill. Candidate phrase filters are unchanged.
+
+Deployment requires the complete `services/bulletin` directory, including the
+vendored helpers. The existing gateway endpoints and database schema suffice.
+Before production rollout, inspect a small, separately budgeted model pilot for
+real asks, jokes, vague posts, and clarifying replies. Worker deployment and any
+historical reclassification remain separate from merging the web access gate.
 
 Daily runs scan the previous **two complete UTC days**. Each day gets a distinct
 scan key, so the overlap catches late arrivals without rebilling unchanged text.
@@ -242,7 +287,7 @@ that explicit local preview guard. Tweet reads still use ClickHouse.
 ```sh
 BULLETIN_TEST_DSN='host=127.0.0.1 port=55439 dbname=bulletin_test user=frsc' \
   uv run --with 'psycopg[binary]==3.2.9' --with duckdb==1.5.5 \
-  python -m unittest -v test_worker.py test_retries.py test_clickhouse_worker.py
+  python -m unittest -v test_worker.py test_retries.py test_tweet_context.py test_clickhouse_worker.py
 ```
 
 These tests require a named disposable local database. They exercise a fake

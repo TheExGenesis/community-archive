@@ -38,12 +38,10 @@ const detail = {
 beforeEach(() => {
   jest.resetAllMocks()
   jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({ data: [source] })
-  jest
-    .mocked(fetchClickHouseTweetThreadPageData)
-    .mockResolvedValue({
-      tweet: detail,
-      threadTree: null,
-    } as unknown as ClickHouseTweetThreadPageData)
+  jest.mocked(fetchClickHouseTweetThreadPageData).mockResolvedValue({
+    tweet: detail,
+    threadTree: null,
+  } as unknown as ClickHouseTweetThreadPageData)
 })
 test('full-fidelity admin hydration preserves media and quoted context', async () => {
   const result = await hydrateBulletinTweets(['123'], { notices: [record] })
@@ -58,12 +56,10 @@ test('full-fidelity admin hydration preserves media and quoted context', async (
 })
 test('full details cannot expose another account or an edited source', async () => {
   for (const change of [{ account_id: '99' }, { full_text: 'Edited' }]) {
-    jest
-      .mocked(fetchClickHouseTweetThreadPageData)
-      .mockResolvedValue({
-        tweet: { ...detail, ...change },
-        threadTree: null,
-      } as unknown as ClickHouseTweetThreadPageData)
+    jest.mocked(fetchClickHouseTweetThreadPageData).mockResolvedValue({
+      tweet: { ...detail, ...change },
+      threadTree: null,
+    } as unknown as ClickHouseTweetThreadPageData)
     expect(
       (await hydrateBulletinTweets(['123'], { notices: [record] })).tweets,
     ).toEqual([])

@@ -1,4 +1,5 @@
 'use client'
+
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
@@ -36,7 +37,6 @@ import {
 } from '@/lib/bulletin/types'
 import {
   expiry,
-  followLabel,
   isPast,
   relationship,
   sortNotices,
@@ -170,7 +170,6 @@ function NoticeCard({
   notice,
   loadTweet,
   badge,
-  follow,
   replied,
   now,
   order,
@@ -179,7 +178,6 @@ function NoticeCard({
   notice: Notice
   loadTweet: (id: string) => Promise<BulletinTweet>
   badge: string
-  follow: string
   replied: boolean
   now: number
   /** Rank position; restores reading order when stacks collapse into a grid. */
@@ -405,7 +403,6 @@ function NoticeCard({
               <TweetAvatar tweet={tweet || fallback} size={18} />
               <span>{notice.display_name || `@${notice.username}`}</span>
             </Link>
-            {follow && <span className={styles.follow}>{follow}</span>}
             <span className={styles.facts}>
               {when && <span>{when}</span>}
               {replied && (
@@ -435,7 +432,7 @@ export function BulletinBoard({
   initialPage,
   me = '',
   username = '',
-  graph = EMPTY_GRAPH,
+  graph: initialGraph = EMPTY_GRAPH,
   now = Date.now(),
   isAdmin = false,
 }: {
@@ -462,6 +459,8 @@ export function BulletinBoard({
     { kind, side, search, past, recommended, ascending },
     hydrated,
   )
+  const graph = pages.page?.personal || initialGraph
+  const viewerId = pages.page?.personal.account_id || me
   const loaded = pages.page?.notices || notices
   useEffect(() => {
     // Warm the expanded-card chunk so the first click does not flash.
@@ -518,13 +517,24 @@ export function BulletinBoard({
             (side === 'all' || o.side === side),
         ),
         recommended,
-        me,
+        viewerId,
         graph,
         now,
         ascending,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loaded, kind, side, past, needle, recommended, ascending, me, graph, now],
+    [
+      loaded,
+      kind,
+      side,
+      past,
+      needle,
+      recommended,
+      ascending,
+      viewerId,
+      graph,
+      now,
+    ],
   )
   useEffect(() => {
     setLimit(BULLETIN_PAGE_SIZE)
@@ -572,8 +582,8 @@ export function BulletinBoard({
               </p>
               <p>
                 <b>What the numbers mean</b>
-                Reply counts and follow labels come from the archive, so they
-                only see members. Read the tweet before acting on it.
+                Reply counts come from the archive, so they only see members.
+                Read the tweet before acting on it.
               </p>
               <Link href="/bulletin/about" className={styles.aboutLink}>
                 How the scan, lifetimes and ordering work →
@@ -721,10 +731,7 @@ export function BulletinBoard({
                   notice={o}
                   order={index}
                   loadTweet={loadTweet}
-                  badge={relationship(o, me, graph).label}
-                  follow={
-                    o.account_id === me ? '' : followLabel(o.account_id, graph)
-                  }
+                  badge={relationship(o, viewerId, graph).label}
                   replied={
                     !!me &&
                     o.account_id !== me &&
@@ -745,6 +752,7 @@ export function BulletinBoard({
         <p className={styles.empty}>No matching notices.</p>
       )}
       {!pages.pending &&
+        !pages.personalizing &&
         (initialPage
           ? cursor && !pages.loading[kind] && !pages.laneErrors[kind]
           : visible.length > limit) && (

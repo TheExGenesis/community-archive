@@ -3,17 +3,6 @@ import type { Notice } from './types'
 export type BulletinRelationships = {
   outgoing: Record<string, number>
   available: boolean
-  following?: string[]
-  followers?: string[]
-}
-/** Follow relation from archived follow lists; '' when unknown or none. */
-export function followLabel(accountId: string, graph: BulletinRelationships) {
-  const follows = graph.following?.includes(accountId) ?? false
-  const followed = graph.followers?.includes(accountId) ?? false
-  if (follows && followed) return 'mutual'
-  if (follows) return 'following'
-  if (followed) return 'follows you'
-  return ''
 }
 export function expiry(notice: Notice): number | null {
   if (notice.expires_at)
@@ -60,11 +49,14 @@ export function sortNotices(
   graph: BulletinRelationships,
   now: number,
   ascending = false,
+  rankUnanswered = true,
 ) {
   const inner = (a: Notice, b: Notice) =>
     (recommended
       ? relationship(a, me, graph).rank - relationship(b, me, graph).rank ||
-        Number(unansweredAsk(b)) - Number(unansweredAsk(a)) ||
+        (rankUnanswered
+          ? Number(unansweredAsk(b)) - Number(unansweredAsk(a))
+          : 0) ||
         (graph.outgoing?.[b.account_id] || 0) -
           (graph.outgoing?.[a.account_id] || 0)
       : 0) ||

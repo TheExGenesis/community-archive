@@ -14,7 +14,9 @@ export default async function BulletinBoardPage() {
   await requireBulletinUser()
   const [isAdmin, page] = await Promise.all([
     isBulletinAdmin(),
-    loadBulletinPage(DEFAULT_BULLETIN_FILTERS).catch(() => null),
+    loadBulletinPage(DEFAULT_BULLETIN_FILTERS, undefined, false).catch(
+      () => null,
+    ),
   ])
   return (
     <main className={styles.page}>

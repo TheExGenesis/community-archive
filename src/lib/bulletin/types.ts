@@ -161,14 +161,13 @@ export type BulletinPage = {
   cursors: Record<string, string | null>
   total: number
   now: number
+  /** False only for the immediate, unpersonalized first paint. */
+  recommendationsReady?: boolean
   personal: {
     account_id: string
     username: string
     outgoing: Record<string, number>
     available: boolean
-    /** Accounts the viewer follows / is followed by, from archive uploads. */
-    following: string[]
-    followers: string[]
   }
 }
 export function parseKinds(kind: string): string[] | null {

@@ -6,6 +6,7 @@ import {
   loadBulletinBoardState,
   loadRunDashboard,
   loadBulletinRelationships,
+  loadBulletinViewer,
 } from './data'
 import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { getCurrentUser } from '@/lib/portal/auth'
@@ -133,7 +134,7 @@ test('ClickHouse source changes suppress a notice and upstream outages fail the 
   await expect(loadNotices()).rejects.toThrow('unavailable')
 })
 
-test('recommendations use the ClickHouse top outgoing list, and follow lists come from the RPC by trusted id', async () => {
+test('recommendations use only ClickHouse outgoing interactions and trusted identity', async () => {
   jest.mocked(getCurrentUser).mockResolvedValue({
     id: 'member',
     app_metadata: { provider_id: '42' },
@@ -146,28 +147,20 @@ test('recommendations use the ClickHouse top outgoing list, and follow lists com
     query: { accountId: '42', year: null, peopleLimit: 25 },
     data: { people: [{ accountId: '7', interactionCount: '12' }] },
   })
-  rpc.mockResolvedValue({
-    data: { following: ['7', 'bad'], followers: ['8'] },
-    error: null,
-  })
   await expect(loadBulletinRelationships()).resolves.toMatchObject({
     account_id: '42',
     username: 'exgenesis',
     outgoing: { '7': 12 },
     available: true,
-    following: ['7'],
-    followers: ['8'],
   })
+  expect(rpc).not.toHaveBeenCalled()
   expect(fetchAnalyticsGatewayJson).toHaveBeenCalledWith(
     ['user', '42', 'interactions'],
     new URLSearchParams({ limit: '25' }),
     expect.any(Object),
   )
-  expect(rpc).toHaveBeenCalledWith('get_bulletin_relationships', {
-    viewer_account_id: '42',
-  })
 })
-test('unavailable interaction data stays unknown, and a failed follow RPC yields empty lists', async () => {
+test('unavailable interaction data stays unknown', async () => {
   jest.mocked(getCurrentUser).mockResolvedValue({
     id: 'member',
     app_metadata: { provider_id: '42' },
@@ -179,8 +172,6 @@ test('unavailable interaction data stays unknown, and a failed follow RPC yields
   await expect(loadBulletinRelationships()).resolves.toMatchObject({
     outgoing: {},
     available: false,
-    following: [],
-    followers: [],
   })
 })
 
@@ -241,3 +232,14 @@ test('immediate preview text comes only from a currently verified ClickHouse sou
     { tweet_id: '1', preview_text: text },
   ])
 })
+
+test.each([null, { is_anonymous: true }])(
+  'viewer identity requires a signed-in session',
+  async (user) => {
+    jest.mocked(getCurrentUser).mockResolvedValue(user as User | null)
+    await expect(loadBulletinViewer()).rejects.toThrow(
+      'redirect:/login?redirect=/bulletin',
+    )
+    expect(rpc).not.toHaveBeenCalled()
+  },
+)

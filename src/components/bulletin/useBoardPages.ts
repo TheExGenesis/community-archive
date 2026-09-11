@@ -64,6 +64,11 @@ export function useBoardPages(
   filtersRef.current = filters
   const pending = !!initial && state.key !== key
 
+  const personalizing =
+    !pending &&
+    filters.recommended &&
+    state.page?.recommendationsReady === false
+
   useEffect(() => {
     if (!initial || !ready) return
     const controllers = requests.current
@@ -72,31 +77,39 @@ export function useBoardPages(
     setError('')
     const controller = new AbortController()
     // Debounce searches, while preserving the server-rendered default page.
-    const timer = pending
-      ? setTimeout(() => {
-          fetchPage(query(filtersRef.current), controller.signal)
-            .then((page) => {
-              if (!controller.signal.aborted && currentKey.current === key)
-                setState({ key, page })
-            })
-            .catch(() => {
-              if (!controller.signal.aborted)
-                setError('Could not load notices. Please retry.')
-            })
-        }, 200)
-      : undefined
+    const timer =
+      pending || personalizing
+        ? setTimeout(() => {
+            fetchPage(query(filtersRef.current), controller.signal)
+              .then((page) => {
+                if (!controller.signal.aborted && currentKey.current === key)
+                  setState({ key, page })
+              })
+              .catch(() => {
+                if (!controller.signal.aborted)
+                  setError('Could not load notices. Please retry.')
+              })
+          }, 200)
+        : undefined
     return () => {
       clearTimeout(timer)
       controller.abort()
       controllers.forEach((request) => request.abort())
       controllers.clear()
     }
-  }, [key, ready, initial, retry, pending])
+  }, [key, ready, initial, retry, pending, personalizing])
 
   const loadMore = useCallback(
     async (kind: string) => {
       const cursor = state.page?.cursors[kind]
-      if (!initial || pending || !cursor || requests.current.has(kind)) return
+      if (
+        !initial ||
+        pending ||
+        personalizing ||
+        !cursor ||
+        requests.current.has(kind)
+      )
+        return
       const controller = new AbortController()
       requests.current.set(kind, controller)
       setLoading((value) => ({ ...value, [kind]: true }))
@@ -136,11 +149,12 @@ export function useBoardPages(
         }
       }
     },
-    [initial, pending, state.page, key],
+    [initial, pending, personalizing, state.page, key],
   )
   return {
     page: state.page,
     pending,
+    personalizing,
     error,
     loading,
     laneErrors,

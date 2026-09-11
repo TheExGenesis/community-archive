@@ -50,7 +50,9 @@ test('orders one list by absolute share change, preserving new terms and falls t
     'ai agents',
   ])
   const growth = screen.getByRole('img', { name: /model: 400 tweets/ })
-  expect(growth).toHaveAccessibleName(/green overlay shows the gain/)
+  expect(growth).toHaveAccessibleName(
+    /dark blue shows the previous share and bright blue shows the gain/,
+  )
   expect(growth.lastElementChild).toHaveStyle({ left: '50%', width: '50%' })
   expect(screen.queryByText(/Through Sep 6/)).not.toBeInTheDocument()
   const href = screen
@@ -137,5 +139,7 @@ test('makes the explanation available on keyboard focus', async () => {
   expect(tip).toHaveTextContent('Through Sep 6 (UTC).')
   expect(tip).toHaveTextContent('absolute change in author-weighted share')
   expect(tip).toHaveTextContent('faded blue extension')
-  expect(tip).toHaveTextContent('green overlay')
+  expect(tip).toHaveTextContent(
+    'dark blue shows the previous share and bright blue shows the gain',
+  )
 })

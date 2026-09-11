@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import unittest
+import urllib.error
 from unittest.mock import patch
 import psycopg
 from psycopg.rows import dict_row
@@ -126,6 +127,76 @@ class ClickHouseWorkerTests(unittest.TestCase):
         result,calls=self.run_worker(backfill_budget=Decimal('.05'))
         self.assertEqual((result['status'],calls),('ok',1))
         self.assertEqual(self.db.execute('SELECT attempts FROM bulletin.decisions').fetchone()['attempts'],2)
+
+    def http_error(self,code=503):
+        return urllib.error.HTTPError('https://example.invalid/secret',code,'private provider message',{},None)
+
+    def test_transient_errors_retry_in_same_run_and_recover(self):
+        with patch.object(worker,'call_model',side_effect=[self.http_error(),self.http_error(429),self.response(None)]) as model, \
+                patch.object(worker.time,'sleep') as sleep:
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['status'],result['calls'],result['failed'],result['pending']),('ok',3,2,0))
+        self.assertEqual(model.call_count,3)
+        self.assertEqual(sleep.call_count,2)
+        self.assertEqual(self.db.execute('SELECT attempts FROM bulletin.decisions').fetchone()['attempts'],3)
+        calls=self.db.execute('SELECT status,actual_usd FROM bulletin.calls ORDER BY id').fetchall()
+        self.assertEqual([c['status'] for c in calls],['failed:HTTPError:503','failed:HTTPError:429','validated'])
+        self.assertIsNone(calls[0]['actual_usd'])
+        self.assertIsNone(calls[1]['actual_usd'])
+
+    def test_transient_failure_stops_at_durable_attempt_limit(self):
+        with patch.object(worker,'call_model',side_effect=self.http_error()) as model,patch.object(worker.time,'sleep'):
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['status'],result['calls'],result['pending']),('classification_failed',3,1))
+        self.db.execute("UPDATE bulletin.decisions SET last_attempt_at=now()-interval '2 hours'")
+        self.assertEqual(self.run_worker()[1],0)
+
+    def test_auth_error_does_not_immediately_retry(self):
+        with patch.object(worker,'call_model',side_effect=self.http_error(401)),patch.object(worker.time,'sleep') as sleep:
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual(result['calls'],1)
+        sleep.assert_not_called()
+
+    def test_retries_obey_call_limit(self):
+        with patch.object(worker,'call_model',side_effect=self.http_error()),patch.object(worker.time,'sleep'):
+            result=worker.run(self.db,window=self.window,limit=2)
+        self.assertEqual((result['calls'],result['pending']),(2,1))
+
+    def test_retry_must_reserve_budget_again(self):
+        body=worker.request_body(self.source,SYSTEM)
+        cap=worker.reservation(body)*Decimal('1.5')
+        with patch.object(worker,'call_model',side_effect=self.http_error()),patch.object(worker.time,'sleep'):
+            result=worker.run(self.db,window=self.window,backfill_budget=cap)
+        self.assertEqual((result['status'],result['calls']),('budget_limit',1))
+
+    def test_retry_does_not_start_near_deadline(self):
+        with patch.object(worker.time,'monotonic',return_value=0) as clock, \
+                patch.object(worker.time,'sleep') as sleep,patch.object(worker,'MAX_SECONDS',65):
+            def fail(body):
+                clock.return_value=10
+                raise self.http_error()
+            with patch.object(worker,'call_model',side_effect=fail):
+                result=worker.run(self.db,window=self.window)
+        self.assertEqual(result['calls'],1)
+        sleep.assert_not_called()
+
+    def test_publication_error_does_not_repeat_paid_model_call(self):
+        with patch.object(worker,'call_model',side_effect=self.response) as model, \
+                patch.object(worker,'publish',side_effect=self.http_error()), \
+                patch.object(worker.time,'sleep') as sleep:
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['status'],model.call_count),('classification_failed',1))
+        self.assertIsNotNone(self.db.execute('SELECT actual_usd FROM bulletin.calls').fetchone()['actual_usd'])
+        sleep.assert_not_called()
+
+    def test_policy_change_before_retry_suppresses_call(self):
+        def optout(_):
+            self.db.execute("INSERT INTO public.optin VALUES ('10','alice',true)")
+        with patch.object(worker,'call_model',side_effect=self.http_error()) as model, \
+                patch.object(worker.time,'sleep',side_effect=optout):
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['status'],result['calls'],result['suppressed'],result['pending']),('ok',1,1,0))
+        self.assertEqual(model.call_count,1)
 
     def test_browser_cannot_read_state_and_backfill_does_not_touch_daily_cursor(self):
         old=self.db.execute('SELECT cursor_at,cursor_id FROM bulletin.worker_state').fetchone()

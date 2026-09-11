@@ -4,11 +4,15 @@
 # ///
 """Incremental, bounded Bulletin worker. Run after a successful autorefresh."""
 import argparse
+from collections import deque
 import datetime as dt
+from email.utils import parsedate_to_datetime
 from decimal import Decimal
 import json
 import os
+import random
 import time
+import urllib.error
 import urllib.request
 
 import duckdb
@@ -29,6 +33,39 @@ MAX_CALLS = 50
 MAX_PAGES = 100
 MAX_SECONDS = 900
 LOCK = 712606570
+
+
+def retry_wait(exc, attempt):
+    """Short provider retries; a longer Retry-After is deferred to a later run."""
+    if attempt >= 3:
+        return None
+    if isinstance(exc, urllib.error.HTTPError):
+        if exc.code not in (408, 429) and not 500 <= exc.code < 600:
+            return None
+    elif not isinstance(exc, (urllib.error.URLError, TimeoutError)):
+        return None
+    delay = (2 if attempt == 1 else 5) + random.uniform(0, 1)
+    if isinstance(exc, urllib.error.HTTPError):
+        value = exc.headers.get('Retry-After') if exc.headers else None
+        if value:
+            try:
+                seconds = int(value)
+            except ValueError:
+                try:
+                    seconds = (parsedate_to_datetime(value) - dt.datetime.now(dt.timezone.utc)).total_seconds()
+                except (ValueError, TypeError, OverflowError):
+                    seconds = 0
+            delay = max(delay, seconds)
+    return delay if delay <= 60 else None
+
+
+def log_failure(exc, *, run_id, call_id=None, attempt=None, stage, retry_seconds=None):
+    # Allowlist metadata: never serialize exceptions, URLs, bodies, headers or locals.
+    event = dict(event='bulletin_error', run_id=run_id, call_id=call_id,
+        attempt=attempt, stage=stage, error_type=type(exc).__name__, retry_seconds=retry_seconds)
+    if isinstance(exc, urllib.error.HTTPError):
+        event['http_status'] = exc.code
+    print(json.dumps(event), flush=True)
 
 
 def connect():
@@ -244,10 +281,13 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
             if not os.environ.get('OPENROUTER_API_KEY'):
                 raise RuntimeError('missing_model_key')
             retry_delay=dt.timedelta(minutes=1 if backfill_budget is not None else 60)
-            jobs=db.execute('''SELECT * FROM bulletin.decisions WHERE status IN ('pending','failed')
+            jobs=deque(db.execute('''SELECT * FROM bulletin.decisions WHERE status IN ('pending','failed')
               AND attempts<3 AND (last_attempt_at IS NULL OR last_attempt_at<now()-%s)
-              ORDER BY updated_at LIMIT %s''',(retry_delay,limit)).fetchall()
-            for job in jobs:
+              ORDER BY updated_at LIMIT %s''',(retry_delay,limit)).fetchall())
+            while jobs:
+                if counts['calls'] >= limit:
+                    status='call_limit';break
+                job=jobs.popleft()
                 if time.monotonic()-started>MAX_SECONDS:
                     status='time_limit';break
                 source=current(db,job['tweet_id'])
@@ -262,28 +302,45 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
                 if call_id is None:
                     status='budget_limit';break
                 counts['calls']+=1
+                job['attempts']+=1
+                stage='model_request'
                 try:
                     result=call_model(body)
+                    stage='model_validation'
                     db.execute("UPDATE bulletin.calls SET actual_usd=%s,status='responded' WHERE id=%s",
                         (actual_cost(result),call_id))
                     choice=result['choices'][0]
                     if choice.get('finish_reason')!='stop':
                         raise ValueError('incomplete_output')
                     label=validate_label(json.loads(choice['message']['content']),{'text':source['full_text']})
+                    stage='publish'
                     stored=publish(db,job,label)
                     counts['positive' if label['is_notice'] else 'negative']+=int(stored)
                     counts['suppressed']+=int(not stored)
                     db.execute('UPDATE bulletin.calls SET status=%s WHERE id=%s',
                         ('validated' if stored else 'suppressed',call_id))
                 except Exception as exc:
-                    # Never persist provider bodies, prompts, authored text or credentials in logs.
+                    delay=retry_wait(exc,job['attempts']) if stage=='model_request' else None
+                    if delay is not None and (counts['calls']>=limit or
+                            time.monotonic()-started+delay+60>MAX_SECONDS):
+                        delay=None
+                    log_failure(exc,run_id=run_id,call_id=call_id,attempt=job['attempts'],
+                        stage=stage,retry_seconds=delay)
+                    failure='failed:'+type(exc).__name__
+                    if isinstance(exc,urllib.error.HTTPError):
+                        failure+=':'+str(exc.code)
                     db.execute('UPDATE bulletin.calls SET status=%s WHERE id=%s',
-                        ('failed:'+type(exc).__name__,call_id))
+                        (failure,call_id))
                     counts['failed']+=1
                     status='classification_failed'
+                    if delay is not None:
+                        time.sleep(delay)
+                        jobs.appendleft(job)
                 progress(db,run_id,counts)
         pending=db.execute("SELECT count(*) AS n FROM bulletin.decisions WHERE status IN ('pending','failed')").fetchone()['n']
         counts['pending']=pending
+        if not pending and status=='classification_failed':
+            status='ok'
         if enqueue_only:
             status='enqueued_only'
         elif pending and status=='ok':
@@ -294,6 +351,7 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
         progress(db,run_id,counts,status,finished=True)
         return {'status':status,**counts}
     except Exception as exc:
+        log_failure(exc,run_id=run_id,stage='worker')
         if run_id is not None:
             progress(db,run_id,counts,'failed:'+type(exc).__name__,finished=True)
         db.execute('''UPDATE bulletin.worker_state SET last_finished_at=now(),status=%s,counts=%s WHERE id=1''',

@@ -116,8 +116,8 @@ test('shows previous share behind declines even when raw tweet counts increased'
   const currentWidth = parseFloat(
     (decline.lastElementChild as HTMLElement).style.width,
   )
-  expect(previousWidth).toBeGreaterThan(currentWidth)
-  expect(currentWidth).toBeGreaterThan(0)
+  expect(previousWidth).toBe(5)
+  expect(currentWidth).toBe(2.5)
   expect(screen.getByRole('img', { name: /ai agents:/ }).children).toHaveLength(
     1,
   )

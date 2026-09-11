@@ -43,8 +43,7 @@ export function WeeklyKeywordRows({
     )
     .slice(0, 6)
   const max = Math.max(1, ...rows.flatMap((row) => [row.current, row.previous]))
-  const width = (value: number) =>
-    `${(Math.log1p(value) / Math.log1p(max)) * 100}%`
+  const width = (value: number) => `${(value / max) * 100}%`
   const until = weekly[0]?.untilDate
   const through =
     until &&
@@ -59,7 +58,7 @@ export function WeeklyKeywordRows({
       : 'Tweet counts vs the previous week.',
     through ? `Through ${through} (UTC).` : '',
     `Ordered by the absolute change in ${weighted ? 'author-weighted share' : 'tweet count'}.`,
-    `Bars show ${weighted ? 'author-weighted share per 100k' : 'tweet counts'} on a shared logarithmic scale. A faded extension shows the previous week when activity has declined.`,
+    `Bars show ${weighted ? 'author-weighted share per 100k' : 'tweet counts'} on a shared linear scale. A faded extension shows the previous week when activity has declined.`,
   ]
     .filter(Boolean)
     .join(' ')
@@ -91,7 +90,7 @@ export function WeeklyKeywordRows({
           </TooltipProvider>
         </span>
         <span className="text-right">Tweets</span>
-        <span>Volume (log)</span>
+        <span>Volume</span>
         <span className="text-right">
           {dynamic ? 'Share change' : 'Change'}
         </span>
@@ -110,7 +109,7 @@ export function WeeklyKeywordRows({
               : `${row.deltaPct >= 0 ? '+' : '−'}${Math.abs(row.deltaPct).toLocaleString('en-US')}%`
         const falling = row.previous > row.current
         const details = `${row.last7.toLocaleString('en-US')} tweets${row.currentAuthors === undefined ? '' : ` from ${row.currentAuthors} authors`}; ${row.prev7.toLocaleString('en-US')} tweets in the previous week.`
-        const barDetails = `${row.term}: ${row.last7.toLocaleString('en-US')} tweets in the last seven days; ${weighted ? 'author-weighted share per 100k' : 'tweet count'} ${row.current.toLocaleString('en-US', { maximumFractionDigits: 1 })}, previously ${row.previous.toLocaleString('en-US', { maximumFractionDigits: 1 })}; logarithmic scale${falling ? '; faded extension shows the previous week' : ''}`
+        const barDetails = `${row.term}: ${row.last7.toLocaleString('en-US')} tweets in the last seven days; ${weighted ? 'author-weighted share per 100k' : 'tweet count'} ${row.current.toLocaleString('en-US', { maximumFractionDigits: 1 })}, previously ${row.previous.toLocaleString('en-US', { maximumFractionDigits: 1 })}; linear scale${falling ? '; faded extension shows the previous week' : ''}`
         return (
           <div
             key={row.term}

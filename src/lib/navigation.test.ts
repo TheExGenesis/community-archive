@@ -163,14 +163,12 @@ describe('tweet detail navigation', () => {
   })
 })
 
-test('bulletin navigation is signed-in only and preserves the source return link', () => {
-  expect(getPrimaryNav(false).some((item) => item.href === '/bulletin')).toBe(
-    false,
-  )
-  expect(getMobileNav(true)).toContainEqual({
-    href: '/bulletin',
-    label: 'Bulletin',
-  })
+test('bulletin navigation is visible to every audience and preserves the source return link', () => {
+  for (const isMember of [false, true]) {
+    for (const nav of [getPrimaryNav(isMember), getMobileNav(isMember)]) {
+      expect(nav).toContainEqual({ href: '/bulletin', label: 'Bulletin' })
+    }
+  }
   expect(navAnalyticsDestination('/bulletin')).toBe('opportunities')
   expect(getTweetBackLink({ from: 'opportunities' }).href).toBe('/bulletin')
 })

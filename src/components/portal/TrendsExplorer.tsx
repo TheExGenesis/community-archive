@@ -8,6 +8,7 @@ import type { PortalTrends } from '@/lib/portal/types'
 import { BODY, CARD, MUTED, SERIF } from './styles'
 import { useTrendExplorer } from './trends/useTrendExplorer'
 import { useTrendEvidence } from './trends/useTrendEvidence'
+import { TimelineControls } from './trends/TimelineControls'
 import { TrendChart } from './trends/TrendChart'
 import { MAX_SERIES, SERIES_COLORS } from './trends/config'
 import { bucketLabel } from './trends/model'
@@ -33,6 +34,10 @@ export default function TrendsExplorer({
   initialSearch?: string
 }) {
   const {
+    chartRange,
+    setChartRange,
+    timeline,
+    selectTimeline,
     configuredTerms,
     granularity,
     buckets,
@@ -163,7 +168,7 @@ export default function TrendsExplorer({
                   </h2>
                   <p className={`mt-0.5 text-[11.5px] ${MUTED}`}>
                     {scale === 'normalized'
-                      ? `Adjusted for the archive’s changing ${granularity === 'year' ? 'annual' : 'monthly'} volume.`
+                      ? `Adjusted for the archive’s changing ${{ year: 'annual', month: 'monthly', week: 'weekly', day: 'daily' }[granularity]} volume.`
                       : `Raw matching tweet count in each calendar ${granularity}.`}
                   </p>
                 </div>
@@ -172,22 +177,31 @@ export default function TrendsExplorer({
                     className="inline-flex rounded-[4px] border border-zinc-300 p-0.5 dark:border-[#34343a]"
                     aria-label="Trend granularity"
                   >
-                    {(['year', 'month'] as const).map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        aria-pressed={granularity === option}
-                        onClick={() => selectGranularity(option)}
-                        disabled={isLoadingSeries}
-                        className={`rounded-[3px] px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${
-                          granularity === option
-                            ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                            : `${MUTED} hover:text-foreground`
-                        }`}
-                      >
-                        {option === 'year' ? 'Years' : 'Months'}
-                      </button>
-                    ))}
+                    {(['year', 'month', 'week', 'day'] as const).map(
+                      (option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          aria-pressed={granularity === option}
+                          onClick={() => selectGranularity(option)}
+                          disabled={isLoadingSeries}
+                          className={`rounded-[3px] px-2.5 py-1.5 text-[11.5px] font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${
+                            granularity === option
+                              ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                              : `${MUTED} hover:text-foreground`
+                          }`}
+                        >
+                          {
+                            {
+                              year: 'Years',
+                              month: 'Months',
+                              week: 'Weeks',
+                              day: 'Days',
+                            }[option]
+                          }
+                        </button>
+                      ),
+                    )}
                   </div>
                   <div
                     className="inline-flex rounded-[4px] border border-zinc-300 p-0.5 dark:border-[#34343a]"
@@ -236,6 +250,15 @@ export default function TrendsExplorer({
                 </div>
               </div>
 
+              <TimelineControls
+                buckets={buckets}
+                granularity={granularity}
+                range={chartRange}
+                preset={timeline}
+                onRange={setChartRange}
+                onPreset={selectTimeline}
+                disabled={isLoadingSeries || isAdding}
+              />
               {axis === 'log' && (
                 <p className={`px-4 pt-2 text-[11px] ${MUTED}`}>
                   Log scale compresses large peaks while keeping zero visible.
@@ -265,6 +288,7 @@ export default function TrendsExplorer({
               )}
 
               <TrendChart
+                chartRange={chartRange}
                 buckets={buckets}
                 enabledSeries={enabledSeries}
                 granularity={granularity}

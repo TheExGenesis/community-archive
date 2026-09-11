@@ -1,3 +1,10 @@
+import {
+  bucketDate,
+  bucketEnd,
+  bucketKey,
+  dayKey,
+  recentBuckets,
+} from '@/lib/portal/trendTimeline'
 import type {
   PortalTrends,
   TrendGranularity,
@@ -23,6 +30,11 @@ export function evidenceRange(
   granularity: TrendGranularity,
 ): TrendEvidenceRange | null {
   if (!range) return null
+  if (granularity === 'day' || granularity === 'week') {
+    const end = bucketDate(range.end)
+    end.setUTCDate(end.getUTCDate() + (granularity === 'week' ? 7 : 1))
+    return { since: range.start, until: dayKey(end) }
+  }
   if (granularity === 'month') {
     return { since: `${range.start}-01`, until: nextMonthStart(range.end) }
   }
@@ -35,14 +47,16 @@ export function evidenceRange(
 export function convertedRange(
   range: TrendRange | null,
   granularity: TrendGranularity,
+  previousGranularity?: TrendGranularity,
 ): TrendRange | null {
   if (!range) return null
-  return granularity === 'month'
-    ? {
-        start: `${range.start.slice(0, 4)}-01`,
-        end: `${range.end.slice(0, 4)}-12`,
-      }
-    : { start: range.start.slice(0, 4), end: range.end.slice(0, 4) }
+  const end = bucketEnd(range.end)
+  if (previousGranularity === 'week') end.setUTCDate(end.getUTCDate() + 6)
+  end.setUTCDate(end.getUTCDate() - 1)
+  return {
+    start: bucketKey(bucketDate(range.start), granularity),
+    end: bucketKey(end, granularity),
+  }
 }
 
 export function annualSeries(initialTrends: PortalTrends): TrendBucketSeries[] {
@@ -58,6 +72,10 @@ export function snapshotBuckets(
   initialTrends: PortalTrends,
   granularity: TrendGranularity,
 ): string[] {
+  if (granularity === 'day' || granularity === 'week') {
+    const now = new Date(initialTrends.computedAt)
+    return Number.isNaN(now.getTime()) ? [] : recentBuckets(granularity, now)
+  }
   if (granularity === 'year') return initialTrends.years.map(String)
   const firstYear = initialTrends.years[0]
   const lastYear = initialTrends.years.at(-1)
@@ -81,10 +99,13 @@ export function bucketLabel(
   granularity: TrendGranularity,
 ): string {
   if (granularity === 'year') return bucket
-  const [year, month] = bucket.split('-').map(Number)
+  const [year, month, day = 1] = bucket.split('-').map(Number)
   return new Intl.DateTimeFormat('en', {
     month: 'short',
     year: 'numeric',
+    ...(granularity === 'day' || granularity === 'week'
+      ? { day: 'numeric' as const }
+      : {}),
     timeZone: 'UTC',
-  }).format(new Date(Date.UTC(year, month - 1, 1)))
+  }).format(new Date(Date.UTC(year, month - 1, day)))
 }

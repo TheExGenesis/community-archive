@@ -78,8 +78,13 @@ export async function GET(request: NextRequest) {
       const terms = normalizedTerms(params.getAll('q'))
       if (terms.length === 0) throw new Error('Enter at least one term')
       const requestedGranularity = params.get('granularity') ?? 'month'
-      if (requestedGranularity !== 'year' && requestedGranularity !== 'month') {
-        throw new Error('Choose year or month granularity')
+      if (
+        requestedGranularity !== 'year' &&
+        requestedGranularity !== 'month' &&
+        requestedGranularity !== 'week' &&
+        requestedGranularity !== 'day'
+      ) {
+        throw new Error('Choose year, month, week, or day granularity')
       }
       return privateJson(
         await fetchPortalTrendSeries(

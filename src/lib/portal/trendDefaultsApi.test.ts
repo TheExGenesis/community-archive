@@ -31,14 +31,12 @@ test('dynamic defaults are member-only and never cached independently of the gat
 })
 test('series requests default to months while explicit yearly links remain supported', async () => {
   jest.mocked(getIsMember).mockResolvedValue(true)
-  jest
-    .mocked(fetchPortalTrendSeries)
-    .mockResolvedValue({
-      granularity: 'month',
-      buckets: [],
-      series: [],
-      computedAt: '',
-    })
+  jest.mocked(fetchPortalTrendSeries).mockResolvedValue({
+    granularity: 'month',
+    buckets: [],
+    series: [],
+    computedAt: '',
+  })
   await GET(
     new NextRequest('http://localhost/api/portal/trends?view=series&q=astra'),
   )
@@ -60,3 +58,30 @@ test('series requests default to months while explicit yearly links remain suppo
     'year',
   )
 })
+
+test.each(['day', 'week'])(
+  'accepts authenticated %s series requests',
+  async (granularity) => {
+    jest.mocked(getIsMember).mockResolvedValue(true)
+    jest
+      .mocked(fetchPortalTrendSeries)
+      .mockResolvedValue({
+        granularity: granularity as 'day' | 'week',
+        buckets: [],
+        series: [],
+        computedAt: '',
+      })
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/api/portal/trends?view=series&q=astra&granularity=${granularity}`,
+      ),
+    )
+    expect(response.status).toBe(200)
+    expect(fetchPortalTrendSeries).toHaveBeenCalledWith(
+      ['astra'],
+      expect.any(Date),
+      undefined,
+      granularity,
+    )
+  },
+)

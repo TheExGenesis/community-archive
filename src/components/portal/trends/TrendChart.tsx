@@ -12,6 +12,7 @@ import type {
   TrendRange,
   TrendExplorerUrlState,
 } from '@/lib/portal/trendExplorerState'
+import { bucketDate, bucketKey } from '@/lib/portal/trendTimeline'
 import { bucketLabel } from './model'
 import type { CaptureExplorerAction } from './config'
 import { MUTED } from '../styles'
@@ -39,8 +40,9 @@ function compactAxis(value: number): string {
 }
 
 export function TrendChart({
-  buckets,
-  enabledSeries,
+  buckets: allBuckets,
+  enabledSeries: allSeries,
+  chartRange = null,
   granularity,
   scale,
   axis = 'linear',
@@ -51,6 +53,7 @@ export function TrendChart({
   captureExplorerAction,
   onSelectingRangeChange,
 }: {
+  chartRange?: TrendRange | null
   buckets: string[]
   enabledSeries: TrendBucketSeries[]
   granularity: TrendGranularity
@@ -63,6 +66,17 @@ export function TrendChart({
   captureExplorerAction: CaptureExplorerAction
   onSelectingRangeChange: (selecting: boolean) => void
 }) {
+  const visibleIndexes = allBuckets.flatMap((bucket, index) =>
+    !chartRange || (bucket >= chartRange.start && bucket <= chartRange.end)
+      ? [index]
+      : [],
+  )
+  const buckets = visibleIndexes.map((index) => allBuckets[index])
+  const enabledSeries = allSeries.map((item) => ({
+    ...item,
+    tweetsPerBucket: visibleIndexes.map((index) => item.tweetsPerBucket[index]),
+    perBucket: visibleIndexes.map((index) => item.perBucket[index]),
+  }))
   const chartRef = useRef<SVGSVGElement>(null)
   const [dragStartBucket, setDragStartBucket] = useState<string | null>(null)
   const valuesFor = (item: TrendBucketSeries) =>
@@ -89,18 +103,15 @@ export function TrendChart({
   const X1 = 732
   const Y0 = 326
   const Y1 = 24
-  const xPositions = buckets.map(
-    (_, index) => X0 + (index * (X1 - X0)) / Math.max(buckets.length - 1, 1),
+  const xPositions = buckets.map((_, index) =>
+    buckets.length === 1
+      ? (X0 + X1) / 2
+      : X0 + (index * (X1 - X0)) / (buckets.length - 1),
   )
-  const axisTickIndexes = buckets
-    .map((_, index) => index)
-    .filter(
-      (index) =>
-        granularity === 'year' ||
-        index === 0 ||
-        index === buckets.length - 1 ||
-        index % 12 === 0,
-    )
+  const tickCount = Math.min(7, buckets.length)
+  const axisTickIndexes = Array.from({ length: tickCount }, (_, i) =>
+    Math.round((i * (buckets.length - 1)) / Math.max(1, tickCount - 1)),
+  )
   const yPosition = (value: number) =>
     Y0 -
     (axis === 'log'
@@ -108,10 +119,16 @@ export function TrendChart({
       : value / chartMax) *
       (Y0 - Y1)
   const selectedStartIndex = selectedRange
-    ? buckets.indexOf(selectedRange.start)
+    ? buckets.findIndex(
+        (bucket) =>
+          bucket >= selectedRange.start && bucket <= selectedRange.end,
+      )
     : -1
   const selectedEndIndex = selectedRange
-    ? buckets.indexOf(selectedRange.end)
+    ? buckets.findLastIndex(
+        (bucket) =>
+          bucket >= selectedRange.start && bucket <= selectedRange.end,
+      )
     : -1
   const bucketForPointer = (clientX: number): string | null => {
     const svg = chartRef.current
@@ -167,7 +184,7 @@ export function TrendChart({
           viewBox={`0 0 ${W} ${H}`}
           className="block w-full touch-none select-none"
           role="img"
-          aria-label={`${granularity === 'year' ? 'Yearly' : 'Monthly'} term trends shown as ${scale === 'normalized' ? 'occurrences per 100,000 tweets' : 'raw tweet counts'}${axis === 'log' ? ' on a logarithmic axis' : ''}`}
+          aria-label={`${{ year: 'Yearly', month: 'Monthly', week: 'Weekly', day: 'Daily' }[granularity]} term trends shown as ${scale === 'normalized' ? 'occurrences per 100,000 tweets' : 'raw tweet counts'}${axis === 'log' ? ' on a logarithmic axis' : ''}`}
         >
           {gridValues.map((value) => (
             <g key={value}>
@@ -195,7 +212,13 @@ export function TrendChart({
               key={buckets[index]}
               x={xPositions[index]}
               y={350}
-              textAnchor="middle"
+              textAnchor={
+                index === buckets.length - 1
+                  ? 'end'
+                  : index === 0
+                    ? 'start'
+                    : 'middle'
+              }
               fontSize={11}
               className="fill-zinc-400 dark:fill-[#6d6d78]"
             >
@@ -247,7 +270,7 @@ export function TrendChart({
               className="fill-zinc-400 dark:fill-[#6d6d78]"
             >
               {isLoadingSeries
-                ? `Loading ${granularity === 'month' ? 'monthly' : 'yearly'} trends…`
+                ? `Loading ${{ year: 'yearly', month: 'monthly', week: 'weekly', day: 'daily' }[granularity]} trends…`
                 : seriesCount === 0
                   ? 'Add a trend above to start charting.'
                   : 'Select a trend below to draw it.'}
@@ -331,7 +354,7 @@ export function TrendChart({
                 className="ml-1 rounded-[4px] border border-zinc-300 bg-white px-2 py-1 text-foreground dark:border-[#34343a] dark:bg-[#121214]"
               >
                 <option value="">Any</option>
-                {buckets.map((bucket) => (
+                {allBuckets.map((bucket) => (
                   <option key={bucket} value={bucket}>
                     {bucket}
                   </option>
@@ -364,7 +387,7 @@ export function TrendChart({
                 className="ml-1 rounded-[4px] border border-zinc-300 bg-white px-2 py-1 text-foreground dark:border-[#34343a] dark:bg-[#121214]"
               >
                 <option value="">Any</option>
-                {buckets.map((bucket) => (
+                {allBuckets.map((bucket) => (
                   <option key={bucket} value={bucket}>
                     {bucket}
                   </option>
@@ -377,13 +400,17 @@ export function TrendChart({
             <label className={`text-[11px] font-semibold ${MUTED}`}>
               From
               <input
-                type="month"
-                aria-label="Tweets from month"
-                min={buckets[0]}
-                max={buckets.at(-1)}
+                type={granularity === 'month' ? 'month' : 'date'}
+                aria-label={`Tweets from ${granularity}`}
+                min={allBuckets[0]}
+                max={allBuckets.at(-1)}
                 value={selectedRange?.start ?? ''}
                 onChange={(event) => {
-                  const start = event.target.value
+                  const start =
+                    event.target.value &&
+                    (granularity === 'week'
+                      ? bucketKey(bucketDate(event.target.value), 'week')
+                      : event.target.value)
                   if (!start) {
                     captureExplorerAction('year_filter_cleared', {
                       hasYearFilter: false,
@@ -405,13 +432,17 @@ export function TrendChart({
             <label className={`text-[11px] font-semibold ${MUTED}`}>
               To
               <input
-                type="month"
-                aria-label="Tweets through month"
-                min={buckets[0]}
-                max={buckets.at(-1)}
+                type={granularity === 'month' ? 'month' : 'date'}
+                aria-label={`Tweets through ${granularity}`}
+                min={allBuckets[0]}
+                max={allBuckets.at(-1)}
                 value={selectedRange?.end ?? ''}
                 onChange={(event) => {
-                  const end = event.target.value
+                  const end =
+                    event.target.value &&
+                    (granularity === 'week'
+                      ? bucketKey(bucketDate(event.target.value), 'week')
+                      : event.target.value)
                   if (!end) {
                     captureExplorerAction('year_filter_cleared', {
                       hasYearFilter: false,

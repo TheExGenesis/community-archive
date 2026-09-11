@@ -102,7 +102,7 @@ export interface TermSeries {
   perYear: number[]
 }
 
-export type TrendGranularity = 'year' | 'month'
+export type TrendGranularity = 'year' | 'month' | 'week' | 'day'
 
 export interface TrendBucketSeries {
   term: string

@@ -45,3 +45,27 @@ test('log axis reveals small values, keeps zero finite, and preserves actual cou
     'astra · Feb 2026 · 1 per 100k',
   )
 })
+
+test('zooms to the selected window, rescales both axes, and clips the tweet selection to visible dates', () => {
+  const { rerender } = render(
+    <TrendChart
+      {...props}
+      chartRange={{ start: '2026-01', end: '2026-02' }}
+      selectedRange={{ start: '2025-12', end: '2026-01' }}
+    />,
+  )
+  const svg = screen.getByRole('img')
+  const points = svg.querySelectorAll('circle')
+  expect(points).toHaveLength(2)
+  expect(points[0]).toHaveAttribute('cx', '62')
+  expect(points[1]).toHaveAttribute('cx', '732')
+  expect(points[1]).toHaveAttribute('cy', '24')
+  expect(svg.querySelector('rect.pointer-events-none')).toBeInTheDocument()
+  expect(props.setSelectedRange).not.toHaveBeenCalled()
+  rerender(
+    <TrendChart {...props} chartRange={{ start: '2026-02', end: '2026-02' }} />,
+  )
+  expect(svg.querySelector('circle')).toHaveAttribute('cx', '397')
+  rerender(<TrendChart {...props} />)
+  expect(svg.querySelectorAll('circle')).toHaveLength(3)
+})

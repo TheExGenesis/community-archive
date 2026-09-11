@@ -1,6 +1,12 @@
 'use client'
 
 import {
+  presetGranularity,
+  presetRange,
+  type TimelinePreset,
+} from '@/lib/portal/trendTimeline'
+
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -101,11 +107,24 @@ export function useTrendExplorer({
   const [axis, setAxis] = useState<'linear' | 'log'>(
     initialUrlState.axis ?? 'linear',
   )
+  const [timeline, setTimeline] = useState<TimelinePreset | undefined>(
+    initialUrlState.timeline,
+  )
+  const [customChartRange, setCustomChartRange] = useState<TrendRange | null>(
+    initialUrlState.chartRange ?? null,
+  )
+  const chartRange = timeline
+    ? presetRange(timeline, buckets)
+    : clampTrendRange(customChartRange, buckets)
+  const setChartRange = (range: TrendRange | null) => {
+    setTimeline(undefined)
+    setCustomChartRange(range)
+  }
   const [termInput, setTermInput] = useState('')
   const [isAdding, setIsAdding] = useState(false)
   const [isLoadingSeries, setIsLoadingSeries] = useState(
     initialUrlState.terms.length > 0 &&
-      (initialUrlState.granularity === 'month' ||
+      (initialUrlState.granularity !== 'year' ||
         initialUrlState.terms.some((term) => !initialAnnualByTerm.has(term))),
   )
   const [isRetryingDefaults, setIsRetryingDefaults] = useState(false)
@@ -190,6 +209,8 @@ export function useTrendExplorer({
       axis,
       granularity,
       range: selectedRange,
+      timeline,
+      chartRange: customChartRange,
     }),
     [
       axis,
@@ -199,6 +220,8 @@ export function useTrendExplorer({
       includeTerms,
       scale,
       selectedRange,
+      timeline,
+      customChartRange,
     ],
   )
   const serializedState = useMemo(
@@ -209,7 +232,7 @@ export function useTrendExplorer({
 
   useEffect(() => {
     const needsSeriesRequest =
-      granularity === 'month' ||
+      granularity !== 'year' ||
       configuredTerms.some((term) => !initialAnnualByTerm.has(term))
     if (needsSeriesRequest && configuredTerms.length) {
       void loadConfiguredSeries(configuredTerms, granularity)
@@ -413,16 +436,36 @@ export function useTrendExplorer({
     if (nextGranularity === granularity) return
     captureExplorerAction('granularity_changed')
     const nextBuckets = snapshotBuckets(initialTrends, nextGranularity)
+    setTimeline(undefined)
+    setCustomChartRange((current) =>
+      clampTrendRange(
+        convertedRange(current, nextGranularity, granularity),
+        nextBuckets,
+      ),
+    )
     setGranularity(nextGranularity)
     setSelectedRange((current) =>
-      clampTrendRange(convertedRange(current, nextGranularity), nextBuckets),
+      clampTrendRange(
+        convertedRange(current, nextGranularity, granularity),
+        nextBuckets,
+      ),
     )
     setBuckets(nextBuckets)
     setSeries([])
     void loadConfiguredSeries(configuredTerms, nextGranularity)
   }
 
+  const selectTimeline = (preset: TimelinePreset | 'all') => {
+    selectGranularity(preset === 'all' ? 'month' : presetGranularity[preset])
+    setCustomChartRange(null)
+    setTimeline(preset === 'all' ? undefined : preset)
+  }
+
   return {
+    chartRange,
+    setChartRange,
+    timeline,
+    selectTimeline,
     weekly,
     configuredTerms,
     granularity,

@@ -214,3 +214,17 @@ test('returns archived replies beneath the notice, oldest first, without placeho
   expect(body.replies.map((r: { id: string }) => r.id)).toEqual(['3', '2', '5'])
   expect(body.replies[0]).toMatchObject({ username: 'ray', text: 'Reply 3' })
 })
+
+test('asks ClickHouse for only the notice and 20 context tweets', async () => {
+  jest
+    .mocked(fetchClickHouseTweetThreadPageData)
+    .mockImplementation(async (id, fetcher) => {
+      await fetcher!(['tweet', id, 'thread'], new URLSearchParams())
+      return { tweet: detail, threadTree: null }
+    })
+  await call()
+  expect(fetchAnalyticsGatewayJson).toHaveBeenCalledWith(
+    ['tweet', '123', 'thread'],
+    new URLSearchParams({ limit: '21' }),
+  )
+})

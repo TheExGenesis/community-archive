@@ -485,12 +485,10 @@ test('shows cards before interactions finish, then replaces the page and cursor 
         resolve = r
       }),
   )
-  jest
-    .mocked(fetch)
-    .mockResolvedValueOnce({
-      ok: true,
-      json: async () => page([offer]),
-    } as Response)
+  jest.mocked(fetch).mockResolvedValueOnce({
+    ok: true,
+    json: async () => page([offer]),
+  } as Response)
   render(
     <BulletinBoard notices={[offer]} initialPage={initial} now={initial.now} />,
   )
@@ -518,4 +516,99 @@ test('shows cards before interactions finish, then replaces the page and cursor 
     ),
   )
   expect(String(jest.mocked(fetch).mock.calls[1][0])).toContain('after=2')
+})
+
+test('keeps an open tweet in place when background recommendations arrive', async () => {
+  const initial = { ...page([offer], '1'), recommendationsReady: false }
+  let recommend!: (response: Response) => void
+  let details!: (response: Response) => void
+  jest.mocked(fetch).mockImplementation(
+    (url) =>
+      new Promise((resolve) => {
+        if (String(url).includes('/board?')) recommend = resolve
+        else details = resolve
+      }),
+  )
+  render(
+    <BulletinBoard notices={[offer]} initialPage={initial} now={initial.now} />,
+  )
+  await act(async () => {
+    jest.advanceTimersByTime(200)
+  })
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Read full tweet by @alice' }),
+  )
+  await act(async () => {
+    jest.advanceTimersByTime(20)
+  })
+  await act(async () =>
+    recommend({
+      ok: true,
+      json: async () => ({ ...page([ask]), recommendationsReady: true }),
+    } as Response),
+  )
+  expect(
+    screen.getByRole('button', { name: 'Collapse tweet by @alice' }),
+  ).toBeInTheDocument()
+  expect(screen.queryByText('Feedback on a garden')).not.toBeInTheDocument()
+  await act(async () =>
+    details({
+      ok: true,
+      json: async () => ({
+        tweets: [
+          {
+            id: '1',
+            text: 'Loaded original',
+            replies: [{ id: '10', text: 'Loaded reply' }],
+          },
+        ],
+      }),
+    } as Response),
+  )
+  expect(screen.getByText('Loaded original')).toBeInTheDocument()
+  expect(screen.getByText('Loaded reply')).toBeInTheDocument()
+  expect(
+    jest
+      .mocked(fetch)
+      .mock.calls.filter(([url]) => String(url).includes('/tweets?')),
+  ).toHaveLength(1)
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Collapse tweet by @alice' }),
+  )
+  expect(screen.getByText('Feedback on a garden')).toBeInTheDocument()
+})
+
+test('keeps expansion when ranking moves a card between columns', async () => {
+  const props = {
+    notices: [offer, ask],
+    now: Date.parse('2026-09-09T00:00:00Z'),
+  }
+  const { rerender } = render(
+    <BulletinBoard
+      {...props}
+      graph={{ outgoing: { a: 10 }, available: true }}
+    />,
+  )
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Read full tweet by @alice' }),
+  )
+  await act(async () => {
+    jest.advanceTimersByTime(20)
+  })
+  await act(async () => {
+    rerender(
+      <BulletinBoard
+        {...props}
+        graph={{ outgoing: { b: 10 }, available: true }}
+      />,
+    )
+  })
+  expect(
+    screen.getByRole('button', { name: 'Collapse tweet by @alice' }),
+  ).toBeInTheDocument()
+  expect(
+    jest
+      .mocked(fetch)
+      .mock.calls.filter(([url]) => String(url).includes('/tweets?')),
+  ).toHaveLength(1)
 })

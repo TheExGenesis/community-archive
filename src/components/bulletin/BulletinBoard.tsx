@@ -174,8 +174,12 @@ function NoticeCard({
   now,
   order,
   onKind,
+  open,
+  setOpen,
 }: {
   notice: Notice
+  open: boolean
+  setOpen: (open: boolean) => void
   loadTweet: (id: string) => Promise<BulletinTweet>
   badge: string
   replied: boolean
@@ -184,7 +188,6 @@ function NoticeCard({
   order: number
   onKind: (kind: string) => void
 }) {
-  const [open, setOpen] = useState(false)
   const [tweet, setTweet] = useState<BulletinTweet | null>(null)
   const [error, setError] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -447,6 +450,7 @@ export function BulletinBoard({
   adminControls?: React.ReactNode
 }) {
   const loadTweet = useTweetBatch()
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [limit, setLimit] = useState(BULLETIN_PAGE_SIZE)
   const [side, setSide] = useState('all')
   const [kinds, setKinds] = useState<string[]>([])
@@ -460,6 +464,7 @@ export function BulletinBoard({
     initialPage,
     { kind, side, search, past, recommended, ascending },
     hydrated,
+    Object.values(expanded).some(Boolean),
   )
   const graph = pages.page?.personal || initialGraph
   const viewerId = pages.page?.personal.account_id || me
@@ -540,6 +545,7 @@ export function BulletinBoard({
   )
   useEffect(() => {
     setLimit(BULLETIN_PAGE_SIZE)
+    setExpanded({})
   }, [kind, side, needle, past, recommended, ascending])
   // Counts under the other dimension's filter: server-provided when paging
   // server-side, otherwise derived from the notices in hand.
@@ -744,6 +750,10 @@ export function BulletinBoard({
                 <NoticeCard
                   key={o.tweet_id}
                   notice={o}
+                  open={!!expanded[o.tweet_id]}
+                  setOpen={(open) =>
+                    setExpanded((value) => ({ ...value, [o.tweet_id]: open }))
+                  }
                   order={index}
                   loadTweet={loadTweet}
                   badge={relationship(o, viewerId, graph).label}

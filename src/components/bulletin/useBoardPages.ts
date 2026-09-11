@@ -47,7 +47,11 @@ export function useBoardPages(
   initial: BulletinPage | undefined,
   filters: BulletinFilters,
   ready: boolean,
+  reading = false,
 ) {
+  const readingRef = useRef(reading)
+  readingRef.current = reading
+  const deferred = useRef<{ key: string; page: BulletinPage }>()
   const key = filterKey(filters)
   const [state, setState] = useState({
     key: filterKey(DEFAULT_BULLETIN_FILTERS),
@@ -69,7 +73,17 @@ export function useBoardPages(
     filters.recommended &&
     state.page?.recommendationsReady === false
 
+  // Apply a completed recommendation refresh only after the reader closes
+  // their tweet. Replacing the first page can otherwise remove that card.
   useEffect(() => {
+    if (!reading && deferred.current?.key === key) {
+      setState(deferred.current)
+      deferred.current = undefined
+    }
+  }, [reading, key])
+
+  useEffect(() => {
+    deferred.current = undefined
     if (!initial || !ready) return
     const controllers = requests.current
     setLoading({})
@@ -82,8 +96,11 @@ export function useBoardPages(
         ? setTimeout(() => {
             fetchPage(query(filtersRef.current), controller.signal)
               .then((page) => {
-                if (!controller.signal.aborted && currentKey.current === key)
-                  setState({ key, page })
+                if (!controller.signal.aborted && currentKey.current === key) {
+                  if (personalizing && readingRef.current)
+                    deferred.current = { key, page }
+                  else setState({ key, page })
+                }
               })
               .catch(() => {
                 if (!controller.signal.aborted)

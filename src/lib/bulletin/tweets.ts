@@ -37,7 +37,7 @@ function replyCard(tweet: ThreadTweet): PortalTweet {
     })),
   }
 }
-/** Every archived reply beneath the notice, in posting order. */
+/** Replies beneath the notice from its bounded context, in posting order. */
 export function repliesTo(
   tweetId: string,
   tree: ConversationTree | null,
@@ -123,13 +123,13 @@ export async function loadBulletinTweets(ids: string[]) {
       for (let offset = 0; offset < ids.length; offset += 4) {
         details.push(
           ...(await Promise.all(
-            ids
-              .slice(offset, offset + 4)
-              .map((id) =>
-                fetchClickHouseTweetThreadPageData(id, (path, params) =>
-                  fetchAnalyticsGatewayJson(path, params),
-                ).catch(() => null),
-              ),
+            ids.slice(offset, offset + 4).map((id) =>
+              fetchClickHouseTweetThreadPageData(id, (path, params) => {
+                const bounded = new URLSearchParams(params)
+                bounded.set('limit', String(MAX_REPLIES + 1))
+                return fetchAnalyticsGatewayJson(path, bounded)
+              }).catch(() => null),
+            ),
           )),
         )
       }

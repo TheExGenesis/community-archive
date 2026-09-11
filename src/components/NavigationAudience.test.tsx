@@ -30,6 +30,10 @@ describe('NavigationAudience', () => {
     )
 
     expect(screen.getByRole('link', { name: 'Docs' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Bulletin' })).toHaveAttribute(
+      'href',
+      '/bulletin',
+    )
     expect(
       screen.getByRole('link', { name: 'Upload archive' }),
     ).toBeInTheDocument()

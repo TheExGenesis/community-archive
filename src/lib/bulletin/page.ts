@@ -1,9 +1,11 @@
 import 'server-only'
+import { measureServerRead } from '@/lib/performance/server'
 import {
   hydrateBulletinNotices,
   loadBulletinBoardState,
   loadBulletinRelationships,
   loadBulletinViewer,
+  verifyBulletinResolutions,
   type StoredNotice,
 } from './data'
 import { isPast, sortNotices, visibleStatus } from './board'
@@ -46,9 +48,9 @@ export async function loadBulletinPage(
   const now = Date.now()
   const search = filters.search.trim().toLowerCase()
   const [state, personal] = await Promise.all([
-    loadBulletinBoardState(),
+    measureServerRead('bulletin.state', () => loadBulletinBoardState(false)),
     personalize && filters.recommended
-      ? loadBulletinRelationships()
+      ? measureServerRead('bulletin.recommendations', loadBulletinRelationships)
       : loadBulletinViewer(),
   ])
   const me = personal.account_id
@@ -65,13 +67,26 @@ export async function loadBulletinPage(
   const rejected = new Set<string>()
   async function hydrate(notices: StoredNotice[]) {
     if (!notices.length) return
-    const rows = await hydrateBulletinNotices({ ...state, notices })
+    const rows = await measureServerRead('bulletin.sources', () =>
+      hydrateBulletinNotices({ ...state, notices }),
+    )
     const found = new Set(rows.map((o) => o.tweet_id))
     for (const o of notices)
       if (!found.has(o.tweet_id)) rejected.add(o.tweet_id)
     for (const o of rows) verified.set(o.tweet_id, o)
   }
-  const live = (o: StoredNotice): Notice => verified.get(o.tweet_id) || o
+  const live = (o: StoredNotice | Notice): Notice => {
+    const source = verified.get(o.tweet_id)
+    // Resolution verification runs alongside hydration, which may finish first.
+    // Always use the verified resolution state when selecting visible cards.
+    return source
+      ? {
+          ...source,
+          resolution_state: o.resolution_state,
+          resolution_tweet_id: o.resolution_tweet_id,
+        }
+      : o
+  }
   const shown = (o: Notice) =>
     !rejected.has(o.tweet_id) &&
     visibleStatus(o, now, filters.past, filters.resolved) &&
@@ -100,9 +115,14 @@ export async function loadBulletinPage(
       (o) => [o.tweet_id, o],
     ),
   )
-  await hydrate(
-    search ? eligible : (Array.from(preflight.values()) as StoredNotice[]),
-  )
+  await Promise.all([
+    measureServerRead('bulletin.resolutions', () =>
+      verifyBulletinResolutions(state.notices),
+    ),
+    hydrate(
+      search ? eligible : (Array.from(preflight.values()) as StoredNotice[]),
+    ),
+  ])
 
   const rows = sortNotices(
     eligible.map(live).filter(shown),
@@ -130,7 +150,7 @@ export async function loadBulletinPage(
       ) as StoredNotice[],
     )
     for (const row of chunk) {
-      const current = verified.get(row.tweet_id)
+      const current = verified.has(row.tweet_id) ? live(row) : undefined
       if (current && shown(current)) selected.push(current)
     }
     position += chunk.length

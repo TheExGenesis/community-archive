@@ -168,6 +168,7 @@ export const getPrimaryNav = (
     : [
         { href: BANGERS_WEEK_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
+        { href: '/bulletin', label: 'Bulletin' },
         { href: '/user-dir', label: 'Users' },
         { href: '/community', label: 'Apps' },
         { href: '/trends', label: 'Trends' },

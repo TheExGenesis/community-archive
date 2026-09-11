@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { loadRunDashboard, requireBulletinAdmin } from '@/lib/bulletin/data'
 import { RunDashboard } from '@/components/bulletin/RunDashboard'
 import { RefreshButton } from '@/components/bulletin/RefreshButton'
+import { CandidateFilters } from '@/components/bulletin/CandidateFilters'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
@@ -44,6 +45,7 @@ export default async function BulletinRunsPage({
           found and what still needs attention.
         </p>
       </header>
+      <CandidateFilters />
       {prompts ? (
         <PromptEditor data={prompts} olderThan={searchParams?.prompts_before} />
       ) : (

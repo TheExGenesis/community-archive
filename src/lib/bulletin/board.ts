@@ -60,11 +60,14 @@ export function sortNotices(
   graph: BulletinRelationships,
   now: number,
   ascending = false,
+  rankUnanswered = true,
 ) {
   const inner = (a: Notice, b: Notice) =>
     (recommended
       ? relationship(a, me, graph).rank - relationship(b, me, graph).rank ||
-        Number(unansweredAsk(b)) - Number(unansweredAsk(a)) ||
+        (rankUnanswered
+          ? Number(unansweredAsk(b)) - Number(unansweredAsk(a))
+          : 0) ||
         (graph.outgoing?.[b.account_id] || 0) -
           (graph.outgoing?.[a.account_id] || 0)
       : 0) ||

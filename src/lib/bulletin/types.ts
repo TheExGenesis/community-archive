@@ -167,8 +167,8 @@ export type BulletinPage = {
     outgoing: Record<string, number>
     available: boolean
     /** Accounts the viewer follows / is followed by, from archive uploads. */
-    following: string[]
-    followers: string[]
+    following?: string[]
+    followers?: string[]
   }
 }
 export function parseKinds(kind: string): string[] | null {

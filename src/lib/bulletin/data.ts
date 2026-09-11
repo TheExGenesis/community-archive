@@ -140,7 +140,7 @@ export async function loadRunDashboard(before?: string): Promise<RunDashboard> {
   return data as unknown as RunDashboard
 }
 
-export async function loadBulletinRelationships() {
+async function bulletinViewer() {
   const user = await requireBulletinUser()
   // The loopback admin preview has no session. Let a local fixture name the
   // viewer so badges and Recommended can be exercised; never trusted elsewhere.
@@ -158,13 +158,17 @@ export async function loadBulletinRelationships() {
     : preview && /^[A-Za-z0-9_]{1,15}$/.test(previewUsername)
       ? previewUsername
       : ''
-  const follows = await loadFollowLists(me, username, preview)
+  return { me, username, preview }
+}
+
+/** Only the outgoing interactions used for ranking belong on the page load path. */
+export async function loadBulletinRelationships() {
+  const { me, username } = await bulletinViewer()
   const empty = {
     account_id: me,
     username,
     outgoing: {} as Record<string, number>,
     available: false,
-    ...follows,
   }
   const identifier = me || username
   if (!identifier) return empty
@@ -215,7 +219,8 @@ function idList(value: unknown): string[] {
     : []
 }
 /** Follow lists from members' own archive uploads: a snapshot, not live X. */
-async function loadFollowLists(me: string, username: string, preview: boolean) {
+export async function loadBulletinFollowLists() {
+  const { me, username, preview } = await bulletinViewer()
   const none = { following: [] as string[], followers: [] as string[] }
   if (!me && !username) return none
   try {

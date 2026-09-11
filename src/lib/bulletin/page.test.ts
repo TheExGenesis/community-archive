@@ -43,8 +43,6 @@ beforeEach(() => {
     username: '',
     outgoing: {},
     available: false,
-    following: [],
-    followers: [],
   })
   jest.mocked(hydrateBulletinNotices).mockImplementation(async ({ notices }) =>
     notices.map(({ content_hash, ...o }) => ({
@@ -127,4 +125,31 @@ test('accepts a set of kinds and keys the cursor by that set', async () => {
   expect(page.notices).toHaveLength(18)
   expect(page.cursors).toEqual({ 'feedback,help': '23' })
   expect(page.counts.help).toBe(40)
+})
+
+// Reply counts only exist for hydrated sources. Ranking a partial subset by
+// those counts must not move the pagination cursor over unvisited notices.
+test('partial uptake enrichment never repeats notices or adds source round trips', async () => {
+  jest.mocked(loadBulletinBoardState).mockResolvedValue({
+    notices: Array.from({ length: 40 }, (_, i) => ({
+      ...notice(i + 1),
+      side: 'ask',
+    })),
+  })
+  jest.mocked(hydrateBulletinNotices).mockImplementation(async ({ notices }) =>
+    notices.map(({ content_hash, ...o }) => ({
+      ...o,
+      replies: Number(o.tweet_id) % 2,
+      quotes: 0,
+    })),
+  )
+  const first = await loadBulletinPage(filters)
+  const second = await loadBulletinPage(filters, first.cursors.help!)
+  const third = await loadBulletinPage(filters, second.cursors.help!)
+  const all = [...first.notices, ...second.notices, ...third.notices].map(
+    (o) => o.tweet_id,
+  )
+  expect(new Set(all).size).toBe(40)
+  expect(all).toHaveLength(40)
+  expect(hydrateBulletinNotices).toHaveBeenCalledTimes(3)
 })

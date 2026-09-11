@@ -2,6 +2,10 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { BulletinBoard, dealStacks, sinceLabel } from './BulletinBoard'
 import type { Notice } from '@/lib/bulletin/types'
 jest.mock('./BulletinBoard.module.css', () => ({}))
+// The independent badge request is covered in useFollowBadges.test.tsx.
+jest.mock('./useFollowBadges', () => ({
+  useFollowBadges: (graph: unknown) => graph,
+}))
 const offer = {
   tweet_id: '1',
   account_id: 'a',

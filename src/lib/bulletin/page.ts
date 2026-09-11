@@ -84,6 +84,7 @@ export async function loadBulletinPage(
     personal,
     now,
     filters.ascending,
+    false, // Live uptake ranks loaded cards in the client, never a partial server cursor.
   )
   const active = metadataOrder.filter((o) => filters.past || !isPast(o, now))
   const start = after ? active.findIndex((o) => o.tweet_id === after) + 1 : 0
@@ -104,6 +105,7 @@ export async function loadBulletinPage(
     personal,
     now,
     filters.ascending,
+    false, // Live uptake ranks loaded cards in the client, never a partial server cursor.
   )
   const index = after ? rows.findIndex((o) => o.tweet_id === after) : -1
   if (after && index < 0)

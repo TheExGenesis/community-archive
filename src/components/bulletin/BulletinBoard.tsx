@@ -1,4 +1,6 @@
 'use client'
+
+import { useFollowBadges } from './useFollowBadges'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
@@ -435,7 +437,7 @@ export function BulletinBoard({
   initialPage,
   me = '',
   username = '',
-  graph = EMPTY_GRAPH,
+  graph: initialGraph = EMPTY_GRAPH,
   now = Date.now(),
   isAdmin = false,
 }: {
@@ -447,6 +449,7 @@ export function BulletinBoard({
   now?: number
   isAdmin?: boolean
 }) {
+  const graph = useFollowBadges(initialGraph, !!initialPage)
   const loadTweet = useTweetBatch()
   const [limit, setLimit] = useState(BULLETIN_PAGE_SIZE)
   const [side, setSide] = useState('all')

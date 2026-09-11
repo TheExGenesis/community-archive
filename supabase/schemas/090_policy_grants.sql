@@ -203,3 +203,11 @@ GRANT EXECUTE ON FUNCTION public.get_bulletin_board_state(integer) TO service_ro
 
 REVOKE ALL ON FUNCTION public.get_bulletin_relationships(text,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.get_bulletin_relationships(text,text) TO service_role;
+
+ALTER TABLE bulletin.refresh_requests ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON bulletin.refresh_requests FROM PUBLIC,anon,authenticated,service_role;
+GRANT SELECT,INSERT,UPDATE ON bulletin.refresh_requests TO service_role;
+REVOKE ALL ON FUNCTION public.request_bulletin_refresh(uuid,text,bigint,numeric,uuid) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.get_bulletin_refreshes() FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.request_bulletin_refresh(uuid,text,bigint,numeric,uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.get_bulletin_refreshes() TO service_role;

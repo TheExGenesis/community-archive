@@ -4,6 +4,8 @@ import { isBulletinAdmin, requireBulletinUser } from '@/lib/bulletin/data'
 import { loadBulletinPage } from '@/lib/bulletin/page'
 import { DEFAULT_BULLETIN_FILTERS } from '@/lib/bulletin/types'
 import { BulletinBoard } from '@/components/bulletin/BulletinBoard'
+import { loadPrompts } from '@/lib/bulletin/prompts'
+import { RefreshControls } from '@/components/bulletin/RefreshControls'
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'Bulletin | Community Archive',
@@ -18,6 +20,7 @@ export default async function BulletinBoardPage() {
       () => null,
     ),
   ])
+  const prompt = isAdmin ? await loadPrompts().catch(() => null) : null
   return (
     <main className={styles.page}>
       {page === null ? (
@@ -34,6 +37,9 @@ export default async function BulletinBoardPage() {
           graph={page.personal}
           now={page.now}
           isAdmin={isAdmin}
+          adminControls={
+            prompt ? <RefreshControls promptId={prompt.active.id} /> : undefined
+          }
         />
       )}
     </main>

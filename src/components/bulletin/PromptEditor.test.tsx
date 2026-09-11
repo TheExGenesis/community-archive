@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { PromptEditor } from './PromptEditor'
 import { savePrompt } from '@/app/admin/bulletin/actions'
 import type { PromptDashboard } from '@/lib/bulletin/types'
+jest.mock('./RefreshControls', () => ({ RefreshControls: () => null }))
 jest.mock('@/app/admin/bulletin/actions', () => ({
   savePrompt: jest.fn(),
 }))

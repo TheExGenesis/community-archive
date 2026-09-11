@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { savePrompt } from '@/app/admin/bulletin/actions'
 import { formatTimestamp, type PromptDashboard } from '@/lib/bulletin/types'
+import { RefreshControls } from './RefreshControls'
 
 export function PromptEditor({
   data,
@@ -136,6 +137,10 @@ export function PromptEditor({
         restart a running job or recheck old decisions. Phrase filters, JSON
         validation, and spending limits stay in place.
       </p>
+      <RefreshControls
+        promptId={active.id}
+        dirty={saving || body !== active.body}
+      />
       <details>
         <summary className="cursor-pointer text-sm font-medium">
           Prompt version history

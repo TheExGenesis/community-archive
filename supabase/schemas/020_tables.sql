@@ -730,3 +730,26 @@ CREATE TABLE bulletin.scans (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CHECK (window_end>window_start AND window_end-window_start<=interval '15 days')
 );
+
+-- Admin-triggered refreshes are durable, bounded jobs consumed by the worker.
+CREATE TABLE bulletin.refresh_requests (
+  id uuid PRIMARY KEY,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  created_by uuid NOT NULL,
+  window_start timestamptz NOT NULL,
+  window_end timestamptz NOT NULL,
+  prompt_version_id bigint NOT NULL REFERENCES bulletin.prompt_versions(id),
+  budget_usd numeric NOT NULL CHECK (budget_usd > 0 AND budget_usd <= 1),
+  status text NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','complete','stopped')),
+  last_status text,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (window_end > window_start AND window_end-window_start <= interval '15 days')
+);
+CREATE UNIQUE INDEX bulletin_one_active_refresh ON bulletin.refresh_requests ((true))
+  WHERE status IN ('queued','running');
+ALTER TABLE bulletin.decisions ADD COLUMN refresh_request_id uuid REFERENCES bulletin.refresh_requests(id);
+CREATE INDEX bulletin_refresh_pending_idx ON bulletin.decisions(refresh_request_id,updated_at)
+  WHERE status IN ('pending','failed');
+
+CREATE INDEX bulletin_runs_refresh_idx ON bulletin.runs ((counts->>'refresh_request_id'))
+  WHERE counts ? 'refresh_request_id';

@@ -126,6 +126,54 @@ uv run worker.py --start 2026-08-26 --end 2026-09-09 --backfill-budget-usd 1
 
 ## Runtime and rollout
 
+### Admin refresh controls
+
+Admins can open **Refresh notices** in the bulletin header, or use the controls
+under the prompt editor. Save a draft first, then choose the latest run's exact
+window or the previous 14 complete UTC days and a per-request cap ($0.01–$1,
+default $0.10). This reclassifies all phrase-filter candidates, including cached
+positive/negative decisions, with the saved prompt version pinned at submission.
+It does not rerun scraping or bypass the upstream phrase filters.
+
+The server checks the existing admin identity gate and rejects local read-preview
+writes. The service-only RPC records an idempotent request and allows only one
+active refresh. `ca-bulletin-refresh.timer` checks the queue once per minute;
+`worker.py --queued-only` processes one bounded batch under the same advisory lock
+as the daily worker. An empty queue makes no model calls. Intake and call/time
+limits automatically continue on the next tick, using the same cursor, pinned
+prompt, attempts and cumulative spending cap. The existing monthly cap and
+conservative reservations also apply. Budget exhaustion or model errors stop the
+request visibly; there is no automatic budget increase or retry-counter reset.
+Only a new, explicitly submitted refresh resets attempts once for its candidates.
+Daily classification does not consume refresh-owned pending decisions.
+
+Unchanged existing notices remain visible while reclassification is pending or
+fails. A successful positive replaces the notice; a successful negative removes
+it. Current source-hash and consent checks still suppress stale/private sources.
+The UI polls status and shows the latest batch plus cumulative spending; reload
+the board to see newly classified results. Stopped requests can be investigated
+in run history before explicitly requesting another refresh.
+
+Production activation is separate from shipping this code:
+
+1. Apply `20260911014857_bulletin_refresh_requests.sql` and verify service-role
+   RPC access and denial for browser roles. This migration is required by the
+   updated daily worker as well as the refresh worker.
+2. While the daily unit is idle, install the tested worker release and the new
+   refresh service/timer beside the existing unit, retaining the same runtime
+   credentials and previous release. Enable the timer. An empty-queue smoke
+   requires no model calls. Verify timer health before exposing the controls.
+3. Set server-only `BULLETIN_REFRESH_ENABLED=true` for the intended website
+   environment. Leave it unset on previews unless their worker/DB queue is
+   separately configured. Local admin preview always remains read-only.
+4. Any production classification smoke needs its own approved window/cap.
+
+To disable new requests, remove `BULLETIN_REFRESH_ENABLED`. Stop the refresh
+timer/service before rolling back the worker. Keep schema, requests, prompts,
+derived data and cost history. An older daily worker does not understand refresh
+ownership; do not resume it with pending refresh-owned decisions until those
+requests have been reconciled. Never clear billing history to make a rerun fit.
+
 Owner: Community Archive backend. Existing worker host: `ca-autorefresh`
 (`95.217.12.23`), unit `ca-bulletin.service`, invoked after autorefresh succeeds.
 The wrapper never reruns scraping to retry Bulletin. Service failure invokes the

@@ -491,6 +491,16 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+.newPill {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 3px 6px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
 .offer {
   color: color-mix(in srgb, var(--accent) 74%, var(--muted));
 }

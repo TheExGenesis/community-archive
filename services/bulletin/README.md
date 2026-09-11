@@ -97,8 +97,18 @@ metadata say so rather than inventing attribution.
 
 Normal admission limits are $0.10/day and $1/calendar month, UTC, with 10%
 headroom. Calls reserve a conservative maximum first; ambiguous or timed-out
-calls retain that reservation. Retries wait an hour and stop after three
-attempts per unchanged input. Model routing forbids fallback or price escalation
+calls retain that reservation. Transient model-request failures (HTTP 408, 429,
+5xx, network errors and timeouts) retry within the same run after 2 then 5 seconds,
+plus up to one second of jitter. Respect a provider's `Retry-After` up to 60 seconds;
+longer waits are deferred to a later run. Authentication, payment, validation and
+publication errors do not trigger immediate model retries. Retries stop after
+three total attempts per unchanged input, including attempts from earlier runs.
+Every retry rechecks current source/policy and reserves budget again; it counts
+toward the run's 50-call cap and must fit within the remaining time allowance.
+Successful recovery makes the run `ok`; `failed` still counts failed attempts.
+Unresolved work from an earlier run remains eligible after an hour, when the
+next run starts; there is no standalone retry timer.
+Model routing forbids fallback or price escalation
 and caps prices at $0.15 input / $0.50 output per million tokens.
 
 An explicitly approved backfill can use `--backfill-budget-usd` (at most $1).
@@ -121,6 +131,16 @@ Owner: Community Archive backend. Existing worker host: `ca-autorefresh`
 The wrapper never reruns scraping to retry Bulletin. Service failure invokes the
 existing journal failure unit. Inspect unit status, last-success age, queue and
 run dashboard; investigate non-complete status or freshness older than 36 hours.
+
+Failures emit a JSON `bulletin_error` event to the systemd journal with run/call
+IDs, attempt, processing stage, exception class, HTTP status when available, and
+the scheduled retry delay. The private call ledger also retains HTTP status in
+`failed:HTTPError:<status>`. These diagnostics intentionally omit exception
+messages, request URLs, provider bodies, tweet content, credentials and headers.
+Inspect them with `journalctl -u ca-bulletin.service --since today -o cat`.
+Grafana Alloy can forward this unit's journal to Loki; worker installation alone
+does not configure log shipping or external alerts. Alert on the final failed
+run or stale last success, rather than every recovered attempt.
 
 The immutable release lives beneath `/opt/community-archive-bulletin/releases/`
 with a `current` symlink. PostgreSQL policy/state settings are read at runtime
@@ -160,7 +180,7 @@ that explicit local preview guard. Tweet reads still use ClickHouse.
 ```sh
 BULLETIN_TEST_DSN='host=127.0.0.1 port=55439 dbname=bulletin_test user=frsc' \
   uv run --with 'psycopg[binary]==3.2.9' --with duckdb==1.5.5 \
-  python -m unittest -v test_worker.py test_clickhouse_worker.py
+  python -m unittest -v test_worker.py test_retries.py test_clickhouse_worker.py
 ```
 
 These tests require a named disposable local database. They exercise a fake

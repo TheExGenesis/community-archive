@@ -58,7 +58,7 @@ export function WeeklyKeywordRows({
       : 'Tweet counts vs the previous week.',
     through ? `Through ${through} (UTC).` : '',
     `Ordered by the absolute change in ${weighted ? 'author-weighted share' : 'tweet count'}.`,
-    `Bars show ${weighted ? 'author-weighted share per 100k' : 'tweet counts'} on a shared linear scale. A faded extension shows the previous week when activity has declined.`,
+    `Bars show ${weighted ? 'author-weighted share per 100k' : 'tweet counts'} on a shared linear scale. A green overlay shows activity gained this week; a faded blue extension shows activity lost since the previous week.`,
   ]
     .filter(Boolean)
     .join(' ')
@@ -108,8 +108,9 @@ export function WeeklyKeywordRows({
               ? '—'
               : `${row.deltaPct >= 0 ? '+' : '−'}${Math.abs(row.deltaPct).toLocaleString('en-US')}%`
         const falling = row.previous > row.current
+        const rising = row.current > row.previous
         const details = `${row.last7.toLocaleString('en-US')} tweets${row.currentAuthors === undefined ? '' : ` from ${row.currentAuthors} authors`}; ${row.prev7.toLocaleString('en-US')} tweets in the previous week.`
-        const barDetails = `${row.term}: ${row.last7.toLocaleString('en-US')} tweets in the last seven days; ${weighted ? 'author-weighted share per 100k' : 'tweet count'} ${row.current.toLocaleString('en-US', { maximumFractionDigits: 1 })}, previously ${row.previous.toLocaleString('en-US', { maximumFractionDigits: 1 })}; linear scale${falling ? '; faded extension shows the previous week' : ''}`
+        const barDetails = `${row.term}: ${row.last7.toLocaleString('en-US')} tweets in the last seven days; ${weighted ? 'author-weighted share per 100k' : 'tweet count'} ${row.current.toLocaleString('en-US', { maximumFractionDigits: 1 })}, previously ${row.previous.toLocaleString('en-US', { maximumFractionDigits: 1 })}; linear scale${falling ? '; faded extension shows the previous week' : rising ? '; green overlay shows the gain since the previous week' : ''}`
         return (
           <div
             key={row.term}
@@ -145,6 +146,15 @@ export function WeeklyKeywordRows({
                 className="relative h-full rounded bg-chart-accent"
                 style={{ width: width(row.current) }}
               />
+              {rising && (
+                <div
+                  className="absolute inset-y-0 rounded-r bg-emerald-500/70 dark:bg-emerald-400/70"
+                  style={{
+                    left: width(row.previous),
+                    width: width(row.current - row.previous),
+                  }}
+                />
+              )}
             </div>
             <span
               title={details}

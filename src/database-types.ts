@@ -2043,6 +2043,16 @@ export type Database = {
         }
         Returns: Json
       }
+      get_bulletin_decisions: {
+        Args: {
+          decision_status?: string
+          before_updated_at?: string
+          before_tweet_id?: string
+          max_results?: number
+          selected_tweet_id?: string
+        }
+        Returns: Json
+      }
       get_bulletin_opportunities: {
         Args: {
           max_results?: number

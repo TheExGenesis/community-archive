@@ -243,3 +243,23 @@ ClickHouse source against real PostgreSQL policy/job state, including a tweet
 that does not exist in PostgreSQL, replay, edits, failure recovery, opt-out,
 private grants, budgets and prompt pinning. Gateway and website tests cover the
 corresponding read and ranking contracts. No production corpus reset is needed.
+
+### Admin decision browser
+
+`/admin/bulletin/decisions` inspects the latest stored candidate decisions by
+status, with keyset pagination. It does not reconstruct per-run labels, include
+posts rejected before the model, or include private experimental ledgers.
+Negative decisions have no persisted detailed rejection rationale. Full tweet
+expansion uses the shared source/hash verification and canonical tweet card.
+
+The read-only `20260911204733_bulletin_admin_decisions.sql` migration is required
+before deploying this UI. It grants execution only to the backend service role;
+application reads additionally require bulletin admin authorization. Current
+membership policy is checked in PostgreSQL and live source identity, hash,
+reply/repost status and availability are checked before display. Expired accepted
+notices remain inspectable; acceptance is distinct from live board visibility.
+
+Focused SQL verification on a disposable empty local PostgreSQL database:
+`psql -v ON_ERROR_STOP=1 -f services/bulletin/test_admin_decisions.sql`.
+The fixture and assertions roll back all changes. Server regression tests live
+in `src/lib/bulletin/decisions.test.ts` and `src/lib/bulletin/tweets.test.ts`.

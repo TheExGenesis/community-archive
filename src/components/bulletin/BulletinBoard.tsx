@@ -590,6 +590,11 @@ export function BulletinBoard({
               </Link>
             </div>
           </details>
+          {isAdmin && (
+            <Link href="/admin/bulletin" className={styles.adminLink}>
+              Bulletin admin →
+            </Link>
+          )}
         </div>
         <p className={styles.lede}>
           Asks and offers that members posted on Twitter, gathered from the
@@ -778,7 +783,6 @@ export function BulletinBoard({
           Thanks to <Link href="/user/maskys_">@maskys_</Link> for the first
           prototype.
         </p>
-        {isAdmin && <Link href="/admin/bulletin">Run dashboard →</Link>}
       </footer>
     </>
   )

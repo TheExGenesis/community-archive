@@ -1,11 +1,12 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import styles from '@/components/bulletin/BulletinBoard.module.css'
 import { isBulletinAdmin, requireBulletinUser } from '@/lib/bulletin/data'
 import { loadBulletinPage } from '@/lib/bulletin/page'
 import { DEFAULT_BULLETIN_FILTERS } from '@/lib/bulletin/types'
 import { BulletinBoard } from '@/components/bulletin/BulletinBoard'
-import { loadPrompts } from '@/lib/bulletin/prompts'
-import { RefreshControls } from '@/components/bulletin/RefreshControls'
+import { BulletinRefreshControls } from './refresh-controls'
+import { measureServerRead } from '@/lib/performance/server'
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'Bulletin | Community Archive',
@@ -13,13 +14,14 @@ export const metadata: Metadata = {
 }
 
 export default async function BulletinBoardPage() {
-  const user = await requireBulletinUser()
-  const [isAdmin, page] = await Promise.all([
+  const [user, isAdmin, page] = await Promise.all([
+    requireBulletinUser(),
     isBulletinAdmin(),
     // Resolve recommendations before showing cards so the first selection stays put.
-    loadBulletinPage(DEFAULT_BULLETIN_FILTERS).catch(() => null),
+    measureServerRead('bulletin.page', () =>
+      loadBulletinPage(DEFAULT_BULLETIN_FILTERS),
+    ).catch(() => null),
   ])
-  const prompt = isAdmin ? await loadPrompts().catch(() => null) : null
   return (
     <main className={styles.page}>
       {page === null ? (
@@ -37,7 +39,11 @@ export default async function BulletinBoardPage() {
           now={page.now}
           isAdmin={isAdmin}
           adminControls={
-            prompt ? <RefreshControls promptId={prompt.active.id} /> : undefined
+            isAdmin ? (
+              <Suspense fallback={null}>
+                <BulletinRefreshControls />
+              </Suspense>
+            ) : undefined
           }
         />
       )}

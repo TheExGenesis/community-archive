@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { requireBulletinUser } from '@/lib/bulletin/data'
+import { isBulletinAdmin, requireBulletinUser } from '@/lib/bulletin/data'
 import { loadBulletinPage } from '@/lib/bulletin/page'
+import { loadPrompts } from '@/lib/bulletin/prompts'
 import { DEFAULT_BULLETIN_FILTERS } from '@/lib/bulletin/types'
 import BulletinPage from './page'
 
@@ -28,6 +29,16 @@ jest.mock('@/components/bulletin/BulletinBoard', () => ({
 }))
 
 afterEach(() => jest.restoreAllMocks())
+
+test('admin prompt loading cannot delay the first recommended cards', async () => {
+  jest.mocked(requireBulletinUser).mockResolvedValue({ id: 'alice' } as never)
+  jest.mocked(isBulletinAdmin).mockResolvedValueOnce(true)
+  jest.mocked(loadPrompts).mockImplementationOnce(() => new Promise(() => {}))
+  render(await BulletinPage())
+  expect(screen.getByRole('button', { name: 'Read tweet' })).toBeInTheDocument()
+  // The optional server child runs in its own streaming boundary.
+  expect(loadPrompts).not.toHaveBeenCalled()
+})
 
 test('initial server page requests recommendations before rendering the board', async () => {
   jest.mocked(requireBulletinUser).mockResolvedValue({ id: 'alice' } as never)

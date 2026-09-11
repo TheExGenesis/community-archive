@@ -1,5 +1,6 @@
 import { getSessionTwitterUsername } from '@/lib/sessionTwitterUsername'
 import 'server-only'
+import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { getOptInStatus } from '@/lib/auth-utils'
@@ -8,12 +9,13 @@ import { getAdminClient, requireAdmin, checkIsAdmin } from '@/app/admin/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 import { createHash } from 'crypto'
+import { measureServerRead } from '@/lib/performance/server'
 import type { Notice, RunDashboard } from './types'
 
 export const BULLETIN_LIMIT = 2000
 export const RUN_PAGE_SIZE = 25
 
-export async function requireBulletinUser() {
+async function readBulletinUser() {
   if ((await getLocalAdminPreview()) === 'admin') return null
   // Member-preview cookies never authorize reads. The explicit loopback-only
   // local admin read preview follows the same convention as Birdseye.
@@ -28,6 +30,13 @@ export async function requireBulletinUser() {
     redirect('/opt-in?redirect=/bulletin')
   return user
 }
+
+// Share one live consent check within this server render, never across requests.
+// React 18's non-RSC test runtime does not provide cache().
+const requestCache = cache ?? ((read: typeof readBulletinUser) => read)
+export const requireBulletinUser = requestCache(() =>
+  measureServerRead('bulletin.access', readBulletinUser),
+)
 
 /** Hydrate only the selected notices, retaining the live source/policy checks. */
 export async function hydrateBulletinNotices({
@@ -230,7 +239,7 @@ export async function loadBulletinRelationships() {
 }
 
 export type StoredNotice = Notice & { content_hash: string }
-export async function loadBulletinBoardState(): Promise<{
+export async function loadBulletinBoardState(verifyResolution = true): Promise<{
   notices: StoredNotice[]
   allowedAccounts?: string[]
 }> {
@@ -255,6 +264,12 @@ export async function loadBulletinBoardState(): Promise<{
   )
   if (error) throw new Error('Bulletin notices could not be loaded')
   const notices = (data ?? []) as unknown as StoredNotice[]
+  if (verifyResolution) await verifyBulletinResolutions(notices)
+  return { notices }
+}
+
+/** Callers deferring this check must await it before selecting visible cards. */
+export async function verifyBulletinResolutions(notices: StoredNotice[]) {
   // Verify resolution evidence even for notices hidden by the default filter.
   // A deleted/edited update must not leave a notice silently hidden forever.
   const resolved = notices.filter((o) => o.resolution_state === 'resolved')
@@ -292,5 +307,4 @@ export async function loadBulletinBoardState(): Promise<{
       }
     }
   }
-  return { notices }
 }

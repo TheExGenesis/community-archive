@@ -4,6 +4,7 @@ import {
   loadBulletinBoardState,
   loadBulletinRelationships,
   loadBulletinViewer,
+  verifyBulletinResolutions,
   type StoredNotice,
 } from './data'
 import { BULLETIN_PAGE_SIZE, DEFAULT_BULLETIN_FILTERS } from './types'
@@ -12,6 +13,7 @@ jest.mock('./data', () => ({
   loadBulletinBoardState: jest.fn(),
   loadBulletinRelationships: jest.fn(),
   loadBulletinViewer: jest.fn(),
+  verifyBulletinResolutions: jest.fn(),
 }))
 const filters = { ...DEFAULT_BULLETIN_FILTERS, kind: 'help' }
 const notice = (i: number): StoredNotice => ({
@@ -36,6 +38,7 @@ const ids = (from: number, to: number) =>
   Array.from({ length: from - to + 1 }, (_, i) => String(from - i))
 beforeEach(() => {
   jest.clearAllMocks()
+  jest.mocked(verifyBulletinResolutions).mockResolvedValue(undefined)
   jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-09T00:00:00Z'))
   jest.mocked(loadBulletinBoardState).mockResolvedValue({
     notices: Array.from({ length: 40 }, (_, i) => notice(i + 1)),
@@ -60,20 +63,66 @@ beforeEach(() => {
   )
 })
 afterEach(() => jest.restoreAllMocks())
-test('resolved notices are hidden by default and independently included even when expired', async () => {
-  jest
-    .mocked(loadBulletinBoardState)
-    .mockResolvedValue({
-      notices: [
-        notice(1),
-        {
-          ...notice(2),
-          resolution_state: 'resolved',
-          resolution_tweet_id: '3',
-          expires_at: '2026-01-01',
-        },
-      ],
+test.each([false, true])(
+  'source hydration overlaps resolution checks and uses their final result (show resolved: %s)',
+  async (resolved) => {
+    const reopened = {
+      ...notice(2),
+      resolution_state: 'resolved' as const,
+      resolution_tweet_id: '3',
+    }
+    jest.mocked(loadBulletinBoardState).mockResolvedValue({
+      notices: [notice(1), reopened],
     })
+    let finish!: () => void
+    jest.mocked(verifyBulletinResolutions).mockImplementationOnce(
+      (notices) =>
+        new Promise<void>((resolve) => {
+          finish = () => {
+            notices[1].resolution_state = 'unknown'
+            notices[1].resolution_tweet_id = null
+            resolve()
+          }
+        }),
+    )
+    let completed = false
+    const pending = loadBulletinPage({ ...filters, resolved }).then((page) => {
+      completed = true
+      return page
+    })
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(hydrateBulletinNotices).toHaveBeenCalledTimes(1)
+    expect(completed).toBe(false)
+    finish()
+    const page = await pending
+    expect(page.notices.map((o) => o.tweet_id)).toEqual(['2', '1'])
+    expect(page.notices[0]).toMatchObject({
+      resolution_state: 'unknown',
+      resolution_tweet_id: null,
+    })
+    expect(page.counts.help).toBe(2)
+  },
+)
+
+test('resolution verification outages still fail the page', async () => {
+  jest
+    .mocked(verifyBulletinResolutions)
+    .mockRejectedValueOnce(new Error('source unavailable'))
+  await expect(loadBulletinPage(filters)).rejects.toThrow('source unavailable')
+})
+
+test('resolved notices are hidden by default and independently included even when expired', async () => {
+  jest.mocked(loadBulletinBoardState).mockResolvedValue({
+    notices: [
+      notice(1),
+      {
+        ...notice(2),
+        resolution_state: 'resolved',
+        resolution_tweet_id: '3',
+        expires_at: '2026-01-01',
+      },
+    ],
+  })
   const normal = await loadBulletinPage(filters)
   expect(normal.notices.map((o) => o.tweet_id)).toEqual(['1'])
   expect(normal.counts.help).toBe(1)

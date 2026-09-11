@@ -16,9 +16,8 @@ export default async function BulletinBoardPage() {
   const user = await requireBulletinUser()
   const [isAdmin, page] = await Promise.all([
     isBulletinAdmin(),
-    loadBulletinPage(DEFAULT_BULLETIN_FILTERS, undefined, false).catch(
-      () => null,
-    ),
+    // Resolve recommendations before showing cards so the first selection stays put.
+    loadBulletinPage(DEFAULT_BULLETIN_FILTERS).catch(() => null),
   ])
   const prompt = isAdmin ? await loadPrompts().catch(() => null) : null
   return (

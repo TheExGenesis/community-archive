@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { requireBulletinUser } from '@/lib/bulletin/data'
+import { loadBulletinPage } from '@/lib/bulletin/page'
+import { DEFAULT_BULLETIN_FILTERS } from '@/lib/bulletin/types'
 import BulletinPage from './page'
 
 jest.mock('@/components/bulletin/BulletinBoard.module.css', () => ({}))
@@ -26,6 +28,15 @@ jest.mock('@/components/bulletin/BulletinBoard', () => ({
 }))
 
 afterEach(() => jest.restoreAllMocks())
+
+test('initial server page requests recommendations before rendering the board', async () => {
+  jest.mocked(requireBulletinUser).mockResolvedValue({ id: 'alice' } as never)
+  jest.mocked(loadBulletinPage).mockClear()
+  render(await BulletinPage())
+  expect(loadBulletinPage).toHaveBeenCalledTimes(1)
+  expect(loadBulletinPage).toHaveBeenCalledWith(DEFAULT_BULLETIN_FILTERS)
+  expect(screen.getByRole('button', { name: 'Read tweet' })).toBeInTheDocument()
+})
 
 test('server refresh preserves board state but changing the viewer resets it', async () => {
   jest.mocked(requireBulletinUser).mockResolvedValue({ id: 'alice' } as never)

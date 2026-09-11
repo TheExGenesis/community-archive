@@ -503,6 +503,20 @@ test('deals cards round-robin into three stacks and keeps rank order via style o
   })
 })
 
+test('server recommendations are visible immediately without fetching a replacement page', async () => {
+  const initial = { ...page([ask], '2'), recommendationsReady: true }
+  render(
+    <BulletinBoard notices={[ask]} initialPage={initial} now={initial.now} />,
+  )
+  expect(screen.getByText('Feedback on a garden')).toBeInTheDocument()
+  await act(async () => {
+    jest.advanceTimersByTime(1000)
+  })
+  expect(screen.getByText('Feedback on a garden')).toBeInTheDocument()
+  expect(screen.getByLabelText('Load more notices')).toBeInTheDocument()
+  expect(fetch).not.toHaveBeenCalled()
+})
+
 test('shows cards before interactions finish, then replaces the page and cursor together', async () => {
   const initial = { ...page([offer], '1'), recommendationsReady: false }
   let resolve!: (value: Response) => void

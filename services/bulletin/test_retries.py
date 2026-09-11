@@ -40,5 +40,17 @@ class RetryTests(unittest.TestCase):
         self.assertEqual(event,dict(event='bulletin_error',run_id=14,call_id=2,attempt=1,
             stage='model_request',error_type='HTTPError',retry_seconds=2,http_status=503))
 
+    def test_validator_codes_are_allowlisted_and_unknown_messages_are_private(self):
+        for message, code in [('invalid response mode', 'invalid_response_mode'),
+                ('availability_requires_exact_author_evidence', 'availability_requires_exact_author_evidence'),
+                ('private tweet text https://secret.invalid', None)]:
+            with self.subTest(message=message):
+                out=io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    worker.log_failure(ValueError(message),run_id=1,stage='model_validation')
+                event=json.loads(out.getvalue())
+                self.assertEqual(event.get('validation_code'),code)
+                self.assertNotIn('private tweet text',out.getvalue())
+
 
 if __name__=='__main__':unittest.main()

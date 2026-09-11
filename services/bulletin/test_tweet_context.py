@@ -116,6 +116,13 @@ class TweetContextTests(unittest.TestCase):
     def test_contract_keeps_joke_exclusion_and_seed_evidence(self):
         prepared = context.prepare(self.db, self.seed)
         body = worker.request_body(self.seed, SYSTEM, prepared)
+        response_format = json.loads(body)['response_format']
+        self.assertEqual(response_format['type'], 'json_schema')
+        self.assertTrue(response_format['json_schema']['strict'])
+        properties = response_format['json_schema']['schema']['properties']
+        self.assertEqual(properties['is_notice']['type'], 'boolean')
+        self.assertNotIn('dm or reply', properties['respond']['enum'])
+        self.assertNotIn('work', properties['kind']['enum'])
         self.assertEqual(json.loads(body)['provider'], {
             'allow_fallbacks': True, 'require_parameters': True,
             'max_price': {'prompt': 0.15, 'completion': 0.50},

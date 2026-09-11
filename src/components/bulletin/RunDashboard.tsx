@@ -16,7 +16,7 @@ const columns = [
   ['positive', 'Notices'],
   ['negative', 'Not notices'],
   ['failed', 'Failed'],
-  ['pending', 'Left in queue'],
+  ['pending', 'Unresolved at finish'],
 ] as const
 
 export function RunDashboard({
@@ -236,15 +236,21 @@ export function RunDashboard({
           earlier scans. <strong>Notices</strong> counts positive decisions
           saved during this run, before expiry and later consent changes. It is
           not the number currently visible on the website.{' '}
-          <strong>Left in queue</strong> includes waiting, failed and exhausted
-          decisions at the end of that run.
+          <strong>Unresolved at finish</strong> (previously “Left in queue”)
+          counts candidates without a successful decision when that run ended:
+          waiting, failed, or out of retries. It can include leftovers from
+          earlier scans. It is not a manual approval queue, and later retries do
+          not change this historical count. The cards above show the current
+          queue across runs; refresh runs count only their own request queue.
         </p>
         <p>
           Running and interrupted rows may have partial counts. Costs show
           reported charges plus reservations for requests whose final cost is
           unknown. Limits: $0.10/day, $1/calendar month, at most 50 calls per
-          run. Failed decisions wait at least an hour and retry on a later run,
-          up to three attempts.
+          run for normal daily scans. Transient provider failures can retry
+          within the run after roughly 2 then 5 seconds, plus jitter, up to
+          three total attempts. Otherwise eligible failures wait at least an
+          hour for a later run. Exhausted items do not retry automatically.
         </p>
         {latest && (
           <p>

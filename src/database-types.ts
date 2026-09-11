@@ -2037,6 +2037,16 @@ export type Database = {
           archive_upload_id: number
         }[]
       }
+      get_bulletin_decisions: {
+        Args: {
+          decision_status?: string
+          before_updated_at?: string
+          before_tweet_id?: string
+          max_results?: number
+          selected_tweet_id?: string
+        }
+        Returns: Json
+      }
       get_bulletin_board_state: {
         Args: {
           max_results?: number

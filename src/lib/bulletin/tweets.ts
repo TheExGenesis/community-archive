@@ -1,6 +1,6 @@
 import 'server-only'
 import { createHash } from 'crypto'
-import { loadBulletinBoardState } from './data'
+import { loadBulletinBoardState, type StoredNotice } from './data'
 import { fetchAnalyticsGatewayJson } from '@/lib/clickhouseGateway'
 import {
   fetchClickHouseTweetThreadPageData,
@@ -104,9 +104,18 @@ function card(tweet: TweetData): PortalTweet {
 }
 
 export async function loadBulletinTweets(ids: string[]) {
-  // Share the live notice/policy read and source check across a small batch.
-  const [state, current, details] = await Promise.all([
-    loadBulletinBoardState(),
+  return hydrateBulletinTweets(ids, await loadBulletinBoardState())
+}
+
+/** Call only with records from an authorized, current-policy read. */
+export async function hydrateBulletinTweets(
+  ids: string[],
+  state: {
+    notices: Pick<StoredNotice, 'tweet_id' | 'account_id' | 'content_hash'>[]
+    allowedAccounts?: string[]
+  },
+) {
+  const [current, details] = await Promise.all([
     fetchAnalyticsGatewayJson<{
       data: Array<{
         tweet_id: string

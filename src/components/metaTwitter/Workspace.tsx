@@ -24,6 +24,7 @@ import type {
   ArchivePerson,
   BangerTweet,
 } from '@/lib/metaTwitter/types'
+import { interactionBreakdown } from '@/lib/metaTwitter/interactionBreakdown'
 
 export const BANGER_SCORE_EXPLANATION =
   'Banger score is the number of archived quote posts from Community Archive members, excluding self-quotes.'
@@ -492,8 +493,7 @@ export function Workspace({
                       </span>
                       <br />
                       <span className="text-muted-foreground">
-                        {person.interactions} interaction
-                        {person.interactions === 1 ? '' : 's'}
+                        {interactionBreakdown(person)}
                       </span>
                     </div>
                     {person.curation?.is_featured && !editing && (

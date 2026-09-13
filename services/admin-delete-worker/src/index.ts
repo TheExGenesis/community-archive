@@ -1,6 +1,10 @@
 import 'dotenv/config'
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
+import {
+  canonicalAdminDeleteErrorCode,
+  publishCanonicalAdminDeleteShadow,
+} from './canonicalShadow.ts'
 import { logger } from './logger.ts'
 import { exportAndDelete } from './exporter.ts'
 import { makeRunRecorder } from './runRecorder.ts'
@@ -155,13 +159,39 @@ async function drainOnce(
   })
 
   try {
-    const result = await exportAndDelete(storage, sql, {
-      accountId: job.args.account_id,
-      username: job.args.username,
-      reason: job.args.reason ?? 'Admin manual opt-out',
-      requesterUserId: job.args.requested_by_user_id ?? '',
-      enqueuedAt: job.args.enqueued_at,
-    })
+    const { tweet_ids: canonicalTweetIds, ...result } = await exportAndDelete(
+      storage,
+      sql,
+      {
+        accountId: job.args.account_id,
+        username: job.args.username,
+        reason: job.args.reason ?? 'Admin manual opt-out',
+        requesterUserId: job.args.requested_by_user_id ?? '',
+        enqueuedAt: job.args.enqueued_at,
+      },
+    )
+    try {
+      const canonical = await publishCanonicalAdminDeleteShadow({
+        jobKey: job.key,
+        accountId: job.args.account_id,
+        tweetIds: canonicalTweetIds,
+        observedAt: job.args.enqueued_at,
+      })
+      if (!canonical.skipped) {
+        jobLogger.info(
+          {
+            canonical_event_count: canonical.eventCount,
+            canonical_duplicate_count: canonical.duplicateCount,
+          },
+          'canonical admin-delete shadow published',
+        )
+      }
+    } catch (error) {
+      jobLogger.warn(
+        { canonical_error_code: canonicalAdminDeleteErrorCode(error) },
+        'canonical admin-delete shadow failed; legacy deletion remains successful',
+      )
+    }
     await recorder.finish(runId, { status: 'succeeded', result })
     await sql`
       UPDATE private.admin_jobs

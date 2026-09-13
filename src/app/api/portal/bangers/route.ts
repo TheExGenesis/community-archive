@@ -8,6 +8,7 @@ import type {
   PortalBangersScope,
   PortalBangersSort,
 } from '@/lib/portal/types'
+import { enforceBotId } from '@/lib/botIdServer'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -40,6 +41,9 @@ function boundedInteger(
 }
 
 export async function GET(request: NextRequest) {
+  const botResponse = await enforceBotId()
+  if (botResponse) return botResponse
+
   try {
     const params = new URL(request.url).searchParams
     const offset = boundedInteger(params.get('offset'), 0, 0, 1_000_000)

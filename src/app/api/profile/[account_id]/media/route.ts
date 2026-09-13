@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getClickHouseProfileMediaOrThrow } from '@/lib/metaTwitter/clickhouseSidebar'
+import { enforceBotId } from '@/lib/botIdServer'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -10,6 +11,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { account_id: string } },
 ) {
+  const botResponse = await enforceBotId()
+  if (botResponse) return botResponse
+
   if (!ACCOUNT_ID_PATTERN.test(params.account_id)) {
     return NextResponse.json(
       { error: 'Invalid profile account' },

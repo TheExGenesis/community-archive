@@ -5,6 +5,7 @@ import {
   type PortalStreamPageCursor,
   type PortalStreamUpdateCursor,
 } from '@/lib/portal/data'
+import { enforceBotId } from '@/lib/botIdServer'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -42,6 +43,9 @@ function parsePageCursor(
 }
 
 export async function GET(request: NextRequest) {
+  const botResponse = await enforceBotId()
+  if (botResponse) return botResponse
+
   let updateCursor: PortalStreamUpdateCursor | null
   let pageCursor: PortalStreamPageCursor | null
   try {

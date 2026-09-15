@@ -58,7 +58,7 @@ test('uptake is unknown before hydration and counts replies plus quotes after', 
   expect(uptake({ ...notice('1'), replies: 2, quotes: 1 })).toBe(3)
   expect(uptake({ ...notice('1'), replies: 0, quotes: 0 })).toBe(0)
 })
-test('recommended lifts unanswered asks within a group while newest stays chronological', () => {
+test('recommended gives unanswered asks a modest boost while newest stays chronological', () => {
   const graph = { outgoing: {}, available: true }
   const rows = [
     { ...notice('a'), posted_at: '2026-08-05T00:00:00Z' },
@@ -86,6 +86,65 @@ test('recommended lifts unanswered asks within a group while newest stays chrono
       (o) => o.tweet_id,
     ),
   ).toEqual(['a', 'c', 'b', 'd'])
+})
+test('fresh notices can outrank old contacts while recent contacts keep a relevance boost', () => {
+  const graph = { outgoing: { contact: 100000 }, available: true }
+  const recent = { ...notice('new'), posted_at: '2026-09-14T00:00:00Z' }
+  const oldContact = {
+    ...notice('old'),
+    account_id: 'contact',
+    posted_at: '2026-09-01T00:00:00Z',
+  }
+  const recentContact = {
+    ...notice('recent-contact'),
+    account_id: 'contact',
+    posted_at: '2026-09-13T00:00:00Z',
+  }
+  const now = Date.parse('2026-09-15T00:00:00Z')
+  for (const rankUnanswered of [false, true]) {
+    expect(
+      sortNotices(
+        [oldContact, recent, recentContact],
+        true,
+        '',
+        graph,
+        now,
+        false,
+        rankUnanswered,
+      ).map((o) => o.tweet_id),
+    ).toEqual(['recent-contact', 'new', 'old'])
+  }
+  expect(sortNotices([recent, oldContact], true, 'old', graph, now)[0]).toBe(
+    recent,
+  )
+  expect(
+    sortNotices([recent, oldContact], true, 'contact', graph, now)[0],
+  ).toBe(oldContact)
+  expect(
+    sortNotices([oldContact, recent, recentContact], false, '', graph, now).map(
+      (o) => o.tweet_id,
+    ),
+  ).toEqual(['new', 'recent-contact', 'old'])
+})
+test('renewal keeps an old notice active without pretending it was newly posted', () => {
+  const graph = { outgoing: {}, available: false }
+  const renewed = {
+    ...notice('old', 'ask'),
+    renewed_at: '2026-09-14T00:00:00Z',
+    replies: 0,
+    quotes: 0,
+  }
+  const recent = {
+    ...notice('new', 'ask'),
+    posted_at: '2026-09-13T00:00:00Z',
+    replies: 3,
+    quotes: 0,
+  }
+  const now = Date.parse('2026-09-15T00:00:00Z')
+  expect(isPast(renewed, now)).toBe(false)
+  expect(
+    sortNotices([renewed, recent], true, '', graph, now).map((o) => o.tweet_id),
+  ).toEqual(['new', 'old'])
 })
 test('ascending reverses the order but keeps past notices last', () => {
   const graph = { outgoing: {}, available: true }

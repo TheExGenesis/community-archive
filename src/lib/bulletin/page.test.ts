@@ -246,3 +246,31 @@ test('first paint and newest sorting never wait for interactions', async () => {
   expect(newest.notices).toHaveLength(18)
   expect(loadBulletinRelationships).not.toHaveBeenCalled()
 })
+
+test('freshness and personal relevance page every notice exactly once', async () => {
+  jest.mocked(loadBulletinBoardState).mockResolvedValue({
+    notices: Array.from({ length: 40 }, (_, i) => ({
+      ...notice(i + 1),
+      account_id: i % 2 ? 'contact' : 'other',
+      posted_at: new Date(Date.now() - i * 86400000).toISOString(),
+    })),
+  })
+  jest.mocked(loadBulletinRelationships).mockResolvedValue({
+    account_id: '',
+    username: '',
+    outgoing: { contact: 100 },
+    available: true,
+  })
+  const first = await loadBulletinPage(filters)
+  expect(first.notices.slice(0, 3).map((o) => o.tweet_id)).toEqual([
+    '2',
+    '4',
+    '1',
+  ])
+  const second = await loadBulletinPage(filters, first.cursors.help!)
+  const third = await loadBulletinPage(filters, second.cursors.help!)
+  const all = [...first.notices, ...second.notices, ...third.notices]
+  expect(new Set(all.map((o) => o.tweet_id)).size).toBe(40)
+  expect(all).toHaveLength(40)
+  expect(third.cursors.help).toBeNull()
+})

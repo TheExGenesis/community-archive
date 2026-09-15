@@ -69,10 +69,12 @@ export default function BulletinAboutPage() {
         <section>
           <h2 className="text-base font-semibold text-foreground">Ordering</h2>
           <p className="mt-2">
-            Relevance puts your own notices first, then people you reply to and
-            quote most, then everyone else. Within each group, asks with no
-            member reply come before answered ones, then newest. Date is newest
-            first. The arrow icon reverses either order.
+            Relevance puts your own notices first, then balances recent posts
+            with people you reply to and quote. The freshness boost fades over a
+            few days, so new posts can rise above older notices from familiar
+            people. Asks with no known member replies or quote posts get a
+            smaller boost. Date is newest first. The arrow icon reverses either
+            order.
           </p>
         </section>
         <section>

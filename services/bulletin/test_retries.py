@@ -1,6 +1,7 @@
 """Retry policy and allowlisted diagnostics, without network calls."""
 import contextlib
 import datetime as dt
+from http.client import RemoteDisconnected
 from email.utils import format_datetime
 import io
 import json
@@ -31,6 +32,15 @@ class RetryTests(unittest.TestCase):
             self.assertIsNone(worker.retry_wait(exc,3))
         for exc in (self.error(400),self.error(401),self.error(402),self.error(403),ValueError('invalid label')):
             self.assertIsNone(worker.retry_wait(exc,1))
+
+    def test_closed_model_connections_retry_without_resetting_attempts(self):
+        # urllib can propagate these directly instead of wrapping them in URLError.
+        for exc in (RemoteDisconnected('Remote end closed connection without response'),
+                    ConnectionResetError(), BrokenPipeError()):
+            with self.subTest(error=type(exc).__name__), patch.object(worker.random,'uniform',return_value=0):
+                self.assertEqual(worker.retry_wait(exc,1),2)
+                self.assertEqual(worker.retry_wait(exc,2),5)
+                self.assertIsNone(worker.retry_wait(exc,3))
 
     def test_log_has_only_safe_structured_metadata(self):
         out=io.StringIO()

@@ -202,8 +202,9 @@ metadata say so rather than inventing attribution.
 Normal admission limits are $0.10/day and $1/calendar month, UTC, with 10%
 headroom. Calls reserve a conservative maximum first; ambiguous or timed-out
 calls retain that reservation. Transient model-request failures (HTTP 408, 429,
-5xx, network errors and timeouts) retry within the same run after 2 then 5 seconds,
-plus up to one second of jitter. Respect a provider's `Retry-After` up to 60 seconds;
+5xx, network errors including closed/reset connections, and timeouts) retry within
+the same run after 2 then 5 seconds, plus up to one second of jitter. Respect a
+provider's `Retry-After` up to 60 seconds;
 longer waits are deferred to a later run. Authentication, payment, validation and
 publication errors do not trigger immediate model retries. Retries stop after
 three total attempts per unchanged input, including attempts from earlier runs.

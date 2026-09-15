@@ -45,7 +45,7 @@ def retry_wait(exc, attempt):
     if isinstance(exc, urllib.error.HTTPError):
         if exc.code not in (408, 429) and not 500 <= exc.code < 600:
             return None
-    elif not isinstance(exc, (urllib.error.URLError, TimeoutError)):
+    elif not isinstance(exc, (urllib.error.URLError, TimeoutError, ConnectionError)):
         return None
     delay = (2 if attempt == 1 else 5) + random.uniform(0, 1)
     if isinstance(exc, urllib.error.HTTPError):

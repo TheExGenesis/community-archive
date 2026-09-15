@@ -21,6 +21,13 @@ The decisions table no longer requires a matching PostgreSQL tweet row.
 Only derived notices and source hashes are stored, not a second tweet corpus.
 
 Browser roles cannot access the `bulletin` schema or its service-only RPCs.
+`bulletin.allowed_accounts` uses membership-only SQL equivalent to the directory's
+completed-archive and explicit-opt-in paths, including its alias deduplication.
+It omits directory profile/count enrichment while retaining live opt-outs,
+tombstones and scrape blocks. The membership-read migration preserves the
+existing view's grants. `test_membership_read.py` compares it with the canonical
+directory on synthetic membership/policy cases in a named local database.
+
 The board and tweet API routes verify the session and current PostgreSQL
 `optin` record before fetching private state: `opted_in` must be true and
 `explicit_optout` must not be true. Archive membership alone does not grant

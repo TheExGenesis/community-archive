@@ -13,6 +13,7 @@ import { DigestDaySelector } from './DigestDaySelector'
 import { DigestLikeButton } from './DigestLikeButton'
 import { DigestComments } from './DigestComments'
 import { SectionReady } from '@/components/PagePerformance'
+import { DigestSubscriberCount } from './DigestSubscriberCount'
 
 async function Likes({ edition }: { edition: DigestEdition }) {
   const [likes, user] = await Promise.all([
@@ -86,6 +87,11 @@ export function PublishedDigestView({ edition }: { edition: DigestEdition }) {
         edition={edition}
         archive={[]}
         slots={{
+          subscribers: (
+            <Suspense fallback={null}>
+              <DigestSubscriberCount />
+            </Suspense>
+          ),
           likes: edition.isPreview ? (
             <></>
           ) : (

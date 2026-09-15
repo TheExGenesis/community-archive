@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { checkIsAdmin } from '@/app/admin/data'
 import { PublishedDigestView } from '@/components/digest/PublishedDigestView'
 import { getPublishedDigest } from '@/lib/digest/data'
 import { getDigestMetadata } from '@/lib/digest/metadata'
+import { DigestSubscriberCount } from '@/components/digest/DigestSubscriberCount'
 
 export const revalidate = 300
 
@@ -47,6 +49,11 @@ export default async function DigestPage() {
               Editorial lab →
             </Link>
           ) : null}
+        </div>
+        <div className="mt-4">
+          <Suspense fallback={null}>
+            <DigestSubscriberCount />
+          </Suspense>
         </div>
       </div>
     </main>

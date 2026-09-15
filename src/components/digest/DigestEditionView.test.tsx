@@ -2,7 +2,7 @@
 
 import React from 'react'
 import '@testing-library/jest-dom'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { DigestEditionView } from './DigestEditionView'
 import { AUGUST_11_MOCK_DIGEST } from '@/lib/digest/mock'
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
@@ -34,7 +34,7 @@ jest.mock('@/components/digest/DigestMarkdown', () => ({
 }))
 
 describe('DigestEditionView', () => {
-  test('offers the inline email subscribe control', () => {
+  test('offers the inline email subscribe control', async () => {
     render(
       <DigestEditionView
         edition={AUGUST_11_MOCK_DIGEST}
@@ -42,9 +42,9 @@ describe('DigestEditionView', () => {
       />,
     )
 
-    expect(
-      screen.getByRole('button', { name: 'Subscribe' }),
-    ).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Subscribe' })).toBeEnabled(),
+    )
     expect(
       screen.queryByRole('link', {
         name: 'Subscribe to Community Archive on Substack',
@@ -52,7 +52,7 @@ describe('DigestEditionView', () => {
     ).not.toBeInTheDocument()
   })
 
-  test('shows the editorial lab shortcut only to admins', () => {
+  test('shows the editorial lab shortcut only to admins', async () => {
     const { rerender } = render(
       <DigestEditionView
         edition={AUGUST_11_MOCK_DIGEST}
@@ -61,6 +61,9 @@ describe('DigestEditionView', () => {
       />,
     )
 
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Subscribe' })).toBeEnabled(),
+    )
     expect(
       screen.getByRole('link', { name: 'Editorial lab →' }),
     ).toHaveAttribute('href', '/admin/digest')

@@ -12,13 +12,18 @@ export const runtime = 'nodejs'
 const maskEmail = maskSubscriptionEmail
 
 const subscriptionStatus = (subscription: {
+  id: string
   email: string
+  confirmedAt: string | null
   unsubscribedAt: string | null
 }) => ({
+  id: subscription.id,
   email: maskEmail(subscription.email),
   status: subscription.unsubscribedAt
     ? ('unsubscribed' as const)
-    : ('subscribed' as const),
+    : subscription.confirmedAt
+      ? ('subscribed' as const)
+      : ('none' as const),
 })
 
 export async function GET() {
@@ -29,6 +34,7 @@ export async function GET() {
   const subscription = await getSubscriptionForAccount(accountId)
   return NextResponse.json(
     subscription ? subscriptionStatus(subscription) : { status: 'none' },
+    { headers: { 'Cache-Control': 'private, no-store' } },
   )
 }
 
@@ -40,16 +46,32 @@ export async function POST(request: Request) {
     return new NextResponse('Unauthorized', { status: 401 })
   }
   let action: unknown
+  let subscriptionId: unknown
   try {
-    ;({ action } = await request.json())
+    ;({ action, subscriptionId } = await request.json())
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 })
   }
   if (action !== 'unsubscribe') {
     return NextResponse.json({ error: 'Unknown action.' }, { status: 400 })
   }
+  if (
+    subscriptionId !== undefined &&
+    (typeof subscriptionId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        subscriptionId,
+      ))
+  ) {
+    return NextResponse.json(
+      { error: 'Invalid subscription.' },
+      { status: 400 },
+    )
+  }
 
-  const subscription = await getSubscriptionForAccount(accountId)
+  const subscription = await getSubscriptionForAccount(
+    accountId,
+    subscriptionId as string | undefined,
+  )
   if (!subscription) {
     return NextResponse.json({ status: 'none' })
   }

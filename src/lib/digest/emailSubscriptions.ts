@@ -2,6 +2,18 @@ import 'server-only'
 
 import { createServerServiceRoleClient } from '@/utils/supabase'
 
+/** Public aggregate only: never fetch addresses or unsubscribe tokens here. */
+export async function getActiveDigestSubscriberCount(): Promise<number> {
+  const { count, error } = await createServerServiceRoleClient()
+    .from('digest_email_subscriptions')
+    .select('id', { count: 'exact', head: true })
+    .not('confirmed_at', 'is', null)
+    .is('unsubscribed_at', null)
+  if (error) throw error
+  if (count === null) throw new Error('Digest subscriber count unavailable')
+  return count
+}
+
 export interface DigestEmailSubscription {
   id: string
   email: string
@@ -106,16 +118,21 @@ export async function upsertSubscription(
   return mapRow(inserted.data)
 }
 
-/** The subscription linked to a signed-in account, newest first if several. */
+/** Prefer an active subscription; an explicit id must still belong to the account. */
 export async function getSubscriptionForAccount(
   accountId: string,
+  subscriptionId?: string,
 ): Promise<DigestEmailSubscription | null> {
   const admin = createServerServiceRoleClient()
-  const result = await admin
+  let query = admin
     .from('digest_email_subscriptions')
     .select(SUBSCRIPTION_COLUMNS)
     .eq('account_id', accountId)
+  if (subscriptionId) query = query.eq('id', subscriptionId)
+  const result = await query
+    .order('unsubscribed_at', { ascending: true, nullsFirst: true })
     .order('created_at', { ascending: false })
+    .order('id', { ascending: true })
     .limit(1)
     .maybeSingle()
   if (result.error) throw result.error

@@ -34,6 +34,12 @@ export async function POST(request: Request) {
     return NextResponse.json({
       status: 'subscribed',
       email: maskSubscriptionEmail(subscription.email),
+      // Only an account that owns this subscription can manage it here.
+      // Never expose the unsubscribe token or grant access by email alone.
+      subscriptionId:
+        accountId && subscription.accountId === accountId
+          ? subscription.id
+          : null,
     })
   } catch (error) {
     console.error(

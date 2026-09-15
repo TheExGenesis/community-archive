@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Suspense } from 'react'
 import { AdminTable } from './AdminTable'
 import { AdminActivityFeed } from './AdminActivityFeed'
+import { DigestSubscribersSection } from './DigestSubscribersSection'
 import { loadActivityPage } from './activityFeedData'
 import {
   ADMIN_USERNAMES,
@@ -120,7 +121,7 @@ async function AccountsSection({ search }: { search: string }) {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams?: { q?: string }
+  searchParams?: { q?: string; subscriberPage?: string }
 }) {
   const { user } = await requireAdmin()
   const search = normalizeUsername(searchParams?.q)
@@ -180,6 +181,15 @@ export default async function AdminPage({
             Daily scans, candidates, notices produced, costs and failures.
           </p>
         </Link>
+
+        <Suspense
+          fallback={<SectionSkeleton label="Loading digest subscribers" />}
+        >
+          <DigestSubscribersSection
+            page={Number(searchParams?.subscriberPage ?? 1)}
+            search={search}
+          />
+        </Suspense>
 
         <Suspense
           fallback={<SectionSkeleton label="Loading archive activity" />}

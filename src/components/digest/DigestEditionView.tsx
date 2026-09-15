@@ -42,7 +42,10 @@ export function DigestEditionView({
   isSignedIn?: boolean
   commentCount?: number
   slots?: Partial<
-    Record<'likes' | 'admin' | 'calendar' | 'recent' | 'comments', ReactNode>
+    Record<
+      'likes' | 'admin' | 'calendar' | 'recent' | 'comments' | 'subscribers',
+      ReactNode
+    >
   >
 }) {
   const content = edition.content
@@ -79,6 +82,7 @@ export function DigestEditionView({
                     isSignedIn={isSignedIn}
                   />
                 ))}
+              {slots.subscribers}
               <DigestSubscribeButton />
               {slots.admin ??
                 (isAdmin ? (

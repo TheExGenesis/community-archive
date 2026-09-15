@@ -2,6 +2,18 @@ import 'server-only'
 
 import { createServerServiceRoleClient } from '@/utils/supabase'
 
+/** Public aggregate only: never fetch addresses or unsubscribe tokens here. */
+export async function getActiveDigestSubscriberCount(): Promise<number> {
+  const { count, error } = await createServerServiceRoleClient()
+    .from('digest_email_subscriptions')
+    .select('id', { count: 'exact', head: true })
+    .not('confirmed_at', 'is', null)
+    .is('unsubscribed_at', null)
+  if (error) throw error
+  if (count === null) throw new Error('Digest subscriber count unavailable')
+  return count
+}
+
 export interface DigestEmailSubscription {
   id: string
   email: string

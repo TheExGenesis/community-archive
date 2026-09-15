@@ -47,11 +47,31 @@ export function relationship(
   if (count > 0) return { rank: 1, label: '' }
   return { rank: 3, label: '' }
 }
+function recommendationScore(
+  notice: Notice,
+  graph: BulletinRelationships,
+  now: number,
+  rankUnanswered: boolean,
+) {
+  // Use the original posting date: catching up an old notice does not make
+  // it newly posted. Freshness halves every three days, without a hard cutoff.
+  const ageDays = Math.max(0, (now - Date.parse(notice.posted_at)) / 86400000)
+  const freshness = 4 * 2 ** (-ageDays / 3)
+  const interactions = Math.max(0, graph.outgoing?.[notice.account_id] || 0)
+  // Keep personal relevance, but bound it so a prolific contact cannot pin
+  // their old notices above every recent post. One to 100 interactions: 1–2.
+  const relevance = interactions
+    ? 1 + Math.min(1, Math.log10(interactions) / 2)
+    : 0
+  return (
+    freshness + relevance + (rankUnanswered && unansweredAsk(notice) ? 0.5 : 0)
+  )
+}
+
 /**
- * Recommended: active before past; your notices, then people you interact
- * with, then everyone; within a group, asks nobody has answered first, then
- * newest. Newest: chronological, active before past. Ascending reverses the
- * order inside the active/past split.
+ * Recommended: your notices first, then a blend of freshness, outgoing
+ * interactions and unanswered asks. Newest stays chronological. Both keep
+ * resolved/past notices last; ascending reverses only within those groups.
  */
 export function sortNotices(
   notices: Notice[],
@@ -64,10 +84,10 @@ export function sortNotices(
 ) {
   const inner = (a: Notice, b: Notice) =>
     (recommended
-      ? relationship(a, me, graph).rank - relationship(b, me, graph).rank ||
-        (rankUnanswered
-          ? Number(unansweredAsk(b)) - Number(unansweredAsk(a))
-          : 0) ||
+      ? Number(!!me && b.account_id === me) -
+          Number(!!me && a.account_id === me) ||
+        recommendationScore(b, graph, now, rankUnanswered) -
+          recommendationScore(a, graph, now, rankUnanswered) ||
         (graph.outgoing?.[b.account_id] || 0) -
           (graph.outgoing?.[a.account_id] || 0)
       : 0) ||

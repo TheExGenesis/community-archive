@@ -172,8 +172,14 @@ sorting, past notices and expandable originals. Category, sort and past filters
 are preserved in the URL hash; the optional recommendation handle is a query
 parameter. The verified signed-in account is the default viewer.
 
-Recommended order: own notices, mutuals, one-way follows, everyone else; newest
-within each group. Active notices precede past notices. Undated asks expire after
+Recommended order: own notices first, then a blend of posting-date freshness,
+outgoing interactions and unanswered asks. Freshness starts at 4 points and
+halves every three days. Interaction relevance ranges from 1 point for one
+interaction to 2 points at 100 or more; known unanswered asks get 0.5 points
+among loaded cards. The server omits that last signal from pagination because
+only hydrated cards have live reply counts. Catch-up ingestion and self-quote
+renewals do not reset a notice's posting date. Active notices precede past
+notices. Undated asks expire after
 14 days and offers after 60 days; standing notices do not expire. An explicit
 expiry date is inclusive in UTC. An archived self-quote renews the default
 undated lifetime, but does not override an explicit expiry date.

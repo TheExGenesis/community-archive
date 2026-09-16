@@ -26,6 +26,14 @@ Required environment variables are `DATABASE_URL`, `SUPABASE_URL`, and
 `SUPABASE_SERVICE_ROLE`. `POLL_INTERVAL_MS` defaults to 10 seconds. See
 `docker-compose.yml` and `env.example` for runtime wiring.
 
+The worker also has a disabled post-success canonical shadow copy. Set
+`CANONICAL_ADMIN_DELETE_SHADOW_PUBLISH_ENABLED=true` only after the firehose
+canonical stream and external publisher are separately enabled. It publishes
+content-free account and tweet tombstones using the dedicated
+`CANONICAL_PUBLISHER_API_KEY`; failure logs only a bounded error code and never
+changes the completed legacy deletion result. The shadow copy is not a
+transactional outbox and must not be used as the canonical deletion authority.
+
 ## Operational verification
 
 - A policy block must make PostgreSQL rows content-free before the job is

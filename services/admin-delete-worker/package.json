@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "tsx --watch src/index.ts",
     "start": "tsx src/index.ts",
+    "test:canonical": "node --import tsx --test src/canonicalShadow.test.ts",
     "build": "tsc --noEmit",
     "docker:build": "cd ../../ && docker build -f services/admin-delete-worker/Dockerfile -t admin-delete-worker:latest .",
     "docker:up": "docker compose up -d --build",

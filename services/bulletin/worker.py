@@ -38,11 +38,22 @@ MAX_SECONDS = 900
 LOCK = 712606570
 
 
+class IncompleteOutput(ValueError):
+    """Keep provider output private while retaining a bounded completion reason."""
+    def __init__(self, finish_reason):
+        super().__init__('incomplete_output')
+        self.finish_reason = (finish_reason if isinstance(finish_reason, str) and
+            finish_reason in ('length', 'error', 'content_filter', 'tool_calls') else 'unknown')
+
+
 def retry_wait(exc, attempt):
     """Short provider retries; a longer Retry-After is deferred to a later run."""
     if attempt >= 3:
         return None
-    if isinstance(exc, urllib.error.HTTPError):
+    if isinstance(exc, IncompleteOutput):
+        if exc.finish_reason not in ('length', 'error'):
+            return None
+    elif isinstance(exc, urllib.error.HTTPError):
         if exc.code not in (408, 429) and not 500 <= exc.code < 600:
             return None
     elif not isinstance(exc, (urllib.error.URLError, TimeoutError, ConnectionError)):
@@ -68,6 +79,8 @@ def log_failure(exc, *, run_id, call_id=None, attempt=None, stage, retry_seconds
         attempt=attempt, stage=stage, error_type=type(exc).__name__, retry_seconds=retry_seconds)
     if isinstance(exc, urllib.error.HTTPError):
         event['http_status'] = exc.code
+    if isinstance(exc, IncompleteOutput):
+        event['finish_reason'] = exc.finish_reason
     reasons = {
         'label must be an object', 'is_notice must be boolean',
         'invalid side or category', 'invalid summary', 'standing must be boolean',
@@ -390,7 +403,7 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
                         (actual_cost(result),call_id))
                     choice=result['choices'][0]
                     if choice.get('finish_reason')!='stop':
-                        raise ValueError('incomplete_output')
+                        raise IncompleteOutput(choice.get('finish_reason'))
                     raw_label=json.loads(choice['message']['content'])
                     label=validate_label(raw_label,{'text':source['full_text']})
                     availability=(resolution.validate(raw_label.get('availability'),source,context)
@@ -402,7 +415,9 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
                     db.execute('UPDATE bulletin.calls SET status=%s WHERE id=%s',
                         ('validated' if stored else 'suppressed',call_id))
                 except Exception as exc:
-                    delay=retry_wait(exc,job['attempts']) if stage=='model_request' else None
+                    retryable_stage = (stage=='model_request' or
+                        (stage=='model_validation' and isinstance(exc,IncompleteOutput)))
+                    delay=retry_wait(exc,job['attempts']) if retryable_stage else None
                     if delay is not None and (counts['calls']>=limit or
                             time.monotonic()-started+delay+60>MAX_SECONDS):
                         delay=None

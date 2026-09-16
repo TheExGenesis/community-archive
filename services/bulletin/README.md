@@ -218,8 +218,11 @@ calls retain that reservation. Transient model-request failures (HTTP 408, 429,
 5xx, network errors including closed/reset connections, and timeouts) retry within
 the same run after 2 then 5 seconds, plus up to one second of jitter. Respect a
 provider's `Retry-After` up to 60 seconds;
-longer waits are deferred to a later run. Authentication, payment, validation and
-publication errors do not trigger immediate model retries. Retries stop after
+longer waits are deferred to a later run. Incomplete model responses with a
+`length` or `error` finish reason use the same bounded retry path; partial output
+is never published, and each response's cost stays recorded. Content filtering,
+unexpected or missing finish reasons, authentication, payment, semantic validation
+and publication errors do not trigger immediate model retries. Retries stop after
 three total attempts per unchanged input, including attempts from earlier runs.
 Every retry rechecks current source/policy and reserves budget again; it counts
 toward the run's 50-call cap and must fit within the remaining time allowance.
@@ -306,7 +309,9 @@ run dashboard; investigate non-complete status or freshness older than 36 hours.
 
 Failures emit a JSON `bulletin_error` event to the systemd journal with run/call
 IDs, attempt, processing stage, exception class, HTTP status when available, and
-the scheduled retry delay. The private call ledger also retains HTTP status in
+the scheduled retry delay. Incomplete outputs also log an allowlisted finish
+reason (`length`, `error`, `content_filter`, `tool_calls`, or `unknown`), without
+provider text. The private call ledger also retains HTTP status in
 `failed:HTTPError:<status>`. These diagnostics intentionally omit exception
 messages, request URLs, provider bodies, tweet content, credentials and headers.
 Inspect them with `journalctl -u ca-bulletin.service --since today -o cat`.

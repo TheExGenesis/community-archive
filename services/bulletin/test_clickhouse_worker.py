@@ -387,6 +387,53 @@ class ClickHouseWorkerTests(unittest.TestCase):
         self.db.execute("UPDATE bulletin.decisions SET last_attempt_at=now()-interval '2 hours'")
         self.assertEqual(self.run_worker()[1],0)
 
+    def incomplete_response(self,reason='length'):
+        # Even a parseable partial answer must not be published.
+        result=self.response(None)
+        result['choices'][0]['finish_reason']=reason
+        return result
+
+    def test_incomplete_output_recovers_without_publishing_partial_answer(self):
+        responses=[self.incomplete_response(),self.incomplete_response('error'),self.response(None)]
+        with patch.object(worker,'call_model',side_effect=responses) as model, \
+                patch.object(worker.time,'sleep') as sleep, \
+                patch.object(worker,'publish',wraps=worker.publish) as publish:
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['status'],result['calls'],result['failed'],result['pending']),('ok',3,2,0))
+        self.assertEqual((model.call_count,sleep.call_count,publish.call_count),(3,2,1))
+        self.assertEqual(self.db.execute('SELECT attempts FROM bulletin.decisions').fetchone()['attempts'],3)
+        calls=self.db.execute('SELECT status,actual_usd FROM bulletin.calls ORDER BY id').fetchall()
+        self.assertEqual([c['status'] for c in calls],['failed:IncompleteOutput','failed:IncompleteOutput','validated'])
+        self.assertEqual([c['actual_usd'] for c in calls],[Decimal(str(r['usage']['cost'])) for r in responses])
+
+    def test_incomplete_output_exhaustion_stays_failed_across_runs(self):
+        with patch.object(worker,'call_model',return_value=self.incomplete_response()),patch.object(worker.time,'sleep'):
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['status'],result['calls'],result['pending']),('classification_failed',3,1))
+        self.assertEqual(self.db.execute('SELECT count(*) AS n FROM bulletin.opportunities').fetchone()['n'],0)
+        self.db.execute("UPDATE bulletin.decisions SET last_attempt_at=now()-interval '2 hours'")
+        self.assertEqual(self.run_worker()[1],0)
+
+    def test_content_filter_and_invalid_evidence_do_not_retry(self):
+        for response in (self.incomplete_response('content_filter'),self.response(None)):
+            self.label['evidence']='This is not in the source.'
+            if response['choices'][0]['finish_reason']=='stop':
+                response=self.response(None)
+            with self.subTest(reason=response['choices'][0]['finish_reason']), \
+                    patch.object(worker,'call_model',return_value=response),patch.object(worker.time,'sleep') as sleep:
+                result=worker.run(self.db,window=self.window)
+            self.assertEqual((result['calls'],result['pending']),(1,1))
+            sleep.assert_not_called()
+            self.db.execute("UPDATE bulletin.decisions SET last_attempt_at=now()-interval '2 hours'")
+
+    def test_incomplete_output_retry_preserves_admission_limits(self):
+        body=worker.request_body(self.source,SYSTEM,worker.tweet_context.prepare(self.db,self.source))
+        paid=Decimal(str(self.incomplete_response()['usage']['cost']))
+        cap=worker.reservation(body)+paid/2
+        with patch.object(worker,'call_model',return_value=self.incomplete_response()),patch.object(worker.time,'sleep'):
+            result=worker.run(self.db,window=self.window,backfill_budget=cap)
+        self.assertEqual((result['status'],result['calls']),('budget_limit',1))
+
     def test_auth_error_does_not_immediately_retry(self):
         with patch.object(worker,'call_model',side_effect=self.http_error(401)),patch.object(worker.time,'sleep') as sleep:
             result=worker.run(self.db,window=self.window)

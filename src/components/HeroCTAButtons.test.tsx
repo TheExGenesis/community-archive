@@ -75,10 +75,16 @@ describe('HeroCTAButtons', () => {
       }),
     })
 
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/')
-      expect(mockRefresh).toHaveBeenCalledTimes(1)
-    })
+    expect(
+      await screen.findByRole('heading', { name: 'You’re opted in' }),
+    ).toBeInTheDocument()
+    expect(mockReplace).not.toHaveBeenCalled()
+    expect(mockRefresh).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(mockReplace).toHaveBeenCalledWith('/')
+    expect(mockRefresh).toHaveBeenCalledTimes(1)
   })
 
   it('does not opt in automatically without the OAuth return action', async () => {
@@ -108,16 +114,44 @@ describe('HeroCTAButtons', () => {
     render(<HeroCTAButtons />)
 
     expect(
-      await screen.findByText(
+      await screen.findByRole('heading', {
+        name: 'We couldn’t complete your opt-in',
+      }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getAllByText(
         'Too many requests. Please wait 1 minute and try again.',
       ),
-    ).toBeInTheDocument()
+    ).toHaveLength(2)
     expect(mockFetch).toHaveBeenCalledTimes(1)
     expect(mockReplace).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: /retry opt in/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/'))
+    expect(
+      await screen.findByRole('heading', { name: 'You’re opted in' }),
+    ).toBeInTheDocument()
+    expect(mockReplace).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(mockReplace).toHaveBeenCalledWith('/')
+    expect(mockRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('confirms an OAuth return when the user is already opted in', async () => {
+    render(<HeroCTAButtons initialIsOptedIn />)
+
+    expect(
+      await screen.findByRole('heading', { name: 'You’re opted in' }),
+    ).toBeInTheDocument()
+    expect(mockFetch).not.toHaveBeenCalled()
+    expect(mockReplace).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(mockReplace).toHaveBeenCalledWith('/')
+    expect(mockRefresh).toHaveBeenCalledTimes(1)
   })
 })

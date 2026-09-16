@@ -91,6 +91,7 @@
     "@tremor/react": "^3.18.7",
     "@vercel/analytics": "^1.4.1",
     "@zip.js/zip.js": "^2.7.57",
+    "botid": "^1.5.11",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "d3-force": "3.0.0",

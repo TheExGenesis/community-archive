@@ -12,6 +12,8 @@ jest.mock('@/lib/upload-archive/uploadArchive', () => ({
 }))
 jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 
+const mockedUploadArchive = jest.mocked(uploadArchive)
+
 const archive: Archive = {
   profile: [
     {
@@ -54,18 +56,20 @@ const archive: Archive = {
   like: [],
 }
 
+beforeEach(() => {
+  mockedUploadArchive.mockReset()
+})
+
 test('shows one concise upload status while progress is active', async () => {
-  jest
-    .mocked(uploadArchive)
-    .mockImplementation(
-      (
-        _supabase,
-        onProgress: (progress: { phase: string; percent: number }) => void,
-      ) => {
-        onProgress({ phase: 'Uploading archive to storage', percent: 0 })
-        return new Promise(() => {})
-      },
-    )
+  mockedUploadArchive.mockImplementation(
+    (
+      _supabase,
+      onProgress: (progress: { phase: string; percent: number }) => void,
+    ) => {
+      onProgress({ phase: 'Uploading archive to storage', percent: 0 })
+      return new Promise(() => {})
+    },
+  )
   const user = userEvent.setup()
 
   render(
@@ -85,4 +89,31 @@ test('shows one concise upload status while progress is active', async () => {
     await screen.findByText('Uploading archive to storage: 0.00%'),
   ).toBeVisible()
   expect(screen.getAllByText(/uploading/i)).toHaveLength(1)
+})
+
+test('suggests recovery steps when an upload fails', async () => {
+  mockedUploadArchive.mockRejectedValue(
+    new Error('new row violates row-level security policy'),
+  )
+  const user = userEvent.setup()
+
+  render(
+    <FileUploadDialog
+      supabase={{} as SupabaseClient<Database>}
+      isOpen
+      onClose={jest.fn()}
+      archive={archive}
+    />,
+  )
+
+  await user.click(screen.getByRole('button', { name: 'Upload' }))
+
+  expect(
+    await screen.findByRole('heading', { name: 'Upload Error' }),
+  ).toBeVisible()
+  expect(
+    screen.getByText('new row violates row-level security policy'),
+  ).toBeVisible()
+  expect(screen.getByText(/try signing out and back in/i)).toBeVisible()
+  expect(screen.getByText(/try a different browser/i)).toBeVisible()
 })

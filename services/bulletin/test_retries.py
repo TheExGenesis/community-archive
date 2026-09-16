@@ -50,6 +50,24 @@ class RetryTests(unittest.TestCase):
         self.assertEqual(event,dict(event='bulletin_error',run_id=14,call_id=2,attempt=1,
             stage='model_request',error_type='HTTPError',retry_seconds=2,http_status=503))
 
+    def test_incomplete_output_retries_only_transient_finish_reasons(self):
+        for reason in ('length', 'error'):
+            with self.subTest(reason=reason), patch.object(worker.random,'uniform',return_value=0):
+                self.assertEqual(worker.retry_wait(worker.IncompleteOutput(reason),1),2)
+                self.assertEqual(worker.retry_wait(worker.IncompleteOutput(reason),2),5)
+                self.assertIsNone(worker.retry_wait(worker.IncompleteOutput(reason),3))
+        for reason in ('content_filter','tool_calls',None,{'secret':'body'},'private provider message'):
+            exc=worker.IncompleteOutput(reason)
+            self.assertIsNone(worker.retry_wait(exc,1))
+            out=io.StringIO()
+            with contextlib.redirect_stdout(out):
+                worker.log_failure(exc,run_id=1,stage='model_validation')
+            event=json.loads(out.getvalue())
+            self.assertIn(event['finish_reason'],('content_filter','tool_calls','unknown'))
+            self.assertEqual(event['validation_code'],'incomplete_output')
+            self.assertNotIn('secret',out.getvalue())
+            self.assertNotIn('private provider message',out.getvalue())
+
     def test_validator_codes_are_allowlisted_and_unknown_messages_are_private(self):
         for message, code in [('invalid response mode', 'invalid_response_mode'),
                 ('availability_requires_exact_author_evidence', 'availability_requires_exact_author_evidence'),

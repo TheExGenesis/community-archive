@@ -45,6 +45,12 @@ export interface ArchivePerson {
   screen_name: string
   name: string | null
   interactions: number
+  interaction_counts?: {
+    mentions: number
+    replies: number
+    quotes: number
+    reposts: number
+  }
   avatar_media_url?: string | null
   in_archive?: boolean
   curation?: {

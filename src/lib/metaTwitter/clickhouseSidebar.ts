@@ -66,6 +66,10 @@ interface SidebarPersonRow {
   displayName?: unknown
   avatarUrl?: unknown
   interactionCount?: unknown
+  mentionCount?: unknown
+  replyCount?: unknown
+  quoteCount?: unknown
+  repostCount?: unknown
 }
 
 export interface ClickHouseProfileSidebar {
@@ -160,6 +164,12 @@ const personItem = (value: unknown): ArchivePerson | null => {
         ? row.displayName
         : null,
     interactions,
+    interaction_counts: {
+      mentions: safeCount(row.mentionCount) ?? 0,
+      replies: safeCount(row.replyCount) ?? 0,
+      quotes: safeCount(row.quoteCount) ?? 0,
+      reposts: safeCount(row.repostCount) ?? 0,
+    },
     avatar_media_url:
       typeof row.avatarUrl === 'string' && row.avatarUrl.trim()
         ? row.avatarUrl

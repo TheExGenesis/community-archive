@@ -321,16 +321,35 @@ export async function fetchPortalTrendSeries(
   fetcher: AnalyticsFetcher = fetchAnalyticsGatewayJson,
   granularity: TrendGranularity = 'year',
 ): Promise<PortalTrendSeries> {
-  const { buckets, from, to } = trendBuckets(granularity, now)
+  const { buckets: requestedBuckets, from, to } = trendBuckets(granularity, now)
   const responses = await runBatched(
     terms.map((term) => () => fetchTrend(term, granularity, from, to, fetcher)),
   )
 
-  const series = terms.map((term, index) => {
+  const rowsByTerm = responses.map((response) => {
     const rows = new Map<string, ClickHouseTrendRow>()
-    for (const row of responses[index].data) {
+    for (const row of response.data) {
       rows.set(trendBucketKey(row.bucket, granularity), row)
     }
+    return rows
+  })
+  // The gateway returns corpus totals even when a term has zero matches.
+  // A missing/empty corpus bucket is not a measured zero. Cached term reads
+  // can have different watermarks, so end at a bucket covered by every series.
+  let lastCoveredIndex = rowsByTerm.length ? requestedBuckets.length - 1 : -1
+  while (
+    lastCoveredIndex >= 0 &&
+    !rowsByTerm.every((rows) => {
+      const row = rows.get(requestedBuckets[lastCoveredIndex])
+      return row && safeCount(row.totalTweets, 'trend total tweet count') > 0
+    })
+  ) {
+    lastCoveredIndex -= 1
+  }
+  const buckets = requestedBuckets.slice(0, lastCoveredIndex + 1)
+
+  const series = terms.map((term, index) => {
+    const rows = rowsByTerm[index]
     return {
       term,
       color: stableTrendColor(term),

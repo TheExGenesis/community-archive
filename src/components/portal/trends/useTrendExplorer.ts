@@ -326,19 +326,32 @@ export function useTrendExplorer({
 
     setIsAdding(true)
     try {
-      const body = await requestTrendSeries(newTerms, granularity)
+      // Refresh the whole chart together: available corpus dates can advance
+      // between additions, so retained arrays cannot reuse old bucket indexes.
+      const body = await requestTrendSeries(nextConfiguredTerms, granularity)
 
       const retainedSeries = replaceDefaults
         ? series.filter(({ term }) => alreadyPresent.includes(term))
         : series
       const firstColorIndex = retainedSeries.length
-      const additions = body.series.map((item, index) => ({
+      const retainedColors = new Map(
+        retainedSeries.map((item) => [item.term, item.color]),
+      )
+      const nextSeries = body.series.map((item) => ({
         ...item,
-        color: SERIES_COLORS[(firstColorIndex + index) % SERIES_COLORS.length],
+        color:
+          retainedColors.get(item.term) ??
+          SERIES_COLORS[
+            (firstColorIndex + newTerms.indexOf(item.term)) %
+              SERIES_COLORS.length
+          ],
       }))
-      const nextSeries = [...retainedSeries, ...additions]
+      const additions = nextSeries.filter((item) =>
+        newTerms.includes(item.term),
+      )
       setBuckets(body.buckets)
       setSeries(nextSeries)
+      setSelectedRange((current) => clampTrendRange(current, body.buckets))
       setConfiguredTerms(nextConfiguredTerms)
       setChartEnabled((current) =>
         replaceDefaults

@@ -247,16 +247,19 @@ describe('TrendsExplorer request isolation', () => {
       const requestUrl = new URL(String(url), 'https://example.com')
       if (requestUrl.searchParams.get('view') === 'series') {
         const terms = requestUrl.searchParams.getAll('q')
+        const buckets = terms.includes('second idea')
+          ? ['2025', '2026']
+          : ['2025']
         return {
           ok: true,
           json: async () => ({
             granularity: 'year',
-            buckets: ['2025', '2026'],
+            buckets,
             series: terms.map((term) => ({
               term,
               color: '#3b82f6',
-              tweetsPerBucket: [1, 2],
-              perBucket: [10, 20],
+              tweetsPerBucket: buckets.map((_, index) => index + 1),
+              perBucket: buckets.map((_, index) => (index + 1) * 10),
             })),
           }),
         } as Response
@@ -298,6 +301,12 @@ describe('TrendsExplorer request isolation', () => {
       screen.getByRole('button', { name: 'Remove custom idea trend' }),
     ).toBeVisible()
     expect(screen.getByText('2/12 trends')).toBeVisible()
+    expect(
+      screen.getByLabelText('custom idea · 2026 · 20 per 100k'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByLabelText('second idea · 2026 · 20 per 100k'),
+    ).toBeInTheDocument()
   })
 
   test('loads only a newly included term when prior term evidence is cached', async () => {

@@ -29,7 +29,7 @@ describe('API middleware rate limits', () => {
     'isolates search from background API traffic while retaining the %s quota',
     async (country, quota, ip) => {
       const backgroundPaths = [
-        '/api/user-directory',
+        '/api/link-preview/image?hash=example',
         '/api/profile/123/avatar',
         '/api/portal/stream',
         '/api/tweets/456/link-previews',
@@ -45,7 +45,7 @@ describe('API middleware rate limits', () => {
         ).resolves.toMatchObject({ status: 200 })
       }
       await expect(
-        request('/api/user-directory', ip, 'GET', country),
+        request('/api/portal/stream', ip, 'GET', country),
       ).resolves.toMatchObject({ status: 429 })
 
       for (let index = 0; index < quota; index += 1) {
@@ -69,6 +69,50 @@ describe('API middleware rate limits', () => {
       await expect(response.json()).resolves.toEqual({
         error: 'Too Many Requests',
       })
+    },
+  )
+
+  it.each([
+    ['US', 20, '203.0.113.30'],
+    ['SG', 5, '203.0.113.31'],
+  ])(
+    'isolates both pagination budgets from previews and each other, retaining the %s quotas',
+    async (country, quota, ip) => {
+      for (let index = 0; index < quota; index += 1) {
+        await expect(
+          request(`/api/tweets/${index}/link-previews`, ip, 'GET', country),
+        ).resolves.toMatchObject({ status: 200 })
+      }
+      await expect(
+        request('/api/portal/stream', ip, 'GET', country),
+      ).resolves.toMatchObject({ status: 429 })
+
+      for (const path of ['/api/user-directory', '/api/strands']) {
+        for (let index = 0; index < quota; index += 1) {
+          await expect(
+            request(`${path}?offset=${index * 24}`, ip, 'GET', country),
+          ).resolves.toMatchObject({ status: 200 })
+        }
+        const limited = await request(`${path}?offset=999`, ip, 'GET', country)
+        expect(limited.status).toBe(429)
+        expect(limited.headers.get('Retry-After')).toBe('60')
+        // A separate visitor still has their own budget.
+        await expect(
+          request(
+            path,
+            country === 'US' ? '203.0.113.32' : '203.0.113.33',
+            'GET',
+            country,
+          ),
+        ).resolves.toMatchObject({ status: 200 })
+      }
+      // The exemption is restricted to exact GET endpoints.
+      await expect(
+        request('/api/strands/123/context', ip, 'GET', country),
+      ).resolves.toMatchObject({ status: 429 })
+      await expect(
+        request('/api/user-directory', ip, 'POST', country),
+      ).resolves.toMatchObject({ status: 429 })
     },
   )
 

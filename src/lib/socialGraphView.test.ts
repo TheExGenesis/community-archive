@@ -19,7 +19,7 @@ describe('social graph view controls', () => {
       }),
     ).toEqual({
       minimumFollowers: 517,
-      startYear: 2021,
+      startYear: 2025,
       endYear: 2026,
       minimumStrength: 0.3,
       maximumNodes: 720,
@@ -40,7 +40,7 @@ describe('social graph view controls', () => {
     ).toEqual(
       expect.objectContaining({
         minimumFollowers: 100,
-        startYear: 2024,
+        startYear: 2025,
         endYear: 2025,
         maximumNodes: 50,
       }),

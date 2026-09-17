@@ -220,11 +220,9 @@ export default function ConversationMap({
       y: ((event.clientY - r.top) * vb.height) / r.height,
     }
   }
-  const pan = (direction: number) => {
-    if (wholeYear) {
-      const next = years[years.indexOf(year) + direction]
-      if (next) setYear(next)
-    } else changeRange(range[0] + span * 0.7 * direction, span)
+  const changeYear = (direction: number) => {
+    const next = years[years.indexOf(year) + direction]
+    if (next !== undefined) setYear(next)
   }
   const dateRange = `${dateFormat.format(new Date(Date.UTC(year, 0, 1) + range[0] * DAY))} — ${dateFormat.format(new Date(Date.UTC(year, 0, 1) + Math.min(days - 0.001, range[1]) * DAY))}`
 
@@ -284,12 +282,9 @@ export default function ConversationMap({
         </div>
         <div className={styles.pan}>
           <button
-            aria-label={wholeYear ? 'Previous year' : 'Earlier dates'}
-            disabled={
-              !ready ||
-              (wholeYear ? years.indexOf(year) === 0 : range[0] <= 0.001)
-            }
-            onClick={() => pan(-1)}
+            aria-label="Previous year"
+            disabled={!ready || years.indexOf(year) <= 0}
+            onClick={() => changeYear(-1)}
           >
             <ArrowLeft size={18} />
           </button>
@@ -298,14 +293,9 @@ export default function ConversationMap({
             <span aria-live="polite">{dateRange}</span>
           </div>
           <button
-            aria-label={wholeYear ? 'Next year' : 'Later dates'}
-            disabled={
-              !ready ||
-              (wholeYear
-                ? years.indexOf(year) === years.length - 1
-                : range[1] >= days - 0.001)
-            }
-            onClick={() => pan(1)}
+            aria-label="Next year"
+            disabled={!ready || years.indexOf(year) >= years.length - 1}
+            onClick={() => changeYear(1)}
           >
             <ArrowRight size={18} />
           </button>

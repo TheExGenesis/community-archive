@@ -138,7 +138,7 @@ export function DigestEditionView({
                   tweet={content.topBanger}
                   variant="editorial"
                   featuredRank={1}
-                  noClamp
+                  collapsible
                   showDate
                   origin="digest"
                   returnTo={returnTo}
@@ -193,7 +193,7 @@ export function DigestEditionView({
                           key={tweet.id}
                           tweet={tweet}
                           variant="editorial"
-                          noClamp
+                          collapsible
                           showDate
                           origin="digest"
                           returnTo={returnTo}

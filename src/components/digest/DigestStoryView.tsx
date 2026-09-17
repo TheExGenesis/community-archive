@@ -114,7 +114,7 @@ export function DigestStoryView({
                     key={tweet.id}
                     tweet={tweet}
                     variant="editorial"
-                    noClamp
+                    collapsible
                     showDate
                     origin="digest"
                     returnTo={returnTo}
@@ -142,7 +142,7 @@ export function DigestStoryView({
                       key={tweet.id}
                       tweet={tweet}
                       variant="editorial"
-                      noClamp
+                      collapsible
                       showDate
                       origin="digest"
                       returnTo={returnTo}
@@ -180,7 +180,7 @@ export function DigestStoryView({
                             key={tweet.id}
                             tweet={tweet}
                             variant="editorial"
-                            noClamp
+                            collapsible
                             showDate
                             quotedTweetDisplay="summary"
                             origin="digest"

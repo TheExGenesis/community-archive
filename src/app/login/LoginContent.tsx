@@ -7,6 +7,8 @@ interface LoginContentProps {
 }
 
 export default function LoginContent({ redirectUrl }: LoginContentProps) {
+  const fromBulletin =
+    redirectUrl === '/bulletin' || redirectUrl === '/opt-in?redirect=/bulletin'
   const isDev = process.env.NODE_ENV === 'development'
 
   return (
@@ -16,7 +18,9 @@ export default function LoginContent({ redirectUrl }: LoginContentProps) {
           <div className="mb-8 text-center">
             <h1 className="mb-2 text-3xl font-bold text-foreground">Sign In</h1>
             <p className="text-muted-foreground">
-              Sign in to continue exploring Community Archive.
+              {fromBulletin
+                ? 'The bulletin shows asks and offers from the community. To maintain this high trust environment, we gate the page to users who have opted into Community Archive.'
+                : 'Sign in to continue exploring Community Archive.'}
             </p>
             {redirectUrl && (
               <p className="mt-2 text-sm text-brand">

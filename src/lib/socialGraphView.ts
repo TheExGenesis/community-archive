@@ -4,7 +4,7 @@ export type YearRangeHandle = 'start' | 'end'
 
 export const SOCIAL_GRAPH_DEFAULTS = {
   minimumFollowers: 517,
-  startYear: 2021,
+  startYear: 2025,
   endYear: 2026,
   minimumStrength: 0.3,
   maximumNodes: 720,

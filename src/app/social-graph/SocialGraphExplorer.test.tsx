@@ -103,7 +103,7 @@ const snapshot = {
       target: 'b',
       strength: 3,
       mutualInteractions: 3,
-      yearlyInteractions: [[2021, 3, 3, 100, 100]],
+      yearlyInteractions: [[2025, 3, 3, 100, 100]],
     },
   ],
 } as SocialGraphSnapshot
@@ -144,7 +144,7 @@ describe('SocialGraphExplorer defaults', () => {
     expect(screen.getByText('Around @alpha, @beta')).toBeInTheDocument()
     expect(
       screen.getByRole('slider', { name: 'Interaction start year' }),
-    ).toHaveAttribute('aria-valuenow', '2021')
+    ).toHaveAttribute('aria-valuenow', '2025')
     expect(
       screen.getByRole('slider', { name: 'Interaction end year' }),
     ).toHaveAttribute('aria-valuenow', '2026')

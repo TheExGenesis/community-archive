@@ -33,9 +33,10 @@ export default async function OptInPage({ searchParams }: OptInPageProps) {
               </Link>
             ) : (
               <p>
-                The bulletin is available to people who have opted in to
-                Community Archive. Review the data policy below and choose
-                whether to opt in.
+                The bulletin shows asks and offers from the community. To
+                maintain this high trust environment, we gate the page to users
+                who have opted into Community Archive. Review the data policy
+                below and choose whether to opt in.
               </p>
             )}
           </div>

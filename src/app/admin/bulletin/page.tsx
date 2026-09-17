@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { loadRunDashboard, requireBulletinAdmin } from '@/lib/bulletin/data'
 import { RunDashboard } from '@/components/bulletin/RunDashboard'
 import { RefreshButton } from '@/components/bulletin/RefreshButton'
+import { RecommendationExplainer } from '@/components/bulletin/RecommendationExplainer'
 import { CandidateFilters } from '@/components/bulletin/CandidateFilters'
 
 export const dynamic = 'force-dynamic'
@@ -45,7 +46,14 @@ export default async function BulletinRunsPage({
           found and what still needs attention.
         </p>
       </header>
+      <Link
+        href="/admin/bulletin/decisions"
+        className="inline-flex rounded-lg border px-4 py-3 text-sm font-medium text-brand hover:bg-muted"
+      >
+        Browse accepted, rejected and queued tweets →
+      </Link>
       <CandidateFilters />
+      <RecommendationExplainer />
       {prompts ? (
         <PromptEditor data={prompts} olderThan={searchParams?.prompts_before} />
       ) : (

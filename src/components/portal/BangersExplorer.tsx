@@ -493,7 +493,7 @@ export function BangersExplorer({
             </SelectTrigger>
             <SelectContent className="rounded-[3px]">
               <SelectItem value="all">All time</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="today">Last 24h</SelectItem>
               <SelectItem value="week">Last 7 days</SelectItem>
               <SelectItem value="three-months">Last 3 months</SelectItem>
               {availableYears.map((availableYear) => (

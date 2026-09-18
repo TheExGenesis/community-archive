@@ -26,8 +26,18 @@ describe('renderDigestEmail', () => {
   })
 
   it('renders the top banger and per-story tweet cards', () => {
-    const { html, text } = renderDigestEmail(AUGUST_11_MOCK_DIGEST, LINKS)
-    const { topBanger, stories } = AUGUST_11_MOCK_DIGEST.content
+    const edition = {
+      ...AUGUST_11_MOCK_DIGEST,
+      content: {
+        ...AUGUST_11_MOCK_DIGEST.content,
+        topBanger: {
+          ...AUGUST_11_MOCK_DIGEST.content.topBanger,
+          id: 'standalone',
+        },
+      },
+    }
+    const { html, text } = renderDigestEmail(edition, LINKS)
+    const { topBanger, stories } = edition.content
 
     expect(html).toContain('Top tweet')
     expect(html).toContain(`@${topBanger.username}`)
@@ -41,6 +51,19 @@ describe('renderDigestEmail', () => {
       expect(html).not.toContain(`${LINKS.siteUrl}/tweets/${thirdTweet.id}`)
       expect(html).toContain('more tweet')
     }
+  })
+
+  it('leaves a repeated representative tweet in its story, without a second featured card', () => {
+    const tweet = AUGUST_11_MOCK_DIGEST.content.stories[0].bangers[0]
+    const edition = {
+      ...AUGUST_11_MOCK_DIGEST,
+      content: { ...AUGUST_11_MOCK_DIGEST.content, topBanger: tweet },
+    }
+    const { html, text } = renderDigestEmail(edition, LINKS)
+    expect(html).not.toContain('Top tweet')
+    expect(text).not.toContain('TOP TWEET')
+    expect(html.split(`${LINKS.siteUrl}/tweets/${tweet.id}`)).toHaveLength(2)
+    expect(text).toContain(tweet.text)
   })
 
   it('escapes HTML in model-authored copy', () => {

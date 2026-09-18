@@ -11,6 +11,7 @@ import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
 import { buildSearchHref } from '@/lib/searchParams'
 import { MUTED, SERIF } from '@/components/portal/styles'
 import PostHogLink from '@/components/PostHogLink'
+import { shouldShowRepresentativeTweet } from '@/lib/digest/presentation'
 
 const longDate = (date: string) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -49,6 +50,7 @@ export function DigestEditionView({
   >
 }) {
   const content = edition.content
+  const showRepresentativeTweet = shouldShowRepresentativeTweet(content)
   const returnTo = `/digest/${edition.digestDate}`
 
   return (
@@ -128,25 +130,27 @@ export function DigestEditionView({
 
         <div className="mt-12 grid items-start lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-x-14">
           <div className="min-w-0">
-            <section>
-              <div className="flex items-center gap-3.5">
-                <span className={sectionLabel}>Representative tweet</span>
-                <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
-              </div>
-              <div className="mt-6">
-                <TweetCard
-                  tweet={content.topBanger}
-                  variant="editorial"
-                  featuredRank={1}
-                  collapsible
-                  showDate
-                  origin="digest"
-                  returnTo={returnTo}
-                />
-              </div>
-            </section>
+            {showRepresentativeTweet && (
+              <section>
+                <div className="flex items-center gap-3.5">
+                  <span className={sectionLabel}>Representative tweet</span>
+                  <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
+                </div>
+                <div className="mt-6">
+                  <TweetCard
+                    tweet={content.topBanger}
+                    variant="editorial"
+                    featuredRank={1}
+                    collapsible
+                    showDate
+                    origin="digest"
+                    returnTo={returnTo}
+                  />
+                </div>
+              </section>
+            )}
 
-            <div className="mt-12">
+            <div className={showRepresentativeTweet ? 'mt-12' : undefined}>
               {content.stories.map((story) => {
                 const storyHref = `/digest/${edition.digestDate}/${story.slug}`
 

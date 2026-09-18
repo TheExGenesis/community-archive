@@ -42,6 +42,41 @@ export interface CommunityProject {
  */
 export const COMMUNITY_PROJECTS: CommunityProject[] = [
   {
+    slug: 'bangers',
+    name: 'Bangers',
+    creator: 'Community Archive',
+    summary: 'Find standout community tweets from the last day or years ago.',
+    description:
+      'Browse popular archived posts, search by keyword, and explore different time periods and rankings.',
+    archiveUse:
+      'Ranks posts from participating accounts using archived engagement and community interactions.',
+    category: 'Tools',
+    tags: ['Discovery', 'Popular tweets', 'Search'],
+    projectUrl: '/bangers',
+    image: '/images/featured/bangers.png',
+    coverClass: 'from-[#f3d36b] via-[#f0a660] to-[#1e9bcd]',
+    featured: true,
+    publishedAt: '2026-09-18',
+  },
+  {
+    slug: 'pairwise',
+    name: 'Pairwise',
+    creator: 'Loopy',
+    creatorHandle: 'strangestloop',
+    summary: 'Read two people’s archives as one conversation.',
+    description:
+      'Explore replies between two archive contributors, their shared words, and when they talk, in a searchable conversation view.',
+    archiveUse:
+      'Brings together archived replies between two people to show their conversations over time.',
+    category: 'Tools',
+    tags: ['Conversations', 'Personal archive', 'Relationships'],
+    projectUrl: 'https://strangestloop.io/pairwise',
+    sourceUrl: 'https://strangestloop.io/coding/',
+    coverClass: 'from-[#ffb5d8] via-[#ffd7e8] to-[#8bd2ee]',
+    featured: true,
+    publishedAt: '2026-09-18',
+  },
+  {
     slug: 'birdseye',
     name: 'Birdseye',
     creator: 'Community Archive',

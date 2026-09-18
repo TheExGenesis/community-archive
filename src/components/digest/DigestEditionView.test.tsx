@@ -106,3 +106,21 @@ describe('DigestEditionView', () => {
     ).not.toBeInTheDocument()
   })
 })
+
+test('shows the publication date with an explicit coverage window', () => {
+  render(
+    <DigestEditionView
+      edition={{
+        ...AUGUST_11_MOCK_DIGEST,
+        publishedAt: '2026-08-12T00:30:00Z',
+      }}
+      archive={[]}
+    />,
+  )
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+    'Wednesday, 12 August 2026',
+  )
+  expect(screen.getByText(/24-hour coverage:/)).toHaveTextContent(
+    'Aug 11, 2026, 06:00 – Aug 12, 2026, 06:00 UTC',
+  )
+})

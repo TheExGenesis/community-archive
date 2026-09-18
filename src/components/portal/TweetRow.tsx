@@ -13,6 +13,7 @@ import {
   userProfileHref,
   type TweetOrigin,
 } from '@/lib/navigation'
+import { HighlightedText } from '@/components/HighlightedText'
 import { decodeTweetText } from '@/lib/tweetText'
 import {
   Tooltip,
@@ -155,6 +156,7 @@ function QuotedTweet({
   origin,
   returnTo,
   onOpen,
+  highlightQuery,
 }: {
   tweet: PortalQuotedTweet
   compact: boolean
@@ -165,6 +167,7 @@ function QuotedTweet({
   origin?: TweetOrigin
   returnTo?: string
   onOpen: () => void
+  highlightQuery?: string
 }) {
   if (tweet.isDeleted) {
     return (
@@ -216,7 +219,10 @@ function QuotedTweet({
         <div
           className={`${condensed && !noClamp ? 'line-clamp-3' : ''} mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-zinc-700 dark:text-[#d9d9de]`}
         >
-          {decodeTweetText(tweet.text)}
+          <HighlightedText
+            text={decodeTweetText(tweet.text)}
+            query={highlightQuery}
+          />
         </div>
       </Link>
       {!summary && (
@@ -255,6 +261,7 @@ function QuotedTweet({
 
 export interface TweetCardProps {
   tweet: PortalTweet
+  highlightQuery?: string
   variant?: 'default' | 'editorial'
   animate?: boolean
   compact?: boolean
@@ -313,6 +320,7 @@ function ArchivedQuotesMetric({
 
 export function TweetRow({
   tweet,
+  highlightQuery,
   variant = 'default',
   animate = false,
   compact = false,
@@ -419,7 +427,10 @@ export function TweetRow({
               : ''
       }`}
     >
-      {decodeTweetText(tweet.text)}
+      <HighlightedText
+        text={decodeTweetText(tweet.text)}
+        query={highlightQuery}
+      />
     </div>
   )
 
@@ -521,6 +532,7 @@ export function TweetRow({
         {tweet.quotedTweet && (
           <QuotedTweet
             tweet={tweet.quotedTweet}
+            highlightQuery={highlightQuery}
             compact={compact}
             summary={quotedTweetDisplay === 'summary'}
             noClamp={noClamp || (isPreview && isExpanded)}

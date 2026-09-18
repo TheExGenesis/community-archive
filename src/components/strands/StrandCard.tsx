@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { HighlightedText } from '@/components/HighlightedText'
 import PostHogLink from '@/components/PostHogLink'
 import TweetCard from '@/components/TweetCard'
 import type { StrandCardItem } from '@/lib/community-apps/types'
@@ -7,7 +8,13 @@ import { StrandActivity } from './StrandActivity'
 import { STRAND_CLUSTER_NAMES } from '@/lib/community-apps/strand-cluster-names'
 import { AnalysisText } from '@/components/community-apps/AnalysisText'
 
-export function StrandCard({ strand }: { strand: StrandCardItem }) {
+export function StrandCard({
+  strand,
+  highlightQuery,
+}: {
+  strand: StrandCardItem
+  highlightQuery?: string
+}) {
   return (
     <StrandCardFocus
       id={strand.id}
@@ -21,6 +28,7 @@ export function StrandCard({ strand }: { strand: StrandCardItem }) {
           {strand.tweet ? (
             <TweetCard
               tweet={strand.tweet}
+              highlightQuery={highlightQuery}
               showDate
               noClamp
               clickable={false}
@@ -58,11 +66,13 @@ export function StrandCard({ strand }: { strand: StrandCardItem }) {
               href={`/strands/${strand.id}`}
               className="hover:text-brand"
             >
-              {strand.title}
+              <HighlightedText text={strand.title} query={highlightQuery} />
             </PostHogLink>
           </h2>
           <div className="mt-3 text-sm leading-6">
-            <AnalysisText>{strand.summary.split(/\n\n/)[0]}</AnalysisText>
+            <AnalysisText highlightQuery={highlightQuery}>
+              {strand.summary.split(/\n\n/)[0]}
+            </AnalysisText>
           </div>
           <StrandActivity
             activity={strand.activity}

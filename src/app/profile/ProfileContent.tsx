@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
@@ -98,6 +99,7 @@ export default function ProfileContent({
   }
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false)
   const [showOptOutDialog, setShowOptOutDialog] = useState(false)
+  const [optOutReason, setOptOutReason] = useState('')
   const supabase = createBrowserClient()
 
   const twitterUsername =
@@ -220,7 +222,8 @@ export default function ProfileContent({
       termsVersion: 'v1.0',
       explicitOptOut: checked,
       optOutReason: checked
-        ? 'User explicitly opted out via profile settings'
+        ? optOutReason.trim() ||
+          'User explicitly opted out via profile settings'
         : null,
     })
   }
@@ -233,6 +236,7 @@ export default function ProfileContent({
     setSuccess(null)
 
     if (checked) {
+      setOptOutReason('')
       setShowOptOutDialog(true)
       return
     }
@@ -802,6 +806,23 @@ export default function ProfileContent({
                 This part is irreversible.
               </p>
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="opt-out-reason">
+              Why are you opting out? (optional)
+            </Label>
+            <Textarea
+              id="opt-out-reason"
+              value={optOutReason}
+              onChange={(event) => setOptOutReason(event.target.value)}
+              maxLength={1000}
+              rows={3}
+              disabled={isPreferenceSaving || deletingArchive === 'all'}
+              placeholder="Anything you’d like us to know"
+            />
+            <p className="text-xs text-muted-foreground">
+              You can leave this blank and still opt out.
+            </p>
           </div>
           <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
             <Button

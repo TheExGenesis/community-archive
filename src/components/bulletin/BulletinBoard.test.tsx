@@ -653,3 +653,57 @@ test('keeps expansion when ranking moves a card between columns', async () => {
       .mock.calls.filter(([url]) => String(url).includes('/tweets?')),
   ).toHaveLength(1)
 })
+
+test('shows staged filter loading hints, resets for new filters, and clears on completion', async () => {
+  let complete!: (value: Response) => void
+  jest.mocked(fetch).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve
+      }),
+  )
+  const initial = page([offer])
+  render(
+    <BulletinBoard notices={[offer]} initialPage={initial} now={initial.now} />,
+  )
+  fireEvent.change(screen.getByLabelText('Filter notices'), {
+    target: { value: 'python' },
+  })
+  await act(async () => {
+    jest.advanceTimersByTime(200)
+  })
+  expect(
+    screen.getByText(
+      /^(Loading matching notices|Still finding matching notices)/,
+    ),
+  ).toHaveTextContent('Loading matching notices…')
+  await act(async () => {
+    jest.advanceTimersByTime(10000)
+  })
+  expect(
+    screen.getByText(
+      /^(Loading matching notices|Still finding matching notices)/,
+    ),
+  ).toHaveTextContent('taking longer than usual')
+  fireEvent.change(screen.getByLabelText('Filter notices'), {
+    target: { value: 'help' },
+  })
+  await act(async () => {
+    jest.advanceTimersByTime(200)
+  })
+  expect(
+    screen.getByText(
+      /^(Loading matching notices|Still finding matching notices)/,
+    ).textContent,
+  ).toBe('Loading matching notices…')
+  await act(async () => {
+    complete({ ok: true, json: async () => page([offer]) } as Response)
+  })
+  expect(
+    screen.queryByText(/Still finding matching notices/),
+  ).not.toBeInTheDocument()
+  expect(
+    screen.queryByText('Loading matching notices…'),
+  ).not.toBeInTheDocument()
+  expect(screen.getByText('Help with Python')).toBeInTheDocument()
+})

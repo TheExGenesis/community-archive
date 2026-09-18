@@ -1,5 +1,7 @@
 'use client'
 
+import { LoadingStatus } from '@/components/LoadingStatus'
+
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import UnifiedTweetList from '@/components/UnifiedTweetList'
 import { Button } from '@/components/ui/button'
@@ -252,6 +254,11 @@ export default function TweetList({
   if (isLoading) {
     return (
       <div className="space-y-4" aria-label="Loading tweets">
+        <LoadingStatus
+          label="Searching tweets…"
+          slowLabel="Still searching the archive…"
+          className="block text-sm text-muted-foreground"
+        />
         <div className="flex items-center justify-between border-b border-border pb-5">
           <div className="space-y-2">
             <Skeleton className="h-6 w-40" />

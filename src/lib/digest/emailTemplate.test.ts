@@ -81,3 +81,19 @@ describe('renderDigestEmail', () => {
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt; &amp; more')
   })
 })
+
+it('uses the UTC publication date while retaining the edition URL and exact coverage', () => {
+  const edition = {
+    ...AUGUST_11_MOCK_DIGEST,
+    publishedAt: '2026-08-12T00:30:00Z',
+  }
+  const { subject, html, text } = renderDigestEmail(edition, LINKS)
+  expect(subject).toBe('Community Archive Digest — Wednesday, August 12, 2026')
+  expect(html).toContain('/digest/2026-08-11')
+  expect(text).toContain(
+    '24-hour coverage: Aug 11, 2026, 06:00 – Aug 12, 2026, 06:00 UTC',
+  )
+  expect(html).toContain(
+    '24-hour coverage: Aug 11, 2026, 06:00 – Aug 12, 2026, 06:00 UTC',
+  )
+})

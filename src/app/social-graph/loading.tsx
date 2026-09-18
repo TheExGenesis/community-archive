@@ -7,5 +7,10 @@ export default function Loading() {
   useEffect(() => {
     void import('./SocialGraphExplorer').catch(() => {})
   }, [])
-  return <PortalPageLoading label="Loading Social graph" />
+  return (
+    <PortalPageLoading
+      label="Loading Social graph"
+      slowLabel="Still loading the social graph…"
+    />
+  )
 }

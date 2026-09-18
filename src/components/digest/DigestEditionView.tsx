@@ -11,7 +11,11 @@ import type { DigestCalendarDay, DigestEdition } from '@/lib/digest/types'
 import { buildSearchHref } from '@/lib/searchParams'
 import { MUTED, SERIF } from '@/components/portal/styles'
 import PostHogLink from '@/components/PostHogLink'
-import { shouldShowRepresentativeTweet } from '@/lib/digest/presentation'
+import {
+  digestPublicationDate,
+  digestCoverageLabel,
+  shouldShowRepresentativeTweet,
+} from '@/lib/digest/presentation'
 
 const longDate = (date: string) =>
   new Intl.DateTimeFormat('en-GB', {
@@ -109,8 +113,11 @@ export function DigestEditionView({
               className="text-[42px] font-semibold leading-[1.02] tracking-[-0.01em] sm:text-[56px] lg:text-[66px]"
               style={SERIF}
             >
-              {longDate(edition.digestDate)}
+              {longDate(digestPublicationDate(edition))}
             </h1>
+            <p className={`mt-3 text-sm ${MUTED}`}>
+              {digestCoverageLabel(content)}
+            </p>
           </div>
 
           <div className="mt-7 border-t-[3px] border-zinc-800 dark:border-zinc-200" />

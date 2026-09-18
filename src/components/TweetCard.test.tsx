@@ -300,3 +300,36 @@ test('partial cards hide unknown counts without hiding text or outbound navigati
   ).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Read more' })).toBeInTheDocument()
 })
+
+test('highlights literal queries in tweet and quote text without changing navigation', () => {
+  const { container, rerender } = render(
+    <TweetCard tweet={tweet} highlightQuery='"complete tweet" "quoted"' />,
+  )
+  expect(
+    Array.from(container.querySelectorAll('mark')).map(
+      (mark) => mark.textContent,
+    ),
+  ).toEqual(['complete tweet', 'quoted'])
+  expect(screen.getByRole('link', { name: 'Alice @alice' })).toHaveAttribute(
+    'href',
+    expect.stringContaining('alice'),
+  )
+  rerender(
+    <TweetCard
+      tweet={{
+        ...tweet,
+        text: 'Literal a+b and <script> text',
+        quotedTweet: undefined,
+      }}
+      highlightQuery="a+b <script>"
+    />,
+  )
+  expect(
+    Array.from(container.querySelectorAll('mark')).map(
+      (mark) => mark.textContent,
+    ),
+  ).toEqual(['a+b', '<script>'])
+  expect(container.querySelector('script')).toBeNull()
+  rerender(<TweetCard tweet={tweet} highlightQuery="" />)
+  expect(container.querySelector('mark')).toBeNull()
+})

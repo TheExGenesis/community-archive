@@ -130,6 +130,12 @@ function getApiRateLimitPolicy(
   method: string,
   isSG: boolean,
 ) {
+  if (method === 'GET' && pathname.startsWith('/api/companion/v1/')) {
+    return {
+      bucket: 'api:companion',
+      maxRequests: isSG ? IN_MEMORY_MAX_API_SG : IN_MEMORY_MAX_API_DEFAULT,
+    }
+  }
   // Avatars, stream polling, and link previews must not consume the next
   // search or pagination request. Keep each browsing quota bounded per IP.
   if (

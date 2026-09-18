@@ -18,7 +18,9 @@ const SocialGraphExplorer = dynamic(() => import('./SocialGraphExplorer'), {
 
 export const metadata = { title: 'Social graph · Community Archive' }
 
-export default async function SocialGraphPage() {
+export default async function SocialGraphPage({
+  searchParams = {},
+}: { searchParams?: { person?: string } } = {}) {
   const snapshotResult = getSocialGraphSnapshot().then(
     (snapshot) => ({ snapshot, error: null }),
     (error: unknown) => ({ snapshot: null, error }),
@@ -84,6 +86,12 @@ export default async function SocialGraphPage() {
         <SocialGraphExplorer
           snapshot={snapshot}
           currentMember={currentMember}
+          initialPerson={
+            typeof searchParams.person === 'string' &&
+            /^[A-Za-z0-9_]{1,15}$/.test(searchParams.person)
+              ? searchParams.person
+              : undefined
+          }
         />
       </div>
     </main>

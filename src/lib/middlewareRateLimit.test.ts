@@ -22,6 +22,24 @@ const request = (
   )
 
 describe('API middleware rate limits', () => {
+  it('gives companion reads one bounded budget separate from website background traffic', async () => {
+    const ip = '203.0.113.80'
+    for (let index = 0; index < 20; index++) {
+      expect((await request('/api/portal/stream', ip)).status).toBe(200)
+      expect(
+        (
+          await request(
+            `/api/companion/v1/${index % 2 ? 'digest' : 'bangers'}`,
+            ip,
+          )
+        ).status,
+      ).toBe(200)
+    }
+    expect(
+      (await request('/api/companion/v1/graph?username=alice', ip)).status,
+    ).toBe(429)
+    expect((await request('/api/tweet-search?q=memory', ip)).status).toBe(200)
+  })
   it.each([
     ['US', 20, '203.0.113.20'],
     ['SG', 5, '203.0.113.21'],

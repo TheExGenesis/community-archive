@@ -13,7 +13,11 @@ import SocialGraphPage from './page'
 
 jest.mock('next/dynamic', () => ({
   __esModule: true,
-  default: () => () => null,
+  default:
+    () =>
+    ({ initialPerson }: { initialPerson?: string }) => (
+      <span data-testid="graph-focus">{initialPerson}</span>
+    ),
 }))
 
 jest.mock('@/app/admin/data', () => ({
@@ -41,6 +45,11 @@ const getTwitterProviderIdMock = jest.mocked(getTwitterProviderId)
 const getTwitterUsernameMock = jest.mocked(getTwitterUsername)
 
 describe('SocialGraphPage public access', () => {
+  it('preserves a valid person from the companion URL', async () => {
+    getCurrentUserMock.mockResolvedValue(null)
+    render(await SocialGraphPage({ searchParams: { person: 'alice' } }))
+    expect(screen.getByTestId('graph-focus')).toHaveTextContent('alice')
+  })
   beforeEach(() => {
     jest.clearAllMocks()
     getSocialGraphSnapshotMock.mockResolvedValue({

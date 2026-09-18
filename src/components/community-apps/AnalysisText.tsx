@@ -1,12 +1,32 @@
 import Link from 'next/link'
+import { HighlightedChildren } from '@/components/HighlightedText'
 import ReactMarkdown from 'react-markdown'
 
-export function AnalysisText({ children }: { children: string }) {
+export function AnalysisText({
+  children,
+  highlightQuery,
+}: {
+  children: string
+  highlightQuery?: string
+}) {
   return (
     <div className="space-y-4 text-[15px] leading-7 text-muted-foreground">
       <ReactMarkdown
         components={{
-          p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+          p: ({ children }) => (
+            <p className="mb-4 last:mb-0">
+              <HighlightedChildren query={highlightQuery}>
+                {children}
+              </HighlightedChildren>
+            </p>
+          ),
+          li: ({ children }) => (
+            <li>
+              <HighlightedChildren query={highlightQuery}>
+                {children}
+              </HighlightedChildren>
+            </li>
+          ),
           a: ({ href, children }) => (
             <a
               href={href}

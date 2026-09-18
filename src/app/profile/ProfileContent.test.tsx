@@ -66,6 +66,58 @@ describe('ProfileContent opt-in preference', () => {
     global.fetch = originalFetch
   })
 
+  it.each([
+    ['  Less time online  ', 'Less time online'],
+    ['', 'User explicitly opted out via profile settings'],
+  ])(
+    'accepts an optional opt-out reason %j without deleting data',
+    async (reason, expected) => {
+      mockFetch.mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      render(
+        <ProfileContent user={user} initialOptInData={null} archives={[]} />,
+      )
+      fireEvent.click(screen.getByRole('switch', { name: /explicit opt-out/i }))
+      const input = screen.getByRole('textbox', {
+        name: /why are you opting out/i,
+      })
+      expect(input).toHaveAttribute('maxLength', '1000')
+      fireEvent.change(input, { target: { value: reason } })
+      fireEvent.click(screen.getByRole('button', { name: 'Opt out only' }))
+      await screen.findByText('Added to explicit opt-out list')
+      expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toMatchObject({
+        optedIn: false,
+        explicitOptOut: true,
+        optOutReason: expected,
+      })
+      expect(mockRpc).not.toHaveBeenCalled()
+    },
+  )
+
+  it('preserves an optional reason after a failed opt-out so the user can retry', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'Please retry' }), { status: 500 }),
+    )
+    render(<ProfileContent user={user} initialOptInData={null} archives={[]} />)
+    fireEvent.click(screen.getByRole('switch', { name: /explicit opt-out/i }))
+    const input = screen.getByRole('textbox', {
+      name: /why are you opting out/i,
+    })
+    fireEvent.change(input, { target: { value: 'My reason' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Opt out only' }))
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Opt out only' }),
+      ).toBeEnabled(),
+    )
+    expect(input).toHaveValue('My reason')
+    mockFetch.mockResolvedValueOnce(new Response('{}', { status: 200 }))
+    fireEvent.click(screen.getByRole('button', { name: 'Opt out only' }))
+    await screen.findByText('Added to explicit opt-out list')
+    expect(JSON.parse(mockFetch.mock.calls[1][1].body).optOutReason).toBe(
+      'My reason',
+    )
+  })
+
   it('shows retry timing and preserves the prior state after a 429', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ error: 'Too Many Requests' }), {

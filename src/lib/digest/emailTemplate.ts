@@ -1,7 +1,11 @@
 import type { DigestEdition } from '@/lib/digest/types'
 import type { PortalTweet } from '@/lib/portal/types'
 import { formatNumber } from '@/lib/formatNumber'
-import { shouldShowRepresentativeTweet } from './presentation'
+import {
+  digestPublicationDate,
+  digestCoverageLabel,
+  shouldShowRepresentativeTweet,
+} from './presentation'
 
 export interface DigestEmailLinks {
   siteUrl: string
@@ -106,7 +110,7 @@ export function renderDigestEmail(
 ): RenderedDigestEmail {
   const { content } = edition
   const showRepresentativeTweet = shouldShowRepresentativeTweet(content)
-  const prettyDate = formatDigestDateParts(edition.digestDate)
+  const prettyDate = formatDigestDateParts(digestPublicationDate(edition))
   const editionUrl = `${links.siteUrl}/digest/${edition.digestDate}`
   const subject = `Community Archive Digest — ${prettyDate.full}`
 
@@ -158,6 +162,7 @@ export function renderDigestEmail(
     <a href="${escapeHtml(links.siteUrl)}" style="display:inline-block;" aria-label="Community Archive website"><img src="${links.siteUrl}/images/email-logo.png" width="48" height="48" alt="Community Archive" style="display:block;margin:0 0 12px;" /></a>
     <p style="margin:0 0 4px;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#9ca3af;">Community Archive Daily Digest</p>
     <h1 class="digest-h1" style="margin:0 0 16px;font-family:${HEADING_FONT};font-size:30px;line-height:1.2;color:#111827;">${escapeHtml(prettyDate.dayPart)}<span class="digest-year">, ${escapeHtml(prettyDate.year)}</span></h1>
+    <p style="margin:0 0 12px;font-size:13px;color:#6b7280;">${escapeHtml(digestCoverageLabel(content))}</p>
     <p style="margin:0 0 20px;"><a href="${escapeHtml(editionUrl)}" style="color:#1d4ed8;font-size:14px;">Read on Community Archive →</a></p>
     <ul style="margin:0 0 24px;padding-left:20px;font-size:14px;line-height:1.5;">${summaryHtml}</ul>
     ${topBangerHtml}
@@ -174,6 +179,7 @@ export function renderDigestEmail(
 
   const text = [
     `Community Archive Daily Digest — ${prettyDate.full}`,
+    digestCoverageLabel(content),
     `Read on Community Archive: ${editionUrl}`,
     '',
     ...content.executiveSummary.map((line) => `* ${line}`),

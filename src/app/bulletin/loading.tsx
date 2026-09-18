@@ -1,3 +1,4 @@
+import { LoadingStatus } from '@/components/LoadingStatus'
 import styles from '@/components/bulletin/BulletinBoard.module.css'
 
 export default function LoadingBulletin() {
@@ -5,9 +6,11 @@ export default function LoadingBulletin() {
     <main className={styles.page} aria-busy="true">
       <header className={styles.head}>
         <h1 className={styles.title}>Bulletin</h1>
-        <p role="status" className={styles.lede}>
-          Loading notices…
-        </p>
+        <LoadingStatus
+          className={`block ${styles.lede}`}
+          label="Loading notices…"
+          slowLabel="Still loading the bulletin…"
+        />
       </header>
       <div className={styles.board} aria-hidden="true">
         {Array.from({ length: 12 }, (_, i) => (

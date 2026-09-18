@@ -687,6 +687,7 @@ export function BangersExplorer({
                 >
                   <TweetCard
                     tweet={tweet}
+                    highlightQuery={loadedQuery}
                     featuredRank={tweetRanks.get(tweet.id)}
                     showDate
                     collapsible

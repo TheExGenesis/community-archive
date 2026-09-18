@@ -1,5 +1,7 @@
 'use client'
 
+import { LoadingStatus } from '@/components/LoadingStatus'
+
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
@@ -766,8 +768,14 @@ export function BulletinBoard({
         </div>
       </div>
       {pages.pending && (
-        <p role="status" className={styles.pending}>
-          {pages.error || 'Loading matching notices…'}
+        <p role={pages.error ? 'alert' : undefined} className={styles.pending}>
+          {pages.error || (
+            <LoadingStatus
+              key={`${kind}:${side}:${needle}:${past}:${resolved}:${recommended}`}
+              label="Loading matching notices…"
+              slowLabel="Still finding matching notices…"
+            />
+          )}
           {pages.error && (
             <button className={styles.hintButton} onClick={pages.retry}>
               Retry
@@ -828,7 +836,15 @@ export function BulletinBoard({
             }
           />
         )}
-      {pages.loading[kind] && <p className={styles.empty}>Loading more…</p>}
+      {pages.loading[kind] && (
+        <p className={styles.empty}>
+          <LoadingStatus
+            key={kind}
+            label="Loading more notices…"
+            slowLabel="Still loading more notices…"
+          />
+        </p>
+      )}
       {pages.laneErrors[kind] && (
         <p className={styles.empty}>
           {pages.laneErrors[kind]}{' '}

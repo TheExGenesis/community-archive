@@ -1,14 +1,27 @@
+import { LoadingStatus } from '@/components/LoadingStatus'
+
 interface PortalPageLoadingProps {
   label: string
+  slowLabel?: string
 }
 
-export function PortalPageLoading({ label }: PortalPageLoadingProps) {
+export function PortalPageLoading({
+  label,
+  slowLabel,
+}: PortalPageLoadingProps) {
   return (
     <main
       aria-busy="true"
       aria-label={label}
       className="min-h-screen bg-zinc-100/80 dark:bg-transparent"
     >
+      {slowLabel && (
+        <LoadingStatus
+          label={`${label}…`}
+          slowLabel={slowLabel}
+          className="mx-auto block max-w-[1600px] px-4 pt-6 text-sm text-muted-foreground sm:px-6 lg:px-8"
+        />
+      )}
       <div className="mx-auto max-w-[1600px] animate-pulse px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-3 h-4 w-24 rounded bg-zinc-300/80 dark:bg-zinc-800" />
         <div className="mb-3 h-8 w-44 rounded bg-zinc-300/80 dark:bg-zinc-800" />

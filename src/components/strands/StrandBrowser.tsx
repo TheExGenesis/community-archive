@@ -83,7 +83,7 @@ export function StrandFeed({
       </p>
       <section aria-label="Strands" className="space-y-7" aria-busy={loading}>
         {page?.items.map((strand) => (
-          <StrandCard key={strand.id} strand={strand} />
+          <StrandCard key={strand.id} strand={strand} highlightQuery={query} />
         ))}
       </section>
       <div ref={sentinel} className="py-8 text-center">

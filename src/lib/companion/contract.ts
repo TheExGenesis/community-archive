@@ -13,6 +13,7 @@ export type ArchiveInput = {
   q?: string
   username?: string
   period?: 'all' | 'week' | 'today' | 'three-months'
+  graphWindow?: 'recent'
   granularity?: 'year' | 'month' | 'week' | 'day'
   offset?: number
   date?: string
@@ -54,7 +55,17 @@ export type DigestData = {
   preview: boolean
   matched: boolean
 }
+export type TrendingWord = {
+  term: string
+  lane?: 'emerging' | 'rising' | 'falling'
+  posts: number
+  changePct: number | null
+  since?: string
+  until?: string
+}
 export type TrendData = {
+  /** Present for the default weekly discovery view (no query). */
+  words?: TrendingWord[]
   term: string
   granularity: string
   buckets: string[]
@@ -66,9 +77,14 @@ export type TrendData = {
 export type GraphPerson = { id: string; username: string; name: string }
 export type GraphData = {
   focus: GraphPerson | null
-  neighbors: (GraphPerson & { strength: number; interactions: number })[]
+  neighbors: (GraphPerson & {
+    strength: number
+    interactions: number
+    lastInteractionAt?: string
+  })[]
   generatedAt: string
   timeWindow: string
+  days?: number
   truncated: boolean
 }
 export type ArchivePayloads = {
@@ -119,6 +135,7 @@ export function archiveRequestPath(input: ArchiveInput): string {
     'username',
     'period',
     'granularity',
+    'graphWindow',
     'offset',
     'date',
   ] as const) {
@@ -152,6 +169,9 @@ export function parseArchiveInput(
   const granularity = params.get('granularity') || 'month'
   if (!['year', 'month', 'week', 'day'].includes(granularity))
     throw new Error('Choose a valid trend interval')
+  const graphWindow = params.get('graphWindow') || ''
+  if (graphWindow && graphWindow !== 'recent')
+    throw new Error('Choose a valid graph window')
   const date = params.get('date') || ''
   if (
     date &&
@@ -160,8 +180,7 @@ export function parseArchiveInput(
       new Date(date).toISOString().slice(0, 10) !== date)
   )
     throw new Error('Choose a valid digest date')
-  if ((feature === 'trends' || feature === 'search') && !q)
-    throw new Error('Enter a topic to explore')
+  if (feature === 'search' && !q) throw new Error('Enter a topic to explore')
   if (feature === 'trends' && q.length > 80)
     throw new Error('Choose a trend term of 80 characters or fewer')
   return {
@@ -172,5 +191,6 @@ export function parseArchiveInput(
     period: period as ArchiveInput['period'],
     granularity: granularity as ArchiveInput['granularity'],
     ...(date ? { date } : {}),
+    ...(graphWindow ? { graphWindow: 'recent' as const } : {}),
   }
 }

@@ -6,9 +6,9 @@ The extension and website use the same CA feature services. `GET /api/companion/
 | --- | --- | --- |
 | `bangers` | `username`, or `q` and `period`; `offset` | Public profile resolution and curated profile bangers; portal bangers |
 | `digest` | Optional `date`, `q`, `username` | Published digest reader; keyword/author matches move stories first |
-| `trends` | Required `q`; `granularity` | Portal series and evidence, with tweet enrichment |
+| `trends` | Optional `q`; `granularity` | Without a query: portal weekly trending words; with a query: series and evidence |
 | `search` | Required `q`; optional `username`, `offset` | Analytical text search and quote/media enrichment |
-| `graph` | `username` | Social graph snapshot, projected to eight strongest retained neighbors |
+| `graph` | `username`, optional `graphWindow=recent` | Existing all-time snapshot; recent mode uses the bounded outgoing-reply neighbor endpoint |
 
 `period` accepts `today`, `week` (default), `three-months`, or `all`. Author bangers use the profile's ranking and curation across time. Trend granularity accepts `year`, `month` (default), `week`, or `day`. Search uses phrase matching for multiple words. Tweet pages contain six results; offsets are bounded to 1,000. Queries are bounded to 120 characters (80 for trends), usernames to Twitter handle syntax, and digest dates to valid ISO dates. Graph responses retain snapshot date, time-window semantics, and truncation status.
 
@@ -47,3 +47,18 @@ pnpm type-check
 ```
 
 Before release, use a configured staging extension to verify actual OAuth bearer validation, all five live response shapes, source links, rate limits, and an unavailable upstream. The local preview uses labeled fictional data; its interactions do not establish live-service compatibility.
+
+
+### Context refinements release
+
+Deploy the gateway `/analytics/recent-neighbors` endpoint before enabling the
+new extension's `graphWindow=recent` requests. It reads outgoing replies in the
+last 30 UTC days, widens to 365 days below three eligible neighbors, and returns
+up to eight neighbors ordered by latest reply. It returns `days` and per-person
+`lastInteractionAt`; the full website graph still includes mutual replies and
+quotes. Omitting `graphWindow` preserves existing v1 graph behavior.
+
+Empty-query Trends now returns an additive `words` array, with lane, weekly
+post counts, change and covered dates. It uses the same authenticated website
+weekly discovery service. Term queries preserve the existing series shape.
+No private-history migration or auth configuration change is part of this release.

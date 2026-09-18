@@ -10,6 +10,7 @@ const ALLOWED_ENDPOINTS: Record<string, ReadonlySet<string>> = {
     'search',
   ]),
   'social-graph': new Set(),
+  'recent-neighbors': new Set(['username']),
   search: new Set([
     'q',
     'mode',

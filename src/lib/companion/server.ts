@@ -4,6 +4,7 @@ import { createServerClient } from '@/utils/supabase'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { getPortalBangersPage, enrichPortalTweets } from '@/lib/portal/data'
 import {
+  fetchPortalWeeklyTrends,
   fetchPortalTrendSeries,
   fetchPortalTrendEvidence,
 } from '@/lib/portal/analytics'
@@ -11,14 +12,19 @@ import { getCuratedProfileBangersPage } from '@/lib/profileCuration'
 import { resolveProfileCore } from '@/lib/metaTwitter/profile'
 import { bangerPortalTweet } from '@/lib/metaTwitter/bangerPortalTweet'
 import { getPublishedDigest } from '@/lib/digest/data'
-import { getSocialGraphSnapshot } from '@/lib/socialGraph'
 import {
   fetchAnalyticsGatewayJson,
   clickHouseSearchGatewayBaseUrl,
   isClickHouseReadsEnabled,
 } from '@/lib/clickhouseGateway'
+import { getSocialGraphSnapshot } from '@/lib/socialGraph'
 import { compactDigest, compactGraph } from './projections'
-import { archiveHref, type ArchiveInput, type ArchiveResult } from './contract'
+import {
+  archiveHref,
+  type ArchiveInput,
+  type ArchiveResult,
+  type GraphData,
+} from './contract'
 import type { PortalTweet } from '@/lib/portal/types'
 
 /** Verify the supplied JWT with Auth; a malformed bearer never falls back to cookies. */
@@ -122,6 +128,33 @@ export async function readCompanion(
       }
     }
     case 'trends': {
+      if (!q) {
+        const weekly = await fetchPortalWeeklyTrends()
+        return {
+          ...base,
+          feature,
+          data: {
+            term: '',
+            granularity: 'week',
+            buckets: [],
+            counts: [],
+            per100k: [],
+            computedAt: new Date().toISOString(),
+            evidence: [],
+            words: weekly.map((word) => ({
+              term: word.term,
+              lane: word.lane,
+              posts: word.last7,
+              changePct: word.deltaPct,
+              since: word.sinceDate,
+              until: word.untilDate,
+            })),
+          },
+          explanation:
+            'Words emerging, rising, and cooling in CA this week. Select a word to explore its history.',
+        }
+      }
+
       const [series, evidence] = await Promise.all([
         fetchPortalTrendSeries(
           [q],
@@ -148,12 +181,24 @@ export async function readCompanion(
       }
     }
     case 'graph':
+      if (input.graphWindow !== 'recent')
+        return {
+          ...base,
+          feature,
+          data: compactGraph(await getSocialGraphSnapshot(), username),
+          explanation:
+            'Recorded mutual replies and quotes. A connection does not imply friendship or agreement.',
+        }
       return {
         ...base,
         feature,
-        data: compactGraph(await getSocialGraphSnapshot(), username),
+        data: await fetchAnalyticsGatewayJson<GraphData>(
+          ['recent-neighbors'],
+          new URLSearchParams({ username }),
+          { timeoutMs: 25000 },
+        ),
         explanation:
-          'Recorded mutual replies and quotes. A connection does not imply friendship or agreement.',
+          'People this author has replied to, ordered by latest reply. The window widens to a year when fewer than three neighbors appear in the month. Open the full CA graph for replies and quotes in both directions.',
       }
     case 'search': {
       if (!isClickHouseReadsEnabled())

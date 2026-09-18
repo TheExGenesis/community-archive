@@ -8,6 +8,7 @@ import { createServerClient } from '@/utils/supabase'
 import { getPublishedDigest } from '@/lib/digest/data'
 import { getSocialGraphSnapshot } from '@/lib/socialGraph'
 import {
+  fetchPortalWeeklyTrends,
   fetchPortalTrendSeries,
   fetchPortalTrendEvidence,
 } from '@/lib/portal/analytics'
@@ -31,6 +32,7 @@ jest.mock('@/lib/metaTwitter/profile', () => ({
 jest.mock('@/lib/digest/data', () => ({ getPublishedDigest: jest.fn() }))
 jest.mock('@/lib/socialGraph', () => ({ getSocialGraphSnapshot: jest.fn() }))
 jest.mock('@/lib/portal/analytics', () => ({
+  fetchPortalWeeklyTrends: jest.fn(),
   fetchPortalTrendSeries: jest.fn(),
   fetchPortalTrendEvidence: jest.fn(),
 }))
@@ -130,13 +132,11 @@ test('resolves an author through public profile policy and reuses their curation
   jest
     .mocked(resolveProfileCore)
     .mockResolvedValue({ accountId: '123' } as never)
-  jest
-    .mocked(getCuratedProfileBangersPage)
-    .mockResolvedValue({
-      available: true,
-      tweets: [],
-      nextOffset: null,
-    } as never)
+  jest.mocked(getCuratedProfileBangersPage).mockResolvedValue({
+    available: true,
+    tweets: [],
+    nextOffset: null,
+  } as never)
   expect((await read('bangers', 'username=Alice')).status).toBe(200)
   expect(resolveProfileCore).toHaveBeenCalledWith('alice')
   expect(getCuratedProfileBangersPage).toHaveBeenCalledWith('123', {
@@ -160,15 +160,24 @@ test('digest projection excludes drafts and orders published relevance without g
   expect(body.data.stories[0].slug).toBe('memory')
   expect(body.data.stories[0].relevant).toBe(true)
 })
-test('graph projection is a bounded, sorted neighborhood with snapshot provenance', async () => {
-  jest.mocked(getSocialGraphSnapshot).mockResolvedValue(graph)
-  const response = await read('graph', 'username=user0')
-  const body = await response.json()
-  expect(body.data.neighbors).toHaveLength(8)
-  expect(body.data.neighbors[0].username).toBe('user11')
-  expect(body.href).toBe('/social-graph?person=user0')
-  expect(body.data.truncated).toBe(true)
-  expect(compactGraph(graph, 'missing').focus).toBeNull()
+test('recent graph uses the bounded shared gateway endpoint', async () => {
+  jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
+    focus: { id: '0', username: 'user0', name: 'User 0' },
+    neighbors: [],
+    days: 365,
+    timeWindow: 'Last 365 days',
+    generatedAt: '2026-09-17',
+    truncated: false,
+  })
+  const response = await read('graph', 'username=user0&graphWindow=recent')
+  expect(response.status).toBe(200)
+  expect((await response.json()).data.days).toBe(365)
+  expect(fetchAnalyticsGatewayJson).toHaveBeenCalledWith(
+    ['recent-neighbors'],
+    new URLSearchParams({ username: 'user0' }),
+    { timeoutMs: 25000 },
+  )
+  expect(getSocialGraphSnapshot).not.toHaveBeenCalled()
 })
 test('trends require authentication before executing analytics', async () => {
   expect((await read('trends', 'q=memory')).status).toBe(401)
@@ -181,16 +190,14 @@ test('verifies extension bearer with Auth, then uses the same trend engine', asy
   jest
     .mocked(createServerClient)
     .mockReturnValue({ auth: { getUser } } as never)
-  jest
-    .mocked(fetchPortalTrendSeries)
-    .mockResolvedValue({
-      granularity: 'month',
-      buckets: ['2026-08'],
-      computedAt: '2026-09-17',
-      series: [
-        { term: 'memory', color: '', tweetsPerBucket: [3], perBucket: [1] },
-      ],
-    })
+  jest.mocked(fetchPortalTrendSeries).mockResolvedValue({
+    granularity: 'month',
+    buckets: ['2026-08'],
+    computedAt: '2026-09-17',
+    series: [
+      { term: 'memory', color: '', tweetsPerBucket: [3], perBucket: [1] },
+    ],
+  })
   jest
     .mocked(fetchPortalTrendEvidence)
     .mockResolvedValue({ tweets: [], nextOffset: null })
@@ -203,47 +210,41 @@ test('verifies extension bearer with Auth, then uses the same trend engine', asy
 })
 test('rejects malformed or rejected bearer even when a cookie session exists', async () => {
   jest.mocked(getCurrentUser).mockResolvedValue({ id: 'cookie-user' } as never)
-  jest
-    .mocked(createServerClient)
-    .mockReturnValue({
-      auth: {
-        getUser: jest
-          .fn()
-          .mockResolvedValue({
-            data: { user: null },
-            error: new Error('invalid'),
-          }),
-      },
-    } as never)
+  jest.mocked(createServerClient).mockReturnValue({
+    auth: {
+      getUser: jest.fn().mockResolvedValue({
+        data: { user: null },
+        error: new Error('invalid'),
+      }),
+    },
+  } as never)
   expect((await read('trends', 'q=memory', 'Basic foo')).status).toBe(401)
   expect((await read('trends', 'q=memory', 'Bearer invalid')).status).toBe(401)
   expect(getCurrentUser).not.toHaveBeenCalled()
 })
 test('search retains filters, cursor, media, and quote enrichment', async () => {
-  jest
-    .mocked(fetchAnalyticsGatewayJson)
-    .mockResolvedValue({
-      data: {
-        tweets: [
-          {
-            tweetId: '123',
-            username: 'alice',
-            accountDisplayName: 'Alice',
-            fullText: 'memory',
-            createdAt: '2026-09-17',
-            favoriteCount: 3,
-            retweetCount: null,
-            media: [
-              {
-                mediaUrl: 'https://pbs.twimg.com/media/a.jpg',
-                mediaType: 'photo',
-              },
-            ],
-          },
-        ],
-        nextOffset: 6,
-      },
-    })
+  jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
+    data: {
+      tweets: [
+        {
+          tweetId: '123',
+          username: 'alice',
+          accountDisplayName: 'Alice',
+          fullText: 'memory',
+          createdAt: '2026-09-17',
+          favoriteCount: 3,
+          retweetCount: null,
+          media: [
+            {
+              mediaUrl: 'https://pbs.twimg.com/media/a.jpg',
+              mediaType: 'photo',
+            },
+          ],
+        },
+      ],
+      nextOffset: 6,
+    },
+  })
   const response = await read('search', 'q=memory&username=alice')
   const body = await response.json()
   expect(body.data.tweets[0].media[0].type).toBe('photo')
@@ -255,9 +256,9 @@ test('search retains filters, cursor, media, and quote enrichment', async () => 
 })
 test('upstream failures return noncacheable errors without leaking query or service details', async () => {
   jest
-    .mocked(getSocialGraphSnapshot)
+    .mocked(fetchAnalyticsGatewayJson)
     .mockRejectedValue(new Error('credential=do-not-leak'))
-  const response = await read('graph', 'username=user0')
+  const response = await read('graph', 'username=user0&graphWindow=recent')
   expect(response.status).toBe(502)
   expect(response.headers.get('cache-control')).toBe('private, no-store')
   expect(await response.text()).not.toContain('credential')
@@ -270,4 +271,43 @@ test('website continuation links retain context and encode query values', () => 
   expect(archiveHref(input)).toBe(
     '/search?q=memory+%26+learning&fromUser=alice',
   )
+})
+
+test('the default trends view reuses weekly word discovery, with auth', async () => {
+  expect((await read('trends')).status).toBe(401)
+  expect(fetchPortalWeeklyTrends).not.toHaveBeenCalled()
+  jest.mocked(getCurrentUser).mockResolvedValue({ id: 'reader' } as never)
+  jest.mocked(fetchPortalWeeklyTrends).mockResolvedValue([
+    {
+      term: 'pacing',
+      lane: 'rising',
+      last7: 42,
+      prev7: 21,
+      deltaPct: 100,
+      status: 'comparable',
+      sinceDate: '2026-09-10',
+      untilDate: '2026-09-16',
+    },
+  ])
+  const response = await read('trends')
+  expect(response.status).toBe(200)
+  expect((await response.json()).data.words).toEqual([
+    {
+      term: 'pacing',
+      lane: 'rising',
+      posts: 42,
+      changePct: 100,
+      since: '2026-09-10',
+      until: '2026-09-16',
+    },
+  ])
+  expect(fetchPortalTrendSeries).not.toHaveBeenCalled()
+})
+
+test('existing clients keep the all-time mutual-interaction graph', async () => {
+  jest.mocked(getSocialGraphSnapshot).mockResolvedValue(graph)
+  const response = await read('graph', 'username=user0')
+  expect(response.status).toBe(200)
+  expect((await response.json()).data.neighbors[0].username).toBe('user11')
+  expect(fetchAnalyticsGatewayJson).not.toHaveBeenCalled()
 })

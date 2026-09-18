@@ -175,6 +175,7 @@ export async function loadDigestLabState(runId?: string) {
 
 async function readPublishedDigest(
   digestDate?: string,
+  options: { strict?: boolean } = {},
 ): Promise<DigestEdition | null> {
   const preview = getPreviewDigestEdition(digestDate)
   if (preview) return preview
@@ -188,6 +189,8 @@ async function readPublishedDigest(
     : query.order('digest_date', { ascending: false }).limit(1)
   const { data, error } = await query.maybeSingle()
   if (error) {
+    if (options.strict)
+      throw new Error('Published digest is temporarily unavailable')
     console.error('Published digest read failed:', error.message)
     return getPreviewDigestEdition(digestDate)
   }

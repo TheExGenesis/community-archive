@@ -389,8 +389,10 @@ function DualRangeSlider({
 export default function SocialGraphExplorer({
   snapshot,
   currentMember = EMPTY_CURRENT_MEMBER,
+  initialPerson,
 }: {
   snapshot: SocialGraphSnapshot
+  initialPerson?: string
   currentMember?: {
     accountId: string | null
     username: string | null
@@ -421,16 +423,22 @@ export default function SocialGraphExplorer({
       }),
     [snapshot.stats, snapshot.temporal],
   )
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const initialNode =
+    snapshot.nodes.find(
+      (node) => node.username.toLowerCase() === initialPerson?.toLowerCase(),
+    )?.id || null
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
+    initialNode,
+  )
   const [focusHistory, setFocusHistory] = useState<string[]>([])
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null)
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(
     null,
   )
   const [query, setQuery] = useState('')
-  const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null)
+  const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(initialNode)
   const [pendingFocusNodeId, setPendingFocusNodeId] = useState<string | null>(
-    null,
+    initialNode,
   )
   const [labelPercentage, setLabelPercentage] = useState<number>(
     defaultSettings.labelPercentage,

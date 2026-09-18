@@ -16,6 +16,7 @@ jest.mock('sigma', () => ({
     kill: jest.fn(),
     setSetting: jest.fn(),
     refresh: jest.fn(),
+    getNodeDisplayData: jest.fn(() => undefined),
     getCamera: jest.fn(() => ({ animatedReset: jest.fn() })),
   })),
 }))
@@ -109,6 +110,13 @@ const snapshot = {
 } as SocialGraphSnapshot
 
 describe('SocialGraphExplorer defaults', () => {
+  it('opens the person requested by a companion deep link', () => {
+    render(<SocialGraphExplorer snapshot={snapshot} initialPerson="BETA" />)
+    expect(screen.getByRole('heading', { name: 'Beta' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Close person details' }),
+    ).toBeInTheDocument()
+  })
   beforeAll(() => {
     Object.defineProperty(globalThis, 'Worker', {
       configurable: true,

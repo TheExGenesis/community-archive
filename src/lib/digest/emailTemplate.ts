@@ -1,6 +1,7 @@
 import type { DigestEdition } from '@/lib/digest/types'
 import type { PortalTweet } from '@/lib/portal/types'
 import { formatNumber } from '@/lib/formatNumber'
+import { shouldShowRepresentativeTweet } from './presentation'
 
 export interface DigestEmailLinks {
   siteUrl: string
@@ -71,7 +72,9 @@ const tweetToText = (tweet: PortalTweet) =>
     `${tweet.name} (@${tweet.username}):`,
     tweet.text,
     ...(tweet.quotedTweet
-      ? [`> ${tweet.quotedTweet.name} (@${tweet.quotedTweet.username}): ${tweet.quotedTweet.text}`]
+      ? [
+          `> ${tweet.quotedTweet.name} (@${tweet.quotedTweet.username}): ${tweet.quotedTweet.text}`,
+        ]
       : []),
   ].join('\n')
 
@@ -102,6 +105,7 @@ export function renderDigestEmail(
   links: DigestEmailLinks,
 ): RenderedDigestEmail {
   const { content } = edition
+  const showRepresentativeTweet = shouldShowRepresentativeTweet(content)
   const prettyDate = formatDigestDateParts(edition.digestDate)
   const editionUrl = `${links.siteUrl}/digest/${edition.digestDate}`
   const subject = `Community Archive Digest — ${prettyDate.full}`
@@ -136,9 +140,11 @@ export function renderDigestEmail(
     )
     .join('')
 
-  const topBangerHtml = `
+  const topBangerHtml = showRepresentativeTweet
+    ? `
     <p style="margin:0 0 8px;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#9ca3af;">Top tweet</p>
     ${renderTweetCard(content.topBanger, links.siteUrl)}`
+    : ''
 
   const html = `
   <style>
@@ -149,9 +155,10 @@ export function renderDigestEmail(
     }
   </style>
   <div style="margin:0 auto;max-width:600px;padding:24px;font-family:${BODY_FONT};color:#111827;">
-    <img src="${links.siteUrl}/images/email-logo.png" width="48" height="48" alt="Community Archive" style="display:block;margin:0 0 12px;" />
+    <a href="${escapeHtml(links.siteUrl)}" style="display:inline-block;" aria-label="Community Archive website"><img src="${links.siteUrl}/images/email-logo.png" width="48" height="48" alt="Community Archive" style="display:block;margin:0 0 12px;" /></a>
     <p style="margin:0 0 4px;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#9ca3af;">Community Archive Daily Digest</p>
     <h1 class="digest-h1" style="margin:0 0 16px;font-family:${HEADING_FONT};font-size:30px;line-height:1.2;color:#111827;">${escapeHtml(prettyDate.dayPart)}<span class="digest-year">, ${escapeHtml(prettyDate.year)}</span></h1>
+    <p style="margin:0 0 20px;"><a href="${escapeHtml(editionUrl)}" style="color:#1d4ed8;font-size:14px;">Read on Community Archive →</a></p>
     <ul style="margin:0 0 24px;padding-left:20px;font-size:14px;line-height:1.5;">${summaryHtml}</ul>
     ${topBangerHtml}
     ${storiesHtml}
@@ -167,12 +174,13 @@ export function renderDigestEmail(
 
   const text = [
     `Community Archive Daily Digest — ${prettyDate.full}`,
+    `Read on Community Archive: ${editionUrl}`,
     '',
     ...content.executiveSummary.map((line) => `* ${line}`),
     '',
-    'TOP TWEET',
-    tweetToText(content.topBanger),
-    '',
+    ...(showRepresentativeTweet
+      ? ['TOP TWEET', tweetToText(content.topBanger), '']
+      : []),
     ...content.stories.flatMap((story) => [
       story.title.toUpperCase(),
       story.subtitle,

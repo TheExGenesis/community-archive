@@ -277,7 +277,7 @@ describe('BangersExplorer', () => {
 
     expect(
       screen.getByRole('combobox', { name: 'Filter by time' }),
-    ).toHaveTextContent('Today')
+    ).toHaveTextContent('Last 24h')
     expect(
       screen.getByRole('link', { name: 'Archive members' }),
     ).toHaveAttribute('href', '/bangers?scope=members&period=today')
@@ -301,7 +301,7 @@ describe('BangersExplorer', () => {
     const options = screen.getAllByRole('option')
     expect(options.slice(0, 4).map((option) => option.textContent)).toEqual([
       'All time',
-      'Today',
+      'Last 24h',
       'Last 7 days',
       'Last 3 months',
     ])

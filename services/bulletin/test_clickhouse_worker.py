@@ -414,17 +414,90 @@ class ClickHouseWorkerTests(unittest.TestCase):
         self.db.execute("UPDATE bulletin.decisions SET last_attempt_at=now()-interval '2 hours'")
         self.assertEqual(self.run_worker()[1],0)
 
-    def test_content_filter_and_invalid_evidence_do_not_retry(self):
-        for response in (self.incomplete_response('content_filter'),self.response(None)):
-            self.label['evidence']='This is not in the source.'
-            if response['choices'][0]['finish_reason']=='stop':
-                response=self.response(None)
-            with self.subTest(reason=response['choices'][0]['finish_reason']), \
-                    patch.object(worker,'call_model',return_value=response),patch.object(worker.time,'sleep') as sleep:
+    def test_content_filter_does_not_retry(self):
+        with patch.object(worker,'call_model',return_value=self.incomplete_response('content_filter')), \
+                patch.object(worker.time,'sleep') as sleep:
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['calls'],result['pending']),(1,1))
+        sleep.assert_not_called()
+
+    def invalid_availability_response(self):
+        response=self.response(None)
+        label=json.loads(response['choices'][0]['message']['content'])
+        label['availability']=dict(state='resolved',tweet_id='1',evidence='Invented author evidence')
+        response['choices'][0]['message']['content']=json.dumps(label)
+        return response
+
+    def test_invalid_availability_recovers_without_publishing_false_resolution(self):
+        responses=[self.invalid_availability_response(),self.response(None)]
+        with patch.object(worker,'call_model',side_effect=responses) as model,patch.object(worker.time,'sleep'), \
+                patch.object(worker,'publish',wraps=worker.publish) as publish:
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['status'],result['calls'],result['failed'],result['pending']),('ok',2,1,0))
+        self.assertEqual(publish.call_count,1)
+        retry=json.loads(model.call_args_list[1].args[0])['messages'][-1]['content']
+        self.assertIn('availability_requires_exact_author_evidence',retry)
+        self.assertIn('["1"]',retry)
+        self.assertNotIn('Invented author evidence',retry)
+        self.assertEqual(self.db.execute('SELECT resolution_state FROM bulletin.opportunities').fetchone()['resolution_state'],'unknown')
+        self.assertEqual([r['actual_usd'] for r in self.db.execute('SELECT actual_usd FROM bulletin.calls ORDER BY id')],
+            [Decimal(str(r['usage']['cost'])) for r in responses])
+
+    def test_invalid_evidence_exhausts_attempts_and_stays_unpublished(self):
+        self.label['evidence']='Invented evidence'
+        with patch.object(worker,'call_model',side_effect=self.response),patch.object(worker.time,'sleep'):
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['status'],result['calls'],result['pending']),('classification_failed',3,1))
+        self.assertEqual(self.db.execute('SELECT count(*) AS n FROM bulletin.opportunities').fetchone()['n'],0)
+        self.db.execute("UPDATE bulletin.decisions SET last_attempt_at=now()-interval '2 hours'")
+        self.assertEqual(self.run_worker()[1],0)
+
+    def test_invalid_availability_obeys_call_cap(self):
+        with patch.object(worker,'call_model',return_value=self.invalid_availability_response()), \
+                patch.object(worker.time,'sleep') as sleep:
+            result=worker.run(self.db,window=self.window,limit=1)
+        self.assertEqual((result['calls'],result['pending']),(1,1))
+        sleep.assert_not_called()
+
+    def test_availability_correction_lists_only_valid_author_reply_sources(self):
+        rows={'1':self.source,
+            '2':dict(self.source,tweet_id='2',reply_to_tweet_id='1'),
+            '3':dict(self.source,tweet_id='3',reply_to_tweet_id=None),
+            '4':dict(self.source,tweet_id='4',reply_to_tweet_id='1',account_id='20')}
+        context=worker.tweet_context.PreparedContext('Context',
+            {ident:(row['account_id'],row['content_hash']) for ident,row in rows.items()},rows)
+        body=json.loads(worker.request_body(self.source,SYSTEM,context,'availability_evidence_not_in_reply_tree'))
+        self.assertIn('["1", "2"]',body['messages'][-1]['content'])
+        self.assertIn('unknown',body['messages'][-1]['content'])
+        self.assertEqual(len(json.loads(worker.request_body(self.source,SYSTEM,context,'private untrusted message'))['messages']),3)
+
+    def test_malformed_json_gets_fresh_validated_response(self):
+        invalid=self.response(None)
+        invalid['choices'][0]['message']['content']='not json'
+        with patch.object(worker,'call_model',side_effect=[invalid,self.response(None)]),patch.object(worker.time,'sleep'):
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['status'],result['calls'],result['pending']),('ok',2,0))
+
+    def test_seven_consecutive_windows_recover_and_replay_without_duplicate_calls(self):
+        first_day=self.window[0]
+        for offset in range(7):
+            begin=first_day+dt.timedelta(days=offset)
+            self.window=(begin,begin+dt.timedelta(days=1))
+            self.source.update(tweet_id=str(offset+1),created_at=begin,updated_at=begin)
+            malformed=self.response(None)
+            malformed['choices'][0]['message']['content']='not json'
+            fault=[self.invalid_availability_response(),malformed,self.http_error(503),
+                self.http_error(429),self.incomplete_response('length'),
+                self.incomplete_response('error'),self.invalid_availability_response()][offset]
+            with self.subTest(day=begin.date()),patch.object(worker.time,'sleep'), \
+                    patch.object(worker,'call_model',side_effect=[fault,self.response(None)]) as model:
                 result=worker.run(self.db,window=self.window)
-            self.assertEqual((result['calls'],result['pending']),(1,1))
-            sleep.assert_not_called()
-            self.db.execute("UPDATE bulletin.decisions SET last_attempt_at=now()-interval '2 hours'")
+                self.assertEqual((result['status'],result['pending'],model.call_count),('ok',0,2))
+            replay,calls=self.run_worker()
+            self.assertEqual((replay['status'],calls),('ok',0))
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.opportunities').fetchone()['n'],7)
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.calls').fetchone()['n'],14)
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.scans WHERE complete').fetchone()['n'],7)
 
     def test_incomplete_output_retry_preserves_admission_limits(self):
         body=worker.request_body(self.source,SYSTEM,worker.tweet_context.prepare(self.db,self.source))

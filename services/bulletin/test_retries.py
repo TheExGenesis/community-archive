@@ -80,5 +80,19 @@ class RetryTests(unittest.TestCase):
                 self.assertEqual(event.get('validation_code'),code)
                 self.assertNotIn('private tweet text',out.getvalue())
 
+    def test_known_rejected_output_retries_but_unknown_errors_do_not(self):
+        for message in worker.VALIDATION_ERRORS:
+            with self.subTest(message=message):
+                self.assertIsNotNone(worker.retry_wait(ValueError(message),1))
+                self.assertIsNone(worker.retry_wait(ValueError(message),3))
+        malformed=json.JSONDecodeError('private response','secret',0)
+        self.assertIsNotNone(worker.retry_wait(malformed,1))
+        out=io.StringIO()
+        with contextlib.redirect_stdout(out):
+            worker.log_failure(malformed,run_id=1,stage='model_validation')
+        self.assertEqual(json.loads(out.getvalue())['validation_code'],'invalid_json')
+        self.assertNotIn('secret',out.getvalue())
+        self.assertIsNone(worker.retry_wait(ValueError('unexpected bug'),1))
+
 
 if __name__=='__main__':unittest.main()

@@ -220,15 +220,24 @@ the same run after 2 then 5 seconds, plus up to one second of jitter. Respect a
 provider's `Retry-After` up to 60 seconds;
 longer waits are deferred to a later run. Incomplete model responses with a
 `length` or `error` finish reason use the same bounded retry path; partial output
-is never published, and each response's cost stays recorded. Content filtering,
-unexpected or missing finish reasons, authentication, payment, semantic validation
-and publication errors do not trigger immediate model retries. Retries stop after
+is never published, and each response's cost stays recorded. Invalid JSON and
+allowlisted label/availability validation failures (including missing exact
+author evidence) also retry through this path. Every response must pass the
+same validation before publication; invalid evidence is never accepted or
+downgraded to bypass a check. Content filtering, unexpected or missing finish
+reasons, authentication, payment, unknown program errors and publication errors
+do not trigger immediate model retries. Retries stop after
 three total attempts per unchanged input, including attempts from earlier runs.
 Every retry rechecks current source/policy and reserves budget again; it counts
 toward the run's 50-call cap and must fit within the remaining time allowance.
 Successful recovery makes the run `ok`; `failed` still counts failed attempts.
 Unresolved work from an earlier run remains eligible after an hour, when the
-next run starts; there is no standalone retry timer.
+next run starts. The daily systemd service retries unsuccessful runs after
+65 minutes, allowing at most three starts in a 12-hour window (the original
+start plus two retries). Completed scan cursors and decisions are reused;
+Autorefresh is not rerun. The next daily trigger is normally outside that
+window. Persistent failures stop visibly at the service limit; never reset
+item attempts or raise budgets to hide them. There is no standalone retry timer.
 Model routing allows provider fallback for the same model while requiring the
 request's parameters and capping prices at $0.15 input / $0.50 output per million tokens.
 Routing prioritizes low latency within those price ceilings. Requests use a
@@ -306,6 +315,20 @@ Owner: Community Archive backend. Existing worker host: `ca-autorefresh`
 The wrapper never reruns scraping to retry Bulletin. Service failure invokes the
 existing journal failure unit. Inspect unit status, last-success age, queue and
 run dashboard; investigate non-complete status or freshness older than 36 hours.
+During the delayed restart, systemd reports `activating/auto-restart`; the
+recurring-job dashboard currently displays that as RUNNING. Consult the saved
+failed run and retry state until the retry completes. At the start limit the
+unit stays FAILED. A missing Autorefresh trigger still requires intervention;
+these retries recover a started job, not a missed upstream schedule.
+
+Deploy the worker and updated `ca-bulletin.service` together while the worker
+is idle. Preserve the existing monitoring drop-in, credentials and previous
+unit/release. Run `systemd-analyze verify`, daemon-reload, and verify effective
+Restart/RestartUSec/StartLimit settings. Confirm the next completed run's
+receipt and hosted metrics. Rollback restores both the saved unit and worker
+release, then daemon-reloads; cancel a pending automatic restart with
+`systemctl stop ca-bulletin.service` before switching releases. A deliberate
+stop suppresses automatic restart. Do not reset the durable decision/cost ledger.
 
 Failures emit a JSON `bulletin_error` event to the systemd journal with run/call
 IDs, attempt, processing stage, exception class, HTTP status when available, and

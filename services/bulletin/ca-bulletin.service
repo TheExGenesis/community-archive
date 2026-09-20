@@ -3,9 +3,15 @@ Description=Community Archive private Bulletin opportunities
 After=network-online.target
 Wants=network-online.target
 OnFailure=ca-bulletin-failure.service
+# Initial run plus at most two retries; the next daily start is outside this window.
+StartLimitIntervalSec=12h
+StartLimitBurst=3
 
 [Service]
 Type=oneshot
+# Longer than the worker's one-hour retry eligibility delay.
+Restart=on-failure
+RestartSec=65min
 WorkingDirectory=/opt/community-archive-bulletin/current
 Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
 LoadCredentialEncrypted=openrouter_api_key:/etc/credstore.encrypted/ca-bulletin-openrouter

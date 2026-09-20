@@ -414,17 +414,53 @@ class ClickHouseWorkerTests(unittest.TestCase):
         self.db.execute("UPDATE bulletin.decisions SET last_attempt_at=now()-interval '2 hours'")
         self.assertEqual(self.run_worker()[1],0)
 
-    def test_content_filter_and_invalid_evidence_do_not_retry(self):
-        for response in (self.incomplete_response('content_filter'),self.response(None)):
-            self.label['evidence']='This is not in the source.'
-            if response['choices'][0]['finish_reason']=='stop':
-                response=self.response(None)
-            with self.subTest(reason=response['choices'][0]['finish_reason']), \
-                    patch.object(worker,'call_model',return_value=response),patch.object(worker.time,'sleep') as sleep:
-                result=worker.run(self.db,window=self.window)
-            self.assertEqual((result['calls'],result['pending']),(1,1))
-            sleep.assert_not_called()
-            self.db.execute("UPDATE bulletin.decisions SET last_attempt_at=now()-interval '2 hours'")
+    def test_content_filter_does_not_retry(self):
+        with patch.object(worker,'call_model',return_value=self.incomplete_response('content_filter')), \
+                patch.object(worker.time,'sleep') as sleep:
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['calls'],result['pending']),(1,1))
+        sleep.assert_not_called()
+
+    def invalid_availability_response(self):
+        response=self.response(None)
+        label=json.loads(response['choices'][0]['message']['content'])
+        label['availability']=dict(state='resolved',tweet_id='1',evidence='Invented author evidence')
+        response['choices'][0]['message']['content']=json.dumps(label)
+        return response
+
+    def test_invalid_availability_recovers_without_publishing_false_resolution(self):
+        responses=[self.invalid_availability_response(),self.response(None)]
+        with patch.object(worker,'call_model',side_effect=responses),patch.object(worker.time,'sleep'), \
+                patch.object(worker,'publish',wraps=worker.publish) as publish:
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['status'],result['calls'],result['failed'],result['pending']),('ok',2,1,0))
+        self.assertEqual(publish.call_count,1)
+        self.assertEqual(self.db.execute('SELECT resolution_state FROM bulletin.opportunities').fetchone()['resolution_state'],'unknown')
+        self.assertEqual([r['actual_usd'] for r in self.db.execute('SELECT actual_usd FROM bulletin.calls ORDER BY id')],
+            [Decimal(str(r['usage']['cost'])) for r in responses])
+
+    def test_invalid_evidence_exhausts_attempts_and_stays_unpublished(self):
+        self.label['evidence']='Invented evidence'
+        with patch.object(worker,'call_model',side_effect=self.response),patch.object(worker.time,'sleep'):
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['status'],result['calls'],result['pending']),('classification_failed',3,1))
+        self.assertEqual(self.db.execute('SELECT count(*) AS n FROM bulletin.opportunities').fetchone()['n'],0)
+        self.db.execute("UPDATE bulletin.decisions SET last_attempt_at=now()-interval '2 hours'")
+        self.assertEqual(self.run_worker()[1],0)
+
+    def test_invalid_availability_obeys_call_cap(self):
+        with patch.object(worker,'call_model',return_value=self.invalid_availability_response()), \
+                patch.object(worker.time,'sleep') as sleep:
+            result=worker.run(self.db,window=self.window,limit=1)
+        self.assertEqual((result['calls'],result['pending']),(1,1))
+        sleep.assert_not_called()
+
+    def test_malformed_json_gets_fresh_validated_response(self):
+        invalid=self.response(None)
+        invalid['choices'][0]['message']['content']='not json'
+        with patch.object(worker,'call_model',side_effect=[invalid,self.response(None)]),patch.object(worker.time,'sleep'):
+            result=worker.run(self.db,window=self.window)
+        self.assertEqual((result['status'],result['calls'],result['pending']),('ok',2,0))
 
     def test_incomplete_output_retry_preserves_admission_limits(self):
         body=worker.request_body(self.source,SYSTEM,worker.tweet_context.prepare(self.db,self.source))

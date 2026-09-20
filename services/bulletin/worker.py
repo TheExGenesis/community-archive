@@ -37,6 +37,22 @@ MAX_PAGES = 100
 MAX_SECONDS = 900
 LOCK = 712606570
 
+VALIDATION_ERRORS = {
+    'label must be an object', 'is_notice must be boolean',
+    'invalid side or category', 'invalid summary', 'standing must be boolean',
+    'invalid response mode', 'invalid topics', 'invalid expiry', 'invalid place',
+    'evidence must be an exact source substring',
+    'invalid_availability', 'unknown_availability_has_evidence',
+    'availability_requires_exact_author_evidence',
+    'availability_evidence_not_in_reply_tree', 'availability_evidence_predates_notice',
+}
+
+
+def rejected_model_output(exc):
+    """Only known output-validation failures, never arbitrary program errors."""
+    return isinstance(exc, json.JSONDecodeError) or (
+        isinstance(exc, ValueError) and str(exc) in VALIDATION_ERRORS)
+
 
 class IncompleteOutput(ValueError):
     """Keep provider output private while retaining a bounded completion reason."""
@@ -47,12 +63,14 @@ class IncompleteOutput(ValueError):
 
 
 def retry_wait(exc, attempt):
-    """Short provider retries; a longer Retry-After is deferred to a later run."""
+    """Bounded model retries; a longer Retry-After is deferred to a later run."""
     if attempt >= 3:
         return None
     if isinstance(exc, IncompleteOutput):
         if exc.finish_reason not in ('length', 'error'):
             return None
+    elif rejected_model_output(exc):
+        pass
     elif isinstance(exc, urllib.error.HTTPError):
         if exc.code not in (408, 429) and not 500 <= exc.code < 600:
             return None
@@ -81,16 +99,9 @@ def log_failure(exc, *, run_id, call_id=None, attempt=None, stage, retry_seconds
         event['http_status'] = exc.code
     if isinstance(exc, IncompleteOutput):
         event['finish_reason'] = exc.finish_reason
-    reasons = {
-        'label must be an object', 'is_notice must be boolean',
-        'invalid side or category', 'invalid summary', 'standing must be boolean',
-        'invalid response mode', 'invalid topics', 'invalid expiry', 'invalid place',
-        'evidence must be an exact source substring', 'incomplete_output',
-        'invalid_availability', 'unknown_availability_has_evidence',
-        'availability_requires_exact_author_evidence',
-        'availability_evidence_not_in_reply_tree', 'availability_evidence_predates_notice',
-    }
-    if isinstance(exc, ValueError) and str(exc) in reasons:
+    if isinstance(exc, json.JSONDecodeError):
+        event['validation_code'] = 'invalid_json'
+    elif isinstance(exc, ValueError) and str(exc) in VALIDATION_ERRORS | {'incomplete_output'}:
         event['validation_code'] = str(exc).replace(' ', '_')
     print(json.dumps(event), flush=True)
 
@@ -416,7 +427,8 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
                         ('validated' if stored else 'suppressed',call_id))
                 except Exception as exc:
                     retryable_stage = (stage=='model_request' or
-                        (stage=='model_validation' and isinstance(exc,IncompleteOutput)))
+                        (stage=='model_validation' and
+                            (isinstance(exc,IncompleteOutput) or rejected_model_output(exc))))
                     delay=retry_wait(exc,job['attempts']) if retryable_stage else None
                     if delay is not None and (counts['calls']>=limit or
                             time.monotonic()-started+delay+60>MAX_SECONDS):

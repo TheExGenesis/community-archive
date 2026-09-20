@@ -462,6 +462,27 @@ class ClickHouseWorkerTests(unittest.TestCase):
             result=worker.run(self.db,window=self.window)
         self.assertEqual((result['status'],result['calls'],result['pending']),('ok',2,0))
 
+    def test_seven_consecutive_windows_recover_and_replay_without_duplicate_calls(self):
+        first_day=self.window[0]
+        for offset in range(7):
+            begin=first_day+dt.timedelta(days=offset)
+            self.window=(begin,begin+dt.timedelta(days=1))
+            self.source.update(tweet_id=str(offset+1),created_at=begin,updated_at=begin)
+            malformed=self.response(None)
+            malformed['choices'][0]['message']['content']='not json'
+            fault=[self.invalid_availability_response(),malformed,self.http_error(503),
+                self.http_error(429),self.incomplete_response('length'),
+                self.incomplete_response('error'),self.invalid_availability_response()][offset]
+            with self.subTest(day=begin.date()),patch.object(worker.time,'sleep'), \
+                    patch.object(worker,'call_model',side_effect=[fault,self.response(None)]) as model:
+                result=worker.run(self.db,window=self.window)
+                self.assertEqual((result['status'],result['pending'],model.call_count),('ok',0,2))
+            replay,calls=self.run_worker()
+            self.assertEqual((replay['status'],calls),('ok',0))
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.opportunities').fetchone()['n'],7)
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.calls').fetchone()['n'],14)
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.scans WHERE complete').fetchone()['n'],7)
+
     def test_incomplete_output_retry_preserves_admission_limits(self):
         body=worker.request_body(self.source,SYSTEM,worker.tweet_context.prepare(self.db,self.source))
         paid=Decimal(str(self.incomplete_response()['usage']['cost']))

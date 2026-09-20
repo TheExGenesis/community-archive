@@ -430,11 +430,15 @@ class ClickHouseWorkerTests(unittest.TestCase):
 
     def test_invalid_availability_recovers_without_publishing_false_resolution(self):
         responses=[self.invalid_availability_response(),self.response(None)]
-        with patch.object(worker,'call_model',side_effect=responses),patch.object(worker.time,'sleep'), \
+        with patch.object(worker,'call_model',side_effect=responses) as model,patch.object(worker.time,'sleep'), \
                 patch.object(worker,'publish',wraps=worker.publish) as publish:
             result=worker.run(self.db,window=self.window)
         self.assertEqual((result['status'],result['calls'],result['failed'],result['pending']),('ok',2,1,0))
         self.assertEqual(publish.call_count,1)
+        retry=json.loads(model.call_args_list[1].args[0])['messages'][-1]['content']
+        self.assertIn('availability_requires_exact_author_evidence',retry)
+        self.assertIn('["1"]',retry)
+        self.assertNotIn('Invented author evidence',retry)
         self.assertEqual(self.db.execute('SELECT resolution_state FROM bulletin.opportunities').fetchone()['resolution_state'],'unknown')
         self.assertEqual([r['actual_usd'] for r in self.db.execute('SELECT actual_usd FROM bulletin.calls ORDER BY id')],
             [Decimal(str(r['usage']['cost'])) for r in responses])
@@ -454,6 +458,18 @@ class ClickHouseWorkerTests(unittest.TestCase):
             result=worker.run(self.db,window=self.window,limit=1)
         self.assertEqual((result['calls'],result['pending']),(1,1))
         sleep.assert_not_called()
+
+    def test_availability_correction_lists_only_valid_author_reply_sources(self):
+        rows={'1':self.source,
+            '2':dict(self.source,tweet_id='2',reply_to_tweet_id='1'),
+            '3':dict(self.source,tweet_id='3',reply_to_tweet_id=None),
+            '4':dict(self.source,tweet_id='4',reply_to_tweet_id='1',account_id='20')}
+        context=worker.tweet_context.PreparedContext('Context',
+            {ident:(row['account_id'],row['content_hash']) for ident,row in rows.items()},rows)
+        body=json.loads(worker.request_body(self.source,SYSTEM,context,'availability_evidence_not_in_reply_tree'))
+        self.assertIn('["1", "2"]',body['messages'][-1]['content'])
+        self.assertIn('unknown',body['messages'][-1]['content'])
+        self.assertEqual(len(json.loads(worker.request_body(self.source,SYSTEM,context,'private untrusted message'))['messages']),3)
 
     def test_malformed_json_gets_fresh_validated_response(self):
         invalid=self.response(None)

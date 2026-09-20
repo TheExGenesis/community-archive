@@ -228,6 +228,11 @@ downgraded to bypass a check. Content filtering, unexpected or missing finish
 reasons, authentication, payment, unknown program errors and publication errors
 do not trigger immediate model retries. Retries stop after
 three total attempts per unchanged input, including attempts from earlier runs.
+Validation retries include the allowlisted rejection reason. Availability
+corrections list only author/descendant IDs accepted by the existing validator
+and explicitly permit unknown availability when evidence is absent. This avoids
+blindly requesting the same invalid citation; the model must still return a
+fully valid response. Previous provider text is never inserted into retry prompts.
 Every retry rechecks current source/policy and reserves budget again; it counts
 toward the run's 50-call cap and must fit within the remaining time allowance.
 Successful recovery makes the run `ok`; `failed` still counts failed attempts.

@@ -205,12 +205,29 @@ def current(db, tweet_id, lock=False):
     return source
 
 
-def request_body(tweet, prompt, context):
+def request_body(tweet, prompt, context, validation_error=None):
     payload={'author':'@'+tweet['username'],'posted_at':tweet['created_at'].isoformat(),
         'text':tweet['full_text'], 'context':context.text}
-    return json.dumps({'model':MODEL,'messages':[{'role':'system','content':prompt},
+    messages=[{'role':'system','content':prompt},
         {'role':'system','content':tweet_context.CONTEXT_RULES+'\n'+resolution.RULES+'\n'+output_schema.RULES},
-        {'role':'user','content':json.dumps(payload,ensure_ascii=False)}],
+        {'role':'user','content':json.dumps(payload,ensure_ascii=False)}]
+    if validation_error in VALIDATION_ERRORS | {'invalid_json'}:
+        guidance=('Your previous response was rejected: '+validation_error+'. '
+            'Return a complete corrected JSON response. Do not reuse unsupported evidence. ')
+        if validation_error.startswith(('availability_', 'invalid_availability', 'unknown_availability')):
+            allowed=[]
+            for ident,row in context.records.items():
+                try:
+                    resolution.validate(dict(state='open',tweet_id=ident,evidence=row['full_text'][:1000]),tweet,context)
+                    allowed.append(ident)
+                except ValueError:
+                    pass
+            guidance+=('Availability evidence may cite only these author/descendant tweet IDs: '
+                +json.dumps(sorted(allowed))+'. If none explicitly establishes availability, '
+                'use availability {"state":"unknown","tweet_id":null,"evidence":null}. '
+                'A valid notice does not require a known availability state.')
+        messages.append({'role':'system','content':guidance})
+    return json.dumps({'model':MODEL,'messages':messages,
         'response_format':output_schema.FORMAT,'max_tokens':MAX_OUTPUT,
         'reasoning':{'effort':'low'},
         'provider':{'allow_fallbacks':True,'require_parameters':True,'sort':'latency',
@@ -397,7 +414,7 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
                     raise
                 if time.monotonic()-started>MAX_SECONDS:
                     status='time_limit';break
-                body=request_body(source,prompt['body'],context)
+                body=request_body(source,prompt['body'],context,job.get('validation_error'))
                 if len(body)>65536:
                     status='oversize_candidate';continue
                 amount=reservation(body)
@@ -443,6 +460,8 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
                     counts['failed']+=1
                     status='classification_failed'
                     if delay is not None:
+                        if stage=='model_validation' and rejected_model_output(exc):
+                            job['validation_error']='invalid_json' if isinstance(exc,json.JSONDecodeError) else str(exc)
                         time.sleep(delay)
                         jobs.appendleft(job)
                 progress(db,run_id,counts)

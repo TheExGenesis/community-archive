@@ -211,3 +211,6 @@ REVOKE ALL ON FUNCTION public.request_bulletin_refresh(uuid,text,bigint,numeric,
 REVOKE ALL ON FUNCTION public.get_bulletin_refreshes() FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.request_bulletin_refresh(uuid,text,bigint,numeric,uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.get_bulletin_refreshes() TO service_role;
+
+REVOKE ALL ON FUNCTION public.get_bulletin_decisions(text,timestamptz,text,integer,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_bulletin_decisions(text,timestamptz,text,integer,text) TO service_role;

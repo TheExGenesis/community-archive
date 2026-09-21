@@ -159,3 +159,6 @@ CREATE INDEX IF NOT EXISTS "community_project_likes_project_id_idx"
   ON "public"."community_project_likes" ("project_id");
 CREATE INDEX IF NOT EXISTS "community_project_comments_project_id_created_at_idx"
   ON "public"."community_project_comments" ("project_id", "created_at");
+
+CREATE INDEX bulletin_decisions_recent_idx ON bulletin.decisions(updated_at DESC,tweet_id DESC);
+CREATE INDEX bulletin_decisions_status_recent_idx ON bulletin.decisions(status,updated_at DESC,tweet_id DESC);

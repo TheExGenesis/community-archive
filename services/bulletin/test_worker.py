@@ -40,7 +40,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public,tes TO service_role;
 
 
 class WrapperTests(unittest.TestCase):
-    def test_downstream_runs_only_after_success(self):
+    def test_cron_wrapper_runs_only_autorefresh(self):
         calls=[]
         def invoke(cmd,**kwargs):
             calls.append(cmd)
@@ -52,4 +52,5 @@ class WrapperTests(unittest.TestCase):
             calls.append(cmd)
             return types.SimpleNamespace(returncode=0)
         self.assertEqual(after_autorefresh.run(Path('/pipeline'),success),0)
-        self.assertEqual(calls[-1],['systemctl','start','ca-bulletin.service'])
+        self.assertEqual(len(calls),1)
+        self.assertEqual(calls[0][-1],'/pipeline/run_pipeline.py')

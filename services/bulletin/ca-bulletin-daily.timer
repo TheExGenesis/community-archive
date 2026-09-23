@@ -1,0 +1,10 @@
+[Unit]
+Description=Start Community Archive Bulletin daily even if Autorefresh fails
+
+[Timer]
+OnCalendar=*-*-* 12:00:00 UTC
+Persistent=true
+Unit=ca-bulletin.service
+
+[Install]
+WantedBy=timers.target

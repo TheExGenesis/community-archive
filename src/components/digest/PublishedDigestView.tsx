@@ -14,6 +14,63 @@ import { DigestLikeButton } from './DigestLikeButton'
 import { DigestComments } from './DigestComments'
 import { SectionReady } from '@/components/PagePerformance'
 import { DigestSubscriberCount } from './DigestSubscriberCount'
+import {
+  loadDigestBulletinItems,
+  type DigestBulletinItem,
+} from '@/lib/digest/bulletin'
+
+function BulletinItems({ items }: { items: DigestBulletinItem[] }) {
+  if (!items.length) return null
+  return (
+    <section className="mt-12 border-t-2 border-zinc-800 pt-7 dark:border-zinc-200">
+      <h2
+        className="text-[30px] font-semibold"
+        style={{ fontFamily: 'Petrona, Georgia, serif' }}
+      >
+        New in the Bulletin
+      </h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Recent community asks and offers
+      </p>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        {items.map((item) => (
+          <article
+            key={item.tweetId}
+            className="rounded-lg border border-zinc-200 p-5 dark:border-zinc-800"
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+              {item.label}
+            </p>
+            <p className="mt-2 text-base leading-relaxed">{item.summary}</p>
+            <a
+              href={`https://x.com/${encodeURIComponent(item.username)}/status/${encodeURIComponent(item.tweetId)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-block text-sm font-semibold text-brand hover:underline"
+            >
+              @{item.username} · View post →
+            </a>
+          </article>
+        ))}
+      </div>
+      <Link
+        href="/bulletin"
+        className="mt-6 inline-block text-sm font-semibold text-brand hover:underline"
+      >
+        Explore the Bulletin (opt-in required) →
+      </Link>
+    </section>
+  )
+}
+
+async function DigestBulletin({ edition }: { edition: DigestEdition }) {
+  try {
+    return <BulletinItems items={await loadDigestBulletinItems(edition)} />
+  } catch (error) {
+    console.error('Digest bulletin selection failed:', error)
+    return null
+  }
+}
 
 async function Likes({ edition }: { edition: DigestEdition }) {
   const [likes, user] = await Promise.all([
@@ -132,6 +189,11 @@ export function PublishedDigestView({ edition }: { edition: DigestEdition }) {
           ) : (
             <Suspense fallback={<p role="status">Loading discussion…</p>}>
               <Comments edition={edition} />
+            </Suspense>
+          ),
+          bulletin: edition.isPreview ? null : (
+            <Suspense fallback={null}>
+              <DigestBulletin edition={edition} />
             </Suspense>
           ),
         }}

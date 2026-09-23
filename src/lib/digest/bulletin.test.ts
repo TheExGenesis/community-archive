@@ -1,0 +1,83 @@
+import {
+  hydrateBulletinNotices,
+  verifyBulletinResolutions,
+} from '@/lib/bulletin/data'
+import { createServerServiceRoleClient } from '@/utils/supabase'
+import { AUGUST_11_MOCK_DIGEST } from './mock'
+import { loadDigestBulletinItems } from './bulletin'
+
+jest.mock('@/lib/bulletin/data', () => ({
+  hydrateBulletinNotices: jest.fn(),
+  verifyBulletinResolutions: jest.fn(),
+}))
+jest.mock('@/utils/supabase', () => ({
+  createServerServiceRoleClient: jest.fn(),
+}))
+
+const rpc = jest.fn()
+const edition = { ...AUGUST_11_MOCK_DIGEST, isPreview: false }
+
+const notice = (id: number, overrides: Record<string, unknown> = {}) => ({
+  tweet_id: String(id),
+  account_id: String(id + 100),
+  username: `author${id}`,
+  posted_at: `2026-08-11T${String(id + 10).padStart(2, '0')}:00:00Z`,
+  created_at: '2026-08-11T18:00:00Z',
+  content_hash: 'hash',
+  side: 'ask',
+  kind: 'help',
+  summary: `Request ${id}`,
+  evidence: 'Request',
+  topics: [],
+  respond: 'reply',
+  standing: false,
+  expires_at: null,
+  place: null,
+  ...overrides,
+})
+
+beforeEach(() => {
+  jest.clearAllMocks()
+  jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-12T10:00:00Z'))
+  jest.mocked(createServerServiceRoleClient).mockReturnValue({ rpc } as never)
+  jest.mocked(verifyBulletinResolutions).mockResolvedValue(undefined)
+  jest
+    .mocked(hydrateBulletinNotices)
+    .mockImplementation(async ({ notices }) => notices as never)
+})
+
+afterEach(() => jest.restoreAllMocks())
+
+test('selects at most four new, open notices after source verification', async () => {
+  rpc.mockResolvedValue({
+    data: [
+      notice(1, { created_at: '2026-08-11T05:59:59Z' }),
+      ...[2, 3, 4, 5, 6].map((id) => notice(id)),
+      notice(7, { resolution_state: 'resolved' }),
+      notice(8, { created_at: '2026-08-12T06:00:00Z' }),
+      notice(9, { expires_at: '2026-08-11' }),
+    ],
+    error: null,
+  })
+  jest
+    .mocked(hydrateBulletinNotices)
+    .mockImplementation(
+      async ({ notices }) =>
+        notices.filter((item) => item.tweet_id !== '6') as never,
+    )
+
+  const items = await loadDigestBulletinItems(edition)
+
+  expect(rpc).toHaveBeenCalledWith('get_bulletin_board_state', {
+    max_results: 2000,
+  })
+  expect(verifyBulletinResolutions).toHaveBeenCalled()
+  expect(hydrateBulletinNotices).toHaveBeenCalled()
+  expect(items.map((item) => item.tweetId)).toEqual(['5', '4', '3', '2'])
+  expect(items[0]).toMatchObject({ label: 'Help wanted', summary: 'Request 5' })
+})
+
+test('omits the section for previews without reading private state', async () => {
+  expect(await loadDigestBulletinItems(AUGUST_11_MOCK_DIGEST)).toEqual([])
+  expect(createServerServiceRoleClient).not.toHaveBeenCalled()
+})

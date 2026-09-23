@@ -80,6 +80,32 @@ describe('renderDigestEmail', () => {
     expect(html).not.toContain('<script>')
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt; &amp; more')
   })
+
+  it('places up to four escaped Bulletin items near the bottom in HTML and text', () => {
+    const items = Array.from({ length: 5 }, (_, index) => ({
+      tweetId: String(index + 1),
+      username: `author${index + 1}`,
+      label: 'Help wanted',
+      summary: index === 0 ? '<script>unsafe</script>' : `Request ${index + 1}`,
+    }))
+    const { html, text } = renderDigestEmail(
+      AUGUST_11_MOCK_DIGEST,
+      LINKS,
+      items,
+    )
+
+    expect(html).toContain('New in the Bulletin')
+    expect(html).toContain('&lt;script&gt;unsafe&lt;/script&gt;')
+    expect(html).not.toContain('<script>unsafe</script>')
+    expect(html).toContain('https://x.com/author4/status/4')
+    expect(html).not.toContain('https://x.com/author5/status/5')
+    expect(html.indexOf('New in the Bulletin')).toBeGreaterThan(
+      html.indexOf('Read the full digest with tweets'),
+    )
+    expect(text).toContain('NEW IN THE BULLETIN')
+    expect(text).toContain('https://x.com/author4/status/4')
+    expect(text).not.toContain('https://x.com/author5/status/5')
+  })
 })
 
 it('uses the UTC publication date while retaining the edition URL and exact coverage', () => {

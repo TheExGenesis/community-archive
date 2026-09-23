@@ -1,5 +1,6 @@
 import type { DigestEdition } from '@/lib/digest/types'
 import type { PortalTweet } from '@/lib/portal/types'
+import type { DigestBulletinItem } from './bulletin'
 import { formatNumber } from '@/lib/formatNumber'
 import {
   digestPublicationDate,
@@ -107,6 +108,7 @@ const formatDigestDateParts = (digestDate: string) => {
 export function renderDigestEmail(
   edition: DigestEdition,
   links: DigestEmailLinks,
+  bulletinItems: DigestBulletinItem[] = [],
 ): RenderedDigestEmail {
   const { content } = edition
   const showRepresentativeTweet = shouldShowRepresentativeTweet(content)
@@ -150,6 +152,21 @@ export function renderDigestEmail(
     ${renderTweetCard(content.topBanger, links.siteUrl)}`
     : ''
 
+  const bulletin = bulletinItems.slice(0, 4)
+  const bulletinHtml = bulletin.length
+    ? `<section style="margin:28px 0 32px;border-top:1px solid #e5e7eb;padding-top:20px;">
+        <h2 style="margin:0 0 6px;font-family:${HEADING_FONT};font-size:24px;">New in the Bulletin</h2>
+        <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">Recent community asks and offers</p>
+        ${bulletin
+          .map((item) => {
+            const url = `https://x.com/${encodeURIComponent(item.username)}/status/${encodeURIComponent(item.tweetId)}`
+            return `<p style="margin:0 0 16px;font-size:14px;line-height:1.5;"><strong>${escapeHtml(item.label)}</strong> · ${escapeHtml(item.summary)}<br /><span style="color:#6b7280;">@${escapeHtml(item.username)}</span> · <a href="${escapeHtml(url)}" style="color:#1d4ed8;">View post →</a></p>`
+          })
+          .join('')}
+        <a href="${escapeHtml(links.siteUrl)}/bulletin" style="color:#1d4ed8;font-size:13px;">Explore the Bulletin (opt-in required) →</a>
+      </section>`
+    : ''
+
   const html = `
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Petrona:wght@500;600&family=Manrope:wght@400;500;700&display=swap');
@@ -170,6 +187,7 @@ export function renderDigestEmail(
     <p style="margin:0 0 32px;">
       <a href="${editionUrl}" style="color:#1d4ed8;font-size:14px;">Read the full digest with tweets →</a>
     </p>
+    ${bulletinHtml}
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:0 0 16px;" />
     <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.5;">
       You are receiving this because you subscribed to the Community Archive Daily Digest.<br />
@@ -197,6 +215,19 @@ export function renderDigestEmail(
       '',
     ]),
     `Read the full digest: ${editionUrl}`,
+    ...(bulletin.length
+      ? [
+          '',
+          'NEW IN THE BULLETIN',
+          'Recent community asks and offers',
+          ...bulletin.flatMap((item) => [
+            `${item.label}: ${item.summary}`,
+            `@${item.username} — https://x.com/${encodeURIComponent(item.username)}/status/${encodeURIComponent(item.tweetId)}`,
+            '',
+          ]),
+          `Explore the Bulletin (opt-in required): ${links.siteUrl}/bulletin`,
+        ]
+      : []),
     '',
     `Unsubscribe: ${links.unsubscribeUrl}`,
   ].join('\n')

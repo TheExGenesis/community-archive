@@ -25,4 +25,5 @@ UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
 
-# Deliberately no timer: the successful autorefresh wrapper starts this unit.
+# ca-bulletin-daily.timer starts this unit at noon UTC, independently of
+# Autorefresh. A failed service retains its bounded restart policy.

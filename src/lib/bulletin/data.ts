@@ -193,10 +193,15 @@ export async function loadBulletinViewer() {
 }
 
 /** Recommendations use ClickHouse outgoing interactions, never follow lists. */
-export async function loadBulletinRelationships() {
-  const empty = await loadBulletinViewer()
-  const { account_id: me, username } = empty
-  const identifier = me || username
+async function outgoingInteractions(
+  identifier: string,
+  expectedAccountId: string,
+) {
+  const empty = {
+    account_id: expectedAccountId,
+    outgoing: {} as Record<string, number>,
+    available: false,
+  }
   if (!identifier) return empty
   try {
     const response = await fetchAnalyticsGatewayJson<{
@@ -211,7 +216,7 @@ export async function loadBulletinRelationships() {
     )
     if (
       !/^\d{1,20}$/.test(response.query?.accountId) ||
-      (!!me && response.query.accountId !== me) ||
+      (!!expectedAccountId && response.query.accountId !== expectedAccountId) ||
       response.query.year !== null ||
       response.query.peopleLimit !== 25 ||
       !Array.isArray(response.data?.people)
@@ -236,6 +241,23 @@ export async function loadBulletinRelationships() {
   } catch {
     return empty
   }
+}
+
+export async function loadBulletinRelationships() {
+  const viewer = await loadBulletinViewer()
+  const relationships = await outgoingInteractions(
+    viewer.account_id || viewer.username,
+    viewer.account_id,
+  )
+  return { ...viewer, ...relationships }
+}
+
+/** Server-only digest lookup using the account id saved at authenticated signup. */
+export function loadBulletinRelationshipsForAccount(accountId: string) {
+  return outgoingInteractions(
+    /^\d{1,20}$/.test(accountId) ? accountId : '',
+    accountId,
+  )
 }
 
 export type StoredNotice = Notice & { content_hash: string }

@@ -6,6 +6,7 @@ import {
   loadBulletinBoardState,
   loadRunDashboard,
   loadBulletinRelationships,
+  loadBulletinRelationshipsForAccount,
   loadBulletinViewer,
   requireBulletinUser,
 } from './data'
@@ -261,6 +262,25 @@ test('recommendations use only ClickHouse outgoing interactions and trusted iden
     available: true,
   })
   expect(rpc).not.toHaveBeenCalled()
+  expect(fetchAnalyticsGatewayJson).toHaveBeenCalledWith(
+    ['user', '42', 'interactions'],
+    new URLSearchParams({ limit: '25' }),
+    expect.any(Object),
+  )
+})
+test('digest recommendations use a saved account id without a viewer session', async () => {
+  jest.mocked(fetchAnalyticsGatewayJson).mockResolvedValue({
+    query: { accountId: '42', year: null, peopleLimit: 25 },
+    data: { people: [{ accountId: '7', interactionCount: '12' }] },
+  })
+  await expect(
+    loadBulletinRelationshipsForAccount('42'),
+  ).resolves.toMatchObject({
+    account_id: '42',
+    outgoing: { '7': 12 },
+    available: true,
+  })
+  expect(getCurrentUser).not.toHaveBeenCalled()
   expect(fetchAnalyticsGatewayJson).toHaveBeenCalledWith(
     ['user', '42', 'interactions'],
     new URLSearchParams({ limit: '25' }),

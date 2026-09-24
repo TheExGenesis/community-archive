@@ -48,7 +48,13 @@ export function DigestEditionView({
   commentCount?: number
   slots?: Partial<
     Record<
-      'likes' | 'admin' | 'calendar' | 'recent' | 'comments' | 'subscribers',
+      | 'likes'
+      | 'admin'
+      | 'calendar'
+      | 'recent'
+      | 'comments'
+      | 'subscribers'
+      | 'bulletin',
       ReactNode
     >
   >
@@ -299,6 +305,8 @@ export function DigestEditionView({
             )}
           </aside>
         </div>
+
+        {slots.bulletin}
 
         <footer className={`mt-4 border-t pt-5 text-xs leading-5 ${MUTED}`}>
           {edition.isPreview

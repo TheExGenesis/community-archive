@@ -71,11 +71,12 @@ After that route has been deployed to Production, set a shared random secret
 BULLETIN_PRODUCTION_BOARD_URL=https://www.community-archive.org/api/bulletin/preview-board
 ```
 
-Redeploy both environments after setting variables. The preview requires a
-staging Bulletin admin, fetches fresh policy-filtered metadata from the
+Redeploy both environments after setting variables. The preview requires an
+opted-in staging user, fetches fresh policy-filtered metadata from the
 production site on each page request, and still checks source tweets through
-the analytics gateway. Login, opt-in, writes, and the service-role key stay on
-staging. Keep Vercel preview protection enabled. If production's Vercel Firewall
+the analytics gateway. Jev filters remain admin-only. Login, opt-in, writes,
+and the service-role key stay on staging. Keep Vercel preview protection enabled.
+If production's Vercel Firewall
 challenges the server-to-server request, allow only this endpoint through the
 firewall; the route itself requires the shared secret and returns no cached
 response. Remove the branch secret and URL when the review is over.

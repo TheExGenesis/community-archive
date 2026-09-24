@@ -13,7 +13,7 @@ import {
 import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { getOptInStatus } from '@/lib/auth-utils'
-import { getAdminClient, requireAdmin } from '@/app/admin/data'
+import { getAdminClient } from '@/app/admin/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 jest.mock('@/lib/clickhouseGateway', () => ({
   fetchAnalyticsGatewayJson: jest.fn(),
@@ -25,7 +25,6 @@ jest.mock('@/lib/portal/auth', () => ({ getCurrentUser: jest.fn() }))
 jest.mock('@/lib/auth-utils', () => ({ getOptInStatus: jest.fn() }))
 jest.mock('@/app/admin/data', () => ({
   getAdminClient: jest.fn(),
-  requireAdmin: jest.fn(),
 }))
 jest.mock('@/utils/supabase', () => ({
   createServerServiceRoleClient: jest.fn(),
@@ -78,7 +77,7 @@ test('opted-in users read the policy-aware RPC, with upstream errors kept distin
   await expect(loadNotices()).rejects.toThrow('could not be loaded')
 })
 
-test('protected Preview reads production board metadata only after staging consent and admin checks', async () => {
+test('protected Preview reads production board metadata for an opted-in staging member', async () => {
   const previous = {
     vercel: process.env.VERCEL_ENV,
     url: process.env.BULLETIN_PRODUCTION_BOARD_URL,
@@ -99,7 +98,7 @@ test('protected Preview reads production board metadata only after staging conse
     await expect(loadBulletinBoardState(false)).resolves.toMatchObject({
       notices: [{ tweet_id: '1' }],
     })
-    expect(requireAdmin).toHaveBeenCalledWith('/admin/bulletin')
+    expect(getOptInStatus).toHaveBeenCalledWith('member')
     expect(fetchMock).toHaveBeenCalledWith(
       new URL(process.env.BULLETIN_PRODUCTION_BOARD_URL),
       expect.objectContaining({ method: 'POST', cache: 'no-store' }),
@@ -107,8 +106,13 @@ test('protected Preview reads production board metadata only after staging conse
     expect(createServerServiceRoleClient).not.toHaveBeenCalled()
 
     fetchMock.mockClear()
-    jest.mocked(requireAdmin).mockRejectedValueOnce(new Error('not an admin'))
-    await expect(loadBulletinBoardState(false)).rejects.toThrow('not an admin')
+    jest.mocked(getOptInStatus).mockResolvedValueOnce({
+      data: { opted_in: false, explicit_optout: true },
+      error: null,
+    } as Awaited<ReturnType<typeof getOptInStatus>>)
+    await expect(loadBulletinBoardState(false)).rejects.toThrow(
+      'redirect:/opt-in?redirect=/bulletin',
+    )
     expect(fetchMock).not.toHaveBeenCalled()
   } finally {
     global.fetch = fetchBefore

@@ -276,6 +276,20 @@ def _author_replies(seed, context):
     return sorted(replies,key=lambda r:int(r['tweet_id']))
 
 
+def _resolution_source_read(fn, run_id, started):
+    """Retry transient read-only gateway failures without losing reply progress."""
+    for attempt in range(1,4):
+        try:
+            return fn()
+        except Exception as exc:
+            delay = worker.retry_wait(exc,attempt)
+            if delay is None or time.monotonic()-started+delay+60>MAX_SECONDS:
+                raise
+            worker.log_failure(exc,run_id=run_id,attempt=attempt,
+                stage='resolution_source',retry_seconds=delay)
+            time.sleep(delay)
+
+
 def check_resolutions(db, run_id, counts, started, limit, key):
     """Recheck current author reply evidence without reclassifying the seed."""
     rows=db.execute('''SELECT * FROM bulletin.jev_items WHERE status='ready'
@@ -287,18 +301,18 @@ def check_resolutions(db, run_id, counts, started, limit, key):
     for job in rows:
         if time.monotonic()-started>MAX_SECONDS or counts['calls']>=limit:
             break
-        valid=_valid_sources(db,[job])
-        if not valid:
-            counts['suppressed']+=1
-            continue
-        seed=valid[0][1]
         call_id=None
         try:
-            context=tweet_context.prepare(db,seed)
+            valid=_resolution_source_read(lambda: _valid_sources(db,[job]),run_id,started)
+            if not valid:
+                counts['suppressed']+=1
+                continue
+            seed=valid[0][1]
+            context=_resolution_source_read(lambda: tweet_context.prepare(db,seed),run_id,started)
             digest=resolution.digest(context)
             replies=_author_replies(seed,context)
             if digest==job['context_digest'] or not replies:
-                if tweet_context.still_current(db,context):
+                if _resolution_source_read(lambda: tweet_context.still_current(db,context),run_id,started):
                     db.execute('''UPDATE bulletin.jev_items SET context_digest=%s,
                       context_checked_at=now() WHERE tweet_id=%s''',(digest,job['tweet_id']))
                     checked+=1
@@ -307,14 +321,31 @@ def check_resolutions(db, run_id, counts, started, limit, key):
             amount=model.reservation(payload)
             if amount>Decimal('.01'):
                 raise ValueError('oversize_jev_resolution_request')
-            call_id=reserve(db,[],amount,run_id,None)
-            if call_id is None:
-                counts['resolution_checked']=checked
-                return 'budget_limit'
-            counts['calls']+=1
-            response=model.call(payload,key)
-            answers,cost=model.validate(response,payload)
-            db.execute("UPDATE bulletin.calls SET actual_usd=%s,status='responded' WHERE id=%s",(cost,call_id))
+            for attempt in range(1,4):
+                call_id=reserve(db,[],amount,run_id,None)
+                if call_id is None:
+                    counts['resolution_checked']=checked
+                    return 'budget_limit'
+                counts['calls']+=1
+                try:
+                    response=model.call(payload,key)
+                    answers,cost=model.validate(response,payload)
+                except Exception as exc:
+                    delay=worker.retry_wait(exc,attempt)
+                    if delay is not None and (counts['calls']>=limit or
+                            time.monotonic()-started+delay+60>MAX_SECONDS):
+                        delay=None
+                    worker.log_failure(exc,run_id=run_id,call_id=call_id,attempt=attempt,
+                        stage='resolution_model_request',retry_seconds=delay)
+                    db.execute('UPDATE bulletin.calls SET status=%s WHERE id=%s',
+                        ('failed:'+type(exc).__name__,call_id))
+                    counts['failed']+=1
+                    if delay is None:
+                        return 'resolution_failed'
+                    time.sleep(delay)
+                else:
+                    db.execute("UPDATE bulletin.calls SET actual_usd=%s,status='responded' WHERE id=%s",(cost,call_id))
+                    break
             update=None
             for i,row in enumerate(replies):
                 answer=answers['reply_'+str(i)]
@@ -325,7 +356,7 @@ def check_resolutions(db, run_id, counts, started, limit, key):
                     'evidence':row['full_text'][:1000]},seed,context)
                 if not update or int(candidate['tweet_id'])>int(update['tweet_id']):
                     update=candidate
-            if not tweet_context.still_current(db,context):
+            if not _resolution_source_read(lambda: tweet_context.still_current(db,context),run_id,started):
                 db.execute("UPDATE bulletin.calls SET status='suppressed' WHERE id=%s",(call_id,))
                 counts['suppressed']+=1
                 continue

@@ -131,18 +131,33 @@ class JevWorkerTests(unittest.TestCase):
             '1':('10',self.source['content_hash']),
             '2':('10',hashlib.sha256(reply['full_text'].encode()).hexdigest())},
             {'1':seed,'2':reply})
+        context_reads=0
+        model_calls=0
+        def prepare_with_disconnect(db,source):
+            nonlocal context_reads
+            context_reads+=1
+            if context_reads==1:
+                raise RemoteDisconnected('gateway closed connection')
+            return context
         def resolved(payload,key):
+            nonlocal model_calls
+            model_calls+=1
+            if model_calls==1:
+                raise RemoteDisconnected('provider closed connection')
             self.assertEqual(len(payload['questions']),1)
             return {'answers':{'reply_0':{'type':'choice','choice':'resolved',
                 'probabilities':{'resolved':.95,'open':.02,'neither':.03}}},
                 'usage':{'cost':.0001}}
-        with patch.object(jev_worker.tweet_context,'prepare',return_value=context), \
+        with patch.object(jev_worker.tweet_context,'prepare',side_effect=prepare_with_disconnect), \
              patch.object(jev_worker.tweet_context,'still_current',return_value=True), \
-             patch.object(model,'call',side_effect=resolved):
+             patch.object(model,'call',side_effect=resolved), \
+             patch.object(jev_worker.time,'sleep'):
             counts={'calls':0,'failed':0,'suppressed':0}
             self.assertEqual(jev_worker.check_resolutions(self.db,1,counts,time.monotonic(),10,'test'),'ok')
+        self.assertEqual((context_reads,model_calls,counts['calls']),(2,2,2))
         saved=self.db.execute('SELECT resolution_state,resolution_tweet_id,context_digest FROM bulletin.jev_items').fetchone()
         self.assertEqual((saved['resolution_state'],saved['resolution_tweet_id']),('resolved','2'))
+        self.assertEqual(self.db.execute("SELECT count(*) n FROM bulletin.calls WHERE status='failed:RemoteDisconnected'").fetchone()['n'],1)
         self.assertIsNotNone(saved['context_digest'])
 
     def test_shadow_state_is_private_and_cutover_requires_database_owner(self):

@@ -32,7 +32,15 @@ const PROJECT_SELECT =
   'id, slug, name, project_url, creator_name, creator_handle, category, description, archive_use, source_post_url, tags, cover_storage_path, cover_mime_type, submitter_username, status, featured, submitted_at, published_at'
 
 function sourceTweetId(sourceUrl: string) {
-  return new URL(sourceUrl).pathname.match(/\/status\/(\d{1,20})/)?.[1] ?? ''
+  try {
+    return (
+      new URL(sourceUrl, 'https://community-archive.org').pathname.match(
+        /\/status\/(\d{1,20})/,
+      )?.[1] ?? ''
+    )
+  } catch {
+    return ''
+  }
 }
 
 export function mapCommunityProjectRow(

@@ -26,7 +26,8 @@ shown in the historical prototype.
   compact segmented sort and small submit button sit right.
 - Default browsing shows every project in one continuous grid, with no row
   break when the category changes. Keep category chips for filtering and the
-  existing card size across the default, search, and filtered views.
+  existing card size across the default, search, and filtered views. Sort by
+  newest first when the gallery opens.
 - The project grid uses three columns when space allows and 26px gaps. Filtering
   to fewer items does not stretch their cards beyond the normal width.
 - Project cards have no outer panel, fill, padding, shadow, or summary copy.

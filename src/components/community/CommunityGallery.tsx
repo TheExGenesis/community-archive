@@ -577,7 +577,7 @@ export default function CommunityGallery({
   const [query, setQuery] = useState('')
   const [category, setCategory] =
     useState<(typeof COMMUNITY_PROJECT_CATEGORIES)[number]>('All')
-  const [sort, setSort] = useState<CommunityProjectSort>('Featured')
+  const [sort, setSort] = useState<CommunityProjectSort>('Newest')
   const [selectedProject, setSelectedProject] =
     useState<CommunityProject | null>(null)
   const [submissionOpen, setSubmissionOpen] = useState(false)

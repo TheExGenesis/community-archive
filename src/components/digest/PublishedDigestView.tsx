@@ -23,6 +23,39 @@ import {
 import { selectDigestTrendMovers } from '@/lib/digest/trends'
 import { fetchPortalWeeklyTrends } from '@/lib/portal/analytics'
 
+const PREVIEW_BULLETIN_ITEMS: DigestBulletinItem[] = [
+  {
+    label: 'Help wanted',
+    summary: 'Looking for feedback on a community research project.',
+    tweet: {
+      id: 'preview-ask',
+      username: 'preview',
+      name: 'Bulletin example',
+      avatar: null,
+      text: 'I would love feedback from people who have organized small research communities. What worked for you?',
+      observedAt: '2026-08-11T18:00:00Z',
+      createdAt: '2026-08-11T18:00:00Z',
+      likes: 0,
+      rts: 0,
+    },
+  },
+  {
+    label: 'Free resource',
+    summary: 'Sharing a practical guide for community organizers.',
+    tweet: {
+      id: 'preview-offer',
+      username: 'preview',
+      name: 'Bulletin example',
+      avatar: null,
+      text: 'I put together a short guide to running a community reading group. Happy to share it with anyone planning one.',
+      observedAt: '2026-08-11T19:00:00Z',
+      createdAt: '2026-08-11T19:00:00Z',
+      likes: 0,
+      rts: 0,
+    },
+  },
+]
+
 async function DigestTrends() {
   try {
     const movers = selectDigestTrendMovers(await fetchPortalWeeklyTrends())
@@ -36,9 +69,11 @@ async function DigestTrends() {
 function BulletinItems({
   items,
   personalized,
+  preview = false,
 }: {
   items: DigestBulletinItem[]
   personalized: boolean
+  preview?: boolean
 }) {
   if (!items.length) return null
   return (
@@ -47,12 +82,15 @@ function BulletinItems({
         className="text-[30px] font-semibold"
         style={{ fontFamily: 'Petrona, Georgia, serif' }}
       >
-        New in the Bulletin{personalized ? ' · For You' : ''}
+        New in the Bulletin
+        {preview ? ' · Sample' : personalized ? ' · For You' : ''}
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        {personalized
-          ? 'Recommended community asks and offers'
-          : 'Recent community asks and offers'}
+        {preview
+          ? 'Example asks and offers for this mock edition; published digests show live picks.'
+          : personalized
+            ? 'Recommended community asks and offers'
+            : 'Recent community asks and offers'}
       </p>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {items.map((item) => (
@@ -63,21 +101,29 @@ function BulletinItems({
             <p className="mb-3 mt-2 text-base leading-relaxed">
               {item.summary}
             </p>
-            <TweetCard
-              tweet={item.tweet}
-              variant="editorial"
-              collapsible
-              showDate
-              origin="digest"
-            />
-            <a
-              href={`https://x.com/${encodeURIComponent(item.tweet.username)}/status/${encodeURIComponent(item.tweet.id)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-block text-sm font-semibold text-brand hover:underline"
-            >
-              Respond on X →
-            </a>
+            {preview ? (
+              <p className="rounded-lg border border-zinc-200 p-4 text-sm leading-relaxed dark:border-zinc-800">
+                {item.tweet.text}
+              </p>
+            ) : (
+              <>
+                <TweetCard
+                  tweet={item.tweet}
+                  variant="editorial"
+                  collapsible
+                  showDate
+                  origin="digest"
+                />
+                <a
+                  href={`https://x.com/${encodeURIComponent(item.tweet.username)}/status/${encodeURIComponent(item.tweet.id)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-block text-sm font-semibold text-brand hover:underline"
+                >
+                  Respond on X →
+                </a>
+              </>
+            )}
           </article>
         ))}
       </div>
@@ -225,7 +271,13 @@ export function PublishedDigestView({ edition }: { edition: DigestEdition }) {
               <Comments edition={edition} />
             </Suspense>
           ),
-          bulletin: edition.isPreview ? null : (
+          bulletin: edition.isPreview ? (
+            <BulletinItems
+              items={PREVIEW_BULLETIN_ITEMS}
+              personalized={false}
+              preview
+            />
+          ) : (
             <Suspense fallback={null}>
               <DigestBulletin edition={edition} />
             </Suspense>

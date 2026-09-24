@@ -14,11 +14,24 @@ import { DigestLikeButton } from './DigestLikeButton'
 import { DigestComments } from './DigestComments'
 import { SectionReady } from '@/components/PagePerformance'
 import { DigestSubscriberCount } from './DigestSubscriberCount'
+import { DigestTrendMovers } from './DigestTrendMovers'
 import TweetCard from '@/components/TweetCard'
 import {
   loadDigestBulletinItems,
   type DigestBulletinItem,
 } from '@/lib/digest/bulletin'
+import { selectDigestTrendMovers } from '@/lib/digest/trends'
+import { fetchPortalWeeklyTrends } from '@/lib/portal/analytics'
+
+async function DigestTrends() {
+  try {
+    const movers = selectDigestTrendMovers(await fetchPortalWeeklyTrends())
+    return movers ? <DigestTrendMovers movers={movers} /> : null
+  } catch (error) {
+    console.error('Digest trends could not be loaded:', error)
+    return null
+  }
+}
 
 function BulletinItems({ items }: { items: DigestBulletinItem[] }) {
   if (!items.length) return null
@@ -189,6 +202,11 @@ export function PublishedDigestView({ edition }: { edition: DigestEdition }) {
           recent: (
             <Suspense fallback={null}>
               <Calendar archive={archive} date={edition.digestDate} recent />
+            </Suspense>
+          ),
+          trends: edition.isPreview ? null : (
+            <Suspense fallback={null}>
+              <DigestTrends />
             </Suspense>
           ),
           comments: edition.isPreview ? (

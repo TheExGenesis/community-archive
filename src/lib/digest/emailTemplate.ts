@@ -1,16 +1,21 @@
 import type { DigestEdition } from '@/lib/digest/types'
 import type { PortalTweet } from '@/lib/portal/types'
 import type { DigestBulletinItem } from './bulletin'
+import type { DigestTrendMovers } from './trends'
 import { formatNumber } from '@/lib/formatNumber'
 import {
   digestPublicationDate,
-  digestCoverageLabel,
   shouldShowRepresentativeTweet,
 } from './presentation'
 
 export interface DigestEmailLinks {
   siteUrl: string
   unsubscribeUrl: string
+}
+
+export interface DigestEmailOptions {
+  trendMovers?: DigestTrendMovers | null
+  personalizedBulletin?: boolean
 }
 
 export interface RenderedDigestEmail {
@@ -44,7 +49,11 @@ const renderQuotedTweet = (tweet: NonNullable<PortalTweet['quotedTweet']>) => `
     <p style="margin:0;font-size:13px;line-height:1.45;color:#374151;">${escapeTweetText(tweet.text)}</p>
   </div>`
 
-const renderTweetCard = (tweet: PortalTweet, siteUrl: string) => {
+const renderTweetCard = (
+  tweet: PortalTweet,
+  siteUrl: string,
+  monochrome = false,
+) => {
   const tweetUrl = `${siteUrl}/tweets/${encodeURIComponent(tweet.id)}`
   const photo = firstPhoto(tweet)
   const avatarHtml = tweet.avatar
@@ -55,7 +64,7 @@ const renderTweetCard = (tweet: PortalTweet, siteUrl: string) => {
       ? ''
       : ` &nbsp;·&nbsp; 🔁 ${escapeHtml(formatNumber(tweet.rts))}`
   return `
-  <table role="presentation" width="100%" style="margin:0 0 12px;border:1px solid #e5e7eb;border-radius:10px;border-collapse:separate;">
+  <table role="presentation" width="100%" style="margin:0 0 12px;border:1px solid #e5e7eb;border-radius:${monochrome ? '0' : '10px'};border-collapse:separate;">
     <tr><td style="padding:12px 14px;">
       <table role="presentation"><tr>
         <td style="vertical-align:top;padding-right:10px;">${avatarHtml}</td>
@@ -65,9 +74,9 @@ const renderTweetCard = (tweet: PortalTweet, siteUrl: string) => {
         </td>
       </tr></table>
       <p style="margin:8px 0 0;font-size:14px;line-height:1.5;color:#111827;">${escapeTweetText(tweet.text)}</p>
-      ${photo ? `<img src="${escapeHtml(photo.url)}" alt="" style="margin:10px 0 0;max-width:100%;border-radius:8px;display:block;" />` : ''}
+      ${photo ? `<img src="${escapeHtml(photo.url)}" alt="" style="margin:10px 16px 0;max-width:calc(100% - 32px);max-height:200px;width:auto;height:auto;object-fit:contain;border-radius:8px;display:block;" />` : ''}
       ${tweet.quotedTweet ? renderQuotedTweet(tweet.quotedTweet) : ''}
-      <p style="margin:10px 0 0;font-size:12px;color:#6b7280;">♥ ${escapeHtml(formatNumber(tweet.likes))}${rtsHtml} &nbsp;·&nbsp; <a href="${tweetUrl}" style="color:#1d4ed8;text-decoration:none;">View in the archive</a></p>
+      <p style="margin:10px 0 0;font-size:12px;color:#6b7280;">♥ ${escapeHtml(formatNumber(tweet.likes))}${rtsHtml} &nbsp;·&nbsp; <a href="${tweetUrl}" style="color:${monochrome ? '#111827' : '#1d4ed8'};text-decoration:none;">View in the archive</a></p>
     </td></tr>
   </table>`
 }
@@ -109,6 +118,7 @@ export function renderDigestEmail(
   edition: DigestEdition,
   links: DigestEmailLinks,
   bulletinItems: DigestBulletinItem[] = [],
+  options: DigestEmailOptions = {},
 ): RenderedDigestEmail {
   const { content } = edition
   const showRepresentativeTweet = shouldShowRepresentativeTweet(content)
@@ -122,11 +132,11 @@ export function renderDigestEmail(
 
   const storiesHtml = content.stories
     .map(
-      (story) => `
+      (story, index) => `
       <table role="presentation" width="100%" style="margin:24px 0 20px;">
         <tr><td>
           <h2 style="margin:0 0 4px;font-family:${HEADING_FONT};font-size:26px;line-height:1.3;">
-            <a href="${editionUrl}#${escapeHtml(story.slug)}" style="color:#111827;text-decoration:none;">${escapeHtml(story.title)}</a>
+            <span style="display:inline-block;min-width:33px;font-family:${BODY_FONT};font-size:15px;font-weight:700;color:#111827;">${String(index + 1).padStart(2, '0')}.</span><a href="${editionUrl}/${encodeURIComponent(story.slug)}" style="color:#111827;text-decoration:none;">${escapeHtml(story.title)}</a>
           </h2>
           <p style="margin:0 0 8px;color:#374151;font-size:14px;line-height:1.5;">${escapeHtml(story.subtitle)}</p>
           <ul style="margin:0 0 10px;padding-left:20px;color:#374151;font-size:14px;line-height:1.5;">
@@ -138,7 +148,7 @@ export function renderDigestEmail(
             .join('')}
           ${
             story.bangers.length > BANGERS_PER_STORY
-              ? `<p style="margin:0;font-size:13px;"><a href="${editionUrl}#${escapeHtml(story.slug)}" style="color:#1d4ed8;">+ ${story.bangers.length - BANGERS_PER_STORY} more tweet${story.bangers.length - BANGERS_PER_STORY === 1 ? '' : 's'} in this story →</a></p>`
+              ? `<p style="margin:0;font-size:13px;"><a href="${editionUrl}/${encodeURIComponent(story.slug)}" style="color:#1d4ed8;">+ ${story.bangers.length - BANGERS_PER_STORY} more tweet${story.bangers.length - BANGERS_PER_STORY === 1 ? '' : 's'} in this story →</a></p>`
               : ''
           }
         </td></tr>
@@ -152,20 +162,63 @@ export function renderDigestEmail(
     ${renderTweetCard(content.topBanger, links.siteUrl)}`
     : ''
 
+  const trendRows = [
+    options.trendMovers?.riser
+      ? {
+          label: 'Top riser',
+          arrow: '↑',
+          color: '#228542',
+          row: options.trendMovers.riser,
+        }
+      : null,
+    options.trendMovers?.faller
+      ? {
+          label: 'Top faller',
+          arrow: '↓',
+          color: '#c93732',
+          row: options.trendMovers.faller,
+        }
+      : null,
+  ].filter((item): item is NonNullable<typeof item> => item !== null)
+  const trendsHtml = trendRows.length
+    ? `<section style="margin:0 0 25px;padding:17px 18px 16px;border:1px solid #dce5ea;border-radius:10px;background:#fbfdfe;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 15px;"><tr>
+          <td style="font-family:${HEADING_FONT};font-size:20px;font-weight:600;color:#111827;">Trending terms · 7 days</td>
+          <td align="right" style="font-size:12px;"><a href="${escapeHtml(links.siteUrl)}/trends" style="color:#247da9;text-decoration:none;">Explore →</a></td>
+        </tr></table>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
+          ${trendRows
+            .map(
+              (
+                { label, arrow, color, row },
+                index,
+              ) => `<td width="${trendRows.length === 2 ? '50%' : '100%'}" style="padding:${index === 0 && trendRows.length === 2 ? '0 15px 0 0' : index === 1 ? '0 0 0 16px' : '0'};vertical-align:top;${index === 0 && trendRows.length === 2 ? 'border-right:1px solid #e2e8f0;' : ''}">
+            <p style="margin:0 0 5px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;">${label}</p>
+            <p style="margin:0 0 4px;font-size:27px;font-weight:700;line-height:1.15;color:${color};">${arrow} ${row.deltaPct! > 0 ? '+' : '−'}${Math.abs(row.deltaPct!).toLocaleString('en-US')}%</p>
+            <p style="margin:0;font-size:13px;line-height:1.4;"><a href="${escapeHtml(links.siteUrl)}/search?${new URLSearchParams({ q: row.term })}" style="font-weight:700;color:#247da9;text-decoration:none;">${escapeHtml(row.term)}</a> <span style="color:#6b7280;">· ${row.last7.toLocaleString('en-US')} tweets</span></p>
+          </td>`,
+            )
+            .join('')}
+        </tr></table>
+        <p style="margin:13px 0 0;font-size:11px;line-height:1.4;color:#6b7280;">Share change versus the previous seven days.</p>
+      </section>`
+    : ''
+
   const bulletin = bulletinItems.slice(0, 4)
   const bulletinHtml = bulletin.length
-    ? `<section style="margin:28px 0 32px;border-top:1px solid #e5e7eb;padding-top:20px;">
-        <h2 style="margin:0 0 6px;font-family:${HEADING_FONT};font-size:24px;">New in the Bulletin</h2>
-        <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">Recent community asks and offers</p>
+    ? `<section style="margin:72px 0 32px;padding:16px 0 12px;border-top:3px solid #111827;border-bottom:1px solid #111827;background:#ffffff;">
+        <p style="margin:0 0 5px;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#111827;">Community opportunities</p>
+        <h2 style="margin:0 0 6px;font-family:${HEADING_FONT};font-size:26px;color:#111827;">New in the Bulletin${options.personalizedBulletin ? ` <span style="display:inline-block;vertical-align:middle;margin-left:8px;border:1px solid #111827;padding:3px 5px;font-family:${BODY_FONT};font-size:10px;font-weight:700;letter-spacing:0.08em;line-height:1.2;text-transform:uppercase;color:#111827;">For You</span>` : ''}</h2>
+        <p style="margin:0 0 6px;color:#4b5563;font-size:13px;line-height:1.5;">Fresh asks and offers from Community Archive members</p>
         ${bulletin
           .map((item) => {
             const url = `https://x.com/${encodeURIComponent(item.tweet.username)}/status/${encodeURIComponent(item.tweet.id)}`
-            return `<p style="margin:0 0 10px;font-size:14px;line-height:1.5;"><strong>${escapeHtml(item.label)}</strong> · ${escapeHtml(item.summary)}</p>
-              ${renderTweetCard(item.tweet, links.siteUrl)}
-              <p style="margin:0 0 20px;font-size:13px;"><a href="${escapeHtml(url)}" style="color:#1d4ed8;">Respond on X →</a></p>`
+            return `<p style="margin:15px 0 10px;padding-top:15px;border-top:1px solid #d1d5db;font-size:16px;line-height:1.45;color:#111827;"><span style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#111827;">${escapeHtml(item.label)}</span><br /><strong>${escapeHtml(item.summary)}</strong></p>
+              ${renderTweetCard(item.tweet, links.siteUrl, true)}
+              <p style="margin:0 0 20px;font-size:13px;"><a href="${escapeHtml(url)}" style="color:#111827;">Respond on X →</a></p>`
           })
           .join('')}
-        <a href="${escapeHtml(links.siteUrl)}/bulletin" style="color:#1d4ed8;font-size:13px;">Explore the Bulletin (opt-in required) →</a>
+        <a href="${escapeHtml(links.siteUrl)}/bulletin" style="color:#111827;font-size:13px;">Explore the Bulletin (opt-in required) →</a>
       </section>`
     : ''
 
@@ -181,9 +234,9 @@ export function renderDigestEmail(
     <a href="${escapeHtml(links.siteUrl)}" style="display:inline-block;" aria-label="Community Archive website"><img src="${links.siteUrl}/images/email-logo.png" width="48" height="48" alt="Community Archive" style="display:block;margin:0 0 12px;" /></a>
     <p style="margin:0 0 4px;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#9ca3af;">Community Archive Daily Digest</p>
     <h1 class="digest-h1" style="margin:0 0 16px;font-family:${HEADING_FONT};font-size:30px;line-height:1.2;color:#111827;">${escapeHtml(prettyDate.dayPart)}<span class="digest-year">, ${escapeHtml(prettyDate.year)}</span></h1>
-    <p style="margin:0 0 12px;font-size:13px;color:#6b7280;">${escapeHtml(digestCoverageLabel(content))}</p>
     <p style="margin:0 0 20px;"><a href="${escapeHtml(editionUrl)}" style="color:#1d4ed8;font-size:14px;">Read on Community Archive →</a></p>
     <ul style="margin:0 0 24px;padding-left:20px;font-size:14px;line-height:1.5;">${summaryHtml}</ul>
+    ${trendsHtml}
     ${topBangerHtml}
     ${storiesHtml}
     <p style="margin:0 0 32px;">
@@ -199,16 +252,28 @@ export function renderDigestEmail(
 
   const text = [
     `Community Archive Daily Digest — ${prettyDate.full}`,
-    digestCoverageLabel(content),
     `Read on Community Archive: ${editionUrl}`,
     '',
     ...content.executiveSummary.map((line) => `* ${line}`),
     '',
+    ...(trendRows.length
+      ? [
+          'TRENDING TERMS · 7 DAYS',
+          ...trendRows.map(
+            ({ arrow, row }) =>
+              `${arrow} ${row.deltaPct! > 0 ? '+' : '−'}${Math.abs(row.deltaPct!).toLocaleString('en-US')}%  ${row.term} · ${row.last7.toLocaleString('en-US')} tweets`,
+          ),
+          'Share change versus the previous seven days.',
+          `Explore: ${links.siteUrl}/trends`,
+          '',
+        ]
+      : []),
     ...(showRepresentativeTweet
       ? ['TOP TWEET', tweetToText(content.topBanger), '']
       : []),
-    ...content.stories.flatMap((story) => [
-      story.title.toUpperCase(),
+    ...content.stories.flatMap((story, index) => [
+      `${String(index + 1).padStart(2, '0')}. ${story.title.toUpperCase()}`,
+      `${editionUrl}/${encodeURIComponent(story.slug)}`,
       story.subtitle,
       ...story.bullets.map((bullet) => `- ${bullet}`),
       ...story.bangers
@@ -220,8 +285,8 @@ export function renderDigestEmail(
     ...(bulletin.length
       ? [
           '',
-          'NEW IN THE BULLETIN',
-          'Recent community asks and offers',
+          `NEW IN THE BULLETIN${options.personalizedBulletin ? ' · FOR YOU' : ''}`,
+          'Fresh asks and offers from Community Archive members',
           ...bulletin.flatMap((item) => [
             `${item.label}: ${item.summary}`,
             tweetToText(item.tweet),

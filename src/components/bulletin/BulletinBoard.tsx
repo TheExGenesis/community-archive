@@ -238,18 +238,18 @@ function NoticeCard({
     </p>
   )
   const label = (
-    <span
-      className={`${styles.kind} ${notice.side === 'offer' ? styles.offer : styles.ask}`}
-    >
-      <button
-        type="button"
-        className={styles.kindButton}
-        aria-label={`Filter by ${KIND_LABELS[notice.kind] || notice.kind}`}
-        onClick={() => onKind(notice.kind)}
-      >
-        <KindIcon kind={notice.kind} size={13} />
-        {cardLabel(notice)}
-      </button>
+    <>
+      <span className={styles.kind}>
+        <button
+          type="button"
+          className={styles.kindButton}
+          aria-label={`Filter by ${KIND_LABELS[notice.kind] || notice.kind}`}
+          onClick={() => onKind(notice.kind)}
+        >
+          <KindIcon kind={notice.kind} size={16} />
+          {cardLabel(notice)}
+        </button>
+      </span>
       {resolved && (
         <a
           className={styles.resolvedPill}
@@ -261,17 +261,8 @@ function NoticeCard({
           Resolved
         </a>
       )}
-      {isNew && !resolved && (
-        <span
-          className={styles.newPill}
-          title="Posted within the last 24 hours"
-        >
-          New
-        </span>
-      )}
       {badge && <span className={styles.rel}>{badge}</span>}
-      {notice.place && <span className={styles.rel}>{notice.place}</span>}
-    </span>
+    </>
   )
   return (
     <article
@@ -284,9 +275,19 @@ function NoticeCard({
         setOpen(true)
       }}
     >
+      {isNew && !resolved && (
+        <span
+          className={styles.newPill}
+          title="Posted within the last 24 hours"
+        >
+          New
+        </span>
+      )}
       {open ? (
         <>
-          <div className={styles.stickerRow}>
+          <div
+            className={`${styles.stickerRow} ${isNew && !resolved ? styles.hasNew : ''}`}
+          >
             {label}
             <button
               type="button"
@@ -398,21 +399,11 @@ function NoticeCard({
         </>
       ) : (
         <>
-          <div className={styles.stickerRow}>
+          <div
+            className={`${styles.stickerRow} ${isNew && !resolved ? styles.hasNew : ''}`}
+          >
             {label}
-            <span className={styles.readHint} aria-hidden>
-              click to read more
-            </span>
           </div>
-          <span className={styles.corner}>
-            <time
-              dateTime={notice.posted_at}
-              title={exactStamp(notice.posted_at)}
-              className={styles.age}
-            >
-              {sinceLabel(notice.posted_at, now)}
-            </time>
-          </span>
           <button
             type="button"
             className={styles.summaryButton}
@@ -448,6 +439,16 @@ function NoticeCard({
                   {replies}
                 </span>
               )}
+              {notice.place && (
+                <span className={styles.place}>{notice.place}</span>
+              )}
+              <time
+                dateTime={notice.posted_at}
+                title={exactStamp(notice.posted_at)}
+                className={styles.age}
+              >
+                {sinceLabel(notice.posted_at, now)}
+              </time>
             </span>
           </div>
         </>

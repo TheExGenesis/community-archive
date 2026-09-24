@@ -10,7 +10,7 @@ import {
   recordSend,
 } from '@/lib/digest/emailSubscriptions'
 import { renderDigestEmail } from '@/lib/digest/emailTemplate'
-import { loadDigestBulletinItems } from '@/lib/digest/bulletin'
+import { prepareDigestBulletinItems } from '@/lib/digest/bulletin'
 import { sendEmail } from '@/lib/email'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 
@@ -76,12 +76,12 @@ async function handleSend(request: Request) {
   }
 
   const recipients = await listUnsentRecipients(edition.id)
-  const bulletinItems = recipients.length
-    ? await loadDigestBulletinItems(edition).catch((error) => {
+  const bulletin = recipients.length
+    ? await prepareDigestBulletinItems(edition).catch((error) => {
         console.error('Digest bulletin selection failed:', error)
-        return []
+        return null
       })
-    : []
+    : null
   const siteUrl = digestEmailSiteUrl()
   let sent = 0
   const failures: string[] = []
@@ -90,6 +90,12 @@ async function handleSend(request: Request) {
     const recipient = recipients[index]
     if (index > 0) await sleep(SEND_INTERVAL_MS)
     const unsubscribeUrl = digestUnsubscribeUrl(recipient.token)
+    const bulletinItems = bulletin
+      ? await bulletin.itemsForAccount(recipient.accountId).catch((error) => {
+          console.error('Digest bulletin recommendation failed:', error)
+          return []
+        })
+      : []
     const rendered = renderDigestEmail(
       edition,
       { siteUrl, unsubscribeUrl },

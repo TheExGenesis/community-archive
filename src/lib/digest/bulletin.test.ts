@@ -1,14 +1,16 @@
 import {
   hydrateBulletinNotices,
+  loadBulletinRelationshipsForAccount,
   verifyBulletinResolutions,
 } from '@/lib/bulletin/data'
 import { hydrateBulletinTweets } from '@/lib/bulletin/tweets'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { AUGUST_11_MOCK_DIGEST } from './mock'
-import { loadDigestBulletinItems } from './bulletin'
+import { loadDigestBulletinItems, prepareDigestBulletinItems } from './bulletin'
 
 jest.mock('@/lib/bulletin/data', () => ({
   hydrateBulletinNotices: jest.fn(),
+  loadBulletinRelationshipsForAccount: jest.fn(),
   verifyBulletinResolutions: jest.fn(),
 }))
 jest.mock('@/lib/bulletin/tweets', () => ({
@@ -45,6 +47,13 @@ beforeEach(() => {
   jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-12T10:00:00Z'))
   jest.mocked(createServerServiceRoleClient).mockReturnValue({ rpc } as never)
   jest.mocked(verifyBulletinResolutions).mockResolvedValue(undefined)
+  jest
+    .mocked(loadBulletinRelationshipsForAccount)
+    .mockImplementation(async (accountId) => ({
+      account_id: accountId,
+      outgoing: {},
+      available: true,
+    }))
   jest
     .mocked(hydrateBulletinNotices)
     .mockImplementation(async ({ notices }) => notices as never)
@@ -104,4 +113,39 @@ test('selects at most four new, open notices after source verification', async (
 test('omits the section for previews without reading private state', async () => {
   expect(await loadDigestBulletinItems(AUGUST_11_MOCK_DIGEST)).toEqual([])
   expect(createServerServiceRoleClient).not.toHaveBeenCalled()
+})
+
+test('ranks each linked recipient with their own interactions, keeping guests recent-first', async () => {
+  rpc.mockResolvedValue({
+    data: [
+      notice(2),
+      notice(3),
+      notice(4),
+      notice(5),
+      notice(8, { created_at: '2026-08-12T06:00:00Z' }),
+    ],
+    error: null,
+  })
+  jest
+    .mocked(loadBulletinRelationshipsForAccount)
+    .mockImplementation(async (accountId) => ({
+      account_id: accountId,
+      outgoing: (accountId === 'one' ? { '102': 20 } : { '103': 20 }) as Record<
+        string,
+        number
+      >,
+      available: true,
+    }))
+  const prepared = await prepareDigestBulletinItems(edition)
+  const guest = await prepared.itemsForAccount(null)
+  const first = await prepared.itemsForAccount('one')
+  const second = await prepared.itemsForAccount('two')
+
+  expect(guest.map((item) => item.tweet.id)).toEqual(['5', '4', '3', '2'])
+  expect(first.map((item) => item.tweet.id)).toEqual(['2', '5', '4', '3'])
+  expect(second.map((item) => item.tweet.id)).toEqual(['3', '5', '4', '2'])
+  expect(loadBulletinRelationshipsForAccount).toHaveBeenCalledTimes(2)
+  expect(verifyBulletinResolutions).toHaveBeenCalledTimes(1)
+  expect(hydrateBulletinNotices).toHaveBeenCalledTimes(1)
+  expect(hydrateBulletinTweets).toHaveBeenCalledTimes(1)
 })

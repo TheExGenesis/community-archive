@@ -113,6 +113,10 @@ test.each([null, '456', '123'])(
     const body = await (
       await subscribe(request({ email: subscription.email }))
     ).json()
+    expect(upsertSubscription).toHaveBeenCalledWith(
+      subscription.email,
+      accountId,
+    )
     expect(body.subscriptionId).toBe(
       accountId === '123' ? subscription.id : null,
     )

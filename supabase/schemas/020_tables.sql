@@ -788,3 +788,56 @@ CREATE INDEX bulletin_refresh_pending_idx ON bulletin.decisions(refresh_request_
 
 CREATE INDEX bulletin_runs_refresh_idx ON bulletin.runs ((counts->>'refresh_request_id'))
   WHERE counts ? 'refresh_request_id';
+
+-- Jev is prepared beside the legacy processor. The single switch makes
+-- publication and rollback atomic without deleting legacy notices.
+CREATE TABLE bulletin.pipeline_state (
+  id integer PRIMARY KEY CHECK (id=1),
+  active text NOT NULL DEFAULT 'legacy' CHECK (active IN ('legacy','jev'))
+);
+INSERT INTO bulletin.pipeline_state(id) VALUES (1);
+
+CREATE TABLE bulletin.jev_items (
+  tweet_id text PRIMARY KEY,
+  account_id text NOT NULL,
+  posted_at timestamptz NOT NULL,
+  content_hash text NOT NULL,
+  version text NOT NULL,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','failed','ready','rejected')),
+  phase text NOT NULL DEFAULT 'disposition' CHECK (phase IN ('disposition','enrich','value')),
+  attempts integer NOT NULL DEFAULT 0,
+  last_attempt_at timestamptz,
+  disposition jsonb,
+  enrichment jsonb,
+  value_answer jsonb,
+  p_opportunity numeric CHECK (p_opportunity BETWEEN 0 AND 1),
+  p_direct numeric CHECK (p_direct BETWEEN 0 AND 1),
+  p_joke numeric CHECK (p_joke BETWEEN 0 AND 1),
+  value_score numeric CHECK (value_score BETWEEN 0 AND 4),
+  side text CHECK (side IN ('ask','offer')),
+  kind text CHECK (kind IN ('help','feedback','intro','free','invite','opportunity','other')),
+  summary text CHECK (length(summary) BETWEEN 1 AND 500),
+  evidence text,
+  topics text[] NOT NULL DEFAULT '{}',
+  respond text CHECK (respond IN ('dm','reply','link','like','unknown')),
+  standing boolean NOT NULL DEFAULT false,
+  expires_at date,
+  place text,
+  model text NOT NULL DEFAULT 'typesafe/jev-1.13',
+  resolution_state text NOT NULL DEFAULT 'unknown' CHECK (resolution_state IN ('unknown','open','resolved')),
+  resolution_tweet_id text,
+  resolution_content_hash text,
+  context_digest text,
+  context_checked_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (status <> 'ready' OR (side IS NOT NULL AND kind IS NOT NULL AND summary IS NOT NULL AND evidence IS NOT NULL)),
+  CHECK ((resolution_state='unknown' AND resolution_tweet_id IS NULL AND resolution_content_hash IS NULL)
+    OR (resolution_state IN ('open','resolved') AND resolution_tweet_id ~ '^[0-9]{1,20}$'
+      AND resolution_content_hash ~ '^[0-9a-f]{64}$'))
+);
+CREATE INDEX bulletin_jev_pending_idx ON bulletin.jev_items(updated_at)
+  WHERE status IN ('pending','failed');
+CREATE INDEX bulletin_jev_ready_idx ON bulletin.jev_items(posted_at DESC)
+  WHERE status='ready';
+CREATE INDEX bulletin_jev_resolution_idx ON bulletin.jev_items(context_checked_at NULLS FIRST,tweet_id)
+  WHERE status='ready';

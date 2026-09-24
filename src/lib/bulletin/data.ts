@@ -113,6 +113,10 @@ export async function hydrateBulletinNotices({
         renewed_at: source.renewed_at ? utc(source.renewed_at) : null,
         resolution_state: notice.resolution_state,
         resolution_tweet_id: notice.resolution_tweet_id,
+        p_opportunity: notice.p_opportunity,
+        p_direct: notice.p_direct,
+        p_joke: notice.p_joke,
+        value_score: notice.value_score,
       })
     }
   }

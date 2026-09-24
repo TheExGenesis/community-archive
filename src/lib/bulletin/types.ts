@@ -18,6 +18,10 @@ export type Notice = Omit<
   resolution_state?: 'unknown' | 'open' | 'resolved'
   resolution_tweet_id?: string | null
   resolution_content_hash?: string | null
+  p_opportunity?: number | null
+  p_direct?: number | null
+  p_joke?: number | null
+  value_score?: number | null
 }
 export type RunCounts = Partial<
   Record<
@@ -29,7 +33,10 @@ export type RunCounts = Partial<
     | 'negative'
     | 'failed'
     | 'suppressed'
-    | 'pending',
+    | 'pending'
+    | 'retryable'
+    | 'resolution_checked'
+    | 'resolution_pending',
     number
   >
 > & {
@@ -69,6 +76,7 @@ export const KIND_LABELS: Record<string, string> = {
   feedback: 'Feedback',
   opportunity: 'Work & collaboration',
   free: 'Free things',
+  other: 'Other',
 }
 /** Phosphor icon name per kind; resolved in the client component. */
 export const KIND_ICONS: Record<string, string> = {
@@ -78,6 +86,7 @@ export const KIND_ICONS: Record<string, string> = {
   intro: 'users',
   help: 'hand-heart',
   feedback: 'chats',
+  other: 'chats',
 }
 /** Card label combining side and kind, indexed [offer, ask]. */
 export const CARD_LABELS: Record<string, [string, string]> = {
@@ -87,6 +96,7 @@ export const CARD_LABELS: Record<string, [string, string]> = {
   intro: ['Intro', 'Intro wanted'],
   help: ['Help', 'Help wanted'],
   feedback: ['Feedback', 'Feedback wanted'],
+  other: ['Offer', 'Ask'],
 }
 export function cardLabel(notice: { side: string; kind: string }) {
   const pair = CARD_LABELS[notice.kind]
@@ -125,6 +135,8 @@ export function runStatus(run: BulletinRun) {
     interrupted: 'Interrupted',
     classification_failed: 'Some decisions failed',
     pending_review: 'Work remaining',
+    resolution_backlog: 'Reply checks remaining',
+    resolution_failed: 'Reply check failed',
     intake_backlog: 'Scan incomplete',
     time_limit: 'Time limit reached',
     budget_limit: 'Budget limit reached',

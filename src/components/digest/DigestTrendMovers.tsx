@@ -27,7 +27,7 @@ export function DigestTrendMovers({
   ].filter((item): item is NonNullable<typeof item> => item !== null)
 
   return (
-    <section className="mt-10 border-y-2 border-zinc-800 py-5 dark:border-zinc-200">
+    <section className="mt-10 border-t-2 border-zinc-800 py-5 dark:border-zinc-200">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h2
           className="text-2xl font-semibold"

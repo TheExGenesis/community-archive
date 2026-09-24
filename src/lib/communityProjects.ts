@@ -224,6 +224,24 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     publishedAt: '2026-09-24',
   },
   {
+    slug: 'tpot-trust',
+    name: 'Tpot-Trust',
+    creator: 'UpTrust HQ',
+    summary:
+      'Explore personalized timelines and a trust map of the tpot archive.',
+    description:
+      'Choose a poster to see how their inferred trust changes the ranking of archived posts, or explore the community trust map.',
+    archiveUse:
+      'Uses likes, replies, and other interactions in a Community Archive snapshot to infer trust between posters and rank posts for each viewer.',
+    category: 'Experiments',
+    tags: ['Trust', 'Personalized timelines', 'Social graph'],
+    projectUrl: 'https://tpot.uptrusthq.com/',
+    image: '/images/community/tpot-trust-cover.png',
+    coverClass: 'from-[#f6f2ea] via-[#cce7e2] to-[#168f83]',
+    featured: false,
+    publishedAt: '2026-09-24',
+  },
+  {
     slug: 'vector-search',
     name: 'Semantic Search',
     creator: 'Corbin',

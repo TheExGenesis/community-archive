@@ -4,8 +4,8 @@ import {
 } from './communityProjects'
 
 describe('community project catalog', () => {
-  it('contains only verified entries with source posts and no prototype filler', () => {
-    expect(COMMUNITY_PROJECTS).toHaveLength(16)
+  it('contains only verified entries and no prototype filler', () => {
+    expect(COMMUNITY_PROJECTS).toHaveLength(17)
     expect(COMMUNITY_PROJECTS).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'Ratio Radar' }),
@@ -26,6 +26,10 @@ describe('community project catalog', () => {
       } else if (project.slug === 'pairwise') {
         expect(project.projectUrl).toBe('https://strangestloop.io/pairwise')
         expect(project.sourceUrl).toBe('https://strangestloop.io/coding/')
+      } else if (project.slug === 'tpot-trust') {
+        expect(project.projectUrl).toBe('https://tpot.uptrusthq.com/')
+        expect(project.creator).toBe('UpTrust HQ')
+        expect(project.sourceTweetId).toBeUndefined()
       } else expect(project.sourceTweetId).toMatch(/^\d+$/)
       expect(project.projectUrl ?? '').not.toContain('example.com')
       expect(project.image ?? '').not.toContain('pbs.twimg.com')

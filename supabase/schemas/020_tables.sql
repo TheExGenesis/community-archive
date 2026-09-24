@@ -1,5 +1,27 @@
 -- Core tables (moved from prod.sql)
 
+-- Generated research is deliberately outside the exposed Data API schemas.
+-- A subject may be known only by a linked Cuties ID, without an archive account.
+CREATE TABLE IF NOT EXISTS "private"."profile_intelligence_runs" (
+    "subject_key" text NOT NULL,
+    "cuties_user_id" uuid,
+    "ca_account_id" text,
+    "profile_run_id" text NOT NULL,
+    "blurb_id" text NOT NULL,
+    "long_profile" text NOT NULL,
+    "profile_data" jsonb NOT NULL,
+    "blurb_text" text NOT NULL,
+    "blurb_data" jsonb NOT NULL,
+    "provenance" jsonb NOT NULL,
+    "profile_generated_at" timestamptz NOT NULL,
+    "blurb_generated_at" timestamptz NOT NULL,
+    "imported_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "profile_intelligence_runs_pkey"
+      PRIMARY KEY ("subject_key", "profile_run_id", "blurb_id"),
+    CONSTRAINT "profile_intelligence_runs_subject_check"
+      CHECK ("cuties_user_id" IS NOT NULL OR "ca_account_id" IS NOT NULL)
+);
+
 -- private.logs
 CREATE TABLE IF NOT EXISTS "private"."logs" (
     "log_id" integer NOT NULL,

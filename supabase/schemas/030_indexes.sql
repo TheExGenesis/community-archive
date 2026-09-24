@@ -1,5 +1,13 @@
 -- Indexes for core tables moved out of prod.sql
 
+CREATE INDEX IF NOT EXISTS "idx_profile_intelligence_cuties_recent"
+  ON "private"."profile_intelligence_runs"
+  ("cuties_user_id", "profile_generated_at" DESC, "blurb_generated_at" DESC);
+CREATE INDEX IF NOT EXISTS "idx_profile_intelligence_account_recent"
+  ON "private"."profile_intelligence_runs"
+  ("ca_account_id", "profile_generated_at" DESC, "blurb_generated_at" DESC)
+  WHERE "ca_account_id" IS NOT NULL;
+
 -- public.all_profile
 CREATE INDEX "idx_all_profile_archive_upload_id" ON "public"."all_profile" USING "btree" ("archive_upload_id");
 

@@ -293,19 +293,22 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          project_id: string
+          project_id: string | null
+          project_slug: string
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
-          project_id: string
+          project_id?: string | null
+          project_slug: string
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
-          project_id?: string
+          project_id?: string | null
+          project_slug?: string
           user_id?: string
         }
         Relationships: [

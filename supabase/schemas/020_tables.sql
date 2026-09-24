@@ -594,15 +594,17 @@ CREATE TABLE IF NOT EXISTS "public"."community_projects" (
 );
 ALTER TABLE "public"."community_projects" OWNER TO "postgres";
 
--- Community Gallery likes. One row per (project, signed-in user); writes are
--- performed by server code after the session identity gate, and counts are
--- readable for any published project.
+-- Community Gallery likes. Slugs remain stable when a checked-in project is
+-- later added to community_projects. project_id is optional for catalog-only
+-- entries; writes are performed by server code after the session identity gate.
 CREATE TABLE IF NOT EXISTS "public"."community_project_likes" (
     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    "project_id" uuid NOT NULL REFERENCES public.community_projects(id) ON DELETE CASCADE,
+    "project_slug" text NOT NULL,
+    "project_id" uuid REFERENCES public.community_projects(id) ON DELETE CASCADE,
     "user_id" uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     "created_at" timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT "community_project_likes_project_user_key" UNIQUE ("project_id", "user_id")
+    CONSTRAINT "community_project_likes_project_user_key" UNIQUE ("project_id", "user_id"),
+    CONSTRAINT "community_project_likes_slug_user_key" UNIQUE ("project_slug", "user_id")
 );
 ALTER TABLE "public"."community_project_likes" OWNER TO "postgres";
 

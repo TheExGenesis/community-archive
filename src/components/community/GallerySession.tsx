@@ -10,9 +10,11 @@ import { SessionContext, type Session } from './gallerySessionContext'
 /** Public browsing works while request-scoped viewer state streams in. */
 export function GallerySession({
   projects,
+  likeCounts,
   children,
 }: {
   projects: CommunityProject[]
+  likeCounts: Record<string, number>
   children: ReactNode
 }) {
   const [session, setSession] = useState<Session | null>(null)
@@ -21,8 +23,9 @@ export function GallerySession({
     <SessionContext.Provider value={{ ready: session !== null, setSession }}>
       <CommunityGallery
         publishedProjects={projects}
+        likeCounts={likeCounts}
         isSignedIn={session?.isSignedIn ?? false}
-        likedProjectIds={session?.likedProjectIds ?? []}
+        likedProjectSlugs={session?.likedProjectSlugs ?? []}
       />
       {children}
     </SessionContext.Provider>

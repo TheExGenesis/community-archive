@@ -63,7 +63,7 @@ describe('CommunityGallery', () => {
     )
     expect(screen.getByText('1 project')).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: /Community Archive Radio/i }),
+      screen.getByRole('button', { name: /Community Archive Radio by/i }),
     ).toBeInTheDocument()
 
     await user.clear(
@@ -72,13 +72,13 @@ describe('CommunityGallery', () => {
     await user.click(screen.getByRole('button', { name: 'Games' }))
     expect(screen.getByText('1 project')).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: /Followle/i }),
+      screen.getByRole('button', { name: /Followle by/i }),
     ).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Research' }))
     expect(screen.getByText('2 projects')).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: /Model Behavior Reports/i }),
+      screen.getByRole('button', { name: /Model Behavior Reports by/i }),
     ).toBeInTheDocument()
   })
 
@@ -311,7 +311,7 @@ describe('CommunityGallery', () => {
       <CommunityGallery
         isSignedIn
         publishedProjects={[PUBLISHED_PROJECT]}
-        likedProjectIds={[]}
+        likedProjectSlugs={[]}
       />,
     )
 
@@ -326,7 +326,7 @@ describe('CommunityGallery', () => {
     await user.click(cardLike)
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/community/projects/${PUBLISHED_PROJECT.databaseId}/like`,
+      `/api/community/projects/${PUBLISHED_PROJECT.slug}/like`,
       expect.objectContaining({ method: 'POST' }),
     )
     expect(
@@ -334,6 +334,33 @@ describe('CommunityGallery', () => {
     ).toHaveTextContent('3')
     // The card like must not open the project modal.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('likes a checked-in project without a database row', async () => {
+    const user = userEvent.setup()
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ liked: true, count: 5 }),
+    } as Response)
+
+    render(<CommunityGallery isSignedIn likeCounts={{ 'tpot-trust': 4 }} />)
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search community projects' }),
+      'Tpot-Trust',
+    )
+
+    const likeButton = screen.getByRole('button', { name: 'Like Tpot-Trust' })
+    expect(likeButton).toHaveTextContent('4')
+    await user.click(likeButton)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/community/projects/tpot-trust/like',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(
+      await screen.findByRole('button', { name: 'Unlike Tpot-Trust' }),
+    ).toHaveTextContent('5')
   })
 
   it('optimistically likes a published project and calls the like API', async () => {
@@ -348,7 +375,7 @@ describe('CommunityGallery', () => {
       <CommunityGallery
         isSignedIn
         publishedProjects={[PUBLISHED_PROJECT]}
-        likedProjectIds={[]}
+        likedProjectSlugs={[]}
       />,
     )
 
@@ -362,7 +389,7 @@ describe('CommunityGallery', () => {
     await user.click(likeButton)
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/community/projects/${PUBLISHED_PROJECT.databaseId}/like`,
+      `/api/community/projects/${PUBLISHED_PROJECT.slug}/like`,
       expect.objectContaining({ method: 'POST' }),
     )
     const liked = await screen.findByRole('button', {
@@ -383,7 +410,7 @@ describe('CommunityGallery', () => {
       <CommunityGallery
         isSignedIn
         publishedProjects={[PUBLISHED_PROJECT]}
-        likedProjectIds={[PUBLISHED_PROJECT.databaseId!]}
+        likedProjectSlugs={[PUBLISHED_PROJECT.slug]}
       />,
     )
 
@@ -394,7 +421,7 @@ describe('CommunityGallery', () => {
     )
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `/api/community/projects/${PUBLISHED_PROJECT.databaseId}/like`,
+      `/api/community/projects/${PUBLISHED_PROJECT.slug}/like`,
       expect.objectContaining({ method: 'DELETE' }),
     )
     const unliked = await screen.findByRole('button', {

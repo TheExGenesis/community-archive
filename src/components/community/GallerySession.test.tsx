@@ -5,7 +5,9 @@ import { GallerySession, GallerySessionValue } from './GallerySession'
 test('public filtering works before session hydration and account actions unlock afterwards', async () => {
   const user = userEvent.setup()
   const { rerender } = render(
-    <GallerySession projects={[]}>{null}</GallerySession>,
+    <GallerySession projects={[]} likeCounts={{}}>
+      {null}
+    </GallerySession>,
   )
   expect(
     screen.getByRole('button', { name: 'Submit a project' }),
@@ -16,9 +18,9 @@ test('public filtering works before session hydration and account actions unlock
   )
   expect(screen.getByText('1 project')).toBeInTheDocument()
   rerender(
-    <GallerySession projects={[]}>
+    <GallerySession projects={[]} likeCounts={{}}>
       <GallerySessionValue
-        session={{ isSignedIn: true, likedProjectIds: [] }}
+        session={{ isSignedIn: true, likedProjectSlugs: [] }}
       />
     </GallerySession>,
   )

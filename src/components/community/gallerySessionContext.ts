@@ -1,6 +1,6 @@
 'use client'
 import { createContext, useContext } from 'react'
-export type Session = { isSignedIn: boolean; likedProjectIds: string[] }
+export type Session = { isSignedIn: boolean; likedProjectSlugs: string[] }
 export const SessionContext = createContext<{
   ready: boolean
   setSession: (session: Session) => void

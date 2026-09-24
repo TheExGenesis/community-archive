@@ -47,6 +47,7 @@ const SORT_OPTIONS: CommunityProjectSort[] = [
 ]
 
 type LikeState = { liked: boolean; count: number }
+const EMPTY_LIKE_COUNTS: Record<string, number> = {}
 
 function LikeButton({
   project,
@@ -567,11 +568,13 @@ function ProjectDialog({
 export default function CommunityGallery({
   isSignedIn = true,
   publishedProjects = [],
-  likedProjectIds = [],
+  likeCounts = EMPTY_LIKE_COUNTS,
+  likedProjectSlugs = [],
 }: {
   isSignedIn?: boolean
   publishedProjects?: CommunityProject[]
-  likedProjectIds?: string[]
+  likeCounts?: Record<string, number>
+  likedProjectSlugs?: string[]
 }) {
   const viewerReady = useGallerySessionReady()
   const [query, setQuery] = useState('')
@@ -588,26 +591,6 @@ export default function CommunityGallery({
   const [likeOverrides, setLikeOverrides] = useState<Record<string, LikeState>>(
     {},
   )
-
-  const serverLikes = useMemo(() => {
-    const liked = new Set(likedProjectIds)
-    return new Map<string, LikeState>(
-      publishedProjects
-        .filter((project) => project.databaseId)
-        .map((project) => [
-          project.databaseId!,
-          {
-            liked: liked.has(project.databaseId!),
-            count: project.likeCount ?? 0,
-          },
-        ]),
-    )
-  }, [publishedProjects, likedProjectIds])
-
-  const likes = useMemo(() => {
-    const merged: Record<string, LikeState> = Object.fromEntries(serverLikes)
-    return { ...merged, ...likeOverrides }
-  }, [serverLikes, likeOverrides])
 
   const baseCatalog = useMemo(() => {
     const bySlug = new Map(
@@ -626,10 +609,28 @@ export default function CommunityGallery({
     return Array.from(bySlug.values())
   }, [publishedProjects])
 
+  const serverLikes = useMemo(() => {
+    const liked = new Set(likedProjectSlugs)
+    return Object.fromEntries(
+      baseCatalog.map((project) => [
+        project.slug,
+        {
+          liked: liked.has(project.slug),
+          count: likeCounts[project.slug] ?? project.likeCount ?? 0,
+        },
+      ]),
+    ) as Record<string, LikeState>
+  }, [baseCatalog, likedProjectSlugs, likeCounts])
+
+  const likes = useMemo(
+    () => ({ ...serverLikes, ...likeOverrides }),
+    [serverLikes, likeOverrides],
+  )
+
   const catalog = useMemo(
     () =>
       baseCatalog.map((project) => {
-        const state = project.databaseId ? likes[project.databaseId] : undefined
+        const state = likes[project.slug]
         return state ? { ...project, likeCount: state.count } : project
       }),
     [baseCatalog, likes],
@@ -642,23 +643,22 @@ export default function CommunityGallery({
 
   const toggleLike = useCallback(
     (project: CommunityProject) => {
-      const id = project.databaseId
-      if (!id) return
+      const slug = project.slug
       if (!isSignedIn) {
         window.location.href = '/login?redirect=/community'
         return
       }
 
-      const previous = likes[id] ?? { liked: false, count: 0 }
+      const previous = likes[slug] ?? { liked: false, count: 0 }
       const next: LikeState = {
         liked: !previous.liked,
         count: Math.max(0, previous.count + (previous.liked ? -1 : 1)),
       }
-      setLikeOverrides((current) => ({ ...current, [id]: next }))
+      setLikeOverrides((current) => ({ ...current, [slug]: next }))
 
       void (async () => {
         try {
-          const response = await fetch(`/api/community/projects/${id}/like`, {
+          const response = await fetch(`/api/community/projects/${slug}/like`, {
             method: next.liked ? 'POST' : 'DELETE',
           })
           if (response.status === 401) {
@@ -672,13 +672,13 @@ export default function CommunityGallery({
           }
           setLikeOverrides((current) => ({
             ...current,
-            [id]: {
+            [slug]: {
               liked: result.liked ?? next.liked,
               count: result.count ?? next.count,
             },
           }))
         } catch {
-          setLikeOverrides((current) => ({ ...current, [id]: previous }))
+          setLikeOverrides((current) => ({ ...current, [slug]: previous }))
         }
       })()
     },
@@ -686,7 +686,7 @@ export default function CommunityGallery({
   )
 
   const likeStateFor = (project: CommunityProject) =>
-    project.databaseId ? (likes[project.databaseId] ?? undefined) : undefined
+    likes[project.slug] ?? { liked: false, count: 0 }
 
   const openSubmission = () => {
     if (!isSignedIn) {

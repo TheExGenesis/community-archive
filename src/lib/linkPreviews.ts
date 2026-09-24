@@ -282,12 +282,27 @@ export async function fetchSafeRemoteResource(
         ? null
         : new Agent({
             connect: {
-              lookup: ((_, __, callback) =>
-                callback(
-                  null,
-                  pinnedAddress.address,
-                  pinnedAddress.family as 4 | 6,
-                )) as LookupFunction,
+              lookup: ((
+                _: string,
+                options: { all?: boolean },
+                callback: (
+                  error: NodeJS.ErrnoException | null,
+                  address: string | Array<{ address: string; family: number }>,
+                  family?: number,
+                ) => void,
+              ) => {
+                // Node requests an address array when autoSelectFamily is on.
+                // Keep both lookup forms pinned to the validated address.
+                if (options.all) {
+                  callback(null, [pinnedAddress])
+                } else {
+                  callback(
+                    null,
+                    pinnedAddress.address,
+                    pinnedAddress.family as 4 | 6,
+                  )
+                }
+              }) as LookupFunction,
             },
           })
       try {

@@ -83,7 +83,7 @@ beforeEach(() => {
 
 afterEach(() => jest.restoreAllMocks())
 
-test('selects at most four open notices posted in the edition window', async () => {
+test('selects at most three open notices posted in the edition window', async () => {
   rpc.mockResolvedValue({
     data: [
       notice(1, { posted_at: '2026-08-11T05:59:59Z' }),
@@ -106,10 +106,11 @@ test('selects at most four open notices posted in the edition window', async () 
     '6',
     '5',
     '4',
-    '3',
   ])
-  expect(items.map((item) => item.tweet.id)).toEqual(['5', '4', '3', '2'])
+  expect(items.map((item) => item.tweet.id)).toEqual(['5', '4', '3'])
   expect(items[0]).toMatchObject({
+    side: 'ask',
+    kind: 'help',
     label: 'Help wanted',
     summary: 'Request 5',
     tweet: { text: 'Original post 5' },
@@ -147,13 +148,13 @@ test('ranks each linked recipient with their own interactions, keeping guests re
   const first = await prepared.itemsForAccount('one')
   const second = await prepared.itemsForAccount('two')
 
-  expect(guest.map((item) => item.tweet.id)).toEqual(['5', '4', '3', '2'])
-  expect(first.map((item) => item.tweet.id)).toEqual(['2', '5', '4', '3'])
-  expect(second.map((item) => item.tweet.id)).toEqual(['3', '5', '4', '2'])
+  expect(guest.map((item) => item.tweet.id)).toEqual(['5', '4', '3'])
+  expect(first.map((item) => item.tweet.id)).toEqual(['2', '5', '4'])
+  expect(second.map((item) => item.tweet.id)).toEqual(['3', '5', '4'])
   expect(loadBulletinRelationshipsForAccount).toHaveBeenCalledTimes(2)
   expect(verifyBulletinResolutions).toHaveBeenCalledTimes(1)
   expect(hydrateBulletinNotices).toHaveBeenCalledTimes(1)
-  expect(hydrateBulletinTweets).toHaveBeenCalledTimes(1)
+  expect(hydrateBulletinTweets).toHaveBeenCalledTimes(2)
 })
 
 test('website picks use the trusted signed-in account and ignore mutable metadata', async () => {

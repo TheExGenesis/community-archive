@@ -204,7 +204,7 @@ export function renderDigestEmail(
       </section>`
     : ''
 
-  const bulletin = bulletinItems.slice(0, 4)
+  const bulletin = bulletinItems.slice(0, 3)
   const bulletinHtml = bulletin.length
     ? `<section style="margin:72px 0 32px;padding:16px 0 12px;border-top:3px solid #111827;border-bottom:1px solid #111827;background:#ffffff;">
         <p style="margin:0 0 5px;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#111827;">Community opportunities</p>
@@ -213,9 +213,12 @@ export function renderDigestEmail(
         ${bulletin
           .map((item) => {
             const url = `https://x.com/${encodeURIComponent(item.tweet.username)}/status/${encodeURIComponent(item.tweet.id)}`
-            return `<p style="margin:15px 0 10px;padding-top:15px;border-top:1px solid #d1d5db;font-size:16px;line-height:1.45;color:#111827;"><span style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#111827;">${escapeHtml(item.label)}</span><br /><strong>${escapeHtml(item.summary)}</strong></p>
-              ${renderTweetCard(item.tweet, links.siteUrl, true)}
-              <p style="margin:0 0 20px;font-size:13px;"><a href="${escapeHtml(url)}" style="color:#111827;">Respond on X →</a></p>`
+            const color = item.side === 'offer' ? '#0369a1' : '#9a5b1a'
+            return `<div style="margin:20px 0 0;padding:16px;border:1px solid #e8e8e5;border-radius:8px;background:#ffffff;font-family:${BODY_FONT};">
+              <p style="margin:0 0 10px;font-size:12px;font-weight:600;line-height:1.2;color:${color};">${escapeHtml(item.label)}</p>
+              <p style="margin:0 0 12px;font-size:15px;font-weight:600;line-height:1.35;color:#111827;">${escapeHtml(item.summary)}</p>
+              <p style="margin:0;font-size:13px;line-height:1.4;color:#6b7280;">${escapeHtml(item.tweet.name || `@${item.tweet.username}`)} · <a href="${escapeHtml(url)}" style="color:#0369a1;text-decoration:none;">Read on X →</a></p>
+            </div>`
           })
           .join('')}
         <a href="${escapeHtml(links.siteUrl)}/bulletin" style="color:#111827;font-size:13px;">Explore the Bulletin (opt-in required) →</a>

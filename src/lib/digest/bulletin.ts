@@ -14,11 +14,13 @@ import type { PortalTweet } from '@/lib/portal/types'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 
-export const DIGEST_BULLETIN_LIMIT = 4
+export const DIGEST_BULLETIN_LIMIT = 3
 const CANDIDATE_LIMIT = 100
 const DETAIL_LIMIT = 8
 
 export type DigestBulletinItem = {
+  side: Notice['side']
+  kind: Notice['kind']
   summary: string
   label: string
   tweet: PortalTweet
@@ -116,7 +118,15 @@ export async function prepareDigestBulletinItems(
       .flatMap((notice: Notice) => {
         const tweet = details.get(notice.tweet_id)
         return tweet
-          ? [{ summary: notice.summary, label: cardLabel(notice), tweet }]
+          ? [
+              {
+                side: notice.side,
+                kind: notice.kind,
+                summary: notice.summary,
+                label: cardLabel(notice),
+                tweet,
+              },
+            ]
           : []
       })
       .slice(0, DIGEST_BULLETIN_LIMIT)

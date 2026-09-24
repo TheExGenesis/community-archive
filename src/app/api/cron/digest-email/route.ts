@@ -11,6 +11,8 @@ import {
 } from '@/lib/digest/emailSubscriptions'
 import { renderDigestEmail } from '@/lib/digest/emailTemplate'
 import { prepareDigestBulletinItems } from '@/lib/digest/bulletin'
+import { selectDigestTrendMovers } from '@/lib/digest/trends'
+import { fetchPortalWeeklyTrends } from '@/lib/portal/analytics'
 import { sendEmail } from '@/lib/email'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 
@@ -76,12 +78,21 @@ async function handleSend(request: Request) {
   }
 
   const recipients = await listUnsentRecipients(edition.id)
+  const trendsPromise = recipients.length
+    ? fetchPortalWeeklyTrends()
+        .then(selectDigestTrendMovers)
+        .catch((error) => {
+          console.error('Digest trends could not be loaded:', error)
+          return null
+        })
+    : Promise.resolve(null)
   const bulletin = recipients.length
     ? await prepareDigestBulletinItems(edition).catch((error) => {
         console.error('Digest bulletin selection failed:', error)
         return null
       })
     : null
+  const trendMovers = await trendsPromise
   const siteUrl = digestEmailSiteUrl()
   let sent = 0
   const failures: string[] = []
@@ -100,6 +111,10 @@ async function handleSend(request: Request) {
       edition,
       { siteUrl, unsubscribeUrl },
       bulletinItems,
+      {
+        trendMovers,
+        personalizedBulletin: Boolean(recipient.accountId),
+      },
     )
     const result = await sendEmail({
       to: recipient.email,

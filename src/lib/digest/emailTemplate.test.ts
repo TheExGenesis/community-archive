@@ -1,5 +1,6 @@
 import { AUGUST_11_MOCK_DIGEST } from './mock'
 import { renderDigestEmail } from './emailTemplate'
+import type { DigestTrendMovers } from './trends'
 
 const LINKS = {
   siteUrl: 'https://www.community-archive.org',
@@ -53,6 +54,65 @@ describe('renderDigestEmail', () => {
     }
   })
 
+  it('renders front-page movers, numbered story links, and restrained tweet photos', () => {
+    const trends: DigestTrendMovers = {
+      riser: {
+        term: 'claude opus',
+        last7: 20,
+        prev7: 1,
+        deltaPct: 1769,
+        status: 'comparable',
+      },
+      faller: {
+        term: 'regulatory capture',
+        last7: 8,
+        prev7: 29,
+        deltaPct: -72,
+        status: 'comparable',
+      },
+    }
+    const story = AUGUST_11_MOCK_DIGEST.content.stories[0]
+    const edition = {
+      ...AUGUST_11_MOCK_DIGEST,
+      content: {
+        ...AUGUST_11_MOCK_DIGEST.content,
+        stories: [
+          {
+            ...story,
+            bangers: [
+              {
+                ...story.bangers[0],
+                media: [
+                  { type: 'photo', url: 'https://example.com/photo.jpg' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    }
+    const { html, text } = renderDigestEmail(edition, LINKS, [], {
+      trendMovers: trends,
+    })
+
+    expect(html).toContain('Trending terms · 7 days')
+    expect(html).toContain('↑ +1,769%')
+    expect(html).toContain('↓ −72%')
+    expect(html).toContain('/search?q=claude+opus')
+    expect(html).toContain(
+      `href="${LINKS.siteUrl}/digest/${edition.digestDate}/${story.slug}"`,
+    )
+    expect(html).toContain('color:#111827;">01.</span>')
+    expect(html).toContain('max-height:200px')
+    expect(html).toContain('max-width:calc(100% - 32px)')
+    expect(html).not.toContain('24-hour coverage:')
+    expect(text).toContain('TRENDING TERMS · 7 DAYS')
+    expect(text).toContain(`01. ${story.title.toUpperCase()}`)
+    expect(text).toContain(
+      `${LINKS.siteUrl}/digest/${edition.digestDate}/${story.slug}`,
+    )
+  })
+
   it('leaves a repeated representative tweet in its story, without a second featured card', () => {
     const tweet = AUGUST_11_MOCK_DIGEST.content.stories[0].bangers[0]
     const edition = {
@@ -103,6 +163,7 @@ describe('renderDigestEmail', () => {
     )
 
     expect(html).toContain('New in the Bulletin')
+    expect(html).not.toContain('For You')
     expect(html).toContain('&lt;script&gt;unsafe&lt;/script&gt;')
     expect(html).not.toContain('<script>unsafe</script>')
     expect(html).toContain('https://x.com/author4/status/4')
@@ -116,10 +177,22 @@ describe('renderDigestEmail', () => {
     expect(text).toContain('https://x.com/author4/status/4')
     expect(text).not.toContain('https://x.com/author5/status/5')
     expect(text).toContain('Original post 4')
+
+    const personalized = renderDigestEmail(
+      AUGUST_11_MOCK_DIGEST,
+      LINKS,
+      items,
+      {
+        personalizedBulletin: true,
+      },
+    )
+    expect(personalized.html).toContain('For You')
+    expect(personalized.html).toContain('margin:72px 0 32px')
+    expect(personalized.text).toContain('NEW IN THE BULLETIN · FOR YOU')
   })
 })
 
-it('uses the UTC publication date while retaining the edition URL and exact coverage', () => {
+it('uses the UTC publication date and omits the coverage line from email', () => {
   const edition = {
     ...AUGUST_11_MOCK_DIGEST,
     publishedAt: '2026-08-12T00:30:00Z',
@@ -127,10 +200,6 @@ it('uses the UTC publication date while retaining the edition URL and exact cove
   const { subject, html, text } = renderDigestEmail(edition, LINKS)
   expect(subject).toBe('Community Archive Digest — Wednesday, August 12, 2026')
   expect(html).toContain('/digest/2026-08-11')
-  expect(text).toContain(
-    '24-hour coverage: Aug 11, 2026, 06:00 – Aug 12, 2026, 06:00 UTC',
-  )
-  expect(html).toContain(
-    '24-hour coverage: Aug 11, 2026, 06:00 – Aug 12, 2026, 06:00 UTC',
-  )
+  expect(text).not.toContain('24-hour coverage:')
+  expect(html).not.toContain('24-hour coverage:')
 })

@@ -72,6 +72,7 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     tags: ['Conversations', 'Personal archive', 'Relationships'],
     projectUrl: 'https://strangestloop.io/pairwise',
     sourceUrl: 'https://strangestloop.io/coding/',
+    image: '/images/community/pairwise-cover.webp',
     coverClass: 'from-[#ffb5d8] via-[#ffd7e8] to-[#8bd2ee]',
     featured: true,
     publishedAt: '2026-09-18',

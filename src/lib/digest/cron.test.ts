@@ -42,13 +42,13 @@ describe('nightly digest cron gate', () => {
         undefined,
         new Date('2026-08-21T07:00:00.000Z'),
       ),
-    ).toBe('2026-08-20')
+    ).toBe('2026-08-21')
   })
 
   test('accepts only a recent completed date for supervised recovery', () => {
     const now = new Date('2026-08-21T07:00:00.000Z')
     expect(resolveDigestAutomationDate('2026-08-19', now)).toBe('2026-08-19')
-    expect(() => resolveDigestAutomationDate('2026-08-21', now)).toThrow(
+    expect(() => resolveDigestAutomationDate('2026-08-22', now)).toThrow(
       'within the last 30 completed days',
     )
     expect(() => resolveDigestAutomationDate('not-a-date', now)).toThrow(

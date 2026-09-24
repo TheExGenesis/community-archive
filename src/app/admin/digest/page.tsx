@@ -334,9 +334,8 @@ export default async function DigestLabPage({
             <section className="rounded-lg border bg-card p-4">
               <h2 className="font-semibold">Generate a past day</h2>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                Each day runs from 06:00 UTC through 05:59 UTC the next day, so
-                European morning and the same-date US West Coast evening stay
-                together. Jobs keep running after refresh or navigation.
+                Each date covers 06:00 UTC on the previous day through 05:59 UTC
+                on that date. Jobs keep running after refresh or navigation.
               </p>
               {prompt ? (
                 <div className="mt-4">

@@ -11,25 +11,26 @@ import { cardLabel, type Notice } from '@/lib/bulletin/types'
 import { hydrateBulletinTweets } from '@/lib/bulletin/tweets'
 import type { DigestEdition } from '@/lib/digest/types'
 import type { PortalTweet } from '@/lib/portal/types'
+import { getCurrentUser } from '@/lib/portal/auth'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 
-export const DIGEST_BULLETIN_LIMIT = 4
+export const DIGEST_BULLETIN_LIMIT = 3
 const CANDIDATE_LIMIT = 100
 const DETAIL_LIMIT = 8
 
 export type DigestBulletinItem = {
+  side: Notice['side']
+  kind: Notice['kind']
   summary: string
   label: string
   tweet: PortalTweet
 }
 
-type NewNotice = StoredNotice & { created_at: string }
-
 export type DigestBulletinSelection = {
   itemsForAccount: (accountId?: string | null) => Promise<DigestBulletinItem[]>
 }
 
-/** Verify the edition's new notices once, then rank them for each subscriber. */
+/** Verify notices posted in the edition window, then rank for each reader. */
 export async function prepareDigestBulletinItems(
   edition: DigestEdition,
 ): Promise<DigestBulletinSelection> {
@@ -52,9 +53,9 @@ export async function prepareDigestBulletinItems(
   const now = Date.now()
   const candidates = (
     sortNotices(
-      ((data ?? []) as unknown as NewNotice[]).filter((notice) => {
-        const added = Date.parse(notice.created_at)
-        return Number.isFinite(added) && added >= start && added < end
+      ((data ?? []) as unknown as StoredNotice[]).filter((notice) => {
+        const posted = Date.parse(notice.posted_at)
+        return Number.isFinite(posted) && posted >= start && posted < end
       }),
       true,
       '',
@@ -62,7 +63,7 @@ export async function prepareDigestBulletinItems(
       now,
       false,
       false,
-    ) as NewNotice[]
+    ) as StoredNotice[]
   ).slice(0, CANDIDATE_LIMIT)
 
   await verifyBulletinResolutions(candidates)
@@ -117,7 +118,15 @@ export async function prepareDigestBulletinItems(
       .flatMap((notice: Notice) => {
         const tweet = details.get(notice.tweet_id)
         return tweet
-          ? [{ summary: notice.summary, label: cardLabel(notice), tweet }]
+          ? [
+              {
+                side: notice.side,
+                kind: notice.kind,
+                summary: notice.summary,
+                label: cardLabel(notice),
+                tweet,
+              },
+            ]
           : []
       })
       .slice(0, DIGEST_BULLETIN_LIMIT)
@@ -137,4 +146,21 @@ export async function loadDigestBulletinItems(
   edition: DigestEdition,
 ): Promise<DigestBulletinItem[]> {
   return (await prepareDigestBulletinItems(edition)).itemsForAccount()
+}
+
+/** Use the signed-in account's trusted X identity for the website picks. */
+export async function loadDigestBulletinItemsForViewer(edition: DigestEdition) {
+  const [selection, user] = await Promise.all([
+    prepareDigestBulletinItems(edition),
+    getCurrentUser(),
+  ])
+  const providerId = user?.app_metadata?.provider_id
+  const accountId =
+    typeof providerId === 'string' && /^\d{1,20}$/.test(providerId)
+      ? providerId
+      : null
+  return {
+    items: await selection.itemsForAccount(accountId),
+    personalized: accountId !== null,
+  }
 }

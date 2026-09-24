@@ -15,13 +15,67 @@ import { DigestComments } from './DigestComments'
 import { SectionReady } from '@/components/PagePerformance'
 import { DigestSubscriberCount } from './DigestSubscriberCount'
 import { DigestTrendMovers } from './DigestTrendMovers'
-import TweetCard from '@/components/TweetCard'
+import { DigestBulletinCards } from './DigestBulletinCards'
 import {
-  loadDigestBulletinItems,
+  loadDigestBulletinItemsForViewer,
   type DigestBulletinItem,
 } from '@/lib/digest/bulletin'
 import { selectDigestTrendMovers } from '@/lib/digest/trends'
 import { fetchPortalWeeklyTrends } from '@/lib/portal/analytics'
+
+const PREVIEW_BULLETIN_ITEMS: DigestBulletinItem[] = [
+  {
+    side: 'ask',
+    kind: 'help',
+    label: 'Help wanted',
+    summary: 'Looking for feedback on a community research project.',
+    tweet: {
+      id: 'preview-ask',
+      username: 'preview',
+      name: 'Bulletin example',
+      avatar: null,
+      text: 'I would love feedback from people who have organized small research communities. What worked for you?',
+      observedAt: '2026-08-11T18:00:00Z',
+      createdAt: '2026-08-11T18:00:00Z',
+      likes: 0,
+      rts: 0,
+    },
+  },
+  {
+    side: 'offer',
+    kind: 'free',
+    label: 'Free',
+    summary: 'Sharing a practical guide for community organizers.',
+    tweet: {
+      id: 'preview-offer',
+      username: 'preview',
+      name: 'Bulletin example',
+      avatar: null,
+      text: 'I put together a short guide to running a community reading group. Happy to share it with anyone planning one.',
+      observedAt: '2026-08-11T19:00:00Z',
+      createdAt: '2026-08-11T19:00:00Z',
+      likes: 0,
+      rts: 0,
+    },
+  },
+  {
+    side: 'offer',
+    kind: 'invite',
+    label: 'Invitation',
+    summary: 'Inviting neighbors to a community reading group.',
+    tweet: {
+      id: 'preview-invite',
+      username: 'preview',
+      name: 'Bulletin example',
+      avatar: null,
+      text: 'We are starting a monthly reading group and would love to meet other curious neighbors. Join us next week!',
+      observedAt: '2026-08-11T20:00:00Z',
+      createdAt: '2026-08-11T20:00:00Z',
+      likes: 0,
+      rts: 0,
+    },
+  },
+]
 
 async function DigestTrends() {
   try {
@@ -33,7 +87,15 @@ async function DigestTrends() {
   }
 }
 
-function BulletinItems({ items }: { items: DigestBulletinItem[] }) {
+function BulletinItems({
+  items,
+  personalized,
+  preview = false,
+}: {
+  items: DigestBulletinItem[]
+  personalized: boolean
+  preview?: boolean
+}) {
   if (!items.length) return null
   return (
     <section className="mt-12 border-t-2 border-zinc-800 pt-7 dark:border-zinc-200">
@@ -42,37 +104,16 @@ function BulletinItems({ items }: { items: DigestBulletinItem[] }) {
         style={{ fontFamily: 'Petrona, Georgia, serif' }}
       >
         New in the Bulletin
+        {preview ? ' · Sample' : personalized ? ' · For You' : ''}
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Recent community asks and offers
+        {preview
+          ? 'Example asks and offers for this mock edition; published digests show live picks.'
+          : personalized
+            ? 'Recommended community asks and offers'
+            : 'Recent community asks and offers'}
       </p>
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        {items.map((item) => (
-          <article key={item.tweet.id} className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
-              {item.label}
-            </p>
-            <p className="mb-3 mt-2 text-base leading-relaxed">
-              {item.summary}
-            </p>
-            <TweetCard
-              tweet={item.tweet}
-              variant="editorial"
-              collapsible
-              showDate
-              origin="digest"
-            />
-            <a
-              href={`https://x.com/${encodeURIComponent(item.tweet.username)}/status/${encodeURIComponent(item.tweet.id)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-block text-sm font-semibold text-brand hover:underline"
-            >
-              Respond on X →
-            </a>
-          </article>
-        ))}
-      </div>
+      <DigestBulletinCards items={items} preview={preview} />
       <Link
         href="/bulletin"
         className="mt-6 inline-block text-sm font-semibold text-brand hover:underline"
@@ -85,7 +126,8 @@ function BulletinItems({ items }: { items: DigestBulletinItem[] }) {
 
 async function DigestBulletin({ edition }: { edition: DigestEdition }) {
   try {
-    return <BulletinItems items={await loadDigestBulletinItems(edition)} />
+    const recommendation = await loadDigestBulletinItemsForViewer(edition)
+    return <BulletinItems {...recommendation} />
   } catch (error) {
     console.error('Digest bulletin selection failed:', error)
     return null
@@ -216,7 +258,13 @@ export function PublishedDigestView({ edition }: { edition: DigestEdition }) {
               <Comments edition={edition} />
             </Suspense>
           ),
-          bulletin: edition.isPreview ? null : (
+          bulletin: edition.isPreview ? (
+            <BulletinItems
+              items={PREVIEW_BULLETIN_ITEMS}
+              personalized={false}
+              preview
+            />
+          ) : (
             <Suspense fallback={null}>
               <DigestBulletin edition={edition} />
             </Suspense>

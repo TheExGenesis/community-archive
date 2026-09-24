@@ -1,4 +1,5 @@
-.page {
+.page,
+.digestCards {
   --ink: #111111;
   --muted: #6b7280;
   --faint: #7c8291;
@@ -13,10 +14,13 @@
   color: var(--ink);
   background: var(--surface);
   font-family: var(--font-manrope), system-ui, sans-serif;
-  min-height: 70vh;
   width: 100%;
 }
-:global(.dark) .page {
+.page {
+  min-height: 70vh;
+}
+:global(.dark) .page,
+:global(.dark) .digestCards {
   --ink: #eeeeec;
   --muted: #a1a1aa;
   --faint: #8e8e98;
@@ -28,6 +32,13 @@
   --surface-3: #27272b;
   --accent: #7dd3fc;
   --ask: #e7ad70;
+}
+.digestCards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+  margin-top: 32px;
 }
 .page a {
   font-weight: inherit;
@@ -834,6 +845,9 @@
   .board {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .digestCards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .stack {
     display: contents;
   }
@@ -843,6 +857,9 @@
     grid-template-columns: 1fr;
     padding-left: 16px;
     padding-right: 16px;
+  }
+  .digestCards {
+    grid-template-columns: 1fr;
   }
   .head,
   .controlRow,

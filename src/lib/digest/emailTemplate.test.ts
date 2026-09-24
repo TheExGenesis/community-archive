@@ -83,10 +83,18 @@ describe('renderDigestEmail', () => {
 
   it('places up to four escaped Bulletin items near the bottom in HTML and text', () => {
     const items = Array.from({ length: 5 }, (_, index) => ({
-      tweetId: String(index + 1),
-      username: `author${index + 1}`,
       label: 'Help wanted',
       summary: index === 0 ? '<script>unsafe</script>' : `Request ${index + 1}`,
+      tweet: {
+        ...AUGUST_11_MOCK_DIGEST.content.stories[0].bangers[0],
+        id: String(index + 1),
+        username: `author${index + 1}`,
+        name: `Author ${index + 1}`,
+        text: `Original post ${index + 1}`,
+        avatar: null,
+        media: [],
+        quotedTweet: undefined,
+      },
     }))
     const { html, text } = renderDigestEmail(
       AUGUST_11_MOCK_DIGEST,
@@ -99,12 +107,15 @@ describe('renderDigestEmail', () => {
     expect(html).not.toContain('<script>unsafe</script>')
     expect(html).toContain('https://x.com/author4/status/4')
     expect(html).not.toContain('https://x.com/author5/status/5')
+    expect(html).toContain('Original post 4')
+    expect(html).not.toContain('Original post 5')
     expect(html.indexOf('New in the Bulletin')).toBeGreaterThan(
       html.indexOf('Read the full digest with tweets'),
     )
     expect(text).toContain('NEW IN THE BULLETIN')
     expect(text).toContain('https://x.com/author4/status/4')
     expect(text).not.toContain('https://x.com/author5/status/5')
+    expect(text).toContain('Original post 4')
   })
 })
 

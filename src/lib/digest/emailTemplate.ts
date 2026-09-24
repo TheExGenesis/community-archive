@@ -159,8 +159,10 @@ export function renderDigestEmail(
         <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">Recent community asks and offers</p>
         ${bulletin
           .map((item) => {
-            const url = `https://x.com/${encodeURIComponent(item.username)}/status/${encodeURIComponent(item.tweetId)}`
-            return `<p style="margin:0 0 16px;font-size:14px;line-height:1.5;"><strong>${escapeHtml(item.label)}</strong> · ${escapeHtml(item.summary)}<br /><span style="color:#6b7280;">@${escapeHtml(item.username)}</span> · <a href="${escapeHtml(url)}" style="color:#1d4ed8;">View post →</a></p>`
+            const url = `https://x.com/${encodeURIComponent(item.tweet.username)}/status/${encodeURIComponent(item.tweet.id)}`
+            return `<p style="margin:0 0 10px;font-size:14px;line-height:1.5;"><strong>${escapeHtml(item.label)}</strong> · ${escapeHtml(item.summary)}</p>
+              ${renderTweetCard(item.tweet, links.siteUrl)}
+              <p style="margin:0 0 20px;font-size:13px;"><a href="${escapeHtml(url)}" style="color:#1d4ed8;">Respond on X →</a></p>`
           })
           .join('')}
         <a href="${escapeHtml(links.siteUrl)}/bulletin" style="color:#1d4ed8;font-size:13px;">Explore the Bulletin (opt-in required) →</a>
@@ -222,7 +224,8 @@ export function renderDigestEmail(
           'Recent community asks and offers',
           ...bulletin.flatMap((item) => [
             `${item.label}: ${item.summary}`,
-            `@${item.username} — https://x.com/${encodeURIComponent(item.username)}/status/${encodeURIComponent(item.tweetId)}`,
+            tweetToText(item.tweet),
+            `Respond on X: https://x.com/${encodeURIComponent(item.tweet.username)}/status/${encodeURIComponent(item.tweet.id)}`,
             '',
           ]),
           `Explore the Bulletin (opt-in required): ${links.siteUrl}/bulletin`,

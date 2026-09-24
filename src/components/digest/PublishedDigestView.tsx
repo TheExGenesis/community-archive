@@ -14,6 +14,7 @@ import { DigestLikeButton } from './DigestLikeButton'
 import { DigestComments } from './DigestComments'
 import { SectionReady } from '@/components/PagePerformance'
 import { DigestSubscriberCount } from './DigestSubscriberCount'
+import TweetCard from '@/components/TweetCard'
 import {
   loadDigestBulletinItems,
   type DigestBulletinItem,
@@ -34,21 +35,27 @@ function BulletinItems({ items }: { items: DigestBulletinItem[] }) {
       </p>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {items.map((item) => (
-          <article
-            key={item.tweetId}
-            className="rounded-lg border border-zinc-200 p-5 dark:border-zinc-800"
-          >
+          <article key={item.tweet.id} className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
               {item.label}
             </p>
-            <p className="mt-2 text-base leading-relaxed">{item.summary}</p>
+            <p className="mb-3 mt-2 text-base leading-relaxed">
+              {item.summary}
+            </p>
+            <TweetCard
+              tweet={item.tweet}
+              variant="editorial"
+              collapsible
+              showDate
+              origin="digest"
+            />
             <a
-              href={`https://x.com/${encodeURIComponent(item.username)}/status/${encodeURIComponent(item.tweetId)}`}
+              href={`https://x.com/${encodeURIComponent(item.tweet.username)}/status/${encodeURIComponent(item.tweet.id)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-3 inline-block text-sm font-semibold text-brand hover:underline"
             >
-              @{item.username} · View post →
+              Respond on X →
             </a>
           </article>
         ))}

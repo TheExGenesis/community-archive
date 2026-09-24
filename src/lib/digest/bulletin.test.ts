@@ -2,6 +2,7 @@ import {
   hydrateBulletinNotices,
   verifyBulletinResolutions,
 } from '@/lib/bulletin/data'
+import { hydrateBulletinTweets } from '@/lib/bulletin/tweets'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import { AUGUST_11_MOCK_DIGEST } from './mock'
 import { loadDigestBulletinItems } from './bulletin'
@@ -9,6 +10,9 @@ import { loadDigestBulletinItems } from './bulletin'
 jest.mock('@/lib/bulletin/data', () => ({
   hydrateBulletinNotices: jest.fn(),
   verifyBulletinResolutions: jest.fn(),
+}))
+jest.mock('@/lib/bulletin/tweets', () => ({
+  hydrateBulletinTweets: jest.fn(),
 }))
 jest.mock('@/utils/supabase', () => ({
   createServerServiceRoleClient: jest.fn(),
@@ -44,6 +48,22 @@ beforeEach(() => {
   jest
     .mocked(hydrateBulletinNotices)
     .mockImplementation(async ({ notices }) => notices as never)
+  jest.mocked(hydrateBulletinTweets).mockImplementation(async (ids) => ({
+    tweets: ids
+      .filter((id) => id !== '6')
+      .map((id) => ({
+        id,
+        username: `author${id}`,
+        name: `Author ${id}`,
+        avatar: null,
+        text: `Original post ${id}`,
+        observedAt: '2026-08-11T18:00:00Z',
+        createdAt: '2026-08-11T18:00:00Z',
+        likes: 1,
+        rts: 0,
+      })),
+    errors: {},
+  }))
 })
 
 afterEach(() => jest.restoreAllMocks())
@@ -59,13 +79,6 @@ test('selects at most four new, open notices after source verification', async (
     ],
     error: null,
   })
-  jest
-    .mocked(hydrateBulletinNotices)
-    .mockImplementation(
-      async ({ notices }) =>
-        notices.filter((item) => item.tweet_id !== '6') as never,
-    )
-
   const items = await loadDigestBulletinItems(edition)
 
   expect(rpc).toHaveBeenCalledWith('get_bulletin_board_state', {
@@ -73,8 +86,19 @@ test('selects at most four new, open notices after source verification', async (
   })
   expect(verifyBulletinResolutions).toHaveBeenCalled()
   expect(hydrateBulletinNotices).toHaveBeenCalled()
-  expect(items.map((item) => item.tweetId)).toEqual(['5', '4', '3', '2'])
-  expect(items[0]).toMatchObject({ label: 'Help wanted', summary: 'Request 5' })
+  expect(hydrateBulletinTweets).toHaveBeenCalledTimes(2)
+  expect(jest.mocked(hydrateBulletinTweets).mock.calls[0][0]).toEqual([
+    '6',
+    '5',
+    '4',
+    '3',
+  ])
+  expect(items.map((item) => item.tweet.id)).toEqual(['5', '4', '3', '2'])
+  expect(items[0]).toMatchObject({
+    label: 'Help wanted',
+    summary: 'Request 5',
+    tweet: { text: 'Original post 5' },
+  })
 })
 
 test('omits the section for previews without reading private state', async () => {

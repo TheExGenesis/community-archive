@@ -18,7 +18,7 @@ export function digestDateForCommunityDay(date = new Date()) {
 export function getDigestDateWindow(digestDate: string) {
   if (!DATE_PATTERN.test(digestDate)) throw new Error('Invalid digest date')
   const windowStart = new Date(
-    `${digestDate}T${String(DIGEST_DAY_START_UTC_HOUR).padStart(2, '0')}:00:00.000Z`,
+    `${shiftDate(digestDate, -1)}T${String(DIGEST_DAY_START_UTC_HOUR).padStart(2, '0')}:00:00.000Z`,
   )
   const windowEnd = new Date(windowStart.getTime() + DAY_MS)
   if (
@@ -36,9 +36,9 @@ export function getDigestDateWindow(digestDate: string) {
 }
 
 export function listPastDigestDates(count = 7, now = new Date()) {
-  const today = digestDateForCommunityDay(now)
+  const latestCompleted = digestDateForCommunityDay(now)
   return Array.from({ length: Math.max(0, count) }, (_, index) =>
-    shiftDate(today, -(index + 1)),
+    shiftDate(latestCompleted, -index),
   )
 }
 

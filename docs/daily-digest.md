@@ -1,12 +1,14 @@
 # Daily Digest
 
 The Daily Digest turns a frozen 24-hour snapshot of recent bangers into three
-to five readable stories. A dated edition runs from 06:00 UTC on its date to
-05:59 UTC the following date. This keeps the beginning of the European morning
-and the same-date evening on the US West Coast in one editorial day, including
-through daylight-saving changes. Public pages are fixed publication artifacts;
-the private lab keeps the exact inputs, prompt version, model response, usage,
-and stage-by-stage trace needed to reproduce and compare generations.
+to five readable stories. A dated edition covers 06:00 UTC on the previous date
+through 05:59 UTC on its date. For example, the September 24 edition covers
+September 23 at 06:00 UTC through September 24 at 06:00 UTC. This keeps the
+European morning and the same-date US West Coast evening in one 24-hour window,
+including through daylight-saving changes. Public pages are fixed publication
+artifacts; the private lab keeps the exact inputs, prompt version, model
+response, usage, and stage-by-stage trace needed to reproduce and compare
+generations.
 
 ## Product surfaces
 

@@ -7,11 +7,11 @@ import {
 } from './dateWindow'
 
 describe('digest date windows', () => {
-  test('uses the 06:00 UTC Community Archive day boundary', () => {
-    expect(getDigestDateWindow('2026-08-11')).toEqual({
-      digestDate: '2026-08-11',
-      windowStart: '2026-08-11T06:00:00.000Z',
-      windowEnd: '2026-08-12T06:00:00.000Z',
+  test('names a 06:00 UTC window for the day it ends', () => {
+    expect(getDigestDateWindow('2026-09-24')).toEqual({
+      digestDate: '2026-09-24',
+      windowStart: '2026-09-23T06:00:00.000Z',
+      windowEnd: '2026-09-24T06:00:00.000Z',
     })
   })
 
@@ -41,26 +41,27 @@ describe('digest date windows', () => {
     const now = new Date('2026-08-14T12:00:00.000Z')
     expect(digestDateForCommunityDay(now)).toBe('2026-08-14')
     expect(listPastDigestDates(3, now)).toEqual([
+      '2026-08-14',
       '2026-08-13',
       '2026-08-12',
-      '2026-08-11',
     ])
     expect(isRecentPastDigestDate('2026-08-11', now)).toBe(true)
-    expect(isRecentPastDigestDate('2026-08-14', now)).toBe(false)
+    expect(isRecentPastDigestDate('2026-08-14', now)).toBe(true)
+    expect(isRecentPastDigestDate('2026-08-15', now)).toBe(false)
   })
 
   test('selects the latest completed edition on either side of the cutoff', () => {
     expect(
       getLatestCompletedDigestDate(new Date('2026-08-21T05:59:59.000Z')),
-    ).toBe('2026-08-19')
+    ).toBe('2026-08-20')
     expect(
       getLatestCompletedDigestDate(new Date('2026-08-21T06:15:00.000Z')),
-    ).toBe('2026-08-20')
+    ).toBe('2026-08-21')
   })
 
   test('allows completed days across the twelve-month generation calendar', () => {
     const now = new Date('2026-08-14T12:00:00.000Z')
-    expect(isRecentPastDigestDate('2025-08-14', now, 365)).toBe(true)
-    expect(isRecentPastDigestDate('2025-08-13', now, 365)).toBe(false)
+    expect(isRecentPastDigestDate('2025-08-15', now, 365)).toBe(true)
+    expect(isRecentPastDigestDate('2025-08-14', now, 365)).toBe(false)
   })
 })

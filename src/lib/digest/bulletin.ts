@@ -24,13 +24,11 @@ export type DigestBulletinItem = {
   tweet: PortalTweet
 }
 
-type NewNotice = StoredNotice & { created_at: string }
-
 export type DigestBulletinSelection = {
   itemsForAccount: (accountId?: string | null) => Promise<DigestBulletinItem[]>
 }
 
-/** Verify the edition's new notices once, then rank them for each subscriber. */
+/** Verify notices posted in the edition window, then rank for each reader. */
 export async function prepareDigestBulletinItems(
   edition: DigestEdition,
 ): Promise<DigestBulletinSelection> {
@@ -53,9 +51,9 @@ export async function prepareDigestBulletinItems(
   const now = Date.now()
   const candidates = (
     sortNotices(
-      ((data ?? []) as unknown as NewNotice[]).filter((notice) => {
-        const added = Date.parse(notice.created_at)
-        return Number.isFinite(added) && added >= start && added < end
+      ((data ?? []) as unknown as StoredNotice[]).filter((notice) => {
+        const posted = Date.parse(notice.posted_at)
+        return Number.isFinite(posted) && posted >= start && posted < end
       }),
       true,
       '',
@@ -63,7 +61,7 @@ export async function prepareDigestBulletinItems(
       now,
       false,
       false,
-    ) as NewNotice[]
+    ) as StoredNotice[]
   ).slice(0, CANDIDATE_LIMIT)
 
   await verifyBulletinResolutions(candidates)

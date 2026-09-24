@@ -34,7 +34,6 @@ const notice = (id: number, overrides: Record<string, unknown> = {}) => ({
   account_id: String(id + 100),
   username: `author${id}`,
   posted_at: `2026-08-11T${String(id + 10).padStart(2, '0')}:00:00Z`,
-  created_at: '2026-08-11T18:00:00Z',
   content_hash: 'hash',
   side: 'ask',
   kind: 'help',
@@ -84,13 +83,13 @@ beforeEach(() => {
 
 afterEach(() => jest.restoreAllMocks())
 
-test('selects at most four new, open notices after source verification', async () => {
+test('selects at most four open notices posted in the edition window', async () => {
   rpc.mockResolvedValue({
     data: [
-      notice(1, { created_at: '2026-08-11T05:59:59Z' }),
+      notice(1, { posted_at: '2026-08-11T05:59:59Z' }),
       ...[2, 3, 4, 5, 6].map((id) => notice(id)),
       notice(7, { resolution_state: 'resolved' }),
-      notice(8, { created_at: '2026-08-12T06:00:00Z' }),
+      notice(8, { posted_at: '2026-08-12T06:00:00Z' }),
       notice(9, { expires_at: '2026-08-11' }),
     ],
     error: null,
@@ -129,7 +128,7 @@ test('ranks each linked recipient with their own interactions, keeping guests re
       notice(3),
       notice(4),
       notice(5),
-      notice(8, { created_at: '2026-08-12T06:00:00Z' }),
+      notice(8, { posted_at: '2026-08-12T06:00:00Z' }),
     ],
     error: null,
   })

@@ -17,7 +17,7 @@ import { DigestSubscriberCount } from './DigestSubscriberCount'
 import { DigestTrendMovers } from './DigestTrendMovers'
 import TweetCard from '@/components/TweetCard'
 import {
-  loadDigestBulletinItems,
+  loadDigestBulletinItemsForViewer,
   type DigestBulletinItem,
 } from '@/lib/digest/bulletin'
 import { selectDigestTrendMovers } from '@/lib/digest/trends'
@@ -33,7 +33,13 @@ async function DigestTrends() {
   }
 }
 
-function BulletinItems({ items }: { items: DigestBulletinItem[] }) {
+function BulletinItems({
+  items,
+  personalized,
+}: {
+  items: DigestBulletinItem[]
+  personalized: boolean
+}) {
   if (!items.length) return null
   return (
     <section className="mt-12 border-t-2 border-zinc-800 pt-7 dark:border-zinc-200">
@@ -41,10 +47,12 @@ function BulletinItems({ items }: { items: DigestBulletinItem[] }) {
         className="text-[30px] font-semibold"
         style={{ fontFamily: 'Petrona, Georgia, serif' }}
       >
-        New in the Bulletin
+        New in the Bulletin{personalized ? ' · For You' : ''}
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Recent community asks and offers
+        {personalized
+          ? 'Recommended community asks and offers'
+          : 'Recent community asks and offers'}
       </p>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {items.map((item) => (
@@ -85,7 +93,8 @@ function BulletinItems({ items }: { items: DigestBulletinItem[] }) {
 
 async function DigestBulletin({ edition }: { edition: DigestEdition }) {
   try {
-    return <BulletinItems items={await loadDigestBulletinItems(edition)} />
+    const recommendation = await loadDigestBulletinItemsForViewer(edition)
+    return <BulletinItems {...recommendation} />
   } catch (error) {
     console.error('Digest bulletin selection failed:', error)
     return null

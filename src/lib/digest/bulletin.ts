@@ -11,6 +11,7 @@ import { cardLabel, type Notice } from '@/lib/bulletin/types'
 import { hydrateBulletinTweets } from '@/lib/bulletin/tweets'
 import type { DigestEdition } from '@/lib/digest/types'
 import type { PortalTweet } from '@/lib/portal/types'
+import { getCurrentUser } from '@/lib/portal/auth'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 
 export const DIGEST_BULLETIN_LIMIT = 4
@@ -137,4 +138,21 @@ export async function loadDigestBulletinItems(
   edition: DigestEdition,
 ): Promise<DigestBulletinItem[]> {
   return (await prepareDigestBulletinItems(edition)).itemsForAccount()
+}
+
+/** Use the signed-in account's trusted X identity for the website picks. */
+export async function loadDigestBulletinItemsForViewer(edition: DigestEdition) {
+  const [selection, user] = await Promise.all([
+    prepareDigestBulletinItems(edition),
+    getCurrentUser(),
+  ])
+  const providerId = user?.app_metadata?.provider_id
+  const accountId =
+    typeof providerId === 'string' && /^\d{1,20}$/.test(providerId)
+      ? providerId
+      : null
+  return {
+    items: await selection.itemsForAccount(accountId),
+    personalized: accountId !== null,
+  }
 }

@@ -5,8 +5,13 @@ import {
 } from '@/lib/bulletin/data'
 import { hydrateBulletinTweets } from '@/lib/bulletin/tweets'
 import { createServerServiceRoleClient } from '@/utils/supabase'
+import { getCurrentUser } from '@/lib/portal/auth'
 import { AUGUST_11_MOCK_DIGEST } from './mock'
-import { loadDigestBulletinItems, prepareDigestBulletinItems } from './bulletin'
+import {
+  loadDigestBulletinItems,
+  loadDigestBulletinItemsForViewer,
+  prepareDigestBulletinItems,
+} from './bulletin'
 
 jest.mock('@/lib/bulletin/data', () => ({
   hydrateBulletinNotices: jest.fn(),
@@ -19,6 +24,7 @@ jest.mock('@/lib/bulletin/tweets', () => ({
 jest.mock('@/utils/supabase', () => ({
   createServerServiceRoleClient: jest.fn(),
 }))
+jest.mock('@/lib/portal/auth', () => ({ getCurrentUser: jest.fn() }))
 
 const rpc = jest.fn()
 const edition = { ...AUGUST_11_MOCK_DIGEST, isPreview: false }
@@ -44,6 +50,7 @@ const notice = (id: number, overrides: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks()
+  jest.mocked(getCurrentUser).mockResolvedValue(null)
   jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-12T10:00:00Z'))
   jest.mocked(createServerServiceRoleClient).mockReturnValue({ rpc } as never)
   jest.mocked(verifyBulletinResolutions).mockResolvedValue(undefined)
@@ -148,4 +155,26 @@ test('ranks each linked recipient with their own interactions, keeping guests re
   expect(verifyBulletinResolutions).toHaveBeenCalledTimes(1)
   expect(hydrateBulletinNotices).toHaveBeenCalledTimes(1)
   expect(hydrateBulletinTweets).toHaveBeenCalledTimes(1)
+})
+
+test('website picks use the trusted signed-in account and ignore mutable metadata', async () => {
+  rpc.mockResolvedValue({ data: [notice(2), notice(3)], error: null })
+  jest.mocked(getCurrentUser).mockResolvedValueOnce({
+    app_metadata: { provider_id: '42' },
+    user_metadata: { provider_id: '999' },
+  } as never)
+
+  const signedIn = await loadDigestBulletinItemsForViewer(edition)
+  expect(signedIn.personalized).toBe(true)
+  expect(signedIn.items).toHaveLength(2)
+  expect(loadBulletinRelationshipsForAccount).toHaveBeenCalledWith('42')
+
+  jest.mocked(getCurrentUser).mockResolvedValueOnce({
+    app_metadata: {},
+    user_metadata: { provider_id: '999' },
+  } as never)
+  const withoutTrustedId = await loadDigestBulletinItemsForViewer(edition)
+  expect(withoutTrustedId.personalized).toBe(false)
+  expect(withoutTrustedId.items).toHaveLength(2)
+  expect(loadBulletinRelationshipsForAccount).toHaveBeenCalledTimes(1)
 })

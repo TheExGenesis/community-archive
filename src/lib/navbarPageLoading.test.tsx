@@ -18,7 +18,10 @@ import {
   getDigestLikeState,
 } from '@/lib/digest/data'
 import { getCurrentUser, getIsMember } from '@/lib/portal/auth'
-import { loadPublishedCommunityProjects } from '@/lib/communityProjectDatabase'
+import {
+  loadCommunityProjectLikeCounts,
+  loadPublishedCommunityProjects,
+} from '@/lib/communityProjectDatabase'
 import { getPortalTrendSnapshot, startStreamData } from '@/lib/portal/data'
 import { AUGUST_11_MOCK_DIGEST } from '@/lib/digest/mock'
 
@@ -36,7 +39,8 @@ jest.mock('@/lib/portal/auth', () => ({
 jest.mock('@/app/admin/data', () => ({ checkIsAdmin: jest.fn() }))
 jest.mock('@/lib/communityProjectDatabase', () => ({
   loadPublishedCommunityProjects: jest.fn(),
-  loadCommunityProjectLikesForUser: jest.fn(),
+  loadCommunityProjectLikeCounts: jest.fn(),
+  loadCommunityProjectLikedSlugsForUser: jest.fn(),
 }))
 jest.mock('@/lib/portal/data', () => ({
   startStreamData: jest.fn(),
@@ -83,6 +87,7 @@ test('published article is available while calendar and viewer reads remain pend
 test('gallery catalog does not wait for viewer authentication', async () => {
   jest.mocked(getCurrentUser).mockReturnValue(pending)
   jest.mocked(loadPublishedCommunityProjects).mockResolvedValue([])
+  jest.mocked(loadCommunityProjectLikeCounts).mockResolvedValue({})
   const page = await CommunityPage()
   expect(page.type).toBe(GallerySession)
   expect(page.props.projects).toEqual([])

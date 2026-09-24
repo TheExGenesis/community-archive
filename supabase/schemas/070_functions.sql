@@ -3828,3 +3828,19 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
     ORDER BY r.created_at DESC LIMIT 10
   ) item
 $$;
+-- Old deployments still insert likes by project_id during the database-first
+-- rollout. Fill the slug before the new NOT NULL and unique checks run.
+CREATE OR REPLACE FUNCTION public.fill_community_like_slug()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW.project_slug IS NULL AND NEW.project_id IS NOT NULL THEN
+    SELECT slug INTO NEW.project_slug
+    FROM public.community_projects
+    WHERE id = NEW.project_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;

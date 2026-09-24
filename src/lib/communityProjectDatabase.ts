@@ -78,8 +78,7 @@ export function mapCommunityProjectRow(
 }
 
 type CommunityProjectLikeRow = {
-  project_id: string
-  user_id: string
+  project_slug: string
 }
 
 type CommunityProjectCommentRow = {
@@ -106,14 +105,14 @@ export async function loadPublishedCommunityProjects(): Promise<
   const rows = (data ?? []) as unknown as CommunityProjectRow[]
   const projectIds = rows.map((row) => row.id)
   const [likeCounts, commentCounts] = await Promise.all([
-    loadCommunityProjectLikeCounts(projectIds),
+    loadCommunityProjectLikeCounts(rows.map((row) => row.slug)),
     loadCommunityProjectCommentCounts(projectIds),
   ])
 
   return rows.map((row) =>
     mapCommunityProjectRow(
       row,
-      likeCounts.get(row.id) ?? 0,
+      likeCounts[row.slug] ?? 0,
       commentCounts.get(row.id) ?? 0,
     ),
   )
@@ -141,31 +140,31 @@ async function loadCommunityProjectCommentCounts(
   return counts
 }
 
-async function loadCommunityProjectLikeCounts(
-  projectIds: string[],
-): Promise<Map<string, number>> {
-  const counts = new Map<string, number>()
-  if (!projectIds.length) return counts
+export async function loadCommunityProjectLikeCounts(
+  projectSlugs: string[],
+): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {}
+  if (!projectSlugs.length) return counts
 
   const admin = createServerServiceRoleClient()
   const { data, error } = await admin
     .from('community_project_likes')
-    .select('project_id, user_id')
-    .in('project_id', projectIds)
+    .select('project_slug')
+    .in('project_slug', projectSlugs)
 
   if (error) return counts
 
   for (const like of (data ?? []) as unknown as CommunityProjectLikeRow[]) {
-    counts.set(like.project_id, (counts.get(like.project_id) ?? 0) + 1)
+    counts[like.project_slug] = (counts[like.project_slug] ?? 0) + 1
   }
   return counts
 }
 
 /**
- * Database ids of the published projects the given user has liked. Returns an
+ * Slugs of the projects the given user has liked. Returns an
  * empty list when signed out or when the likes table is unavailable.
  */
-export async function loadCommunityProjectLikesForUser(
+export async function loadCommunityProjectLikedSlugsForUser(
   userId: string | null | undefined,
 ): Promise<string[]> {
   if (!userId) return []
@@ -173,12 +172,12 @@ export async function loadCommunityProjectLikesForUser(
   const admin = createServerServiceRoleClient()
   const { data, error } = await admin
     .from('community_project_likes')
-    .select('project_id, user_id')
+    .select('project_slug')
     .eq('user_id', userId)
 
   if (error) return []
   return ((data ?? []) as unknown as CommunityProjectLikeRow[]).map(
-    (like) => like.project_id,
+    (like) => like.project_slug,
   )
 }
 

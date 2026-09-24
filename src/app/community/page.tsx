@@ -5,9 +5,11 @@ import {
   GallerySessionValue,
 } from '@/components/community/GallerySession'
 import {
-  loadCommunityProjectLikesForUser,
+  loadCommunityProjectLikeCounts,
+  loadCommunityProjectLikedSlugsForUser,
   loadPublishedCommunityProjects,
 } from '@/lib/communityProjectDatabase'
+import { COMMUNITY_PROJECTS } from '@/lib/communityProjects'
 import { getCurrentUser } from '@/lib/portal/auth'
 
 export const metadata: Metadata = {
@@ -43,16 +45,21 @@ async function loadViewer() {
   const user = await getCurrentUser()
   return {
     isSignedIn: Boolean(user),
-    likedProjectIds: await loadCommunityProjectLikesForUser(user?.id),
+    likedProjectSlugs: await loadCommunityProjectLikedSlugsForUser(user?.id),
   }
 }
 export default async function CommunityPage() {
   const viewer = loadViewer()
   // Attach rejection handling immediately while the independent catalog read runs.
   void viewer.catch(() => {})
-  const publishedProjects = await loadPublishedCommunityProjects()
+  const [publishedProjects, likeCounts] = await Promise.all([
+    loadPublishedCommunityProjects(),
+    loadCommunityProjectLikeCounts(
+      COMMUNITY_PROJECTS.map((project) => project.slug),
+    ),
+  ])
   return (
-    <GallerySession projects={publishedProjects}>
+    <GallerySession projects={publishedProjects} likeCounts={likeCounts}>
       <Suspense fallback={null}>
         <Viewer result={viewer} />
       </Suspense>

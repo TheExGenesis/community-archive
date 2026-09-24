@@ -53,3 +53,6 @@ CREATE OR REPLACE TRIGGER trg_log_archive_upload_event
 CREATE TRIGGER preserve_archive_storage_reference
 BEFORE UPDATE ON public.archive_upload FOR EACH ROW
 EXECUTE FUNCTION private.preserve_archive_storage_reference();
+CREATE OR REPLACE TRIGGER fill_community_like_slug
+BEFORE INSERT ON public.community_project_likes
+FOR EACH ROW EXECUTE FUNCTION public.fill_community_like_slug();

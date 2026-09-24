@@ -3336,7 +3336,7 @@ SET search_path = ''
 AS $$
   WITH expected AS (
     SELECT
-      ((CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '30 hours')::date
+      ((CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '6 hours')::date
         AS digest_date,
       (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') AS checked_at
   ), latest_published AS (
@@ -3375,7 +3375,7 @@ AS $$
       CASE
         WHEN state.published_date = state.expected_date THEN 1
         WHEN state.run_failed THEN 0
-        WHEN state.checked_at < state.expected_date::timestamp + INTERVAL '32 hours'
+        WHEN state.checked_at < state.expected_date::timestamp + INTERVAL '8 hours'
           THEN 1
         ELSE 0
       END

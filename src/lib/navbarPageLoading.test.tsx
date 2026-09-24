@@ -22,6 +22,7 @@ import { loadPublishedCommunityProjects } from '@/lib/communityProjectDatabase'
 import { getPortalTrendSnapshot, startStreamData } from '@/lib/portal/data'
 import { AUGUST_11_MOCK_DIGEST } from '@/lib/digest/mock'
 
+jest.mock('@/components/bulletin/BulletinBoard.module.css', () => ({}))
 jest.mock('@/lib/digest/data', () => ({
   getPublishedDigest: jest.fn(),
   listPublishedDigestDays: jest.fn(),

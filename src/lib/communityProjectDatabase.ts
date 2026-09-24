@@ -40,6 +40,10 @@ export function mapCommunityProjectRow(
   likeCount = 0,
   commentCount = 0,
 ): CommunityProject {
+  // First-party catalog rows use their own project URL as the required source
+  // URL. Do not show a duplicate "View source post" link for those rows.
+  const sourceUrl =
+    row.source_post_url === row.project_url ? undefined : row.source_post_url
   return {
     likeCount,
     commentCount,
@@ -54,8 +58,8 @@ export function mapCommunityProjectRow(
     category: row.category,
     tags: row.tags,
     projectUrl: row.project_url,
-    sourceTweetId: sourceTweetId(row.source_post_url),
-    sourceUrl: row.source_post_url,
+    sourceTweetId: sourceUrl ? sourceTweetId(sourceUrl) : undefined,
+    sourceUrl,
     image: row.cover_storage_path
       ? `/api/community/projects/${row.id}/cover?v=${encodeURIComponent(row.cover_storage_path)}`
       : undefined,

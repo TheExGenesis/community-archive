@@ -313,25 +313,6 @@ function ProjectComments({
   )
 }
 
-const CURATED_SECTIONS = [
-  {
-    category: 'Tools',
-    blurb: 'Things that make the archive easier to actually use.',
-  },
-  {
-    category: 'Experiments',
-    blurb: 'New ways to remix and interact with the archive.',
-  },
-  {
-    category: 'Research',
-    blurb: 'Studies and discoveries made from archive data.',
-  },
-  {
-    category: 'Games',
-    blurb: 'The archive used for no productive reason whatsoever.',
-  },
-] as const
-
 function ProjectCover({
   project,
   modal = false,
@@ -707,7 +688,6 @@ export default function CommunityGallery({
   const likeStateFor = (project: CommunityProject) =>
     project.databaseId ? (likes[project.databaseId] ?? undefined) : undefined
 
-  const isCurated = category === 'All' && query.trim() === ''
   const openSubmission = () => {
     if (!isSignedIn) {
       window.location.href = '/login?redirect=/community'
@@ -812,61 +792,22 @@ export default function CommunityGallery({
       </div>
 
       <div className="mx-auto max-w-[1280px] px-5 pb-20 min-[940px]:px-7">
-        {isCurated ? (
-          <span className="sr-only">
-            {projects.length} {projects.length === 1 ? 'project' : 'projects'}
-          </span>
-        ) : null}
-
-        {projects.length && isCurated
-          ? CURATED_SECTIONS.map((section) => {
-              const sectionProjects = projects.filter(
-                (project) => project.category === section.category,
-              )
-              if (!sectionProjects.length) return null
-
-              return (
-                <section key={section.category} className="pb-12 pt-[38px]">
-                  <div className="mb-5">
-                    <div>
-                      <h2 className="text-2xl font-bold">{section.category}</h2>
-                      <p className="mt-1 text-[14.5px] text-muted-foreground">
-                        {section.blurb}
-                      </p>
-                    </div>
-                  </div>
-                  <div
-                    className="grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-[26px]"
-                    style={{ maxWidth: sectionProjects.length * 380 }}
-                  >
-                    {sectionProjects.map((project) => (
-                      <ProjectCard
-                        key={project.slug}
-                        project={project}
-                        onOpen={() => setSelectedProject(project)}
-                        likeState={likeStateFor(project)}
-                        onToggleLike={toggleLike}
-                        isSignedIn={isSignedIn}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )
-            })
-          : null}
-
-        {projects.length && !isCurated ? (
+        {projects.length ? (
           <section className="py-[38px]">
             <div className="mb-6 flex items-baseline justify-between gap-4 border-b border-border pb-3">
               <h2 className="text-[26px] font-bold">
-                {query.trim() ? 'Search results' : category}
+                {query.trim()
+                  ? 'Search results'
+                  : category === 'All'
+                    ? 'All projects'
+                    : category}
               </h2>
               <span className="text-[13px] text-muted-foreground">
                 {projects.length}{' '}
                 {projects.length === 1 ? 'project' : 'projects'}
               </span>
             </div>
-            <div className="grid grid-cols-1 gap-[26px] sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(300px,100%),1fr))] gap-[26px]">
               {projects.map((project) => (
                 <ProjectCard
                   key={project.slug}

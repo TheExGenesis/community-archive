@@ -37,8 +37,8 @@ export interface CommunityProject {
 
 /**
  * Curated community-made projects verified against the public Community
- * Archive thread rooted at tweet 1961022793023119441, plus the explicitly
- * requested first-party Conversation Map. Never fabricate a launch post.
+ * Archive thread rooted at tweet 1961022793023119441, plus explicitly
+ * requested additions with verified sources. Never fabricate a launch post.
  */
 export const COMMUNITY_PROJECTS: CommunityProject[] = [
   {
@@ -202,6 +202,26 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
     coverClass: 'from-[#f3d36b] via-[#f0a660] to-[#1e9bcd]',
     featured: true,
     publishedAt: '2025-08-28',
+  },
+  {
+    slug: 'model-behavior-reports',
+    name: 'Model Behavior Reports',
+    creator: 'Alexandre Variengien',
+    creatorHandle: 'A_Variengien',
+    summary: 'Spot patterns in how language models behave in the wild.',
+    description:
+      'Browse crowdsourced reports of models’ personalities, tendencies, and surprising actions, with summaries that update as new observations appear.',
+    archiveUse:
+      'Collects public behavior reports from X through the Community Archive and groups them by model to separate recurring patterns from one-offs.',
+    category: 'Research',
+    tags: ['LLM behavior', 'Crowdsourced research', 'Model reports'],
+    projectUrl: 'https://modelbehavior.report/',
+    sourceTweetId: '2103163809213145552',
+    sourceUrl: 'https://x.com/A_Variengien/status/2103163809213145552',
+    image: '/images/community/model-behavior-reports.webp',
+    coverClass: 'from-[#f4f0ff] via-[#e0d9ff] to-[#aeb8f2]',
+    featured: true,
+    publishedAt: '2026-09-24',
   },
   {
     slug: 'vector-search',

@@ -5,7 +5,7 @@ import {
 
 describe('community project catalog', () => {
   it('contains only verified entries with source posts and no prototype filler', () => {
-    expect(COMMUNITY_PROJECTS).toHaveLength(15)
+    expect(COMMUNITY_PROJECTS).toHaveLength(16)
     expect(COMMUNITY_PROJECTS).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: 'Ratio Radar' }),
@@ -56,7 +56,7 @@ describe('community project catalog', () => {
       'All',
       'Newest',
     )
-    expect(newest[0].name).toBe('Bangers')
+    expect(newest[0].name).toBe('Model Behavior Reports')
 
     const alphabetical = filterCommunityProjects(
       COMMUNITY_PROJECTS,

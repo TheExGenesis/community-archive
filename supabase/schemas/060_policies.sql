@@ -1,5 +1,8 @@
 -- Row Level Security policies and enablement
 
+-- Private generated research: no client policies or Data API exposure.
+ALTER TABLE "private"."profile_intelligence_runs" ENABLE ROW LEVEL SECURITY;
+
 ALTER TABLE "public"."digest_prompt_versions" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_runs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_editions" ENABLE ROW LEVEL SECURITY;

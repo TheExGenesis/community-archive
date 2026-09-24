@@ -1,5 +1,9 @@
 -- Grants and default privileges
 
+-- Generated profiles are for private SQL research, not any client role.
+REVOKE ALL ON TABLE "private"."profile_intelligence_runs"
+  FROM PUBLIC, "anon", "authenticated", "readclient", "service_role";
+
 -- Schema usage for readclient
 GRANT USAGE ON SCHEMA "public" TO "readclient";
 

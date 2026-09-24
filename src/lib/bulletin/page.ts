@@ -9,6 +9,7 @@ import {
   type StoredNotice,
 } from './data'
 import { isPast, sortNotices, visibleStatus } from './board'
+import { matchesJevFilters } from './curation'
 import {
   BULLETIN_PAGE_SIZE,
   KIND_LABELS,
@@ -49,7 +50,7 @@ export async function loadBulletinPage(
   const search = filters.search.trim().toLowerCase()
   const [state, personal] = await Promise.all([
     measureServerRead('bulletin.state', () => loadBulletinBoardState(false)),
-    personalize && filters.recommended
+    personalize && filters.recommended && !filters.sortBy
       ? measureServerRead('bulletin.recommendations', loadBulletinRelationships)
       : loadBulletinViewer(),
   ])
@@ -57,7 +58,9 @@ export async function loadBulletinPage(
   const chosenKinds = parseKinds(filters.kind) ?? []
   const inKinds = (o: { kind: string }) =>
     !chosenKinds.length || chosenKinds.includes(o.kind)
-  const known = state.notices.filter((o) => o.kind in KIND_LABELS)
+  const known = state.notices.filter(
+    (o) => o.kind in KIND_LABELS && matchesJevFilters(o, filters),
+  )
   const bySide = known.filter(
     (o) => filters.side === 'all' || o.side === filters.side,
   )
@@ -104,6 +107,7 @@ export async function loadBulletinPage(
     now,
     filters.ascending,
     false, // Live uptake ranks loaded cards in the client, never a partial server cursor.
+    filters.sortBy,
   )
   const active = metadataOrder.filter((o) =>
     visibleStatus(o, now, filters.past, filters.resolved),
@@ -132,6 +136,7 @@ export async function loadBulletinPage(
     now,
     filters.ascending,
     false, // Live uptake ranks loaded cards in the client, never a partial server cursor.
+    filters.sortBy,
   )
   const index = after ? rows.findIndex((o) => o.tweet_id === after) : -1
   if (after && index < 0)
@@ -176,6 +181,7 @@ export async function loadBulletinPage(
     total: state.notices.length,
     now,
     personal,
-    recommendationsReady: personalize || !filters.recommended,
+    recommendationsReady:
+      personalize || !filters.recommended || !!filters.sortBy,
   }
 }

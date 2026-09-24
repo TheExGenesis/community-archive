@@ -13,7 +13,7 @@ import {
 import { getLocalAdminPreview } from '@/lib/localAdminPreview'
 import { getCurrentUser } from '@/lib/portal/auth'
 import { getOptInStatus } from '@/lib/auth-utils'
-import { getAdminClient } from '@/app/admin/data'
+import { getAdminClient, requireAdmin } from '@/app/admin/data'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 jest.mock('@/lib/clickhouseGateway', () => ({
   fetchAnalyticsGatewayJson: jest.fn(),
@@ -23,7 +23,10 @@ jest.mock('@/lib/localAdminPreview', () => ({
 }))
 jest.mock('@/lib/portal/auth', () => ({ getCurrentUser: jest.fn() }))
 jest.mock('@/lib/auth-utils', () => ({ getOptInStatus: jest.fn() }))
-jest.mock('@/app/admin/data', () => ({ getAdminClient: jest.fn() }))
+jest.mock('@/app/admin/data', () => ({
+  getAdminClient: jest.fn(),
+  requireAdmin: jest.fn(),
+}))
 jest.mock('@/utils/supabase', () => ({
   createServerServiceRoleClient: jest.fn(),
 }))
@@ -73,6 +76,51 @@ test('opted-in users read the policy-aware RPC, with upstream errors kept distin
     max_results: 2000,
   })
   await expect(loadNotices()).rejects.toThrow('could not be loaded')
+})
+
+test('protected Preview reads production board metadata only after staging consent and admin checks', async () => {
+  const previous = {
+    vercel: process.env.VERCEL_ENV,
+    url: process.env.BULLETIN_PRODUCTION_BOARD_URL,
+    secret: process.env.BULLETIN_PREVIEW_READ_SECRET,
+  }
+  const fetchBefore = global.fetch
+  process.env.VERCEL_ENV = 'preview'
+  process.env.BULLETIN_PRODUCTION_BOARD_URL =
+    'https://www.community-archive.org/api/bulletin/preview-board'
+  process.env.BULLETIN_PREVIEW_READ_SECRET = 'x'.repeat(40)
+  const fetchMock = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => [{ tweet_id: '1', account_id: '10' }],
+  })
+  global.fetch = fetchMock
+  try {
+    jest.mocked(getCurrentUser).mockResolvedValue({ id: 'member' } as User)
+    await expect(loadBulletinBoardState(false)).resolves.toMatchObject({
+      notices: [{ tweet_id: '1' }],
+    })
+    expect(requireAdmin).toHaveBeenCalledWith('/admin/bulletin')
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL(process.env.BULLETIN_PRODUCTION_BOARD_URL),
+      expect.objectContaining({ method: 'POST', cache: 'no-store' }),
+    )
+    expect(createServerServiceRoleClient).not.toHaveBeenCalled()
+
+    fetchMock.mockClear()
+    jest.mocked(requireAdmin).mockRejectedValueOnce(new Error('not an admin'))
+    await expect(loadBulletinBoardState(false)).rejects.toThrow('not an admin')
+    expect(fetchMock).not.toHaveBeenCalled()
+  } finally {
+    global.fetch = fetchBefore
+    if (previous.vercel === undefined) delete process.env.VERCEL_ENV
+    else process.env.VERCEL_ENV = previous.vercel
+    if (previous.url === undefined)
+      delete process.env.BULLETIN_PRODUCTION_BOARD_URL
+    else process.env.BULLETIN_PRODUCTION_BOARD_URL = previous.url
+    if (previous.secret === undefined)
+      delete process.env.BULLETIN_PREVIEW_READ_SECRET
+    else process.env.BULLETIN_PREVIEW_READ_SECRET = previous.secret
+  }
 })
 test('run history always requires admin authorization', async () => {
   jest.mocked(getAdminClient).mockRejectedValueOnce(new Error('not authorized'))

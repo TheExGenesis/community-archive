@@ -1,4 +1,5 @@
 import type { Database } from '@/database-types'
+import { DEFAULT_JEV_FILTERS, type JevFilters } from './curation'
 
 export type Notice = Omit<
   Database['public']['Functions']['get_bulletin_opportunities']['Returns'][number],
@@ -161,7 +162,7 @@ export type PromptDashboard = {
 }
 export type PromptSaveResult = { error?: string; version?: string }
 
-export type BulletinFilters = {
+export type BulletinFilters = JevFilters & {
   /** 'all', or a sorted comma-separated set of kinds, e.g. 'feedback,help'. */
   kind: string
   side: string
@@ -196,6 +197,7 @@ export function kindKey(kinds: string[]) {
 }
 export const BULLETIN_PAGE_SIZE = 18
 export const DEFAULT_BULLETIN_FILTERS: BulletinFilters = {
+  ...DEFAULT_JEV_FILTERS,
   kind: 'all',
   side: 'all',
   search: '',

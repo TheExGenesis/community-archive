@@ -111,6 +111,52 @@ test('resolution verification outages still fail the page', async () => {
   await expect(loadBulletinPage(filters)).rejects.toThrow('source unavailable')
 })
 
+test('Jev controls filter and rank before pagination and counts', async () => {
+  jest.mocked(loadBulletinBoardState).mockResolvedValue({
+    notices: [
+      {
+        ...notice(1),
+        value_score: 2.5,
+        p_opportunity: 0.9,
+        p_joke: 0.1,
+        topics: ['arts'],
+      },
+      {
+        ...notice(2),
+        value_score: 3.5,
+        p_opportunity: 0.85,
+        p_joke: 0.15,
+        topics: ['arts'],
+      },
+      {
+        ...notice(3),
+        value_score: 4,
+        p_opportunity: 0.9,
+        p_joke: 0.4,
+        topics: ['arts'],
+      },
+      {
+        ...notice(4),
+        value_score: 4,
+        p_opportunity: 0.9,
+        p_joke: 0.1,
+        topics: ['ai'],
+      },
+    ],
+  })
+  const page = await loadBulletinPage({
+    ...filters,
+    minValue: 2,
+    minOpportunity: 0.8,
+    maxJoke: 0.2,
+    topics: ['arts'],
+    sortBy: 'value',
+  })
+  expect(page.notices.map((o) => o.tweet_id)).toEqual(['2', '1'])
+  expect(page.counts.help).toBe(2)
+  expect(page.total).toBe(4)
+})
+
 test('resolved notices are hidden by default and independently included even when expired', async () => {
   jest.mocked(loadBulletinBoardState).mockResolvedValue({
     notices: [

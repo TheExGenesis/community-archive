@@ -5,6 +5,7 @@
 """Focused Jev worker and board switch checks on disposable PostgreSQL."""
 import datetime as dt
 import hashlib
+from http.client import RemoteDisconnected
 import os
 from pathlib import Path
 import time
@@ -170,7 +171,7 @@ class JevWorkerTests(unittest.TestCase):
         self.assertEqual(jev['pending'],0)
 
     def test_failed_model_call_reserves_cost_and_retries_same_source(self):
-        with patch.object(model,'call',side_effect=TimeoutError('provider timeout')):
+        with patch.object(model,'call',side_effect=ValueError('invalid provider response')):
             result=jev_worker.run(self.db,window=self.window,backfill_budget=.05)
         self.assertEqual((result['status'],result['pending']),('classification_failed',1))
         first=self.db.execute('SELECT status,phase,attempts FROM bulletin.jev_items').fetchone()
@@ -182,6 +183,22 @@ class JevWorkerTests(unittest.TestCase):
         recovered=jev_worker.run(self.db,window=self.window,backfill_budget=.05)
         self.assertEqual(recovered['status'],'ok')
         self.assertEqual(self.db.execute('SELECT status FROM bulletin.jev_items').fetchone()['status'],'ready')
+
+    def test_transient_disconnect_retries_with_separate_call_reservations(self):
+        calls=0
+        def disconnect_once(payload,key):
+            nonlocal calls
+            calls+=1
+            if calls==1:
+                raise RemoteDisconnected('connection closed')
+            return self.answer(payload,key)
+        with patch.object(model,'call',side_effect=disconnect_once), \
+             patch.object(jev_worker.time,'sleep'):
+            result=jev_worker.run(self.db,window=self.window,backfill_budget=.05)
+        self.assertEqual((result['status'],result['calls']),('ok',4))
+        self.assertEqual(self.db.execute('SELECT status FROM bulletin.jev_items').fetchone()['status'],'ready')
+        self.assertEqual(self.db.execute("SELECT count(*) n FROM bulletin.calls WHERE status='failed:RemoteDisconnected'").fetchone()['n'],1)
+        self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.calls').fetchone()['n'],4)
 
     def test_failed_scan_does_not_advance_cursor(self):
         with patch.object(jev_worker.clickhouse_source,'page',side_effect=RuntimeError('gateway unavailable')):

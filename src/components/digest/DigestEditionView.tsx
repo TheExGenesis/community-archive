@@ -173,7 +173,7 @@ export function DigestEditionView({
                 return (
                   <article
                     key={story.slug}
-                    className="border-t-2 border-zinc-800 pb-1 pt-7 dark:border-zinc-200"
+                    className="border-t-2 border-zinc-800 pb-12 pt-7 dark:border-zinc-200"
                   >
                     <div className="flex flex-wrap items-center gap-3 text-[13px] text-muted-foreground">
                       <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-semibold text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
@@ -232,14 +232,6 @@ export function DigestEditionView({
                     >
                       Read the full story and surrounding conversation →
                     </PostHogLink>
-
-                    <div className="my-12 flex items-center gap-4 text-zinc-400 dark:text-zinc-600">
-                      <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
-                      <span className="text-[13px]" aria-hidden="true">
-                        ✦
-                      </span>
-                      <span className="flex-1 border-t border-zinc-200 dark:border-zinc-800" />
-                    </div>
                   </article>
                 )
               })}

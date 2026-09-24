@@ -79,3 +79,13 @@ test('keeps browser fingerprinting on document page requests', async () => {
   expect(response.status).toBe(403)
   await expect(response.text()).resolves.toBe('Forbidden')
 })
+
+test('lets the secret-gated Bulletin source reach its route from another server', async () => {
+  const request = new NextRequest(
+    'https://www.community-archive.org/api/bulletin/preview-board',
+    { method: 'POST', headers: { 'user-agent': 'undici' } },
+  )
+  const response = await middleware(request)
+  expect(response.status).toBe(200)
+  expect(response.headers.get('x-middleware-next')).toBe('1')
+})

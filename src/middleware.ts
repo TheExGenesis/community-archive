@@ -336,10 +336,12 @@ export async function middleware(request: NextRequest) {
   // Machine-to-machine routes that carry their own credentials: cron routes
   // require the CRON_SECRET bearer token (Vercel's cron caller sends a short
   // non-browser UA), and one-click unsubscribe POSTs come from mailbox
-  // provider servers holding a per-subscription token.
+  // provider servers holding a per-subscription token. The Bulletin preview
+  // source requires its own bearer secret and is called from another server.
   const machineAuthRoute =
     pathname.startsWith('/api/cron/') ||
-    pathname === '/api/digest/email/unsubscribe'
+    pathname === '/api/digest/email/unsubscribe' ||
+    pathname === '/api/bulletin/preview-board'
 
   // ── Stage 1: Bot User-Agent Detection (all routes) ──────────────────────
   if (

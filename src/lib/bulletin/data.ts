@@ -265,6 +265,16 @@ export function loadBulletinRelationshipsForAccount(accountId: string) {
 }
 
 export type StoredNotice = Notice & { content_hash: string }
+/** Production-only source for an explicitly authorized, read-only PR preview. */
+export async function loadBulletinBoardSnapshot(): Promise<StoredNotice[]> {
+  const { data, error } = await createServerServiceRoleClient().rpc(
+    'get_bulletin_board_state',
+    { max_results: BULLETIN_LIMIT },
+  )
+  if (error) throw new Error('Bulletin notices could not be loaded')
+  return (data ?? []) as unknown as StoredNotice[]
+}
+
 export async function loadBulletinBoardState(verifyResolution = true): Promise<{
   notices: StoredNotice[]
   allowedAccounts?: string[]
@@ -284,12 +294,39 @@ export async function loadBulletinBoardState(verifyResolution = true): Promise<{
     if (!response.ok) throw new Error('Local board snapshot unavailable')
     return response.json()
   }
-  const { data, error } = await createServerServiceRoleClient().rpc(
-    'get_bulletin_board_state',
-    { max_results: BULLETIN_LIMIT },
-  )
-  if (error) throw new Error('Bulletin notices could not be loaded')
-  const notices = (data ?? []) as unknown as StoredNotice[]
+  const previewUrl = process.env.BULLETIN_PRODUCTION_BOARD_URL
+  let notices: StoredNotice[]
+  if (process.env.VERCEL_ENV === 'preview' && previewUrl) {
+    await requireBulletinAdmin()
+    const url = new URL(previewUrl)
+    if (
+      url.origin !== 'https://www.community-archive.org' ||
+      url.pathname !== '/api/bulletin/preview-board' ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    )
+      throw new Error('Invalid production Bulletin source URL')
+    const secret = process.env.BULLETIN_PREVIEW_READ_SECRET
+    if (!secret || secret.length < 32)
+      throw new Error('Production Bulletin preview is not configured')
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${secret}` },
+      cache: 'no-store',
+      redirect: 'error',
+      signal: AbortSignal.timeout(20_000),
+    })
+    if (!response.ok)
+      throw new Error('Production Bulletin preview is unavailable')
+    const body: unknown = await response.json()
+    if (!Array.isArray(body))
+      throw new Error('Invalid production Bulletin snapshot')
+    notices = body as StoredNotice[]
+  } else {
+    notices = await loadBulletinBoardSnapshot()
+  }
   if (verifyResolution) await verifyBulletinResolutions(notices)
   return { notices }
 }

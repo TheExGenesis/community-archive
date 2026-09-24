@@ -58,6 +58,28 @@ Scope these overrides to the portal PR/staging branch. Keep
 all writes remain isolated. `PORTAL_READ_SUPABASE_ANON_KEY` is server-only and
 must be the public anonymous key, never the production service-role key.
 
+### Reviewing production Bulletin items in a protected PR preview
+
+The Bulletin uses private Jev metadata and live production consent checks, so
+an ordinary staging preview has an empty board. A production-backed preview
+requires the read-only bridge in `src/app/api/bulletin/preview-board/route.ts`.
+After that route has been deployed to Production, set a shared random secret
+(at least 32 characters) as `BULLETIN_PREVIEW_READ_SECRET` in Production and
+**only the intended PR's Preview branch**. In that Preview branch also set:
+
+```env
+BULLETIN_PRODUCTION_BOARD_URL=https://www.community-archive.org/api/bulletin/preview-board
+```
+
+Redeploy both environments after setting variables. The preview requires a
+staging Bulletin admin, fetches fresh policy-filtered metadata from the
+production site on each page request, and still checks source tweets through
+the analytics gateway. Login, opt-in, writes, and the service-role key stay on
+staging. Keep Vercel preview protection enabled. If production's Vercel Firewall
+challenges the server-to-server request, allow only this endpoint through the
+firewall; the route itself requires the shared secret and returns no cached
+response. Remove the branch secret and URL when the review is over.
+
 The default staging login identity is configured via env:
 
 - Email: value of `STAGING_DEV_LOGIN_EMAIL`

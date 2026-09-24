@@ -58,7 +58,8 @@ export function defaultTrendExplorerState(
     shown: terms.slice(0, 6),
     included: terms.slice(0, 1),
     scale: 'normalized',
-    granularity: 'month',
+    granularity: 'day',
+    timeline: '15d',
     range: null,
   }
 }
@@ -74,12 +75,21 @@ export function parseTrendExplorerState(
   const shownParams = params.getAll('show')
   const includedParams = params.getAll('include')
   const timelineValue = params.get('timeline')
-  const timeline =
+  const explicitTimeline =
     timelineValue === '12m' ||
     timelineValue === '12w' ||
     timelineValue === '15d'
       ? timelineValue
       : undefined
+  const timeline =
+    explicitTimeline ??
+    (!params.has('granularity') &&
+      !params.has('chartFrom') &&
+      !params.has('chartTo') &&
+      !params.has('from') &&
+      !params.has('to')
+      ? defaults.timeline
+      : undefined)
   const requested = params.get('granularity')
   const granularity: TrendGranularity = timeline
     ? presetGranularity[timeline]

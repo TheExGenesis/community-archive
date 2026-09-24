@@ -692,6 +692,7 @@ test('charts six live monthly defaults with a brief note and independent log tog
   render(
     <TrendsExplorer
       initialTrends={{ ...emptyPortalTrends(new Date('2026-09-10')), weekly }}
+      initialSearch="granularity=month"
     />,
   )
   await waitFor(() =>
@@ -774,7 +775,10 @@ test('zooms monthly data locally and loads real weekly/daily detail for short pr
     } as Response
   })
   render(
-    <TrendsExplorer initialTrends={snapshot} initialSearch="q=tpot&axis=log" />,
+    <TrendsExplorer
+      initialTrends={snapshot}
+      initialSearch="q=tpot&axis=log&granularity=month"
+    />,
   )
   const preset = (name: string) => screen.getByRole('button', { name })
   const points = () =>

@@ -174,6 +174,15 @@ describe('CommunityGallery', () => {
     expect(
       screen.queryByRole('button', { name: 'Browse all tools' }),
     ).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Newest' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(
+      screen.getAllByRole('button', { name: /Preview of/ })[0],
+    ).toHaveAccessibleName(/Model Behavior Reports/)
+
+    await user.click(screen.getByRole('button', { name: 'Featured' }))
     expect(
       screen
         .getAllByRole('button')

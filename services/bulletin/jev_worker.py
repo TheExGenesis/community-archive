@@ -217,37 +217,47 @@ def process(db, run_id, window, prompt, counts, started, limit, backfill_budget,
             amount = model.reservation(payload)
             if amount > Decimal('.01'):
                 raise ValueError('oversize_jev_request')
-            call_id = reserve(db,[j['tweet_id'] for j in jobs],amount,run_id,backfill_budget)
-            if call_id is None:
-                return 'budget_limit'
-            counts['calls'] += 1
-            stage = 'model_request'
-            try:
-                response = model.call(payload,key)
-                stage = 'model_validation'
-                answers,cost = model.validate(response,payload,None if phase=='value' else jobs,phase)
-                db.execute("UPDATE bulletin.calls SET actual_usd=%s,status='responded' WHERE id=%s",(cost,call_id))
-                stage = 'publish'
-                answers = [answers] if phase=='value' else answers
-                # Consent, source state and text hash can change during a call.
-                fresh = {j['tweet_id']:(j,s) for j,s in _valid_sources(db,jobs)}
-                with db.transaction():
-                    for job,answer in zip(jobs,answers):
-                        pair = fresh.get(job['tweet_id'])
-                        if not pair:
-                            counts['suppressed'] += 1
-                            continue
-                        _publish(db,job,pair[1],phase,answer)
-                        if phase == 'value':
-                            counts['positive' if model.passes(job['disposition'],job['enrichment'],answer)
-                                   else 'negative'] += 1
-                    db.execute("UPDATE bulletin.calls SET status='validated' WHERE id=%s",(call_id,))
-            except Exception as exc:
-                worker.log_failure(exc,run_id=run_id,call_id=call_id,stage=stage)
-                db.execute('UPDATE bulletin.calls SET status=%s WHERE id=%s',
-                    ('failed:'+type(exc).__name__,call_id))
-                counts['failed'] += len(jobs)
-                return 'classification_failed'
+            for retry in range(3):
+                attempt = max(j['attempts'] for j in jobs) + retry + 1
+                call_id = reserve(db,[j['tweet_id'] for j in jobs],amount,run_id,backfill_budget)
+                if call_id is None:
+                    return 'budget_limit'
+                counts['calls'] += 1
+                stage = 'model_request'
+                try:
+                    response = model.call(payload,key)
+                    stage = 'model_validation'
+                    answers,cost = model.validate(response,payload,None if phase=='value' else jobs,phase)
+                    db.execute("UPDATE bulletin.calls SET actual_usd=%s,status='responded' WHERE id=%s",(cost,call_id))
+                    stage = 'publish'
+                    answers = [answers] if phase=='value' else answers
+                    # Consent, source state and text hash can change during a call.
+                    fresh = {j['tweet_id']:(j,s) for j,s in _valid_sources(db,jobs)}
+                    with db.transaction():
+                        for job,answer in zip(jobs,answers):
+                            pair = fresh.get(job['tweet_id'])
+                            if not pair:
+                                counts['suppressed'] += 1
+                                continue
+                            _publish(db,job,pair[1],phase,answer)
+                            if phase == 'value':
+                                counts['positive' if model.passes(job['disposition'],job['enrichment'],answer)
+                                       else 'negative'] += 1
+                        db.execute("UPDATE bulletin.calls SET status='validated' WHERE id=%s",(call_id,))
+                    break
+                except Exception as exc:
+                    delay = worker.retry_wait(exc,attempt) if stage in ('model_request','model_validation') else None
+                    if delay is not None and (counts['calls']>=limit or
+                            time.monotonic()-started+delay+60>MAX_SECONDS):
+                        delay = None
+                    worker.log_failure(exc,run_id=run_id,call_id=call_id,attempt=attempt,
+                        stage=stage,retry_seconds=delay)
+                    db.execute('UPDATE bulletin.calls SET status=%s WHERE id=%s',
+                        ('failed:'+type(exc).__name__,call_id))
+                    counts['failed'] += len(jobs)
+                    if delay is None:
+                        return 'classification_failed'
+                    time.sleep(delay)
     return 'ok'
 
 

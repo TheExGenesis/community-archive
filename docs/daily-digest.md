@@ -10,6 +10,11 @@ artifacts; the private lab keeps the exact inputs, prompt version, model
 response, usage, and stage-by-stage trace needed to reproduce and compare
 generations.
 
+The automated editions originally dated August 28 through September 23, 2026
+were moved to their window-end dates. Earlier editions retain their original
+URLs so the separately published August 27 rolling-window edition remains
+available in the calendar.
+
 ## Product surfaces
 
 - `/digest` shows the latest published edition.

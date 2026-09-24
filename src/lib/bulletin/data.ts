@@ -297,7 +297,6 @@ export async function loadBulletinBoardState(verifyResolution = true): Promise<{
   const previewUrl = process.env.BULLETIN_PRODUCTION_BOARD_URL
   let notices: StoredNotice[]
   if (process.env.VERCEL_ENV === 'preview' && previewUrl) {
-    await requireBulletinAdmin()
     const url = new URL(previewUrl)
     if (
       url.origin !== 'https://www.community-archive.org' ||

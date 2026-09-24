@@ -144,6 +144,71 @@
   font-size: 14px;
   color: var(--muted);
 }
+.adminFilters {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 13px;
+}
+.adminFilters > summary,
+.topicFilters > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.adminFilters p {
+  margin: 10px 0 0;
+  color: var(--muted);
+}
+.adminSliders {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 18px;
+}
+.adminSliders label,
+.adminSliders label span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.adminSliders label {
+  flex-direction: column;
+}
+.adminSliders strong {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.adminSliders input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.topicFilters {
+  margin-top: 16px;
+}
+.topicOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 12px;
+}
+.topicOptions label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.topicOptions input {
+  accent-color: var(--accent);
+}
+.adminReset {
+  margin-top: 14px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+}
 .sticky {
   position: sticky;
   top: 56px;
@@ -286,6 +351,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 .sortLinks > span {
   color: var(--faint);
@@ -839,6 +905,9 @@
   }
 }
 @media (max-width: 840px) {
+  .adminSliders {
+    grid-template-columns: 1fr;
+  }
   .board {
     grid-template-columns: 1fr;
     padding-left: 16px;

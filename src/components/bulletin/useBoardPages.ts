@@ -5,6 +5,7 @@ import {
   type BulletinFilters,
   type BulletinPage,
 } from '@/lib/bulletin/types'
+import { addJevParams } from '@/lib/bulletin/curation'
 
 function filterKey(filters: BulletinFilters) {
   return JSON.stringify([
@@ -15,18 +16,26 @@ function filterKey(filters: BulletinFilters) {
     filters.resolved,
     filters.recommended,
     filters.ascending,
+    filters.minValue,
+    filters.minOpportunity,
+    filters.maxJoke,
+    filters.topics,
+    filters.sortBy,
   ])
 }
 function query(filters: BulletinFilters) {
-  return new URLSearchParams({
-    kind: filters.kind,
-    side: filters.side,
-    q: filters.search.trim(),
-    past: filters.past ? '1' : '0',
-    resolved: filters.resolved ? '1' : '0',
-    sort: filters.recommended ? 'recommended' : 'newest',
-    dir: filters.ascending ? 'asc' : 'desc',
-  })
+  return addJevParams(
+    new URLSearchParams({
+      kind: filters.kind,
+      side: filters.side,
+      q: filters.search.trim(),
+      past: filters.past ? '1' : '0',
+      resolved: filters.resolved ? '1' : '0',
+      sort: filters.recommended ? 'recommended' : 'newest',
+      dir: filters.ascending ? 'asc' : 'desc',
+    }),
+    filters,
+  )
 }
 async function fetchPage(
   params: URLSearchParams,
@@ -73,6 +82,7 @@ export function useBoardPages(
   const personalizing =
     !pending &&
     filters.recommended &&
+    !filters.sortBy &&
     state.page?.recommendationsReady === false
 
   // Apply a completed recommendation refresh only after the reader closes

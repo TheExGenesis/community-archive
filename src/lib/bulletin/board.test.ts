@@ -53,6 +53,24 @@ test('relationship labels are grounded in own account and outgoing interactions'
   expect(relationship(notice('3'), '1', graph).label).toBe('')
   expect(relationship(notice('1'), '', graph).label).toBe('')
 })
+test('Jev sorts use the selected score and keep low joke probability first', () => {
+  const now = Date.parse('2026-08-02T00:00:00Z')
+  const rows = [
+    { ...notice('a'), value_score: 1, p_opportunity: 0.95, p_joke: 0.3 },
+    { ...notice('b'), value_score: 4, p_opportunity: 0.8, p_joke: 0.1 },
+  ]
+  const graph = { outgoing: {}, available: false }
+  expect(
+    sortNotices(rows, true, '', graph, now, false, true, 'value')[0].tweet_id,
+  ).toBe('b')
+  expect(
+    sortNotices(rows, true, '', graph, now, false, true, 'opportunity')[0]
+      .tweet_id,
+  ).toBe('a')
+  expect(
+    sortNotices(rows, true, '', graph, now, false, true, 'joke')[0].tweet_id,
+  ).toBe('b')
+})
 test('uptake is unknown before hydration and counts replies plus quotes after', () => {
   expect(uptake(notice('1'))).toBeNull()
   expect(uptake({ ...notice('1'), replies: 2, quotes: 1 })).toBe(3)
@@ -160,9 +178,7 @@ test('Jev value helps order recommended notices while newest stays chronological
   expect(sortNotices([recent, valuable], true, '', graph, now)[0]).toBe(
     valuable,
   )
-  expect(sortNotices([recent, valuable], false, '', graph, now)[0]).toBe(
-    recent,
-  )
+  expect(sortNotices([recent, valuable], false, '', graph, now)[0]).toBe(recent)
 })
 test('ascending reverses the order but keeps past notices last', () => {
   const graph = { outgoing: {}, available: true }

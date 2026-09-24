@@ -47,6 +47,14 @@ import {
   uptake,
   type BulletinRelationships,
 } from '@/lib/bulletin/board'
+import {
+  addJevParams,
+  DEFAULT_JEV_FILTERS,
+  JEV_TOPIC_LABELS,
+  matchesJevFilters,
+  parseJevFilters,
+  type JevSort,
+} from '@/lib/bulletin/curation'
 import styles from './BulletinBoard.module.css'
 
 const loadTweetCard = () => import('@/components/TweetCard')
@@ -486,10 +494,27 @@ export function BulletinBoard({
   const [resolved, setResolved] = useState(false)
   const [recommended, setRecommended] = useState(true)
   const [ascending, setAscending] = useState(false)
+  const [minValue, setMinValue] = useState(0)
+  const [minOpportunity, setMinOpportunity] = useState(0)
+  const [maxJoke, setMaxJoke] = useState(1)
+  const [topics, setTopics] = useState<string[]>([])
+  const [sortBy, setSortBy] = useState<JevSort | null>(null)
   const [hydrated, setHydrated] = useState(false)
+  const jevFilters = isAdmin
+    ? { minValue, minOpportunity, maxJoke, topics, sortBy }
+    : DEFAULT_JEV_FILTERS
   const pages = useBoardPages(
     initialPage,
-    { kind, side, search, past, resolved, recommended, ascending },
+    {
+      kind,
+      side,
+      search,
+      past,
+      resolved,
+      recommended,
+      ascending,
+      ...jevFilters,
+    },
     hydrated,
     Object.values(expanded).some(Boolean),
   )
@@ -516,8 +541,16 @@ export function BulletinBoard({
     setResolved(p.get('resolved') === '1')
     setRecommended(p.get('sort') !== 'newest')
     setAscending(p.get('dir') === 'asc')
+    const jev = isAdmin ? parseJevFilters(p) : null
+    if (jev) {
+      setMinValue(jev.minValue)
+      setMinOpportunity(jev.minOpportunity)
+      setMaxJoke(jev.maxJoke)
+      setTopics(jev.topics)
+      setSortBy(jev.sortBy)
+    }
     setHydrated(true)
-  }, [])
+  }, [isAdmin])
   useEffect(() => {
     if (!hydrated) return
     const p = new URLSearchParams()
@@ -527,6 +560,7 @@ export function BulletinBoard({
     if (resolved) p.set('resolved', '1')
     if (!recommended) p.set('sort', 'newest')
     if (ascending) p.set('dir', 'asc')
+    if (isAdmin) addJevParams(p, jevFilters)
     window.history.replaceState(
       null,
       '',
@@ -534,10 +568,25 @@ export function BulletinBoard({
         window.location.search +
         (p.toString() ? '#' + p.toString() : ''),
     )
-  }, [kind, side, past, resolved, recommended, ascending, hydrated])
+  }, [
+    kind,
+    side,
+    past,
+    resolved,
+    recommended,
+    ascending,
+    minValue,
+    minOpportunity,
+    maxJoke,
+    topics,
+    sortBy,
+    isAdmin,
+    hydrated,
+  ])
   const needle = search.trim().toLowerCase()
   const matches = (o: Notice) =>
     visibleStatus(o, now, past, resolved) &&
+    matchesJevFilters(o, jevFilters) &&
     [o.summary, o.preview_text, o.username, o.place, ...o.topics]
       .filter(Boolean)
       .join(' ')
@@ -557,6 +606,8 @@ export function BulletinBoard({
         graph,
         now,
         ascending,
+        true,
+        jevFilters.sortBy,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -568,6 +619,12 @@ export function BulletinBoard({
       needle,
       recommended,
       ascending,
+      minValue,
+      minOpportunity,
+      maxJoke,
+      topics,
+      sortBy,
+      isAdmin,
       viewerId,
       graph,
       now,
@@ -576,7 +633,20 @@ export function BulletinBoard({
   useEffect(() => {
     setLimit(BULLETIN_PAGE_SIZE)
     setExpanded({})
-  }, [kind, side, needle, past, resolved, recommended, ascending])
+  }, [
+    kind,
+    side,
+    needle,
+    past,
+    resolved,
+    recommended,
+    ascending,
+    minValue,
+    minOpportunity,
+    maxJoke,
+    topics,
+    sortBy,
+  ])
   // Counts under the other dimension's filter: server-provided when paging
   // server-side, otherwise derived from the notices in hand.
   const count = (key: string) => {
@@ -646,6 +716,117 @@ export function BulletinBoard({
             <div className="mt-3">{adminControls}</div>
           </details>
         ) : null}
+        {isAdmin && (
+          <details className={styles.adminFilters}>
+            <summary>Jev filters · admin only</summary>
+            <p>
+              Explore published notices. These settings change only your view.
+              Publication already requires P(opportunity) ≥ 75% and P(joke) &lt;
+              50%.
+            </p>
+            <div className={styles.adminSliders}>
+              <label>
+                <span>
+                  Minimum value <strong>{minValue.toFixed(1)} / 4</strong>
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="4"
+                  step="0.1"
+                  value={minValue}
+                  onChange={(event) => setMinValue(Number(event.target.value))}
+                />
+              </label>
+              <label>
+                <span>
+                  Minimum P(opportunity){' '}
+                  <strong>{Math.round((minOpportunity || 0.75) * 100)}%</strong>
+                </span>
+                <input
+                  type="range"
+                  min="0.75"
+                  max="1"
+                  step="0.05"
+                  value={minOpportunity || 0.75}
+                  onChange={(event) =>
+                    setMinOpportunity(
+                      Number(event.target.value) <= 0.75
+                        ? 0
+                        : Number(event.target.value),
+                    )
+                  }
+                />
+              </label>
+              <label>
+                <span>
+                  Maximum P(joke){' '}
+                  <strong>
+                    {Math.round((maxJoke === 1 ? 0.5 : maxJoke) * 100)}%
+                  </strong>
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="0.5"
+                  step="0.05"
+                  value={maxJoke === 1 ? 0.5 : maxJoke}
+                  onChange={(event) =>
+                    setMaxJoke(
+                      Number(event.target.value) >= 0.5
+                        ? 1
+                        : Number(event.target.value),
+                    )
+                  }
+                />
+              </label>
+            </div>
+            <details className={styles.topicFilters}>
+              <summary>
+                Jev topic tags
+                {topics.length ? ` · ${topics.length} selected` : ''}
+              </summary>
+              <div
+                className={styles.topicOptions}
+                role="group"
+                aria-label="Jev topic tags"
+              >
+                {Object.entries(JEV_TOPIC_LABELS).map(([id, label]) => (
+                  <label key={id}>
+                    <input
+                      type="checkbox"
+                      checked={topics.includes(id)}
+                      onChange={(event) =>
+                        setTopics((current) =>
+                          event.target.checked
+                            ? [...current, id].sort()
+                            : current.filter((topic) => topic !== id),
+                        )
+                      }
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <p>Selected tags match any selected tag.</p>
+            </details>
+            <button
+              type="button"
+              className={styles.adminReset}
+              onClick={() => {
+                setMinValue(0)
+                setMinOpportunity(0)
+                setMaxJoke(1)
+                setTopics([])
+                setSortBy(null)
+                setRecommended(true)
+                setAscending(false)
+              }}
+            >
+              Reset Jev filters
+            </button>
+          </details>
+        )}
       </header>
       <div className={styles.sticky}>
         <div className={styles.controlRow}>
@@ -740,9 +921,19 @@ export function BulletinBoard({
               [
                 ['relevance', 'Relevance', true],
                 ['date', 'Date', false],
+                ...(isAdmin
+                  ? ([
+                      ['value', 'Value', true],
+                      ['opportunity', 'P(opportunity)', true],
+                      ['joke', 'P(joke), lowest first', true],
+                    ] as const)
+                  : []),
               ] as const
             ).map(([id, text, rec], i) => {
-              const active = recommended === rec
+              const active =
+                id === 'relevance' || id === 'date'
+                  ? !sortBy && recommended === rec
+                  : sortBy === id
               return (
                 <span key={id} className={styles.sortOption}>
                   {i > 0 && <span aria-hidden>·</span>}
@@ -754,6 +945,9 @@ export function BulletinBoard({
                     onClick={() => {
                       if (active) setAscending((value) => !value)
                       else {
+                        setSortBy(
+                          id === 'relevance' || id === 'date' ? null : id,
+                        )
                         setRecommended(rec)
                         setAscending(false)
                       }

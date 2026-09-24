@@ -106,6 +106,51 @@ test('loads full details only on inline expansion', async () => {
   expect(screen.queryByText('Original card')).not.toBeInTheDocument()
   expect(screen.getByText('Help with Python')).toBeInTheDocument()
 })
+test('admin can filter published notices by Jev score and topic', () => {
+  const scoredOffer = {
+    ...offer,
+    value_score: 3,
+    p_opportunity: 0.95,
+    p_joke: 0.05,
+    topics: ['arts'],
+  }
+  const scoredAsk = {
+    ...ask,
+    value_score: 1,
+    p_opportunity: 0.8,
+    p_joke: 0.2,
+    topics: ['ai'],
+  }
+  const { rerender } = render(
+    <BulletinBoard
+      notices={[scoredOffer, scoredAsk]}
+      isAdmin
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  fireEvent.click(screen.getByText('Jev filters · admin only'))
+  fireEvent.change(screen.getByRole('slider', { name: /Minimum value/ }), {
+    target: { value: '2' },
+  })
+  expect(screen.getAllByRole('article')).toHaveLength(1)
+  expect(screen.getByText('Help with Python')).toBeInTheDocument()
+  fireEvent.click(screen.getByText('Jev topic tags'))
+  fireEvent.click(screen.getByRole('checkbox', { name: 'AI' }))
+  expect(screen.queryByRole('article')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Reset Jev filters' }))
+  fireEvent.click(screen.getByRole('button', { name: /Sort by value/i }))
+  expect(
+    within(screen.getAllByRole('article')[0]).getByText('Help with Python'),
+  ).toBeInTheDocument()
+  expect(window.location.hash).toContain('metric=value')
+  rerender(
+    <BulletinBoard
+      notices={[scoredOffer, scoredAsk]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  expect(screen.queryByText('Jev filters · admin only')).not.toBeInTheDocument()
+})
 test('shows one stream with combined labels, and combines side, category and search filters', () => {
   render(
     <BulletinBoard

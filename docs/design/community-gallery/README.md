@@ -24,12 +24,11 @@ shown in the historical prototype.
 - Muted 17px centered subhead and a 520px-wide, 44px-tall pill search field.
 - Sticky filter row below the 56px app header. Category chips sit left; a
   compact segmented sort and small submit button sit right.
-- Default browsing is grouped into curated category sections with a Petrona
-  title and one-line blurb. Show every project in each section, wrapping into
-  additional rows instead of hiding projects behind a “Browse all” action.
-  Searching or choosing a category switches to a single filtered grid.
-- Project grids use three columns when space allows, 26px gaps, and do not
-  stretch sections with fewer than three items beyond their natural card width.
+- Default browsing shows every project in one continuous grid, with no row
+  break when the category changes. Keep category chips for filtering and the
+  existing card size across the default, search, and filtered views.
+- The project grid uses three columns when space allows and 26px gaps. Filtering
+  to fewer items does not stretch their cards beyond the normal width.
 - Project cards have no outer panel, fill, padding, shadow, or summary copy.
   The 16:10 cover is the card chrome, with a 12px radius and 1px border. Under
   it, show only the compact title row and `by <creator> · Free` metadata.

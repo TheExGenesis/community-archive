@@ -3,7 +3,10 @@ jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CommunityGallery from './CommunityGallery'
-import type { CommunityProject } from '@/lib/communityProjects'
+import {
+  COMMUNITY_PROJECTS,
+  type CommunityProject,
+} from '@/lib/communityProjects'
 
 const PUBLISHED_PROJECT: CommunityProject = {
   databaseId: '8c21b2b5-3530-4ec8-9729-07635b28b692',
@@ -52,7 +55,7 @@ describe('CommunityGallery', () => {
         name: 'Discover community-made tools, bots, visualizations, and more',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText('15 projects')).toBeInTheDocument()
+    expect(screen.getByText('16 projects')).toBeInTheDocument()
 
     await user.type(
       screen.getByRole('searchbox', { name: 'Search community projects' }),
@@ -70,6 +73,12 @@ describe('CommunityGallery', () => {
     expect(screen.getByText('1 project')).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: /Followle/i }),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Research' }))
+    expect(screen.getByText('2 projects')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Model Behavior Reports/i }),
     ).toBeInTheDocument()
   })
 
@@ -149,10 +158,19 @@ describe('CommunityGallery', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('shows every curated Tools card across rows in the requested order', async () => {
+  it('shows one continuous grid and preserves the curated Tools order when filtered', async () => {
     const user = userEvent.setup()
     render(<CommunityGallery />)
 
+    expect(
+      screen.getByRole('heading', { name: 'All projects' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Tools' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Research' }),
+    ).not.toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: 'Browse all tools' }),
     ).not.toBeInTheDocument()
@@ -176,6 +194,29 @@ describe('CommunityGallery', () => {
 
     await user.click(screen.getByRole('button', { name: 'Tools' }))
     expect(screen.getByText('9 projects')).toBeInTheDocument()
+  })
+
+  it('shows hearts for curated cards once their published rows are loaded', () => {
+    const slugs = [
+      'bangers',
+      'pairwise',
+      'birdseye',
+      'strands',
+      'model-behavior-reports',
+    ]
+    const publishedProjects = slugs.map((slug, index) => ({
+      ...COMMUNITY_PROJECTS.find((project) => project.slug === slug)!,
+      databaseId: `00000000-0000-0000-0000-${String(index).padStart(12, '0')}`,
+      likeCount: 0,
+    }))
+
+    render(<CommunityGallery publishedProjects={publishedProjects} />)
+
+    for (const project of publishedProjects) {
+      expect(
+        screen.getByRole('button', { name: `Like ${project.name}` }),
+      ).toBeInTheDocument()
+    }
   })
 
   it('submits a project to the approval queue', async () => {

@@ -31,4 +31,15 @@ describe('mapCommunityProjectRow', () => {
       '/api/community/projects/79f33a88-91b8-4486-bc24-aaad1c0a44c2/cover?v=1dc9a3f8-a243-4627-b81a-ff491c62a475%2F79f33a88-91b8-4486-bc24-aaad1c0a44c2-c2f50181.png',
     )
   })
+
+  it('does not turn a first-party project URL into a duplicate source link', () => {
+    const project = mapCommunityProjectRow({
+      ...projectRow,
+      project_url: '/bangers',
+      source_post_url: '/bangers',
+    })
+    expect(project.projectUrl).toBe('/bangers')
+    expect(project.sourceUrl).toBeUndefined()
+    expect(project.sourceTweetId).toBeUndefined()
+  })
 })

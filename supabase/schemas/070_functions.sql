@@ -3683,10 +3683,15 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
      WHERE before_id IS NULL OR r.id<before_id
      ORDER BY r.id DESC LIMIT greatest(1,least(coalesce(max_results,26),51))
    ) page),'[]'::jsonb),
-   'queue', (SELECT jsonb_build_object(
-     'pending',count(*) FILTER (WHERE status='pending'),
-     'retrying',count(*) FILTER (WHERE status='failed' AND attempts<3),
-     'exhausted',count(*) FILTER (WHERE status='failed' AND attempts>=3)) FROM bulletin.decisions),
+   'queue', CASE WHEN (SELECT active FROM bulletin.pipeline_state WHERE id=1)='jev'
+     THEN (SELECT jsonb_build_object(
+       'pending',count(*) FILTER (WHERE status='pending'),
+       'retrying',count(*) FILTER (WHERE status='failed' AND attempts<3),
+       'exhausted',count(*) FILTER (WHERE status='failed' AND attempts>=3)) FROM bulletin.jev_items)
+     ELSE (SELECT jsonb_build_object(
+       'pending',count(*) FILTER (WHERE status='pending'),
+       'retrying',count(*) FILTER (WHERE status='failed' AND attempts<3),
+       'exhausted',count(*) FILTER (WHERE status='failed' AND attempts>=3)) FROM bulletin.decisions) END,
    'last_success_at',(SELECT last_success_at FROM bulletin.worker_state WHERE id=1)
  )
 $$;
@@ -3726,10 +3731,22 @@ CREATE OR REPLACE FUNCTION public.get_bulletin_board_state(max_results integer D
 RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
  SELECT coalesce(jsonb_agg(to_jsonb(notice) ORDER BY notice.posted_at DESC,notice.tweet_id DESC),'[]'::jsonb)
  FROM (
-   SELECT o.*,d.account_id,d.posted_at,a.username
+   SELECT o.tweet_id,o.content_hash,o.side,o.kind,o.summary,o.evidence,o.topics,o.respond,
+     o.standing,o.expires_at,o.place,o.model,o.resolution_state,o.resolution_tweet_id,
+     o.resolution_content_hash,d.account_id,d.posted_at,a.username,
+     NULL::numeric AS p_opportunity,NULL::numeric AS p_direct,NULL::numeric AS p_joke,
+     NULL::numeric AS value_score
    FROM bulletin.opportunities o JOIN bulletin.decisions d USING(tweet_id)
    JOIN bulletin.allowed_accounts a ON a.account_id=d.account_id
-   ORDER BY d.posted_at DESC,o.tweet_id DESC
+   WHERE (SELECT active FROM bulletin.pipeline_state WHERE id=1)='legacy'
+   UNION ALL
+   SELECT j.tweet_id,j.content_hash,j.side,j.kind,j.summary,j.evidence,j.topics,j.respond,
+     j.standing,j.expires_at,j.place,j.model,j.resolution_state,j.resolution_tweet_id,
+     j.resolution_content_hash,j.account_id,j.posted_at,a.username,
+     j.p_opportunity,j.p_direct,j.p_joke,j.value_score
+   FROM bulletin.jev_items j JOIN bulletin.allowed_accounts a ON a.account_id=j.account_id
+   WHERE j.status='ready' AND (SELECT active FROM bulletin.pipeline_state WHERE id=1)='jev'
+   ORDER BY posted_at DESC,tweet_id DESC
    LIMIT greatest(0,least(coalesce(max_results,2000),2000))
  ) notice
 $$;

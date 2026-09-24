@@ -63,8 +63,13 @@ function recommendationScore(
   const relevance = interactions
     ? 1 + Math.min(1, Math.log10(interactions) / 2)
     : 0
+  // Only Jev notices have a value estimate. It is a rough sorting signal,
+  // tempered by opportunity and joke probabilities, not a dollar valuation.
+  const value = Math.max(0, Math.min(4, notice.value_score ?? 0)) *
+    Math.max(0, Math.min(1, notice.p_opportunity ?? 0)) *
+    (1 - Math.max(0, Math.min(1, notice.p_joke ?? 0)))
   return (
-    freshness + relevance + (rankUnanswered && unansweredAsk(notice) ? 0.5 : 0)
+    freshness + relevance + value + (rankUnanswered && unansweredAsk(notice) ? 0.5 : 0)
   )
 }
 

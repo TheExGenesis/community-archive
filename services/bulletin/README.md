@@ -1,5 +1,10 @@
 # Community Bulletin
 
+The proposed Jev processor, shadow schema, two-week import, thresholds and
+cutover/rollback procedure are in [JEV_ROLLOUT.md](JEV_ROLLOUT.md). The legacy
+processor documented below remains active until the private pipeline switch is
+explicitly changed after shadow verification.
+
 Signed-in users with an active streaming opt-in use `/bulletin`; the existing
 admin allowlist controls `/admin/bulletin`. The worker starts daily at 12:00
 UTC, independently of whether Autorefresh succeeded. Recent successful
@@ -49,7 +54,7 @@ restricted to currently allowed members. These are historical observations, not
 live X follow state. Without that source the UI explicitly falls back to own
 notices and newest, and does not invent social recommendations.
 
-## Method and coverage
+## Legacy method and coverage
 
 1. Page all distinct ClickHouse tweet IDs in the run's posting-date window.
 2. Re-read their latest content and keep eligible originals: permitted community

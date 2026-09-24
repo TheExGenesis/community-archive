@@ -146,6 +146,24 @@ test('renewal keeps an old notice active without pretending it was newly posted'
     sortNotices([renewed, recent], true, '', graph, now).map((o) => o.tweet_id),
   ).toEqual(['new', 'old'])
 })
+test('Jev value helps order recommended notices while newest stays chronological', () => {
+  const graph = { outgoing: {}, available: true }
+  const now = Date.parse('2026-09-15T00:00:00Z')
+  const recent = { ...notice('recent'), posted_at: '2026-09-14T00:00:00Z' }
+  const valuable = {
+    ...notice('valuable'),
+    posted_at: '2026-09-13T00:00:00Z',
+    value_score: 3.5,
+    p_opportunity: 0.95,
+    p_joke: 0.05,
+  }
+  expect(sortNotices([recent, valuable], true, '', graph, now)[0]).toBe(
+    valuable,
+  )
+  expect(sortNotices([recent, valuable], false, '', graph, now)[0]).toBe(
+    recent,
+  )
+})
 test('ascending reverses the order but keeps past notices last', () => {
   const graph = { outgoing: {}, available: true }
   const rows = [

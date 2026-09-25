@@ -1,6 +1,5 @@
 import { AUGUST_11_MOCK_DIGEST } from './mock'
 import { renderDigestEmail } from './emailTemplate'
-import type { DigestTrendMovers } from './trends'
 
 const LINKS = {
   siteUrl: 'https://www.community-archive.org',
@@ -54,28 +53,20 @@ describe('renderDigestEmail', () => {
     }
   })
 
-  it('renders front-page movers, numbered story links, and restrained tweet photos', () => {
-    const trends: DigestTrendMovers = {
-      riser: {
-        term: 'claude opus',
-        last7: 20,
-        prev7: 1,
-        deltaPct: 1769,
-        status: 'comparable',
-      },
-      faller: {
-        term: 'regulatory capture',
-        last7: 8,
-        prev7: 29,
-        deltaPct: -72,
-        status: 'comparable',
-      },
-    }
+  it('renders the saved volume-ranked trends, numbered story links, and restrained tweet photos', () => {
     const story = AUGUST_11_MOCK_DIGEST.content.stories[0]
     const edition = {
       ...AUGUST_11_MOCK_DIGEST,
       content: {
         ...AUGUST_11_MOCK_DIGEST.content,
+        trends: {
+          sinceDate: '2026-08-04',
+          untilDate: '2026-08-10',
+          terms: [
+            { term: 'claude opus', tweets: 120, changePct: 1769 },
+            { term: 'regulatory capture', tweets: 80, changePct: -72 },
+          ],
+        },
         stories: [
           {
             ...story,
@@ -91,13 +82,12 @@ describe('renderDigestEmail', () => {
         ],
       },
     }
-    const { html, text } = renderDigestEmail(edition, LINKS, [], {
-      trendMovers: trends,
-    })
+    const { html, text } = renderDigestEmail(edition, LINKS, [])
 
     expect(html).toContain('Trending terms · 7 days')
-    expect(html).toContain('↑ +1,769%')
-    expect(html).toContain('↓ −72%')
+    expect(html).toContain('#1 by tweet volume')
+    expect(html).toContain('120 <span')
+    expect(html).toContain('2026-08-04–2026-08-10 UTC')
     expect(html).toContain('/search?q=claude+opus')
     expect(html).toContain(
       `href="${LINKS.siteUrl}/digest/${edition.digestDate}/${story.slug}"`,
@@ -107,6 +97,7 @@ describe('renderDigestEmail', () => {
     expect(html).toContain('max-width:calc(100% - 32px)')
     expect(html).not.toContain('24-hour coverage:')
     expect(text).toContain('TRENDING TERMS · 7 DAYS')
+    expect(text).toContain('#1 claude opus · 120 tweets')
     expect(text).toContain(`01. ${story.title.toUpperCase()}`)
     expect(text).toContain(
       `${LINKS.siteUrl}/digest/${edition.digestDate}/${story.slug}`,

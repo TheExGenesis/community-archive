@@ -12,6 +12,7 @@ import {
   toJson,
 } from '@/lib/digest/data'
 import { createDigestAdminClient } from '@/lib/digest/database'
+import { freezeDraftDigestTrends } from '@/lib/digest/freezeTrends'
 import { getDigestDateWindow } from '@/lib/digest/dateWindow'
 import {
   assembleDigestEditionContent,
@@ -713,6 +714,7 @@ async function publishNightlyDigestRun(runId: string) {
     draft = createdDraft
   }
 
+  await freezeDraftDigestTrends(admin, draft.id)
   const { data: published, error: publishError } = await admin.rpc(
     'publish_digest_edition',
     { p_edition_id: draft.id },

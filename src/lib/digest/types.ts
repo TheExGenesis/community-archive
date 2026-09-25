@@ -1,4 +1,6 @@
 import type { PortalTweet } from '@/lib/portal/types'
+import type { DigestTrendSnapshot } from './trends'
+import { parseDigestTrendSnapshot } from './trends'
 
 export type DigestRunStatus =
   | 'candidates_ready'
@@ -82,6 +84,8 @@ export interface DigestEditionContent {
   topBanger: PortalTweet
   stories: DigestStory[]
   keywords: string[]
+  /** Frozen when the edition is published; absent on older editions. */
+  trends?: DigestTrendSnapshot
   source: {
     candidateCount: number
     selectedCount: number
@@ -318,5 +322,7 @@ export function parseDigestEditionContent(
     ...value,
     executiveSummary,
     stories,
+    trends:
+      parseDigestTrendSnapshot(value.trends, value.digestDate) ?? undefined,
   } as unknown as DigestEditionContent
 }

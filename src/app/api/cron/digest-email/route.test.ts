@@ -6,7 +6,6 @@ import {
   recordSend,
 } from '@/lib/digest/emailSubscriptions'
 import { prepareDigestBulletinItems } from '@/lib/digest/bulletin'
-import { fetchPortalWeeklyTrends } from '@/lib/portal/analytics'
 import { renderDigestEmail } from '@/lib/digest/emailTemplate'
 import { sendEmail } from '@/lib/email'
 import { createServerServiceRoleClient } from '@/utils/supabase'
@@ -22,9 +21,6 @@ jest.mock('@/lib/digest/emailSubscriptions', () => ({
 }))
 jest.mock('@/lib/digest/bulletin', () => ({
   prepareDigestBulletinItems: jest.fn(),
-}))
-jest.mock('@/lib/portal/analytics', () => ({
-  fetchPortalWeeklyTrends: jest.fn(),
 }))
 jest.mock('@/lib/digest/emailTemplate', () => ({
   renderDigestEmail: jest.fn(),
@@ -67,7 +63,6 @@ test('renders each email with its subscriber account recommendations', async () 
       unsubscribedAt: null,
     },
   ])
-  jest.mocked(fetchPortalWeeklyTrends).mockResolvedValue([])
   const itemsForAccount = jest.fn(async (accountId?: string | null) => [
     {
       label: 'Help wanted',
@@ -103,14 +98,14 @@ test('renders each email with its subscriber account recommendations', async () 
     AUGUST_11_MOCK_DIGEST,
     expect.any(Object),
     expect.arrayContaining([expect.objectContaining({ summary: '42' })]),
-    expect.objectContaining({ personalizedBulletin: true, trendMovers: null }),
+    expect.objectContaining({ personalizedBulletin: true }),
   )
   expect(renderDigestEmail).toHaveBeenNthCalledWith(
     2,
     AUGUST_11_MOCK_DIGEST,
     expect.any(Object),
     expect.arrayContaining([expect.objectContaining({ summary: 'guest' })]),
-    expect.objectContaining({ personalizedBulletin: false, trendMovers: null }),
+    expect.objectContaining({ personalizedBulletin: false }),
   )
   expect(sendEmail).toHaveBeenCalledTimes(2)
   expect(recordSend).toHaveBeenCalledTimes(2)

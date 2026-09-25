@@ -2,7 +2,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import Homepage, { dynamic as homepageRenderingMode } from '@/app/page'
 import { getIsMember } from '@/lib/portal/auth'
-import { startHomepageData } from '@/lib/portal/data'
+import { startHomepageData, startMemberHomepageData } from '@/lib/portal/data'
 
 jest.mock('server-only', () => ({}), { virtual: true })
 jest.mock('@/components/home/ClassicHomepage', () => ({
@@ -22,8 +22,20 @@ jest.mock('@/components/home/ClassicHomepage', () => ({
     </div>
   ),
 }))
-jest.mock('@/lib/portal/auth', () => ({ getIsMember: jest.fn() }))
-jest.mock('@/lib/portal/data', () => ({ startHomepageData: jest.fn() }))
+jest.mock('@/components/home/MemberHomepage', () => ({
+  __esModule: true,
+  default: ({ user }: { user: { id: string } | null }) => (
+    <div>member home · user {user?.id ?? 'none'}</div>
+  ),
+}))
+jest.mock('@/lib/portal/auth', () => ({
+  getIsMember: jest.fn(),
+  getCurrentUser: jest.fn(async () => ({ id: 'user-1' })),
+}))
+jest.mock('@/lib/portal/data', () => ({
+  startHomepageData: jest.fn(),
+  startMemberHomepageData: jest.fn(() => ({})),
+}))
 jest.mock('@/components/home/HomepagePeople', () => ({
   __esModule: true,
   default: () => <div>homepage people</div>,
@@ -48,6 +60,7 @@ describe('Homepage OAuth actions', () => {
   })
 
   it('returns the homepage shell without waiting for portal analytics', async () => {
+    getIsMemberMock.mockResolvedValue(false)
     startHomepageDataMock.mockReturnValue({
       globalStats: new Promise(() => undefined),
     } as ReturnType<typeof startHomepageData>)
@@ -69,14 +82,14 @@ describe('Homepage OAuth actions', () => {
     expect(startHomepageDataMock).toHaveBeenCalledTimes(1)
   })
 
-  it('renders the same dashboard without the CTA for signed-in visitors', async () => {
+  it('gives signed-in members their own home instead of the pitch', async () => {
     const page = await Homepage({ searchParams: {} })
 
     const markup = renderToStaticMarkup(page)
-    expect(markup).toContain('shared homepage · member true · CTA false')
-    expect(markup).toContain('homepage people')
-    expect(getIsMemberMock).toHaveBeenCalledTimes(1)
-    expect(startHomepageDataMock).toHaveBeenCalledTimes(1)
+    expect(markup).toContain('member home · user user-1')
+    expect(markup).not.toContain('homepage people')
+    expect(startMemberHomepageData).toHaveBeenCalledTimes(1)
+    expect(startHomepageDataMock).not.toHaveBeenCalled()
   })
 
   it('renders the shared dashboard with the CTA for logged-out visitors', async () => {

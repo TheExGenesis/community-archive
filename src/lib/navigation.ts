@@ -147,7 +147,7 @@ export function getTweetBackLink(searchParams?: {
  *
  * Logged out: the marketing/educational funnel — what the archive is, what's
  * built on it, and how to contribute.
- * Logged in: the portal workspace — the member's daily views of the data.
+ * Logged in: the pages that change every day up front, the rest under More.
  */
 export const getPrimaryNav = (
   isMember: boolean,
@@ -158,12 +158,7 @@ export const getPrimaryNav = (
         { href: BANGERS_WEEK_HREF, label: 'Bangers' },
         { href: '/digest', label: 'Digest' },
         { href: '/bulletin', label: 'Bulletin' },
-        { href: '/user-dir', label: 'Users' },
-        { href: '/community', label: 'Community' },
         { href: '/trends', label: 'Trends' },
-        { href: '/stream', label: 'Live stream' },
-        { href: '/social-graph', label: 'Graph' },
-        { href: '/research', label: 'Research' },
       ]
     : [
         { href: BANGERS_WEEK_HREF, label: 'Bangers' },
@@ -177,14 +172,23 @@ export const getPrimaryNav = (
         { href: '/#upload-archive', label: 'Upload archive' },
       ]
 
-/** Links rendered in the header's right-hand utility cluster. */
-export const getUtilityNav = (isMember: boolean): NavItem[] =>
-  isMember ? [{ href: '/docs', label: 'Docs' }] : []
+/** Member pages that sit behind the header's More menu. */
+export const getMoreNav = (isMember: boolean, _isAdmin = false): NavItem[] =>
+  isMember || _isAdmin
+    ? [
+        { href: '/stream', label: 'Live stream' },
+        { href: '/social-graph', label: 'Graph' },
+        { href: '/user-dir', label: 'Users' },
+        { href: '/community', label: 'Community' },
+        { href: '/research', label: 'Research' },
+        { href: '/docs', label: 'Docs' },
+      ]
+    : []
 
-/** Everything the mobile hamburger shows: primary + utilities + search. */
+/** Everything the mobile hamburger shows: primary + More + search. */
 export const getMobileNav = (isMember: boolean, isAdmin = false): NavItem[] => [
   ...getPrimaryNav(isMember, isAdmin),
-  ...getUtilityNav(isMember),
+  ...getMoreNav(isMember, isAdmin),
   { href: '/search', label: 'Search' },
 ]
 

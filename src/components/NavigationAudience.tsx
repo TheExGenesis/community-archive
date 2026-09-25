@@ -5,7 +5,7 @@ import { Shield } from 'lucide-react'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import HeaderNavigation from '@/components/HeaderNavigation'
 import MobileNavigation from '@/components/MobileNavigation'
-import { getMobileNav, getPrimaryNav, getUtilityNav } from '@/lib/navigation'
+import { getMobileNav, getMoreNav, getPrimaryNav } from '@/lib/navigation'
 
 type NavigationAudience = {
   isMember: boolean
@@ -62,22 +62,14 @@ export function NavigationAudienceProvider({
   )
 }
 
-export function AudienceHeaderNavigation({
-  kind,
-}: {
-  kind: 'primary' | 'utility'
-}) {
+export function AudienceHeaderNavigation() {
   const { isMember, isAdmin } = useContext(NavigationAudienceContext)
   const items = useMemo(
-    () =>
-      kind === 'primary'
-        ? getPrimaryNav(isMember, isAdmin)
-        : getUtilityNav(isMember),
-    [isAdmin, isMember, kind],
+    () => getPrimaryNav(isMember, isAdmin),
+    [isAdmin, isMember],
   )
-
-  if (items.length === 0) return null
-  return <HeaderNavigation items={items} />
+  const more = useMemo(() => getMoreNav(isMember, isAdmin), [isAdmin, isMember])
+  return <HeaderNavigation items={items} more={more} />
 }
 
 export function AudienceMobileNavigation() {

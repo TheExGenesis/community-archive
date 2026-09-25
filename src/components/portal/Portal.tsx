@@ -28,8 +28,10 @@ const ARCHIVE_EXPORT_URL =
   'https://github.com/TheExGenesis/community-archive/releases/latest'
 const COMMUNITY_BUILDS_URL = '/tweets/1835411943735140798'
 
-type DashboardDestination =
+export type DashboardDestination =
   | 'all_time_bangers'
+  | 'bulletin'
+  | 'community_apps'
   | 'community_builds'
   | 'data_export'
   | 'daily_digest'
@@ -38,8 +40,9 @@ type DashboardDestination =
   | 'research'
   | 'research_article'
   | 'trends'
+  | 'your_profile'
 
-function captureDashboardDestination(
+export function captureDashboardDestination(
   destination: DashboardDestination,
   surface: 'card' | 'list' | 'panel_header',
   external: boolean,
@@ -60,7 +63,7 @@ const compact = (n: number) =>
 const signInHref = (returnTo: string) =>
   `/login?redirect=${encodeURIComponent(returnTo)}`
 
-function PanelHeader({
+export function PanelHeader({
   title,
   action,
   live,
@@ -124,7 +127,7 @@ function PanelHeader({
   )
 }
 
-function PanelUnavailable({ message }: { message: string }) {
+export function PanelUnavailable({ message }: { message: string }) {
   return (
     <div
       role="status"
@@ -767,7 +770,9 @@ function HomeStreamPanel({
         role="region"
         aria-label="Live tweet stream"
         tabIndex={0}
-        className="flex max-h-[420px] flex-col overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60 lg:max-h-none lg:min-h-0 lg:flex-1 [&::-webkit-scrollbar]:hidden"
+        // `relative` makes this the containing block for the cards' sr-only
+        // labels; without it they escape the scroll box and lengthen the page.
+        className="relative flex max-h-[420px] flex-col overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/60 lg:max-h-none lg:min-h-0 lg:flex-1 [&::-webkit-scrollbar]:hidden"
       >
         {visible.slice(0, HOME_LIVE_STREAM_LIMIT).map((t, i) => (
           <TweetCard

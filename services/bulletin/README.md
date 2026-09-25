@@ -168,6 +168,17 @@ A zero source-ID page marks intake complete. A successful run also requires no
 unresolved decisions in the queue. An intake-complete cursor alone does not mean
 classification completed.
 
+Run history separates `new_notices` (positive results inserted into the saved
+board) from `existing_notices` (positive rechecks/refreshes of saved notices).
+Unchanged cached decisions, rejected responses and suppressed publications add
+to neither count. A notice removed and later added again counts as a new
+addition. These are saved additions, before expiry/visibility filtering, not
+the current number of visible cards. The legacy `positive` total is retained;
+older runs without the split show unknown counts rather than guessed zeros.
+No migration or historical reclassification is required; new worker runs store
+the counters in the existing run JSON. Deploy the worker to start recording
+them; the dashboard safely supports both old and new run records.
+
 A run reads at most 100 pages of 500 IDs, makes at most 50 model calls, and has a
 15-minute soft / 20-minute systemd limit. Partial scans resume with the same
 window. Run counts show scanned source IDs, eligible originals, phrase matches,

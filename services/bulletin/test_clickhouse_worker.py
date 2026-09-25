@@ -81,6 +81,7 @@ class ClickHouseWorkerTests(unittest.TestCase):
         with patch.object(worker,'intake',return_value=True),patch.object(worker,'call_model',side_effect=self.response) as model:
             result=worker.run(self.db)
         self.assertEqual((result['positive'],model.call_count,result['resolution_rechecks_queued']),(1,1,1))
+        self.assertEqual((result['new_notices'],result['existing_notices']),(0,1))
         self.assertEqual(self.db.execute('SELECT resolution_state FROM bulletin.opportunities').fetchone()['resolution_state'],'open')
 
     def test_completed_refresh_notices_can_join_daily_resolution_queue(self):
@@ -214,6 +215,7 @@ class ClickHouseWorkerTests(unittest.TestCase):
         self.response=respond
         result,calls=self.run_refresh()
         self.assertEqual((result['status'],calls),('ok',1))
+        self.assertEqual((result['new_notices'],result['existing_notices']),(0,0))
         self.assertEqual(self.db.execute('SELECT count(*) n FROM bulletin.opportunities').fetchone()['n'],0)
         self.assertEqual(self.db.execute('SELECT status FROM bulletin.refresh_requests WHERE id=%s',(request,)).fetchone()['status'],'complete')
         self.assertEqual(self.run_refresh()[0]['status'],'queue_empty')
@@ -221,7 +223,8 @@ class ClickHouseWorkerTests(unittest.TestCase):
     def test_refresh_updates_positive_and_preserves_notice_on_model_failure(self):
         self.run_worker();self.queue_refresh()
         self.label['summary']='Updated offer.'
-        self.run_refresh()
+        result,_=self.run_refresh()
+        self.assertEqual((result['new_notices'],result['existing_notices']),(0,1))
         self.assertEqual(self.db.execute('SELECT summary FROM bulletin.opportunities').fetchone()['summary'],'Updated offer.')
         self.queue_refresh('00000000-0000-4000-8000-000000000002')
         with patch.object(worker,'call_model',side_effect=self.http_error(401)):
@@ -312,10 +315,14 @@ class ClickHouseWorkerTests(unittest.TestCase):
     def test_clickhouse_only_tweet_publishes_and_replay_reuses_decision(self):
         result,calls=self.run_worker()
         self.assertEqual((result['status'],result['rows_seen'],result['eligible_originals'],calls),('ok',500,1,1))
+        self.assertEqual((result['new_notices'],result['existing_notices']),(1,0))
+        saved=self.db.execute('SELECT counts FROM bulletin.runs ORDER BY id DESC LIMIT 1').fetchone()['counts']
+        self.assertEqual((saved['new_notices'],saved['existing_notices']),(1,0))
         self.assertEqual(self.db.execute('SELECT count(*) AS n FROM public.tweets').fetchone()['n'],0)
         state=self.db.execute('SELECT public.get_bulletin_board_state(2000) AS data').fetchone()['data']
         self.assertEqual(state[0]['account_id'],'10')
-        self.assertEqual(self.run_worker()[1],0)
+        replay,calls=self.run_worker()
+        self.assertEqual((calls,replay['new_notices'],replay['existing_notices']),(0,0,0))
     def test_negative_is_cached_and_changed_text_is_reclassified(self):
         self.label={'is_notice':False};self.run_worker()
         self.assertEqual(self.run_worker()[1],0)
@@ -330,6 +337,7 @@ class ClickHouseWorkerTests(unittest.TestCase):
         self.response=optout
         result,_=self.run_worker()
         self.assertEqual(result['suppressed'],1)
+        self.assertEqual((result['new_notices'],result['existing_notices']),(0,0))
         self.assertEqual(self.db.execute('SELECT count(*) AS n FROM bulletin.opportunities').fetchone()['n'],0)
     def test_failed_page_does_not_advance_cursor(self):
         with patch.object(worker.clickhouse_source,'page',side_effect=RuntimeError('unavailable')):
@@ -435,6 +443,7 @@ class ClickHouseWorkerTests(unittest.TestCase):
             result=worker.run(self.db,window=self.window)
         self.assertEqual((result['status'],result['calls'],result['failed'],result['pending']),('ok',2,1,0))
         self.assertEqual(publish.call_count,1)
+        self.assertEqual((result['new_notices'],result['existing_notices']),(1,0))
         retry=json.loads(model.call_args_list[1].args[0])['messages'][-1]['content']
         self.assertIn('availability_requires_exact_author_evidence',retry)
         self.assertIn('["1"]',retry)

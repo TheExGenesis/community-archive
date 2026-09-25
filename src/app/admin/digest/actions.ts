@@ -14,6 +14,7 @@ import {
   MINIMUM_DIGEST_CANDIDATE_POOL,
 } from '@/lib/digest/candidates'
 import { createDigestAdminClient } from '@/lib/digest/database'
+import { freezeDraftDigestTrends } from '@/lib/digest/freezeTrends'
 import { captureDigestPostHogEvent } from '@/lib/digest/posthogServer'
 import { mapDigestEdition, mapDigestRun, toJson } from '@/lib/digest/data'
 import {
@@ -923,6 +924,7 @@ export async function stageEditedDigestEditionAction(formData: FormData) {
 
   let publishedEdition: typeof savedEdition | null = null
   if (publishImmediately) {
+    await freezeDraftDigestTrends(admin, savedEdition.id)
     const { data, error: publishError } = await admin.rpc(
       'publish_digest_edition',
       { p_edition_id: savedEdition.id },
@@ -1044,6 +1046,7 @@ export async function saveDigestEditionAction(formData: FormData) {
     })
   }
   if (publishImmediately) {
+    await freezeDraftDigestTrends(admin, savedEdition.id)
     const { data: publishedEdition, error: publishError } = await admin.rpc(
       'publish_digest_edition',
       { p_edition_id: savedEdition.id },
@@ -1095,6 +1098,7 @@ export async function publishDigestEditionAction(formData: FormData) {
     runId: runId || null,
   })
   const admin = createDigestAdminClient()
+  await freezeDraftDigestTrends(admin, editionId)
   const { data: edition, error } = await admin.rpc('publish_digest_edition', {
     p_edition_id: editionId,
   })

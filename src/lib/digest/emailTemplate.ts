@@ -1,7 +1,7 @@
 import type { DigestEdition } from '@/lib/digest/types'
 import type { PortalTweet } from '@/lib/portal/types'
 import type { DigestBulletinItem } from './bulletin'
-import type { DigestTrendMovers } from './trends'
+import { formatDigestShareChange } from './trends'
 import { formatNumber } from '@/lib/formatNumber'
 import {
   digestPublicationDate,
@@ -14,7 +14,6 @@ export interface DigestEmailLinks {
 }
 
 export interface DigestEmailOptions {
-  trendMovers?: DigestTrendMovers | null
   personalizedBulletin?: boolean
 }
 
@@ -162,45 +161,28 @@ export function renderDigestEmail(
     ${renderTweetCard(content.topBanger, links.siteUrl)}`
     : ''
 
-  const trendRows = [
-    options.trendMovers?.riser
-      ? {
-          label: 'Top riser',
-          arrow: '↑',
-          color: '#228542',
-          row: options.trendMovers.riser,
-        }
-      : null,
-    options.trendMovers?.faller
-      ? {
-          label: 'Top faller',
-          arrow: '↓',
-          color: '#c93732',
-          row: options.trendMovers.faller,
-        }
-      : null,
-  ].filter((item): item is NonNullable<typeof item> => item !== null)
+  const trendRows = content.trends?.terms ?? []
   const trendsHtml = trendRows.length
     ? `<section style="margin:0 0 25px;padding:17px 18px 16px;border:1px solid #dce5ea;border-radius:10px;background:#fbfdfe;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 15px;"><tr>
           <td style="font-family:${HEADING_FONT};font-size:20px;font-weight:600;color:#111827;">Trending terms · 7 days</td>
-          <td align="right" style="font-size:12px;"><a href="${escapeHtml(links.siteUrl)}/trends" style="color:#247da9;text-decoration:none;">Explore →</a></td>
+          <td align="right" style="font-size:12px;"><a href="${escapeHtml(links.siteUrl)}/trends" style="color:#247da9;text-decoration:none;">Explore current trends →</a></td>
         </tr></table>
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
           ${trendRows
             .map(
               (
-                { label, arrow, color, row },
+                row,
                 index,
               ) => `<td width="${trendRows.length === 2 ? '50%' : '100%'}" style="padding:${index === 0 && trendRows.length === 2 ? '0 15px 0 0' : index === 1 ? '0 0 0 16px' : '0'};vertical-align:top;${index === 0 && trendRows.length === 2 ? 'border-right:1px solid #e2e8f0;' : ''}">
-            <p style="margin:0 0 5px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;">${label}</p>
-            <p style="margin:0 0 4px;font-size:27px;font-weight:700;line-height:1.15;color:${color};">${arrow} ${row.deltaPct! > 0 ? '+' : '−'}${Math.abs(row.deltaPct!).toLocaleString('en-US')}%</p>
-            <p style="margin:0;font-size:13px;line-height:1.4;"><a href="${escapeHtml(links.siteUrl)}/search?${new URLSearchParams({ q: row.term })}" style="font-weight:700;color:#247da9;text-decoration:none;">${escapeHtml(row.term)}</a> <span style="color:#6b7280;">· ${row.last7.toLocaleString('en-US')} tweets</span></p>
+            <p style="margin:0 0 5px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;">#${index + 1} by tweet volume</p>
+            <p style="margin:0 0 4px;font-size:27px;font-weight:700;line-height:1.15;color:#111827;">${row.tweets.toLocaleString('en-US')} <span style="font-size:13px;font-weight:400;color:#6b7280;">tweets</span></p>
+            <p style="margin:0;font-size:13px;line-height:1.4;"><a href="${escapeHtml(links.siteUrl)}/search?${new URLSearchParams({ q: row.term })}" style="font-weight:700;color:#247da9;text-decoration:none;">${escapeHtml(row.term)}</a>${row.changePct === null ? '' : ` <span style="color:#6b7280;">· ${formatDigestShareChange(row.changePct)} share</span>`}</p>
           </td>`,
             )
             .join('')}
         </tr></table>
-        <p style="margin:13px 0 0;font-size:11px;line-height:1.4;color:#6b7280;">Share change versus the previous seven days.</p>
+        <p style="margin:13px 0 0;font-size:11px;line-height:1.4;color:#6b7280;">${content.trends?.sinceDate}–${content.trends?.untilDate} UTC · Share change versus the previous seven days.</p>
       </section>`
     : ''
 
@@ -263,11 +245,11 @@ export function renderDigestEmail(
       ? [
           'TRENDING TERMS · 7 DAYS',
           ...trendRows.map(
-            ({ arrow, row }) =>
-              `${arrow} ${row.deltaPct! > 0 ? '+' : '−'}${Math.abs(row.deltaPct!).toLocaleString('en-US')}%  ${row.term} · ${row.last7.toLocaleString('en-US')} tweets`,
+            (row, index) =>
+              `#${index + 1} ${row.term} · ${row.tweets.toLocaleString('en-US')} tweets${row.changePct === null ? '' : ` · ${formatDigestShareChange(row.changePct)} share`}`,
           ),
-          'Share change versus the previous seven days.',
-          `Explore: ${links.siteUrl}/trends`,
+          `${content.trends?.sinceDate}–${content.trends?.untilDate} UTC · Share change versus the previous seven days.`,
+          `Explore current trends: ${links.siteUrl}/trends`,
           '',
         ]
       : []),

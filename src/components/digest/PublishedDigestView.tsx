@@ -14,14 +14,12 @@ import { DigestLikeButton } from './DigestLikeButton'
 import { DigestComments } from './DigestComments'
 import { SectionReady } from '@/components/PagePerformance'
 import { DigestSubscriberCount } from './DigestSubscriberCount'
-import { DigestTrendMovers } from './DigestTrendMovers'
+import { DigestTopTerms } from './DigestTopTerms'
 import { DigestBulletinCards } from './DigestBulletinCards'
 import {
   loadDigestBulletinItemsForViewer,
   type DigestBulletinItem,
 } from '@/lib/digest/bulletin'
-import { selectDigestTrendMovers } from '@/lib/digest/trends'
-import { fetchPortalWeeklyTrends } from '@/lib/portal/analytics'
 
 const PREVIEW_BULLETIN_ITEMS: DigestBulletinItem[] = [
   {
@@ -76,16 +74,6 @@ const PREVIEW_BULLETIN_ITEMS: DigestBulletinItem[] = [
     },
   },
 ]
-
-async function DigestTrends() {
-  try {
-    const movers = selectDigestTrendMovers(await fetchPortalWeeklyTrends())
-    return movers ? <DigestTrendMovers movers={movers} /> : null
-  } catch (error) {
-    console.error('Digest trends could not be loaded:', error)
-    return null
-  }
-}
 
 function BulletinItems({
   items,
@@ -246,11 +234,9 @@ export function PublishedDigestView({ edition }: { edition: DigestEdition }) {
               <Calendar archive={archive} date={edition.digestDate} recent />
             </Suspense>
           ),
-          trends: edition.isPreview ? null : (
-            <Suspense fallback={null}>
-              <DigestTrends />
-            </Suspense>
-          ),
+          trends: edition.content.trends ? (
+            <DigestTopTerms snapshot={edition.content.trends} />
+          ) : null,
           comments: edition.isPreview ? (
             <></>
           ) : (

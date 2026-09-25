@@ -38,6 +38,13 @@ export function uptake(notice: Notice): number | null {
 function unansweredAsk(notice: Notice) {
   return notice.side === 'ask' && uptake(notice) === 0
 }
+export function isRecommendedCandidate(
+  notice: Notice,
+  recommended: boolean,
+  me: string,
+) {
+  return !recommended || !me || notice.account_id !== me
+}
 export function relationship(
   notice: Notice,
   me: string,
@@ -79,7 +86,7 @@ function recommendationScore(
 }
 
 /**
- * Recommended: your notices first, then a blend of freshness, outgoing
+ * Recommended excludes your notices, then blends freshness, outgoing
  * interactions and unanswered asks. Newest stays chronological. Both keep
  * resolved/past notices last; ascending reverses only within those groups.
  */
@@ -103,19 +110,19 @@ export function sortNotices(
     (sortBy
       ? metric(b) - metric(a)
       : recommended
-        ? Number(!!me && b.account_id === me) -
-            Number(!!me && a.account_id === me) ||
-          recommendationScore(b, graph, now, rankUnanswered) -
+        ? recommendationScore(b, graph, now, rankUnanswered) -
             recommendationScore(a, graph, now, rankUnanswered) ||
           (graph.outgoing?.[b.account_id] || 0) -
             (graph.outgoing?.[a.account_id] || 0)
         : 0) ||
     Date.parse(b.posted_at) - Date.parse(a.posted_at) ||
     b.tweet_id.localeCompare(a.tweet_id)
-  return [...notices].sort(
-    (a, b) =>
-      Number(isResolved(a)) - Number(isResolved(b)) ||
-      Number(isPast(a, now)) - Number(isPast(b, now)) ||
-      (ascending ? -inner(a, b) : inner(a, b)),
-  )
+  return notices
+    .filter((o) => isRecommendedCandidate(o, recommended, me))
+    .sort(
+      (a, b) =>
+        Number(isResolved(a)) - Number(isResolved(b)) ||
+        Number(isPast(a, now)) - Number(isPast(b, now)) ||
+        (ascending ? -inner(a, b) : inner(a, b)),
+    )
 }

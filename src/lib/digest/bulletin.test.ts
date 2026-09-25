@@ -157,6 +157,24 @@ test('ranks each linked recipient with their own interactions, keeping guests re
   expect(hydrateBulletinTweets).toHaveBeenCalledTimes(2)
 })
 
+test('personalized digest skips the reader’s posts and fills from other authors', async () => {
+  rpc.mockResolvedValue({
+    data: [notice(2), notice(3), notice(4), notice(5, { account_id: '105' })],
+    error: null,
+  })
+  const prepared = await prepareDigestBulletinItems(edition)
+  const own = await prepared.itemsForAccount('105')
+  const guest = await prepared.itemsForAccount(null)
+
+  expect(own.map((item) => item.tweet.id)).toEqual(['4', '3', '2'])
+  expect(guest.map((item) => item.tweet.id)).toEqual(['5', '4', '3'])
+  expect(jest.mocked(hydrateBulletinTweets).mock.calls[0][0]).toEqual([
+    '4',
+    '3',
+    '2',
+  ])
+})
+
 test('website picks use the trusted signed-in account and ignore mutable metadata', async () => {
   rpc.mockResolvedValue({ data: [notice(2), notice(3)], error: null })
   jest.mocked(getCurrentUser).mockResolvedValueOnce({

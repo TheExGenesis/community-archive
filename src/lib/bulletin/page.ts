@@ -8,7 +8,12 @@ import {
   verifyBulletinResolutions,
   type StoredNotice,
 } from './data'
-import { isPast, sortNotices, visibleStatus } from './board'
+import {
+  isPast,
+  isRecommendedCandidate,
+  sortNotices,
+  visibleStatus,
+} from './board'
 import { matchesJevFilters } from './curation'
 import {
   BULLETIN_PAGE_SIZE,
@@ -59,7 +64,10 @@ export async function loadBulletinPage(
   const inKinds = (o: { kind: string }) =>
     !chosenKinds.length || chosenKinds.includes(o.kind)
   const known = state.notices.filter(
-    (o) => o.kind in KIND_LABELS && matchesJevFilters(o, filters),
+    (o) =>
+      o.kind in KIND_LABELS &&
+      matchesJevFilters(o, filters) &&
+      isRecommendedCandidate(o, filters.recommended, me),
   )
   const bySide = known.filter(
     (o) => filters.side === 'all' || o.side === filters.side,

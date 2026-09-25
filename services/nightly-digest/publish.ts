@@ -209,12 +209,13 @@ const getPrompt = async (db: SupabaseRest) => {
     'digest_prompt_versions',
     query({
       select: '*',
-      model: 'eq.z-ai/glm-5.3',
+      model: 'eq.anthropic/claude-opus-5.5',
       order: 'version.desc',
       limit: '1',
     }),
   )
-  if (!rows[0]) throw new Error('No z-ai/glm-5.3 digest prompt is configured')
+  if (!rows[0])
+    throw new Error('No anthropic/claude-opus-5.5 digest prompt is configured')
   return mapPrompt(rows[0])
 }
 

@@ -138,7 +138,7 @@ selection forks an editable run. Both paths preserve failed and successful
 model responses for comparison.
 Manual generations never auto-stage or auto-publish. The production nightly
 workflow is the deliberate exception: it creates one system-owned run for the
-completed date, generates with the newest immutable prompt, stages the
+completed date, generates with the newest immutable Opus 5.5 prompt, stages the
 validated output, and publishes it. The unique automated-run index and the
 one-published-edition index make duplicate cron delivery safe.
 
@@ -191,9 +191,8 @@ OpenRouter key, or ClickHouse token with a `NEXT_PUBLIC_` prefix. Public digest
 reads use the normal anonymous Supabase client and the `status = 'published'`
 RLS policy.
 
-The current prompt uses `z-ai/glm-5.3` through OpenRouter, high reasoning
-effort, temperature `0.2`, and the model's 131,072-token maximum completion
-ceiling. Its
+The current nightly prompt uses `anthropic/claude-opus-5.5` through OpenRouter,
+high reasoning effort, and a 128,000-token maximum completion ceiling. Its
 one-call structured output requires exactly three summary bullets, a
 representative tweet index, three to five stories with loose labels and
 tweet-index lists, tweet-grounded titles, short explanatory subtitles,
@@ -231,7 +230,7 @@ digest tweet cards label community-authored posts as `Community author`.
 `community-archive-nightly-digest.timer` runs on `prod-firehose` at `06:15 UTC`
 every day. That is 10:15 PM PST or 11:15 PM PDT, fifteen minutes after the
 Community Archive editorial day closes. The oneshot Bun process ingests the
-candidate snapshot, sends one GLM-5.3 request, performs one repair request only
+candidate snapshot, sends one Opus 5.5 request, performs one repair request only
 when deterministic validation rejects the first response, and stages and
 publishes the validated edition through Supabase.
 

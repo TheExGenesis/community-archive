@@ -109,10 +109,9 @@ export default function RootLayout({
                           Community Archive
                         </span>
                       </PostHogLink>
-                      <AudienceHeaderNavigation kind="primary" />
+                      <AudienceHeaderNavigation />
                     </div>
                     <div className="flex flex-shrink-0 items-center space-x-2 2xl:space-x-3">
-                      <AudienceHeaderNavigation kind="utility" />
                       <HeaderSearch />
                       <div className="text-sm">
                         <DynamicSignIn />

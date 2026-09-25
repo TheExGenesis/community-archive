@@ -7,9 +7,14 @@ import { Search } from 'lucide-react'
 import UserSearchInput from '@/components/UserSearchInput'
 import { buildSearchHref, parseSearchExpression } from '@/lib/searchParams'
 import { capturePostHogEvent } from '@/lib/posthog'
+import { useNavigationAudience } from '@/components/NavigationAudience'
+import { cn } from '@/utils/tailwind'
 
 export default function HeaderSearch() {
   const router = useRouter()
+  // The member nav is short enough to keep the full input at every desktop
+  // width; the visitor nav collapses it to an icon between lg and 2xl.
+  const { isMember } = useNavigationAudience()
   const [query, setQuery] = useState('')
   const searchHref = buildSearchHref(query)
 
@@ -29,13 +34,19 @@ export default function HeaderSearch() {
       <Link
         href="/search"
         aria-label="Search Community Archive"
-        className="hidden h-9 w-9 items-center justify-center rounded-md border border-input hover:bg-accent lg:inline-flex 2xl:hidden"
+        className={cn(
+          'hidden h-9 w-9 items-center justify-center rounded-md border border-input hover:bg-accent',
+          !isMember && 'lg:inline-flex 2xl:hidden',
+        )}
       >
         <Search className="h-4 w-4" aria-hidden="true" />
       </Link>
       <form
         onSubmit={handleSubmit}
-        className="hidden items-center sm:flex lg:hidden 2xl:flex"
+        className={cn(
+          'hidden items-center sm:flex',
+          !isMember && 'lg:hidden 2xl:flex',
+        )}
       >
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

@@ -24,7 +24,7 @@ describe('NavigationAudience', () => {
   it('server-renders public navigation before checking the session', () => {
     render(
       <NavigationAudienceProvider>
-        <AudienceHeaderNavigation kind="primary" />
+        <AudienceHeaderNavigation />
         <AdminNavigationLink />
       </NavigationAudienceProvider>,
     )
@@ -50,19 +50,20 @@ describe('NavigationAudience', () => {
 
     render(
       <NavigationAudienceProvider>
-        <AudienceHeaderNavigation kind="primary" />
+        <AudienceHeaderNavigation />
         <AdminNavigationLink />
       </NavigationAudienceProvider>,
     )
 
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'Trends' })).toBeInTheDocument()
-      expect(screen.getByRole('link', { name: 'Graph' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
       expect(
         screen.getByRole('link', { name: 'Admin dashboard' }),
       ).toBeInTheDocument()
     })
     expect(screen.queryByRole('link', { name: 'Upload archive' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Users' })).toBeNull()
     expect(global.fetch).toHaveBeenCalledTimes(1)
   })
 })

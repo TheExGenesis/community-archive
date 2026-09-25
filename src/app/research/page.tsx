@@ -1,6 +1,6 @@
 import { FaExternalLinkAlt } from 'react-icons/fa'
-import { getResearchPosts } from '@/lib/portal/research'
-import { RESEARCH_SOURCE, type ResearchPost } from '@/lib/portal/types'
+import { getResearchPosts, PINNED_RESEARCH_POSTS } from '@/lib/portal/research'
+import { RESEARCH_SOURCE } from '@/lib/portal/types'
 import { MUTED, SERIF } from '@/components/portal/styles'
 
 export const metadata = { title: 'Research · Community Archive' }
@@ -8,20 +8,10 @@ export const metadata = { title: 'Research · Community Archive' }
 // Refresh the listing hourly (the feed fetch itself is also cached for 1h).
 export const revalidate = 3600
 
-const MODEL_BEHAVIOR_REPORTS: ResearchPost = {
-  title: 'Model Behavior Reports',
-  url: 'https://modelbehavior.report/',
-  date: '2026-09-24T12:00:00.000Z',
-  excerpt:
-    'Crowdsourced reports of how language models behave in the wild, collected from X through the Community Archive and summarized by model.',
-  image: '/images/community/model-behavior-reports.webp',
-  author: 'Alexandre Variengien',
-}
-
 // Public: research built on the archive is useful to visitors and members.
 export default async function ResearchPage() {
   const feedPosts = await getResearchPosts(24)
-  const posts = [MODEL_BEHAVIOR_REPORTS, ...feedPosts]
+  const posts = [...PINNED_RESEARCH_POSTS, ...feedPosts]
 
   return (
     <main className="min-h-screen bg-zinc-100/80 dark:bg-transparent">

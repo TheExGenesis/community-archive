@@ -14,7 +14,13 @@ import {
   fetchPortalTrends,
   fetchPortalWeeklyTrends,
 } from './analytics'
-import { getResearchPosts, selectFeaturedResearchPosts } from './research'
+import { getLatestDigestPreview } from '@/lib/digest/data'
+import {
+  getResearchListing,
+  getResearchPosts,
+  latestResearchPost,
+  selectFeaturedResearchPosts,
+} from './research'
 import { selectHomepageStream } from './stream'
 import type {
   PortalBangersPage,
@@ -1192,6 +1198,18 @@ export function startHomepageData() {
   return {
     globalStats,
     overview,
+    ...startDashboardFeeds(sourceKey, today),
+    research: loadPortalComponentData(
+      'research',
+      async () => selectFeaturedResearchPosts(await getResearchPosts(24)),
+      [],
+    ),
+  }
+}
+
+/** The feeds the member home shares with the public dashboard. */
+function startDashboardFeeds(sourceKey: string, today: string) {
+  return {
     stream: loadPortalComponentData(
       'initial-stream',
       async () =>
@@ -1218,15 +1236,27 @@ export function startHomepageData() {
       () => fetchPortalWeeklyTrends(),
       [],
     ),
-    research: loadPortalComponentData(
-      'research',
-      async () => selectFeaturedResearchPosts(await getResearchPosts(24)),
-      [],
+  }
+}
+
+/** Member home: skips the public hero stats; research shrinks to its latest post. */
+export function startMemberHomepageData() {
+  return {
+    ...startDashboardFeeds(
+      portalDataSourceKey(),
+      new Date().toISOString().slice(0, 10),
+    ),
+    digest: loadPortalComponentData('digest', getLatestDigestPreview, null),
+    latestResearch: loadPortalComponentData(
+      'latest-research',
+      async () => latestResearchPost(await getResearchListing(24)),
+      null,
     ),
   }
 }
 
 export type HomepageData = ReturnType<typeof startHomepageData>
+export type MemberHomepageData = ReturnType<typeof startMemberHomepageData>
 
 /** Public feed and optional total have independent failure/streaming boundaries. */
 export function startStreamData() {

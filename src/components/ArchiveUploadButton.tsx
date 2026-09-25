@@ -13,10 +13,11 @@ type ArchiveUploadButtonProps = Omit<
   'disabled' | 'onClick'
 >
 
-export function ArchiveUploadButton({
-  children,
-  ...buttonProps
-}: ArchiveUploadButtonProps) {
+/**
+ * The archive picker and its confirmation dialog, for any trigger. Render
+ * `elements` once next to whatever calls `openPicker`.
+ */
+export function useArchiveUpload() {
   const supabase = createBrowserClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [archive, setArchive] = useState<Archive | null>(null)
@@ -39,26 +40,8 @@ export function ArchiveUploadButton({
     }
   }
 
-  return (
+  const elements = (
     <>
-      <div className="inline-flex flex-col items-center gap-1">
-        <Button
-          {...buttonProps}
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isProcessing}
-        >
-          <Upload className="h-4 w-4" />
-          {isProcessing ? 'Processing...' : children}
-        </Button>
-        <a
-          href="https://x.com/settings/download_your_data"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-muted-foreground"
-        >
-          Request your archive from X
-        </a>
-      </div>
       <input
         ref={fileInputRef}
         type="file"
@@ -77,6 +60,39 @@ export function ArchiveUploadButton({
           archive={archive}
         />
       )}
+    </>
+  )
+
+  return {
+    openPicker: () => fileInputRef.current?.click(),
+    isProcessing,
+    elements,
+  }
+}
+
+export function ArchiveUploadButton({
+  children,
+  ...buttonProps
+}: ArchiveUploadButtonProps) {
+  const { openPicker, isProcessing, elements } = useArchiveUpload()
+
+  return (
+    <>
+      <div className="inline-flex flex-col items-center gap-1">
+        <Button {...buttonProps} onClick={openPicker} disabled={isProcessing}>
+          <Upload className="h-4 w-4" />
+          {isProcessing ? 'Processing...' : children}
+        </Button>
+        <a
+          href="https://x.com/settings/download_your_data"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-muted-foreground"
+        >
+          Request your archive from X
+        </a>
+      </div>
+      {elements}
     </>
   )
 }

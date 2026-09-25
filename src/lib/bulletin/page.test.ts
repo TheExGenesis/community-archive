@@ -205,6 +205,33 @@ test('pages the all-categories stream under one cursor with side and category co
     ask: 0,
   })
 })
+test('recommended pages and counts exclude own notices; newest keeps them', async () => {
+  jest.mocked(loadBulletinBoardState).mockResolvedValue({
+    notices: Array.from({ length: 22 }, (_, i) => ({
+      ...notice(i + 1),
+      account_id: i >= 14 ? '42' : '123',
+    })),
+  })
+  jest.mocked(loadBulletinRelationships).mockResolvedValue({
+    account_id: '42',
+    username: 'viewer',
+    outgoing: {},
+    available: true,
+  })
+
+  const recommended = await loadBulletinPage(filters)
+  expect(recommended.notices.map((o) => o.tweet_id)).toEqual(ids(14, 1))
+  expect(recommended.counts).toMatchObject({ help: 14, offer: 14 })
+  expect(recommended.cursors.help).toBeNull()
+
+  const firstPaint = await loadBulletinPage(filters, undefined, false)
+  expect(firstPaint.notices.map((o) => o.tweet_id)).toEqual(ids(14, 1))
+  expect(firstPaint.recommendationsReady).toBe(false)
+
+  const newest = await loadBulletinPage({ ...filters, recommended: false })
+  expect(newest.notices.map((o) => o.tweet_id)).toEqual(ids(22, 5))
+  expect(newest.counts).toMatchObject({ help: 22, offer: 22 })
+})
 test('refills holes from removed sources and rejects missing cursors', async () => {
   jest
     .mocked(hydrateBulletinNotices)

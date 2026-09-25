@@ -29,7 +29,7 @@ test('asks age out after 14 days, offers after 60, and standing notices remain',
     isPast({ ...ask, standing: true, expires_at: '2026-08-15' }, now),
   ).toBe(true)
 })
-test('outgoing ranking uses counts and puts expired notices last', () => {
+test('recommended excludes own notices and ranks other authors by interactions', () => {
   const graph = {
     outgoing: { '2': 5, '3': 2, '4': 10 },
     available: true,
@@ -39,10 +39,10 @@ test('outgoing ranking uses counts and puts expired notices last', () => {
     sortNotices(rows, true, '1', graph, Date.parse('2026-08-10')).map(
       (o) => o.account_id,
     ),
-  ).toEqual(['1', '4', '2', '3', '5'])
+  ).toEqual(['4', '2', '3', '5'])
   rows[4].expires_at = '2026-08-01'
   expect(
-    sortNotices(rows, true, '1', graph, Date.parse('2026-08-10')).at(-1)
+    sortNotices(rows, false, '1', graph, Date.parse('2026-08-10')).at(-1)
       ?.account_id,
   ).toBe('1')
 })
@@ -132,12 +132,13 @@ test('fresh notices can outrank old contacts while recent contacts keep a releva
       ).map((o) => o.tweet_id),
     ).toEqual(['recent-contact', 'new', 'old'])
   }
-  expect(sortNotices([recent, oldContact], true, 'old', graph, now)[0]).toBe(
+  expect(sortNotices([recent, oldContact], true, 'old', graph, now)).toEqual([
     recent,
-  )
+    oldContact,
+  ])
   expect(
-    sortNotices([recent, oldContact], true, 'contact', graph, now)[0],
-  ).toBe(oldContact)
+    sortNotices([recent, oldContact], true, 'contact', graph, now),
+  ).toEqual([recent])
   expect(
     sortNotices([oldContact, recent, recentContact], false, '', graph, now).map(
       (o) => o.tweet_id,

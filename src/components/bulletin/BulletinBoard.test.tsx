@@ -236,7 +236,7 @@ test('resolved notices have their own toggle and link to the author evidence', (
   fireEvent.click(screen.getByLabelText('Show resolved notices'))
   expect(screen.getByRole('status')).toHaveTextContent('0 notices')
 })
-test('shows the ledger and relationship words only from own account and outgoing counts', () => {
+test('hides own notices in recommendations but shows them in newest with the ledger', () => {
   render(
     <BulletinBoard
       notices={[
@@ -252,16 +252,19 @@ test('shows the ledger and relationship words only from own account and outgoing
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
-  const cards = screen.getAllByRole('article')
-  expect(cards[1]).not.toHaveTextContent(/mutual|following|follows you/)
-  expect(cards[1]).toHaveTextContent('you replied')
-  expect(cards[0]).not.toHaveTextContent('you replied')
+  expect(screen.queryByText('Help with Python')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Sort by date' }))
+  const ownCard = screen.getByText('Help with Python').closest('article')!
+  const otherCard = screen.getByText('Feedback on a garden').closest('article')!
+  expect(otherCard).not.toHaveTextContent(/mutual|following|follows you/)
+  expect(otherCard).toHaveTextContent('you replied')
+  expect(ownCard).not.toHaveTextContent('you replied')
   expect(
     screen.getByLabelText('3 replies from archived members'),
   ).toBeInTheDocument()
-  expect(cards[0]).not.toHaveTextContent(/mutual|following|follows you/)
-  expect(cards[0]).not.toHaveTextContent('· you')
-  expect(cards[1]).not.toHaveTextContent('near you')
+  expect(ownCard).not.toHaveTextContent(/mutual|following|follows you/)
+  expect(ownCard).not.toHaveTextContent('· you')
+  expect(otherCard).not.toHaveTextContent('near you')
 })
 test('coalesces expanded cards and reuses their details after filtering', async () => {
   render(

@@ -5,6 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -23,6 +31,8 @@ interface HeroCTAButtonsProps {
   initialIsOptedIn?: boolean
 }
 
+type OptInOutcome = 'success' | 'error' | null
+
 export default function HeroCTAButtons({
   initialIsOptedIn = false,
 }: HeroCTAButtonsProps) {
@@ -38,6 +48,7 @@ export default function HeroCTAButtons({
   const [isOptedIn, setIsOptedIn] = useState(initialIsOptedIn)
   const [isOptInLoading, setIsOptInLoading] = useState(false)
   const [optInError, setOptInError] = useState<string | null>(null)
+  const [optInOutcome, setOptInOutcome] = useState<OptInOutcome>(null)
 
   const twitterUsername = userMetadata?.user_name
   const shouldAutoOptIn = searchParams.get('action') === 'optin'
@@ -129,39 +140,55 @@ export default function HeroCTAButtons({
     }
   }
 
-  const completeOptIn = useCallback(async () => {
-    if (!user?.id || !twitterUsername || isOptedIn || optInInFlight.current) {
-      return false
-    }
+  const finishOAuthReturn = useCallback(() => {
+    setOptInOutcome(null)
+    router.replace('/')
+    router.refresh()
+  }, [router])
 
-    optInInFlight.current = true
-    setIsOptInLoading(true)
-    setOptInError(null)
+  const completeOptIn = useCallback(
+    async ({ showConfirmation = false } = {}) => {
+      if (!user?.id || !twitterUsername || isOptedIn || optInInFlight.current) {
+        return false
+      }
 
-    try {
-      await updateOptIn({
-        username: twitterUsername.toLowerCase(),
-        optedIn: true,
-        termsVersion: 'v1.0',
-      })
+      optInInFlight.current = true
+      setIsOptInLoading(true)
+      setOptInError(null)
 
-      setIsOptedIn(true)
-      router.replace('/')
-      router.refresh()
-      return true
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : 'Failed to opt in. Please try again.'
-      console.error('Opt-in error:', message)
-      setOptInError(message)
-      return false
-    } finally {
-      optInInFlight.current = false
-      setIsOptInLoading(false)
-    }
-  }, [isOptedIn, router, twitterUsername, user?.id])
+      try {
+        await updateOptIn({
+          username: twitterUsername.toLowerCase(),
+          optedIn: true,
+          termsVersion: 'v1.0',
+        })
+
+        setIsOptedIn(true)
+        if (showConfirmation) {
+          setOptInOutcome('success')
+        } else {
+          router.replace('/')
+          router.refresh()
+        }
+        return true
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Failed to opt in. Please try again.'
+        console.error('Opt-in error:', message)
+        setOptInError(message)
+        if (showConfirmation) {
+          setOptInOutcome('error')
+        }
+        return false
+      } finally {
+        optInInFlight.current = false
+        setIsOptInLoading(false)
+      }
+    },
+    [isOptedIn, router, twitterUsername, user?.id],
+  )
 
   // Clicking Opt in before authentication records the intent in the OAuth
   // callback URL. Complete that intent as soon as the returning session and
@@ -173,14 +200,14 @@ export default function HeroCTAButtons({
 
     if (isOptedIn) {
       autoOptInStarted.current = true
-      router.replace('/')
+      setOptInOutcome('success')
       return
     }
 
     if (!user?.id || !twitterUsername) return
 
     autoOptInStarted.current = true
-    void completeOptIn()
+    void completeOptIn({ showConfirmation: true })
   }, [
     completeOptIn,
     isOptedIn,
@@ -205,7 +232,7 @@ export default function HeroCTAButtons({
       return
     }
 
-    await completeOptIn()
+    await completeOptIn({ showConfirmation: shouldAutoOptIn })
   }
 
   const getOptInButtonText = () => {
@@ -311,6 +338,55 @@ export default function HeroCTAButtons({
           </Alert>
         ) : null}
       </div>
+      <Dialog
+        open={optInOutcome !== null}
+        onOpenChange={(open) => {
+          if (open) return
+
+          if (optInOutcome === 'success') {
+            finishOAuthReturn()
+          } else {
+            setOptInOutcome(null)
+          }
+        }}
+      >
+        <DialogContent>
+          {optInOutcome === 'success' ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>You’re opted in</DialogTitle>
+                <DialogDescription>
+                  Your public tweets can now be included in the Community
+                  Archive.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button onClick={finishOAuthReturn}>Continue</Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>We couldn’t complete your opt-in</DialogTitle>
+                <DialogDescription>
+                  {optInError || 'Please try again.'}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  onClick={() => {
+                    setOptInOutcome(null)
+                    void completeOptIn({ showConfirmation: true })
+                  }}
+                  disabled={isOptInLoading}
+                >
+                  Try again
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   )
 }

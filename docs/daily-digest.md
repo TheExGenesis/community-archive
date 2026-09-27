@@ -285,3 +285,11 @@ Before setting `DIGEST_AUTOMATION_ENABLED=true` in production:
 
 Do not drop digest tables as an ordinary rollback after editors have created
 prompt/run history. Preserve the ledger and remove only the consuming UI.
+
+### Validation repair diagnostics
+
+The receiver reports the rejected field and its limit. The bounded repair
+request includes that error and the complete JSON schema and asks the model
+to rewrite complete sentences instead of truncating prose. Each response and
+its cumulative token usage is saved before validation, including when both
+attempts fail. Failures remain private and do not publish an invalid edition.

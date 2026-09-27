@@ -32,14 +32,14 @@ afterEach(() => {
   jest.clearAllMocks()
 })
 
-test('saves the matching day’s highest-volume terms in draft content', async () => {
+test('saves one rising and one falling term in draft content', async () => {
   jest.useFakeTimers().setSystemTime(new Date('2026-09-25T06:15:00Z'))
   jest.mocked(fetchPortalWeeklyTrends).mockResolvedValue([
     {
-      term: 'large change',
+      term: 'falling',
       last7: 24,
       prev7: 1,
-      deltaPct: 2057,
+      deltaPct: -50,
       status: 'comparable',
       sinceDate: '2026-09-18',
       untilDate: '2026-09-24',
@@ -63,7 +63,7 @@ test('saves the matching day’s highest-volume terms in draft content', async (
         untilDate: '2026-09-24',
         terms: [
           { term: 'jev', tweets: 178, changePct: 267 },
-          { term: 'large change', tweets: 24, changePct: 2057 },
+          { term: 'falling', tweets: 24, changePct: -50 },
         ],
       },
     }),
@@ -75,5 +75,17 @@ test('does not attach current trends to an older edition', async () => {
   const { client, update } = adminForDate('2026-09-16')
   await freezeDraftDigestTrends(client, 'old-edition')
   expect(fetchPortalWeeklyTrends).not.toHaveBeenCalled()
+  expect(update).not.toHaveBeenCalled()
+})
+
+test('does not silently drop a failed trend fetch', async () => {
+  jest.useFakeTimers().setSystemTime(new Date('2026-09-25T06:15:00Z'))
+  jest
+    .mocked(fetchPortalWeeklyTrends)
+    .mockRejectedValue(new Error('gateway unavailable'))
+  const { client, update } = adminForDate('2026-09-25')
+  await expect(freezeDraftDigestTrends(client, 'edition-id')).rejects.toThrow(
+    'gateway unavailable',
+  )
   expect(update).not.toHaveBeenCalled()
 })

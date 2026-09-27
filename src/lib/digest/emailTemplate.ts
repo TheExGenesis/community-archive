@@ -1,7 +1,7 @@
 import type { DigestEdition } from '@/lib/digest/types'
 import type { PortalTweet } from '@/lib/portal/types'
 import type { DigestBulletinItem } from './bulletin'
-import { formatDigestShareChange } from './trends'
+import { digestTrendLabel, formatDigestShareChange } from './trends'
 import { formatNumber } from '@/lib/formatNumber'
 import {
   digestPublicationDate,
@@ -175,7 +175,7 @@ export function renderDigestEmail(
                 row,
                 index,
               ) => `<td width="${trendRows.length === 2 ? '50%' : '100%'}" style="padding:${index === 0 && trendRows.length === 2 ? '0 15px 0 0' : index === 1 ? '0 0 0 16px' : '0'};vertical-align:top;${index === 0 && trendRows.length === 2 ? 'border-right:1px solid #e2e8f0;' : ''}">
-            <p style="margin:0 0 5px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;">#${index + 1} by tweet volume</p>
+            <p style="margin:0 0 5px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#6b7280;">${digestTrendLabel(row.changePct)}</p>
             <p style="margin:0 0 4px;font-size:27px;font-weight:700;line-height:1.15;color:#111827;">${row.tweets.toLocaleString('en-US')} <span style="font-size:13px;font-weight:400;color:#6b7280;">tweets</span></p>
             <p style="margin:0;font-size:13px;line-height:1.4;"><a href="${escapeHtml(links.siteUrl)}/search?${new URLSearchParams({ q: row.term })}" style="font-weight:700;color:#247da9;text-decoration:none;">${escapeHtml(row.term)}</a>${row.changePct === null ? '' : ` <span style="color:#6b7280;">· ${formatDigestShareChange(row.changePct)} share</span>`}</p>
           </td>`,
@@ -245,8 +245,8 @@ export function renderDigestEmail(
       ? [
           'TRENDING TERMS · 7 DAYS',
           ...trendRows.map(
-            (row, index) =>
-              `#${index + 1} ${row.term} · ${row.tweets.toLocaleString('en-US')} tweets${row.changePct === null ? '' : ` · ${formatDigestShareChange(row.changePct)} share`}`,
+            (row) =>
+              `${digestTrendLabel(row.changePct)}: ${row.term} · ${row.tweets.toLocaleString('en-US')} tweets${row.changePct === null ? '' : ` · ${formatDigestShareChange(row.changePct)} share`}`,
           ),
           `${content.trends?.sinceDate}–${content.trends?.untilDate} UTC · Share change versus the previous seven days.`,
           `Explore current trends: ${links.siteUrl}/trends`,

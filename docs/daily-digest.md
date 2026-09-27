@@ -286,6 +286,21 @@ Before setting `DIGEST_AUTOMATION_ENABLED=true` in production:
 Do not drop digest tables as an ordinary rollback after editors have created
 prompt/run history. Preserve the ledger and remove only the consuming UI.
 
+### Frozen trend snapshot
+
+Before current-day publication, both the standalone nightly publisher and the
+website save one rising and one falling term in `digest_editions.content.trends`.
+Within each direction, the term with the highest seven-day tweet volume wins;
+direction uses share change versus the preceding seven days. New and unchanged
+terms cannot fill either directional slot. Web and email render the same saved
+snapshot, ending on the UTC day before the edition date. Retries preserve it.
+
+If current-day trend retrieval or persistence fails, publication fails visibly;
+the completed generation can be retried without another model call. Older
+editions without snapshots remain unchanged: the live weekly endpoint cannot
+reconstruct historical trends. This code also requires deploying the standalone
+nightly service; a website deployment alone does not update that publisher.
+
 ### Validation repair diagnostics
 
 The receiver reports the rejected field and its limit. The bounded repair

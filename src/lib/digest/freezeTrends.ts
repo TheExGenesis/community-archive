@@ -1,7 +1,6 @@
-import { fetchPortalWeeklyTrends } from '@/lib/portal/analytics'
 import { toJson } from './data'
 import { createDigestAdminClient } from './database'
-import { selectDigestTopTerms } from './trends'
+import { snapshotDigestTrends } from './snapshotTrends'
 import { parseDigestEditionContent } from './types'
 
 /** Save trends on the draft before publication, so web and email read one value. */
@@ -18,26 +17,11 @@ export async function freezeDraftDigestTrends(
   const content = parseDigestEditionContent(row.content)
   if (!content || row.status !== 'draft')
     throw new Error('Draft digest content is unavailable')
-  if (content.trends) return
-
-  // The live Trends endpoint describes the latest complete UTC week only.
-  // Older drafts must never receive a snapshot from a different day.
-  if (row.digest_date !== new Date().toISOString().slice(0, 10)) return
-
-  let trends
-  try {
-    trends = selectDigestTopTerms(
-      await fetchPortalWeeklyTrends(),
-      row.digest_date,
-    )
-  } catch (error) {
-    console.error('Digest trends could not be frozen:', error)
-    return
-  }
-  if (!trends) return
+  const frozenContent = await snapshotDigestTrends(content)
+  if (frozenContent === content) return
   const { error: updateError } = await admin
     .from('digest_editions')
-    .update({ content: toJson({ ...content, trends }) })
+    .update({ content: toJson(frozenContent) })
     .eq('id', editionId)
     .eq('status', 'draft')
   if (updateError) throw updateError

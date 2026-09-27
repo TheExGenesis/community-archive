@@ -1,3 +1,4 @@
+import { snapshotDigestTrends } from '@/lib/digest/snapshotTrends'
 import { loadDigestCandidates } from '@/lib/digest/candidates'
 import {
   getDigestDateWindow,
@@ -310,7 +311,7 @@ export async function generateValidated(input: {
   throw new Error(lastError || 'Digest generation failed')
 }
 
-async function publishCompletedRun(
+export async function publishCompletedRun(
   db: SupabaseRest,
   run: RunRow,
   digestDate: string,
@@ -324,7 +325,7 @@ async function publishCompletedRun(
   const existingDrafts = await db.select<EditionRow>(
     'digest_editions',
     query({
-      select: 'id,digest_date,source_run_id,status,version',
+      select: 'id,digest_date,source_run_id,status,version,content',
       source_run_id: `eq.${run.id}`,
       status: 'eq.draft',
       order: 'version.desc',
@@ -351,7 +352,17 @@ async function publishCompletedRun(
       created_by: null,
     })
   }
-  if (!draft) throw new Error('Could not create digest draft')
+  if (!draft?.content) throw new Error('Digest draft content is unavailable')
+  const frozenContent = await snapshotDigestTrends(draft.content)
+  if (frozenContent !== draft.content) {
+    const updated = await db.update<EditionRow>(
+      'digest_editions',
+      query({ id: `eq.${draft.id}`, status: 'eq.draft' }),
+      { content: frozenContent },
+    )
+    if (!updated.length)
+      throw new Error('Digest draft changed before trends were saved')
+  }
   const published = await db.rpc<EditionRow>('publish_digest_edition', {
     p_edition_id: draft.id,
   })

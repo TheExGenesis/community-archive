@@ -188,7 +188,20 @@ function parseModelDigest(
       !editorialNote ||
       !tweetIndices?.length
     ) {
-      throw new Error(`Story ${index + 1} is incomplete`)
+      const errors = [
+        !category &&
+          `category must be one of: ${DIGEST_STORY_CATEGORIES.join(', ')}`,
+        !title && 'title must be non-empty text of at most 300 characters',
+        !subtitle &&
+          'subtitle must be non-empty text of at most 500 characters',
+        !bullets?.length &&
+          'bullets must contain 1–3 non-empty strings, each at most 220 characters',
+        !editorialNote &&
+          'editorial_note must be non-empty text of at most 360 characters',
+        !tweetIndices?.length &&
+          'tweet_indices must contain 1–18 non-negative integer indices',
+      ].filter(Boolean)
+      throw new Error(`Story ${index + 1} is incomplete: ${errors.join('; ')}`)
     }
     const indexedTweets = tweetIndices.map((tweetIndex) => {
       const row = corpus[tweetIndex]

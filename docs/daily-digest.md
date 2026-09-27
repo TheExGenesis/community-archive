@@ -300,3 +300,11 @@ the completed generation can be retried without another model call. Older
 editions without snapshots remain unchanged: the live weekly endpoint cannot
 reconstruct historical trends. This code also requires deploying the standalone
 nightly service; a website deployment alone does not update that publisher.
+
+### Validation repair diagnostics
+
+The receiver reports the rejected field and its limit. The bounded repair
+request includes that error and the complete JSON schema and asks the model
+to rewrite complete sentences instead of truncating prose. Each response and
+its cumulative token usage is saved before validation, including when both
+attempts fail. Failures remain private and do not publish an invalid edition.

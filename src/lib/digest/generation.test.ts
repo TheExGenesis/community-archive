@@ -410,6 +410,32 @@ describe('daily digest generation contract', () => {
     ).toThrow('Story 1 is incomplete')
   })
 
+  test('reports the exact rejected field and limit so the model can repair it', () => {
+    expect(() =>
+      assembleDigestEditionContent({
+        runId: 'run-1',
+        digestDate: '2026-09-27',
+        windowStart: '2026-09-26T06:00:00.000Z',
+        windowEnd: '2026-09-27T06:00:00.000Z',
+        allCandidateCount: 3,
+        enrichedCandidates: candidates,
+        modelOutput: {
+          ...modelOutput,
+          stories: [
+            {
+              ...modelOutput.stories[0],
+              bullets: ['x'.repeat(221)],
+              editorial_note: '',
+            },
+            ...modelOutput.stories.slice(1),
+          ],
+        },
+      }),
+    ).toThrow(
+      'Story 1 is incomplete: bullets must contain 1–3 non-empty strings, each at most 220 characters; editorial_note must be non-empty text of at most 360 characters',
+    )
+  })
+
   test('accepts a concise paraphrased title and marks it as unquoted', () => {
     const edition = assembleDigestEditionContent({
       runId: 'run-1',

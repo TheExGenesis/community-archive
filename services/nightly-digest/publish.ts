@@ -11,6 +11,7 @@ import {
   type EnrichedDigestCandidate,
 } from '@/lib/digest/generation'
 import {
+  DIGEST_JSON_SCHEMA,
   generateDigestWithModel,
   type DigestGenerationResponse,
 } from '@/lib/digest/openai'
@@ -258,7 +259,7 @@ const sumTokens = (
     : null
 }
 
-async function generateValidated(input: {
+export async function generateValidated(input: {
   runId: string
   digestDate: string
   windowStart: string
@@ -266,6 +267,7 @@ async function generateValidated(input: {
   candidates: EnrichedDigestCandidate[]
   prompt: DigestPromptVersion
   renderedPrompt: string
+  onAttempt?: (attempts: DigestGenerationResponse[]) => Promise<void>
 }) {
   const attempts: DigestGenerationResponse[] = []
   let lastError = ''
@@ -275,7 +277,7 @@ async function generateValidated(input: {
     const userPrompt =
       attempt === 1
         ? input.renderedPrompt
-        : `${input.renderedPrompt}\n\nREPAIR THE REJECTED RESPONSE\nThe previous JSON was rejected by the deterministic receiver: ${lastError}\nReturn one corrected JSON object only. Do not add Markdown or prose. Preserve grounded content while fixing every validation error.\n\nREJECTED RESPONSE\n${JSON.stringify(rejectedOutput)}`
+        : `${input.renderedPrompt}\n\nREPAIR THE REJECTED RESPONSE\nThe previous JSON was rejected by the deterministic receiver: ${lastError}\nReturn one corrected JSON object only. Do not add Markdown or prose. Preserve grounded content while fixing every validation error. Shorten overlong fields by rewriting complete sentences; never truncate them.\n\nREQUIRED JSON SCHEMA\n${JSON.stringify(DIGEST_JSON_SCHEMA)}\n\nREJECTED RESPONSE\n${JSON.stringify(rejectedOutput)}`
     const generated = await generateDigestWithModel({
       runId: input.runId,
       model: input.prompt.model,
@@ -286,6 +288,7 @@ async function generateValidated(input: {
       temperature: attempt === 1 ? input.prompt.parameters.temperature : 0,
     })
     attempts.push(generated)
+    await input.onAttempt?.(attempts)
     rejectedOutput = generated.output
     try {
       if (generated.outputError) throw new Error(generated.outputError)
@@ -477,6 +480,25 @@ export async function publishNightlyDigest(
       candidates: enrichedCandidates,
       prompt,
       renderedPrompt,
+      onAttempt: dryRun
+        ? undefined
+        : async (attempts) => {
+            const latest = attempts[attempts.length - 1]
+            await db.update(
+              'digest_runs',
+              query({ id: `eq.${runId}`, status: 'eq.running' }),
+              {
+                raw_response: {
+                  attempts: attempts.map(({ response }) => response),
+                },
+                response_id: latest.responseId,
+                input_tokens: sumTokens(attempts, 'inputTokens'),
+                output_tokens: sumTokens(attempts, 'outputTokens'),
+                total_tokens: sumTokens(attempts, 'totalTokens'),
+                updated_at: new Date().toISOString(),
+              },
+            )
+          },
     })
     const completedAt = new Date()
     const durationMs = completedAt.getTime() - startedAt.getTime()
@@ -577,7 +599,7 @@ export async function publishNightlyDigest(
   }
 }
 
-if (require.main === module) {
+if (process.argv[1]?.endsWith('/nightly-digest/publish.ts')) {
   const args = process.argv.slice(2)
   const dateIndex = args.indexOf('--date')
   const digestDate = dateIndex >= 0 ? args[dateIndex + 1] : undefined

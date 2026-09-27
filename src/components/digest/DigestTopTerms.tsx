@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { DigestTrendSnapshot } from '@/lib/digest/trends'
-import { formatDigestShareChange } from '@/lib/digest/trends'
+import { digestTrendLabel, formatDigestShareChange } from '@/lib/digest/trends'
 import { buildSearchHref } from '@/lib/searchParams'
 
 export function DigestTopTerms({
@@ -37,7 +37,7 @@ export function DigestTopTerms({
             }
           >
             <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-              #{index + 1} by tweet volume
+              {digestTrendLabel(row.changePct)}
             </p>
             <p className="mt-1 text-[30px] font-bold leading-tight">
               {row.tweets.toLocaleString('en-US')}

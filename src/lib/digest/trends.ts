@@ -26,7 +26,16 @@ const dayBefore = (date: string) => {
   return new Date(parsed.getTime() - 86_400_000).toISOString().slice(0, 10)
 }
 
-/** Freeze the two highest-volume terms from the Trends widget for this edition. */
+export const digestTrendLabel = (changePct: number | null) =>
+  changePct === null
+    ? 'New term'
+    : changePct > 0
+      ? 'Trending up'
+      : changePct < 0
+        ? 'Trending down'
+        : 'Unchanged'
+
+/** Freeze the highest-volume rising and falling terms for this edition. */
 export function selectDigestTopTerms(
   rows: TermWeek[],
   digestDate: string,
@@ -46,16 +55,18 @@ export function selectDigestTopTerms(
     return null
   const sinceDate = rows[0].sinceDate!
   if (rows.some((row) => row.sinceDate !== sinceDate)) return null
-  const terms = [...rows]
-    .filter((row) => row.last7 > 0)
+  const ranked = [...rows]
+    .filter((row) => row.last7 > 0 && Number.isFinite(row.deltaPct))
     .sort((a, b) => b.last7 - a.last7 || a.term.localeCompare(b.term))
-    .slice(0, 2)
-    .map((row) => ({
-      term: row.term,
-      tweets: row.last7,
-      changePct: row.deltaPct,
-    }))
-  return terms.length ? { sinceDate, untilDate, terms } : null
+  const rising = ranked.find((row) => row.deltaPct! > 0)
+  const falling = ranked.find((row) => row.deltaPct! < 0)
+  if (!rising || !falling) return null
+  const terms = [rising, falling].map((row) => ({
+    term: row.term,
+    tweets: row.last7,
+    changePct: row.deltaPct,
+  }))
+  return parseDigestTrendSnapshot({ sinceDate, untilDate, terms }, digestDate)
 }
 
 /** Invalid or legacy saved values never turn into today's live trends. */

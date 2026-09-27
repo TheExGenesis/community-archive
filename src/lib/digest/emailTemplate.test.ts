@@ -85,7 +85,8 @@ describe('renderDigestEmail', () => {
     const { html, text } = renderDigestEmail(edition, LINKS, [])
 
     expect(html).toContain('Trending terms · 7 days')
-    expect(html).toContain('#1 by tweet volume')
+    expect(html).toContain('Trending up')
+    expect(html).toContain('Trending down')
     expect(html).toContain('120 <span')
     expect(html).toContain('2026-08-04–2026-08-10 UTC')
     expect(html).toContain('/search?q=claude+opus')
@@ -97,7 +98,7 @@ describe('renderDigestEmail', () => {
     expect(html).toContain('max-width:calc(100% - 32px)')
     expect(html).not.toContain('24-hour coverage:')
     expect(text).toContain('TRENDING TERMS · 7 DAYS')
-    expect(text).toContain('#1 claude opus · 120 tweets')
+    expect(text).toContain('Trending up: claude opus · 120 tweets')
     expect(text).toContain(`01. ${story.title.toUpperCase()}`)
     expect(text).toContain(
       `${LINKS.siteUrl}/digest/${edition.digestDate}/${story.slug}`,

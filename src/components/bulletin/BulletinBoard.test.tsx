@@ -18,6 +18,9 @@ const offer = {
   expires_at: null,
   place: null,
   model: 'test',
+  value_score: 1,
+  p_opportunity: 0.9,
+  p_joke: 0.3,
 } as unknown as Notice
 const ask = {
   ...offer,
@@ -117,7 +120,7 @@ test('admin can filter published notices by Jev score and topic', () => {
   const scoredAsk = {
     ...ask,
     value_score: 1,
-    p_opportunity: 0.8,
+    p_opportunity: 0.9,
     p_joke: 0.2,
     topics: ['ai'],
   }
@@ -138,6 +141,13 @@ test('admin can filter published notices by Jev score and topic', () => {
   fireEvent.click(screen.getByRole('checkbox', { name: 'AI' }))
   expect(screen.queryByRole('article')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Reset Jev filters' }))
+  expect(screen.getByRole('slider', { name: /Minimum value/ })).toHaveValue('1')
+  expect(
+    screen.getByRole('slider', { name: /Minimum P\(opportunity\)/ }),
+  ).toHaveValue('0.9')
+  expect(screen.getByRole('slider', { name: /Maximum P\(joke\)/ })).toHaveValue(
+    '0.3',
+  )
   fireEvent.click(screen.getByRole('button', { name: /Sort by value/i }))
   expect(
     within(screen.getAllByRole('article')[0]).getByText('Help with Python'),
@@ -149,6 +159,23 @@ test('admin can filter published notices by Jev score and topic', () => {
       now={Date.parse('2026-09-09T00:00:00Z')}
     />,
   )
+  expect(screen.queryByText('Jev filters · admin only')).not.toBeInTheDocument()
+})
+
+test('readers see only notices meeting the shared score defaults', () => {
+  render(
+    <BulletinBoard
+      notices={[
+        offer,
+        { ...ask, p_opportunity: 0.89 },
+        { ...ask, tweet_id: '3', value_score: 0.9 },
+        { ...ask, tweet_id: '4', p_joke: 0.31 },
+      ]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  expect(screen.getAllByRole('article')).toHaveLength(1)
+  expect(screen.getByText('Help with Python')).toBeInTheDocument()
   expect(screen.queryByText('Jev filters · admin only')).not.toBeInTheDocument()
 })
 test('shows one stream with combined labels, and combines side, category and search filters', () => {

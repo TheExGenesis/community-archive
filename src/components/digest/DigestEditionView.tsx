@@ -247,6 +247,8 @@ export function DigestEditionView({
               />
             )}
 
+            {slots.trendsSidebar}
+
             <section className="mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800">
               <h2 className="text-[19px] font-semibold" style={SERIF}>
                 Keywords in this edition
@@ -292,7 +294,6 @@ export function DigestEditionView({
               </PostHogLink>
             </section>
 
-            {slots.trendsSidebar}
           </aside>
         </div>
 

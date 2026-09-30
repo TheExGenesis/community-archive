@@ -31,6 +31,8 @@ export type RunCounts = Partial<
     | 'candidates_seen'
     | 'calls'
     | 'positive'
+    | 'new_notices'
+    | 'existing_notices'
     | 'negative'
     | 'failed'
     | 'suppressed'

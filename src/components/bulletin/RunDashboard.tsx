@@ -13,7 +13,8 @@ const columns = [
   ['eligible_originals', 'Eligible originals'],
   ['candidates_seen', 'Candidates'],
   ['calls', 'AI calls'],
-  ['positive', 'Notices'],
+  ['new_notices', 'New notices'],
+  ['existing_notices', 'Existing notices'],
   ['negative', 'Not notices'],
   ['failed', 'Failed'],
   ['pending', 'Left in queue'],
@@ -157,6 +158,14 @@ export function RunDashboard({
                           </div>
                           <div>
                             <dt className="inline">
+                              Total positive decisions:{' '}
+                            </dt>
+                            <dd className="inline">
+                              {number(run.counts.positive)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="inline">
                               Suppressed before saving:{' '}
                             </dt>
                             <dd className="inline">
@@ -226,18 +235,21 @@ export function RunDashboard({
         <h2 className="font-semibold text-foreground">Reading the counts</h2>
         <p>
           <strong>Tweets scanned</strong> counts rows examined in this run. The
-          one-hour overlap can scan a tweet again; it does not pay for another
-          AI call when the text is unchanged. <strong>Candidates</strong> passed
+          daily overlap can scan a tweet again; it does not pay for another AI
+          call when the text is unchanged. <strong>Candidates</strong> passed
           the original-post and phrase filters, including previously checked
           matches.
         </p>
         <p>
           <strong>AI calls</strong> includes retries and candidates left from
-          earlier scans. <strong>Notices</strong> counts positive decisions
-          saved during this run, before expiry and later consent changes. It is
-          not the number currently visible on the website.{' '}
-          <strong>Left in queue</strong> includes waiting, failed and exhausted
-          decisions at the end of that run.
+          earlier scans. <strong>New notices</strong> counts notices added to
+          the saved board during this run. <strong>Existing notices</strong>{' '}
+          counts saved notices that were rechecked and kept, not new additions.
+          Both counts are before expiry and later consent changes, so a new
+          notice may already be past its end date. Older runs show — when this
+          split was not recorded; their total positive decisions remain in the
+          run details. <strong>Left in queue</strong> includes waiting, failed
+          and exhausted decisions at the end of that run.
         </p>
         <p>
           Running and interrupted rows may have partial counts. Costs show

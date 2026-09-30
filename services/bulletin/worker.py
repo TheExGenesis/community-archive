@@ -284,6 +284,7 @@ def actual_cost(result):
 
 
 def publish(db, job, label, context, availability=None):
+    """Return new_notice, existing_notice, negative, or False when suppressed."""
     with db.transaction():
         source=current(db,job['tweet_id'],lock=True)
         if not source or source['content_hash']!=job['content_hash']:
@@ -299,6 +300,10 @@ def publish(db, job, label, context, availability=None):
         db.execute('UPDATE bulletin.decisions SET status=%s,updated_at=now() WHERE tweet_id=%s',
             ('positive' if label['is_notice'] else 'negative',job['tweet_id']))
         if label['is_notice']:
+            # The worker advisory lock serializes publication. Read before the
+            # upsert so a successful recheck is not counted as a new addition.
+            previous=db.execute('SELECT resolution_tweet_id FROM bulletin.opportunities WHERE tweet_id=%s',
+                (job['tweet_id'],)).fetchone()
             db.execute('''INSERT INTO bulletin.opportunities
               (tweet_id,content_hash,side,kind,summary,evidence,topics,respond,standing,expires_at,place,model)
               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
@@ -310,11 +315,9 @@ def publish(db, job, label, context, availability=None):
                label['evidence'],label['topics'],label['respond'],label['standing'],
                label['expires_at'],label['place'],MODEL))
             availability = availability or dict(state='unknown',tweet_id=None,content_hash=None)
-            previous=db.execute('SELECT resolution_tweet_id FROM bulletin.opportunities WHERE tweet_id=%s',
-                (job['tweet_id'],)).fetchone()
             # Tweet IDs are chronological snowflakes. Truncated context must
             # not let an older "still available" override a newer resolution.
-            if (availability['state']!='unknown' and previous['resolution_tweet_id']
+            if (availability['state']!='unknown' and previous and previous['resolution_tweet_id']
                     and int(availability['tweet_id'])<int(previous['resolution_tweet_id'])):
                 availability=dict(state='unknown',tweet_id=None,content_hash=None)
             # Unknown is not evidence that a confirmed resolution has reopened.
@@ -330,7 +333,7 @@ def publish(db, job, label, context, availability=None):
                availability['state'],availability['content_hash'],job['tweet_id']))
         else:
             db.execute('DELETE FROM bulletin.opportunities WHERE tweet_id=%s',(job['tweet_id'],))
-    return True
+    return ('existing_notice' if previous else 'new_notice') if label['is_notice'] else 'negative'
 
 
 def progress(db, run_id, counts, status='running', finished=False):
@@ -347,7 +350,8 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
     if not db.execute('SELECT pg_try_advisory_lock(%s) AS locked',(LOCK,)).fetchone()['locked']:
         return {'status':'already_running'}
     started=time.monotonic()
-    counts=dict(rows_seen=0,candidates_seen=0,calls=0,positive=0,negative=0,failed=0,suppressed=0)
+    counts=dict(rows_seen=0,candidates_seen=0,calls=0,positive=0,new_notices=0,
+        existing_notices=0,negative=0,failed=0,suppressed=0)
     if backfill_budget is not None:
         counts['backfill_budget_usd']=str(backfill_budget)
     run_id=None
@@ -438,7 +442,9 @@ def run(db, limit=MAX_CALLS, enqueue_only=False, window=None, backfill_budget=No
                         if label['is_notice'] else None)
                     stage='publish'
                     stored=publish(db,job,label,context,availability)
-                    counts['positive' if label['is_notice'] else 'negative']+=int(stored)
+                    counts['positive' if label['is_notice'] else 'negative']+=int(bool(stored))
+                    if stored in ('new_notice','existing_notice'):
+                        counts[stored+'s']+=1
                     counts['suppressed']+=int(not stored)
                     db.execute('UPDATE bulletin.calls SET status=%s WHERE id=%s',
                         ('validated' if stored else 'suppressed',call_id))

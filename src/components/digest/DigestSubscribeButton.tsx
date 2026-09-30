@@ -38,6 +38,7 @@ function SubscribeControl({ placement }: { placement: Placement }) {
   const focusOnOpen = useRef(false)
   const isDigestCta = placement === 'digest'
   const isHome = placement === 'home'
+  const startsWithEmailField = isHome || isDigestCta
 
   // Viewer state must come from the session, not shared digest page caches.
   useEffect(() => {
@@ -57,16 +58,16 @@ function SubscribeControl({ placement }: { placement: Placement }) {
           setSubscription({ id: body.id, email: body.email })
           setPhase('done')
         } else {
-          setPhase(isHome ? 'open' : 'idle')
+          setPhase(startsWithEmailField ? 'open' : 'idle')
         }
       } catch {
-        if (active) setPhase(isHome ? 'open' : 'idle')
+        if (active) setPhase(startsWithEmailField ? 'open' : 'idle')
       }
     })()
     return () => {
       active = false
     }
-  }, [isHome])
+  }, [startsWithEmailField])
 
   useEffect(() => {
     if (phase === 'open' && focusOnOpen.current) {
@@ -136,7 +137,7 @@ function SubscribeControl({ placement }: { placement: Placement }) {
         )
       }
       setSubscription(null)
-      setPhase(isHome ? 'open' : 'idle')
+      setPhase(startsWithEmailField ? 'open' : 'idle')
       setMessage('Unsubscribed ✓')
     } catch (cause) {
       setError(
@@ -251,7 +252,8 @@ function SubscribeControl({ placement }: { placement: Placement }) {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Escape') setPhase('idle')
+            if (event.key === 'Escape' && !startsWithEmailField)
+              setPhase('idle')
           }}
           placeholder="you@example.com"
           aria-label="Email address for the daily digest"

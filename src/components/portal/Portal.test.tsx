@@ -8,6 +8,10 @@ jest.mock('./TweetRow', () => ({
   ),
 }))
 
+jest.mock('@/components/digest/DigestSubscribeButton', () => ({
+  DigestSubscribeButton: () => <div>Digest signup</div>,
+}))
+
 const seedTweet: PortalTweet = {
   id: '100',
   username: 'alice',

@@ -8,7 +8,7 @@ import {
   listPublishedDigestDays,
 } from '@/lib/digest/data'
 import type { DigestEdition, DigestCalendarDay } from '@/lib/digest/types'
-import { DigestEditionView, DigestRecentEditions } from './DigestEditionView'
+import { DigestEditionView } from './DigestEditionView'
 import { DigestDaySelector } from './DigestDaySelector'
 import { DigestLikeButton } from './DigestLikeButton'
 import { DigestComments } from './DigestComments'
@@ -152,16 +152,12 @@ async function AdminLink() {
 async function Calendar({
   archive,
   date,
-  recent = false,
 }: {
   archive: Promise<DigestCalendarDay[]>
   date: string
-  recent?: boolean
 }) {
   const days = await archive
-  return recent ? (
-    <DigestRecentEditions archive={days} currentDate={date} />
-  ) : (
+  return (
     <DigestDaySelector
       currentDate={date}
       availableDays={days}
@@ -229,13 +225,14 @@ export function PublishedDigestView({ edition }: { edition: DigestEdition }) {
               <Calendar archive={archive} date={edition.digestDate} />
             </Suspense>
           ),
-          recent: (
-            <Suspense fallback={null}>
-              <Calendar archive={archive} date={edition.digestDate} recent />
-            </Suspense>
-          ),
           trends: edition.content.trends ? (
             <DigestTopTerms snapshot={edition.content.trends} />
+          ) : null,
+          trendsSidebar: edition.content.trends ? (
+            <DigestTopTerms
+              snapshot={edition.content.trends}
+              variant="sidebar"
+            />
           ) : null,
           comments: edition.isPreview ? (
             <></>

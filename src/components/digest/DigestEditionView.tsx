@@ -51,10 +51,10 @@ export function DigestEditionView({
       | 'likes'
       | 'admin'
       | 'calendar'
-      | 'recent'
       | 'comments'
       | 'subscribers'
       | 'trends'
+      | 'trendsSidebar'
       | 'bulletin',
       ReactNode
     >
@@ -292,12 +292,7 @@ export function DigestEditionView({
               </PostHogLink>
             </section>
 
-            {slots.recent ?? (
-              <DigestRecentEditions
-                archive={archive}
-                currentDate={edition.digestDate}
-              />
-            )}
+            {slots.trendsSidebar}
           </aside>
         </div>
 
@@ -319,44 +314,5 @@ export function DigestEditionView({
           ))}
       </article>
     </main>
-  )
-}
-
-export function DigestRecentEditions({
-  archive,
-  currentDate,
-}: {
-  archive: DigestCalendarDay[]
-  currentDate: string
-}) {
-  return (
-    <>
-      {archive.length > 1 ? (
-        <section className="mt-8 border-t border-zinc-200 pt-7 dark:border-zinc-800">
-          <h2 className="text-[19px] font-semibold" style={SERIF}>
-            Recent editions
-          </h2>
-          <div className="mt-4 space-y-2">
-            {archive
-              .filter((item) => item.digestDate !== currentDate)
-              .slice(0, 6)
-              .map((item) => (
-                <PostHogLink
-                  key={item.digestDate}
-                  href={`/digest/${item.digestDate}`}
-                  eventName="digest_action"
-                  eventProperties={{
-                    action: 'recent_edition_opened',
-                    surface: 'recent_editions',
-                  }}
-                  className="block text-sm text-muted-foreground hover:text-brand"
-                >
-                  {longDate(item.digestDate)}
-                </PostHogLink>
-              ))}
-          </div>
-        </section>
-      ) : null}
-    </>
   )
 }

@@ -8,6 +8,18 @@ const LINKS = {
 }
 
 describe('renderDigestEmail', () => {
+  it('includes a per-send open image only in HTML', () => {
+    const openUrl = 'https://www.community-archive.org/api/digest/email/open/token'
+    const { html, text } = renderDigestEmail(
+      AUGUST_11_MOCK_DIGEST,
+      LINKS,
+      [],
+      { openUrl },
+    )
+    expect(html).toContain(`<img src="${openUrl}" width="1" height="1"`)
+    expect(text).not.toContain(openUrl)
+  })
+
   it('renders subject, stories, edition link, and unsubscribe link', () => {
     const { subject, html, text } = renderDigestEmail(
       AUGUST_11_MOCK_DIGEST,

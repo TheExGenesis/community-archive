@@ -59,6 +59,7 @@ export interface DigestEditionRow {
   created_at: string
   published_at: string | null
   updated_at: string
+  view_count: number
 }
 
 export interface DigestEditionLikeRow {
@@ -136,6 +137,10 @@ type DigestDatabase = {
     }
     Views: { [_ in never]: never }
     Functions: {
+      record_digest_view: {
+        Args: { p_edition_id: string }
+        Returns: number
+      }
       publish_digest_edition: {
         Args: { p_edition_id: string }
         Returns: DigestEditionRow

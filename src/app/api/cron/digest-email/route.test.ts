@@ -98,15 +98,27 @@ test('renders each email with its subscriber account recommendations', async () 
     AUGUST_11_MOCK_DIGEST,
     expect.any(Object),
     expect.arrayContaining([expect.objectContaining({ summary: '42' })]),
-    expect.objectContaining({ personalizedBulletin: true }),
+    expect.objectContaining({
+      personalizedBulletin: true,
+      openUrl: expect.stringMatching(/\/api\/digest\/email\/open\/[0-9a-f-]+$/),
+    }),
   )
   expect(renderDigestEmail).toHaveBeenNthCalledWith(
     2,
     AUGUST_11_MOCK_DIGEST,
     expect.any(Object),
     expect.arrayContaining([expect.objectContaining({ summary: 'guest' })]),
-    expect.objectContaining({ personalizedBulletin: false }),
+    expect.objectContaining({
+      personalizedBulletin: false,
+      openUrl: expect.stringMatching(/\/api\/digest\/email\/open\/[0-9a-f-]+$/),
+    }),
   )
   expect(sendEmail).toHaveBeenCalledTimes(2)
   expect(recordSend).toHaveBeenCalledTimes(2)
+  expect(recordSend).toHaveBeenCalledWith(
+    AUGUST_11_MOCK_DIGEST.id,
+    'linked',
+    'message',
+    expect.any(String),
+  )
 })

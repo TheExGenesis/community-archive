@@ -195,12 +195,33 @@ export async function recordSend(
   editionId: string,
   subscriptionId: string,
   messageId: string,
+  openToken: string,
 ): Promise<void> {
   const admin = createServerServiceRoleClient()
   const result = await admin.from('digest_email_sends').insert({
     edition_id: editionId,
     subscription_id: subscriptionId,
     message_id: messageId,
+    open_token: openToken,
   })
   if (result.error) throw result.error
+}
+
+/** Aggregate for the private digest lab; no recipient data leaves this helper. */
+export async function getDigestEmailOpenStats(editionId: string) {
+  const admin = createServerServiceRoleClient()
+  const [sent, opened] = await Promise.all([
+    admin
+      .from('digest_email_sends')
+      .select('edition_id', { count: 'exact', head: true })
+      .eq('edition_id', editionId),
+    admin
+      .from('digest_email_sends')
+      .select('edition_id', { count: 'exact', head: true })
+      .eq('edition_id', editionId)
+      .not('opened_at', 'is', null),
+  ])
+  if (sent.error) throw sent.error
+  if (opened.error) throw opened.error
+  return { sent: sent.count ?? 0, opened: opened.count ?? 0 }
 }

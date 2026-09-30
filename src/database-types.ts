@@ -513,6 +513,7 @@ export type Database = {
           status: string
           updated_at: string
           version: number
+          view_count: number
         }
         Insert: {
           content: Json
@@ -526,6 +527,7 @@ export type Database = {
           status?: string
           updated_at?: string
           version: number
+          view_count?: number
         }
         Update: {
           content?: Json
@@ -539,6 +541,7 @@ export type Database = {
           status?: string
           updated_at?: string
           version?: number
+          view_count?: number
         }
         Relationships: [
           {
@@ -554,18 +557,24 @@ export type Database = {
         Row: {
           edition_id: string
           message_id: string | null
+          open_token: string | null
+          opened_at: string | null
           sent_at: string
           subscription_id: string
         }
         Insert: {
           edition_id: string
           message_id?: string | null
+          open_token?: string | null
+          opened_at?: string | null
           sent_at?: string
           subscription_id: string
         }
         Update: {
           edition_id?: string
           message_id?: string | null
+          open_token?: string | null
+          opened_at?: string | null
           sent_at?: string
           subscription_id?: string
         }
@@ -2498,7 +2507,14 @@ export type Database = {
           status: string
           updated_at: string
           version: number
+          view_count: number
         }
+      }
+      record_digest_view: {
+        Args: {
+          p_edition_id: string
+        }
+        Returns: number
       }
       refresh_global_activity_summary: {
         Args: Record<PropertyKey, never>

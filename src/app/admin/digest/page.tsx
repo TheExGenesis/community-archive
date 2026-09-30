@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { DigestDaySelector } from '@/components/digest/DigestDaySelector'
 import { requireAdmin } from '@/app/admin/data'
 import { loadDigestLabState } from '@/lib/digest/data'
+import { getDigestEmailOpenStats } from '@/lib/digest/emailSubscriptions'
 import { listPastDigestDates } from '@/lib/digest/dateWindow'
 import type { DigestEdition, DigestRun } from '@/lib/digest/types'
 import {
@@ -189,6 +190,12 @@ export default async function DigestLabPage({
           edition.status === 'published',
       ) ?? null)
     : null
+  const emailStats = activePublished
+    ? await getDigestEmailOpenStats(activePublished.id).catch((error) => {
+        console.error('Digest email open stats failed:', error)
+        return null
+      })
+    : null
 
   return (
     <main className="min-h-screen bg-zinc-50 dark:bg-background">
@@ -216,7 +223,7 @@ export default async function DigestLabPage({
             {runningRuns[0] ? (
               <Link
                 href={`/admin/digest?run=${runningRuns[0].id}`}
-                className="dark:bg-amber-950/35 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 dark:border-amber-800 dark:text-amber-100"
+                className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/35 dark:text-amber-100"
               >
                 <span
                   className="h-2 w-2 animate-pulse rounded-full bg-amber-500"
@@ -257,6 +264,14 @@ export default async function DigestLabPage({
           >
             {searchParams.error}
           </div>
+        ) : null}
+
+        {emailStats ? (
+          <p className="mb-5 text-sm text-muted-foreground">
+            {emailStats.opened.toLocaleString('en-US')} of{' '}
+            {emailStats.sent.toLocaleString('en-US')} digest emails opened
+            <span className="ml-1 text-xs">(image-based estimate)</span>
+          </p>
         ) : null}
 
         {activeDraft && state.activeRun ? (

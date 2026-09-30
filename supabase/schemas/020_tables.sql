@@ -480,9 +480,11 @@ CREATE TABLE IF NOT EXISTS "public"."digest_editions" (
     "created_by" uuid,
     "created_at" timestamptz NOT NULL DEFAULT now(),
     "published_at" timestamptz,
+    "view_count" bigint NOT NULL DEFAULT 0,
     "updated_at" timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT "digest_editions_date_version_key" UNIQUE ("digest_date", "version"),
     CONSTRAINT "digest_editions_version_positive" CHECK (version > 0),
+    CONSTRAINT "digest_editions_view_count_nonnegative" CHECK (view_count >= 0),
     CONSTRAINT "digest_editions_status_check" CHECK (status IN ('draft', 'published', 'archived')),
     CONSTRAINT "digest_editions_content_object" CHECK (jsonb_typeof(content) = 'object'),
     CONSTRAINT "digest_editions_publication_time_check" CHECK ((status = 'published' AND published_at IS NOT NULL) OR status <> 'published')
@@ -519,6 +521,8 @@ CREATE TABLE IF NOT EXISTS "public"."digest_email_sends" (
     "subscription_id" uuid NOT NULL REFERENCES "public"."digest_email_subscriptions"("id") ON DELETE CASCADE,
     "message_id" text,
     "sent_at" timestamptz NOT NULL DEFAULT now(),
+    "open_token" uuid UNIQUE,
+    "opened_at" timestamptz,
     PRIMARY KEY ("edition_id", "subscription_id")
 );
 ALTER TABLE "public"."digest_email_sends" OWNER TO "postgres";

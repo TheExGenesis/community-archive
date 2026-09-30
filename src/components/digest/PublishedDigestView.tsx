@@ -14,6 +14,7 @@ import { DigestLikeButton } from './DigestLikeButton'
 import { DigestComments } from './DigestComments'
 import { SectionReady } from '@/components/PagePerformance'
 import { DigestSubscriberCount } from './DigestSubscriberCount'
+import { DigestViewCount } from './DigestViewCount'
 import { DigestTopTerms } from './DigestTopTerms'
 import { DigestBulletinCards } from './DigestBulletinCards'
 import {
@@ -191,9 +192,12 @@ export function PublishedDigestView({ edition }: { edition: DigestEdition }) {
         archive={[]}
         slots={{
           subscribers: (
-            <Suspense fallback={null}>
-              <DigestSubscriberCount />
-            </Suspense>
+            <>
+              <DigestViewCount key={edition.id} editionId={edition.id} />
+              <Suspense fallback={null}>
+                <DigestSubscriberCount />
+              </Suspense>
+            </>
           ),
           likes: edition.isPreview ? (
             <></>

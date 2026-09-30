@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { randomUUID } from 'node:crypto'
 import { mapDigestEdition } from '@/lib/digest/data'
 import { isAuthorizedDigestCronRequest } from '@/lib/digest/cron'
 import {
@@ -90,6 +91,7 @@ async function handleSend(request: Request) {
     const recipient = recipients[index]
     if (index > 0) await sleep(SEND_INTERVAL_MS)
     const unsubscribeUrl = digestUnsubscribeUrl(recipient.token)
+    const openToken = randomUUID()
     const bulletinItems = bulletin
       ? await bulletin.itemsForAccount(recipient.accountId).catch((error) => {
           console.error('Digest bulletin recommendation failed:', error)
@@ -102,6 +104,7 @@ async function handleSend(request: Request) {
       bulletinItems,
       {
         personalizedBulletin: Boolean(recipient.accountId),
+        openUrl: `${siteUrl}/api/digest/email/open/${openToken}`,
       },
     )
     const result = await sendEmail({
@@ -122,7 +125,7 @@ async function handleSend(request: Request) {
       failures.push(recipient.id)
       continue
     }
-    await recordSend(edition.id, recipient.id, result.id)
+    await recordSend(edition.id, recipient.id, result.id, openToken)
     sent += 1
   }
 

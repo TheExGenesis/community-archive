@@ -495,9 +495,11 @@ export function BulletinBoard({
   const [resolved, setResolved] = useState(false)
   const [recommended, setRecommended] = useState(true)
   const [ascending, setAscending] = useState(false)
-  const [minValue, setMinValue] = useState(0)
-  const [minOpportunity, setMinOpportunity] = useState(0)
-  const [maxJoke, setMaxJoke] = useState(1)
+  const [minValue, setMinValue] = useState(DEFAULT_JEV_FILTERS.minValue)
+  const [minOpportunity, setMinOpportunity] = useState(
+    DEFAULT_JEV_FILTERS.minOpportunity,
+  )
+  const [maxJoke, setMaxJoke] = useState(DEFAULT_JEV_FILTERS.maxJoke)
   const [topics, setTopics] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<JevSort | null>(null)
   const [hydrated, setHydrated] = useState(false)
@@ -815,9 +817,9 @@ export function BulletinBoard({
               type="button"
               className={styles.adminReset}
               onClick={() => {
-                setMinValue(0)
-                setMinOpportunity(0)
-                setMaxJoke(1)
+                setMinValue(DEFAULT_JEV_FILTERS.minValue)
+                setMinOpportunity(DEFAULT_JEV_FILTERS.minOpportunity)
+                setMaxJoke(DEFAULT_JEV_FILTERS.maxJoke)
                 setTopics([])
                 setSortBy(null)
                 setRecommended(true)

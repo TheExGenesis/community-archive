@@ -1,6 +1,7 @@
 import {
   addJevParams,
   DEFAULT_JEV_FILTERS,
+  hasJevFilters,
   matchesJevFilters,
   parseJevFilters,
 } from './curation'
@@ -25,6 +26,21 @@ test('parses bounded Jev controls and round trips URL settings', () => {
     parseJevFilters(addJevParams(new URLSearchParams(), selected)),
   ).toEqual(selected)
   expect(parseJevFilters(new URLSearchParams())).toEqual(DEFAULT_JEV_FILTERS)
+  expect(
+    addJevParams(new URLSearchParams(), DEFAULT_JEV_FILTERS).toString(),
+  ).toBe('')
+  expect(hasJevFilters(DEFAULT_JEV_FILTERS)).toBe(false)
+  expect(hasJevFilters(selected)).toBe(true)
+  const relaxed = {
+    ...DEFAULT_JEV_FILTERS,
+    minValue: 0,
+    minOpportunity: 0,
+    maxJoke: 1,
+  }
+  expect(parseJevFilters(addJevParams(new URLSearchParams(), relaxed))).toEqual(
+    relaxed,
+  )
+  expect(hasJevFilters(relaxed)).toBe(true)
   for (const query of [
     'minValue=5',
     'minOpportunity=-1',
@@ -37,6 +53,15 @@ test('parses bounded Jev controls and round trips URL settings', () => {
 
 test('thresholds and selected tags narrow notices without fabricating missing scores', () => {
   expect(matchesJevFilters(notice, DEFAULT_JEV_FILTERS)).toBe(true)
+  expect(
+    matchesJevFilters({ ...notice, value_score: 0.9 }, DEFAULT_JEV_FILTERS),
+  ).toBe(false)
+  expect(
+    matchesJevFilters({ ...notice, p_opportunity: 0.89 }, DEFAULT_JEV_FILTERS),
+  ).toBe(false)
+  expect(
+    matchesJevFilters({ ...notice, p_joke: 0.31 }, DEFAULT_JEV_FILTERS),
+  ).toBe(false)
   expect(
     matchesJevFilters(notice, { ...DEFAULT_JEV_FILTERS, minValue: 3 }),
   ).toBe(false)

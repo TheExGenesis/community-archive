@@ -33,6 +33,9 @@ const notice = (i: number): StoredNotice => ({
   evidence: '',
   respond: 'dm',
   content_hash: 'hash',
+  value_score: 1,
+  p_opportunity: 0.9,
+  p_joke: 0.3,
 })
 const ids = (from: number, to: number) =>
   Array.from({ length: from - to + 1 }, (_, i) => String(from - i))
@@ -154,6 +157,21 @@ test('Jev controls filter and rank before pagination and counts', async () => {
   })
   expect(page.notices.map((o) => o.tweet_id)).toEqual(['2', '1'])
   expect(page.counts.help).toBe(2)
+  expect(page.total).toBe(4)
+})
+
+test('default score thresholds filter the first page and counts', async () => {
+  jest.mocked(loadBulletinBoardState).mockResolvedValue({
+    notices: [
+      notice(1),
+      { ...notice(2), value_score: 0.9 },
+      { ...notice(3), p_opportunity: 0.89 },
+      { ...notice(4), p_joke: 0.31 },
+    ],
+  })
+  const page = await loadBulletinPage(filters)
+  expect(page.notices.map((o) => o.tweet_id)).toEqual(['1'])
+  expect(page.counts.help).toBe(1)
   expect(page.total).toBe(4)
 })
 

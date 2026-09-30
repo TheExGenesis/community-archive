@@ -95,7 +95,6 @@ export function DigestEditionView({
                   />
                 ))}
               {slots.subscribers}
-              <DigestSubscribeButton />
               {slots.admin ??
                 (isAdmin ? (
                   <Link
@@ -139,6 +138,7 @@ export function DigestEditionView({
               </li>
             ))}
           </ul>
+          <DigestSubscribeButton placement="digest" />
         </header>
 
         <div className="mt-12 grid items-start lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-x-14">

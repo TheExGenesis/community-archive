@@ -53,7 +53,7 @@ describe('DigestSubscribeButton', () => {
     expect(screen.getByRole('button', { name: 'Subscribe' })).toBeEnabled()
   })
 
-  it('shows the large digest invitation only to unsubscribed viewers', async () => {
+  it('opens the email field in the large digest invitation only for unsubscribed viewers', async () => {
     jest.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ status: 'none' }),
@@ -63,6 +63,11 @@ describe('DigestSubscribeButton', () => {
       name: 'Subscribe to the daily digest',
     })
     expect(invitation).toHaveTextContent('Get the daily digest in your inbox')
+    const input = screen.getByRole('textbox', {
+      name: 'Email address for the daily digest',
+    })
+    expect(input).toBeVisible()
+    expect(input).not.toHaveFocus()
     expect(screen.getByRole('button', { name: 'Subscribe' })).toBeEnabled()
     unmount()
 

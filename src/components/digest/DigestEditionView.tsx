@@ -53,7 +53,6 @@ export function DigestEditionView({
       | 'calendar'
       | 'comments'
       | 'subscribers'
-      | 'trends'
       | 'trendsSidebar'
       | 'bulletin',
       ReactNode
@@ -141,8 +140,6 @@ export function DigestEditionView({
             ))}
           </ul>
         </header>
-
-        {slots.trends}
 
         <div className="mt-12 grid items-start lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-x-14">
           <div className="min-w-0">
@@ -293,7 +290,6 @@ export function DigestEditionView({
                 Explore today&apos;s bangers →
               </PostHogLink>
             </section>
-
           </aside>
         </div>
 

@@ -225,14 +225,8 @@ export function PublishedDigestView({ edition }: { edition: DigestEdition }) {
               <Calendar archive={archive} date={edition.digestDate} />
             </Suspense>
           ),
-          trends: edition.content.trends ? (
-            <DigestTopTerms snapshot={edition.content.trends} />
-          ) : null,
           trendsSidebar: edition.content.trends ? (
-            <DigestTopTerms
-              snapshot={edition.content.trends}
-              variant="sidebar"
-            />
+            <DigestTopTerms snapshot={edition.content.trends} />
           ) : null,
           comments: edition.isPreview ? (
             <></>

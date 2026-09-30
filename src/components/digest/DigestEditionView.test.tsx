@@ -33,6 +33,12 @@ jest.mock('@/components/digest/DigestMarkdown', () => ({
   DigestMarkdown: ({ children }: { children: string }) => <>{children}</>,
 }))
 
+jest.mock('@/components/digest/DigestSubscribeButton', () => ({
+  DigestSubscribeButton: ({ placement }: { placement: string }) => (
+    <button data-placement={placement}>Subscribe</button>
+  ),
+}))
+
 describe('DigestEditionView', () => {
   test('shows a standalone representative tweet but omits one already in a story', async () => {
     const content = AUGUST_11_MOCK_DIGEST.content
@@ -48,6 +54,10 @@ describe('DigestEditionView', () => {
     )
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Subscribe' })).toBeEnabled(),
+    )
+    expect(screen.getByRole('button', { name: 'Subscribe' })).toHaveAttribute(
+      'data-placement',
+      'digest',
     )
     expect(screen.getByText('Representative tweet')).toBeVisible()
     const cardCount = screen.getAllByTestId('tweet-card').length

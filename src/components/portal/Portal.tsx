@@ -18,6 +18,7 @@ import TweetCard from '@/components/TweetCard'
 import { BANGERS_ALL_TIME_HREF, BANGERS_WEEK_HREF } from '@/lib/portal/bangers'
 import { capturePostHogEvent } from '@/lib/posthog'
 import type { DigestPreview } from '@/lib/digest/types'
+import { DigestSubscribeButton } from '@/components/digest/DigestSubscribeButton'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 import { CHROME_EXTENSION_URL } from '@/lib/browserExtension'
 
@@ -314,18 +315,21 @@ export function DigestHero({ preview }: { preview: DigestPreview | null }) {
   if (!preview) {
     return (
       <div
-        className={`${CARD} mb-4 border-t-2 border-dashed border-t-brand px-8 py-7 text-center dark:border-t-brand`}
+        className={`${CARD} mb-4 border-t-2 border-dashed border-t-brand px-6 py-7 dark:border-t-brand sm:px-8`}
       >
-        <div
-          className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${MUTED}`}
-        >
-          What happened yesterday
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div
+            className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${MUTED}`}
+          >
+            What happened yesterday
+          </div>
+          <DigestSubscribeButton placement="home" />
         </div>
-        <p className="mt-2 text-[24px] font-medium" style={SERIF}>
+        <p className="mt-2 text-center text-[24px] font-medium" style={SERIF}>
           Today&rsquo;s edition is being assembled
         </p>
         <p
-          className={`mx-auto mt-2 max-w-[520px] text-[13px] leading-normal ${MUTED}`}
+          className={`mx-auto mt-2 max-w-[520px] text-center text-[13px] leading-normal ${MUTED}`}
         >
           Editions are written from a frozen 24-hour banger set and reviewed
           before publication. Yesterday&rsquo;s is still in the editorial lab.
@@ -335,7 +339,7 @@ export function DigestHero({ preview }: { preview: DigestPreview | null }) {
           onClick={() =>
             captureDashboardDestination('recent_bangers', 'card', false)
           }
-          className="mt-3.5 inline-block text-[13px] font-semibold text-brand"
+          className="mt-3.5 block text-center text-[13px] font-semibold text-brand"
         >
           Explore today&rsquo;s bangers &rarr;
         </Link>
@@ -350,7 +354,7 @@ export function DigestHero({ preview }: { preview: DigestPreview | null }) {
     <div
       className={`${CARD} mb-4 border-t-2 border-t-brand px-6 pb-[30px] pt-7 dark:border-t-brand sm:px-8`}
     >
-      <div className="mb-[18px] flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+      <div className="mb-[18px] flex flex-col justify-between gap-4 sm:flex-row sm:items-start sm:gap-6">
         <span className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1">
           <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand">
             What happened yesterday
@@ -361,13 +365,7 @@ export function DigestHero({ preview }: { preview: DigestPreview | null }) {
             {preview.isPreview ? ' \u00b7 preview' : ''}
           </span>
         </span>
-        <Link
-          href={preview.href}
-          onClick={openDigest}
-          className="whitespace-nowrap text-[13px] font-semibold text-brand"
-        >
-          Read the edition &rarr;
-        </Link>
+        <DigestSubscribeButton placement="home" />
       </div>
 
       {preview.headline && (
@@ -413,6 +411,13 @@ export function DigestHero({ preview }: { preview: DigestPreview | null }) {
           ))}
         </div>
       )}
+      <Link
+        href={preview.href}
+        onClick={openDigest}
+        className="mt-5 inline-block text-[13px] font-semibold text-brand"
+      >
+        Read the edition &rarr;
+      </Link>
     </div>
   )
 }

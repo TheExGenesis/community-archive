@@ -39,6 +39,50 @@ describe('DigestSubscribeButton', () => {
     )
   })
 
+  it('opens the email field on the home card without moving focus', async () => {
+    jest.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+    } as Response)
+    render(<DigestSubscribeButton placement="home" />)
+
+    const input = await screen.findByRole('textbox', {
+      name: 'Email address for the daily digest',
+    })
+    expect(input).toBeVisible()
+    expect(input).not.toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Subscribe' })).toBeEnabled()
+  })
+
+  it('shows the large digest invitation only to unsubscribed viewers', async () => {
+    jest.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ status: 'none' }),
+    } as Response)
+    const { unmount } = render(<DigestSubscribeButton placement="digest" />)
+    const invitation = await screen.findByRole('region', {
+      name: 'Subscribe to the daily digest',
+    })
+    expect(invitation).toHaveTextContent('Get the daily digest in your inbox')
+    expect(screen.getByRole('button', { name: 'Subscribe' })).toBeEnabled()
+    unmount()
+
+    jest.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        status: 'subscribed',
+        id: 'b4f865c8-f05a-4f86-975f-a2a6edfd3981',
+        email: 're••••@example.com',
+      }),
+    } as Response)
+    render(<DigestSubscribeButton placement="digest" />)
+    expect(
+      await screen.findByRole('button', { name: 'Subscribed' }),
+    ).toBeEnabled()
+    expect(
+      screen.queryByRole('region', { name: 'Subscribe to the daily digest' }),
+    ).not.toBeInTheDocument()
+  })
+
   it('shows the server error and stays open on failure', async () => {
     ;(global.fetch as jest.Mock).mockResolvedValue({
       ok: false,

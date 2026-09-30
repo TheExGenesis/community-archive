@@ -11,6 +11,7 @@ type Phase =
   | 'done'
   | 'unsubscribing'
 type ManagedSubscription = { id: string; email: string }
+type Placement = 'compact' | 'home' | 'digest'
 
 // Unsubscribe redirects land on /digest?email=<status>.
 const REDIRECT_MESSAGES: Record<string, string> = {
@@ -22,7 +23,7 @@ const REDIRECT_MESSAGES: Record<string, string> = {
 const pillClasses =
   'rounded-full bg-brand px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 dark:text-brand-foreground dark:focus-visible:ring-offset-[#111114]'
 
-function SubscribeControl() {
+function SubscribeControl({ placement }: { placement: Placement }) {
   // Nullable outside the app router (e.g. bare jsdom renders).
   const searchParams = useSearchParams()
   const redirectMessage = REDIRECT_MESSAGES[searchParams?.get('email') ?? '']
@@ -34,6 +35,9 @@ function SubscribeControl() {
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const focusOnOpen = useRef(false)
+  const isDigestCta = placement === 'digest'
+  const isHome = placement === 'home'
 
   // Viewer state must come from the session, not shared digest page caches.
   useEffect(() => {
@@ -53,19 +57,22 @@ function SubscribeControl() {
           setSubscription({ id: body.id, email: body.email })
           setPhase('done')
         } else {
-          setPhase('idle')
+          setPhase(isHome ? 'open' : 'idle')
         }
       } catch {
-        if (active) setPhase('idle')
+        if (active) setPhase(isHome ? 'open' : 'idle')
       }
     })()
     return () => {
       active = false
     }
-  }, [])
+  }, [isHome])
 
   useEffect(() => {
-    if (phase === 'open') inputRef.current?.focus()
+    if (phase === 'open' && focusOnOpen.current) {
+      inputRef.current?.focus()
+      focusOnOpen.current = false
+    }
   }, [phase])
 
   const submit = async () => {
@@ -129,7 +136,7 @@ function SubscribeControl() {
         )
       }
       setSubscription(null)
-      setPhase('idle')
+      setPhase(isHome ? 'open' : 'idle')
       setMessage('Unsubscribed ✓')
     } catch (cause) {
       setError(
@@ -168,8 +175,25 @@ function SubscribeControl() {
     )
   }
 
+  // Wait for the account check before showing a large invitation to subscribers.
+  if (isDigestCta && phase === 'loading') return null
+
+  const ctaCopy = isDigestCta ? (
+    <div>
+      <p className="text-xl font-semibold text-zinc-950 dark:text-white sm:text-2xl">
+        Get the daily digest in your inbox
+      </p>
+      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+        The stories worth catching up on, delivered each day.
+      </p>
+    </div>
+  ) : null
+
+  const ctaClasses =
+    'mt-9 flex flex-col gap-4 rounded-2xl border border-sky-200 bg-sky-50 p-5 dark:border-sky-900 dark:bg-sky-950/40 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-6'
+
   if (phase === 'idle' || phase === 'loading') {
-    return (
+    const control = (
       <div className="flex items-center gap-2">
         {message || redirectMessage ? (
           <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-500 dark:text-zinc-400">
@@ -180,19 +204,41 @@ function SubscribeControl() {
           type="button"
           disabled={phase === 'loading'}
           aria-busy={phase === 'loading'}
-          onClick={() => setPhase('open')}
-          className={pillClasses}
+          onClick={() => {
+            focusOnOpen.current = true
+            setPhase('open')
+          }}
+          className={
+            isDigestCta
+              ? 'rounded-full bg-brand px-7 py-3 text-base font-bold text-white shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 dark:text-brand-foreground'
+              : pillClasses
+          }
         >
           Subscribe
         </button>
       </div>
     )
+    return isDigestCta ? (
+      <section
+        aria-label="Subscribe to the daily digest"
+        className={ctaClasses}
+      >
+        {ctaCopy}
+        {control}
+      </section>
+    ) : (
+      control
+    )
   }
 
-  return (
-    <div className="relative">
+  const form = (
+    <div className={isHome || isDigestCta ? 'w-full sm:w-auto' : 'relative'}>
       <form
-        className="flex items-center gap-1 rounded-full border border-zinc-300 bg-white py-0.5 pl-3 pr-0.5 focus-within:ring-2 focus-within:ring-brand dark:border-zinc-700 dark:bg-zinc-900"
+        className={`flex items-center gap-1 border border-zinc-300 bg-white pl-3 focus-within:ring-2 focus-within:ring-brand dark:border-zinc-700 dark:bg-zinc-900 ${
+          isHome || isDigestCta
+            ? 'rounded-xl py-1 pr-1 shadow-sm'
+            : 'rounded-full py-0.5 pr-0.5'
+        }`}
         onSubmit={(event) => {
           event.preventDefault()
           void submit()
@@ -209,29 +255,57 @@ function SubscribeControl() {
           }}
           placeholder="you@example.com"
           aria-label="Email address for the daily digest"
-          className="w-44 bg-transparent text-[13px] text-zinc-900 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-100 sm:w-52"
+          className={`min-w-0 flex-1 bg-transparent text-zinc-900 placeholder:text-zinc-400 focus:outline-none dark:text-zinc-100 ${
+            isHome || isDigestCta
+              ? 'w-32 text-sm sm:w-44'
+              : 'w-44 text-[13px] sm:w-52'
+          }`}
           disabled={phase === 'submitting'}
         />
         <button
           type="submit"
           disabled={phase === 'submitting'}
-          className={`${pillClasses} disabled:opacity-60`}
+          className={`${
+            isHome || isDigestCta
+              ? 'shrink-0 rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:text-brand-foreground'
+              : pillClasses
+          } disabled:opacity-60`}
         >
           {phase === 'submitting' ? 'Subscribing…' : 'Subscribe'}
         </button>
       </form>
-      <span className="absolute right-0 top-full mt-1 whitespace-nowrap pr-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+      <span
+        className={`${isHome || isDigestCta ? 'mt-1 block' : 'absolute right-0 top-full mt-1 whitespace-nowrap pr-2'} text-[11px] text-zinc-500 dark:text-zinc-400`}
+      >
         {error ?? 'Daily digest in your inbox. Unsubscribe anytime.'}
       </span>
     </div>
   )
+  return isDigestCta ? (
+    <section aria-label="Subscribe to the daily digest" className={ctaClasses}>
+      {ctaCopy}
+      {form}
+    </section>
+  ) : (
+    form
+  )
 }
 
-export function DigestSubscribeButton() {
+export function DigestSubscribeButton({
+  placement = 'compact',
+}: {
+  placement?: Placement
+}) {
   return (
     // useSearchParams needs a Suspense boundary on statically rendered pages.
-    <Suspense fallback={<span className={pillClasses}>Subscribe</span>}>
-      <SubscribeControl />
+    <Suspense
+      fallback={
+        placement === 'digest' ? null : (
+          <span className={pillClasses}>Subscribe</span>
+        )
+      }
+    >
+      <SubscribeControl placement={placement} />
     </Suspense>
   )
 }

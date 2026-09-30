@@ -15,6 +15,7 @@ export interface DigestEmailLinks {
 
 export interface DigestEmailOptions {
   personalizedBulletin?: boolean
+  openUrl?: string
 }
 
 export interface RenderedDigestEmail {
@@ -217,6 +218,7 @@ export function renderDigestEmail(
   </style>
   <div style="margin:0 auto;max-width:600px;padding:24px;font-family:${BODY_FONT};color:#111827;">
     <a href="${escapeHtml(links.siteUrl)}" style="display:inline-block;" aria-label="Community Archive website"><img src="${links.siteUrl}/images/email-logo.png" width="48" height="48" alt="Community Archive" style="display:block;margin:0 0 12px;" /></a>
+    ${options.openUrl ? `<img src="${escapeHtml(options.openUrl)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;" />` : ''}
     <p style="margin:0 0 4px;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#9ca3af;">Community Archive Daily Digest</p>
     <h1 class="digest-h1" style="margin:0 0 16px;font-family:${HEADING_FONT};font-size:30px;line-height:1.2;color:#111827;">${escapeHtml(prettyDate.dayPart)}<span class="digest-year">, ${escapeHtml(prettyDate.year)}</span></h1>
     <p style="margin:0 0 20px;"><a href="${escapeHtml(editionUrl)}" style="color:#1d4ed8;font-size:14px;">Read on Community Archive →</a></p>

@@ -3844,3 +3844,16 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+CREATE OR REPLACE FUNCTION public.record_digest_view(p_edition_id uuid)
+RETURNS bigint
+LANGUAGE sql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+  UPDATE public.digest_editions
+  SET view_count = view_count + 1
+  WHERE id = p_edition_id AND status = 'published'
+  RETURNING view_count;
+$$;
+REVOKE ALL ON FUNCTION public.record_digest_view(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.record_digest_view(uuid) TO service_role;

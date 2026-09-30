@@ -2507,7 +2507,14 @@ export type Database = {
           status: string
           updated_at: string
           version: number
+          view_count: number
         }
+      }
+      record_digest_view: {
+        Args: {
+          p_edition_id: string
+        }
+        Returns: number
       }
       refresh_global_activity_summary: {
         Args: Record<PropertyKey, never>
@@ -2766,3 +2773,4 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+

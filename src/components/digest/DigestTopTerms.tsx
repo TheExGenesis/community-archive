@@ -20,24 +20,26 @@ function TrendTerm({ row }: { row: DigestTrendTerm }) {
         <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
           {digestTrendLabel(row.changePct)}
         </p>
-        <p className="mt-1 text-[23px] font-bold leading-tight">
-          {row.tweets.toLocaleString('en-US')}
-          <span className="ml-1 text-sm font-normal text-muted-foreground">
-            tweets
-          </span>
-        </p>
-        <p className="mt-1 text-sm">
+        <p className="mt-1 break-words text-[20px] font-bold leading-tight">
           <Link
             href={buildSearchHref(row.term)}
-            className="font-semibold text-brand hover:underline"
+            className="text-brand hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             {row.term}
-          </Link>{' '}
-          {row.changePct !== null && (
-            <span className="text-muted-foreground">
-              · {formatDigestShareChange(row.changePct)} share
-            </span>
-          )}
+          </Link>
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          <span aria-hidden="true">
+            {row.tweets.toLocaleString('en-US')}
+            {row.changePct !== null && (
+              <> · {formatDigestShareChange(row.changePct)}</>
+            )}
+          </span>
+          <span className="sr-only">
+            {row.tweets.toLocaleString('en-US')} tweets
+            {row.changePct !== null &&
+              `, ${formatDigestShareChange(row.changePct)} share change`}
+          </span>
         </p>
       </div>
     </div>
@@ -55,19 +57,19 @@ export function DigestTopTerms({
         className="text-[19px] font-semibold"
         style={{ fontFamily: 'Petrona, Georgia, serif' }}
       >
-        Trending terms · 7 days
+        <Link
+          href="/trends"
+          className="text-brand hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
+          Trending terms
+        </Link>{' '}
+        · 7 days
       </h2>
-      <div className="mt-4 space-y-5">
+      <div className="mt-4 space-y-6">
         {snapshot.terms.map((row) => (
           <TrendTerm key={row.term} row={row} />
         ))}
       </div>
-      <Link
-        href="/trends"
-        className="mt-4 inline-flex text-sm font-semibold text-brand hover:underline"
-      >
-        Explore current trends →
-      </Link>
     </section>
   )
 }

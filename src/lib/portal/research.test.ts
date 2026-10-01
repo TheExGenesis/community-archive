@@ -1,6 +1,10 @@
 jest.mock('server-only', () => ({}), { virtual: true })
 
-import { getResearchPosts, selectFeaturedResearchPosts } from './research'
+import {
+  getResearchPosts,
+  latestResearchPost,
+  selectFeaturedResearchPosts,
+} from './research'
 import type { ResearchPost } from './types'
 
 function post(title: string): ResearchPost {
@@ -69,4 +73,24 @@ test('shows the featured research posts and hides the phoenix post', async () =>
     'https://xiqo.substack.com/p/why-do-i-care-about-twitter-so-much',
   ])
   fetchSpy.mockRestore()
+})
+
+test('the latest research post is the newest dated one', () => {
+  const post = (title: string, date: string) => ({
+    title,
+    url: `https://example.com/${title}`,
+    date,
+    excerpt: '',
+    image: null,
+    author: null,
+  })
+  expect(
+    latestResearchPost([
+      post('pinned', '2026-09-24T12:00:00.000Z'),
+      post('undated', ''),
+      post('newer', '2026-09-25T08:00:00.000Z'),
+      post('older', '2026-01-01T00:00:00.000Z'),
+    ])?.title,
+  ).toBe('newer')
+  expect(latestResearchPost([post('undated', '')])).toBeNull()
 })

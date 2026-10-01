@@ -95,6 +95,7 @@ export function DigestEditionView({
                   />
                 ))}
               {slots.subscribers}
+              <div id="digest-subscribe-header" className="contents" />
               {slots.admin ??
                 (isAdmin ? (
                   <Link

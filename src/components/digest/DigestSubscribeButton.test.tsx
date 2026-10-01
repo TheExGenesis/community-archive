@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { DigestSubscribeButton } from './DigestSubscribeButton'
 
 const searchParams = new URLSearchParams()
@@ -127,6 +133,36 @@ describe('DigestSubscribeButton', () => {
   const response = (body: unknown, ok = true) => ({
     ok,
     json: async () => body,
+  })
+
+  it('puts a signed-in subscriber in the digest header and restores the invitation after unsubscribing', async () => {
+    jest
+      .mocked(fetch)
+      .mockResolvedValueOnce(response(subscriber) as Response)
+      .mockResolvedValueOnce(response({ status: 'unsubscribed' }) as Response)
+    jest.mocked(window.confirm).mockReturnValue(true)
+    render(
+      <>
+        <div id="digest-subscribe-header" data-testid="digest-header" />
+        <div data-testid="digest-summary">
+          <DigestSubscribeButton placement="digest" />
+        </div>
+      </>,
+    )
+
+    const header = screen.getByTestId('digest-header')
+    const summary = screen.getByTestId('digest-summary')
+    fireEvent.click(
+      await within(header).findByRole('button', { name: 'Subscribed' }),
+    )
+    expect(within(summary).queryByRole('button')).not.toBeInTheDocument()
+
+    expect(
+      await within(summary).findByRole('textbox', {
+        name: 'Email address for the daily digest',
+      }),
+    ).toBeVisible()
+    expect(within(header).queryByRole('button')).not.toBeInTheDocument()
   })
 
   it('recognizes an existing subscriber and cancels without sending an unsubscribe request', async () => {

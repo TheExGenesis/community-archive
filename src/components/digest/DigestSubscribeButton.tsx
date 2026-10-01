@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 
 type Phase =
@@ -150,7 +151,7 @@ function SubscribeControl({ placement }: { placement: Placement }) {
   }
 
   if (phase === 'done' || phase === 'unsubscribing') {
-    return (
+    const control = (
       <div className="flex flex-wrap items-center gap-2">
         {subscription ? (
           <button
@@ -174,6 +175,11 @@ function SubscribeControl({ placement }: { placement: Placement }) {
         ) : null}
       </div>
     )
+    const header =
+      isDigestCta && subscription && typeof document !== 'undefined'
+        ? document.getElementById('digest-subscribe-header')
+        : null
+    return header ? createPortal(control, header) : control
   }
 
   // Wait for the account check before showing a large invitation to subscribers.

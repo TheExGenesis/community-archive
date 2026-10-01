@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { DigestTrendSnapshot, DigestTrendTerm } from '@/lib/digest/trends'
-import { digestTrendLabel, formatDigestShareChange } from '@/lib/digest/trends'
+import { formatDigestShareChange } from '@/lib/digest/trends'
 import { buildSearchHref } from '@/lib/searchParams'
 
 function TrendTerm({ row }: { row: DigestTrendTerm }) {
@@ -17,10 +17,7 @@ function TrendTerm({ row }: { row: DigestTrendTerm }) {
         </span>
       )}
       <div className="min-w-0">
-        <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-          {digestTrendLabel(row.changePct)}
-        </p>
-        <p className="mt-1 break-words text-[20px] font-bold leading-tight">
+        <p className="break-words text-[20px] font-bold leading-tight">
           <Link
             href={buildSearchHref(row.term)}
             className="text-brand hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
@@ -30,7 +27,7 @@ function TrendTerm({ row }: { row: DigestTrendTerm }) {
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
           <span aria-hidden="true">
-            {row.tweets.toLocaleString('en-US')}
+            {row.tweets.toLocaleString('en-US')} tweets
             {row.changePct !== null && (
               <> · {formatDigestShareChange(row.changePct)}</>
             )}

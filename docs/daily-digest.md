@@ -85,10 +85,15 @@ non-production environment. Do not set it in production.
   `communityAuthored` marker on each candidate. A run keeps only the top `min(50,
 num_bangers_with_score_at_least_2)` rows: every included post has a Community
   Archive banger score of at least two, and there are never more than 50.
-- The existing Supabase tweet-page RPC supplies in-window conversation replies
-  while the experiment is manual. Quote posts remain filtered to Community
-  Archive members through ClickHouse. Both are frozen into the run before the
-  model is called.
+- `src/lib/digest/enrichment.ts` builds each banger's context from the
+  ClickHouse tweet-thread and quote-post endpoints, for both the scheduled
+  publisher and the editor workflow: up to six posts in the reply chain the
+  banger answers, the post it quotes plus up to four posts above that one in
+  its thread, eight in-window replies, twelve in-window Community Archive
+  quote posts, and up to three in-window replies to each of the six most-liked
+  quotes. Every row records what it replies to or quotes, and the prompt
+  resolves those edges to corpus indices. All of it is frozen into the run
+  before the model is called.
 - Supabase/PostgreSQL is authoritative for editorial state:
   `digest_prompt_versions`, `digest_runs`, and `digest_editions`.
 - Published content contains immutable tweet snapshots. Reading a digest does
@@ -105,9 +110,9 @@ projection, not a write authority.
    default, up to 50; save any inclusion or exclusion changes.
 3. Generate. The request queues a Vercel Workflow and returns immediately, so
    refreshing, closing the tab, or navigating elsewhere cannot cancel the job.
-   The durable step fetches up to twelve archived Community Archive quote posts
-   and eight in-window replies per selected banger with independent failure
-   handling. It flattens bangers and context into one deterministic zero-indexed
+   The durable step gathers the thread, quote-post and reply context described
+   above for each selected banger with independent failure handling. It
+   flattens bangers and context into one deterministic zero-indexed
    corpus, then makes exactly one Responses API call. Bangers occupy the first
    indices in rank order, so index `0` is the default representative tweet. The
    receiver validates the JSON schema and converts every returned index back to

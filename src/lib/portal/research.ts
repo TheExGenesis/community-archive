@@ -126,3 +126,32 @@ export async function getResearchPosts(limit = 12): Promise<ResearchPost[]> {
     return []
   }
 }
+
+// Research built on the archive that lives outside the lab-notes feed.
+export const PINNED_RESEARCH_POSTS: ResearchPost[] = [
+  {
+    title: 'Model Behavior Reports',
+    url: 'https://modelbehavior.report/',
+    date: '2026-09-24T12:00:00.000Z',
+    excerpt:
+      'Crowdsourced reports of how language models behave in the wild, collected from X through the Community Archive and summarized by model.',
+    image: '/images/community/model-behavior-reports.webp',
+    author: 'Alexandre Variengien',
+  },
+]
+
+/** Everything /research lists: pinned projects first, then the feed. */
+export async function getResearchListing(limit = 24): Promise<ResearchPost[]> {
+  return [...PINNED_RESEARCH_POSTS, ...(await getResearchPosts(limit))]
+}
+
+/** The most recently dated post; undated feed items never win. */
+export function latestResearchPost(posts: ResearchPost[]): ResearchPost | null {
+  let latest: ResearchPost | null = null
+  for (const post of posts) {
+    const at = Date.parse(post.date)
+    if (!Number.isFinite(at)) continue
+    if (!latest || at > Date.parse(latest.date)) latest = post
+  }
+  return latest
+}

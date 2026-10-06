@@ -1,5 +1,6 @@
 import {
   getMobileNav,
+  getMoreNav,
   getPrimaryNav,
   getTweetBackLink,
   isNavItemActive,
@@ -28,18 +29,22 @@ describe('member navigation', () => {
     expect(navAnalyticsDestination('/community')).toBe('community')
   })
 
-  it('uses the requested primary order without a redundant Home link', () => {
+  it('leads with the daily pages and puts the rest under More, without a redundant Home link', () => {
     expect(getPrimaryNav(true)).toEqual([
       { href: '/bangers?period=week', label: 'Bangers' },
       { href: '/digest', label: 'Digest' },
       { href: '/bulletin', label: 'Bulletin' },
-      { href: '/user-dir', label: 'Users' },
-      { href: '/community', label: 'Community' },
       { href: '/trends', label: 'Trends' },
+    ])
+    expect(getMoreNav(true)).toEqual([
       { href: '/stream', label: 'Live stream' },
       { href: '/social-graph', label: 'Graph' },
+      { href: '/user-dir', label: 'Users' },
+      { href: '/community', label: 'Community' },
       { href: '/research', label: 'Research' },
+      { href: '/docs', label: 'Docs' },
     ])
+    expect(getMoreNav(false)).toEqual([])
     expect(getMobileNav(true)).toEqual(
       expect.arrayContaining([
         { href: '/user-dir', label: 'Users' },
@@ -83,14 +88,14 @@ describe('member navigation', () => {
     })
   })
 
-  it('shows Graph as a standard navigation item to every audience', () => {
+  it('shows Graph to every audience, under More for members', () => {
     const graphItem = {
       href: '/social-graph',
       label: 'Graph',
     }
     expect(getPrimaryNav(false)).toContainEqual(graphItem)
-    expect(getPrimaryNav(true)).toContainEqual(graphItem)
-    expect(getPrimaryNav(true, true)).toContainEqual(graphItem)
+    expect(getMoreNav(true)).toContainEqual(graphItem)
+    expect(getMoreNav(true, true)).toContainEqual(graphItem)
     expect(getMobileNav(false)).toContainEqual(graphItem)
     expect(getMobileNav(true)).toContainEqual(graphItem)
   })

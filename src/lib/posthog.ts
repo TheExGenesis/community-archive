@@ -60,6 +60,8 @@ const isSearchSurface = isOneOf(['advanced', 'header', 'homepage'])
 const isDashboardDestination = isOneOf([
   'all_time_bangers',
   'best_strands',
+  'bulletin',
+  'community_apps',
   'community_builds',
   'daily_digest',
   'data_export',
@@ -70,6 +72,7 @@ const isDashboardDestination = isOneOf([
   'tool',
   'tools',
   'trends',
+  'your_profile',
 ])
 const isDashboardLinkSurface = isOneOf(['card', 'list', 'panel_header'])
 const isTweetCardAction = isOneOf([

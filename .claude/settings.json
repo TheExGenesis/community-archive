@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm tsx scripts/read-digest-runs.ts:*)",
+      "Bash(npx tsx scripts/read-digest-runs.ts:*)",
+      "Bash(pnpm tsx services/nightly-digest/publish.ts --dry-run:*)",
+      "Bash(npx tsx services/nightly-digest/publish.ts --dry-run:*)"
+    ]
+  }
+}

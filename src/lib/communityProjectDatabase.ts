@@ -43,6 +43,15 @@ function sourceTweetId(sourceUrl: string) {
   }
 }
 
+/**
+ * Submissions only carry a full description, so gallery cards lead with its
+ * first sentence as the project's one-line summary.
+ */
+export function summarizeDescription(description: string) {
+  const text = description.trim().replace(/\s+/g, ' ')
+  return text.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? text
+}
+
 export function mapCommunityProjectRow(
   row: CommunityProjectRow,
   likeCount = 0,
@@ -60,7 +69,7 @@ export function mapCommunityProjectRow(
     name: row.name,
     creator: row.creator_name,
     creatorHandle: row.creator_handle ?? undefined,
-    summary: row.description,
+    summary: summarizeDescription(row.description),
     description: row.description,
     archiveUse: row.archive_use,
     category: row.category,

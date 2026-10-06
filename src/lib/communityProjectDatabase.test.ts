@@ -42,4 +42,14 @@ describe('mapCommunityProjectRow', () => {
     expect(project.sourceUrl).toBeUndefined()
     expect(project.sourceTweetId).toBeUndefined()
   })
+
+  it('leads cards with the first sentence of a submitted description', () => {
+    const project = mapCommunityProjectRow({
+      ...projectRow,
+      description:
+        'A voice-first journal with AI reflection. It also exports to v1.2 PDFs.',
+    })
+    expect(project.summary).toBe('A voice-first journal with AI reflection.')
+    expect(project.description).toContain('exports to v1.2 PDFs.')
+  })
 })

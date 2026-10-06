@@ -205,6 +205,26 @@ describe('CommunityGallery', () => {
     expect(screen.getByText('9 projects')).toBeInTheDocument()
   })
 
+  it('leads each card with its one-line summary, then name and creator', () => {
+    const pairwise = COMMUNITY_PROJECTS.find(
+      (project) => project.slug === 'pairwise',
+    )!
+    render(
+      <CommunityGallery
+        publishedProjects={[
+          // A backfilled row only carries the long description.
+          { ...pairwise, summary: pairwise.description },
+        ]}
+      />,
+    )
+
+    const card = screen.getByRole('button', { name: /Pairwise by Loopy/ })
+    expect(card).toHaveTextContent(
+      `${pairwise.summary}${pairwise.name} by ${pairwise.creator}`,
+    )
+    expect(screen.queryByText(/Free/)).not.toBeInTheDocument()
+  })
+
   it('shows hearts for curated cards once their published rows are loaded', () => {
     const slugs = [
       'bangers',

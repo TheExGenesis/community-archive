@@ -202,6 +202,62 @@ describe('daily digest generation contract', () => {
     })
   })
 
+  test('labels thread context and points rows at what they answer or quote', () => {
+    const parent = tweet('4', 'which archive formats should we ship next')
+    const quoteReply = tweet('5', 'graphs beat flat dumps every time')
+    const prompt = renderDigestPrompt('{{candidate_json}}', {
+      digestDate: '2026-08-12',
+      windowStart: '2026-08-11T12:00:00.000Z',
+      windowEnd: '2026-08-12T12:00:00.000Z',
+      candidates: [
+        {
+          ...candidates[2],
+          commentary: [parent, candidates[2].commentary[0], quoteReply],
+          contextKinds: { '4': 'parent', '33': 'quote', '5': 'quote_reply' },
+          relations: {
+            '3': { replyToTweetId: '4' },
+            '33': { quotesTweetId: '3' },
+            '5': { replyToTweetId: '33' },
+          },
+        },
+      ],
+    })
+    const rows = JSON.parse(prompt.split('\n\nCONTEXT ROW KINDS')[0])
+
+    expect(rows.map(({ kind }: { kind: string }) => kind)).toEqual([
+      'banger',
+      'parent',
+      'quote',
+      'quote_reply',
+    ])
+    expect(rows[0]).toMatchObject({ tweet_id: '3', replies_to_index: 1 })
+    expect(rows[2]).toMatchObject({ tweet_id: '33', quotes_index: 0 })
+    expect(rows[3]).toMatchObject({ tweet_id: '5', replies_to_index: 2 })
+    expect(prompt).toContain('CONTEXT ROW KINDS')
+  })
+
+  test('inlines quoted text that has no corpus row of its own', () => {
+    const quoting = {
+      ...tweet('6', 'this is the part everyone missed'),
+      quotedTweet: {
+        ...tweet('7', 'the original announcement'),
+        media: [],
+      },
+    }
+    const prompt = renderDigestPrompt('{{candidate_json}}', {
+      digestDate: '2026-08-12',
+      windowStart: '2026-08-11T12:00:00.000Z',
+      windowEnd: '2026-08-12T12:00:00.000Z',
+      candidates: [{ ...candidates[0], commentary: [quoting] }],
+    })
+
+    expect(JSON.parse(prompt)[1].tweet.quoted_tweet).toEqual({
+      author: '@user_7',
+      text: 'the original announcement',
+    })
+    expect(prompt).not.toContain('CONTEXT ROW KINDS')
+  })
+
   test('assembles validated story and tweet snapshots for publication', () => {
     const edition = assembleDigestEditionContent({
       runId: 'run-1',

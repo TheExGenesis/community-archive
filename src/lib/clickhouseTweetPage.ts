@@ -4,7 +4,7 @@ import {
   buildConversationTree,
   type ConversationTree,
   type ThreadTweet,
-} from './threadUtils'
+} from './conversationTree'
 
 interface ClickHouseTweetDetail {
   tweetId: string

@@ -12,6 +12,9 @@ rsync -a --delete "$repo_root/services/nightly-digest/" "$host:$stage/services/n
 rsync -a --delete "$repo_root/src/lib/digest/" "$host:$stage/src/lib/digest/"
 rsync -a --delete "$repo_root/src/lib/portal/" "$host:$stage/src/lib/portal/"
 rsync -a "$repo_root/src/lib/clickhouseGateway.ts" "$host:$stage/src/lib/clickhouseGateway.ts"
+rsync -a "$repo_root/src/lib/clickhouseQuotePosts.ts" "$host:$stage/src/lib/clickhouseQuotePosts.ts"
+rsync -a "$repo_root/src/lib/clickhouseTweetPage.ts" "$host:$stage/src/lib/clickhouseTweetPage.ts"
+rsync -a "$repo_root/src/lib/conversationTree.ts" "$host:$stage/src/lib/conversationTree.ts"
 rsync -a "$repo_root/tsconfig.json" "$host:$stage/tsconfig.json"
 rsync -a "$repo_root/ops/nightly-digest/community-archive-nightly-digest.service" \
   "$host:/etc/systemd/system/community-archive-nightly-digest.service"

@@ -12,7 +12,16 @@ export interface EnrichedDigestCandidate {
   commentary: PortalTweet[]
   /** IDs within commentary that are replies; every other commentary row is a quote post. */
   replyTweetIds?: string[]
+  /** Context role of each commentary row; overrides replyTweetIds when present. */
+  contextKinds?: Record<string, DigestPromptTweetKind>
+  /** Reply and quote edges for the banger and its commentary, by tweet ID. */
+  relations?: Record<string, DigestTweetRelation>
   totalReplyCount: number
+}
+
+export interface DigestTweetRelation {
+  replyToTweetId?: string
+  quotesTweetId?: string
 }
 
 interface ModelStory {
@@ -32,7 +41,20 @@ interface ParsedModelDigest {
   editorialWarnings: string[]
 }
 
-export type DigestPromptTweetKind = 'banger' | 'quote' | 'reply'
+export type DigestPromptTweetKind =
+  | 'banger'
+  /** A quote post of the banger. */
+  | 'quote'
+  /** A reply in the banger's conversation, below the banger. */
+  | 'reply'
+  /** A post above the banger in the reply chain it answers. */
+  | 'parent'
+  /** The post the banger quotes. */
+  | 'quoted'
+  /** A post above the quoted post in its reply chain. */
+  | 'quoted_thread'
+  /** A reply to one of the banger's quote posts. */
+  | 'quote_reply'
 
 export interface DigestPromptCorpusRow {
   index: number
@@ -287,25 +309,29 @@ export function buildDigestPromptCorpus(
   const seenTweetIds = new Set(bangerRows.map(({ tweetId }) => tweetId))
   const contextRows: DigestPromptCorpusRow[] = []
 
-  candidates.forEach(({ commentary, replyTweetIds }, parentBangerIndex) => {
-    const replies = new Set(replyTweetIds ?? [])
-    commentary.forEach((tweet) => {
-      if (seenTweetIds.has(tweet.id)) return
-      seenTweetIds.add(tweet.id)
-      contextRows.push({
-        index: bangerRows.length + contextRows.length,
-        kind: replies.has(tweet.id) ? 'reply' : 'quote',
-        parentBangerIndex,
-        tweetId: tweet.id,
-        tweet,
+  candidates.forEach(
+    ({ commentary, replyTweetIds, contextKinds }, parentBangerIndex) => {
+      const replies = new Set(replyTweetIds ?? [])
+      commentary.forEach((tweet) => {
+        if (seenTweetIds.has(tweet.id)) return
+        seenTweetIds.add(tweet.id)
+        contextRows.push({
+          index: bangerRows.length + contextRows.length,
+          kind:
+            contextKinds?.[tweet.id] ??
+            (replies.has(tweet.id) ? 'reply' : 'quote'),
+          parentBangerIndex,
+          tweetId: tweet.id,
+          tweet,
+        })
       })
-    })
-  })
+    },
+  )
 
   return [...bangerRows, ...contextRows]
 }
 
-const promptTweet = (tweet: PortalTweet) => ({
+const promptTweet = (tweet: PortalTweet, quotedIsInCorpus: boolean) => ({
   author: `@${tweet.username}`,
   display_name: tweet.name,
   created_at: tweet.createdAt,
@@ -313,7 +339,18 @@ const promptTweet = (tweet: PortalTweet) => ({
   likes: tweet.likes,
   reposts: tweet.rts,
   has_media: Boolean(tweet.media?.length),
+  ...(tweet.quotedTweet && !quotedIsInCorpus
+    ? {
+        quoted_tweet: {
+          author: `@${tweet.quotedTweet.username}`,
+          text: tweet.quotedTweet.text,
+        },
+      }
+    : {}),
 })
+
+const CONTEXT_GUIDE = `CONTEXT ROW KINDS
+Each banger is followed by rows whose parent_banger_index points to it. kind says how a row relates: "parent" rows are the reply chain the banger answers (oldest first); "quoted" is the post the banger quotes and "quoted_thread" rows are the reply chain above that post; "reply" rows are in-window replies below the banger; "quote" rows are in-window quote posts of the banger; "quote_reply" rows are replies to those quote posts. replies_to_index and quotes_index point to the corpus row a post answers or quotes. A tweet.quoted_tweet field carries quoted text that is not its own row. Read a banger through this context before describing it, and keep crediting the banger's author for the banger's words.`
 
 export function renderDigestPrompt(
   template: string,
@@ -326,17 +363,41 @@ export function renderDigestPrompt(
   },
 ): string {
   const corpus = buildDigestPromptCorpus(input.candidates)
+  const indexByTweetId = new Map(corpus.map((row) => [row.tweetId, row.index]))
+  const relations = new Map<string, DigestTweetRelation>()
+  for (const candidate of input.candidates) {
+    for (const [tweetId, relation] of Object.entries(
+      candidate.relations ?? {},
+    )) {
+      if (!relations.has(tweetId)) relations.set(tweetId, relation)
+    }
+  }
+  const hasContextGraph = input.candidates.some(
+    ({ relations, contextKinds }) => relations || contextKinds,
+  )
   const candidateJson = JSON.stringify(
     corpus.map((row) => {
       const candidate =
         row.kind === 'banger'
           ? input.candidates[row.index]?.candidate
           : undefined
+      const relation = relations.get(row.tweetId)
+      const repliesToIndex = relation?.replyToTweetId
+        ? indexByTweetId.get(relation.replyToTweetId)
+        : undefined
+      const quotedTweetId = relation?.quotesTweetId ?? row.tweet.quotedTweet?.id
+      const quotesIndex = quotedTweetId
+        ? indexByTweetId.get(quotedTweetId)
+        : undefined
       return {
         index: row.index,
         kind: row.kind,
         parent_banger_index: row.parentBangerIndex,
         tweet_id: row.tweetId,
+        ...(repliesToIndex !== undefined
+          ? { replies_to_index: repliesToIndex }
+          : {}),
+        ...(quotesIndex !== undefined ? { quotes_index: quotesIndex } : {}),
         ...(candidate
           ? {
               source_rank: candidate.sourceRank,
@@ -351,17 +412,20 @@ export function renderDigestPrompt(
                 0,
             }
           : {}),
-        tweet: promptTweet(row.tweet),
+        tweet: promptTweet(row.tweet, quotesIndex !== undefined),
       }
     }),
     null,
     2,
   )
-  const rendered = template
+  const renderedTemplate = template
     .replaceAll('{{digest_date}}', input.digestDate)
     .replaceAll('{{window_start}}', input.windowStart)
     .replaceAll('{{window_end}}', input.windowEnd)
     .replaceAll('{{candidate_json}}', candidateJson)
+  const rendered = hasContextGraph
+    ? `${renderedTemplate}\n\n${CONTEXT_GUIDE}`
+    : renderedTemplate
 
   if (!input.priorDigests?.length) return rendered
 

@@ -1,5 +1,6 @@
 import { snapshotDigestTrends } from '@/lib/digest/snapshotTrends'
 import { loadDigestCandidates } from '@/lib/digest/candidates'
+import { enrichDigestCandidates } from '@/lib/digest/enrichment'
 import {
   getDigestDateWindow,
   getLatestCompletedDigestDate,
@@ -416,8 +417,9 @@ export async function publishNightlyDigest(
       `Only ${snapshot.candidates.length} digest candidates were found`,
     )
   }
-  const enrichedCandidates: EnrichedDigestCandidate[] = snapshot.candidates.map(
-    (candidate) => ({ candidate, commentary: [], totalReplyCount: 0 }),
+  const { enrichedCandidates, failedFetches } = await enrichDigestCandidates(
+    snapshot.candidates,
+    window,
   )
   const runId = crypto.randomUUID()
   const startedAt = new Date()
@@ -432,6 +434,18 @@ export async function publishNightlyDigest(
         community_authored_count: snapshot.communityAuthoredCount,
         interaction_fallback_count: snapshot.fallbackCount,
         qualifying_banger_count: snapshot.bangerCount,
+      },
+    ),
+    event(
+      'commentary',
+      'completed',
+      'Saved thread, quote-post and reply context for the candidates.',
+      {
+        failed_fetches: failedFetches,
+        commentary_count: enrichedCandidates.reduce(
+          (sum, candidate) => sum + candidate.commentary.length,
+          0,
+        ),
       },
     ),
   ]

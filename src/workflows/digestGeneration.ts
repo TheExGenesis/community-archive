@@ -17,7 +17,11 @@ import {
   renderDigestPrompt,
   renderDigestRevisionPrompt,
 } from '@/lib/digest/generation'
-import { generateDigestWithModel } from '@/lib/digest/openai'
+import {
+  DIGEST_CONTENT_FILTER_FALLBACK_MODEL,
+  generateDigestWithModel,
+  isContentFiltered,
+} from '@/lib/digest/openai'
 import type { DigestEditionContent, DigestRunEvent } from '@/lib/digest/types'
 import { getWorkflowMetadata } from 'workflow'
 
@@ -215,15 +219,35 @@ async function executeDigestGeneration(runId: string) {
 
   let generated
   try {
-    generated = await generateDigestWithModel({
+    const request = {
       runId,
-      model: prompt.model,
       systemPrompt: prompt.systemPrompt,
       userPrompt,
       reasoningEffort: prompt.parameters.reasoning_effort,
       maxOutputTokens: prompt.parameters.max_output_tokens,
       temperature: prompt.parameters.temperature,
+    }
+    generated = await generateDigestWithModel({
+      ...request,
+      model: prompt.model,
     })
+    if (
+      isContentFiltered(generated) &&
+      prompt.model !== DIGEST_CONTENT_FILTER_FALLBACK_MODEL
+    ) {
+      events.push(
+        event(
+          'generation',
+          'started',
+          `${prompt.model} hit a content filter; retrying with ${DIGEST_CONTENT_FILTER_FALLBACK_MODEL}.`,
+          { filtered_response_id: generated.responseId },
+        ),
+      )
+      generated = await generateDigestWithModel({
+        ...request,
+        model: DIGEST_CONTENT_FILTER_FALLBACK_MODEL,
+      })
+    }
   } catch (error) {
     console.error('[daily digest workflow] model generation failed', {
       runId,

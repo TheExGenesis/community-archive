@@ -1,5 +1,9 @@
 import { generateValidated } from '../../../services/nightly-digest/publish'
-import { generateDigestWithModel, DIGEST_JSON_SCHEMA } from './openai'
+import {
+  DIGEST_CONTENT_FILTER_FALLBACK_MODEL,
+  DIGEST_JSON_SCHEMA,
+  generateDigestWithModel,
+} from './openai'
 import { assembleDigestEditionContent } from './generation'
 import type { DigestPromptVersion } from './types'
 
@@ -65,4 +69,34 @@ test('does not spend another request after validation succeeds', async () => {
   const result = await generateValidated(input)
   expect(result.attempts).toHaveLength(1)
   expect(generate).toHaveBeenCalledTimes(1)
+})
+
+test('retries a content-filtered request on the fallback model', async () => {
+  const response = (model: string, finishReason: string) => ({
+    response: { choices: [{ finish_reason: finishReason }] },
+    output: finishReason === 'stop' ? { stories: [] } : null,
+    outputError:
+      finishReason === 'stop'
+        ? null
+        : 'OpenRouter response did not include output text',
+    responseId: `${model}-response`,
+    model,
+    inputTokens: 10,
+    outputTokens: 10,
+    totalTokens: 20,
+  })
+  generate
+    .mockResolvedValueOnce(response(input.prompt.model, 'content_filter'))
+    .mockResolvedValueOnce(
+      response(DIGEST_CONTENT_FILTER_FALLBACK_MODEL, 'stop'),
+    )
+  assemble.mockReturnValue({ stories: [] } as never)
+  const result = await generateValidated(input)
+  expect(generate.mock.calls.map(([request]) => request.model)).toEqual([
+    input.prompt.model,
+    DIGEST_CONTENT_FILTER_FALLBACK_MODEL,
+  ])
+  expect(generate.mock.calls[1][0].userPrompt).toBe(input.renderedPrompt)
+  expect(result.attempts).toHaveLength(2)
+  expect(result.generated.model).toBe(DIGEST_CONTENT_FILTER_FALLBACK_MODEL)
 })

@@ -104,6 +104,22 @@ export interface DigestGenerationResponse {
 
 const MODEL_REQUEST_TIMEOUT_MS = 240_000
 
+// Claude's safety classifier can refuse a whole edition over one newsworthy
+// post (for example biosecurity reporting). The digest should still cover
+// controversial material, so a filtered request is retried on this model.
+export const DIGEST_CONTENT_FILTER_FALLBACK_MODEL = 'moonshotai/kimi-k3'
+
+export function isContentFiltered(generated: DigestGenerationResponse) {
+  const choices = generated.response.choices
+  const choice = Array.isArray(choices) ? choices[0] : null
+  return Boolean(
+    choice &&
+      typeof choice === 'object' &&
+      (choice as { finish_reason?: unknown }).finish_reason ===
+        'content_filter',
+  )
+}
+
 const safeTokenCount = (value: unknown): number | null => {
   const parsed = Number(value)
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null

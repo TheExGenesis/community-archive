@@ -12,8 +12,10 @@ import {
   type EnrichedDigestCandidate,
 } from '@/lib/digest/generation'
 import {
+  DIGEST_CONTENT_FILTER_FALLBACK_MODEL,
   DIGEST_JSON_SCHEMA,
   generateDigestWithModel,
+  isContentFiltered,
   type DigestGenerationResponse,
 } from '@/lib/digest/openai'
 import type {
@@ -273,23 +275,38 @@ export async function generateValidated(input: {
   const attempts: DigestGenerationResponse[] = []
   let lastError = ''
   let rejectedOutput: unknown = null
+  let model = input.prompt.model
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     const userPrompt =
       attempt === 1
         ? input.renderedPrompt
         : `${input.renderedPrompt}\n\nREPAIR THE REJECTED RESPONSE\nThe previous JSON was rejected by the deterministic receiver: ${lastError}\nReturn one corrected JSON object only. Do not add Markdown or prose. Preserve grounded content while fixing every validation error. Shorten overlong fields by rewriting complete sentences; never truncate them.\n\nREQUIRED JSON SCHEMA\n${JSON.stringify(DIGEST_JSON_SCHEMA)}\n\nREJECTED RESPONSE\n${JSON.stringify(rejectedOutput)}`
-    const generated = await generateDigestWithModel({
+    const request = {
       runId: input.runId,
-      model: input.prompt.model,
       systemPrompt: input.prompt.systemPrompt,
       userPrompt,
       reasoningEffort: input.prompt.parameters.reasoning_effort,
       maxOutputTokens: input.prompt.parameters.max_output_tokens,
       temperature: attempt === 1 ? input.prompt.parameters.temperature : 0,
-    })
+    }
+    let generated = await generateDigestWithModel({ ...request, model })
     attempts.push(generated)
     await input.onAttempt?.(attempts)
+    if (
+      isContentFiltered(generated) &&
+      model !== DIGEST_CONTENT_FILTER_FALLBACK_MODEL
+    ) {
+      log('content filter; retrying with fallback model', {
+        attempt,
+        from: model,
+        to: DIGEST_CONTENT_FILTER_FALLBACK_MODEL,
+      })
+      model = DIGEST_CONTENT_FILTER_FALLBACK_MODEL
+      generated = await generateDigestWithModel({ ...request, model })
+      attempts.push(generated)
+      await input.onAttempt?.(attempts)
+    }
     rejectedOutput = generated.output
     try {
       if (generated.outputError) throw new Error(generated.outputError)

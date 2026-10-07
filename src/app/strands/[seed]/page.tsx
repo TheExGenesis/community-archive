@@ -24,12 +24,15 @@ export async function generateMetadata({
   params: { seed: string }
 }): Promise<Metadata> {
   const strand = await findStrand(params.seed)
+  const title = `${strand.title} · Strands · Community Archive`
+  const description = strand.summary.slice(0, 160)
+  const url = `https://www.community-archive.org/strands/${strand.id}`
   return {
-    title: `${strand.title} · Strands · Community Archive`,
-    description: strand.summary.slice(0, 160),
-    alternates: {
-      canonical: `https://www.community-archive.org/strands/${strand.id}`,
-    },
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { type: 'article', url, title, description },
+    twitter: { card: 'summary_large_image', title, description },
   }
 }
 export default async function StrandPage({

@@ -20,6 +20,8 @@ export interface CommunityProject {
   creator: string
   creatorHandle?: string
   summary: string
+  /** An admin set this headline; it wins over the curated one. */
+  summaryEdited?: boolean
   description: string
   archiveUse: string
   category: CommunityProjectCategory
@@ -401,7 +403,9 @@ export function mergeCommunityCatalog(
     bySlug.set(project.slug, {
       ...project,
       image: override?.image ?? project.image ?? curated?.image,
-      summary: curated?.summary ?? override?.summary ?? project.summary,
+      summary: project.summaryEdited
+        ? project.summary
+        : (curated?.summary ?? override?.summary ?? project.summary),
       coverClass: curated?.coverClass ?? project.coverClass,
     })
   }

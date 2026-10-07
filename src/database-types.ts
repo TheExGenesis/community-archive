@@ -342,6 +342,7 @@ export type Database = {
           submitted_at: string
           submitted_by: string | null
           submitter_username: string
+          summary: string | null
           tags: string[]
         }
         Insert: {
@@ -364,6 +365,7 @@ export type Database = {
           submitted_at?: string
           submitted_by?: string | null
           submitter_username: string
+          summary?: string | null
           tags?: string[]
         }
         Update: {
@@ -386,6 +388,7 @@ export type Database = {
           submitted_at?: string
           submitted_by?: string | null
           submitter_username?: string
+          summary?: string | null
           tags?: string[]
         }
         Relationships: []

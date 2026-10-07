@@ -99,6 +99,9 @@ describe('CommunityGallery', () => {
       'https://x.com/IvanVendrov/status/1892730504702566541',
     )
     expect(screen.getByRole('checkbox', { name: /Featured/ })).toBeChecked()
+    expect(screen.getByLabelText(/Card headline/)).toHaveValue(
+      'Trace emerging language through the people who used it first.',
+    )
     await user.clear(projectUrl)
     await user.type(projectUrl, 'https://example.org/new-words')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
@@ -107,6 +110,9 @@ describe('CommunityGallery', () => {
     const submitted = mockEdit.mock.calls[0][0]
     expect(submitted.get('projectSlug')).toBe('new-words-and-their-pioneers')
     expect(submitted.get('projectUrl')).toBe('https://example.org/new-words')
+    expect(submitted.get('summary')).toBe(
+      'Trace emerging language through the people who used it first.',
+    )
     await waitFor(() => expect(mockRefresh).toHaveBeenCalled())
     expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()
   })

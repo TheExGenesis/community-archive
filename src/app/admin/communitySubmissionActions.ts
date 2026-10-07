@@ -102,8 +102,14 @@ export async function editPublishedCommunityProject(
   })
   if (!validation.ok) return validation
   const value = validation.value
+  const summary = String(formData.get('summary') ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+  if (summary.length > 160)
+    return { ok: false, error: 'Card headline must be at most 160 characters.' }
   const fields = {
     name: value.name,
+    summary: summary || null,
     project_url: value.projectUrl,
     creator_name: value.creatorName,
     creator_handle: value.creatorHandle,

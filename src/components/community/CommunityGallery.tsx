@@ -479,6 +479,19 @@ function ProjectEditForm({
       </DialogHeader>
       <input type="hidden" name="projectSlug" value={project.slug} />
       <fieldset disabled={saving} className="grid gap-3">
+        <label className="grid gap-1 text-sm">
+          Card headline
+          <input
+            name="summary"
+            defaultValue={project.summary}
+            maxLength={160}
+            className="w-full rounded-md border border-input bg-background px-3 py-2"
+          />
+          <span className="text-muted-foreground">
+            The one-liner on the gallery card and home page. Leave blank to use
+            the default.
+          </span>
+        </label>
         <ProjectEditFields
           sourceOptional
           values={{

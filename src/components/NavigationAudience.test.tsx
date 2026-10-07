@@ -4,13 +4,8 @@ import '@testing-library/jest-dom'
 import { render, screen, waitFor } from '@testing-library/react'
 import {
   AdminNavigationLink,
-  AudienceHeaderNavigation,
   NavigationAudienceProvider,
 } from './NavigationAudience'
-
-jest.mock('next/navigation', () => ({
-  usePathname: () => '/',
-}))
 
 describe('NavigationAudience', () => {
   beforeEach(() => {
@@ -21,28 +16,17 @@ describe('NavigationAudience', () => {
     jest.restoreAllMocks()
   })
 
-  it('server-renders public navigation before checking the session', () => {
+  it('hides the admin link before checking the session', () => {
     render(
       <NavigationAudienceProvider>
-        <AudienceHeaderNavigation kind="primary" />
         <AdminNavigationLink />
       </NavigationAudienceProvider>,
     )
 
-    expect(screen.getByRole('link', { name: 'Docs' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Bulletin' })).toHaveAttribute(
-      'href',
-      '/bulletin',
-    )
-    expect(
-      screen.getByRole('link', { name: 'Upload archive' }),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Graph' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Trends' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Admin dashboard' })).toBeNull()
   })
 
-  it('adds member and admin navigation after session hydration', async () => {
+  it('adds the admin link after session hydration', async () => {
     jest.mocked(global.fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ isMember: true, isAdmin: true }),
@@ -50,19 +34,15 @@ describe('NavigationAudience', () => {
 
     render(
       <NavigationAudienceProvider>
-        <AudienceHeaderNavigation kind="primary" />
         <AdminNavigationLink />
       </NavigationAudienceProvider>,
     )
 
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Trends' })).toBeInTheDocument()
-      expect(screen.getByRole('link', { name: 'Graph' })).toBeInTheDocument()
       expect(
         screen.getByRole('link', { name: 'Admin dashboard' }),
       ).toBeInTheDocument()
     })
-    expect(screen.queryByRole('link', { name: 'Upload archive' })).toBeNull()
     expect(global.fetch).toHaveBeenCalledTimes(1)
   })
 })

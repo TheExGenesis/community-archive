@@ -45,11 +45,12 @@ function sourceTweetId(sourceUrl: string) {
 
 /**
  * Submissions only carry a full description, so gallery cards lead with its
- * first sentence as the project's one-line summary.
+ * first sentence as the project's one-line summary. Punctuation followed by a
+ * lowercase word is part of a name ("Cuties! is a..."), not a sentence end.
  */
 export function summarizeDescription(description: string) {
   const text = description.trim().replace(/\s+/g, ' ')
-  return text.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? text
+  return text.match(/^.+?[.!?](?=\s+[^a-z]|\s*$)/)?.[0] ?? text
 }
 
 export function mapCommunityProjectRow(

@@ -358,6 +358,29 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
   },
 ]
 
+/**
+ * Presentation overrides for projects submitted through the gallery form,
+ * keyed by their database slug. A listed cover replaces the uploaded one, and
+ * a listed summary replaces the first sentence of the description.
+ */
+export const SUBMITTED_PROJECT_OVERRIDES: Record<
+  string,
+  Partial<Pick<CommunityProject, 'image' | 'summary'>>
+> = {
+  'cuties-b9b5e204': {
+    image: '/images/community/cuties-preview.webp',
+    summary:
+      'Find friends, opportunities, and dates through a community vouch network.',
+  },
+  'loore-79f33a88': {
+    image: '/images/community/loore-preview.webp',
+  },
+  'finding-your-digital-twin-in-latent-space': {
+    image: '/images/community/finding-your-digital-twin-card.webp',
+    summary: 'Fine-tune a small model to draft tweets in your own voice.',
+  },
+}
+
 export function filterCommunityProjects(
   projects: CommunityProject[],
   query: string,

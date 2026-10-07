@@ -15,6 +15,9 @@ ALTER TABLE "public"."community_project_comments" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE "public"."digest_edition_likes" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_edition_comments" ENABLE ROW LEVEL SECURITY;
+-- No policies on the strand tables: service-role only.
+ALTER TABLE "public"."strand_likes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."strand_comments" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Published digest editions are publicly readable"
   ON "public"."digest_editions"

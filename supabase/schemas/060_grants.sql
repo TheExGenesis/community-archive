@@ -120,9 +120,21 @@ GRANT SELECT ON TABLE "public"."digest_edition_likes" TO "anon", "authenticated"
 REVOKE ALL PRIVILEGES ON TABLE "public"."ca_tweet_likes" FROM "anon", "authenticated";
 GRANT ALL PRIVILEGES ON TABLE "public"."ca_tweet_likes" TO "service_role";
 
+REVOKE ALL PRIVILEGES ON TABLE "public"."tweet_page_summaries" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."tweet_page_summaries" TO "service_role";
+GRANT SELECT ON TABLE "public"."tweet_page_summaries" TO "anon", "authenticated";
+
 REVOKE ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" FROM "anon", "authenticated";
 GRANT ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" TO "service_role";
 GRANT SELECT ON TABLE "public"."digest_edition_comments" TO "anon", "authenticated";
+
+-- Strand likes and comments: service-role only. The API checks the strand is
+-- visible before reading or writing.
+REVOKE ALL PRIVILEGES ON TABLE "public"."strand_likes" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."strand_likes" TO "service_role";
+
+REVOKE ALL PRIVILEGES ON TABLE "public"."strand_comments" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."strand_comments" TO "service_role";
 
 -- Community Gallery: public clients can read only rows allowed by RLS. All
 -- submissions and approvals are performed by authenticated server code after

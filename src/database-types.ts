@@ -372,6 +372,7 @@ export type Database = {
           submitted_at: string
           submitted_by: string | null
           submitter_username: string
+          summary: string | null
           tags: string[]
         }
         Insert: {
@@ -394,6 +395,7 @@ export type Database = {
           submitted_at?: string
           submitted_by?: string | null
           submitter_username: string
+          summary?: string | null
           tags?: string[]
         }
         Update: {
@@ -416,6 +418,7 @@ export type Database = {
           submitted_at?: string
           submitted_by?: string | null
           submitter_username?: string
+          summary?: string | null
           tags?: string[]
         }
         Relationships: []
@@ -1216,6 +1219,63 @@ export type Database = {
         }
         Relationships: []
       }
+      strand_comments: {
+        Row: {
+          content: string
+          created_at: string
+          deleted_at: string | null
+          display_name: string | null
+          id: string
+          strand_id: string
+          updated_at: string
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          id?: string
+          strand_id: string
+          updated_at?: string
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          id?: string
+          strand_id?: string
+          updated_at?: string
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      strand_likes: {
+        Row: {
+          created_at: string
+          id: string
+          strand_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          strand_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          strand_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tweet_link_previews: {
         Row: {
           canonical_url: string | null
@@ -1325,6 +1385,48 @@ export type Database = {
             referencedColumns: ["tweet_id"]
           },
         ]
+      }
+      tweet_page_summaries: {
+        Row: {
+          description: string | null
+          eligible: boolean
+          generated_at: string
+          ineligible_reason: string | null
+          kind: string
+          model: string
+          prompt_version: number
+          search_vector: unknown | null
+          subject_key: string
+          title: string | null
+          tweet_ids: string[]
+        }
+        Insert: {
+          description?: string | null
+          eligible: boolean
+          generated_at?: string
+          ineligible_reason?: string | null
+          kind: string
+          model: string
+          prompt_version: number
+          search_vector?: never
+          subject_key: string
+          title?: string | null
+          tweet_ids: string[]
+        }
+        Update: {
+          description?: string | null
+          eligible?: boolean
+          generated_at?: string
+          ineligible_reason?: string | null
+          kind?: string
+          model?: string
+          prompt_version?: number
+          search_vector?: never
+          subject_key?: string
+          title?: string | null
+          tweet_ids?: string[]
+        }
+        Relationships: []
       }
       tweet_urls: {
         Row: {

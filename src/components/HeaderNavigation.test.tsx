@@ -37,7 +37,7 @@ describe('HeaderNavigation', () => {
     render(<HeaderNavigation entries={getPrimaryNav()} label="Main" />)
 
     expect(screen.getByRole('button', { name: 'Explore archive' })).toHaveClass(
-      'text-brand-deep',
+      'text-brand',
     )
     expect(screen.getByRole('button', { name: 'Ideas' })).not.toHaveClass(
       'bg-brand/10',

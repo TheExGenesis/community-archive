@@ -69,7 +69,8 @@ describe('QuotingTweetsSidebar', () => {
     )
 
     expect(markup).toContain('aria-labelledby="quoting-tweets-heading"')
-    expect(markup).toContain('Tweets quoting this')
+    expect(markup).toContain('Conversation')
+    expect(markup).toContain('Quote tweets')
     expect(markup).toContain('Quote Author')
     expect(markup).toContain('A useful perspective &amp; a second thought.')
     expect(markup).toContain('quote-image.jpg')

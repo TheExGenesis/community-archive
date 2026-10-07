@@ -19,8 +19,9 @@ import {
 import { capturePostHogEvent } from '@/lib/posthog'
 
 const topLevelStyle =
-  'inline-flex h-9 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-medium text-foreground/80 transition-colors hover:bg-brand/5 hover:text-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 xl:px-3 xl:text-sm'
-const activeStyle = 'bg-brand/10 font-semibold text-brand-deep'
+  'inline-flex h-9 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold text-foreground/80 transition-colors hover:bg-brand/5 hover:text-brand-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 xl:px-3 xl:text-sm'
+const activeStyle =
+  'bg-brand/10 text-brand hover:text-brand data-[state=open]:text-brand'
 
 function trackClick(href: string, alreadyActive: boolean) {
   capturePostHogEvent('navigation_item_clicked', {
@@ -106,7 +107,7 @@ function GroupMenu({
                         <span className="block text-[15px] font-semibold leading-tight text-foreground group-data-[active]/item:text-brand-deep">
                           {item.label}
                         </span>
-                        <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">
+                        <span className="mt-1 block text-[13px] font-normal leading-snug text-muted-foreground">
                           {item.description}
                         </span>
                       </span>

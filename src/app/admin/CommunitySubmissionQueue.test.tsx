@@ -31,6 +31,7 @@ const pendingProject: CommunityProjectRow = {
   creator_handle: 'ada',
   category: 'Experiments',
   description: 'A visual map of recurring conversations.',
+  summary: null,
   archive_use: 'It groups archive posts into conversation clusters.',
   source_post_url: 'https://x.com/ada/status/1234567890',
   tags: ['visualization'],

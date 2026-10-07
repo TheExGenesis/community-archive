@@ -538,6 +538,30 @@ CREATE TABLE IF NOT EXISTS "public"."digest_edition_likes" (
 );
 ALTER TABLE "public"."digest_edition_likes" OWNER TO "postgres";
 
+-- Generated editorial titles and summaries for archive permalink pages. One
+-- row per connected sequence (a single tweet or a thread), shared by every
+-- permalink inside it. Ineligible outcomes are stored too, so a low-content
+-- post is judged once. Writes come only from the server's service-role client.
+CREATE TABLE IF NOT EXISTS "public"."tweet_page_summaries" (
+    "subject_key" text PRIMARY KEY,
+    "kind" text NOT NULL CHECK ("kind" IN ('tweet', 'thread')),
+    "tweet_ids" text[] NOT NULL CHECK (cardinality("tweet_ids") > 0),
+    "eligible" boolean NOT NULL,
+    "title" text,
+    "description" text,
+    "ineligible_reason" text,
+    "model" text NOT NULL,
+    "prompt_version" integer NOT NULL,
+    "generated_at" timestamptz NOT NULL DEFAULT now(),
+    "search_vector" tsvector GENERATED ALWAYS AS (
+        to_tsvector('english', coalesce("title", '') || ' ' || coalesce("description", ''))
+    ) STORED,
+    CONSTRAINT "tweet_page_summaries_eligible_has_copy" CHECK (
+        NOT "eligible" OR ("title" IS NOT NULL AND "description" IS NOT NULL)
+    )
+);
+ALTER TABLE "public"."tweet_page_summaries" OWNER TO "postgres";
+
 -- Reader comments on a published edition. The display identity is captured at
 -- write time so rendering never joins auth.users; writes go through the API's
 -- service-role client after session verification. Deletes are soft so a thread
@@ -577,6 +601,35 @@ CREATE TABLE IF NOT EXISTS "public"."ca_tweet_likes" (
 );
 ALTER TABLE "public"."ca_tweet_likes" OWNER TO "postgres";
 
+-- Reader likes and comments on strands. Strands live in the community app
+-- data snapshot rather than a table, so rows key on the seed tweet id. Both
+-- tables are service-role only: visibility is decided in application code.
+CREATE TABLE IF NOT EXISTS "public"."strand_likes" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "strand_id" text NOT NULL,
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "strand_likes_strand_user_key" UNIQUE ("strand_id", "user_id"),
+    CONSTRAINT "strand_likes_strand_id_check" CHECK ("strand_id" ~ '^[0-9]{1,20}$')
+);
+ALTER TABLE "public"."strand_likes" OWNER TO "postgres";
+
+CREATE TABLE IF NOT EXISTS "public"."strand_comments" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "strand_id" text NOT NULL,
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "content" text NOT NULL,
+    "username" text,
+    "display_name" text,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "updated_at" timestamptz NOT NULL DEFAULT now(),
+    "deleted_at" timestamptz,
+    CONSTRAINT "strand_comments_strand_id_check" CHECK ("strand_id" ~ '^[0-9]{1,20}$'),
+    CONSTRAINT "strand_comments_content_length_check"
+      CHECK (char_length("content") BETWEEN 1 AND 2000)
+);
+ALTER TABLE "public"."strand_comments" OWNER TO "postgres";
+
 -- Moderated Community Gallery submissions. Signed-in users submit through the
 -- server; only published rows are exposed to public clients. Covers remain in
 -- a private Storage bucket and are served through a status-gated route.
@@ -589,6 +642,7 @@ CREATE TABLE IF NOT EXISTS "public"."community_projects" (
     "creator_handle" text,
     "category" text NOT NULL,
     "description" text NOT NULL,
+    "summary" text,
     "archive_use" text NOT NULL,
     "source_post_url" text NOT NULL,
     "tags" text[] NOT NULL DEFAULT ARRAY[]::text[],
@@ -605,6 +659,7 @@ CREATE TABLE IF NOT EXISTS "public"."community_projects" (
     CONSTRAINT "community_projects_creator_name_length" CHECK (char_length(creator_name) BETWEEN 1 AND 120),
     CONSTRAINT "community_projects_creator_handle_length" CHECK (creator_handle IS NULL OR char_length(creator_handle) BETWEEN 1 AND 80),
     CONSTRAINT "community_projects_description_length" CHECK (char_length(description) BETWEEN 1 AND 360),
+    CONSTRAINT "community_projects_summary_length" CHECK (summary IS NULL OR char_length(summary) BETWEEN 1 AND 160),
     CONSTRAINT "community_projects_archive_use_length" CHECK (char_length(archive_use) BETWEEN 1 AND 500),
     CONSTRAINT "community_projects_category_check" CHECK (category IN ('Tools', 'Experiments', 'Research', 'Games')),
     CONSTRAINT "community_projects_status_check" CHECK (status IN ('pending', 'published')),

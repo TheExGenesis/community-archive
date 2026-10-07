@@ -1,6 +1,8 @@
 import {
   COMMUNITY_PROJECTS,
   filterCommunityProjects,
+  homepageFeaturedProjects,
+  mergeCommunityCatalog,
 } from './communityProjects'
 
 describe('community project catalog', () => {
@@ -34,6 +36,46 @@ describe('community project catalog', () => {
       expect(project.projectUrl ?? '').not.toContain('example.com')
       expect(project.image ?? '').not.toContain('pbs.twimg.com')
     }
+  })
+
+  it('lets admin-edited rows choose the home page projects', () => {
+    expect(
+      homepageFeaturedProjects(mergeCommunityCatalog([])).map(
+        (project) => project.slug,
+      ),
+    ).toEqual(['bangers', 'pairwise', 'birdseye'])
+
+    const edited = mergeCommunityCatalog([
+      {
+        ...COMMUNITY_PROJECTS[0],
+        featured: false,
+        name: 'Bangers (edited)',
+        summary: 'Derived from the description.',
+      },
+      {
+        ...COMMUNITY_PROJECTS.find((project) => project.slug === 'followle')!,
+        featured: true,
+      },
+    ])
+    expect(edited).toHaveLength(COMMUNITY_PROJECTS.length)
+    // A backfilled row keeps the curated headline until an admin writes one.
+    expect(edited[0].summary).toBe(COMMUNITY_PROJECTS[0].summary)
+    expect(
+      mergeCommunityCatalog([
+        {
+          ...COMMUNITY_PROJECTS[0],
+          summary: 'A new headline.',
+          summaryEdited: true,
+        },
+      ])[0].summary,
+    ).toBe('A new headline.')
+    expect(edited[0].name).toBe('Bangers (edited)')
+    expect(
+      homepageFeaturedProjects(edited).map((project) => project.slug),
+    ).toEqual(['pairwise', 'birdseye', 'strands'])
+    expect(
+      filterCommunityProjects(edited, '', 'Games', 'Featured')[0].featured,
+    ).toBe(true)
   })
 
   it('searches across project, creator, category, and tag copy', () => {

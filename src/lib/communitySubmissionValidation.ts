@@ -42,8 +42,17 @@ const parseHttpsUrl = (value: string, label: string) => {
   }
 }
 
+/**
+ * Admin edits of published Gallery entries also cover the curated catalog,
+ * whose first-party entries link to site paths and whose source may be a
+ * non-X page or absent altogether.
+ */
+const parseCatalogUrl = (value: string, label: string) =>
+  /^\/(?![/\\])[^\s\\]*$/.test(value) ? value : parseHttpsUrl(value, label)
+
 export function validateCommunitySubmission(
   formData: FormData,
+  { allowCatalogLinks = false }: { allowCatalogLinks?: boolean } = {},
 ): CommunitySubmissionValidationResult {
   const name = field(formData, 'projectName')
   const creatorName = field(formData, 'creatorName')
@@ -84,11 +93,17 @@ export function validateCommunitySubmission(
   let projectUrl: string
   let sourcePostUrl: string
   try {
-    projectUrl = parseHttpsUrl(field(formData, 'projectUrl'), 'Project URL')
-    sourcePostUrl = parseHttpsUrl(
-      field(formData, 'sourcePost'),
-      'Launch/source post',
-    )
+    const rawSourcePost = field(formData, 'sourcePost')
+    if (allowCatalogLinks) {
+      projectUrl = parseCatalogUrl(field(formData, 'projectUrl'), 'Project URL')
+      // A source equal to the project URL means "no separate source post".
+      sourcePostUrl = rawSourcePost
+        ? parseCatalogUrl(rawSourcePost, 'Launch/source post')
+        : projectUrl
+    } else {
+      projectUrl = parseHttpsUrl(field(formData, 'projectUrl'), 'Project URL')
+      sourcePostUrl = parseHttpsUrl(rawSourcePost, 'Launch/source post')
+    }
   } catch (error) {
     return {
       ok: false,
@@ -96,16 +111,19 @@ export function validateCommunitySubmission(
     }
   }
 
-  const sourceUrl = new URL(sourcePostUrl)
-  if (
-    !['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'].includes(
-      sourceUrl.hostname,
-    )
-  ) {
+  const sourceUrl = new URL(sourcePostUrl, 'https://community-archive.org')
+  const isXPost = [
+    'x.com',
+    'www.x.com',
+    'twitter.com',
+    'www.twitter.com',
+  ].includes(sourceUrl.hostname)
+  if (!isXPost && !allowCatalogLinks) {
     return { ok: false, error: 'Launch/source post must be an X post URL.' }
   }
-  const sourceTweetId = sourceUrl.pathname.match(/\/status\/(\d{1,20})/)?.[1]
-  if (!sourceTweetId) {
+  const sourceTweetId =
+    (isXPost && sourceUrl.pathname.match(/\/status\/(\d{1,20})/)?.[1]) || ''
+  if (!sourceTweetId && (isXPost || !allowCatalogLinks)) {
     return { ok: false, error: 'Launch/source post must include a post ID.' }
   }
 

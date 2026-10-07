@@ -16,6 +16,9 @@ ALTER TABLE "public"."community_project_comments" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."ca_tweet_likes" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_edition_likes" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_edition_comments" ENABLE ROW LEVEL SECURITY;
+-- No policies on the strand tables: service-role only.
+ALTER TABLE "public"."strand_likes" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "public"."strand_comments" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Published digest editions are publicly readable"
   ON "public"."digest_editions"
@@ -247,3 +250,12 @@ CREATE POLICY "Users can read own action log" ON "public"."user_action_log"
 
 GRANT SELECT, INSERT ON public.user_action_log TO authenticated, service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.user_action_log_id_seq TO authenticated, service_role;
+
+ALTER TABLE "public"."tweet_page_summaries" ENABLE ROW LEVEL SECURITY;
+
+-- Generated summaries are public archive metadata. Writes stay service-role only.
+CREATE POLICY "Tweet page summaries are publicly readable"
+  ON "public"."tweet_page_summaries"
+  FOR SELECT
+  TO "anon", "authenticated"
+  USING (true);

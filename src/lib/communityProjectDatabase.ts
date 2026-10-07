@@ -16,6 +16,7 @@ export type CommunityProjectRow = {
   creator_handle: string | null
   category: CommunityProjectCategory
   description: string
+  summary: string | null
   archive_use: string
   source_post_url: string
   tags: string[]
@@ -29,7 +30,7 @@ export type CommunityProjectRow = {
 }
 
 const PROJECT_SELECT =
-  'id, slug, name, project_url, creator_name, creator_handle, category, description, archive_use, source_post_url, tags, cover_storage_path, cover_mime_type, submitter_username, status, featured, submitted_at, published_at'
+  'id, slug, name, project_url, creator_name, creator_handle, category, description, summary, archive_use, source_post_url, tags, cover_storage_path, cover_mime_type, submitter_username, status, featured, submitted_at, published_at'
 
 function sourceTweetId(sourceUrl: string) {
   try {
@@ -70,7 +71,8 @@ export function mapCommunityProjectRow(
     name: row.name,
     creator: row.creator_name,
     creatorHandle: row.creator_handle ?? undefined,
-    summary: summarizeDescription(row.description),
+    summary: row.summary ?? summarizeDescription(row.description),
+    summaryEdited: Boolean(row.summary),
     description: row.description,
     archiveUse: row.archive_use,
     category: row.category,
@@ -96,9 +98,9 @@ type CommunityProjectCommentRow = {
   deleted_at: string | null
 }
 
-export async function loadPublishedCommunityProjects(): Promise<
-  CommunityProject[]
-> {
+export async function loadPublishedCommunityProjects({
+  withCounts = true,
+}: { withCounts?: boolean } = {}): Promise<CommunityProject[]> {
   const admin = createServerServiceRoleClient()
   const { data, error } = await admin
     .from('community_projects')
@@ -113,6 +115,7 @@ export async function loadPublishedCommunityProjects(): Promise<
   }
 
   const rows = (data ?? []) as unknown as CommunityProjectRow[]
+  if (!withCounts) return rows.map((row) => mapCommunityProjectRow(row))
   const projectIds = rows.map((row) => row.id)
   const [likeCounts, commentCounts] = await Promise.all([
     loadCommunityProjectLikeCounts(rows.map((row) => row.slug)),

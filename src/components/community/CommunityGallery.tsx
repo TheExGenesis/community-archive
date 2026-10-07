@@ -409,8 +409,8 @@ function ProjectCard({
             likeState && 'pr-14',
           )}
         >
-          <span className="font-semibold text-foreground">{project.name}</span>{' '}
-          by {project.creator}
+          <span className="font-medium text-foreground">{project.name}</span> by{' '}
+          {project.creator}
         </span>
       </button>
       {likeState ? (

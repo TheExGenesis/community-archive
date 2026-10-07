@@ -1,6 +1,9 @@
 import {
+  flattenNav,
   getMobileNav,
   getPrimaryNav,
+  isNavGroup,
+  isNavGroupActive,
   getTweetBackLink,
   isNavItemActive,
   navAnalyticsDestination,
@@ -23,76 +26,72 @@ describe('user profile navigation', () => {
   })
 })
 
-describe('member navigation', () => {
+describe('site navigation', () => {
   it('maps Community navigation to its own analytics destination', () => {
     expect(navAnalyticsDestination('/community')).toBe('community')
   })
 
-  it('uses the requested primary order without a redundant Home link', () => {
-    expect(getPrimaryNav(true)).toEqual([
-      { href: '/bangers?period=week', label: 'Bangers' },
-      { href: '/digest', label: 'Digest' },
-      { href: '/bulletin', label: 'Bulletin' },
-      { href: '/user-dir', label: 'Users' },
-      { href: '/community', label: 'Community' },
-      { href: '/trends', label: 'Trends' },
-      { href: '/stream', label: 'Live stream' },
-      { href: '/social-graph', label: 'Graph' },
-      { href: '/research', label: 'Research' },
+  it('leads with Home and the digest, then three menus, then Research', () => {
+    const nav = getPrimaryNav()
+    expect(nav.map((entry) => entry.label)).toEqual([
+      'Home',
+      "Today's Digest",
+      'Ideas',
+      'Explore archive',
+      'Community',
+      'Research',
     ])
-    expect(getMobileNav(true)).toEqual(
-      expect.arrayContaining([
-        { href: '/user-dir', label: 'Users' },
-        { href: '/stream', label: 'Live stream' },
-        { href: '/bangers?period=week', label: 'Bangers' },
-        { href: '/digest', label: 'Digest' },
-        { href: '/search', label: 'Search' },
-        { href: '/community', label: 'Community' },
-        { href: '/social-graph', label: 'Graph' },
-      ]),
+    const menus = Object.fromEntries(
+      nav
+        .filter(isNavGroup)
+        .map((group) => [
+          group.label,
+          group.items.map((item) => [item.label, item.href]),
+        ]),
     )
+    expect(menus).toEqual({
+      Ideas: [
+        ['Bangers', '/bangers?period=week'],
+        ['Strands', '/strands'],
+      ],
+      'Explore archive': [
+        ['Explore by user', '/user-dir'],
+        ['Live Stream', '/stream'],
+        ['Trends', '/trends'],
+        ['Social Graph', '/social-graph'],
+      ],
+      Community: [
+        ['Bulletin Board', '/bulletin'],
+        ['Community Apps', '/community'],
+      ],
+    })
+    expect(nav.slice(0, 2)).toEqual([
+      { href: '/', label: 'Home' },
+      { href: '/digest', label: "Today's Digest" },
+    ])
+    expect(nav[5]).toEqual({ href: '/research', label: 'Research' })
+    for (const item of nav.filter(isNavGroup).flatMap((g) => g.items)) {
+      expect(item.description).toMatch(/\.$/)
+    }
+  })
+
+  it('adds Docs and Search to the mobile menu', () => {
+    const mobile = flattenNav(getMobileNav())
+    expect(isNavItemActive('/digest', '/')).toBe(false)
+    expect(mobile.slice(-2)).toEqual([
+      { href: '/docs', label: 'Docs' },
+      { href: '/search', label: 'Search' },
+    ])
+  })
+
+  it('highlights a page and the menu that holds it', () => {
     expect(isNavItemActive('/bangers', '/bangers?period=week')).toBe(true)
     expect(isNavItemActive('/stream', '/stream')).toBe(true)
+    expect(isNavItemActive('/strands/abc', '/strands')).toBe(true)
     expect(isNavItemActive('/search', '/bangers?period=week')).toBe(false)
-  })
-
-  it('shows Bangers and Trends navigation to every audience', () => {
-    expect(getPrimaryNav(false)).toContainEqual({
-      href: '/bangers?period=week',
-      label: 'Bangers',
-    })
-    expect(getPrimaryNav(false)).toContainEqual({
-      href: '/trends',
-      label: 'Trends',
-    })
-    expect(getPrimaryNav(false)).toContainEqual({
-      href: '/digest',
-      label: 'Digest',
-    })
-    expect(getPrimaryNav(false)).toContainEqual({
-      href: '/user-dir',
-      label: 'Users',
-    })
-    expect(getPrimaryNav(false)).toContainEqual({
-      href: '/community',
-      label: 'Community',
-    })
-    expect(getPrimaryNav(true)).toContainEqual({
-      href: '/trends',
-      label: 'Trends',
-    })
-  })
-
-  it('shows Graph as a standard navigation item to every audience', () => {
-    const graphItem = {
-      href: '/social-graph',
-      label: 'Graph',
-    }
-    expect(getPrimaryNav(false)).toContainEqual(graphItem)
-    expect(getPrimaryNav(true)).toContainEqual(graphItem)
-    expect(getPrimaryNav(true, true)).toContainEqual(graphItem)
-    expect(getMobileNav(false)).toContainEqual(graphItem)
-    expect(getMobileNav(true)).toContainEqual(graphItem)
+    const [ideas, explore] = getPrimaryNav().filter(isNavGroup)
+    expect(isNavGroupActive('/strands/abc', ideas)).toBe(true)
+    expect(isNavGroupActive('/strands/abc', explore)).toBe(false)
   })
 })
 
@@ -163,12 +162,10 @@ describe('tweet detail navigation', () => {
   })
 })
 
-test('bulletin navigation is visible to every audience and preserves the source return link', () => {
-  for (const isMember of [false, true]) {
-    for (const nav of [getPrimaryNav(isMember), getMobileNav(isMember)]) {
-      expect(nav).toContainEqual({ href: '/bulletin', label: 'Bulletin' })
-    }
-  }
+test('bulletin navigation preserves the source return link', () => {
+  expect(flattenNav(getMobileNav())).toContainEqual(
+    expect.objectContaining({ href: '/bulletin', label: 'Bulletin Board' }),
+  )
   expect(navAnalyticsDestination('/bulletin')).toBe('opportunities')
   expect(getTweetBackLink({ from: 'opportunities' }).href).toBe('/bulletin')
 })

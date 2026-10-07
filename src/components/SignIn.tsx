@@ -158,7 +158,11 @@ export default function SignIn({ fullPage = false }: { fullPage?: boolean }) {
             'Sign in (Dev Mode)'
           ) : (
             <>
-              Sign in<span className="hidden sm:inline"> with Twitter</span>
+              Sign in
+              <span className="hidden sm:inline lg:hidden xl:inline">
+                {' '}
+                with Twitter
+              </span>
             </>
           )}
         </button>

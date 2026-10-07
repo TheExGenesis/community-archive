@@ -18,10 +18,11 @@ import PagePerformance from '@/components/PagePerformance'
 import PostHogLink from '@/components/PostHogLink'
 import {
   AdminNavigationLink,
-  AudienceHeaderNavigation,
-  AudienceMobileNavigation,
   NavigationAudienceProvider,
 } from '@/components/NavigationAudience'
+import HeaderNavigation from '@/components/HeaderNavigation'
+import MobileNavigation from '@/components/MobileNavigation'
+import { getMobileNav, getPrimaryNav, getUtilityNav } from '@/lib/navigation'
 
 const DynamicSignIn = dynamic(() => import('@/components/SignIn'), {
   ssr: false,
@@ -78,9 +79,9 @@ export default function RootLayout({
               <HashScrollHandler />
               <NavigationAudienceProvider>
                 <header className="sticky top-0 z-50 w-full border-b border-border bg-background/90 backdrop-blur-md">
-                  <div className="flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <AudienceMobileNavigation />
+                  <div className="flex h-14 items-center justify-between px-4 sm:px-6 xl:px-8">
+                    <div className="flex min-w-0 items-center gap-3 lg:gap-2 xl:gap-3">
+                      <MobileNavigation entries={getMobileNav()} />
                       <PostHogLink
                         href="/"
                         eventName="navigation_item_clicked"
@@ -100,7 +101,7 @@ export default function RootLayout({
                           priority
                         />
                         <span
-                          className="hidden whitespace-nowrap text-lg font-bold text-foreground sm:inline lg:hidden 2xl:inline"
+                          className="hidden whitespace-nowrap text-lg font-bold text-foreground sm:inline"
                           style={{
                             fontFamily:
                               'var(--font-petrona), Georgia, "Times New Roman", serif',
@@ -109,10 +110,16 @@ export default function RootLayout({
                           Community Archive
                         </span>
                       </PostHogLink>
-                      <AudienceHeaderNavigation kind="primary" />
+                      <HeaderNavigation
+                        entries={getPrimaryNav()}
+                        label="Main"
+                      />
                     </div>
                     <div className="flex flex-shrink-0 items-center space-x-2 2xl:space-x-3">
-                      <AudienceHeaderNavigation kind="utility" />
+                      <HeaderNavigation
+                        entries={getUtilityNav()}
+                        label="Utility"
+                      />
                       <HeaderSearch />
                       <div className="text-sm">
                         <DynamicSignIn />

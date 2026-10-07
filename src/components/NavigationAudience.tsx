@@ -2,10 +2,7 @@
 
 import Link from 'next/link'
 import { Shield } from 'lucide-react'
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import HeaderNavigation from '@/components/HeaderNavigation'
-import MobileNavigation from '@/components/MobileNavigation'
-import { getMobileNav, getPrimaryNav, getUtilityNav } from '@/lib/navigation'
+import { createContext, useContext, useEffect, useState } from 'react'
 
 type NavigationAudience = {
   isMember: boolean
@@ -60,33 +57,6 @@ export function NavigationAudienceProvider({
       {children}
     </NavigationAudienceContext.Provider>
   )
-}
-
-export function AudienceHeaderNavigation({
-  kind,
-}: {
-  kind: 'primary' | 'utility'
-}) {
-  const { isMember, isAdmin } = useContext(NavigationAudienceContext)
-  const items = useMemo(
-    () =>
-      kind === 'primary'
-        ? getPrimaryNav(isMember, isAdmin)
-        : getUtilityNav(isMember),
-    [isAdmin, isMember, kind],
-  )
-
-  if (items.length === 0) return null
-  return <HeaderNavigation items={items} />
-}
-
-export function AudienceMobileNavigation() {
-  const { isMember, isAdmin } = useContext(NavigationAudienceContext)
-  const items = useMemo(
-    () => getMobileNav(isMember, isAdmin),
-    [isAdmin, isMember],
-  )
-  return <MobileNavigation items={items} />
 }
 
 export function AdminNavigationLink() {

@@ -106,7 +106,7 @@ function GroupMenu({
                         <span className="block text-[15px] font-semibold leading-tight text-foreground group-data-[active]/item:text-brand-deep">
                           {item.label}
                         </span>
-                        <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">
+                        <span className="mt-1 block text-[13px] font-normal leading-snug text-muted-foreground">
                           {item.description}
                         </span>
                       </span>

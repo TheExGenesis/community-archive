@@ -32,6 +32,7 @@ import {
   CommunityProject,
   CommunityProjectSort,
   filterCommunityProjects,
+  SUBMITTED_PROJECT_OVERRIDES,
 } from '@/lib/communityProjects'
 import { cn } from '@/utils/tailwind'
 
@@ -590,10 +591,11 @@ export default function CommunityGallery({
       // A backfilled database row has no uploaded cover; keep the curated
       // catalog's artwork for the same slug so the card doesn't regress.
       const curated = bySlug.get(project.slug)
+      const override = SUBMITTED_PROJECT_OVERRIDES[project.slug]
       bySlug.set(project.slug, {
         ...project,
-        image: project.image ?? curated?.image,
-        summary: curated?.summary ?? project.summary,
+        image: override?.image ?? project.image ?? curated?.image,
+        summary: curated?.summary ?? override?.summary ?? project.summary,
         coverClass: curated?.coverClass ?? project.coverClass,
       })
     }

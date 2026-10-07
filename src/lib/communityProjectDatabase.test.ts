@@ -52,4 +52,15 @@ describe('mapCommunityProjectRow', () => {
     expect(project.summary).toBe('A voice-first journal with AI reflection.')
     expect(project.description).toContain('exports to v1.2 PDFs.')
   })
+
+  it('does not end the summary at punctuation inside a project name', () => {
+    const project = mapCommunityProjectRow({
+      ...projectRow,
+      description:
+        'Cuties! is a community-driven social app and vouch network. People use it to find friends.',
+    })
+    expect(project.summary).toBe(
+      'Cuties! is a community-driven social app and vouch network.',
+    )
+  })
 })

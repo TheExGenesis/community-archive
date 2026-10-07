@@ -225,6 +225,37 @@ describe('CommunityGallery', () => {
     expect(screen.queryByText(/Free/)).not.toBeInTheDocument()
   })
 
+  it('applies cover and summary overrides to a submitted project', () => {
+    const pairwise = COMMUNITY_PROJECTS.find(
+      (project) => project.slug === 'pairwise',
+    )!
+    render(
+      <CommunityGallery
+        publishedProjects={[
+          {
+            ...pairwise,
+            databaseId: 'b9b5e204-282a-47be-841f-74dd182ddbf5',
+            slug: 'cuties-b9b5e204',
+            name: 'Cuties!',
+            creator: 'Christine',
+            summary: 'Cuties!',
+            image: '/api/community/projects/b9b5e204/cover?v=1',
+          },
+        ]}
+      />,
+    )
+
+    const card = screen.getByRole('button', { name: /Cuties! by Christine/ })
+    expect(card).toHaveTextContent(
+      'Find friends, opportunities, and dates through a community vouch network.',
+    )
+    expect(
+      decodeURIComponent(
+        screen.getByAltText('Preview of Cuties!').getAttribute('src') ?? '',
+      ),
+    ).toContain('/images/community/cuties-preview.webp')
+  })
+
   it('shows hearts for curated cards once their published rows are loaded', () => {
     const slugs = [
       'bangers',

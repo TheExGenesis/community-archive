@@ -164,3 +164,23 @@ const requestCache =
     }
   ).cache ?? (<T>(loader: () => Promise<T>) => loader)
 export const getStrands = requestCache(loadStrands)
+
+/**
+ * Visibility check for one strand, with the same rules as getStrands() but a
+ * membership lookup for its author only. API routes call this per request.
+ */
+export async function getVisibleStrand(seed: string) {
+  const manifest = await getAppDataManifest()
+  const strands = (await readSnapshot(
+    `${manifest.prefix}/strands.json`,
+  )) as Strand[]
+  const strand = strands.find((item) => item.id === seed)
+  if (!strand) return null
+  const policy = await getAppPolicy([strand.username])
+  if (
+    !policy.members.has(strand.username.toLowerCase()) ||
+    hasBlockedParticipant(strand.participants, policy.blocked)
+  )
+    return null
+  return strand
+}

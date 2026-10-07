@@ -399,28 +399,18 @@ function ProjectCard({
         className="group block w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-4 focus-visible:ring-offset-background"
       >
         <ProjectCover project={project} />
-        {/* Leave room on the right for the like button layered on top. */}
-        <span
-          className={cn(
-            'mt-3 flex items-baseline justify-between gap-3',
-            likeState && 'pr-14',
-          )}
-        >
-          <span className="text-[15.5px] font-bold tracking-[-0.005em]">
-            {project.name}
-          </span>
+        <span className="mt-3 block text-[15.5px] font-bold leading-snug tracking-[-0.005em]">
+          {project.summary}
         </span>
+        {/* Leave room on the right for the like button layered on top. */}
         <span
           className={cn(
             'mt-1 block text-[13.5px] text-muted-foreground',
             likeState && 'pr-14',
           )}
         >
-          by{' '}
-          <span className="font-semibold text-foreground">
-            {project.creator}
-          </span>{' '}
-          · Free
+          <span className="font-semibold text-foreground">{project.name}</span>{' '}
+          by {project.creator}
         </span>
       </button>
       {likeState ? (
@@ -603,6 +593,7 @@ export default function CommunityGallery({
       bySlug.set(project.slug, {
         ...project,
         image: project.image ?? curated?.image,
+        summary: curated?.summary ?? project.summary,
         coverClass: curated?.coverClass ?? project.coverClass,
       })
     }

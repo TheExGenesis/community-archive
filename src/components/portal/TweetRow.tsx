@@ -636,12 +636,12 @@ export function TweetRow({
       {details}
       {compact && showEngagement && (
         <div className="whitespace-nowrap text-[11.5px] tabular-nums text-zinc-500 dark:text-[#a7a7b4]">
-          <CountMetric
-            count={tweet.likes}
-            label={tweet.likes === 1 ? 'like' : 'likes'}
-          >
-            <PiHeart />
-          </CountMetric>
+          <TweetLikeButton
+            tweetId={tweet.id}
+            xLikeCount={tweet.likes}
+            onToggle={captureAction}
+            format={formatCount}
+          />
         </div>
       )}
     </article>

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import { TweetLikeButton } from '@/components/TweetLikeButton'
 import { PiArrowSquareOut, PiHeart, PiQuotes, PiRepeat } from 'react-icons/pi'
 import ImageLightbox from '@/components/ImageLightbox'
 import { TweetAvatar } from '@/components/TweetAvatar'
@@ -359,10 +360,12 @@ export function TweetRow({
     action:
       | 'collapse'
       | 'expand'
+      | 'like'
       | 'open'
       | 'open_archived_quotes'
       | 'open_external'
-      | 'open_quoted_tweet',
+      | 'open_quoted_tweet'
+      | 'unlike',
   ) => {
     capturePostHogEvent('tweet_card_action', {
       action,
@@ -555,12 +558,12 @@ export function TweetRow({
             />
           )}
           {showEngagement && (
-            <CountMetric
-              count={tweet.likes}
-              label={tweet.likes === 1 ? 'like' : 'likes'}
-            >
-              <PiHeart />
-            </CountMetric>
+            <TweetLikeButton
+              tweetId={tweet.id}
+              xLikeCount={tweet.likes}
+              onToggle={captureAction}
+              format={formatCount}
+            />
           )}
           {showEngagement && tweet.retweetCountAvailable !== false ? (
             <CountMetric

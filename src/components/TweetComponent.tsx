@@ -22,6 +22,8 @@ import { HighlightedText } from '@/components/HighlightedText'
 import { decodeTweetText } from '@/lib/tweetText'
 import TweetAvatarImage from '@/components/TweetAvatarImage'
 import ImageLightbox from '@/components/ImageLightbox'
+import TweetLikeButton from '@/components/TweetLikeButton'
+import TweetLikers from '@/components/TweetLikers'
 
 import type { TweetData } from '@/lib/tweets/types'
 
@@ -60,7 +62,9 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       | 'open_external'
       | 'open_quoted_tweet'
       | 'expand'
-      | 'collapse',
+      | 'collapse'
+      | 'like'
+      | 'unlike',
   ) => {
     capturePostHogEvent('tweet_card_action', {
       action,
@@ -539,11 +543,11 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
             {formatDistanceToNow(createdAt, { addSuffix: true })}
           </Link>
           <span className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1">
-              <FaHeart aria-hidden="true" />
-              {formatNumber(tweet.favorite_count)}
-              <span className="sr-only">likes</span>
-            </span>
+            <TweetLikeButton
+              tweetId={tweet.tweet_id}
+              xLikeCount={tweet.favorite_count}
+              onToggle={captureAction}
+            />
             <span className="inline-flex items-center gap-1">
               <FaRetweet aria-hidden="true" />
               {formatNumber(tweet.retweet_count ?? 0)}
@@ -567,11 +571,11 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
           role="cell"
           className="hidden items-center gap-3 self-center text-xs text-muted-foreground md:flex"
         >
-          <span className="inline-flex items-center gap-1">
-            <FaHeart aria-hidden="true" />
-            {formatNumber(tweet.favorite_count)}
-            <span className="sr-only">likes</span>
-          </span>
+          <TweetLikeButton
+            tweetId={tweet.tweet_id}
+            xLikeCount={tweet.favorite_count}
+            onToggle={captureAction}
+          />
           <span className="inline-flex items-center gap-1">
             <FaRetweet aria-hidden="true" />
             {formatNumber(tweet.retweet_count ?? 0)}
@@ -666,9 +670,11 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
 
       <div className="mt-4 flex flex-col gap-3 border-t border-border pt-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center space-x-4">
-          <span className="flex items-center">
-            <FaHeart className="mr-1" /> {formatNumber(tweet.favorite_count)}
-          </span>
+          <TweetLikeButton
+            tweetId={tweet.tweet_id}
+            xLikeCount={tweet.favorite_count}
+            onToggle={captureAction}
+          />
           <span className="flex items-center">
             <FaRetweet className="mr-1" />{' '}
             {formatNumber(tweet.retweet_count ?? 0)}
@@ -709,6 +715,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
           </a>
         </div>
       </div>
+      {isPermalinkPage && <TweetLikers tweetId={tweet.tweet_id} />}
     </div>
   )
 }

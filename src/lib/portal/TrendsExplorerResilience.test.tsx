@@ -17,6 +17,10 @@ jest.mock('@/components/ExtensionInstallPrompt', () => ({
   __esModule: true,
   default: () => null,
 }))
+// These tests count the explorer's own requests; like hydration is separate.
+jest.mock('@/components/TweetLikeButton', () => ({
+  TweetLikeButton: () => null,
+}))
 const mockCapturePostHogEvent = capturePostHogEvent as jest.Mock
 
 jest.mock('next/navigation', () => ({

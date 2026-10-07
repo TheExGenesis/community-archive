@@ -75,10 +75,12 @@ const isDashboardLinkSurface = isOneOf(['card', 'list', 'panel_header'])
 const isTweetCardAction = isOneOf([
   'collapse',
   'expand',
+  'like',
   'open',
   'open_archived_quotes',
   'open_external',
   'open_quoted_tweet',
+  'unlike',
 ])
 const isTweetOrigin = isOneOf([
   // 'opportunities' is the Bulletin page's launch name, kept for event continuity.

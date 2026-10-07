@@ -140,9 +140,12 @@ function getApiRateLimitPolicy(
   // search or pagination request. Keep each browsing quota bounded per IP.
   if (
     method === 'GET' &&
-    ['/api/tweet-search', '/api/user-directory', '/api/strands'].includes(
-      pathname,
-    )
+    [
+      '/api/tweet-search',
+      '/api/user-directory',
+      '/api/strands',
+      '/api/search/related',
+    ].includes(pathname)
   ) {
     return {
       bucket: `api:${pathname.slice('/api/'.length)}`,

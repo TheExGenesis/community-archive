@@ -259,7 +259,11 @@ export default function TweetList({
           slowLabel="Still searching the archive…"
           className="block text-sm text-muted-foreground"
         />
-        <div className="flex items-center justify-between border-b border-border pb-5">
+        <div
+          className={`flex items-center justify-between ${
+            compact ? 'pb-1' : 'border-b border-border pb-5'
+          }`}
+        >
           <div className="space-y-2">
             <Skeleton className="h-6 w-40" />
             <Skeleton className="h-4 w-64 max-w-full" />

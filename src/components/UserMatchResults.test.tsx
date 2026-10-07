@@ -7,29 +7,24 @@ import {
   fetchMemberSuggestions,
 } from '@/lib/queries/fetchUsers'
 
-jest.mock('@/utils/supabase', () => ({
-  createBrowserClient: () => ({}),
-}))
-
 jest.mock('@/lib/queries/fetchUsers', () => ({
   fetchAccountSuggestions: jest.fn(),
   fetchMemberSuggestions: jest.fn(),
 }))
 
-const accountMatch = {
+const memberMatch = {
   account_id: '123',
-  directory_id: 'account:123',
+  directory_id: 'archive:123',
   username: 'christineist',
   account_display_name: 'Christine Shiba',
-  avatar_media_url: null,
+  avatar_media_url: 'https://pbs.twimg.com/profile_images/1/a.jpg',
   num_followers: 100,
 }
 
 describe('UserMatchResults', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    jest.mocked(fetchAccountSuggestions).mockResolvedValue([accountMatch])
-    jest.mocked(fetchMemberSuggestions).mockResolvedValue([])
+    jest.mocked(fetchMemberSuggestions).mockResolvedValue([memberMatch])
   })
 
   it('shows possible people for a standalone username-like search', async () => {
@@ -45,6 +40,21 @@ describe('UserMatchResults', () => {
     ).toHaveAttribute('href', '/user/christineist')
   })
 
+  it('only offers people who have a profile in the member directory', async () => {
+    jest.mocked(fetchMemberSuggestions).mockResolvedValue([])
+
+    await act(async () => {
+      render(<UserMatchResults query="vibecoder" />)
+    })
+
+    expect(fetchMemberSuggestions).toHaveBeenCalledWith('vibecoder', 3)
+    // Stream-only accounts have no profile, so the all-account search is unused.
+    expect(fetchAccountSuggestions).not.toHaveBeenCalled()
+    expect(
+      screen.queryByRole('heading', { name: /People matching/ }),
+    ).not.toBeInTheDocument()
+  })
+
   it('does not run user matching for a topic phrase', () => {
     render(<UserMatchResults query="community archive" />)
 
@@ -54,7 +64,6 @@ describe('UserMatchResults', () => {
   it('clears old people while a different query is loading or fails', async () => {
     const { rerender } = render(<UserMatchResults query="christine" />)
     await screen.findByRole('link', { name: /Christine Shiba/ })
-    jest.mocked(fetchAccountSuggestions).mockRejectedValue(new Error('offline'))
     jest.mocked(fetchMemberSuggestions).mockRejectedValue(new Error('offline'))
 
     await act(async () => rerender(<UserMatchResults query="exgenesis" />))

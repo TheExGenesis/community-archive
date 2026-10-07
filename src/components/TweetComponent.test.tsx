@@ -108,3 +108,63 @@ it.each([true, false])(
     }
   },
 )
+
+describe('compact search row', () => {
+  const renderRow = () => {
+    render(<TweetComponent tweet={tweet} compact permalinkOrigin="search" />)
+    const [mobileLink, desktopLink] = screen.getAllByRole('link', {
+      name: 'View tweet in Community Archive',
+    })
+    const opened = jest.fn()
+    for (const link of [mobileLink, desktopLink])
+      link.addEventListener('click', (event) => {
+        event.preventDefault()
+        opened(link.getAttribute('href'))
+      })
+    return opened
+  }
+
+  beforeEach(() => jest.clearAllMocks())
+
+  it('opens the archive page when the row is clicked, without an Archive button', () => {
+    const opened = renderRow()
+
+    expect(screen.queryByText('Archive')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('A tweet'))
+
+    expect(opened).toHaveBeenCalledTimes(1)
+    expect(opened.mock.calls[0][0]).toMatch(/^\/tweets\/123\?from=search/)
+    expect(capturePostHogEvent).toHaveBeenCalledWith(
+      'tweet_card_action',
+      expect.objectContaining({ action: 'open' }),
+    )
+  })
+
+  it('leaves clicks on the row’s own links alone', () => {
+    const opened = renderRow()
+    const twitter = screen.getAllByRole('link', {
+      name: 'View original tweet on Twitter',
+    })[0]
+    twitter.addEventListener('click', (event) => event.preventDefault())
+
+    fireEvent.click(twitter)
+    fireEvent.click(screen.getAllByRole('link', { name: /profile/ })[0])
+
+    expect(opened).not.toHaveBeenCalled()
+  })
+
+  it('opens a new tab for modifier clicks', () => {
+    const opened = renderRow()
+    const open = jest.spyOn(window, 'open').mockReturnValue(null)
+
+    fireEvent.click(screen.getByText('A tweet'), { metaKey: true })
+
+    expect(open).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/tweets\/123\?from=search/),
+      '_blank',
+      'noopener',
+    )
+    expect(opened).not.toHaveBeenCalled()
+    open.mockRestore()
+  })
+})

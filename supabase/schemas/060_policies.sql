@@ -13,6 +13,7 @@ ALTER TABLE "public"."community_projects" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."community_project_likes" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."community_project_comments" ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE "public"."ca_tweet_likes" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_edition_likes" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."digest_edition_comments" ENABLE ROW LEVEL SECURITY;
 

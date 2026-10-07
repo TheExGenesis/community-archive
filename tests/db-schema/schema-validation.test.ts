@@ -36,6 +36,7 @@ describe('Database Schema Validation', () => {
       'tweet_link_previews',
       'community_projects',
       'community_project_likes',
+      'ca_tweet_likes',
       'community_project_comments',
     ]
 

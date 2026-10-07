@@ -557,6 +557,25 @@ CREATE TABLE IF NOT EXISTS "public"."digest_edition_comments" (
 );
 ALTER TABLE "public"."digest_edition_comments" OWNER TO "postgres";
 
+-- Likes made on Community Archive itself, distinct from the archived X likes
+-- in "likes"/"liked_tweets". One row is one public record shaped for a later
+-- atproto port: "id" is the record key, "account_id" the actor, "tweet_id" the
+-- subject, "created_at" the record time. The subject is not a foreign key
+-- because tweets may live only in the ClickHouse projection.
+CREATE TABLE IF NOT EXISTS "public"."ca_tweet_likes" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "account_id" text NOT NULL,
+    "tweet_id" text NOT NULL,
+    "username" text,
+    "display_name" text,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "ca_tweet_likes_user_tweet_key" UNIQUE ("user_id", "tweet_id"),
+    CONSTRAINT "ca_tweet_likes_account_id_check" CHECK ("account_id" ~ '^[0-9]{1,20}$'),
+    CONSTRAINT "ca_tweet_likes_tweet_id_check" CHECK ("tweet_id" ~ '^[0-9]{1,20}$')
+);
+ALTER TABLE "public"."ca_tweet_likes" OWNER TO "postgres";
+
 -- Moderated Community Gallery submissions. Signed-in users submit through the
 -- server; only published rows are exposed to public clients. Covers remain in
 -- a private Storage bucket and are served through a status-gated route.

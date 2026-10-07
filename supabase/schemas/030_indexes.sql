@@ -150,6 +150,9 @@ CREATE INDEX IF NOT EXISTS "digest_editions_public_archive_idx"
 CREATE INDEX IF NOT EXISTS "digest_edition_likes_edition_idx"
   ON "public"."digest_edition_likes" ("edition_id");
 
+CREATE INDEX IF NOT EXISTS "ca_tweet_likes_tweet_created_idx"
+  ON "public"."ca_tweet_likes" ("tweet_id", "created_at" DESC);
+
 CREATE INDEX IF NOT EXISTS "digest_edition_comments_edition_created_idx"
   ON "public"."digest_edition_comments" ("edition_id", "created_at");
 CREATE INDEX IF NOT EXISTS "policy_storage_objects_account_ids_idx"

@@ -116,6 +116,10 @@ REVOKE ALL PRIVILEGES ON TABLE "public"."digest_edition_likes" FROM "anon", "aut
 GRANT ALL PRIVILEGES ON TABLE "public"."digest_edition_likes" TO "service_role";
 GRANT SELECT ON TABLE "public"."digest_edition_likes" TO "anon", "authenticated";
 
+-- CA tweet likes carry auth user ids: service-role only, served through the API.
+REVOKE ALL PRIVILEGES ON TABLE "public"."ca_tweet_likes" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."ca_tweet_likes" TO "service_role";
+
 REVOKE ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" FROM "anon", "authenticated";
 GRANT ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" TO "service_role";
 GRANT SELECT ON TABLE "public"."digest_edition_comments" TO "anon", "authenticated";

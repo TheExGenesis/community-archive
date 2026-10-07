@@ -1356,6 +1356,48 @@ export type Database = {
           },
         ]
       }
+      tweet_page_summaries: {
+        Row: {
+          description: string | null
+          eligible: boolean
+          generated_at: string
+          ineligible_reason: string | null
+          kind: string
+          model: string
+          prompt_version: number
+          search_vector: unknown | null
+          subject_key: string
+          title: string | null
+          tweet_ids: string[]
+        }
+        Insert: {
+          description?: string | null
+          eligible: boolean
+          generated_at?: string
+          ineligible_reason?: string | null
+          kind: string
+          model: string
+          prompt_version: number
+          search_vector?: never
+          subject_key: string
+          title?: string | null
+          tweet_ids: string[]
+        }
+        Update: {
+          description?: string | null
+          eligible?: boolean
+          generated_at?: string
+          ineligible_reason?: string | null
+          kind?: string
+          model?: string
+          prompt_version?: number
+          search_vector?: never
+          subject_key?: string
+          title?: string | null
+          tweet_ids?: string[]
+        }
+        Relationships: []
+      }
       tweet_urls: {
         Row: {
           display_url: string

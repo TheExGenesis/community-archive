@@ -116,6 +116,10 @@ REVOKE ALL PRIVILEGES ON TABLE "public"."digest_edition_likes" FROM "anon", "aut
 GRANT ALL PRIVILEGES ON TABLE "public"."digest_edition_likes" TO "service_role";
 GRANT SELECT ON TABLE "public"."digest_edition_likes" TO "anon", "authenticated";
 
+REVOKE ALL PRIVILEGES ON TABLE "public"."tweet_page_summaries" FROM "anon", "authenticated";
+GRANT ALL PRIVILEGES ON TABLE "public"."tweet_page_summaries" TO "service_role";
+GRANT SELECT ON TABLE "public"."tweet_page_summaries" TO "anon", "authenticated";
+
 REVOKE ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" FROM "anon", "authenticated";
 GRANT ALL PRIVILEGES ON TABLE "public"."digest_edition_comments" TO "service_role";
 GRANT SELECT ON TABLE "public"."digest_edition_comments" TO "anon", "authenticated";

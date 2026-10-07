@@ -281,8 +281,8 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                 tweetId={quotedTweet.tweet_id}
               />
               <AvatarFallback>
-                {quotedTweet.account_display_name?.charAt(0) ||
-                  quotedTweet.username?.charAt(0) ||
+                {Array.from(quotedTweet.account_display_name ?? '')[0] ||
+                  Array.from(quotedTweet.username ?? '')[0] ||
                   'U'}
               </AvatarFallback>
             </Avatar>
@@ -476,7 +476,9 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
                 tweetId={tweet.retweeted_tweet_id || tweet.tweet_id}
               />
               <AvatarFallback className="text-xs">
-                {displayName?.charAt(0) || displayUsername?.charAt(0) || 'U'}
+                {Array.from(displayName ?? '')[0] ||
+                  Array.from(displayUsername ?? '')[0] ||
+                  'U'}
               </AvatarFallback>
             </Avatar>
           </Link>
@@ -614,7 +616,9 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
               tweetId={tweet.retweeted_tweet_id || tweet.tweet_id}
             />
             <AvatarFallback>
-              {displayName?.charAt(0) || displayUsername?.charAt(0) || 'U'}
+              {Array.from(displayName ?? '')[0] ||
+                Array.from(displayUsername ?? '')[0] ||
+                'U'}
             </AvatarFallback>
           </Avatar>
         </Link>

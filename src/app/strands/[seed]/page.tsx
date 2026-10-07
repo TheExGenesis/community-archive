@@ -115,6 +115,7 @@ export default async function StrandPage({
             }),
           )}
           activeId={strand.id}
+          className="order-none"
         />
       </div>
     </main>

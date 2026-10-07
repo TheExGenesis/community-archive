@@ -5,6 +5,7 @@ import type { Strand } from '@/lib/community-apps/types'
 import { decodeTweetText } from '@/lib/tweetText'
 import { STRAND_CLUSTER_NAMES } from '@/lib/community-apps/strand-cluster-names'
 import { useStrandFocus } from './StrandFocus'
+import { cn } from '@/lib/utils'
 
 export type MapStrand = Pick<
   Strand,
@@ -14,10 +15,12 @@ export default function StrandMinimap({
   strands,
   activeId,
   initialCluster,
+  className,
 }: {
   strands: MapStrand[]
   activeId?: string
   initialCluster?: number
+  className?: string
 }) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
@@ -158,7 +161,10 @@ export default function StrandMinimap({
   return (
     <aside
       aria-label="Strands minimap"
-      className="order-first border border-border bg-card p-4 [scrollbar-width:none] lg:sticky lg:top-20 lg:order-last lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto [&::-webkit-scrollbar]:hidden"
+      className={cn(
+        'order-first border border-border bg-card p-4 [scrollbar-width:none] lg:sticky lg:top-20 lg:order-last lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto [&::-webkit-scrollbar]:hidden',
+        className,
+      )}
     >
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-bold">A map of ideas</h2>

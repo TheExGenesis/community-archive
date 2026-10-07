@@ -1408,7 +1408,7 @@ export type Database = {
           kind: string
           model: string
           prompt_version: number
-          search_vector?: never
+          search_vector?: unknown | null
           subject_key: string
           title?: string | null
           tweet_ids: string[]
@@ -1421,7 +1421,7 @@ export type Database = {
           kind?: string
           model?: string
           prompt_version?: number
-          search_vector?: never
+          search_vector?: unknown | null
           subject_key?: string
           title?: string | null
           tweet_ids?: string[]

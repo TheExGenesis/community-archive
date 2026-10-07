@@ -145,10 +145,19 @@ function getApiRateLimitPolicy(
       '/api/user-directory',
       '/api/strands',
       '/api/search/related',
+      '/api/tweets/likes',
     ].includes(pathname)
   ) {
     return {
       bucket: `api:${pathname.slice('/api/'.length)}`,
+      maxRequests: isSG ? IN_MEMORY_MAX_API_SG : IN_MEMORY_MAX_API_DEFAULT,
+    }
+  }
+
+  // Liking is a burst of small writes; keep it out of the shared API quota.
+  if (/^\/api\/tweets\/\d+\/like$/.test(pathname) && method !== 'GET') {
+    return {
+      bucket: 'api:tweet-like',
       maxRequests: isSG ? IN_MEMORY_MAX_API_SG : IN_MEMORY_MAX_API_DEFAULT,
     }
   }

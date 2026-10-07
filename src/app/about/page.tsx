@@ -7,6 +7,12 @@ import {
 } from '@/lib/projectContributors'
 import { userProfileHref } from '@/lib/navigation'
 
+export const metadata = {
+  title: 'About · Community Archive',
+  description:
+    'Community Archive is open-source public infrastructure for collecting, hosting, and serving Twitter archives that people choose to share.',
+}
+
 export default function AboutPage() {
   return (
     <div className="container mx-auto max-w-3xl px-4 py-8">

@@ -3,6 +3,12 @@ import UserDirectoryClient from './UserDirectoryClient'
 import { getStats } from '@/lib/stats'
 import { getUserDirectoryPage } from '@/lib/userDirectory'
 
+export const metadata = {
+  title: 'Member directory · Community Archive',
+  description:
+    'Browse the members of Community Archive and their archived tweets.',
+}
+
 export default async function UserDirectoryPage() {
   const totalCount = getStats()
     .then((stats) => stats.userCount)

@@ -6,7 +6,11 @@ import { MUTED, SERIF } from '@/components/portal/styles'
 import ExtensionInstallPrompt from '@/components/ExtensionInstallPrompt'
 import { CHROME_EXTENSION_URL } from '@/lib/browserExtension'
 
-export const metadata = { title: 'Stream · Community Archive' }
+export const metadata = {
+  title: 'Stream · Community Archive',
+  description:
+    'A live feed of tweets arriving in Community Archive as contributors read their timelines.',
+}
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 

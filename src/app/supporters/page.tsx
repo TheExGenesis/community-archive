@@ -3,7 +3,11 @@ import { FaHeart } from 'react-icons/fa'
 import TieredSupportersDisplay from '@/components/TieredSupportersDisplay'
 import { getOpenCollectiveContributors } from '@/lib/supporters'
 
-export const metadata = { title: 'Supporters · Community Archive' }
+export const metadata = {
+  title: 'Supporters · Community Archive',
+  description:
+    'The supporters who make Community Archive, an open public archive of tweets, possible.',
+}
 
 export default async function SupportersPage() {
   const contributors = await getOpenCollectiveContributors()

@@ -1,5 +1,11 @@
 import React from 'react'
 
+export const metadata = {
+  title: 'Privacy policy · Community Archive',
+  description:
+    'What Community Archive stores from an uploaded Twitter archive, what stays private, and how to opt out or delete your data.',
+}
+
 export default function DataPolicyPage() {
   return (
     <div className="container mx-auto max-w-3xl px-4 py-8">
@@ -281,10 +287,7 @@ export default function DataPolicyPage() {
           @exgenesis
         </a>
         . Or find us on{' '}
-        <a
-          href="https://discord.gg/RArTGrUawX"
-          className="text-brand"
-        >
+        <a href="https://discord.gg/RArTGrUawX" className="text-brand">
           Discord
         </a>{' '}
         or{' '}

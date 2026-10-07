@@ -13,6 +13,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import { capturePostHogEvent } from '@/lib/posthog'
 import UserMatchResults from '@/components/UserMatchResults'
+import RelatedContentResults from '@/components/search/RelatedContentResults'
 
 const TweetList = dynamic(() => import('@/components/TweetList'), {
   loading: () => <p role="status">Loading results…</p>,
@@ -91,11 +92,11 @@ function SearchPageContent() {
       <section className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <div className={hasSearch ? 'mb-4' : 'mb-8 max-w-2xl'}>
           <div
-            className={`flex items-center gap-2 font-semibold uppercase tracking-[0.16em] text-brand ${
-              hasSearch ? 'mb-1 text-xs' : 'mb-3 text-sm'
+            className={`flex items-center gap-1.5 font-semibold uppercase tracking-[0.16em] text-brand ${
+              hasSearch ? 'mb-2 text-[11px]' : 'mb-4 text-xs'
             }`}
           >
-            <Search className="h-4 w-4" />
+            <Search className={hasSearch ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
             Archive search
           </div>
           <h1
@@ -122,6 +123,7 @@ function SearchPageContent() {
           {hasSearch ? (
             <>
               <UserMatchResults query={cleanRawText} />
+              <RelatedContentResults query={cleanRawText} />
               <TweetList
                 key={tweetListKey}
                 filterCriteria={filterCriteria}

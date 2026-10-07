@@ -128,6 +128,18 @@ export const createServerAdminClient = (
 // passes the user's JWT as Authorization (service_role only as apikey), which
 // PostgREST treats as the user's authenticated role — fine for ops that
 // should still respect the user's identity, wrong for true admin ops.
+/** Cookie-free anonymous client for public reads inside shared caches. */
+export const createServerAnonClient = () => {
+  const { url, anonKey } = getSupabaseConfig()
+  return createClient<Database>(url, anonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: {
+      fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+        fetch(input, { ...init, cache: 'no-store' }),
+    },
+  })
+}
+
 export const createServerServiceRoleClient = () => {
   const { url, serviceRole } = getSupabaseConfig(true)
   return createClient<Database>(url, serviceRole!, {

@@ -32,6 +32,9 @@ module.exports = {
         },
         'chart-accent': 'hsl(var(--chart-accent))',
         'brand-icon': 'hsl(var(--brand-icon))',
+        'muted-cool': 'hsl(var(--muted-cool) / <alpha-value>)',
+        'table-header': 'hsl(var(--table-header) / <alpha-value>)',
+        'border-cool': 'hsl(var(--border-cool) / <alpha-value>)',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         primary: {

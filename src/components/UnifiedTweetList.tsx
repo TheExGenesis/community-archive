@@ -120,8 +120,8 @@ export default function UnifiedTweetList({
     <div className={compact ? 'space-y-3' : 'space-y-4'}>
       {(headerTitle || headerDescription || showCsvExport) && (
         <div
-          className={`flex flex-col gap-3 border-b border-border sm:flex-row sm:items-end sm:justify-between ${
-            compact ? 'pb-3' : 'pb-5'
+          className={`flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between ${
+            compact ? 'pb-1' : 'border-b border-border pb-5'
           }`}
         >
           <div>
@@ -177,10 +177,13 @@ export default function UnifiedTweetList({
             aria-label={headerTitle || 'Tweets'}
             className="overflow-hidden rounded-lg border border-border bg-card"
           >
-            <div role="rowgroup" className="hidden bg-muted/60 md:block">
+            <div
+              role="rowgroup"
+              className="hidden border-b border-border-cool bg-table-header md:block"
+            >
               <div
                 role="row"
-                className={`${compactTweetGridClass} py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground`}
+                className={`${compactTweetGridClass} py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-cool`}
               >
                 <div role="columnheader">Author</div>
                 <div role="columnheader">Tweet</div>

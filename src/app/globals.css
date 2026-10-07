@@ -34,6 +34,10 @@
     --chart-accent: 197 74.4% 46%;
     /* Icon glyphs only: a lift off the accent so small marks stay legible. */
     --brand-icon: 197 74.1% 51%; /* #25AADF */
+    /* Blue-tinted slate for data-table chrome (search results header). */
+    --muted-cool: 215 20% 42%; /* #566780 */
+    --table-header: 214 40% 97%; /* #F4F7FA */
+    --border-cool: 214 28% 91%; /* #E2E7EE */
     --radius: 0.5rem;
   }
 
@@ -68,6 +72,9 @@
     --chart-accent: 197 74.1% 69%;
     /* Same +5% lift off the accent that the light theme uses. */
     --brand-icon: 197 74.1% 74%;
+    --muted-cool: 215 16% 68%;
+    --table-header: 215 14% 14%;
+    --border-cool: 215 12% 20%;
   }
 }
 

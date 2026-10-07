@@ -16,7 +16,6 @@ import {
   FaReply,
   FaTwitter,
 } from 'react-icons/fa'
-import { Archive } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { formatNumber } from '@/lib/formatNumber'
 import { HighlightedText } from '@/components/HighlightedText'
@@ -38,7 +37,7 @@ interface TweetComponentProps {
 }
 
 export const compactTweetGridClass =
-  'grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-3 py-3 sm:px-4 md:grid-cols-[minmax(190px,0.95fr)_minmax(300px,2.6fr)_6.5rem_6rem_10rem] md:gap-x-4'
+  'grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 px-3 py-3 sm:px-4 md:grid-cols-[minmax(190px,0.95fr)_minmax(300px,2.6fr)_6.5rem_6rem_6rem] md:gap-x-4'
 
 const compactActionClass =
   'inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
@@ -54,6 +53,7 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
   highlightQuery,
 }) => {
   const [isTextExpanded, setIsTextExpanded] = React.useState(false)
+  const permalinkRef = React.useRef<HTMLAnchorElement>(null)
   const captureAction = (
     action:
       | 'open'
@@ -401,20 +401,6 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       aria-label="Tweet links"
     >
       <a
-        onClick={() => captureAction('open')}
-        href={tweetPermalinkHref(
-          tweet.tweet_id,
-          permalinkOrigin,
-          permalinkReturnTo,
-        )}
-        className={`${compactActionClass} border-brand/30 bg-brand/10 text-brand hover:bg-brand/20`}
-        aria-label="View tweet in Community Archive"
-        title="View tweet in Community Archive"
-      >
-        <Archive className="h-3.5 w-3.5" aria-hidden="true" />
-        Archive
-      </a>
-      <a
         onClick={() => captureAction('open_external')}
         href={`https://twitter.com/${displayUsername}/status/${tweet.tweet_id}`}
         target="_blank"
@@ -437,9 +423,42 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
       year: 'numeric',
     })
     const profileHref = userProfileHref(displayUsername, displayAccountId)
+    const permalinkHref = tweetPermalinkHref(
+      tweet.tweet_id,
+      permalinkOrigin,
+      permalinkReturnTo,
+    )
+    const permalinkProps = {
+      href: permalinkHref,
+      onClick: () => captureAction('open'),
+      'aria-label': 'View tweet in Community Archive',
+      className:
+        'rounded-sm transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+    }
+    // The whole row opens the archive page; the dates are its keyboard links.
+    // Clicks on the row's own links, buttons, or a text selection are left alone.
+    const openFromRow = (event: React.MouseEvent<HTMLDivElement>) => {
+      const target = event.target as HTMLElement
+      if (
+        event.defaultPrevented ||
+        !event.currentTarget.contains(target) ||
+        target.closest('a, button, input, select, textarea, [role="button"]') ||
+        window.getSelection()?.toString()
+      )
+        return
+      if (event.metaKey || event.ctrlKey || event.shiftKey) {
+        captureAction('open')
+        window.open(permalinkHref, '_blank', 'noopener')
+        return
+      }
+      permalinkRef.current?.click()
+    }
 
     return (
-      <div className={`${compactTweetGridClass} ${className}`}>
+      <div
+        className={`${compactTweetGridClass} cursor-pointer ${className}`}
+        onClick={openFromRow}
+      >
         <div
           role="cell"
           className="col-span-2 flex min-w-0 items-center gap-2.5 md:col-span-1"
@@ -516,7 +535,9 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
           className="col-span-2 flex items-center justify-between text-xs text-muted-foreground md:hidden"
           title={createdAt.toLocaleString()}
         >
-          <span>{formatDistanceToNow(createdAt, { addSuffix: true })}</span>
+          <Link {...permalinkProps}>
+            {formatDistanceToNow(createdAt, { addSuffix: true })}
+          </Link>
           <span className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1">
               <FaHeart aria-hidden="true" />
@@ -537,7 +558,9 @@ export const TweetComponent: React.FC<TweetComponentProps> = ({
           className="hidden self-center text-xs text-muted-foreground md:block"
           title={createdAt.toLocaleString()}
         >
-          {formattedDate}
+          <Link ref={permalinkRef} {...permalinkProps}>
+            {formattedDate}
+          </Link>
         </div>
 
         <div

@@ -1,65 +1,38 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { UserRound } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-  fetchAccountSuggestions,
-  fetchMemberSuggestions,
-} from '@/lib/queries/fetchUsers'
-import {
-  getStandaloneUserSearchTerm,
-  mergeUserSuggestions,
-} from '@/lib/searchSuggestions'
+import { fetchMemberSuggestions } from '@/lib/queries/fetchUsers'
+import { getStandaloneUserSearchTerm } from '@/lib/searchSuggestions'
 import type { UserSuggestion } from '@/lib/searchSuggestions'
 import { userProfileHref } from '@/lib/navigation'
-import { createBrowserClient } from '@/utils/supabase'
 
 const RESULT_LIMIT = 3
 
+// Only archive members and opted-in accounts have a profile page worth
+// opening, so accounts merely seen in the stream are not offered as people.
 export default function UserMatchResults({ query }: { query?: string }) {
-  const supabase = useMemo(() => createBrowserClient(), [])
   const searchTerm = getStandaloneUserSearchTerm(query || '')
   const [matches, setMatches] = useState<UserSuggestion[]>([])
 
   useEffect(() => {
     let active = true
-    let memberMatches: UserSuggestion[] = []
-    let accountMatches: UserSuggestion[] = []
     setMatches([])
 
-    if (!searchTerm) {
-      return () => {
-        active = false
-      }
+    if (searchTerm) {
+      void fetchMemberSuggestions(searchTerm, RESULT_LIMIT)
+        .then((users) => {
+          if (active) setMatches(users)
+        })
+        .catch(() => undefined)
     }
-
-    const publish = () => {
-      if (!active) return
-      setMatches(
-        mergeUserSuggestions(memberMatches, accountMatches, RESULT_LIMIT),
-      )
-    }
-
-    void fetchAccountSuggestions(supabase, searchTerm, RESULT_LIMIT)
-      .then((users) => {
-        accountMatches = users
-        publish()
-      })
-      .catch(() => undefined)
-
-    void fetchMemberSuggestions(searchTerm, RESULT_LIMIT)
-      .then((users) => {
-        memberMatches = users
-        publish()
-      })
-      .catch(() => undefined)
 
     return () => {
       active = false
     }
-  }, [searchTerm, supabase])
+  }, [searchTerm])
 
   if (matches.length === 0) return null
 

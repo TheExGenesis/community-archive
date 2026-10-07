@@ -538,6 +538,30 @@ CREATE TABLE IF NOT EXISTS "public"."digest_edition_likes" (
 );
 ALTER TABLE "public"."digest_edition_likes" OWNER TO "postgres";
 
+-- Generated editorial titles and summaries for archive permalink pages. One
+-- row per connected sequence (a single tweet or a thread), shared by every
+-- permalink inside it. Ineligible outcomes are stored too, so a low-content
+-- post is judged once. Writes come only from the server's service-role client.
+CREATE TABLE IF NOT EXISTS "public"."tweet_page_summaries" (
+    "subject_key" text PRIMARY KEY,
+    "kind" text NOT NULL CHECK ("kind" IN ('tweet', 'thread')),
+    "tweet_ids" text[] NOT NULL CHECK (cardinality("tweet_ids") > 0),
+    "eligible" boolean NOT NULL,
+    "title" text,
+    "description" text,
+    "ineligible_reason" text,
+    "model" text NOT NULL,
+    "prompt_version" integer NOT NULL,
+    "generated_at" timestamptz NOT NULL DEFAULT now(),
+    "search_vector" tsvector GENERATED ALWAYS AS (
+        to_tsvector('english', coalesce("title", '') || ' ' || coalesce("description", ''))
+    ) STORED,
+    CONSTRAINT "tweet_page_summaries_eligible_has_copy" CHECK (
+        NOT "eligible" OR ("title" IS NOT NULL AND "description" IS NOT NULL)
+    )
+);
+ALTER TABLE "public"."tweet_page_summaries" OWNER TO "postgres";
+
 -- Reader comments on a published edition. The display identity is captured at
 -- write time so rendering never joins auth.users; writes go through the API's
 -- service-role client after session verification. Deletes are soft so a thread

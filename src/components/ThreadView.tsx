@@ -6,12 +6,18 @@ import { ConversationTree } from '@/lib/threadUtils'
 interface ThreadViewProps {
   tree: ConversationTree
   highlightTweetId?: string
+  heading?: string
+  // Render only these subtrees (e.g. the replies under a main tweet) instead
+  // of the whole conversation; the count chip then names them replies.
+  rootIds?: string[]
   className?: string
 }
 
 export const ThreadView: React.FC<ThreadViewProps> = ({
   tree,
   highlightTweetId,
+  heading = 'Thread',
+  rootIds,
   className = '',
 }) => {
   // Render tweet with children recursively
@@ -36,8 +42,15 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
         ) : (
           <div
             className={`
-            ${isHighlighted ? 'border-brand/50 bg-card ring-1 ring-brand/20' : tweet.from_external ? 'border-dashed border-amber-300 bg-amber-50/60 dark:border-amber-700 dark:bg-amber-900/10' : 'border-border bg-card'}
-            relative mb-4 rounded-lg border p-4 sm:p-5
+            ${
+              isHighlighted
+                ? // Same pop treatment as a strand's seed post.
+                  'border-2 border-foreground/80 bg-card shadow-[3px_3px_0_0_hsl(var(--brand))]'
+                : tweet.from_external
+                  ? 'rounded-lg border border-dashed border-amber-300 bg-amber-50/60 dark:border-amber-700 dark:bg-amber-900/10'
+                  : 'rounded-lg border border-border bg-card'
+            }
+            relative mb-4 p-4 sm:p-5
           `}
           >
             {tweet.from_external && (
@@ -75,8 +88,13 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
   // Render all roots. When some parent tweets in the conversation were deleted, each
   // surviving orphan reply gets a synthesized placeholder parent that becomes its own
   // root, so the tree can have more than one.
-  const allRoots =
-    tree.roots && tree.roots.length > 0
+  const allRoots = rootIds
+    ? [...rootIds].sort(
+        (a, b) =>
+          new Date(tree.tweets[a]!.created_at).getTime() -
+          new Date(tree.tweets[b]!.created_at).getTime(),
+      )
+    : tree.roots && tree.roots.length > 0
       ? tree.roots
       : tree.root
         ? [tree.root]
@@ -90,17 +108,25 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
     )
   }
 
-  // Header count excludes placeholders.
-  const realCount = Object.values(tree.tweets).filter(
-    (t) => !t.is_deleted_placeholder,
+  // Header count covers the rendered subtrees and excludes placeholders.
+  const renderedIds = new Set<string>()
+  const collect = (id: string) => {
+    if (renderedIds.has(id)) return
+    renderedIds.add(id)
+    for (const child of tree.children[id] ?? []) collect(child)
+  }
+  allRoots.forEach(collect)
+  const realCount = Array.from(renderedIds).filter(
+    (id) => tree.tweets[id] && !tree.tweets[id]!.is_deleted_placeholder,
   ).length
+  const [one, many] = rootIds ? ['reply', 'replies'] : ['tweet', 'tweets']
 
   return (
     <div className={`thread-view ${className}`}>
       <div className="mb-5 flex items-center justify-between gap-4">
-        <h2 className="text-xl font-semibold text-foreground">Thread</h2>
+        <h2 className="text-xl font-semibold text-foreground">{heading}</h2>
         <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-          {realCount} {realCount === 1 ? 'tweet' : 'tweets'}
+          {realCount} {realCount === 1 ? one : many}
         </span>
       </div>
       <div className="thread-container">

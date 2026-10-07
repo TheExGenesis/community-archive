@@ -7,6 +7,9 @@ import Link from 'next/link'
 import PostHogLink from '@/components/PostHogLink'
 import { capturePostHogEvent } from '@/lib/posthog'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { editPublishedCommunityProject } from '@/app/admin/communitySubmissionActions'
+import { ProjectEditFields } from './ProjectEditFields'
 import {
   ArrowUpRight,
   Heart,
@@ -28,11 +31,11 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
   COMMUNITY_PROJECT_CATEGORIES,
-  COMMUNITY_PROJECTS,
   CommunityProject,
   CommunityProjectSort,
   filterCommunityProjects,
-  SUBMITTED_PROJECT_OVERRIDES,
+  HOMEPAGE_FEATURED_PROJECT_COUNT,
+  mergeCommunityCatalog,
 } from '@/lib/communityProjects'
 import { cn } from '@/utils/tailwind'
 
@@ -428,23 +431,126 @@ function ProjectCard({
   )
 }
 
+function sourceHref(project: CommunityProject) {
+  return project.sourceUrl ?? `/tweets/${project.sourceTweetId}`
+}
+
+/** Admin-only; the server action re-checks admin access on save. */
+function ProjectEditForm({
+  project,
+  onDone,
+}: {
+  project: CommunityProject
+  onDone: () => void
+}) {
+  const router = useRouter()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    setError(null)
+    setSaving(true)
+    try {
+      const result = await editPublishedCommunityProject(formData)
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      router.refresh()
+      onDone()
+    } catch {
+      setError('The change could not be saved. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <form
+      onSubmit={save}
+      aria-label={`Edit ${project.name}`}
+      className="grid gap-3 px-[26px] pb-[26px] pt-[22px]"
+    >
+      <DialogHeader className="text-left">
+        <DialogTitle>Edit {project.name}</DialogTitle>
+        <DialogDescription>
+          Changes are published to the gallery immediately.
+        </DialogDescription>
+      </DialogHeader>
+      <input type="hidden" name="projectSlug" value={project.slug} />
+      <fieldset disabled={saving} className="grid gap-3">
+        <ProjectEditFields
+          sourceOptional
+          values={{
+            name: project.name,
+            projectUrl: project.projectUrl ?? '',
+            creatorName: project.creator,
+            creatorHandle: project.creatorHandle ?? '',
+            sourcePostUrl:
+              project.sourceUrl || project.sourceTweetId
+                ? sourceHref(project)
+                : '',
+            tags: project.tags,
+            category: project.category,
+            description: project.description,
+            archiveUse: project.archiveUse,
+          }}
+        />
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="featured"
+            defaultChecked={project.featured}
+            className="mt-1"
+          />
+          <span>
+            Featured
+            <span className="block text-muted-foreground">
+              Featured projects are listed first in the gallery, and the first{' '}
+              {HOMEPAGE_FEATURED_PROJECT_COUNT} appear on the home page.
+            </span>
+          </span>
+        </label>
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+        <div className="flex gap-2">
+          <Button type="submit">{saving ? 'Saving…' : 'Save changes'}</Button>
+          <Button type="button" variant="outline" onClick={onDone}>
+            Cancel
+          </Button>
+        </div>
+      </fieldset>
+    </form>
+  )
+}
+
 function ProjectDialog({
   project,
   onOpenChange,
   likeState,
   onToggleLike,
   isSignedIn,
+  isAdmin,
 }: {
   project: CommunityProject | null
   onOpenChange: (open: boolean) => void
   likeState?: LikeState
   onToggleLike: (project: CommunityProject) => void
   isSignedIn: boolean
+  isAdmin: boolean
 }) {
+  const [editing, setEditing] = useState(false)
+  const slug = project?.slug
+  useEffect(() => setEditing(false), [slug])
   return (
     <Dialog open={Boolean(project)} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-[620px] gap-0 overflow-y-auto p-0">
-        {project ? (
+        {project && editing ? (
+          <ProjectEditForm project={project} onDone={() => setEditing(false)} />
+        ) : project ? (
           <>
             <ProjectCover project={project} modal />
             <div className="relative z-10 flex flex-col gap-[15px] bg-background px-[26px] pb-[26px] pt-[22px]">
@@ -503,15 +609,29 @@ function ProjectDialog({
               {/* Comments are built (see ProjectComments + the comments API)
                   but hidden from the gallery for now. */}
               <DialogFooter>
+                {isAdmin && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="sm:mr-auto"
+                    onClick={() => setEditing(true)}
+                  >
+                    Edit
+                  </Button>
+                )}
                 {(project.sourceUrl || project.sourceTweetId) && (
                   <Button asChild variant="outline">
                     <Link
-                      href={
-                        project.sourceUrl ?? `/tweets/${project.sourceTweetId}`
+                      href={sourceHref(project)}
+                      target={
+                        sourceHref(project).startsWith('/')
+                          ? undefined
+                          : '_blank'
                       }
-                      target={project.sourceUrl ? '_blank' : undefined}
                       rel={
-                        project.sourceUrl ? 'noopener noreferrer' : undefined
+                        sourceHref(project).startsWith('/')
+                          ? undefined
+                          : 'noopener noreferrer'
                       }
                     >
                       View source post
@@ -558,11 +678,13 @@ function ProjectDialog({
 
 export default function CommunityGallery({
   isSignedIn = true,
+  isAdmin = false,
   publishedProjects = [],
   likeCounts = EMPTY_LIKE_COUNTS,
   likedProjectSlugs = [],
 }: {
   isSignedIn?: boolean
+  isAdmin?: boolean
   publishedProjects?: CommunityProject[]
   likeCounts?: Record<string, number>
   likedProjectSlugs?: string[]
@@ -571,7 +693,7 @@ export default function CommunityGallery({
   const [query, setQuery] = useState('')
   const [category, setCategory] =
     useState<(typeof COMMUNITY_PROJECT_CATEGORIES)[number]>('All')
-  const [sort, setSort] = useState<CommunityProjectSort>('Newest')
+  const [sort, setSort] = useState<CommunityProjectSort>('Featured')
   const [selectedProject, setSelectedProject] =
     useState<CommunityProject | null>(null)
   const [submissionOpen, setSubmissionOpen] = useState(false)
@@ -583,24 +705,10 @@ export default function CommunityGallery({
     {},
   )
 
-  const baseCatalog = useMemo(() => {
-    const bySlug = new Map(
-      COMMUNITY_PROJECTS.map((project) => [project.slug, project]),
-    )
-    for (const project of publishedProjects) {
-      // A backfilled database row has no uploaded cover; keep the curated
-      // catalog's artwork for the same slug so the card doesn't regress.
-      const curated = bySlug.get(project.slug)
-      const override = SUBMITTED_PROJECT_OVERRIDES[project.slug]
-      bySlug.set(project.slug, {
-        ...project,
-        image: override?.image ?? project.image ?? curated?.image,
-        summary: curated?.summary ?? override?.summary ?? project.summary,
-        coverClass: curated?.coverClass ?? project.coverClass,
-      })
-    }
-    return Array.from(bySlug.values())
-  }, [publishedProjects])
+  const baseCatalog = useMemo(
+    () => mergeCommunityCatalog(publishedProjects),
+    [publishedProjects],
+  )
 
   const serverLikes = useMemo(() => {
     const liked = new Set(likedProjectSlugs)
@@ -677,6 +785,12 @@ export default function CommunityGallery({
     },
     [isSignedIn, likes],
   )
+
+  // Follow the catalog so an admin edit shows up once the page refreshes.
+  const openProject =
+    selectedProject &&
+    (catalog.find((project) => project.slug === selectedProject.slug) ??
+      selectedProject)
 
   const likeStateFor = (project: CommunityProject) =>
     likes[project.slug] ?? { liked: false, count: 0 }
@@ -849,11 +963,12 @@ export default function CommunityGallery({
       </div>
 
       <ProjectDialog
-        project={selectedProject}
+        project={openProject}
         onOpenChange={(open) => !open && setSelectedProject(null)}
-        likeState={selectedProject ? likeStateFor(selectedProject) : undefined}
+        likeState={openProject ? likeStateFor(openProject) : undefined}
         onToggleLike={toggleLike}
         isSignedIn={isSignedIn}
+        isAdmin={isAdmin}
       />
       {submissionRequested && (
         <SubmissionDialog

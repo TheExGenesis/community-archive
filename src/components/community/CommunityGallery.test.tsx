@@ -1,6 +1,14 @@
 import { capturePostHogEvent } from '@/lib/posthog'
 jest.mock('@/lib/posthog', () => ({ capturePostHogEvent: jest.fn() }))
-import { render, screen } from '@testing-library/react'
+jest.mock('@/app/admin/communitySubmissionActions', () => ({
+  editPublishedCommunityProject: jest.fn(),
+}))
+const mockRefresh = jest.fn()
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: mockRefresh }),
+}))
+import { render, screen, waitFor } from '@testing-library/react'
+import { editPublishedCommunityProject } from '@/app/admin/communitySubmissionActions'
 import userEvent from '@testing-library/user-event'
 import CommunityGallery from './CommunityGallery'
 import {
@@ -44,6 +52,63 @@ async function openPublishedProject(user: ReturnType<typeof userEvent.setup>) {
 describe('CommunityGallery', () => {
   afterEach(() => {
     jest.restoreAllMocks()
+  })
+
+  it('hides editing from non-admin readers', async () => {
+    const user = userEvent.setup()
+    render(<CommunityGallery publishedProjects={[PUBLISHED_PROJECT]} />)
+    await openPublishedProject(user)
+
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull()
+  })
+
+  it('lets an admin edit a curated project from its dialog', async () => {
+    // The shared Jest fetch polyfill replaces JSDOM FormData with undici's
+    // non-DOM constructor. Match browser form collection for this test.
+    const FetchFormData = global.FormData
+    jest.spyOn(window, 'FormData').mockImplementation((form) => {
+      const data = new FetchFormData()
+      if (form)
+        Array.from(form.elements).forEach((element) => {
+          if (
+            (element instanceof HTMLInputElement ||
+              element instanceof HTMLTextAreaElement ||
+              element instanceof HTMLSelectElement) &&
+            element.name
+          )
+            data.append(element.name, element.value)
+        })
+      return data
+    })
+    const mockEdit = editPublishedCommunityProject as jest.MockedFunction<
+      typeof editPublishedCommunityProject
+    >
+    mockEdit.mockResolvedValue({ ok: true, projectId: 'id' })
+    const user = userEvent.setup()
+    render(<CommunityGallery isAdmin />)
+
+    await user.click(
+      screen.getByRole('button', { name: /New Words and Their Pioneers by/i }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const projectUrl = screen.getByLabelText('Project URL')
+    expect(projectUrl).toHaveValue(
+      'https://guileless-tanuki-32174a.netlify.app/',
+    )
+    expect(screen.getByLabelText('Source post URL (optional)')).toHaveValue(
+      'https://x.com/IvanVendrov/status/1892730504702566541',
+    )
+    expect(screen.getByRole('checkbox', { name: /Featured/ })).toBeChecked()
+    await user.clear(projectUrl)
+    await user.type(projectUrl, 'https://example.org/new-words')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(mockEdit).toHaveBeenCalledTimes(1))
+    const submitted = mockEdit.mock.calls[0][0]
+    expect(submitted.get('projectSlug')).toBe('new-words-and-their-pioneers')
+    expect(submitted.get('projectUrl')).toBe('https://example.org/new-words')
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()
   })
 
   it('searches and filters the verified project catalog', async () => {
@@ -174,15 +239,13 @@ describe('CommunityGallery', () => {
     expect(
       screen.queryByRole('button', { name: 'Browse all tools' }),
     ).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Newest' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Featured' })).toHaveAttribute(
       'aria-pressed',
       'true',
     )
     expect(
       screen.getAllByRole('button', { name: /Preview of/ })[0],
-    ).toHaveAccessibleName(/Model Behavior Reports/)
-
-    await user.click(screen.getByRole('button', { name: 'Featured' }))
+    ).toHaveAccessibleName(/Bangers/)
     expect(
       screen
         .getAllByRole('button')

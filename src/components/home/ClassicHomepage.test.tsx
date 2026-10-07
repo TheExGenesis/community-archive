@@ -22,6 +22,10 @@ jest.mock('@/components/HomepageSearch', () => ({
   __esModule: true,
   default: () => <div data-testid="homepage-search" />,
 }))
+jest.mock('./FeaturedCommunityApps', () => ({
+  __esModule: true,
+  default: () => <div data-testid="featured-community-apps" />,
+}))
 jest.mock('@/components/home/Testimonials', () => ({
   __esModule: true,
   default: () => <div data-testid="testimonials" />,

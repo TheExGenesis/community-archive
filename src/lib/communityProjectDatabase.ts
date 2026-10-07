@@ -96,9 +96,9 @@ type CommunityProjectCommentRow = {
   deleted_at: string | null
 }
 
-export async function loadPublishedCommunityProjects(): Promise<
-  CommunityProject[]
-> {
+export async function loadPublishedCommunityProjects({
+  withCounts = true,
+}: { withCounts?: boolean } = {}): Promise<CommunityProject[]> {
   const admin = createServerServiceRoleClient()
   const { data, error } = await admin
     .from('community_projects')
@@ -113,6 +113,7 @@ export async function loadPublishedCommunityProjects(): Promise<
   }
 
   const rows = (data ?? []) as unknown as CommunityProjectRow[]
+  if (!withCounts) return rows.map((row) => mapCommunityProjectRow(row))
   const projectIds = rows.map((row) => row.id)
   const [likeCounts, commentCounts] = await Promise.all([
     loadCommunityProjectLikeCounts(rows.map((row) => row.slug)),

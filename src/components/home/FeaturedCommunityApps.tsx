@@ -1,10 +1,44 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import PostHogLink from '@/components/PostHogLink'
-import { COMMUNITY_PROJECTS } from '@/lib/communityProjects'
+import { Suspense } from 'react'
+import {
+  homepageFeaturedProjects,
+  mergeCommunityCatalog,
+  type CommunityProject,
+} from '@/lib/communityProjects'
+import { loadPublishedCommunityProjects } from '@/lib/communityProjectDatabase'
 
-const FEATURED_SLUGS = ['birdseye', 'strands', 'bangers-page']
+/** Admins choose the featured projects from the Community Gallery. */
+async function LiveFeaturedCommunityApps() {
+  const published = await loadPublishedCommunityProjects({ withCounts: false })
+  return (
+    <FeaturedCommunityAppsSection
+      projects={homepageFeaturedProjects(mergeCommunityCatalog(published))}
+    />
+  )
+}
+
 export default function FeaturedCommunityApps() {
+  return (
+    <Suspense
+      fallback={
+        <FeaturedCommunityAppsSection
+          projects={homepageFeaturedProjects(mergeCommunityCatalog([]))}
+        />
+      }
+    >
+      <LiveFeaturedCommunityApps />
+    </Suspense>
+  )
+}
+
+export function FeaturedCommunityAppsSection({
+  projects,
+}: {
+  projects: CommunityProject[]
+}) {
+  if (!projects.length) return null
   return (
     <section
       className="mx-auto max-w-6xl px-5 py-12 sm:px-7"
@@ -24,8 +58,8 @@ export default function FeaturedCommunityApps() {
         </Link>
       </div>
       <div className="grid gap-6 sm:grid-cols-3">
-        {FEATURED_SLUGS.map((slug) => {
-          const project = COMMUNITY_PROJECTS.find((item) => item.slug === slug)!
+        {projects.map((project) => {
+          const slug = project.slug
           const external = project.projectUrl?.startsWith('https:')
           return (
             <PostHogLink
@@ -51,6 +85,9 @@ export default function FeaturedCommunityApps() {
                     alt={`Preview of ${project.name}`}
                     fill
                     sizes="(max-width: 640px) 100vw, 33vw"
+                    unoptimized={project.image.startsWith(
+                      '/api/community/projects/',
+                    )}
                     className="object-cover"
                   />
                 ) : (

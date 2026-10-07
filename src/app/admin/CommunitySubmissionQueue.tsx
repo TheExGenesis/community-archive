@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { COMMUNITY_PROJECT_CATEGORIES } from '@/lib/communityProjects'
+import { ProjectEditFields } from '@/components/community/ProjectEditFields'
 import { Check, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -226,88 +226,19 @@ export function CommunitySubmissionQueue({
                         value={project.id}
                       />
                       <fieldset disabled={isPending} className="grid gap-3">
-                        {(
-                          [
-                            ['projectName', 'App name', project.name, 120],
-                            [
-                              'projectUrl',
-                              'Project URL',
-                              project.project_url,
-                              2048,
-                            ],
-                            [
-                              'creatorName',
-                              'Creator name',
-                              project.creator_name,
-                              120,
-                            ],
-                            [
-                              'creatorHandle',
-                              'Creator X handle (optional)',
-                              project.creator_handle ?? '',
-                              80,
-                            ],
-                            [
-                              'sourcePost',
-                              'Source post URL',
-                              project.source_post_url,
-                              2048,
-                            ],
-                            [
-                              'tags',
-                              'Tags (comma-separated)',
-                              project.tags.join(', '),
-                              326,
-                            ],
-                          ] as const
-                        ).map(([name, label, value, maxLength]) => (
-                          <label key={name} className="grid gap-1 text-sm">
-                            {label}
-                            <input
-                              name={name}
-                              defaultValue={value}
-                              maxLength={maxLength}
-                              required={
-                                !['creatorHandle', 'tags'].includes(name)
-                              }
-                              className="w-full rounded-md border border-input bg-background px-3 py-2"
-                            />
-                          </label>
-                        ))}
-                        <label className="grid gap-1 text-sm">
-                          Category
-                          <select
-                            name="category"
-                            defaultValue={project.category}
-                            className="rounded-md border border-input bg-background px-3 py-2"
-                          >
-                            {COMMUNITY_PROJECT_CATEGORIES.filter(
-                              (category) => category !== 'All',
-                            ).map((category) => (
-                              <option key={category}>{category}</option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="grid gap-1 text-sm">
-                          Description
-                          <textarea
-                            name="description"
-                            defaultValue={project.description}
-                            required
-                            maxLength={360}
-                            className="rounded-md border border-input bg-background px-3 py-2"
-                          />
-                        </label>
-                        <label className="grid gap-1 text-sm">
-                          How it uses the archive
-                          <textarea
-                            name="archiveUse"
-                            defaultValue={project.archive_use}
-                            required
-                            maxLength={500}
-                            className="rounded-md border border-input bg-background px-3 py-2"
-                          />
-                        </label>
+                        <ProjectEditFields
+                          values={{
+                            name: project.name,
+                            projectUrl: project.project_url,
+                            creatorName: project.creator_name,
+                            creatorHandle: project.creator_handle ?? '',
+                            sourcePostUrl: project.source_post_url,
+                            tags: project.tags,
+                            category: project.category,
+                            description: project.description,
+                            archiveUse: project.archive_use,
+                          }}
+                        />
                         <div className="flex gap-2">
                           <Button type="submit">
                             {isPending ? 'Saving…' : 'Save changes'}

@@ -12,6 +12,7 @@ const projectRow: CommunityProjectRow = {
   creator_handle: null,
   category: 'Tools',
   description: 'A voice-first journal with AI reflection.',
+  summary: null,
   archive_use: 'Uses archived posts to seed a personal profile.',
   source_post_url: 'https://x.com/example/status/1234567890',
   tags: ['journaling'],
@@ -51,6 +52,18 @@ describe('mapCommunityProjectRow', () => {
     })
     expect(project.summary).toBe('A voice-first journal with AI reflection.')
     expect(project.description).toContain('exports to v1.2 PDFs.')
+  })
+
+  it('prefers a headline an admin wrote over the derived one', () => {
+    const derived = mapCommunityProjectRow(projectRow)
+    expect(derived.summaryEdited).toBe(false)
+
+    const edited = mapCommunityProjectRow({
+      ...projectRow,
+      summary: 'Journal out loud.',
+    })
+    expect(edited.summary).toBe('Journal out loud.')
+    expect(edited.summaryEdited).toBe(true)
   })
 
   it('does not end the summary at punctuation inside a project name', () => {

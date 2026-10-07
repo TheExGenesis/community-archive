@@ -11,6 +11,7 @@ import {
 } from '@/lib/communityProjectDatabase'
 import { COMMUNITY_PROJECTS } from '@/lib/communityProjects'
 import { getCurrentUser } from '@/lib/portal/auth'
+import { isAdminUser } from '@/app/admin/data'
 
 export const metadata: Metadata = {
   title: 'Community Apps · Community Archive',
@@ -45,6 +46,7 @@ async function loadViewer() {
   const user = await getCurrentUser()
   return {
     isSignedIn: Boolean(user),
+    isAdmin: Boolean(user && isAdminUser(user)),
     likedProjectSlugs: await loadCommunityProjectLikedSlugsForUser(user?.id),
   }
 }

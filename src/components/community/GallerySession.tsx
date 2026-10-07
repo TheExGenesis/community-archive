@@ -25,6 +25,7 @@ export function GallerySession({
         publishedProjects={projects}
         likeCounts={likeCounts}
         isSignedIn={session?.isSignedIn ?? false}
+        isAdmin={session?.isAdmin ?? false}
         likedProjectSlugs={session?.likedProjectSlugs ?? []}
       />
       {children}

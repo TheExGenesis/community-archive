@@ -36,6 +36,47 @@ describe('community submission validation', () => {
     })
   })
 
+  it('accepts curated catalog links only for admin edits', () => {
+    const formData = validFormData()
+    formData.set('projectUrl', '/bangers')
+    formData.set('sourcePost', '')
+
+    expect(validateCommunitySubmission(formData).ok).toBe(false)
+    expect(
+      validateCommunitySubmission(formData, { allowCatalogLinks: true }),
+    ).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        projectUrl: '/bangers',
+        sourcePostUrl: '/bangers',
+        sourceTweetId: '',
+      }),
+    })
+
+    formData.set('sourcePost', 'https://strangestloop.io/coding/')
+    expect(
+      validateCommunitySubmission(formData, { allowCatalogLinks: true }),
+    ).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        sourcePostUrl: 'https://strangestloop.io/coding/',
+      }),
+    })
+
+    formData.set('projectUrl', '//evil.example')
+    expect(
+      validateCommunitySubmission(formData, { allowCatalogLinks: true }).ok,
+    ).toBe(false)
+    formData.set('projectUrl', '/\\evil.example')
+    expect(
+      validateCommunitySubmission(formData, { allowCatalogLinks: true }).ok,
+    ).toBe(false)
+    formData.set('projectUrl', 'javascript:alert(1)')
+    expect(
+      validateCommunitySubmission(formData, { allowCatalogLinks: true }).ok,
+    ).toBe(false)
+  })
+
   it('rejects non-HTTPS project URLs', () => {
     const formData = validFormData()
     formData.set('projectUrl', 'http://example.org/archive-quilt')

@@ -20,6 +20,8 @@ export interface CommunityProject {
   creator: string
   creatorHandle?: string
   summary: string
+  /** An admin set this headline; it wins over the curated one. */
+  summaryEdited?: boolean
   description: string
   archiveUse: string
   category: CommunityProjectCategory
@@ -197,7 +199,9 @@ export const COMMUNITY_PROJECTS: CommunityProject[] = [
       'Analyzes word usage over time to find emerging vocabulary and the accounts that adopted it earliest.',
     category: 'Research',
     tags: ['Language', 'Idea diffusion', 'Hackathon winner'],
-    sourceTweetId: '1961022809938722831',
+    projectUrl: 'https://guileless-tanuki-32174a.netlify.app/',
+    sourceTweetId: '1892730504702566541',
+    sourceUrl: 'https://x.com/IvanVendrov/status/1892730504702566541',
     image: '/images/community/new-words-and-their-pioneers-card.webp',
     coverClass: 'from-[#f3d36b] via-[#f0a660] to-[#1e9bcd]',
     featured: true,
@@ -379,6 +383,42 @@ export const SUBMITTED_PROJECT_OVERRIDES: Record<
     image: '/images/community/finding-your-digital-twin-card.webp',
     summary: 'Fine-tune a small model to draft tweets in your own voice.',
   },
+}
+
+/**
+ * The live Gallery catalog: published database rows replace the checked-in
+ * entry with the same slug, so admin edits win over the curated defaults.
+ */
+export function mergeCommunityCatalog(
+  publishedProjects: CommunityProject[],
+): CommunityProject[] {
+  const bySlug = new Map(
+    COMMUNITY_PROJECTS.map((project) => [project.slug, project]),
+  )
+  for (const project of publishedProjects) {
+    // A backfilled database row has no uploaded cover; keep the curated
+    // catalog's artwork for the same slug so the card doesn't regress.
+    const curated = bySlug.get(project.slug)
+    const override = SUBMITTED_PROJECT_OVERRIDES[project.slug]
+    bySlug.set(project.slug, {
+      ...project,
+      image: override?.image ?? project.image ?? curated?.image,
+      summary: project.summaryEdited
+        ? project.summary
+        : (curated?.summary ?? override?.summary ?? project.summary),
+      coverClass: curated?.coverClass ?? project.coverClass,
+    })
+  }
+  return Array.from(bySlug.values())
+}
+
+export const HOMEPAGE_FEATURED_PROJECT_COUNT = 3
+
+/** The home page shows the first featured projects in Gallery order. */
+export function homepageFeaturedProjects(catalog: CommunityProject[]) {
+  return filterCommunityProjects(catalog, '', 'All', 'Featured')
+    .filter((project) => project.featured && project.projectUrl)
+    .slice(0, HOMEPAGE_FEATURED_PROJECT_COUNT)
 }
 
 export function filterCommunityProjects(

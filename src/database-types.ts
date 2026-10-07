@@ -1189,6 +1189,63 @@ export type Database = {
         }
         Relationships: []
       }
+      strand_comments: {
+        Row: {
+          content: string
+          created_at: string
+          deleted_at: string | null
+          display_name: string | null
+          id: string
+          strand_id: string
+          updated_at: string
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          id?: string
+          strand_id: string
+          updated_at?: string
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          deleted_at?: string | null
+          display_name?: string | null
+          id?: string
+          strand_id?: string
+          updated_at?: string
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      strand_likes: {
+        Row: {
+          created_at: string
+          id: string
+          strand_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          strand_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          strand_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tweet_link_previews: {
         Row: {
           canonical_url: string | null

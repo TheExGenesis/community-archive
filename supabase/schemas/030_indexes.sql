@@ -152,6 +152,12 @@ CREATE INDEX IF NOT EXISTS "digest_edition_likes_edition_idx"
 
 CREATE INDEX IF NOT EXISTS "digest_edition_comments_edition_created_idx"
   ON "public"."digest_edition_comments" ("edition_id", "created_at");
+
+CREATE INDEX IF NOT EXISTS "strand_likes_strand_idx"
+  ON "public"."strand_likes" ("strand_id");
+
+CREATE INDEX IF NOT EXISTS "strand_comments_strand_created_idx"
+  ON "public"."strand_comments" ("strand_id", "created_at");
 CREATE INDEX IF NOT EXISTS "policy_storage_objects_account_ids_idx"
 ON "private"."policy_storage_objects" USING "gin" ("account_ids");
 

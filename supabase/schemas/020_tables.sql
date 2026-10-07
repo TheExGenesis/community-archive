@@ -557,6 +557,35 @@ CREATE TABLE IF NOT EXISTS "public"."digest_edition_comments" (
 );
 ALTER TABLE "public"."digest_edition_comments" OWNER TO "postgres";
 
+-- Reader likes and comments on strands. Strands live in the community app
+-- data snapshot rather than a table, so rows key on the seed tweet id. Both
+-- tables are service-role only: visibility is decided in application code.
+CREATE TABLE IF NOT EXISTS "public"."strand_likes" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "strand_id" text NOT NULL,
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT "strand_likes_strand_user_key" UNIQUE ("strand_id", "user_id"),
+    CONSTRAINT "strand_likes_strand_id_check" CHECK ("strand_id" ~ '^[0-9]{1,20}$')
+);
+ALTER TABLE "public"."strand_likes" OWNER TO "postgres";
+
+CREATE TABLE IF NOT EXISTS "public"."strand_comments" (
+    "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "strand_id" text NOT NULL,
+    "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
+    "content" text NOT NULL,
+    "username" text,
+    "display_name" text,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+    "updated_at" timestamptz NOT NULL DEFAULT now(),
+    "deleted_at" timestamptz,
+    CONSTRAINT "strand_comments_strand_id_check" CHECK ("strand_id" ~ '^[0-9]{1,20}$'),
+    CONSTRAINT "strand_comments_content_length_check"
+      CHECK (char_length("content") BETWEEN 1 AND 2000)
+);
+ALTER TABLE "public"."strand_comments" OWNER TO "postgres";
+
 -- Moderated Community Gallery submissions. Signed-in users submit through the
 -- server; only published rows are exposed to public clients. Covers remain in
 -- a private Storage bucket and are served through a status-gated route.

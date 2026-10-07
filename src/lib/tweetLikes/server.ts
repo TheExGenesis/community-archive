@@ -5,7 +5,8 @@ import { resolveCommenterIdentity } from '@/lib/digest/comments'
 import { createServerServiceRoleClient } from '@/utils/supabase'
 import type { TweetLikeSummary } from './types'
 
-export const TWEET_ID_PATTERN = /^\d{1,20}$/
+// Canonical decimal ids only, so one tweet is one like subject.
+export const TWEET_ID_PATTERN = /^[1-9]\d{0,19}$/
 export const MAX_SUMMARY_TWEET_IDS = 100
 export const MAX_LIKERS = 50
 
@@ -24,14 +25,15 @@ export function resolveLiker(user: User) {
 /** Tweets nobody has liked are absent from the result. */
 export async function loadTweetLikeSummaries(
   tweetIds: string[],
-  viewerId: string | null,
+  viewerAccountId: string | null,
 ): Promise<Record<string, TweetLikeSummary>> {
   if (tweetIds.length === 0) return {}
 
   const admin = createServerServiceRoleClient()
   const { data, error } = await admin.rpc('ca_tweet_like_summary', {
     p_tweet_ids: tweetIds,
-    p_viewer_id: viewerId,
+    // The generated arg type is non-null; SQL treats null as "no viewer".
+    p_viewer_account_id: viewerAccountId as string,
   })
   if (error) throw new Error(`Tweet like summary failed: ${error.message}`)
 

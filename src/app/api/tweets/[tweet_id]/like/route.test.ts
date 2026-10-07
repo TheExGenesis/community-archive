@@ -25,8 +25,8 @@ const xUser = {
 
 function setup() {
   const upsert = jest.fn().mockResolvedValue({ error: null })
-  const deleteUserEq = jest.fn().mockResolvedValue({ error: null })
-  const deleteTweetEq = jest.fn().mockReturnValue({ eq: deleteUserEq })
+  const deleteAccountEq = jest.fn().mockResolvedValue({ error: null })
+  const deleteTweetEq = jest.fn().mockReturnValue({ eq: deleteAccountEq })
   const rpc = jest.fn().mockResolvedValue({
     data: [{ tweet_id: tweetId, like_count: 3, viewer_liked: false }],
     error: null,
@@ -36,7 +36,7 @@ function setup() {
     delete: jest.fn().mockReturnValue({ eq: deleteTweetEq }),
   })
   mockClient.mockReturnValue({ from, rpc } as never)
-  return { upsert, deleteTweetEq, deleteUserEq, from }
+  return { upsert, deleteTweetEq, deleteAccountEq, from, rpc }
 }
 
 const call = (handler: typeof POST, id = tweetId) =>
@@ -62,7 +62,7 @@ describe('tweet like route', () => {
         username: 'ada',
         display_name: 'Ada L',
       },
-      { onConflict: 'user_id,tweet_id', ignoreDuplicates: true },
+      { onConflict: 'account_id,tweet_id', ignoreDuplicates: true },
     )
     await expect(response.json()).resolves.toEqual({ liked: true, count: 3 })
   })
@@ -72,8 +72,19 @@ describe('tweet like route', () => {
     const response = await call(DELETE)
 
     expect(db.deleteTweetEq).toHaveBeenCalledWith('tweet_id', tweetId)
-    expect(db.deleteUserEq).toHaveBeenCalledWith('user_id', 'user-123')
+    expect(db.deleteAccountEq).toHaveBeenCalledWith('account_id', '4242')
     await expect(response.json()).resolves.toEqual({ liked: false, count: 3 })
+  })
+
+  it('still reports a saved like when the recount fails', async () => {
+    const db = setup()
+    db.rpc.mockResolvedValue({ data: null, error: { message: 'down' } })
+    const consoleError = jest.spyOn(console, 'error').mockImplementation()
+    const response = await call(POST)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ liked: true, count: null })
+    consoleError.mockRestore()
   })
 
   it('rejects signed-out visitors without writing', async () => {
@@ -96,6 +107,7 @@ describe('tweet like route', () => {
     setup()
 
     expect((await call(POST, 'abc')).status).toBe(404)
+    expect((await call(POST, '0011')).status).toBe(404)
     expect(mockUser).not.toHaveBeenCalled()
   })
 })

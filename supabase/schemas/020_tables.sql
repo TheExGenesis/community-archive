@@ -560,8 +560,9 @@ ALTER TABLE "public"."digest_edition_comments" OWNER TO "postgres";
 -- Likes made on Community Archive itself, distinct from the archived X likes
 -- in "likes"/"liked_tweets". One row is one public record shaped for a later
 -- atproto port: "id" is the record key, "account_id" the actor, "tweet_id" the
--- subject, "created_at" the record time. The subject is not a foreign key
--- because tweets may live only in the ClickHouse projection.
+-- subject, "created_at" the record time. One like per X account per tweet;
+-- "user_id" only ties the row to the auth user for cascade deletion. The
+-- subject is not a foreign key because tweets may live only in ClickHouse.
 CREATE TABLE IF NOT EXISTS "public"."ca_tweet_likes" (
     "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     "user_id" uuid NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
@@ -570,9 +571,9 @@ CREATE TABLE IF NOT EXISTS "public"."ca_tweet_likes" (
     "username" text,
     "display_name" text,
     "created_at" timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT "ca_tweet_likes_user_tweet_key" UNIQUE ("user_id", "tweet_id"),
-    CONSTRAINT "ca_tweet_likes_account_id_check" CHECK ("account_id" ~ '^[0-9]{1,20}$'),
-    CONSTRAINT "ca_tweet_likes_tweet_id_check" CHECK ("tweet_id" ~ '^[0-9]{1,20}$')
+    CONSTRAINT "ca_tweet_likes_account_tweet_key" UNIQUE ("account_id", "tweet_id"),
+    CONSTRAINT "ca_tweet_likes_account_id_check" CHECK ("account_id" ~ '^[1-9][0-9]{0,19}$'),
+    CONSTRAINT "ca_tweet_likes_tweet_id_check" CHECK ("tweet_id" ~ '^[1-9][0-9]{0,19}$')
 );
 ALTER TABLE "public"."ca_tweet_likes" OWNER TO "postgres";
 

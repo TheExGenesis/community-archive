@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/portal/auth'
 import {
   loadTweetLikeSummaries,
   MAX_SUMMARY_TWEET_IDS,
+  resolveLiker,
   TWEET_ID_PATTERN,
 } from '@/lib/tweetLikes/server'
 import type { TweetLikeSummaryResponse } from '@/lib/tweetLikes/types'
@@ -37,7 +38,10 @@ export async function GET(request: Request) {
   try {
     const body: TweetLikeSummaryResponse = {
       signedIn: Boolean(user),
-      likes: await loadTweetLikeSummaries(ids, user?.id ?? null),
+      likes: await loadTweetLikeSummaries(
+        ids,
+        (user && resolveLiker(user)?.accountId) ?? null,
+      ),
     }
     return NextResponse.json(body, {
       headers: { 'Cache-Control': 'private, no-store' },

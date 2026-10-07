@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { Heart } from 'lucide-react'
 import { formatNumber } from '@/lib/formatNumber'
 import { toggleTweetLike, useTweetLike } from '@/lib/tweetLikes/client'
@@ -22,33 +21,32 @@ export function TweetLikeButton({
   format?: (count: number) => string
   className?: string
 }) {
-  const { liked, count } = useTweetLike(tweetId)
-  const [pending, setPending] = useState(false)
+  const { liked, count, ready } = useTweetLike(tweetId)
 
   const toggle = async () => {
-    if (pending) return
-    setPending(true)
     const result = await toggleTweetLike(tweetId)
-    setPending(false)
     if (result === 'signed_out') {
       window.location.href = `/login?redirect=${encodeURIComponent(
         window.location.pathname + window.location.search,
       )}`
-    } else if (result !== 'error') {
+    } else if (result === 'liked' || result === 'unliked') {
       onToggle?.(result === 'liked' ? 'like' : 'unlike')
     }
   }
 
-  const total = xLikeCount + count
+  const total = (xLikeCount ?? 0) + count
+  const likes = `${format(total)} ${total === 1 ? 'like' : 'likes'}`
   const action = liked ? 'Unlike' : 'Like'
 
   return (
     <button
       type="button"
       onClick={toggle}
+      disabled={!ready}
       aria-pressed={liked}
-      title={`${action} · ${format(xLikeCount)} on X, ${format(count)} on Community Archive`}
-      className={`inline-flex items-center gap-1 rounded-sm tabular-nums transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
+      aria-label={`${action} on Community Archive, ${likes}`}
+      title={`${action} · ${format(xLikeCount ?? 0)} on X, ${format(count)} on Community Archive`}
+      className={`inline-flex items-center gap-1 rounded-sm tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 enabled:hover:text-brand ${
         liked ? 'text-brand' : ''
       } ${className}`}
     >
@@ -57,7 +55,7 @@ export function TweetLikeButton({
         aria-hidden="true"
       />
       <span aria-hidden="true">{format(total)}</span>
-      <span className="sr-only">{`${format(total)} ${total === 1 ? 'like' : 'likes'}`}</span>
+      <span className="sr-only">{likes}</span>
     </button>
   )
 }

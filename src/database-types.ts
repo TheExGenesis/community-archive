@@ -1907,7 +1907,7 @@ export type Database = {
       ca_tweet_like_summary: {
         Args: {
           p_tweet_ids: string[]
-          p_viewer_id: string | null
+          p_viewer_account_id: string
         }
         Returns: {
           tweet_id: string

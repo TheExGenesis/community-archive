@@ -3858,8 +3858,8 @@ $$;
 REVOKE ALL ON FUNCTION public.record_digest_view(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.record_digest_view(uuid) TO service_role;
 
--- Like count per tweet, plus whether the given viewer liked it.
-CREATE OR REPLACE FUNCTION public.ca_tweet_like_summary(p_tweet_ids text[], p_viewer_id uuid)
+-- Like count per tweet, plus whether the given X account liked it.
+CREATE OR REPLACE FUNCTION public.ca_tweet_like_summary(p_tweet_ids text[], p_viewer_account_id text)
 RETURNS TABLE (tweet_id text, like_count bigint, viewer_liked boolean)
 LANGUAGE sql
 STABLE
@@ -3869,10 +3869,10 @@ AS $$
   SELECT
     likes.tweet_id,
     count(*) AS like_count,
-    coalesce(bool_or(likes.user_id = p_viewer_id), false) AS viewer_liked
+    coalesce(bool_or(likes.account_id = p_viewer_account_id), false) AS viewer_liked
   FROM public.ca_tweet_likes AS likes
   WHERE likes.tweet_id = ANY(p_tweet_ids)
   GROUP BY likes.tweet_id;
 $$;
-REVOKE ALL ON FUNCTION public.ca_tweet_like_summary(text[], uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.ca_tweet_like_summary(text[], uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.ca_tweet_like_summary(text[], text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ca_tweet_like_summary(text[], text) TO service_role;

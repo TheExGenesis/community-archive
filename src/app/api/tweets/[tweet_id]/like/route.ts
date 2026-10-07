@@ -41,13 +41,13 @@ async function setLike({ params }: Params, liked: boolean) {
           username: liker.username,
           display_name: liker.displayName,
         },
-        { onConflict: 'user_id,tweet_id', ignoreDuplicates: true },
+        { onConflict: 'account_id,tweet_id', ignoreDuplicates: true },
       )
     : await admin
         .from('ca_tweet_likes')
         .delete()
         .eq('tweet_id', params.tweet_id)
-        .eq('user_id', user.id)
+        .eq('account_id', liker.accountId)
 
   if (error) {
     console.error('Tweet like write failed:', error.message)
@@ -57,15 +57,14 @@ async function setLike({ params }: Params, liked: boolean) {
     )
   }
 
-  try {
-    return NextResponse.json({
-      liked,
-      count: await loadTweetLikeCount(params.tweet_id),
-    })
-  } catch (countError) {
-    console.error(countError)
-    return NextResponse.json({ error: 'Lookup failed' }, { status: 500 })
-  }
+  // The write succeeded; a failed recount must not report it as a failure.
+  const count = await loadTweetLikeCount(params.tweet_id).catch(
+    (countError) => {
+      console.error(countError)
+      return null
+    },
+  )
+  return NextResponse.json({ liked, count })
 }
 
 export async function POST(_request: Request, context: Params) {

@@ -25,7 +25,10 @@ describe('tweet like summary route', () => {
       error: null,
     })
     mockClient.mockReturnValue({ rpc } as never)
-    mockUser.mockResolvedValue({ id: 'user-123' } as never)
+    mockUser.mockResolvedValue({
+      id: 'user-123',
+      app_metadata: { provider_id: '4242' },
+    } as never)
   })
 
   it('returns counts and viewer state for liked tweets only', async () => {
@@ -33,7 +36,7 @@ describe('tweet like summary route', () => {
 
     expect(rpc).toHaveBeenCalledWith('ca_tweet_like_summary', {
       p_tweet_ids: ['11', '12'],
-      p_viewer_id: 'user-123',
+      p_viewer_account_id: '4242',
     })
     expect(response.headers.get('Cache-Control')).toBe('private, no-store')
     await expect(response.json()).resolves.toEqual({
@@ -48,7 +51,7 @@ describe('tweet like summary route', () => {
 
     expect(rpc).toHaveBeenCalledWith('ca_tweet_like_summary', {
       p_tweet_ids: ['11'],
-      p_viewer_id: null,
+      p_viewer_account_id: null,
     })
     expect((await response.json()).signedIn).toBe(false)
   })

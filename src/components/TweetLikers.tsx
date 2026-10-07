@@ -10,10 +10,10 @@ const SHOWN_LIKERS = 8
 
 /** Who liked a tweet on Community Archive. Renders nothing without likes. */
 export function TweetLikers({ tweetId }: { tweetId: string }) {
-  const { count, liked } = useTweetLike(tweetId)
+  const { count, revision } = useTweetLike(tweetId)
   const [data, setData] = useState<TweetLikersResponse | null>(null)
 
-  // Refetch when the viewer's own like changes the list.
+  // Refetch once the server has confirmed a change, not on optimistic updates.
   useEffect(() => {
     let active = true
     if (count === 0) {
@@ -23,13 +23,15 @@ export function TweetLikers({ tweetId }: { tweetId: string }) {
     void fetch(`/api/tweets/${tweetId}/likes`)
       .then((response) => (response.ok ? response.json() : null))
       .then((body: TweetLikersResponse | null) => {
-        if (active) setData(body)
+        // Keep the current list when a refresh fails.
+        if (active && body) setData(body)
       })
       .catch(() => undefined)
     return () => {
       active = false
     }
-  }, [tweetId, count, liked])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- count is read at each confirmed revision
+  }, [tweetId, revision])
 
   if (!data || data.likers.length === 0) return null
 

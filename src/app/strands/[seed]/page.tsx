@@ -55,16 +55,16 @@ export default async function StrandPage({
   return (
     <main
       id="strand-top"
-      className="mx-auto max-w-[1500px] scroll-mt-20 px-5 py-10 sm:px-7"
+      className="mx-auto w-[max(70%,min(100%,1000px))] scroll-mt-20 px-5 py-10 sm:px-7"
     >
       <StrandEntry seedId={strand.id} />
       <a href="/strands" className="text-sm font-semibold text-brand">
         ← All strands
       </a>
-      <div className="mt-6 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_480px]">
+      <div className="mt-6 grid items-start gap-8 lg:grid-cols-[minmax(0,1.93fr)_minmax(0,1fr)]">
         <article className="min-w-0">
           <h1 className="text-4xl font-bold leading-tight">{strand.title}</h1>
-          <div className="mb-8 mt-7 border-2 border-foreground/80 bg-card p-5 shadow-[3px_3px_0_0_hsl(var(--foreground)/0.15)]">
+          <div className="mb-8 mt-7 border-2 border-foreground/80 bg-card p-5 shadow-[3px_3px_0_0_hsl(var(--brand))]">
             <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               The seed post · where this strand begins
             </p>
@@ -92,7 +92,9 @@ export default async function StrandPage({
               An AI-written reading of the conversation. Check the source posts
               for context.
             </p>
-            <AnalysisText>{strand.summary}</AnalysisText>
+            <AnalysisText className="text-foreground">
+              {strand.summary}
+            </AnalysisText>
           </section>
           <StrandTimeline
             posts={posts}

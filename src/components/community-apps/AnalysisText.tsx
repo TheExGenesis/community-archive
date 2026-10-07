@@ -1,16 +1,24 @@
 import Link from 'next/link'
 import { HighlightedChildren } from '@/components/HighlightedText'
 import ReactMarkdown from 'react-markdown'
+import { cn } from '@/lib/utils'
 
 export function AnalysisText({
   children,
   highlightQuery,
+  className,
 }: {
   children: string
   highlightQuery?: string
+  className?: string
 }) {
   return (
-    <div className="space-y-4 text-[15px] leading-7 text-muted-foreground">
+    <div
+      className={cn(
+        'space-y-4 text-[15px] leading-7 text-muted-foreground',
+        className,
+      )}
+    >
       <ReactMarkdown
         components={{
           p: ({ children }) => (

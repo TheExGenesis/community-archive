@@ -3,7 +3,11 @@ import { getResearchPosts } from '@/lib/portal/research'
 import { RESEARCH_SOURCE, type ResearchPost } from '@/lib/portal/types'
 import { MUTED, SERIF } from '@/components/portal/styles'
 
-export const metadata = { title: 'Research · Community Archive' }
+export const metadata = {
+  title: 'Research · Community Archive',
+  description:
+    'Research and analysis built on Community Archive, an open dataset of public tweets.',
+}
 
 // Refresh the listing hourly (the feed fetch itself is also cached for 1h).
 export const revalidate = 3600

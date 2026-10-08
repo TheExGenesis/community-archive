@@ -50,7 +50,9 @@ const defaultUrl =
 export const metadata = {
   metadataBase: new URL(defaultUrl),
   title: 'Community Archive',
-  description: "A public archive of everyone's tweets ",
+  description:
+    'An open, searchable archive of tweets that members of the community have chosen to make public. Browse profiles, search conversations, and build on the data.',
+  openGraph: { siteName: 'Community Archive' },
 }
 
 export default function RootLayout({

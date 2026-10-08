@@ -9,7 +9,11 @@ import type {
   PortalBangersScope,
 } from '@/lib/portal/types'
 
-export const metadata = { title: 'Bangers · Community Archive' }
+export const metadata = {
+  title: 'Bangers · Community Archive',
+  description:
+    'The most-quoted tweets in Community Archive: the posts other members kept building on.',
+}
 export const maxDuration = 60
 
 type BangersSearchParams = Record<string, string | string[] | undefined>

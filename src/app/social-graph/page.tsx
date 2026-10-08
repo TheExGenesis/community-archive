@@ -16,7 +16,11 @@ const SocialGraphExplorer = dynamic(() => import('./SocialGraphExplorer'), {
   ),
 })
 
-export const metadata = { title: 'Social graph · Community Archive' }
+export const metadata = {
+  title: 'Social graph · Community Archive',
+  description:
+    'An interactive map of who talks to whom across the accounts in Community Archive.',
+}
 
 export default async function SocialGraphPage({
   searchParams = {},

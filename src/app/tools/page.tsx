@@ -3,7 +3,11 @@ import { FaExternalLinkAlt } from 'react-icons/fa'
 import { PORTAL_TOOLS } from '@/components/portal/tools'
 import { MUTED, SERIF } from '@/components/portal/styles'
 
-export const metadata = { title: 'Tools · Community Archive' }
+export const metadata = {
+  title: 'Tools · Community Archive',
+  description:
+    'Tools built on Community Archive: explore conversations, chart ideas, and search the corpus by meaning.',
+}
 
 // Public: tools built on the archive are useful to visitors and members alike.
 export default function ToolsPage() {

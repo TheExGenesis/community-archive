@@ -58,6 +58,7 @@ const PREVIEW_BOT_PATTERNS = [
   'slack-imgproxy',
   'discordbot',
   'googlebot',
+  'google-inspectiontool',
   'bingbot',
   'linkedinbot',
   'whatsapp',
@@ -74,12 +75,34 @@ const PREVIEW_BOT_PATTERNS = [
   'iframely',
 ]
 
+// Search engine crawlers and Search Console's live-test fetcher (lowercase).
+// Vercel Bot Protection challenges clients that spoof these names before they
+// reach this middleware, so the User-Agent is only trusted for quota sizing.
+const SEARCH_CRAWLER_PATTERNS = [
+  'googlebot',
+  'google-inspectiontool',
+  'bingbot',
+]
+
+// Sign-in, account, and admin surfaces have no public content worth listing.
+const NOINDEX_PATH_PREFIXES = [
+  '/profile',
+  '/login',
+  '/settings',
+  '/admin',
+  '/auth',
+]
+
 // ─── In-memory rate limiting (secondary signal) ──────────────────────────────
 
 const rateLimitMap = new Map<string, number[]>()
 const RATE_LIMIT_WINDOW_MS = 60_000
 const IN_MEMORY_MAX_DEFAULT = 30
 const IN_MEMORY_MAX_SG = 5
+// Crawlers fetch from a few shared IPs and cannot carry the rate-limit cookie.
+// A 429 on an indexable page tells them to drop it, so they get a larger but
+// still bounded page budget.
+const IN_MEMORY_MAX_SEARCH_CRAWLER = 120
 // API routes get a tighter per-minute quota since they're a more attractive
 // DoS target (no HTML rendering cost shifts the attacker's effort lower).
 const IN_MEMORY_MAX_API_DEFAULT = 20
@@ -229,6 +252,17 @@ function isPreviewBot(ua: string): boolean {
   return PREVIEW_BOT_PATTERNS.some((p) => lower.includes(p))
 }
 
+function isSearchCrawler(ua: string): boolean {
+  const lower = ua.toLowerCase()
+  return SEARCH_CRAWLER_PATTERNS.some((p) => lower.includes(p))
+}
+
+function isNoindexPath(pathname: string): boolean {
+  return NOINDEX_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  )
+}
+
 function isBotUA(ua: string): boolean {
   const lower = ua.toLowerCase()
   return BOT_UA_PATTERNS.some((p) => lower.includes(p))
@@ -304,6 +338,8 @@ function isPageRoute(pathname: string): boolean {
 function isPublicDocumentationRoute(pathname: string): boolean {
   return (
     pathname === '/llms.txt' ||
+    pathname === '/robots.txt' ||
+    pathname === '/sitemap.xml' ||
     pathname === '/openapi.json' ||
     pathname === '/api/reference' ||
     pathname === '/docs' ||
@@ -415,12 +451,21 @@ export async function middleware(request: NextRequest) {
     const ip = getIp(request)
     const country = request.headers.get('x-vercel-ip-country') || ''
     const isSG = country === 'SG'
-    const maxRequests = isSG ? IN_MEMORY_MAX_SG : IN_MEMORY_MAX_DEFAULT
+    const searchCrawler = isSearchCrawler(ua)
+    const maxRequests = searchCrawler
+      ? IN_MEMORY_MAX_SEARCH_CRAWLER
+      : isSG
+        ? IN_MEMORY_MAX_SG
+        : IN_MEMORY_MAX_DEFAULT
 
     cleanupStaleEntries()
 
     // Cookie-based rate limit (works across serverless instances)
-    const cookieMaxRequests = isSG ? 5 : 30
+    const cookieMaxRequests = searchCrawler
+      ? IN_MEMORY_MAX_SEARCH_CRAWLER
+      : isSG
+        ? 5
+        : 30
     const rlCookie = request.cookies.get('__rl')?.value
     const rlData = parseCookieRateLimit(rlCookie)
     const now = Date.now()
@@ -555,6 +600,8 @@ export async function middleware(request: NextRequest) {
     response.headers.set('Cache-Control', 'private, no-store')
     response.headers.set('Referrer-Policy', 'no-referrer')
     response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+  } else if (isNoindexPath(pathname)) {
+    response.headers.set('X-Robots-Tag', 'noindex')
   }
 
   // Set rate limit cookie on final response

@@ -208,7 +208,8 @@ export async function setBulletinDismissal(
     {
       viewer_id: user.id,
       viewer_account_id: me,
-      notice_tweet_id: tweetId,
+      // SQL NULL restores every notice; generated types omit nullability.
+      notice_tweet_id: tweetId as string,
       dismissed,
     },
   )

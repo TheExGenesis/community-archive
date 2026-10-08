@@ -74,7 +74,7 @@ test('renders cited tweets, unverified note, other posts and coverage when done'
   ]
   render(<AgentSearchTurn view={buildTurnView(messages, 0)} active={false} />)
 
-  const cited = screen.getByRole('region', { name: 'Cited tweets' })
+  const cited = screen.getByRole('complementary', { name: 'Cited tweets' })
   expect(cited).toHaveTextContent('Post 1')
   expect(document.getElementById('ask-a1-tweet-1')).toBeInTheDocument()
   expect(screen.getByText(/marked unverified/)).toHaveTextContent('777')

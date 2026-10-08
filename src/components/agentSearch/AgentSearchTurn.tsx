@@ -175,61 +175,91 @@ export function AgentSearchTurn({
 }) {
   const { answer } = view
   const hasAnswer = Boolean(answer.markdown.trim())
+  // Wide screens: the answer on the left, cited tweets in a sticky column
+  // beside it so a citation and its tweet are both on screen. Narrow screens:
+  // the cited tweets follow the answer.
   return (
-    <div className="space-y-5">
-      <ProgressList lines={view.progress} active={active && !hasAnswer} />
+    <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-start lg:gap-x-8 lg:gap-y-5 lg:space-y-0">
+      <div className="min-w-0 space-y-5 lg:col-start-1">
+        <ProgressList lines={view.progress} active={active && !hasAnswer} />
 
-      {hasAnswer && (
-        <div className="break-words text-base text-foreground">
-          <AnswerMarkdown>{answer.markdown}</AnswerMarkdown>
-        </div>
-      )}
+        {hasAnswer && (
+          <div className="break-words text-base text-foreground">
+            <AnswerMarkdown>{answer.markdown}</AnswerMarkdown>
+          </div>
+        )}
 
-      {!active && answer.unverified.length > 0 && (
-        <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
-          {answer.unverified.length === 1
-            ? 'One citation points to a post the searches never returned, so it is marked unverified: '
-            : `${answer.unverified.length} citations point to posts the searches never returned, so they are marked unverified: `}
-          <span className="break-all font-mono text-xs">
-            {answer.unverified.join(', ')}
-          </span>
-        </p>
-      )}
+        {!active && answer.unverified.length > 0 && (
+          <p className="rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground">
+            {answer.unverified.length === 1
+              ? 'One citation points to a post the searches never returned, so it is marked unverified: '
+              : `${answer.unverified.length} citations point to posts the searches never returned, so they are marked unverified: `}
+            <span className="break-all font-mono text-xs">
+              {answer.unverified.join(', ')}
+            </span>
+          </p>
+        )}
+      </div>
 
-      {answer.citations.length > 0 && (
-        <section aria-label="Cited tweets">
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            Cited tweets
-          </h3>
-          <ol className="space-y-3">
-            {answer.citations.map((citation) => (
-              <li
-                key={citation.id}
-                id={citation.anchor}
-                tabIndex={-1}
-                className="flex scroll-mt-24 gap-2 rounded-lg target:ring-2 target:ring-brand/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <span
-                  aria-label={`Citation ${citation.n}`}
-                  className="min-w-5 mt-3 inline-flex h-5 shrink-0 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold text-foreground"
-                >
-                  {citation.n}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <TweetCard tweet={citation.tweet} showDate showExternalLink />
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
+      <CitedTweets citations={answer.citations} active={active} />
 
       {!active && (
-        <>
+        <div className="min-w-0 space-y-5 lg:col-start-1">
           <OtherPosts tweets={view.otherTweets} />
           <CoverageBlock coverage={view.coverage} />
-        </>
+        </div>
       )}
     </div>
+  )
+}
+
+function CitedTweets({
+  citations,
+  active,
+}: {
+  citations: TurnView['answer']['citations']
+  active: boolean
+}) {
+  if (!citations.length && !active) return null
+  return (
+    <aside
+      aria-label="Cited tweets"
+      className="lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
+    >
+      <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        Cited tweets
+        {citations.length > 0 && (
+          <span className="ml-1.5 font-normal normal-case tracking-normal">
+            ({citations.length})
+          </span>
+        )}
+      </h3>
+      {citations.length ? (
+        <ol className="space-y-3">
+          {citations.map((citation) => (
+            <li
+              key={citation.id}
+              id={citation.anchor}
+              tabIndex={-1}
+              className="flex scroll-mt-4 gap-2 rounded-lg target:ring-2 target:ring-brand/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span
+                aria-label={`Citation ${citation.n}`}
+                className="min-w-5 mt-3 inline-flex h-5 shrink-0 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-semibold text-foreground"
+              >
+                {citation.n}
+              </span>
+              <div className="min-w-0 flex-1">
+                <TweetCard tweet={citation.tweet} showDate showExternalLink />
+              </div>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="hidden text-sm text-muted-foreground lg:block">
+          Tweets appear here as the answer cites them.
+        </p>
+      )}
+    </aside>
   )
 }

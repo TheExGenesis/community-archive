@@ -4,39 +4,48 @@ jest.mock('./model', () => ({}))
 
 import { agentSearchScorer } from './classifier'
 
+const env = (vars: Record<string, string>) =>
+  vars as unknown as NodeJS.ProcessEnv
+
 describe('agentSearchScorer', () => {
   test('defaults to Decisions, then Jev, then the LLM, by available key', () => {
     expect(
-      agentSearchScorer({
-        OPENAI_API_KEY: 'k',
-        OPENROUTER_API_KEY: 'k',
-      } as NodeJS.ProcessEnv),
+      agentSearchScorer(
+        env({
+          OPENAI_API_KEY: 'k',
+          OPENROUTER_API_KEY: 'k',
+        }),
+      ),
     ).toBe('decisions')
-    expect(
-      agentSearchScorer({ OPENROUTER_API_KEY: 'k' } as NodeJS.ProcessEnv),
-    ).toBe('jev')
-    expect(agentSearchScorer({} as NodeJS.ProcessEnv)).toBe('llm')
+    expect(agentSearchScorer(env({ OPENROUTER_API_KEY: 'k' }))).toBe('jev')
+    expect(agentSearchScorer(env({}))).toBe('llm')
   })
 
   test('honours AGENT_SEARCH_SCORER only when its key exists', () => {
     expect(
-      agentSearchScorer({
-        OPENAI_API_KEY: 'k',
-        OPENROUTER_API_KEY: 'k',
-        AGENT_SEARCH_SCORER: 'jev',
-      } as NodeJS.ProcessEnv),
+      agentSearchScorer(
+        env({
+          OPENAI_API_KEY: 'k',
+          OPENROUTER_API_KEY: 'k',
+          AGENT_SEARCH_SCORER: 'jev',
+        }),
+      ),
     ).toBe('jev')
     expect(
-      agentSearchScorer({
-        OPENAI_API_KEY: 'k',
-        AGENT_SEARCH_SCORER: 'llm',
-      } as NodeJS.ProcessEnv),
+      agentSearchScorer(
+        env({
+          OPENAI_API_KEY: 'k',
+          AGENT_SEARCH_SCORER: 'llm',
+        }),
+      ),
     ).toBe('llm')
     expect(
-      agentSearchScorer({
-        OPENAI_API_KEY: 'k',
-        AGENT_SEARCH_SCORER: 'jev',
-      } as NodeJS.ProcessEnv),
+      agentSearchScorer(
+        env({
+          OPENAI_API_KEY: 'k',
+          AGENT_SEARCH_SCORER: 'jev',
+        }),
+      ),
     ).toBe('decisions')
   })
 })

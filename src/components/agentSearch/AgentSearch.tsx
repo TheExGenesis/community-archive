@@ -158,7 +158,11 @@ export default function AgentSearch() {
 
   return (
     <main className="min-h-screen bg-background">
-      <section className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+      <section
+        className={`mx-auto w-full px-4 py-8 sm:px-6 sm:py-12 ${
+          hasThread ? 'max-w-6xl' : 'max-w-3xl'
+        }`}
+      >
         <div className={hasThread ? 'mb-6' : 'mb-8'}>
           <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand">
             <MessageSquareText aria-hidden="true" className="h-3.5 w-3.5" />
@@ -245,7 +249,7 @@ export default function AgentSearch() {
           </p>
         )}
 
-        {hasThread && <div className="mt-10">{form}</div>}
+        {hasThread && <div className="mt-10 max-w-3xl">{form}</div>}
       </section>
     </main>
   )

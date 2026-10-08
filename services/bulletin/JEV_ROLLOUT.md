@@ -26,9 +26,11 @@ The existing admin refresh queue is a legacy worker path and must be disabled
 during Jev cutover until a Jev-aware refresh flow is implemented. Admin prompt
 versions continue to guide new Jev batches and are pinned per run.
 
-Daily runs revisit up to 200 ready notices whose author reply context has not
-been checked that UTC day. Jev marks a notice open or resolved only from an
-explicit descendant reply by the same author; the exact reply ID and current
+Daily runs revisit every ready notice whose author reply context has not
+been checked that UTC day, oldest check first, until the run's time or call
+budget is spent; a remainder exits `resolution_backlog` for the unit's retry.
+Jev marks a notice open or resolved only from an explicit descendant reply by
+the same author; the exact reply ID and current
 source hash are stored and reverified on board reads. Unknown or incomplete
 context does not erase an earlier evidenced status.
 

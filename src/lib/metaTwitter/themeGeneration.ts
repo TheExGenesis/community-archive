@@ -518,7 +518,9 @@ const matchText = (text: string) => text.replace(/[‘’]/g, "'")
  * MAX_KEYWORD_SHARE of the year, are dropped; themes left matching nothing
  * are dropped. Model examples survive only if they are in the year's set,
  * match the theme and aren't used by a bigger theme; otherwise the theme's
- * most-liked matching posts stand in. Sorted by postCount descending.
+ * most-liked matching posts stand in. A theme whose every post is already a
+ * bigger theme's example has nothing of its own and is dropped. Sorted by
+ * postCount descending.
  */
 export const countThemes = (
   candidates: CandidateTheme[],
@@ -551,7 +553,7 @@ export const countThemes = (
         b.matched.size - a.matched.size ||
         a.candidate.label.localeCompare(b.candidate.label),
     )
-    .map(({ candidate, keywords, matched }) => {
+    .flatMap(({ candidate, keywords, matched }): ProfileTheme[] => {
       let exampleTweetIds = candidate.exampleTweetIds.filter((id) => {
         const index = byId.get(id)
         return index !== undefined && matched.has(index) && !used.has(id)
@@ -563,14 +565,17 @@ export const countThemes = (
           .sort(byLikes)
           .slice(0, MAX_EXAMPLES)
           .map((post) => post.tweet_id)
+      if (!exampleTweetIds.length) return []
       for (const id of exampleTweetIds) used.add(id)
-      return {
-        label: candidate.label,
-        description: candidate.description,
-        postCount: matched.size,
-        keywords,
-        exampleTweetIds,
-      }
+      return [
+        {
+          label: candidate.label,
+          description: candidate.description,
+          postCount: matched.size,
+          keywords,
+          exampleTweetIds,
+        },
+      ]
     })
 }
 

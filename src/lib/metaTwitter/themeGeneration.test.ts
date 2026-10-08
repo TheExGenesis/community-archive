@@ -224,6 +224,27 @@ test('counts every matching post, drops dead keywords and empty themes, sorts by
   expect(themes[1].keywords).toEqual(['friend', 'friendship'])
 })
 
+test('drops a theme whose every post is already a bigger theme’s example', () => {
+  const themes = countThemes(
+    [
+      {
+        label: 'apps',
+        description: 'apps',
+        keywords: ['app'],
+        exampleTweetIds: ['1', '2', '5'],
+      },
+      {
+        label: 'app store',
+        description: 'store',
+        keywords: ['store'],
+        exampleTweetIds: ['2'],
+      },
+    ],
+    POSTS,
+  )
+  expect(themes.map((t) => t.label)).toEqual(['apps'])
+})
+
 test('model examples must match the theme, else matching posts stand in', () => {
   const [apps] = countThemes(
     [
@@ -338,7 +359,7 @@ test('retries a failed or thin reply once at 0.7 and keeps the better one', asyn
     themes: [
       theme('apps', ['app']),
       theme('friendship', ['friendship', 'best friend']),
-      theme('gardens', ['garden']),
+      theme('quiet days', ['nothing']),
     ],
   })
   const request = jest
@@ -358,16 +379,16 @@ test('retries a failed or thin reply once at 0.7 and keeps the better one', asyn
   expect(empty.failures).toBe(1)
   expect(empty.result!.themes).toEqual([])
 
+  // A reply with a full set of distinct themes is kept without a retry.
+  const subjects = ['chess', 'gardening', 'sourdough', 'climbing', 'tarot']
+  const distinct = subjects.flatMap((subject, i) =>
+    [0, 1].map((n) => post(`${i}${n}`, `more ${subject} today`, n, i + 1)),
+  )
   const complete = JSON.stringify({
-    themes: [
-      theme('apps', ['app']),
-      theme('friendship', ['friendship', 'best friend']),
-      theme('gardens', ['garden']),
-      theme('reviews', ['review']),
-      theme('visits', ['visited']),
-    ],
+    themes: subjects.map((subject) => theme(subject, [subject])),
   })
   const once = jest.fn().mockResolvedValue(complete)
-  await generateYearThemes(2025, POSTS, once)
+  const kept = await generateYearThemes(2025, distinct, once)
   expect(once).toHaveBeenCalledTimes(1)
+  expect(kept.result!.themes).toHaveLength(5)
 })

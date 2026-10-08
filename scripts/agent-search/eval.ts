@@ -547,9 +547,7 @@ async function main() {
   const meta = {
     startedAt,
     model: modelSpec,
-    scorerModel:
-      process.env.AGENT_SEARCH_SCORER_MODEL ||
-      mods.model.agentSearchModelSpec(),
+    scorerModel: mods.model.agentSearchScorerModelSpec(),
     scorer:
       process.env.OPENROUTER_API_KEY &&
       process.env.AGENT_SEARCH_SCORER !== 'llm'

@@ -46,9 +46,9 @@ type SummaryDatabase = {
   }
 }
 
-// The page waits on the first generation (both attempts share this budget),
-// so keep it inside the page's maxDuration; a timeout shows the neutral
-// fallback this time and generation is retried on the next visit.
+// The first visit streams in while this runs and unfurlers wait on it (both
+// attempts share this budget), so keep it inside the page's maxDuration; a
+// timeout shows the neutral fallback this time and retries on the next visit.
 const GENERATION_BUDGET_MS = 15_000
 
 function summaryClient(): SupabaseClient<SummaryDatabase> | null {
@@ -198,29 +198,45 @@ const cachedOutcome = (subject: TweetPageSubject, allowGeneration: boolean) =>
   )()
 
 /**
+ * The summary, null when there is nothing to show, or 'missing' when no
+ * outcome is stored yet and this caller may not generate one.
+ */
+async function lookUpSummary(
+  subject: TweetPageSubject,
+  allowGeneration: boolean,
+): Promise<GeneratedSummary | null | 'missing'> {
+  if (!precheckEligibility(subject).eligible) return null
+  try {
+    const outcome = await cachedOutcome(subject, allowGeneration)
+    return outcome.eligible
+      ? { title: outcome.title, description: outcome.description }
+      : null
+  } catch (error) {
+    if (error instanceof GenerationSkipped) return 'missing'
+    console.warn(
+      'Tweet summary unavailable:',
+      error instanceof Error ? error.message : error,
+    )
+    return null
+  }
+}
+
+/**
  * Generated title and description for a permalink page, or null when the
  * content is not substantive enough or generation is unavailable. Crawlers
  * (`allowGeneration: false`) only see summaries that already exist.
- * Metadata and the page body share one call per request.
  */
 export const getTweetPageSummary = cache(
   async (
     subject: TweetPageSubject,
     allowGeneration: boolean,
   ): Promise<GeneratedSummary | null> => {
-    if (!precheckEligibility(subject).eligible) return null
-    try {
-      const outcome = await cachedOutcome(subject, allowGeneration)
-      return outcome.eligible
-        ? { title: outcome.title, description: outcome.description }
-        : null
-    } catch (error) {
-      if (!(error instanceof GenerationSkipped))
-        console.warn(
-          'Tweet summary unavailable:',
-          error instanceof Error ? error.message : error,
-        )
-      return null
-    }
+    const summary = await lookUpSummary(subject, allowGeneration)
+    return summary === 'missing' ? null : summary
   },
+)
+
+/** Stored outcome only, so it never waits on the model. */
+export const getStoredTweetPageSummary = cache((subject: TweetPageSubject) =>
+  lookUpSummary(subject, false),
 )

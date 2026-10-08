@@ -16,8 +16,8 @@ describe('getMissingAccounts', () => {
       data: { needsOptIn: [], needsArchive: [] },
       query: {
         limit: 100,
-        countMode: 'unique_referencing_tweets',
-        includesMentions: true,
+        countMode: 'unique_reply_tweets',
+        includesMentions: false,
         includesReplies: true,
       },
       generatedAt: '2026-08-07T00:00:00.000Z',

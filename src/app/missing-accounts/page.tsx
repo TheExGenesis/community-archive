@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'Missing accounts | Community Archive',
   description:
-    'The most-mentioned accounts that still need to opt in or upload their Twitter archive.',
+    'The most-replied-to accounts that still need to opt in or upload their Twitter archive.',
 }
 
 type View = 'opt-in' | 'archive'
@@ -113,10 +113,9 @@ function AccountRanking({
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px] border-collapse text-left">
+        <table className="w-full min-w-[520px] border-collapse text-left">
           <caption className="sr-only">
-            Accounts ranked by unique archived tweets that mention or reply to
-            them
+            Accounts ranked by unique archived tweets that reply to them
           </caption>
           <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
@@ -125,12 +124,6 @@ function AccountRanking({
               </th>
               <th scope="col" className="px-4 py-3 font-medium">
                 Account
-              </th>
-              <th scope="col" className="px-4 py-3 text-right font-medium">
-                Referenced by
-              </th>
-              <th scope="col" className="px-4 py-3 text-right font-medium">
-                Mentions
               </th>
               <th scope="col" className="px-4 py-3 text-right font-medium">
                 Replies
@@ -150,16 +143,10 @@ function AccountRanking({
                   <AccountIdentity account={account} />
                 </td>
                 <td className="px-4 py-4 text-right font-semibold tabular-nums text-foreground">
-                  {numberFormatter.format(Number(account.referenceCount))}
+                  {numberFormatter.format(Number(account.replyCount))}
                   <span className="ml-1 text-xs font-normal text-muted-foreground">
                     posts
                   </span>
-                </td>
-                <td className="px-4 py-4 text-right text-sm tabular-nums text-muted-foreground">
-                  {numberFormatter.format(Number(account.mentionCount))}
-                </td>
-                <td className="px-4 py-4 text-right text-sm tabular-nums text-muted-foreground">
-                  {numberFormatter.format(Number(account.replyCount))}
                 </td>
               </tr>
             ))}
@@ -240,8 +227,8 @@ export default async function MissingAccountsPage({
             Who should join next?
           </h1>
           <p className="mt-4 text-base leading-7 text-muted-foreground sm:text-lg">
-            The accounts most often mentioned or replied to by posts already in
-            the Community Archive. Help close the biggest gaps first.
+            The accounts most often replied to by posts already in the Community
+            Archive. Help close the biggest gaps first.
           </p>
         </div>
 
@@ -280,7 +267,7 @@ export default async function MissingAccountsPage({
             </div>
             <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
               <MessageCircle aria-hidden="true" className="h-4 w-4" />
-              Ranked by unique referencing posts
+              Ranked by unique reply posts
             </div>
           </div>
 

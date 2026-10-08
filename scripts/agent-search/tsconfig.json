@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "target": "es2022",
+    "baseUrl": "../..",
+    "incremental": false,
+    "paths": {
+      "@/*": ["./src/*"],
+      "server-only": ["./jest.server-only.js"]
+    }
+  },
+  "include": ["./*.ts", "../../types.d.ts"],
+  "exclude": ["./results/**"]
+}

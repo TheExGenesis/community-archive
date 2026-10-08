@@ -55,6 +55,10 @@
     "docker:run:process-archive": "docker compose -f services/process_archive/docker-compose.yml run --rm process-archive"
   },
   "dependencies": {
+    "@ai-sdk/openai": "4.0.74",
+    "@ai-sdk/openai-compatible": "3.0.55",
+    "@ai-sdk/react": "4.0.116",
+    "@ai-sdk/workflow": "2.0.44",
     "@next/bundle-analyzer": "^14.2.23",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-avatar": "^1.1.2",
@@ -91,6 +95,7 @@
     "@tremor/react": "^3.18.7",
     "@vercel/analytics": "^1.4.1",
     "@zip.js/zip.js": "^2.7.57",
+    "ai": "7.0.113",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "d3-force": "3.0.0",
@@ -122,7 +127,8 @@
     "tsx": "^4.19.2",
     "undici": "^5.28.5",
     "winston": "^3.17.0",
-    "workflow": "4.8.2"
+    "workflow": "5.0.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@swc/core": "^1.10.12",

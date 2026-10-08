@@ -1,0 +1,291 @@
+import type { UIMessage } from 'ai'
+import type { AgentTweet, ScoredTweet } from '@/lib/agentSearch/types'
+import {
+  NOT_SEARCHED_LINE,
+  answerText,
+  buildAnswer,
+  buildCoverage,
+  buildTurnView,
+  collectToolTweets,
+  describeChatError,
+  progressLines,
+  toolCalls,
+} from './messageView'
+
+const tweet = (id: string, extra: Partial<AgentTweet> = {}): AgentTweet => ({
+  id,
+  username: `user${id}`,
+  name: `User ${id}`,
+  avatar: null,
+  text: `Post ${id}`,
+  observedAt: '2025-01-02T00:00:00.000Z',
+  createdAt: '2025-01-01T00:00:00.000Z',
+  likes: 0,
+  rts: 0,
+  replyToTweetId: null,
+  replyToUsername: null,
+  quoteTweetId: null,
+  ...extra,
+})
+
+const scored = (id: string, p: number): ScoredTweet => ({ ...tweet(id), p })
+
+const toolPart = (
+  name: string,
+  input: Record<string, unknown>,
+  output?: unknown,
+  state = output === undefined ? 'input-available' : 'output-available',
+) =>
+  ({
+    type: `tool-${name}`,
+    toolCallId: `call-${name}-${JSON.stringify(input).length}`,
+    state,
+    input,
+    ...(output === undefined ? {} : { output }),
+    ...(state === 'output-error' ? { errorText: 'boom' } : {}),
+  }) as unknown as UIMessage['parts'][number]
+
+const text = (value: string) =>
+  ({ type: 'text', text: value }) as UIMessage['parts'][number]
+
+const assistant = (id: string, parts: UIMessage['parts']): UIMessage => ({
+  id,
+  role: 'assistant',
+  parts,
+})
+
+const user = (id: string, value: string): UIMessage => ({
+  id,
+  role: 'user',
+  parts: [text(value)],
+})
+
+describe('progressLines', () => {
+  test('describes each tool call from its input and output', () => {
+    const message = assistant('a1', [
+      { type: 'step-start' } as UIMessage['parts'][number],
+      toolPart(
+        'search_tweets',
+        { query: 'community archive', fromUser: 'alice' },
+        {
+          query: 'community archive',
+          tweets: [tweet('1'), tweet('2')],
+          nextOffset: null,
+        },
+      ),
+      toolPart(
+        'collect_and_score',
+        { terms: ['archive', 'CA'], criterion: 'Is this a complaint?' },
+        {
+          terms: ['archive', 'CA'],
+          collected: 412,
+          scored: 412,
+          keptCount: 31,
+          kept: [scored('3', 0.9)],
+          borderline: [],
+          scorer: 'llm',
+          costUsd: 0.01,
+        },
+      ),
+      toolPart(
+        'score_tweets',
+        { criterion: 'x', tweetIds: ['1', '2'] },
+        { criterion: 'x', scored: [scored('1', 0.7), scored('2', 0.2)] },
+      ),
+      toolPart(
+        'get_thread',
+        { tweetId: '1' },
+        { tweet: tweet('1'), conversation: [tweet('1'), tweet('4')] },
+      ),
+      toolPart(
+        'get_quote_posts',
+        { tweetId: '1' },
+        { tweetId: '1', total: 1, tweets: [tweet('5')] },
+      ),
+      toolPart('get_tweets', { tweetIds: ['9'] }, undefined, 'output-error'),
+      toolPart('find_people', { query: 'visa' }),
+    ])
+
+    expect(
+      progressLines(message).map((line) => [line.status, line.text]),
+    ).toEqual([
+      ['done', 'Searched “community archive” from @alice · 2 tweets'],
+      ['done', 'Scored 412 posts · 31 kept'],
+      ['done', 'Scored 2 posts · 1 kept'],
+      ['done', 'Read thread · 2 posts'],
+      ['done', 'Read quotes · 1 post'],
+      ['error', 'Could not fetch posts'],
+      ['running', 'Looking up “visa”'],
+    ])
+  })
+
+  test('reads dynamic tool parts by toolName', () => {
+    const message = assistant('a1', [
+      {
+        type: 'dynamic-tool',
+        toolName: 'get_thread',
+        toolCallId: 'c1',
+        state: 'output-available',
+        input: { tweetId: '1' },
+        output: { notFound: true },
+      } as UIMessage['parts'][number],
+    ])
+    expect(toolCalls(message)[0].name).toBe('get_thread')
+    expect(progressLines(message)[0].text).toBe('Thread not found')
+  })
+})
+
+describe('collectToolTweets', () => {
+  test('keeps full tweets over quoted embeds and skips embeds as results', () => {
+    const quoted = {
+      id: '7',
+      username: 'q',
+      name: 'Q',
+      avatar: null,
+      text: 'quoted text',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      likes: 0,
+      rts: 0,
+      media: [],
+    }
+    const found = collectToolTweets([
+      { tweets: [tweet('1', { quotedTweet: quoted }), scored('2', 0.4)] },
+      { scored: [scored('2', 0.8)] },
+    ])
+    expect(found.results).toEqual(['1', '2'])
+    expect(found.byId.get('7')?.observedAt).toBe(quoted.createdAt)
+    expect(found.scores.get('2')).toBe(0.8)
+  })
+})
+
+describe('buildAnswer', () => {
+  const found = collectToolTweets([{ tweets: [tweet('10'), tweet('20')] }])
+
+  test('numbers citations by first appearance and rewrites markers as chips', () => {
+    const answer = buildAnswer(
+      'People complained [[t:20]]. Others agreed [[t:10]][[t:20]].',
+      found,
+      'm1',
+    )
+    expect(answer.citations.map((c) => [c.n, c.id])).toEqual([
+      [1, '20'],
+      [2, '10'],
+    ])
+    expect(answer.citations[0].tweet.text).toBe('Post 20')
+    expect(answer.markdown).toBe(
+      'People complained [1](#ask-m1-tweet-20). Others agreed [2](#ask-m1-tweet-10) [1](#ask-m1-tweet-20).',
+    )
+    expect(answer.unverified).toEqual([])
+  })
+
+  test('marks ids that no tool returned as unverified', () => {
+    const answer = buildAnswer('Claim [[t:99]] and [[t:10]]', found, 'm1')
+    expect(answer.unverified).toEqual(['99'])
+    expect(answer.citations.map((c) => c.id)).toEqual(['10'])
+    expect(answer.markdown).toContain('[unverified](#ask-unverified-99)')
+  })
+
+  test('hides a half-streamed marker', () => {
+    expect(
+      buildAnswer('Claim [[t:12', found, 'm1', { streaming: true }).markdown,
+    ).toBe('Claim ')
+  })
+})
+
+describe('buildCoverage', () => {
+  test('lists searches and totals scored and kept posts', () => {
+    const message = assistant('a1', [
+      toolPart('search_tweets', { query: 'archive' }, { tweets: [tweet('1')] }),
+      toolPart(
+        'collect_and_score',
+        { terms: ['archive'], criterion: 'c' },
+        {
+          collected: 1000,
+          capped: true,
+          scored: 1000,
+          keptCount: 70,
+          kept: [],
+        },
+      ),
+      toolPart(
+        'score_tweets',
+        { criterion: 'c', tweetIds: ['1'] },
+        { scored: [scored('1', 0.6)] },
+      ),
+      toolPart(
+        'get_thread',
+        { tweetId: '1' },
+        { tweet: tweet('1'), conversation: [] },
+      ),
+      toolPart('search_tweets', { query: 'pending' }),
+    ])
+    expect(buildCoverage(toolCalls(message))).toEqual({
+      searches: [
+        { label: '“archive”', detail: '1 tweet' },
+        {
+          label: '“archive”',
+          detail: '1,000 posts collected (stopped at the cap), 70 kept',
+        },
+      ],
+      scored: 1001,
+      kept: 71,
+      threadsRead: 1,
+      quotesRead: 0,
+    })
+    expect(NOT_SEARCHED_LINE).toMatch(/^Not searched: live X/)
+  })
+})
+
+describe('buildTurnView', () => {
+  test('uses text after the last tool call and resolves follow-up citations from earlier turns', () => {
+    const messages: UIMessage[] = [
+      user('u1', 'Who complained?'),
+      assistant('a1', [
+        toolPart(
+          'search_tweets',
+          { query: 'archive' },
+          { tweets: [tweet('1'), tweet('2')] },
+        ),
+        text('First answer [[t:1]]'),
+      ]),
+      user('u2', 'More?'),
+      assistant('a2', [
+        text('Let me look.'),
+        toolPart(
+          'search_tweets',
+          { query: 'ca' },
+          { tweets: [tweet('3'), scored('4', 0.9)] },
+        ),
+        text('Also [[t:3]] and earlier [[t:2]].'),
+      ]),
+    ]
+    const view = buildTurnView(messages, 3)
+    expect(answerText(messages[3])).toBe('Also [[t:3]] and earlier [[t:2]].')
+    expect(view.answer.citations.map((c) => c.id)).toEqual(['3', '2'])
+    expect(view.answer.unverified).toEqual([])
+    expect(view.otherTweets.map((t) => t.id)).toEqual(['4'])
+    expect(view.progress).toHaveLength(1)
+  })
+})
+
+describe('describeChatError', () => {
+  const failed = (status: number, body: string) =>
+    new Error(`Failed to fetch chat: ${status} ${body}`)
+
+  test('maps refusal codes to plain messages', () => {
+    expect(describeChatError(failed(429, '{"error":"daily_limit"}'))).toBe(
+      "You've used today's 10 questions. You can ask again after midnight UTC.",
+    )
+    expect(
+      describeChatError(failed(429, '{"error":"run_in_progress"}')),
+    ).toMatch(/still running/)
+    expect(describeChatError(failed(429, '{"error":"global_budget"}'))).toMatch(
+      /spending limit/,
+    )
+    expect(describeChatError(failed(403, '{"error":"not_eligible"}'))).toMatch(
+      /uploaded their archive/,
+    )
+    expect(describeChatError(failed(503, 'upstream'))).toMatch(/not responding/)
+    expect(describeChatError(undefined)).toBeNull()
+  })
+})

@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import TweetComponent from '@/components/TweetComponent'
@@ -9,13 +10,16 @@ import {
   eyebrowLabel,
   fallbackTitle,
   plainTweetText,
+  type TweetPageSubject,
 } from '@/lib/tweetSummary/subject'
+import type { GeneratedSummary } from '@/lib/tweetSummary/generation'
 import { loadTweetPage } from '@/lib/tweetSummary/loadTweetPage'
+import { getTweetPageSummary } from '@/lib/tweetSummary/store'
 import { Link2, MessagesSquare, Sparkles } from 'lucide-react'
 
 // ISR: serve from CDN cache, revalidate at most once per hour
 export const revalidate = 3600
-// The first visit to a page may wait on summary generation.
+// The first visit keeps streaming while its summary generates.
 export const maxDuration = 30
 
 type PageProps = {
@@ -58,6 +62,7 @@ export default async function TweetPage(props: PageProps) {
     quotingTweetCount,
     subject,
     summary,
+    summaryPending,
   } = page
   const isThread = subject.kind === 'thread'
   // A standalone tweet still shows the replies it collected.
@@ -82,20 +87,12 @@ export default async function TweetPage(props: PageProps) {
             )}
             {eyebrowLabel(subject.kind)}
           </div>
-          <h1 className="max-w-4xl text-4xl font-bold tracking-tight text-foreground [text-wrap:balance] sm:text-5xl">
-            {summary?.title ?? fallbackTitle(subject)}
-          </h1>
-          {summary && (
-            <>
-              <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-                {summary.description}
-              </p>
-              <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground/80">
-                <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                AI-generated summary. The author&rsquo;s original words are
-                below.
-              </p>
-            </>
+          {summaryPending ? (
+            <Suspense fallback={<SummaryHeadingSkeleton />}>
+              <GeneratedSummaryHeading subject={subject} />
+            </Suspense>
+          ) : (
+            <SummaryHeading subject={subject} summary={summary} />
           )}
         </header>
 
@@ -142,5 +139,68 @@ export default async function TweetPage(props: PageProps) {
         </div>
       </section>
     </main>
+  )
+}
+
+function SummaryHeading({
+  subject,
+  summary,
+}: {
+  subject: TweetPageSubject
+  summary: GeneratedSummary | null
+}) {
+  return (
+    <>
+      <h1 className="max-w-4xl text-4xl font-bold tracking-tight text-foreground [text-wrap:balance] sm:text-5xl">
+        {summary?.title ?? fallbackTitle(subject)}
+      </h1>
+      {summary && (
+        <>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
+            {summary.description}
+          </p>
+          <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground/80">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden />
+            AI-generated summary. The author&rsquo;s original words are below.
+          </p>
+        </>
+      )}
+    </>
+  )
+}
+
+// Only rendered for a first visit by a person; everyone after reads the
+// stored summary without waiting.
+async function GeneratedSummaryHeading({
+  subject,
+}: {
+  subject: TweetPageSubject
+}) {
+  const summary = await getTweetPageSummary(subject, true)
+  return <SummaryHeading subject={subject} summary={summary} />
+}
+
+// A wireframe of the heading with a brand-tinted sweep, sized like a
+// one-line title and a three-line description. Holds still for reduced motion.
+const shimmerBar =
+  'rounded-md bg-muted bg-shimmer bg-[length:200%_100%] bg-no-repeat animate-shimmer motion-reduce:animate-none'
+
+function SummaryHeadingSkeleton() {
+  return (
+    <div aria-busy="true">
+      <div className={`${shimmerBar} h-10 w-full max-w-2xl sm:h-12`} />
+      <div className="mt-5 max-w-2xl space-y-3">
+        <div className={`${shimmerBar} h-4 w-full`} />
+        <div className={`${shimmerBar} h-4 w-11/12`} />
+        <div className={`${shimmerBar} h-4 w-3/5`} />
+      </div>
+      <p className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground/80">
+        <Sparkles
+          className="h-3.5 w-3.5 animate-pulse text-brand motion-reduce:animate-none"
+          aria-hidden
+        />
+        Writing an AI summary…
+      </p>
+    </div>
   )
 }

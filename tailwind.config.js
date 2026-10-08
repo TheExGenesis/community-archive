@@ -71,7 +71,16 @@ module.exports = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      backgroundImage: {
+        shimmer:
+          'linear-gradient(90deg, transparent, hsl(var(--brand) / 0.18), transparent)',
+      },
       keyframes: {
+        // Sweeps a 200%-wide gradient from off the left edge to off the right.
+        shimmer: {
+          from: { backgroundPosition: '150% 0' },
+          to: { backgroundPosition: '-50% 0' },
+        },
         'accordion-down': {
           from: { height: '0' },
           to: { height: 'var(--radix-accordion-content-height)' },
@@ -82,6 +91,7 @@ module.exports = {
         },
       },
       animation: {
+        shimmer: 'shimmer 1.6s ease-in-out infinite',
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
       },

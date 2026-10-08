@@ -20,6 +20,8 @@ import {
   getPublicProfileSettings,
 } from '@/lib/profileCuration'
 import { getAuthenticatedAccountId } from '@/lib/authenticatedAccount'
+import { getPublicShelf } from '@/lib/shelf/data'
+import Link from 'next/link'
 import {
   PROFILE_BANGERS_INITIAL_LIMIT,
   resolveProfileChapterYear,
@@ -217,6 +219,11 @@ export default async function UserPage({ params, searchParams }: PageProps) {
                 <OwnerActions profile={profile} />
               </Suspense>
             }
+            shelfLinkSlot={
+              <Suspense fallback={null}>
+                <ProfileShelfLink profile={profile} />
+              </Suspense>
+            }
           />
           <Suspense fallback={<ProfileArchiveSkeleton />}>
             <ProfileArchiveContent
@@ -289,5 +296,32 @@ async function OwnerActions({ profile }: { profile: ProfileHeaderData }) {
       profile={profile}
       downloadArchiveVisible={settings.downloadArchiveVisible}
     />
+  )
+}
+
+/** Links to the public shelf once something is approved; the owner always sees it. */
+async function ProfileShelfLink({ profile }: { profile: ProfileHeaderData }) {
+  const total = await measureServerRead('profile.shelf', () =>
+    getPublicShelf(profile.account_id),
+  )
+    .then((shelf) => shelf.total)
+    .catch(() => 0)
+  const href =
+    total > 0
+      ? `${userProfileHref(profile.username, profile.account_id)}/shelf`
+      : (await measureServerRead(
+            'profile.shelf-owner',
+            getAuthenticatedAccountId,
+          )) === profile.account_id
+        ? '/shelf'
+        : null
+  if (!href) return null
+  return (
+    <Link
+      href={href}
+      className="text-sm font-medium text-brand underline-offset-4 hover:underline"
+    >
+      Shelf →
+    </Link>
   )
 }

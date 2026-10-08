@@ -21,3 +21,6 @@ ALTER SCHEMA "ca_autorefresh" OWNER TO "postgres";
 
 -- Private Bulletin opportunities
 CREATE SCHEMA bulletin;
+
+-- Private member shelves (works a member engaged with, derived from their own tweets)
+CREATE SCHEMA shelf;

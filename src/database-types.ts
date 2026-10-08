@@ -2368,6 +2368,29 @@ export type Database = {
           unique_scrapers: number
         }[]
       }
+      get_shelf: {
+        Args: {
+          p_account_id: string
+          include_unapproved: boolean
+        }
+        Returns: {
+          work_key: string
+          shelf_row: string
+          medium: string
+          label: string
+          needs_title: boolean
+          creator: string
+          url: string
+          marks: string[]
+          evidence_tweet_ids: string[]
+          first_at: string
+          last_at: string
+          image_url: string
+          image_source: string
+          status: string
+          computed_at: string
+        }[]
+      }
       get_simple_streamed_tweet_counts: {
         Args: {
           start_date: string
@@ -2781,6 +2804,15 @@ export type Database = {
       set_limit: {
         Args: {
           "": number
+        }
+        Returns: number
+      }
+      set_shelf_curation: {
+        Args: {
+          p_account_id: string
+          p_work_keys: string[]
+          p_status: string
+          p_title: string
         }
         Returns: number
       }

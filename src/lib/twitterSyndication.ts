@@ -3,13 +3,8 @@
  * have been deleted from our archive but may still be accessible via Twitter's public
  * embed CDN. Used to fill in deleted reply parents and deleted quoted tweets, and
  * to recover an avatar transiently when an archived profile image is missing or
- * stale.
- *
+ * stale. *
  * Hard rules:
- * - Never persist the response to our DB.
- * - Never include hydrated tweet content in search results, profile listings, or any
- *   other query path. Avatar recovery is render-only and is never persisted.
- * - Caller decides whether to render with a "(from Twitter)" marker.
  *
  * The endpoint requires a `token` query param derived from the tweet id. This is
  * the same derivation used by Vercel's `react-tweet`:

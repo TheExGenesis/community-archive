@@ -124,8 +124,23 @@ function termsSubject(input: LooseRecord): string {
   const terms = asArray(input.terms)
     .map(asString)
     .filter((term): term is string => Boolean(term))
-  return terms.length ? terms.map(quote).join(', ') : 'posts'
+  const from = asString(input.fromUser)
+  const subject = terms.length ? terms.map(quote).join(', ') : 'posts'
+  return from ? `${subject} from @${from.replace(/^@/, '')}` : subject
 }
+
+const CRITERION_LIMIT = 140
+
+function criterionText(input: LooseRecord): string {
+  const criterion = asString(input.criterion)
+  if (!criterion) return ''
+  return criterion.length > CRITERION_LIMIT
+    ? `${criterion.slice(0, CRITERION_LIMIT).trimEnd()}…`
+    : criterion
+}
+
+/** Mirrors DEFAULT_COLLECT in toolImpl: the limit when the agent sets none. */
+const DEFAULT_COLLECT = 300
 
 export function progressLine(call: ToolCallView): ProgressLine {
   const { input, output } = call
@@ -159,11 +174,15 @@ export function progressLine(call: ToolCallView): ProgressLine {
     }
     case 'collect_and_score': {
       const subject = termsSubject(input)
-      running = `Collecting and scoring posts for ${subject}`
-      finished = `Scored ${plural(asNumber(out.scored) ?? 0, 'post')} · ${collectKept(
+      const criterion = criterionText(input)
+      const limit =
+        asNumber(out.limit) ?? asNumber(input.maxTweets) ?? DEFAULT_COLLECT
+      const question = criterion ? ` against ${quote(criterion)}` : ''
+      running = `Checking up to ${plural(limit, 'post')} matching ${subject}${question}`
+      finished = `Checked ${plural(asNumber(out.scored) ?? 0, 'post')} matching ${subject} · ${collectKept(
         out,
-      )} kept`
-      failure = `Scoring posts for ${subject} failed`
+      )} kept${out.capped ? ` · stopped at the ${limit.toLocaleString('en-US')}-post limit` : ''}`
+      failure = `Checking posts matching ${subject} failed`
       break
     }
     case 'score_tweets': {
@@ -348,8 +367,8 @@ export function buildCoverage(calls: ToolCallView[]): CoverageView {
         const kept = collectKept(out)
         coverage.searches.push({
           label: termsSubject(call.input),
-          detail: `${plural(collected, 'post')} collected${
-            out.capped ? ' (stopped at the cap)' : ''
+          detail: `${plural(collected, 'post')} checked${
+            out.capped ? ' (stopped at the limit, more exist)' : ''
           }, ${kept} kept`,
         })
         coverage.scored += scored

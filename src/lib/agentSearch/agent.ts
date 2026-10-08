@@ -20,10 +20,10 @@ export const agentSearchInstructions = (
 
 How to work:
 1. Work out what the question is about. If it names a person or account, use find_people to get the right handle. A project or community may have its own account (the archive's is @comm_archive); search for the project, not only its founders.
-2. When the subject has a recognisable name, use collect_and_score: give 2 to 8 search terms (names, handles, common phrasings, likely words) and a precise yes/no criterion that matches the question. It pulls every matching post and scores each one, so you see what actually answers the question rather than everything that mentions it. Use it when the answer is a set of posts (who said something, what people think about a topic); to find one remembered tweet, use search_tweets.
-3. Use search_tweets for narrower lookups: a remembered tweet, a phrase, one person's posts (fromUser), a date range (since/until, YYYY-MM-DD), or the most-liked posts (sort: likes). Short keyword queries work better than sentences. Multi-word queries match as an exact phrase unless you pass mode: 'all'; anyOf searches several alternatives at once.
+2. Start with search_tweets and read what comes back before deciding the next step. Search for the words that signal an answer, not only the topic: for films someone liked, try "great movie", "just watched", "recommend" with fromUser, not the bare word "film", which also matches filming and film cameras. Short keyword queries work better than sentences. Multi-word queries match as an exact phrase unless you pass mode: 'all'; anyOf searches several alternatives at once. Other filters: one person's posts (fromUser), a date range (since/until, YYYY-MM-DD), the most-liked posts (sort: likes).
    Search matches text, not meaning, so try the forms people actually write: word variants (Greek and Greece, ban and banned), abbreviations, handles, and the specific names or jargon the topic would use. If a search finds nothing, rephrase before concluding.
    Leave optional fields out unless you need them. Add since/until only when the question asks about a time period.
+3. Use collect_and_score only when the answer is a set of posts spread across the archive (who criticised something, what people think about a topic) and searches show more matching posts than you can read, many of them off-topic. Give 2 to 8 terms that signal the answer and a precise yes/no criterion. It checks up to 300 posts by default; raise maxTweets (up to 1000) only when the question needs the long tail. If the result says capped, posts past the limit were not checked: narrow the terms or dates, or say so in the answer. Do not use it to find one remembered tweet or when a few searches already answer the question.
 4. Follow conversations when they matter: get_thread for replies and context, get_quote_posts for reactions. Use score_tweets to score posts you found this way.
 5. Stop searching once more searches stop turning up new relevant posts. Do not repeat the same search.
 
@@ -103,7 +103,7 @@ export function createAgentSearchTools(
     }),
     collect_and_score: tool({
       description:
-        'Collect every tweet matching any of the terms (up to 1000), then score each against a yes/no criterion. Returns the posts that answer it (p ≥ 0.5) and borderline ones.',
+        'Collect tweets matching any of the terms (300 by default, maxTweets up to 1000), then check each against a yes/no criterion. Returns the posts that answer it (p ≥ 0.5), borderline ones, and whether the limit cut the collection short.',
       inputSchema: z.object({
         terms: z.array(z.string().min(1).max(60)).min(1).max(8),
         criterion: z.string().min(10).max(400),
@@ -116,6 +116,7 @@ export function createAgentSearchTools(
       toModelOutput: ({ output }) =>
         json({
           collected: output.collected,
+          limit: output.limit,
           capped: output.capped,
           scored: output.scored,
           keptCount: output.keptCount,

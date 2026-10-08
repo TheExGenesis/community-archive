@@ -29,7 +29,9 @@ function present<T extends object>(input: T): T {
 
 export const KEEP_THRESHOLD = 0.5
 export const BORDERLINE_THRESHOLD = 0.35
-const MAX_COLLECT = 1000
+// The agent can ask for up to MAX_COLLECT; most questions need far fewer.
+export const DEFAULT_COLLECT = 300
+export const MAX_COLLECT = 1000
 const PAGE = 100
 const MAX_KEPT_RETURNED = 60
 const MAX_BORDERLINE_RETURNED = 20
@@ -162,7 +164,10 @@ export async function collectAndScoreImpl(raw: CollectAndScoreInput) {
   const terms = Array.from(
     new Set(input.terms.map((t) => t.trim()).filter(Boolean)),
   ).slice(0, 8)
-  const max = Math.min(Math.max(input.maxTweets ?? MAX_COLLECT, 1), MAX_COLLECT)
+  const max = Math.min(
+    Math.max(input.maxTweets ?? DEFAULT_COLLECT, 1),
+    MAX_COLLECT,
+  )
   const collected = new Map<string, AgentTweet>()
   for (const term of terms) {
     let offset: number | null = 0
@@ -195,7 +200,9 @@ export async function collectAndScoreImpl(raw: CollectAndScoreInput) {
   return {
     terms,
     criterion: input.criterion,
+    fromUser: input.fromUser ?? null,
     collected: collected.size,
+    limit: max,
     capped: collected.size >= max,
     scored: scored.length,
     keptCount: kept.length,

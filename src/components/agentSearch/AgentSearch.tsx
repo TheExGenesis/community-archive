@@ -19,8 +19,20 @@ export const EXAMPLE_QUESTIONS = [
 const MAX_QUESTION_LENGTH = 1000
 
 export default function AgentSearch() {
+  // The run id of the answer in progress, so Stop can cancel the workflow
+  // instead of only closing the stream.
+  const runIdRef = useRef<string | null>(null)
   const transport = useMemo(
-    () => new WorkflowChatTransport<UIMessage>({ api: '/api/agent-search' }),
+    () =>
+      new WorkflowChatTransport<UIMessage>({
+        api: '/api/agent-search',
+        onChatSendMessage: (response) => {
+          runIdRef.current = response.headers.get('x-workflow-run-id')
+        },
+        onChatEnd: () => {
+          runIdRef.current = null
+        },
+      }),
     [],
   )
   const {
@@ -50,6 +62,17 @@ export default function AgentSearch() {
     setInput((value) => value || messageText(last))
     textareaRef.current?.focus()
   }, [error, messages, setMessages])
+
+  const stopRun = () => {
+    const runId = runIdRef.current
+    runIdRef.current = null
+    if (runId) {
+      void fetch(`/api/agent-search/${encodeURIComponent(runId)}/cancel`, {
+        method: 'POST',
+      }).catch(() => undefined)
+    }
+    void stop()
+  }
 
   const ask = (question: string) => {
     const text = question.trim().slice(0, MAX_QUESTION_LENGTH)
@@ -110,7 +133,7 @@ export default function AgentSearch() {
         {busy ? (
           <button
             type="button"
-            onClick={() => void stop()}
+            onClick={stopRun}
             className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Square aria-hidden="true" className="h-3.5 w-3.5" />

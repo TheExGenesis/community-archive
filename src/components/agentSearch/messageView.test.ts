@@ -79,6 +79,8 @@ describe('progressLines', () => {
         {
           terms: ['archive', 'CA'],
           collected: 412,
+          limit: 1000,
+          capped: false,
           scored: 412,
           keptCount: 31,
           kept: [scored('3', 0.9)],
@@ -110,13 +112,39 @@ describe('progressLines', () => {
       progressLines(message).map((line) => [line.status, line.text]),
     ).toEqual([
       ['done', 'Searched “community archive” from @alice · 2 tweets'],
-      ['done', 'Scored 412 posts · 31 kept'],
+      ['done', 'Checked 412 posts matching “archive”, “CA” · 31 kept'],
       ['done', 'Scored 2 posts · 1 kept'],
       ['done', 'Read thread · 2 posts'],
       ['done', 'Read quotes · 1 post'],
       ['error', 'Could not fetch posts'],
       ['running', 'Looking up “visa”'],
     ])
+  })
+
+  test('says what collect_and_score checks and when it hit the limit', () => {
+    const input = {
+      terms: ['book'],
+      fromUser: 'patio11',
+      criterion: 'Does this tweet recommend a book?',
+    }
+    const running = assistant('a1', [toolPart('collect_and_score', input)])
+    expect(progressLines(running)[0].text).toBe(
+      'Checking up to 300 posts matching “book” from @patio11 against “Does this tweet recommend a book?”',
+    )
+    const done = assistant('a2', [
+      toolPart('collect_and_score', input, {
+        collected: 300,
+        limit: 300,
+        capped: true,
+        scored: 300,
+        keptCount: 12,
+        kept: [],
+        borderline: [],
+      }),
+    ])
+    expect(progressLines(done)[0].text).toBe(
+      'Checked 300 posts matching “book” from @patio11 · 12 kept · stopped at the 300-post limit',
+    )
   })
 
   test('reads dynamic tool parts by toolName', () => {
@@ -224,7 +252,8 @@ describe('buildCoverage', () => {
         { label: '“archive”', detail: '1 tweet' },
         {
           label: '“archive”',
-          detail: '1,000 posts collected (stopped at the cap), 70 kept',
+          detail:
+            '1,000 posts checked (stopped at the limit, more exist), 70 kept',
         },
       ],
       scored: 1001,

@@ -12,17 +12,23 @@ answer whose claims cite tweets inline. The page renders the cited tweets with
    and the budget (`budget.ts`), then starts the `agentSearchWorkflow`
    (`src/workflows/agentSearch.ts`) and streams it back with an
    `x-workflow-run-id` header. `GET /api/agent-search/{runId}/stream` lets a
-   refreshed page reconnect; only the asker can read a run.
+   refreshed page reconnect, and `POST /api/agent-search/{runId}/cancel` (the
+   page's Stop button) cancels the workflow and closes the run record; only the
+   asker can read or stop a run.
 2. The workflow runs AI SDK 7's `WorkflowAgent`. Each tool call is a durable
    step. Tools (`src/lib/agentSearch/agent.ts`, implemented in `toolImpl.ts`):
    `find_people`, `search_tweets`, `collect_and_score`, `score_tweets`,
    `get_thread`, `get_quote_posts`, `get_tweets`. They read only through the
    gateway (`gateway.ts`), which applies opt-outs. The page receives full tweet
    objects; the model receives a compact form (`toModelOutput`).
-3. `collect_and_score` pulls up to 1,000 matching posts and scores each one
-   against a yes/no criterion (`classifier.ts`): Jev through OpenRouter when
-   `OPENROUTER_API_KEY` is set, otherwise the scorer model with structured
-   output. Replies are scored with their parent's text.
+3. The agent starts with keyword searches. When a question's answer is a set of
+   posts and the searches are too many and too noisy to read, `collect_and_score`
+   pulls matching posts (300 by default, up to 1,000 when the agent asks) and
+   scores each one against a yes/no criterion (`classifier.ts`). The default
+   scorer is OpenAI's Decisions API (one `predicate` question per post, 48
+   requests at a time); Jev through OpenRouter and an LLM with structured output
+   are alternatives. Replies are scored with their parent's text. The result
+   says when the limit cut the collection short.
 4. The answer cites tweets as `[[t:<id>]]`. A citation counts only if the id
    came back from a tool in the same run (`citations.ts`); the page marks other
    ids as unverified and the run record lists them.
@@ -38,15 +44,15 @@ resolved headers, including the API key, into the event log.
 | Variable | Default | Purpose |
 |---|---|---|
 | `AGENT_SEARCH_MODEL` | `openai:gpt-6.1-sol` | Planner (`openai:` or `openrouter:` spec) |
-| `AGENT_SEARCH_SCORER_MODEL` | `openai:gpt-6-luna` | Fallback scorer when Jev is unavailable |
-| `AGENT_SEARCH_SCORER` | unset | `llm` forces the fallback scorer |
-| `AGENT_SEARCH_SCORER_REASONING` | `low` | Fallback scorer reasoning effort (`none`, `low`, `medium`, `high`) |
+| `AGENT_SEARCH_SCORER` | unset | `decisions`, `jev` or `llm`. Unset: Decisions with an OpenAI key, else Jev with an OpenRouter key, else the LLM |
+| `AGENT_SEARCH_SCORER_MODEL` | `openai:gpt-6-luna` | Model for the `llm` scorer |
+| `AGENT_SEARCH_SCORER_REASONING` | `low` | `llm` scorer reasoning effort (`none`, `low`, `medium`, `high`) |
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | | Provider keys; OpenRouter calls send `data_collection: deny, zdr: true` |
 | `AGENT_SEARCH_DAILY_LIMIT` | `10` | Questions per member per UTC day |
 | `AGENT_SEARCH_GLOBAL_DAILY_USD` | `25` | Global daily spend kill switch |
 | `AGENT_SEARCH_STALE_RUN_MS` | `600000` | When a running run stops blocking a new one |
 | `AGENT_SEARCH_INPUT_USD_PER_MTOK`, `AGENT_SEARCH_OUTPUT_USD_PER_MTOK` | price table | Planner prices for models not in `MODEL_PRICES_USD_PER_MTOK` |
-| `AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK`, `..._OUTPUT_...` | price table | Same for the scorer |
+| `AGENT_SEARCH_SCORER_INPUT_USD_PER_MTOK`, `..._OUTPUT_...` | price table | Same for the `llm` scorer (Decisions is priced at $0.10 per million input tokens) |
 | `AGENT_SEARCH_RUN_STORE` | file outside production | `file` forces the local JSON store |
 
 The gateway variables (`CLICKHOUSE_SEARCH_API_URL`, `CLICKHOUSE_ANALYTICS_API_URL`,

@@ -40,8 +40,8 @@ Environment: the script reads `~/ca-local/gateway/site.env` (override the path w
 production settings in `.env.local` never reach a run. Variables already set in the shell
 win. It refuses a gateway URL that is not localhost unless `--allow-remote-gateway` is
 passed. The scorer used by `collect_and_score` / `score_tweets` follows
-`AGENT_SEARCH_SCORER_MODEL` (else the agent model spec); with no `OPENROUTER_API_KEY` it is
-the LLM fallback, not Jev.
+`AGENT_SEARCH_SCORER` (see `docs/agent-search.md`); with an OpenAI key and nothing set it
+is the Decisions API.
 
 Cost: a full run is 30 agent loops plus classifier calls. One smoke-test question used
 about 63k input and 0.6k output tokens with `gpt-6.1-sol`. Run a class or `--limit` first.

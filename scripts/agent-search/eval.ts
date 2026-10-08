@@ -241,6 +241,7 @@ type Modules = {
   citations: typeof import('@/lib/agentSearch/citations')
   model: typeof import('@/lib/agentSearch/model')
   gateway: typeof import('@/lib/agentSearch/gateway')
+  classifier: typeof import('@/lib/agentSearch/classifier')
   ai: typeof import('ai')
 }
 
@@ -523,6 +524,7 @@ async function main() {
     citations: await import('@/lib/agentSearch/citations'),
     model: await import('@/lib/agentSearch/model'),
     gateway: await import('@/lib/agentSearch/gateway'),
+    classifier: await import('@/lib/agentSearch/classifier'),
     ai: await import('ai'),
   }
 
@@ -544,15 +546,17 @@ async function main() {
     throw new Error('OPENAI_API_KEY is not set (expected in .env.local)')
   }
   const startedAt = new Date().toISOString()
+  const scorer = mods.classifier.agentSearchScorer()
   const meta = {
     startedAt,
     model: modelSpec,
-    scorerModel: mods.model.agentSearchScorerModelSpec(),
-    scorer:
-      process.env.OPENROUTER_API_KEY &&
-      process.env.AGENT_SEARCH_SCORER !== 'llm'
-        ? 'jev'
-        : 'llm',
+    scorerModel:
+      scorer === 'decisions'
+        ? `openai:${mods.classifier.DECISIONS_MODEL} (Decisions API)`
+        : scorer === 'jev'
+          ? mods.classifier.JEV_MODEL
+          : mods.model.agentSearchScorerModelSpec(),
+    scorer,
     maxSteps: mods.agent.AGENT_SEARCH_MAX_STEPS,
     questions: args.questions,
     gateway: process.env.CLICKHOUSE_ANALYTICS_API_URL,

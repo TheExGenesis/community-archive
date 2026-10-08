@@ -6,13 +6,16 @@ redirect not followed), cache it in shelf.short_links, and add real targets to t
 URLs. Links that point back to a tweet or its photo are not works and are dropped.
 
 t.co publishes no rate limits, so throttling is tracked: every status is counted, 429/503
-back off (Retry-After honoured), and the stage stops after repeated throttling.
+back off (Retry-After honoured), and the stage stops after repeated throttling. A sequential
+run of 1,300 requests saw no throttling, so lookups run 8 at a time.
 """
 import http.client
 import json
 import re
+import threading
 import time
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 
 from view import is_tweet_link
 
@@ -45,33 +48,46 @@ class Throttled(Exception):
     pass
 
 
-def resolve_codes(codes, record, gap=0.25, log_every=100, fetch=fetch, sleep=time.sleep):
-    """Resolve codes one at a time; record(code, status, target) persists each result.
-    Returns a summary {"requests", "statuses", "throttled", "stopped"}."""
-    statuses, throttled, consecutive, requests = Counter(), 0, 0, 0
-    for i, code in enumerate(codes):
+def resolve_codes(codes, record, workers=8, log_every=100, fetch=fetch, sleep=time.sleep):
+    """Resolve codes on worker threads; record(code, status, target) runs on this thread.
+    Throttling is counted across all threads: 429/503 back off (Retry-After honoured) and
+    MAX_CONSECUTIVE_THROTTLES in a row stops the run. Returns a summary."""
+    lock, stop = threading.Lock(), threading.Event()
+    state = {"consecutive": 0, "throttled": 0}
+
+    def one(code):
+        seen = []
         for attempt in range(4):
+            if stop.is_set():
+                return code, None, None, seen
             status, target, retry_after = fetch(code)
-            requests += 1
-            statuses[status] += 1
+            seen.append(status)
             if status not in THROTTLE_STATUSES:
-                consecutive = 0
-                break
-            throttled += 1
-            consecutive += 1
-            if consecutive >= MAX_CONSECUTIVE_THROTTLES:
-                summary = {"requests": requests, "statuses": dict(statuses), "throttled": throttled,
-                           "stopped": f"{consecutive} throttles in a row at code {i + 1}/{len(codes)}"}
-                print(json.dumps({"tco": summary}), flush=True)
-                return summary
+                with lock:
+                    state["consecutive"] = 0
+                return code, status, target, seen
+            with lock:
+                state["throttled"] += 1
+                state["consecutive"] += 1
+                if state["consecutive"] >= MAX_CONSECUTIVE_THROTTLES:
+                    stop.set()
+                    return code, None, None, seen
             sleep(min(float(retry_after) if retry_after and retry_after.isdigit() else 2 ** (attempt + 2), 120))
-        if status and status not in THROTTLE_STATUSES:
-            record(code, status, target if status in (301, 302, 303, 307, 308) else None)
-        if (i + 1) % log_every == 0:
-            print(json.dumps({"tco": {"done": i + 1, "of": len(codes), "statuses": dict(statuses),
-                                      "throttled": throttled}}), flush=True)
-        sleep(gap)
-    summary = {"requests": requests, "statuses": dict(statuses), "throttled": throttled, "stopped": None}
+        return code, None, None, seen
+
+    statuses, done = Counter(), 0
+    with ThreadPoolExecutor(workers) as pool:
+        for code, status, target, seen in pool.map(one, codes):
+            statuses.update(seen)
+            done += 1
+            if status and status not in THROTTLE_STATUSES:
+                record(code, status, target if status in (301, 302, 303, 307, 308) else None)
+            if done % log_every == 0:
+                print(json.dumps({"tco": {"done": done, "of": len(codes), "statuses": dict(statuses),
+                                          "throttled": state["throttled"]}}), flush=True)
+    summary = {"requests": sum(statuses.values()), "statuses": dict(statuses),
+               "throttled": state["throttled"],
+               "stopped": f"{MAX_CONSECUTIVE_THROTTLES} throttles in a row" if stop.is_set() else None}
     print(json.dumps({"tco": summary}), flush=True)
     return summary
 

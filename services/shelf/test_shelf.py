@@ -261,7 +261,7 @@ class ShortLinks(unittest.TestCase):
 
     def test_stops_after_repeated_throttling(self):
         recorded = []
-        summary = self.sl.resolve_codes(["a1b2", "c3d4"], lambda *r: recorded.append(r),
+        summary = self.sl.resolve_codes(["a1b2", "c3d4"], lambda *r: recorded.append(r), workers=1,
                                         fetch=lambda code: (429, None, "1"), sleep=lambda s: None)
         self.assertIn("throttles in a row", summary["stopped"])
         self.assertEqual(recorded, [])

@@ -79,10 +79,13 @@ export async function searchTweetsImpl(raw: SearchTweetsToolInput) {
     sort: input.sort,
   }
   if (input.anyOf?.length) {
-    // The gateway has no any-word mode yet, so run each term and merge.
+    // The gateway has no any-word mode yet, so run the query and each
+    // alternative separately and merge.
     const terms = Array.from(
-      new Set(input.anyOf.map((t) => t.trim()).filter(Boolean)),
-    ).slice(0, 8)
+      new Set(
+        [input.query, ...input.anyOf].map((t) => t.trim()).filter(Boolean),
+      ),
+    ).slice(0, 9)
     const pages = await Promise.all(
       terms.map((term) => searchTweets({ ...filters, query: term, limit })),
     )
@@ -150,6 +153,57 @@ async function scoreWithParents(
   return { scored, scorer: result.scorer, costUsd: result.costUsd }
 }
 
+/**
+ * Pages through every term in parallel, giving each an equal share of the
+ * limit, so the first term cannot use it all. Shares left unused by terms
+ * that run out pass to terms that still have pages. `capped` is true when
+ * matching posts were left unfetched.
+ */
+async function collectAcrossTerms(
+  terms: string[],
+  max: number,
+  filters: { since?: string; until?: string; fromUser?: string },
+) {
+  const collected = new Map<string, AgentTweet>()
+  const offsets = new Map<string, number | null>(terms.map((t) => [t, 0]))
+  const open = () => terms.filter((term) => offsets.get(term) !== null)
+  let dropped = false
+  while (collected.size < max && open().length) {
+    const active = open()
+    const share = Math.max(1, Math.ceil((max - collected.size) / active.length))
+    const results = await Promise.all(
+      active.map(async (term) => {
+        const tweets: AgentTweet[] = []
+        let offset = offsets.get(term) ?? null
+        while (offset !== null && tweets.length < share) {
+          const page: { tweets: AgentTweet[]; nextOffset: number | null } =
+            await searchTweets({
+              ...filters,
+              query: term,
+              limit: Math.min(PAGE, share - tweets.length),
+              offset,
+            })
+          tweets.push(...page.tweets)
+          offset = page.tweets.length ? page.nextOffset : null
+        }
+        offsets.set(term, offset)
+        return tweets
+      }),
+    )
+    // Interleave so an overlap between terms does not favour the first one.
+    const longest = Math.max(0, ...results.map((tweets) => tweets.length))
+    for (let i = 0; i < longest; i++) {
+      for (const tweets of results) {
+        const tweet = tweets[i]
+        if (!tweet || collected.has(tweet.id)) continue
+        if (collected.size < max) collected.set(tweet.id, tweet)
+        else dropped = true
+      }
+    }
+  }
+  return { collected, capped: dropped || open().length > 0 }
+}
+
 export interface CollectAndScoreInput {
   terms: string[]
   criterion: string
@@ -168,26 +222,11 @@ export async function collectAndScoreImpl(raw: CollectAndScoreInput) {
     Math.max(input.maxTweets ?? DEFAULT_COLLECT, 1),
     MAX_COLLECT,
   )
-  const collected = new Map<string, AgentTweet>()
-  for (const term of terms) {
-    let offset: number | null = 0
-    while (offset !== null && collected.size < max) {
-      const page: { tweets: AgentTweet[]; nextOffset: number | null } =
-        await searchTweets({
-          query: term,
-          since: input.since,
-          until: input.until,
-          fromUser: input.fromUser,
-          limit: PAGE,
-          offset,
-        })
-      for (const tweet of page.tweets) {
-        if (collected.size >= max) break
-        collected.set(tweet.id, tweet)
-      }
-      offset = page.nextOffset
-    }
-  }
+  const { collected, capped } = await collectAcrossTerms(terms, max, {
+    since: input.since,
+    until: input.until,
+    fromUser: input.fromUser,
+  })
   const { scored, scorer, costUsd } = await scoreWithParents(
     input.criterion,
     Array.from(collected.values()),
@@ -203,7 +242,7 @@ export async function collectAndScoreImpl(raw: CollectAndScoreInput) {
     fromUser: input.fromUser ?? null,
     collected: collected.size,
     limit: max,
-    capped: collected.size >= max,
+    capped,
     scored: scored.length,
     keptCount: kept.length,
     kept: kept.slice(0, MAX_KEPT_RETURNED),

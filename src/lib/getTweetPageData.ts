@@ -1,7 +1,14 @@
 import { createServerClient } from '@/utils/supabase'
 import { cookies } from 'next/headers'
-import { ConversationTree, ThreadTweet, buildConversationTree } from './threadUtils'
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/database-types'
+import {
+  ConversationTree,
+  ThreadTweet,
+  buildConversationTree,
+} from './threadUtils'
 import { TweetData } from '@/components/TweetComponent'
+import { resolvePortalReadConfig } from './portal/data'
 import {
   fetchSyndicatedTweets,
   type SyndicatedTweet,
@@ -73,12 +80,34 @@ interface TweetPageResult {
 }
 
 /**
+ * Portal rows may intentionally come from production while the preview app's
+ * auth and writes stay on staging. In that case the permalink must read from
+ * the same public-data source as the row that linked to it.
+ */
+export function createTweetPageDataClient(
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  const hasPortalReadOverride = Boolean(
+    env.PORTAL_READ_SUPABASE_URL || env.PORTAL_READ_SUPABASE_ANON_KEY,
+  )
+  if (!hasPortalReadOverride) {
+    return createServerClient(cookieStore)
+  }
+
+  const { url, anonKey } = resolvePortalReadConfig(env)
+  return createClient<Database>(url, anonKey, {
+    auth: { persistSession: false },
+  })
+}
+
+/**
  * Fetch all data needed for the tweet page in a single RPC call.
  * Replaces ~24 separate Supabase HTTP calls with 1.
  */
 export async function getTweetPageData(tweetId: string): Promise<TweetPageResult> {
   const cookieStore = await cookies()
-  const supabase = createServerClient(cookieStore)
+  const supabase = createTweetPageDataClient(cookieStore)
 
   const { data, error } = await supabase.rpc('get_tweet_page_data' as any, {
     p_tweet_id: tweetId,

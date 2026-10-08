@@ -1,7 +1,12 @@
+jest.mock('server-only', () => ({}), { virtual: true })
+jest.mock('next/cache', () => ({
+  unstable_cache: (callback: unknown) => callback,
+}))
+
 import { getStats } from './stats'
 
 describe('getStats', () => {
-  it('uses the canonical ClickHouse summary when reads are enabled', async () => {
+  it('uses ClickHouse corpus totals with the canonical Supabase member count', async () => {
     const fetchImpl = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -25,9 +30,10 @@ describe('getStats', () => {
         fetchImpl: fetchImpl as any,
         clickHouseBaseUrl: 'https://stream.example/analytics',
         clickHouseToken: 'secret',
+        fetchMemberCount: jest.fn().mockResolvedValue(633),
       }),
     ).resolves.toEqual({
-      userCount: 500,
+      userCount: 633,
       tweetCount: 14_345_564,
       userMentionsCount: 4_200_000,
     })
@@ -50,20 +56,16 @@ describe('getStats', () => {
       error: null,
     })
     const summarySelect = jest.fn().mockReturnValue({ single: summarySingle })
-    const memberSelect = jest
-      .fn()
-      .mockResolvedValue({ count: 500, error: null })
-    const from = jest.fn((table: string) =>
-      table === 'global_activity_summary'
-        ? { select: summarySelect }
-        : { select: memberSelect },
-    )
+    const from = jest.fn(() => ({ select: summarySelect }))
     const supabase = {
       schema: jest.fn().mockReturnValue({ from }),
     }
 
     await expect(
-      getStats(supabase as any, { clickHouseEnabled: false }),
+      getStats(supabase as any, {
+        clickHouseEnabled: false,
+        fetchMemberCount: jest.fn().mockResolvedValue(500),
+      }),
     ).resolves.toEqual({
       userCount: 500,
       tweetCount: 13_600_000,
@@ -72,9 +74,6 @@ describe('getStats', () => {
     expect(summarySelect).toHaveBeenCalledWith(
       'total_tweets, total_user_mentions',
     )
-    expect(memberSelect).toHaveBeenCalledWith('directory_id', {
-      count: 'exact',
-      head: true,
-    })
+    expect(from).toHaveBeenCalledTimes(1)
   })
 })

@@ -5,10 +5,10 @@ import {
   fetchAnalyticsGatewayJson,
   isClickHouseReadsEnabled,
 } from './clickhouseGateway'
+import { fetchPortalMemberCount } from './portal/data'
 
 interface ClickHouseSummaryResponse {
   data: {
-    memberAccounts: string | number
     totalTweets: string | number
     totalUserMentions: string | number
   }
@@ -19,6 +19,7 @@ interface GetStatsOptions {
   fetchImpl?: typeof fetch
   clickHouseBaseUrl?: string
   clickHouseToken?: string
+  fetchMemberCount?: () => Promise<number>
 }
 
 function safeCount(value: string | number, field: string): number {
@@ -35,11 +36,14 @@ export const getStats = async (
 ) => {
   const clickHouseEnabled =
     options.clickHouseEnabled ?? isClickHouseReadsEnabled()
+  const memberCountPromise = (
+    options.fetchMemberCount ?? fetchPortalMemberCount
+  )()
 
   if (clickHouseEnabled) {
     try {
-      const summary =
-        await fetchAnalyticsGatewayJson<ClickHouseSummaryResponse>(
+      const [summary, userCount] = await Promise.all([
+        fetchAnalyticsGatewayJson<ClickHouseSummaryResponse>(
           ['summary'],
           new URLSearchParams(),
           {
@@ -48,9 +52,11 @@ export const getStats = async (
             baseUrl: options.clickHouseBaseUrl,
             token: options.clickHouseToken,
           },
-        )
+        ),
+        memberCountPromise,
+      ])
       return {
-        userCount: safeCount(summary.data.memberAccounts, 'member count'),
+        userCount,
         tweetCount: safeCount(summary.data.totalTweets, 'tweet count'),
         userMentionsCount: safeCount(
           summary.data.totalUserMentions,
@@ -66,14 +72,12 @@ export const getStats = async (
   }
 
   const publicSchema = supabase.schema('public')
-  const [summaryResult, memberResult] = await Promise.all([
+  const [summaryResult, userCount] = await Promise.all([
     publicSchema
       .from('global_activity_summary')
       .select('total_tweets, total_user_mentions')
       .single(),
-    publicSchema
-      .from('user_directory')
-      .select('directory_id', { count: 'exact', head: true }),
+    memberCountPromise,
   ])
 
   if (summaryResult.error) {
@@ -84,16 +88,8 @@ export const getStats = async (
     throw summaryResult.error
   }
 
-  if (memberResult.error) {
-    console.error(
-      'Error fetching participating user count:',
-      memberResult.error,
-    )
-    throw memberResult.error
-  }
-
   return {
-    userCount: memberResult.count,
+    userCount,
     tweetCount: summaryResult.data.total_tweets,
     userMentionsCount: summaryResult.data.total_user_mentions,
   }

@@ -35,6 +35,22 @@ answer whose claims cite tweets inline. The page renders the cited tweets with
 5. The last step stores the run (`runStore.ts`): question, answer, cited and
    invalid ids, tool calls, tokens and estimated cost.
 
+## History
+
+A question and its follow-ups form a conversation, keyed by the page's chat id
+(`?c=<id>` in the URL). Each run stores its `conversation_id` and the answer as
+UI message parts (`parts`), built in `history.ts` with every tweet reduced to
+its id. Workflow keeps a run's own data only 7 days after it ends on Vercel Pro
+(1 day on Hobby), so history never replays the event log.
+
+- `GET /api/agent-search/conversations` lists the viewer's recent conversations.
+- `GET /api/agent-search/conversations/{id}` rebuilds one: it fetches the
+  referenced tweets again through the gateway (`historyTweets.ts`), so a post
+  whose author opted out since drops out of old answers. People lookups keep
+  only handles, not bios. A run still answering is reconnected through its
+  stream.
+- The start route refuses a conversation id that belongs to someone else.
+
 Models cross Workflow step boundaries as `EnvLanguageModel`, which serializes
 only its `provider:model` spec. Provider models would otherwise serialize their
 resolved headers, including the API key, into the event log.

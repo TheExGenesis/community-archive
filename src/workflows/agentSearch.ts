@@ -10,6 +10,7 @@ import {
   collectToolTweetIds,
   validateCitations,
 } from '@/lib/agentSearch/citations'
+import { buildRunParts } from '@/lib/agentSearch/history'
 import { agentSearchModel, estimateModelCostUsd } from '@/lib/agentSearch/model'
 import { getAgentSearchRunStore } from '@/lib/agentSearch/runStore'
 import {
@@ -67,6 +68,8 @@ async function getTweetsStep(input: { tweetIds: string[] }) {
 interface RunSummary {
   runId: string
   accountId: string
+  conversationId: string | null
+  parts: unknown[]
   question: string
   modelSpec: string
   text: string
@@ -104,6 +107,7 @@ async function recordRunStep(summary: RunSummary) {
     await store.create({
       id: summary.runId,
       accountId: summary.accountId,
+      conversationId: summary.conversationId,
       question: summary.question,
       status: 'running',
       model: summary.modelSpec,
@@ -123,6 +127,7 @@ async function recordRunStep(summary: RunSummary) {
     status: summary.error ? 'failed' : 'completed',
     completedAt: new Date().toISOString(),
     answer: summary.text || null,
+    parts: summary.parts,
     citedTweetIds: cited,
     invalidCitationIds: invalid,
     toolCalls: summary.toolCalls,
@@ -144,6 +149,7 @@ function outputCount(output: unknown): number | undefined {
 
 export interface AgentSearchWorkflowInput {
   accountId: string
+  conversationId: string | null
   question: string
   messages: UIMessage[]
   modelSpec: string
@@ -177,6 +183,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   let cachedInputTokens = 0
   let outputTokens = 0
   let classifierCostUsd = 0
+  let parts: unknown[] = []
   try {
     const result = await agent.stream({
       messages: await convertToModelMessages(input.messages),
@@ -205,6 +212,7 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
       }
       if (step.text) text = step.text
     }
+    parts = buildRunParts(result.steps, text)
   } catch (caught) {
     error = caught instanceof Error ? caught.message : String(caught)
   }
@@ -212,6 +220,8 @@ export async function agentSearchWorkflow(input: AgentSearchWorkflowInput) {
   await recordRunStep({
     runId,
     accountId: input.accountId,
+    conversationId: input.conversationId,
+    parts,
     question: input.question,
     modelSpec: input.modelSpec,
     text,

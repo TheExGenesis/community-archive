@@ -3,10 +3,12 @@
 import { useChat } from '@ai-sdk/react'
 import { WorkflowChatTransport } from '@ai-sdk/workflow/client'
 import type { UIMessage } from 'ai'
-import { ArrowUp, MessageSquareText, Square } from 'lucide-react'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { ArrowUp, MessageSquareText, Plus, Square } from 'lucide-react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { FormEvent, KeyboardEvent } from 'react'
+import type { ConversationSummary } from '@/lib/agentSearch/history'
 import { AgentSearchTurn } from './AgentSearchTurn'
+import { RecentConversations } from './RecentConversations'
 import { buildTurnView, describeChatError, messageText } from './messageView'
 
 export const EXAMPLE_QUESTIONS = [
@@ -18,20 +20,65 @@ export const EXAMPLE_QUESTIONS = [
 
 const MAX_QUESTION_LENGTH = 1000
 
-export default function AgentSearch() {
+const newConversationId = () => crypto.randomUUID()
+
+/** Points the address bar at a conversation (or none) without a navigation. */
+function showConversationInUrl(id: string | null) {
+  const url = new URL(window.location.href)
+  if (id) url.searchParams.set('c', id)
+  else url.searchParams.delete('c')
+  window.history.replaceState(window.history.state, '', url)
+}
+
+interface Conversation {
+  /** Also the chat id the server stores runs under. */
+  id: string
+  /** Messages to load once the chat for this id exists. */
+  pending: UIMessage[] | null
+  /** A run of this conversation that is still answering. */
+  runningRunId: string | null
+}
+
+export default function AgentSearch({
+  initialConversationId = null,
+}: {
+  initialConversationId?: string | null
+}) {
+  const [conversation, setConversation] = useState<Conversation>(() => ({
+    id: initialConversationId ?? newConversationId(),
+    pending: null,
+    runningRunId: null,
+  }))
+  const [loading, setLoading] = useState(Boolean(initialConversationId))
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [recent, setRecent] = useState<ConversationSummary[] | null>(null)
+
   // The run id of the answer in progress, so Stop can cancel the workflow
-  // instead of only closing the stream.
+  // instead of only closing the stream, and a reopened conversation can
+  // reconnect to an answer that is still being written.
   const runIdRef = useRef<string | null>(null)
   const transport = useMemo(
     () =>
       new WorkflowChatTransport<UIMessage>({
         api: '/api/agent-search',
-        onChatSendMessage: (response) => {
+        // The transport sends only messages by default; the server files the
+        // run under the chat id, which is the conversation id.
+        prepareSendMessagesRequest: ({ id, messages, body }) => ({
+          body: { ...body, id, messages },
+        }),
+        onChatSendMessage: (response, { chatId }) => {
           runIdRef.current = response.headers.get('x-workflow-run-id')
+          // Only an accepted question makes the conversation worth linking to.
+          if (response.ok) showConversationInUrl(chatId)
         },
         onChatEnd: () => {
           runIdRef.current = null
         },
+        prepareReconnectToStreamRequest: ({ api }) => ({
+          api: runIdRef.current
+            ? `/api/agent-search/${encodeURIComponent(runIdRef.current)}/stream`
+            : api,
+        }),
       }),
     [],
   )
@@ -39,11 +86,83 @@ export default function AgentSearch() {
     messages,
     setMessages,
     sendMessage,
+    resumeStream,
     status,
     error,
     clearError,
     stop,
-  } = useChat({ transport })
+  } = useChat({ id: conversation.id, transport })
+
+  const loadRecent = useCallback(async () => {
+    try {
+      const response = await fetch('/api/agent-search/conversations', {
+        cache: 'no-store',
+      })
+      if (!response.ok) return
+      const body = (await response.json()) as {
+        conversations?: ConversationSummary[]
+      }
+      setRecent(body.conversations ?? [])
+    } catch {
+      // The list is a convenience; the page works without it.
+    }
+  }, [])
+
+  const openConversation = useCallback(async (id: string) => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const response = await fetch(
+        `/api/agent-search/conversations/${encodeURIComponent(id)}`,
+        { cache: 'no-store' },
+      )
+      if (!response.ok) throw new Error(String(response.status))
+      const body = (await response.json()) as {
+        messages: UIMessage[]
+        runningRunId: string | null
+      }
+      setConversation({
+        id,
+        pending: body.messages,
+        runningRunId: body.runningRunId,
+      })
+      showConversationInUrl(id)
+    } catch {
+      setLoadError('That conversation could not be opened.')
+      setConversation({
+        id: newConversationId(),
+        pending: [],
+        runningRunId: null,
+      })
+      showConversationInUrl(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // Messages load after the chat for the new id exists, so they land in it.
+  useEffect(() => {
+    if (!conversation.pending) return
+    setMessages(conversation.pending)
+    if (conversation.runningRunId) {
+      runIdRef.current = conversation.runningRunId
+      void resumeStream()
+    }
+    setConversation((current) =>
+      current.id === conversation.id
+        ? { ...current, pending: null, runningRunId: null }
+        : current,
+    )
+  }, [conversation, setMessages, resumeStream])
+
+  useEffect(() => {
+    if (initialConversationId) void openConversation(initialConversationId)
+  }, [initialConversationId, openConversation])
+
+  // Refresh the list on arrival and whenever an answer finishes.
+  useEffect(() => {
+    if (status === 'ready') void loadRecent()
+  }, [status, loadRecent])
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const inputId = useId()
@@ -76,10 +195,24 @@ export default function AgentSearch() {
 
   const ask = (question: string) => {
     const text = question.trim().slice(0, MAX_QUESTION_LENGTH)
-    if (!text || busy) return
+    if (!text || busy || loading) return
     if (error) clearError()
+    setLoadError(null)
     setInput('')
     void sendMessage({ text })
+  }
+
+  const startNewConversation = () => {
+    if (busy) return
+    if (error) clearError()
+    setLoadError(null)
+    setConversation({
+      id: newConversationId(),
+      pending: [],
+      runningRunId: null,
+    })
+    showConversationInUrl(null)
+    textareaRef.current?.focus()
   }
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -168,13 +301,26 @@ export default function AgentSearch() {
             <MessageSquareText aria-hidden="true" className="h-3.5 w-3.5" />
             Members
           </div>
-          <h1
-            className={`font-bold tracking-tight text-foreground ${
-              hasThread ? 'text-2xl sm:text-3xl' : 'text-4xl sm:text-5xl'
-            }`}
-          >
-            Ask the archive
-          </h1>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1
+              className={`font-bold tracking-tight text-foreground ${
+                hasThread ? 'text-2xl sm:text-3xl' : 'text-4xl sm:text-5xl'
+              }`}
+            >
+              Ask the archive
+            </h1>
+            {hasThread && (
+              <button
+                type="button"
+                onClick={startNewConversation}
+                disabled={busy}
+                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Plus aria-hidden="true" className="h-4 w-4" />
+                New question
+              </button>
+            )}
+          </div>
           {!hasThread && (
             <p className="mt-3 text-base leading-7 text-muted-foreground sm:text-lg">
               An agent searches members’ tweets, follows threads and quotes, and
@@ -184,7 +330,22 @@ export default function AgentSearch() {
           )}
         </div>
 
-        {!hasThread && (
+        {loadError && (
+          <p
+            role="alert"
+            className="mb-6 rounded-md border border-destructive/40 px-3 py-2 text-sm text-foreground"
+          >
+            {loadError}
+          </p>
+        )}
+
+        {!hasThread && loading && (
+          <p aria-live="polite" className="text-sm text-muted-foreground">
+            Opening the conversation
+          </p>
+        )}
+
+        {!hasThread && !loading && (
           <>
             {form}
             <div className="mt-6">
@@ -206,6 +367,10 @@ export default function AgentSearch() {
                 ))}
               </ul>
             </div>
+            <RecentConversations
+              conversations={recent}
+              onOpen={(id) => void openConversation(id)}
+            />
           </>
         )}
 

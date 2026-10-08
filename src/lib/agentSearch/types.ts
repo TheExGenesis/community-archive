@@ -49,6 +49,14 @@ export type AgentSearchRunStatus = 'running' | 'completed' | 'failed'
 export interface AgentSearchRun {
   id: string
   accountId: string
+  /** Groups a question with its follow-ups; the page's chat id. */
+  conversationId?: string | null
+  /**
+   * The answer as UI message parts (tool calls and outputs, then the answer
+   * text) with every tweet reduced to a reference (see history.ts), so a past
+   * answer can be rebuilt after Workflow's own run data has expired.
+   */
+  parts?: unknown[] | null
   question: string
   status: AgentSearchRunStatus
   model: string

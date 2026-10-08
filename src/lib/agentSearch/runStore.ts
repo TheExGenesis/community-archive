@@ -25,6 +25,10 @@ export interface AgentSearchRunStore {
     now?: Date,
   ): Promise<boolean>
   costSince(sinceIso: string): Promise<number>
+  /** The member's runs, newest first, for the history list. */
+  listRecent(accountId: string, limit: number): Promise<AgentSearchRun[]>
+  /** One conversation's runs, oldest first, for any account. */
+  listConversation(conversationId: string): Promise<AgentSearchRun[]>
 }
 
 type RunRow = Database['public']['Tables']['agent_search_runs']['Row']
@@ -148,6 +152,17 @@ export function createFileRunStore(
         .filter((run) => Date.parse(run.startedAt) >= since)
         .reduce((sum, run) => sum + (Number(run.costUsd) || 0), 0)
     },
+    async listRecent(accountId, limit) {
+      return (await readAll())
+        .filter((run) => run.accountId === accountId)
+        .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+        .slice(0, limit)
+    },
+    async listConversation(conversationId) {
+      return (await readAll())
+        .filter((run) => run.conversationId === conversationId)
+        .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+    },
   }
 }
 
@@ -155,6 +170,7 @@ function toRow(run: AgentSearchRun): RunInsert {
   return {
     id: run.id,
     account_id: run.accountId,
+    conversation_id: run.conversationId ?? null,
     question: run.question,
     status: run.status,
     model: run.model,
@@ -168,6 +184,7 @@ function toRow(run: AgentSearchRun): RunInsert {
     output_tokens: run.outputTokens,
     cost_usd: run.costUsd,
     error: run.error,
+    parts: (run.parts ?? null) as Json,
   }
 }
 
@@ -189,6 +206,9 @@ function toRowPatch(patch: Partial<AgentSearchRun>): RunUpdate {
   if (patch.outputTokens !== undefined) row.output_tokens = patch.outputTokens
   if (patch.costUsd !== undefined) row.cost_usd = patch.costUsd
   if (patch.error !== undefined) row.error = patch.error
+  if (patch.conversationId !== undefined)
+    row.conversation_id = patch.conversationId
+  if (patch.parts !== undefined) row.parts = patch.parts as Json
   return row
 }
 
@@ -196,6 +216,8 @@ function fromRow(row: RunRow): AgentSearchRun {
   return {
     id: row.id,
     accountId: row.account_id,
+    conversationId: row.conversation_id,
+    parts: Array.isArray(row.parts) ? (row.parts as unknown[]) : null,
     question: row.question,
     status: row.status as AgentSearchRun['status'],
     model: row.model,
@@ -216,6 +238,7 @@ function fromRow(row: RunRow): AgentSearchRun {
 }
 
 const COST_PAGE_SIZE = 1000
+const MAX_CONVERSATION_RUNS = 50
 
 /** Production store on public.agent_search_runs, service role only. */
 export function createSupabaseRunStore(
@@ -283,6 +306,43 @@ export function createSupabaseRunStore(
         for (const row of rows) total += Number(row.cost_usd) || 0
         if (rows.length < COST_PAGE_SIZE) return total
       }
+    },
+    async listRecent(accountId, limit) {
+      // The list needs no answer bodies or message parts.
+      const { data, error } = await table()
+        .select(
+          'id, account_id, conversation_id, question, status, model, started_at, completed_at, error',
+        )
+        .eq('account_id', accountId)
+        .order('started_at', { ascending: false })
+        .limit(limit)
+      if (error)
+        throw new Error(`Agent search history read failed: ${error.message}`)
+      return (data ?? []).map((row) =>
+        fromRow({
+          ...row,
+          answer: null,
+          cited_tweet_ids: [],
+          invalid_citation_ids: [],
+          tool_calls: [],
+          input_tokens: 0,
+          output_tokens: 0,
+          cost_usd: 0,
+          parts: null,
+        }),
+      )
+    },
+    async listConversation(conversationId) {
+      const { data, error } = await table()
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('started_at', { ascending: true })
+        .limit(MAX_CONVERSATION_RUNS)
+      if (error)
+        throw new Error(
+          `Agent search conversation read failed: ${error.message}`,
+        )
+      return (data ?? []).map(fromRow)
     },
   }
 }

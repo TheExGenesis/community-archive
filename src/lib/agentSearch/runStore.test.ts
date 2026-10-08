@@ -128,6 +128,37 @@ describe('file run store', () => {
     expect(await store.hasRunning('7', 600_000, now)).toBe(true)
   })
 
+  test('lists a member’s recent runs and one conversation’s runs', async () => {
+    const store = createFileRunStore(dir)
+    await store.create(
+      baseRun({
+        id: 'a1',
+        conversationId: 'conv-aaaa',
+        startedAt: '2026-10-08T10:00:00.000Z',
+      }),
+    )
+    await store.create(
+      baseRun({
+        id: 'a2',
+        conversationId: 'conv-aaaa',
+        startedAt: '2026-10-08T11:00:00.000Z',
+      }),
+    )
+    await store.create(
+      baseRun({ id: 'b1', accountId: '7', conversationId: 'conv-bbbb' }),
+    )
+    expect((await store.listRecent('42', 10)).map((run) => run.id)).toEqual([
+      'a2',
+      'a1',
+    ])
+    expect((await store.listRecent('42', 1)).map((run) => run.id)).toEqual([
+      'a2',
+    ])
+    expect(
+      (await store.listConversation('conv-aaaa')).map((run) => run.id),
+    ).toEqual(['a1', 'a2'])
+  })
+
   test('reads an empty or missing directory as no runs', async () => {
     const store = createFileRunStore(path.join(dir, 'not-created'))
     expect(await store.countSince('42', '2026-10-08T00:00:00.000Z')).toBe(0)
@@ -169,6 +200,7 @@ describe('supabase run store', () => {
     expect(insert).toHaveBeenCalledWith({
       id: 'wrun_01',
       account_id: '42',
+      conversation_id: null,
       question: 'Who has criticized the community archive?',
       status: 'running',
       model: 'openai:gpt-6.1-sol',
@@ -182,6 +214,7 @@ describe('supabase run store', () => {
       output_tokens: 0,
       cost_usd: 0,
       error: null,
+      parts: null,
     })
     expect(await store.get('wrun_01')).toMatchObject({
       accountId: '42',

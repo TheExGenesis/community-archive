@@ -48,7 +48,11 @@ function Gate({
   )
 }
 
-export default async function AskTheArchivePage() {
+export default async function AskTheArchivePage({
+  searchParams,
+}: {
+  searchParams?: { c?: string | string[] }
+}) {
   const access = await getAgentSearchViewer()
 
   if (!access.ok && access.reason === 'signed_out') {
@@ -90,5 +94,12 @@ export default async function AskTheArchivePage() {
     )
   }
 
-  return <AgentSearch />
+  const requested = typeof searchParams?.c === 'string' ? searchParams.c : null
+  return (
+    <AgentSearch
+      initialConversationId={
+        requested && /^[A-Za-z0-9_-]{8,100}$/.test(requested) ? requested : null
+      }
+    />
+  )
 }

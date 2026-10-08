@@ -83,6 +83,7 @@ export type Database = {
           answer: string | null
           cited_tweet_ids: string[]
           completed_at: string | null
+          conversation_id: string | null
           cost_usd: number
           error: string | null
           id: string
@@ -90,6 +91,7 @@ export type Database = {
           invalid_citation_ids: string[]
           model: string
           output_tokens: number
+          parts: Json | null
           question: string
           started_at: string
           status: string
@@ -100,6 +102,7 @@ export type Database = {
           answer?: string | null
           cited_tweet_ids?: string[]
           completed_at?: string | null
+          conversation_id?: string | null
           cost_usd?: number
           error?: string | null
           id: string
@@ -107,6 +110,7 @@ export type Database = {
           invalid_citation_ids?: string[]
           model: string
           output_tokens?: number
+          parts?: Json | null
           question: string
           started_at?: string
           status: string
@@ -117,6 +121,7 @@ export type Database = {
           answer?: string | null
           cited_tweet_ids?: string[]
           completed_at?: string | null
+          conversation_id?: string | null
           cost_usd?: number
           error?: string | null
           id?: string
@@ -124,6 +129,7 @@ export type Database = {
           invalid_citation_ids?: string[]
           model?: string
           output_tokens?: number
+          parts?: Json | null
           question?: string
           started_at?: string
           status?: string

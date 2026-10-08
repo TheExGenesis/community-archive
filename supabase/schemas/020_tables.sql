@@ -568,6 +568,7 @@ ALTER TABLE "public"."tweet_page_summaries" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."agent_search_runs" (
     "id" text PRIMARY KEY,
     "account_id" text NOT NULL,
+    "conversation_id" text CHECK (length("conversation_id") <= 100),
     "question" text NOT NULL CHECK (length("question") <= 1000),
     "status" text NOT NULL CHECK ("status" IN ('running', 'completed', 'failed')),
     "model" text NOT NULL,
@@ -580,7 +581,10 @@ CREATE TABLE IF NOT EXISTS "public"."agent_search_runs" (
     "input_tokens" integer NOT NULL DEFAULT 0,
     "output_tokens" integer NOT NULL DEFAULT 0,
     "cost_usd" numeric NOT NULL DEFAULT 0,
-    "error" text
+    "error" text,
+    -- The answer's message parts with tweets reduced to ids; tweets are
+    -- fetched again through the gateway when a past answer is opened.
+    "parts" jsonb
 );
 ALTER TABLE "public"."agent_search_runs" OWNER TO "postgres";
 

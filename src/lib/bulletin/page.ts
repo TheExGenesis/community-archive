@@ -3,6 +3,7 @@ import { measureServerRead } from '@/lib/performance/server'
 import {
   hydrateBulletinNotices,
   loadBulletinBoardState,
+  loadBulletinDismissals,
   loadBulletinRelationships,
   loadBulletinViewer,
   verifyBulletinResolutions,
@@ -53,8 +54,12 @@ export async function loadBulletinPage(
 ): Promise<BulletinPage> {
   const now = Date.now()
   const search = filters.search.trim().toLowerCase()
-  const [state, personal] = await Promise.all([
+  const [state, hidden, personal] = await Promise.all([
     measureServerRead('bulletin.state', () => loadBulletinBoardState(false)),
+    // A failed read shows hidden notices again rather than blanking the board.
+    measureServerRead('bulletin.dismissals', loadBulletinDismissals).catch(
+      () => [] as string[],
+    ),
     personalize && filters.recommended && !filters.sortBy
       ? measureServerRead('bulletin.recommendations', loadBulletinRelationships)
       : loadBulletinViewer(),
@@ -63,8 +68,10 @@ export async function loadBulletinPage(
   const chosenKinds = parseKinds(filters.kind) ?? []
   const inKinds = (o: { kind: string }) =>
     !chosenKinds.length || chosenKinds.includes(o.kind)
+  const dismissed = new Set(hidden)
   const known = state.notices.filter(
     (o) =>
+      !dismissed.has(o.tweet_id) &&
       o.kind in KIND_LABELS &&
       matchesJevFilters(o, filters) &&
       isRecommendedCandidate(o, filters.recommended, me),
@@ -187,6 +194,7 @@ export async function loadBulletinPage(
         position < rows.length ? rows[position - 1].tweet_id : null,
     },
     total: state.notices.length,
+    dismissed: hidden.length,
     now,
     personal,
     recommendationsReady:

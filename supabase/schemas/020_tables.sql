@@ -870,6 +870,16 @@ CREATE INDEX bulletin_refresh_pending_idx ON bulletin.decisions(refresh_request_
 CREATE INDEX bulletin_runs_refresh_idx ON bulletin.runs ((counts->>'refresh_request_id'))
   WHERE counts ? 'refresh_request_id';
 
+-- Notices a reader hid as not relevant. Private per-reader feedback, kept so
+-- recommendations can later learn from it. Undo deletes the row.
+CREATE TABLE bulletin.dismissals (
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  tweet_id text NOT NULL CHECK (tweet_id ~ '^[0-9]{1,20}$'),
+  account_id text CHECK (account_id ~ '^[0-9]{1,20}$'),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, tweet_id)
+);
+
 -- Jev is prepared beside the legacy processor. The single switch makes
 -- publication and rollback atomic without deleting legacy notices.
 CREATE TABLE bulletin.pipeline_state (

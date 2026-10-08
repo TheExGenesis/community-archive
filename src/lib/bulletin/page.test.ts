@@ -2,6 +2,7 @@ import { loadBulletinPage, BulletinCursorExpired } from './page'
 import {
   hydrateBulletinNotices,
   loadBulletinBoardState,
+  loadBulletinDismissals,
   loadBulletinRelationships,
   loadBulletinViewer,
   verifyBulletinResolutions,
@@ -11,6 +12,7 @@ import { BULLETIN_PAGE_SIZE, DEFAULT_BULLETIN_FILTERS } from './types'
 jest.mock('./data', () => ({
   hydrateBulletinNotices: jest.fn(),
   loadBulletinBoardState: jest.fn(),
+  loadBulletinDismissals: jest.fn(),
   loadBulletinRelationships: jest.fn(),
   loadBulletinViewer: jest.fn(),
   verifyBulletinResolutions: jest.fn(),
@@ -42,6 +44,7 @@ const ids = (from: number, to: number) =>
 beforeEach(() => {
   jest.clearAllMocks()
   jest.mocked(verifyBulletinResolutions).mockResolvedValue(undefined)
+  jest.mocked(loadBulletinDismissals).mockResolvedValue([])
   jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-09T00:00:00Z'))
   jest.mocked(loadBulletinBoardState).mockResolvedValue({
     notices: Array.from({ length: 40 }, (_, i) => notice(i + 1)),
@@ -364,4 +367,19 @@ test('freshness and personal relevance page every notice exactly once', async ()
   expect(new Set(all.map((o) => o.tweet_id)).size).toBe(40)
   expect(all).toHaveLength(40)
   expect(third.cursors.help).toBeNull()
+})
+test('leaves out notices the reader dismissed, and survives a failed read', async () => {
+  jest.mocked(loadBulletinBoardState).mockResolvedValue({
+    notices: [notice(1), notice(2), notice(3)],
+  })
+  jest.mocked(loadBulletinDismissals).mockResolvedValue(['2', '99'])
+  const page = await loadBulletinPage(filters)
+  expect(page.notices.map((o) => o.tweet_id)).toEqual(['3', '1'])
+  expect(page.counts.help).toBe(2)
+  expect(page.dismissed).toBe(2)
+
+  jest.mocked(loadBulletinDismissals).mockRejectedValue(new Error('down'))
+  const fallback = await loadBulletinPage(filters)
+  expect(fallback.notices).toHaveLength(3)
+  expect(fallback.dismissed).toBe(0)
 })

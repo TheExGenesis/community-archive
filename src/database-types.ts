@@ -2198,6 +2198,12 @@ export type Database = {
         }
         Returns: Json
       }
+      get_bulletin_dismissals: {
+        Args: {
+          viewer_id: string
+        }
+        Returns: string[]
+      }
       get_bulletin_opportunities: {
         Args: {
           max_results?: number
@@ -2762,6 +2768,15 @@ export type Database = {
           account_display_name: string
           num_followers: number
         }[]
+      }
+      set_bulletin_dismissal: {
+        Args: {
+          viewer_id: string
+          viewer_account_id: string
+          notice_tweet_id: string
+          dismissed: boolean
+        }
+        Returns: undefined
       }
       set_limit: {
         Args: {

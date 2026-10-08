@@ -211,6 +211,13 @@ REVOKE ALL ON FUNCTION public.request_bulletin_refresh(uuid,text,bigint,numeric,
 REVOKE ALL ON FUNCTION public.get_bulletin_refreshes() FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.request_bulletin_refresh(uuid,text,bigint,numeric,uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.get_bulletin_refreshes() TO service_role;
+ALTER TABLE bulletin.dismissals ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON bulletin.dismissals FROM PUBLIC,anon,authenticated,service_role;
+GRANT SELECT,INSERT,DELETE ON bulletin.dismissals TO service_role;
+REVOKE ALL ON FUNCTION public.get_bulletin_dismissals(uuid) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.set_bulletin_dismissal(uuid,text,text,boolean) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_bulletin_dismissals(uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.set_bulletin_dismissal(uuid,text,text,boolean) TO service_role;
 
 ALTER TABLE bulletin.pipeline_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bulletin.jev_items ENABLE ROW LEVEL SECURITY;

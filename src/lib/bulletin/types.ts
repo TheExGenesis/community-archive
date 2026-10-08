@@ -177,6 +177,8 @@ export type BulletinPage = {
   counts: Record<string, number>
   cursors: Record<string, string | null>
   total: number
+  /** How many notices this reader has hidden; they are never sent. */
+  dismissed?: number
   now: number
   /** False only for the immediate, unpersonalized first paint. */
   recommendationsReady?: boolean

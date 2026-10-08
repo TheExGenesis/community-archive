@@ -8,6 +8,7 @@ import {
   PiArrowSquareOut,
   PiBriefcase,
   PiCalendarBlank,
+  PiCaretUp,
   PiChatCircle,
   PiChatsCircle,
   PiCheck,
@@ -22,6 +23,7 @@ import {
 import type { IconType } from 'react-icons'
 import { useTweetBatch } from './useTweetBatch'
 import { useBoardPages } from './useBoardPages'
+import { useDismissed } from './useDismissed'
 import { TweetAvatar } from '@/components/TweetAvatar'
 import type { PortalTweet } from '@/lib/portal/types'
 import type { BulletinTweet } from '@/lib/bulletin/tweets'
@@ -64,6 +66,8 @@ const ExpandedTweetCard = lazy(() =>
 
 const EMPTY_GRAPH: BulletinRelationships = { outgoing: {}, available: false }
 const STACKS = 3
+/** How long the undo offer stays up after a notice is hidden. */
+const UNDO_MS = 8000
 /** Deal cards round-robin into column stacks so an open card only pushes its own column. */
 export function dealStacks<T>(items: T[], stacks = STACKS): T[][] {
   const out: T[][] = Array.from({ length: stacks }, () => [])
@@ -186,6 +190,7 @@ function NoticeCard({
   now,
   order,
   onKind,
+  onDismiss,
   open,
   setOpen,
 }: {
@@ -199,6 +204,7 @@ function NoticeCard({
   /** Rank position; restores reading order when stacks collapse into a grid. */
   order: number
   onKind: (kind: string) => void
+  onDismiss: () => void
 }) {
   const [tweet, setTweet] = useState<BulletinTweet | null>(null)
   const [error, setError] = useState(false)
@@ -291,6 +297,15 @@ function NoticeCard({
           New
         </span>
       )}
+      <button
+        type="button"
+        className={styles.dismiss}
+        aria-label={`Not relevant: hide notice by @${notice.username}`}
+        title="Not relevant. Hide and don't show again"
+        onClick={onDismiss}
+      >
+        <PiX size={13} aria-hidden />
+      </button>
       {open ? (
         <>
           <div
@@ -305,7 +320,7 @@ function NoticeCard({
               aria-controls={`original-${notice.tweet_id}`}
               onClick={() => setOpen(false)}
             >
-              <PiX size={12} aria-hidden /> collapse
+              <PiCaretUp size={12} aria-hidden /> collapse
             </button>
           </div>
           <div id={`original-${notice.tweet_id}`} className={styles.expanded}>
@@ -485,6 +500,24 @@ export function BulletinBoard({
   adminControls?: React.ReactNode
 }) {
   const loadTweet = useTweetBatch()
+  const {
+    dismissed,
+    count: hiddenCount,
+    error: dismissError,
+    clearError,
+    dismiss,
+    restore,
+    restoreAll,
+  } = useDismissed(initialPage?.dismissed ?? 0)
+  const [undo, setUndo] = useState<Notice | null>(null)
+  useEffect(() => {
+    if (!undo && !dismissError) return
+    const timer = setTimeout(() => {
+      setUndo(null)
+      clearError()
+    }, UNDO_MS)
+    return () => clearTimeout(timer)
+  }, [undo, dismissError, clearError])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [limit, setLimit] = useState(BULLETIN_PAGE_SIZE)
   const [side, setSide] = useState('all')
@@ -587,7 +620,8 @@ export function BulletinBoard({
     hydrated,
   ])
   const needle = search.trim().toLowerCase()
-  const matches = (o: Notice) =>
+  const matches = (o: Notice) => !dismissed.has(o.tweet_id) && matchesFilters(o)
+  const matchesFilters = (o: Notice) =>
     visibleStatus(o, now, past, resolved) &&
     matchesJevFilters(o, jevFilters) &&
     [o.summary, o.preview_text, o.username, o.place, ...o.topics]
@@ -631,6 +665,7 @@ export function BulletinBoard({
       viewerId,
       graph,
       now,
+      dismissed,
     ],
   )
   useEffect(() => {
@@ -652,15 +687,18 @@ export function BulletinBoard({
   ])
   // Counts under the other dimension's filter: server-provided when paging
   // server-side, otherwise derived from the notices in hand.
+  const inLane = (o: Notice, key: string) =>
+    KINDS.includes(key)
+      ? o.kind === key && (side === 'all' || o.side === side)
+      : o.side === key && (!kinds.length || kinds.includes(o.kind))
   const count = (key: string) => {
-    if (initialPage) return pages.page?.counts[key] || 0
-    return loaded.filter(
-      (o) =>
-        matches(o) &&
-        (KINDS.includes(key)
-          ? o.kind === key && (side === 'all' || o.side === side)
-          : o.side === key && (!kinds.length || kinds.includes(o.kind))),
+    if (!initialPage)
+      return loaded.filter((o) => matches(o) && inLane(o, key)).length
+    // Server counts cannot know what this browser hid; take those back out.
+    const hidden = loaded.filter(
+      (o) => dismissed.has(o.tweet_id) && matchesFilters(o) && inLane(o, key),
     ).length
+    return Math.max(0, (pages.page?.counts[key] || 0) - hidden)
   }
   const matching = initialPage
     ? KINDS.filter((id) => !kinds.length || kinds.includes(id)).reduce(
@@ -906,6 +944,20 @@ export function BulletinBoard({
             />
             Show resolved
           </label>
+          {hiddenCount > 0 && (
+            <button
+              type="button"
+              className={styles.hintButton}
+              title="Show every notice you hid as not relevant"
+              onClick={async () => {
+                setUndo(null)
+                // Earlier dismissals were never sent to this page; reload them.
+                if (await restoreAll()) window.location.reload()
+              }}
+            >
+              {hiddenCount} hidden · Restore
+            </button>
+          )}
           <div className={styles.sortLinks} role="group" aria-label="Sort">
             <button
               type="button"
@@ -1010,6 +1062,11 @@ export function BulletinBoard({
                       value.length === 1 && value[0] === id ? [] : [id],
                     )
                   }
+                  onDismiss={() => {
+                    dismiss(o.tweet_id)
+                    setExpanded((value) => ({ ...value, [o.tweet_id]: false }))
+                    setUndo(o)
+                  }}
                 />
               ))}
             </div>
@@ -1047,6 +1104,26 @@ export function BulletinBoard({
           {pages.laneErrors[kind]}{' '}
           <button onClick={() => void pages.loadMore(kind)}>Retry</button>
         </p>
+      )}
+      {dismissError ? (
+        <div role="alert" className={styles.undoToast}>
+          <span>{dismissError}</span>
+        </div>
+      ) : (
+        undo && (
+          <div role="status" className={styles.undoToast}>
+            <span>Hidden. You won&apos;t see this notice again.</span>
+            <button
+              type="button"
+              onClick={() => {
+                restore(undo.tweet_id)
+                setUndo(null)
+              }}
+            >
+              Undo
+            </button>
+          </div>
+        )
       )}
       <footer className={styles.footer}>
         <p>

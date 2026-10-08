@@ -184,6 +184,38 @@ async function bulletinViewer() {
   return { me, username, preview }
 }
 
+/** Notices this reader hid as not relevant. The local admin preview has none. */
+export async function loadBulletinDismissals(): Promise<string[]> {
+  const user = await requireBulletinUser()
+  if (!user) return []
+  const { data, error } = await createServerServiceRoleClient().rpc(
+    'get_bulletin_dismissals',
+    { viewer_id: user.id },
+  )
+  if (error) throw new Error('Bulletin dismissals could not be loaded')
+  return data ?? []
+}
+/** Hide one notice, or restore one (or, with no id, all). False without a session. */
+export async function setBulletinDismissal(
+  tweetId: string | null,
+  dismissed: boolean,
+) {
+  const user = await requireBulletinUser()
+  if (!user) return false
+  const { me } = await bulletinViewer()
+  const { error } = await createServerServiceRoleClient().rpc(
+    'set_bulletin_dismissal',
+    {
+      viewer_id: user.id,
+      viewer_account_id: me,
+      notice_tweet_id: tweetId,
+      dismissed,
+    },
+  )
+  if (error) throw new Error('Bulletin dismissal could not be saved')
+  return true
+}
+
 /** Trusted identity only: no network lookup for recommendations. */
 export async function loadBulletinViewer() {
   const { me, username } = await bulletinViewer()

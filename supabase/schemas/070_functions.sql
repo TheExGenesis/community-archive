@@ -3828,6 +3828,31 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
     ORDER BY r.created_at DESC LIMIT 10
   ) item
 $$;
+CREATE FUNCTION public.get_bulletin_dismissals(viewer_id uuid)
+RETURNS text[] LANGUAGE sql STABLE SECURITY INVOKER SET search_path='' AS $$
+  SELECT coalesce(array_agg(d.tweet_id),'{}'::text[]) FROM (
+    SELECT tweet_id FROM bulletin.dismissals
+    WHERE user_id=viewer_id ORDER BY created_at DESC LIMIT 5000
+  ) d
+$$;
+
+-- A NULL notice with dismissed=false restores everything the reader hid.
+CREATE FUNCTION public.set_bulletin_dismissal(viewer_id uuid, viewer_account_id text, notice_tweet_id text, dismissed boolean)
+RETURNS void LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+BEGIN
+  IF viewer_id IS NULL OR dismissed IS NULL OR (dismissed AND notice_tweet_id IS NULL) THEN
+    RAISE EXCEPTION 'Invalid dismissal' USING ERRCODE='22023';
+  END IF;
+  IF dismissed THEN
+    INSERT INTO bulletin.dismissals(user_id,tweet_id,account_id)
+      VALUES(viewer_id,notice_tweet_id,nullif(viewer_account_id,''))
+      ON CONFLICT (user_id,tweet_id) DO NOTHING;
+  ELSE
+    DELETE FROM bulletin.dismissals
+      WHERE user_id=viewer_id AND (notice_tweet_id IS NULL OR tweet_id=notice_tweet_id);
+  END IF;
+END
+$$;
 -- Old deployments still insert likes by project_id during the database-first
 -- rollout. Fill the slug before the new NOT NULL and unique checks run.
 CREATE OR REPLACE FUNCTION public.fill_community_like_slug()

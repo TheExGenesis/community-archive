@@ -782,3 +782,88 @@ test('shows staged filter loading hints, resets for new filters, and clears on c
   ).not.toBeInTheDocument()
   expect(screen.getByText('Help with Python')).toBeInTheDocument()
 })
+
+const dismissAlice = () =>
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Not relevant: hide notice by @alice' }),
+  )
+const settle = () => act(async () => {})
+test('dismisses a notice as not relevant, with undo', async () => {
+  render(
+    <BulletinBoard
+      notices={[offer, ask]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  dismissAlice()
+  await settle()
+  expect(fetch).toHaveBeenLastCalledWith(
+    '/api/bulletin/dismissals',
+    expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ tweet_id: '1' }),
+    }),
+  )
+  expect(screen.queryByText('Help with Python')).toBeNull()
+  expect(screen.getByText('Feedback on a garden')).toBeTruthy()
+  expect(screen.getAllByRole('status')[0].textContent).toContain('1 notice')
+  expect(chip(/Help/).textContent).toContain('0')
+  expect(
+    screen.getByRole('button', { name: '1 hidden · Restore' }),
+  ).toBeTruthy()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+  await settle()
+  expect(fetch).toHaveBeenLastCalledWith(
+    '/api/bulletin/dismissals?tweet_id=1',
+    { method: 'DELETE' },
+  )
+  expect(screen.getByText('Help with Python')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
+  expect(screen.queryByRole('button', { name: /hidden · Restore/ })).toBeNull()
+
+  // The undo offer expires; the notice stays hidden.
+  dismissAlice()
+  await settle()
+  act(() => {
+    jest.advanceTimersByTime(8000)
+  })
+  expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
+  expect(screen.queryByText('Help with Python')).toBeNull()
+})
+test('puts a notice back when the dismissal cannot be saved', async () => {
+  jest.mocked(fetch).mockResolvedValue({ ok: false } as Response)
+  render(
+    <BulletinBoard
+      notices={[offer, ask]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  dismissAlice()
+  await settle()
+  expect(screen.getByText('Help with Python')).toBeTruthy()
+  expect(screen.getByRole('alert').textContent).toContain('Could not save')
+  expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
+})
+test('offers the dismiss X on an expanded notice too', async () => {
+  render(
+    <BulletinBoard
+      notices={[offer, ask]}
+      now={Date.parse('2026-09-09T00:00:00Z')}
+    />,
+  )
+  await act(async () => {
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Read full tweet by @alice' }),
+    )
+  })
+  expect(
+    screen.getByRole('button', { name: 'Collapse tweet by @alice' }),
+  ).toBeTruthy()
+  dismissAlice()
+  await settle()
+  expect(
+    screen.queryByRole('button', { name: 'Collapse tweet by @alice' }),
+  ).toBeNull()
+  expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy()
+})

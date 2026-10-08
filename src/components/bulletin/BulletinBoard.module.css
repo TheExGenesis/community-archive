@@ -608,6 +608,64 @@
   color: var(--ink);
   background: var(--surface-3);
 }
+/* Every card carries a dismiss X in the corner; "New" moves in beside it. */
+.dismiss {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--faint);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.dismiss:hover {
+  color: var(--ink);
+  background: var(--surface-3);
+}
+.notice .stickerRow {
+  padding-right: 26px;
+}
+.notice .newPill {
+  right: 42px;
+}
+.notice .hasNew {
+  padding-right: 74px;
+}
+.undoToast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 30;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 13px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+}
+.undoToast button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
 .summaryButton {
   border: 0;
   background: transparent;

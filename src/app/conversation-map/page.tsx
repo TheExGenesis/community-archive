@@ -3,7 +3,7 @@ import ConversationMap from '@/components/conversation-map/ConversationMap'
 export const metadata = {
   title: 'Conversation Map · Community Archive',
   description:
-    'Explore a year of community conversations. Zoom to reveal tweet snippets, images, and source posts.',
+    'The most important conversations on the Community Archive, at a glance. Zoom in for more granularity.',
 }
 export const dynamic = 'force-dynamic'
 

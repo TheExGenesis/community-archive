@@ -8,12 +8,14 @@ export interface MapAnnotation {
   rank: number
   score: number
   tweets: PortalTweet[]
+  strand?: 'ai'
 }
 
 export interface ConversationMapData {
   year: number
   years: number[]
   annotations: MapAnnotation[]
+  strand?: 'ai'
 }
 
 export const DAY = 86_400_000

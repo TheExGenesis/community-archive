@@ -5,6 +5,7 @@
   --map-border: hsl(var(--border));
   --map-selection: hsl(var(--secondary));
   --map-accent: hsl(var(--brand));
+  --map-ai: #8461d1;
   --map-snippet: hsl(var(--brand));
   --map-announcement: #b87738;
   --map-discussion: hsl(var(--brand));
@@ -275,4 +276,75 @@
   .plot {
     padding: 6px 8px 10px;
   }
+}
+
+.heading .intro {
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 640px;
+}
+.strands {
+  margin-bottom: 20px;
+}
+.strandControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+}
+.strandControls button {
+  padding: 8px 13px;
+  border: 1px solid var(--map-border);
+  border-radius: 20px;
+}
+.strandControls button span {
+  color: var(--map-ai);
+}
+.strandControls button[aria-pressed='true'] {
+  border-color: var(--map-ai);
+  background: color-mix(in srgb, var(--map-ai) 12%, transparent);
+}
+.strandControls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.strands p {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--map-muted);
+  max-width: 760px;
+  line-height: 1.6;
+}
+.strandTimeline {
+  margin-top: 28px;
+}
+.strandTimeline h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+.strandTimeline p {
+  font-size: 12px;
+  color: var(--map-muted);
+  margin: 6px 0 16px;
+}
+.strandTimeline ol {
+  border-left: 2px solid var(--map-ai);
+  padding-left: 20px;
+}
+.strandTimeline li {
+  margin: 14px 0;
+}
+.strandTimeline time {
+  display: block;
+  color: var(--map-muted);
+  font-size: 12px;
+}
+.strandTimeline a {
+  text-align: left;
+  font-size: 14px;
+}
+.strandTimeline a:hover {
+  text-decoration: underline;
 }

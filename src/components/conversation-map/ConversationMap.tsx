@@ -46,6 +46,8 @@ export default function ConversationMap({
   initialYear: number
 }) {
   const [year, setYear] = useState(initialYear)
+  const [strand, setStrand] = useState(false)
+  const [onlyStrand, setOnlyStrand] = useState(false)
   const [years, setYears] = useState(
     Array.from({ length: initialYear - 2008 + 1 }, (_, i) => 2008 + i),
   )
@@ -66,8 +68,12 @@ export default function ConversationMap({
   const days = yearDays(year),
     span = range[1] - range[0],
     wholeYear = span >= days - 0.01
-  const loading = data?.year !== year && !error
-  const ready = data?.year === year && !error
+  const current = data?.year === year && (data.strand === 'ai') === strand
+  const loading = !current && !error
+  const ready = current && !error
+  const matches = data?.annotations.filter((item) => item.strand === 'ai') ?? []
+  const visibleAnnotations =
+    strand && onlyStrand ? matches : (data?.annotations ?? [])
   const hideHover = useCallback(() => {
     clearTimeout(hoverTimer.current)
     hoverTimer.current = undefined
@@ -121,7 +127,7 @@ export default function ConversationMap({
     setError('')
     setData(null)
     hideHover()
-    fetch(`/api/conversation-map?year=${year}`, {
+    fetch(`/api/conversation-map?year=${year}${strand ? '&strand=ai' : ''}`, {
       signal: controller.signal,
       cache: 'no-store',
     })
@@ -140,7 +146,7 @@ export default function ConversationMap({
         if (!controller.signal.aborted) setError(reason.message)
       })
     return () => controller.abort()
-  }, [year, retry, hideHover])
+  }, [year, strand, retry, hideHover])
   useEffect(() => {
     if (!chart.current) return
     const observer = new ResizeObserver((entries) =>
@@ -158,11 +164,13 @@ export default function ConversationMap({
     geometry.current = drawMap(
       chart.current,
       overview.current,
-      data!.annotations,
+      strand && onlyStrand
+        ? data!.annotations.filter((item) => item.strand === 'ai')
+        : data!.annotations,
       year,
       range,
     )
-  }, [data, year, range, width, ready, hideHover])
+  }, [data, year, range, width, ready, strand, onlyStrand, hideHover])
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') hideHover()
@@ -234,7 +242,10 @@ export default function ConversationMap({
             ← Gallery
           </Link>
           <h1 id="conversation-map-title">Conversation map</h1>
-          <p>Community quotes over time · Zoom to reveal more conversations</p>
+          <p className={styles.intro}>
+            The most important conversations on the Community Archive, at a
+            glance. Zoom in for more granularity.
+          </p>
         </div>
         <label className={styles.yearPicker}>
           Explore a year
@@ -250,6 +261,35 @@ export default function ConversationMap({
             ))}
           </select>
         </label>
+      </div>
+      <div className={styles.strands}>
+        <div className={styles.strandControls}>
+          <span>Themed strands</span>
+          <button
+            aria-pressed={strand}
+            onClick={() => {
+              setStrand(!strand)
+              setOnlyStrand(false)
+            }}
+          >
+            <span aria-hidden="true">●</span> AI discourse
+          </button>
+          {strand && (
+            <label>
+              <input
+                type="checkbox"
+                checked={onlyStrand}
+                onChange={(e) => setOnlyStrand(e.target.checked)}
+              />{' '}
+              Strand only
+            </label>
+          )}
+        </div>
+        <p aria-live="polite">
+          {strand
+            ? `${ready ? `${matches.length} conversations highlighted. ` : ''}AI progress, safety, and culture. Keyword and semantic matches within this year’s top 200 quoted posts; not a complete history.`
+            : 'Explore a theme across the year. Height shows current community quote counts, a proxy for attention.'}
+        </p>
       </div>
       <div className={styles.toolbar}>
         <div className={styles.segmented} aria-label="Time window">
@@ -323,11 +363,14 @@ export default function ConversationMap({
         </label>
       </div>
       <div className={styles.plot} aria-busy={loading}>
-        {(loading || error || (ready && !data?.annotations.length)) && (
+        {(loading || error || (ready && !visibleAnnotations.length)) && (
           <div className={styles.message} role={error ? 'alert' : 'status'}>
             {loading
               ? 'Loading conversations…'
-              : error || 'No ranked conversations found for this year.'}
+              : error ||
+                (strand && onlyStrand
+                  ? 'No AI matches in this year’s sampled conversations. Try another year or turn off Strand only.'
+                  : 'No ranked conversations found for this year.')}
             {error && (
               <button onClick={() => setRetry((n) => n + 1)}>Retry</button>
             )}
@@ -474,6 +517,31 @@ export default function ConversationMap({
           volume
         </span>
       </div>
+      {strand && ready && matches.length > 0 && (
+        <div className={styles.strandTimeline}>
+          <h2>AI discourse · {year}</h2>
+          <p>
+            Read the highlighted conversations in date order. Open a source to
+            explore its context.
+          </p>
+          <ol>
+            {[...matches]
+              .sort((a, b) => a.day - b.day)
+              .map((annotation) => (
+                <li key={annotation.id}>
+                  <time dateTime={annotation.tweets[0].createdAt}>
+                    {dateFormat.format(
+                      new Date(Date.UTC(year, 0, 1) + annotation.day * DAY),
+                    )}
+                  </time>
+                  <Link href={`/tweets/${annotation.tweets[0].id}`}>
+                    {annotation.label}
+                  </Link>
+                </li>
+              ))}
+          </ol>
+        </div>
+      )}
       {hover && (
         <div
           ref={card}
